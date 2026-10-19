@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Button } from "../../../shared/components/Button";
@@ -37,6 +37,11 @@ import {
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { formatSessionCount } from "../components/session-format";
+
+const APP_LOCK_DESCRIPTION = Platform.select({
+  ios: "Ask for Face ID, Touch ID, or your passcode whenever you return to DubGrid.",
+  default: "Ask for your fingerprint, face, or screen lock whenever you return to DubGrid.",
+});
 
 const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
 
@@ -202,10 +207,7 @@ export default function ProfileSecurityScreen() {
                 <View style={styles.toggleRow}>
                   <View style={styles.toggleCopy}>
                     <Text style={styles.rowTitle}>Require unlock on this device</Text>
-                    <Text style={styles.rowDescription}>
-                      Ask for Face ID, fingerprint, or your device passcode whenever you return to
-                      DubGrid.
-                    </Text>
+                    <Text style={styles.rowDescription}>{APP_LOCK_DESCRIPTION}</Text>
                   </View>
                   <AppSwitch
                     accessibilityLabel="App lock"

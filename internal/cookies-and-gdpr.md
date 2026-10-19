@@ -539,7 +539,7 @@ The Expo app (`apps/mobile`) ships no analytics or tracking SDKs today and uses 
 
 ### App Tracking Transparency (ATT)
 
-`expo-tracking-transparency` is installed. `requestTrackingPermissionIfNeeded()` in `consent.ts` is **scaffolding only; not yet called**, because no SDK currently uses the IDFA. When a tracking SDK ships on mobile, call this function on iOS 14.5+ immediately before initializing that SDK, gated on `consent.analytics === true`.
+Not used. The app does no cross-app tracking, so it ships no ATT prompt, no `NSUserTrackingUsageDescription`, and blocks Android's `AD_ID` permission (`android.blockedPermissions` in `app.json`). Apple rejects a declared tracking purpose the app does not use. If an SDK that reads the IDFA or advertising ID is ever added, install `expo-tracking-transparency`, request authorization on iOS immediately before initializing that SDK (gated on `consent.analytics === true`), unblock `AD_ID`, and update the App Privacy and Data safety answers to match.
 
 ---
 

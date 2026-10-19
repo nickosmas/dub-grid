@@ -19,6 +19,9 @@ export function useHasSeenOnboarding() {
     queryKey: HAS_SEEN_ONBOARDING_QUERY_KEY,
     queryFn: loadHasSeenOnboarding,
     staleTime: Infinity,
+    // Device storage only: an offline flag must not pause it and hold the
+    // launch splash on it.
+    networkMode: "always",
   });
 }
 

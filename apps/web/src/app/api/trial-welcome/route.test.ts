@@ -7,6 +7,17 @@ const requireOrgPermissions = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const sendResendEmail = vi.fn();
 const serviceFrom = vi.fn();
+// Collects each after() task so a test can wait for the email work itself.
+const scheduled: Array<Promise<unknown>> = [];
+const after = vi.fn((task: () => unknown) => {
+  scheduled.push(Promise.resolve(task()));
+});
+const settled = () => Promise.all(scheduled.splice(0));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
@@ -198,7 +209,36 @@ describe("GET /api/trial-welcome", () => {
 
       const res = await GET(request());
       expect(res.status).toBe(200);
+      await settled();
       expect(sendResendEmail).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prevKey === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = prevKey;
+    }
+  });
+
+  it("answers without waiting for the trial-started email", async () => {
+    const prevKey = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "re_test";
+    try {
+      orgResult = {
+        data: {
+          name: "Acme",
+          subscription_status: "trialing",
+          trial_ends_at: "2026-06-05T00:00:00Z",
+          trial_welcome_email_sent_at: null,
+          trial_welcome_seen_at: null,
+        },
+        error: null,
+      };
+      sendResendEmail.mockReturnValueOnce(new Promise(() => {}));
+
+      const res = await GET(request());
+
+      expect(res.status).toBe(200);
+      expect(after).toHaveBeenCalledOnce();
+      await expect(res.json()).resolves.toMatchObject({ shouldShowWelcome: true });
+      scheduled.splice(0);
     } finally {
       if (prevKey === undefined) delete process.env.RESEND_API_KEY;
       else process.env.RESEND_API_KEY = prevKey;
@@ -249,6 +289,7 @@ describe("GET /api/trial-welcome", () => {
       });
 
       await Promise.all([GET(request()), GET(request())]);
+      await settled();
       expect(sendResendEmail).toHaveBeenCalledTimes(1);
     } finally {
       if (prevKey === undefined) delete process.env.RESEND_API_KEY;

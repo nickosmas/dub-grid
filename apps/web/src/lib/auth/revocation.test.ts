@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cacheMocks = vi.hoisted(() => ({
-  cacheSet: vi.fn(),
+  cacheSetOrThrow: vi.fn(),
+  cacheGetMany: vi.fn(),
 }));
 
 const serviceMocks = vi.hoisted(() => ({
@@ -18,7 +19,11 @@ const serviceMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/cache", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/cache")>();
-  return { ...actual, cacheSet: cacheMocks.cacheSet };
+  return {
+    ...actual,
+    cacheSetOrThrow: cacheMocks.cacheSetOrThrow,
+    cacheGetMany: cacheMocks.cacheGetMany,
+  };
 });
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -28,6 +33,8 @@ vi.mock("@/lib/supabase-service", () => ({
 import {
   endUserSession,
   endUserSessions,
+  isSessionRevoked,
+  resetRevocationMemo,
   revokeAllUserSessions,
   revokeOtherUserSessions,
   revokeSession,
@@ -36,7 +43,7 @@ import {
 describe("session revocation persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    cacheMocks.cacheSet.mockResolvedValue(undefined);
+    cacheMocks.cacheSetOrThrow.mockResolvedValue(undefined);
     serviceMocks.eq.mockResolvedValue({ error: null });
     serviceMocks.delete.mockReturnValue({ eq: serviceMocks.eq });
     serviceMocks.from.mockReturnValue({ delete: serviceMocks.delete, select: serviceMocks.select });
@@ -53,7 +60,7 @@ describe("session revocation persistence", () => {
   it("ends every provider session as well as rejecting current tokens", async () => {
     await endUserSessions("user-1");
 
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
     expect(serviceMocks.rpc).toHaveBeenCalledWith("end_user_auth_sessions", {
       p_user_id: "user-1",
       p_keep_session_id: null,
@@ -85,10 +92,10 @@ describe("session revocation persistence", () => {
       p_user_id: "user-1",
       p_session_id: "session-1",
     });
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
     expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "session-1");
     expect(serviceMocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(
-      cacheMocks.cacheSet.mock.invocationCallOrder[0],
+      cacheMocks.cacheSetOrThrow.mock.invocationCallOrder[0],
     );
   });
 
@@ -98,7 +105,7 @@ describe("session revocation persistence", () => {
     serviceMocks.rpc.mockResolvedValueOnce({ data: null, error: new Error("auth schema down") });
 
     await expect(endUserSession("user-1", "session-1")).rejects.toThrow("auth schema down");
-    expect(cacheMocks.cacheSet).not.toHaveBeenCalled();
+    expect(cacheMocks.cacheSetOrThrow).not.toHaveBeenCalled();
     expect(serviceMocks.delete).not.toHaveBeenCalled();
   });
 
@@ -107,7 +114,7 @@ describe("session revocation persistence", () => {
 
     expect(serviceMocks.from).toHaveBeenCalledWith("user_sessions");
     expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "session-1");
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
   });
 
   it("removes every tracked database session for user-wide revocation", async () => {
@@ -115,14 +122,24 @@ describe("session revocation persistence", () => {
 
     expect(serviceMocks.from).toHaveBeenCalledWith("user_sessions");
     expect(serviceMocks.eq).toHaveBeenCalledWith("user_id", "user-1");
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
   });
 
   it("keeps the app revocation marker when database cleanup fails", async () => {
     serviceMocks.eq.mockResolvedValueOnce({ error: new Error("database unavailable") });
 
     await expect(revokeSession("session-1")).rejects.toThrow("database unavailable");
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
+  });
+
+  // A copied access token stays valid until it expires unless its marker is
+  // written, so a lost write must fail the revocation rather than pass as done.
+  it("fails the revocation when its marker cannot be written", async () => {
+    cacheMocks.cacheSetOrThrow.mockRejectedValue(new Error("Cache write timed out"));
+
+    await expect(revokeSession("session-1")).rejects.toThrow("Cache write timed out");
+    await expect(revokeAllUserSessions("user-1")).rejects.toThrow("Cache write timed out");
+    expect(serviceMocks.delete).not.toHaveBeenCalled();
   });
 
   it("revokes only the user's tracked peers, including sessions without a refresh hash", async () => {
@@ -139,7 +156,7 @@ describe("session revocation persistence", () => {
     expect(serviceMocks.selectEq).toHaveBeenCalledWith("user_id", "user-1");
     expect(serviceMocks.neq).toHaveBeenCalledWith("supabase_session_id", "current");
     expect(serviceMocks.eq).toHaveBeenCalledExactlyOnceWith("supabase_session_id", "peer-1");
-    expect(cacheMocks.cacheSet).toHaveBeenCalledOnce();
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
   });
 
   it("collects every page before deletion so offsets cannot skip peers", async () => {
@@ -162,6 +179,87 @@ describe("session revocation persistence", () => {
     serviceMocks.range.mockResolvedValueOnce({ data: null, error: new Error("lookup failed") });
     await expect(revokeOtherUserSessions("user-1", "current")).rejects.toThrow("lookup failed");
     expect(serviceMocks.delete).not.toHaveBeenCalled();
-    expect(cacheMocks.cacheSet).not.toHaveBeenCalled();
+    expect(cacheMocks.cacheSetOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("revokes the collected peers together rather than one after another", async () => {
+    serviceMocks.range.mockResolvedValueOnce({
+      data: [{ supabase_session_id: "peer-1" }, { supabase_session_id: "peer-2" }],
+      error: null,
+    });
+    let releaseFirst: () => void = () => {};
+    cacheMocks.cacheSetOrThrow.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    const revoking = revokeOtherUserSessions("user-1", "current");
+    await vi.waitFor(() => expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledTimes(2));
+    releaseFirst();
+    await revoking;
+
+    expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "peer-1");
+    expect(serviceMocks.eq).toHaveBeenCalledWith("supabase_session_id", "peer-2");
+  });
+
+  it("fails when any peer's marker cannot be written", async () => {
+    serviceMocks.range.mockResolvedValueOnce({
+      data: [{ supabase_session_id: "peer-1" }, { supabase_session_id: "peer-2" }],
+      error: null,
+    });
+    cacheMocks.cacheSetOrThrow
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Cache write timed out"));
+
+    await expect(revokeOtherUserSessions("user-1", "current")).rejects.toThrow(
+      "Cache write timed out",
+    );
+  });
+});
+
+describe("revocation lookups", () => {
+  const token = { userId: "user-1", sessionId: "session-1", issuedAtMs: Date.now() };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetRevocationMemo();
+    cacheMocks.cacheGetMany.mockResolvedValue([null, null]);
+    cacheMocks.cacheSetOrThrow.mockResolvedValue(undefined);
+    serviceMocks.eq.mockResolvedValue({ error: null });
+    serviceMocks.delete.mockReturnValue({ eq: serviceMocks.eq });
+    serviceMocks.from.mockReturnValue({ delete: serviceMocks.delete });
+  });
+
+  it("answers a cold fan-out for one session with a single Redis read", async () => {
+    const answers = await Promise.all([
+      isSessionRevoked(token),
+      isSessionRevoked(token),
+      isSessionRevoked(token),
+    ]);
+
+    expect(answers).toEqual([false, false, false]);
+    expect(cacheMocks.cacheGetMany).toHaveBeenCalledOnce();
+  });
+
+  it("does not let a read begun before a revocation answer for after it", async () => {
+    let answerFirstRead: (markers: (number | null)[]) => void = () => {};
+    cacheMocks.cacheGetMany.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answerFirstRead = resolve;
+      }),
+    );
+    const before = isSessionRevoked(token);
+
+    await revokeSession("session-1");
+    cacheMocks.cacheGetMany.mockResolvedValueOnce([null, Date.now()]);
+    const after = isSessionRevoked(token);
+    answerFirstRead([null, null]);
+
+    await expect(after).resolves.toBe(true);
+    await before;
+    await expect(isSessionRevoked(token)).resolves.toBe(true);
+    expect(cacheMocks.cacheGetMany).toHaveBeenCalledTimes(2);
   });
 });

@@ -13,7 +13,7 @@ import type { TextInput } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { Button } from "../../../shared/components/Button";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { signOutMobileSessions } from "../../../shared/lib/api";
+import { requestPasswordRecovery, signOutMobileSessions } from "../../../shared/lib/api";
 import { createEphemeralSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { AuthActions, AuthFields, AuthHeader, AuthShell, AuthStage } from "../components/AuthShell";
@@ -193,15 +193,13 @@ export default function ResetPasswordScreen() {
     setError(null);
     setResending(true);
     try {
-      // Resolves with `{ error }` rather than throwing, so ignoring the return
-      // value claimed "we sent a new code" even when the resend was rejected.
-      const { error: resendError } = await settleMobileAuthAction(
-        supabase.auth.resetPasswordForEmail(email),
-      );
-      if (resendError) throw resendError;
+      // Through DubGrid's server, like the first request, so a resend meets the
+      // same per-address and per-device limits. It answers the same whether or
+      // not the address has an account, so the toast cannot promise a code.
+      await settleMobileAuthAction(requestPasswordRecovery(email));
 
       setCooldown(RESEND_COOLDOWN_SECONDS);
-      pushToast({ message: "We sent a new code.", tone: "info" });
+      pushToast({ message: "If an account uses this email, we sent a new code.", tone: "info" });
     } catch (caught) {
       setError(getRecoveryErrorMessage(caught));
     } finally {
@@ -270,7 +268,9 @@ export default function ResetPasswordScreen() {
     } catch {
       revoked = false;
     }
-    await settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
+    // Not awaited, as in `leaveRecovery`: the global revoke above already ended
+    // this session, and the local sign-out only drops the ephemeral copy.
+    void settleMobileAuthAction(supabase.auth.signOut({ scope: "local" })).catch(() => undefined);
 
     if (!confirmed) {
       pushToast({

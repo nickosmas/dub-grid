@@ -103,10 +103,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     ],
   },
   // Acting as someone else needs a recent sign-in; ending never does (41d7).
+  // The check starts alongside the Gridmaster check for a valid start body,
+  // and its answer is awaited before the RPC.
   "apps/web/src/app/api/gridmaster/impersonation/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
-      /if \(action === "start"\)[\s\S]*?const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("start_impersonation"/,
+      /const startAssurance = bodyRead\.then\(\(read\) =>\s*read\.ok && startSchema\.safeParse\(read\.body\)\.success \? requireSensitiveActionAuth\(req\) : null,\s*\);/,
+      /if \(action === "start"\)[\s\S]*?const assurance = \(await startAssurance\) \?\? \(await requireSensitiveActionAuth\(req\)\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("start_impersonation"/,
     ],
   },
   // Trial, grace, and reminder lengths decide when organizations lock.

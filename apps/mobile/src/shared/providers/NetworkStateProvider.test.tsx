@@ -31,6 +31,7 @@ const setOnline = vi.fn((online: boolean) => {
 const setFocused = vi.fn();
 const startAutoRefresh = vi.fn();
 const stopAutoRefresh = vi.fn();
+const getSession = vi.fn();
 const getNetworkStateAsync = vi.fn();
 const addNetworkStateListener = vi.fn();
 const removeNetworkListener = vi.fn();
@@ -60,6 +61,7 @@ vi.mock("../lib/supabase", () => ({
     auth: {
       startAutoRefresh,
       stopAutoRefresh,
+      getSession,
     },
   }),
 }));
@@ -92,6 +94,7 @@ describe("NetworkStateProvider", () => {
     appStateHarness.listener = null;
     startAutoRefresh.mockResolvedValue(undefined);
     stopAutoRefresh.mockResolvedValue(undefined);
+    getSession.mockResolvedValue({ data: { session: null }, error: null });
     addNetworkStateListener.mockImplementation((listener) => {
       nativeSubscriptions += 1;
       networkListener = listener;
@@ -237,12 +240,12 @@ describe("NetworkStateProvider", () => {
       appStateHarness.listener?.("active");
     });
 
-    expect(setFocused.mock.calls).toEqual([[false], [true]]);
     await act(async () => {
       for (let index = 0; index < 10; index += 1) {
         await Promise.resolve();
       }
     });
+    expect(setFocused.mock.calls).toEqual([[false], [true]]);
     expect(startAutoRefresh).toHaveBeenCalledTimes(2);
     expect(stopAutoRefresh).toHaveBeenCalledTimes(1);
   });
@@ -267,9 +270,106 @@ describe("NetworkStateProvider", () => {
       appStateHarness.listener?.("background");
       appStateHarness.listener?.("active");
     });
+    await act(async () => {
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    });
 
     expect(screen.getByTestId("online")).toHaveTextContent("true");
     expect(setFocused.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it("focuses React Query only after the foreground session has settled", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    let settleSession: () => void = () => {};
+    getSession.mockReturnValue(
+      new Promise((resolve) => {
+        settleSession = () => resolve({ data: { session: null }, error: null });
+      }),
+    );
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+    });
+    await act(async () => {
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    });
+    expect(setFocused.mock.calls).toEqual([[false]]);
+
+    await act(async () => {
+      settleSession();
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    });
+    expect(setFocused.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it("focuses anyway when the session does not settle in time", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    getSession.mockReturnValue(new Promise(() => {}));
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(setFocused.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it("does not focus a foreground that ended before its session settled", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    let settleSession: () => void = () => {};
+    getSession.mockReturnValue(
+      new Promise((resolve) => {
+        settleSession = () => resolve({ data: { session: null }, error: null });
+      }),
+    );
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => {
+      appStateHarness.listener?.("background");
+      appStateHarness.listener?.("active");
+      appStateHarness.listener?.("background");
+    });
+    await act(async () => {
+      settleSession();
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    expect(setFocused.mock.calls).toEqual([[false], [false]]);
   });
 
   it("cancels a reconnect transition when connectivity drops again", async () => {

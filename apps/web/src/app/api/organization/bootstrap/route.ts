@@ -74,6 +74,8 @@ async function resolveOrganizationId(
 ): Promise<{
   orgId: string | null;
   isGridmaster: boolean;
+  /** False when the id came from the request's host rather than verified state. */
+  fromVerifiedState?: boolean;
 }> {
   const impersonationCookie = req.cookies.get(IMPERSONATION_COOKIE_NAME)?.value;
   const impersonation = impersonationCookie
@@ -92,7 +94,7 @@ async function resolveOrganizationId(
       typeof claims.session_id === "string" ? claims.session_id : "",
     );
     if (verified) {
-      return { orgId: verified.targetOrgId, isGridmaster: false };
+      return { orgId: verified.targetOrgId, isGridmaster: false, fromVerifiedState: true };
     }
   }
 
@@ -121,7 +123,7 @@ async function resolveOrganizationId(
       .maybeSingle();
 
     if (ownedSandbox) {
-      return { orgId: ownedSandbox.id, isGridmaster: false };
+      return { orgId: ownedSandbox.id, isGridmaster: false, fromVerifiedState: true };
     }
     // Not theirs (or gone): fall through to the real claims rather than
     // honouring the cookie.
@@ -132,7 +134,7 @@ async function resolveOrganizationId(
   }
 
   if (typeof claims.org_id === "string" && claims.org_id.length > 0) {
-    return { orgId: claims.org_id, isGridmaster: false };
+    return { orgId: claims.org_id, isGridmaster: false, fromVerifiedState: true };
   }
 
   const parsedHost = parseHost(req.headers.get("host") ?? "");
@@ -150,6 +152,116 @@ async function resolveOrganizationId(
   if (error) throw error;
 
   return { orgId: (data?.id as string | undefined) ?? null, isGridmaster: false };
+}
+
+/**
+ * The organization's configuration and entry-gate reads. Started alongside the
+ * permission check, so it must only ever be given an organization id the
+ * server resolved itself, never one the client sent.
+ */
+function loadBootstrapData(timer: Timer, deadlineAt: number, targetOrgId: string, userId: string) {
+  const serviceClient = getServiceClient();
+  return timeBootstrapStage(timer, deadlineAt, "fanout", () =>
+    Promise.all([
+      // Authorization is deliberately outside this cache. The cached
+      // value is configuration for one org only; user, membership,
+      // permissions, session, impersonation, sandbox selection, and staff
+      // count remain request-scoped.
+      timeBootstrapStage(timer, deadlineAt, "config", () =>
+        cacheThrough(CacheKey.bootstrapConfig(targetOrgId), TTL.MIDDLEWARE, () =>
+          Promise.all([
+            serviceClient
+              .from("organizations")
+              .select(`${ORGANIZATION_COLS}, ${BILLING_ACCESS_SELECT}`)
+              .eq("id", targetOrgId)
+              .single(),
+            serviceClient
+              .from("focus_areas")
+              .select(FOCUS_AREA_COLS)
+              .eq("org_id", targetOrgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("shift_categories")
+              .select(SHIFT_CATEGORY_COLS)
+              .eq("org_id", targetOrgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("jobs")
+              .select(JOB_COLS)
+              .eq("org_id", targetOrgId)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("indicator_types")
+              .select(INDICATOR_TYPE_COLS)
+              .eq("org_id", targetOrgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("certifications")
+              .select(NAMED_ITEM_COLS)
+              .eq("org_id", targetOrgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("organization_roles")
+              .select(ORG_ROLE_COLS)
+              .eq("org_id", targetOrgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("departments")
+              .select(DEPARTMENT_COLS)
+              .eq("org_id", targetOrgId)
+              .is("archived_at", null)
+              .order("sort_order", { ascending: true }),
+            serviceClient
+              .from("coverage_requirements")
+              .select(COVERAGE_REQ_COLS)
+              .eq("org_id", targetOrgId),
+            serviceClient
+              .from("absence_types")
+              .select(ABSENCE_TYPE_COLS)
+              .eq("org_id", targetOrgId)
+              .order("sort_order", { ascending: true }),
+          ]),
+        ),
+      ),
+      // Count only: SetupGuard needs to know an org has staff before it
+      // paints, and joining that question to this fan-out means first paint
+      // no longer waits on the full roster fetch behind it.
+      timeBootstrapStage(timer, deadlineAt, "employee_count", () =>
+        serviceClient
+          .from("employees")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", targetOrgId)
+          .eq("status", "active"),
+      ),
+      timeBootstrapStage(timer, deadlineAt, "entry_gate", () =>
+        serviceClient
+          .from("organization_memberships")
+          .select("onboarding_completed_at")
+          .eq("user_id", userId)
+          .eq("org_id", targetOrgId)
+          .maybeSingle(),
+      ),
+      // Whether the organization is open to anyone else yet. A member who
+      // cannot configure the org waits until a super admin has been all the
+      // way through their own onboarding, not merely until the org's
+      // configuration counts as complete: an org can read as configured
+      // while its first super admin is still sitting on their welcome step.
+      // Deliberately outside the cached config slice, so the wait ends on
+      // the next fetch rather than up to a TTL later.
+      timeBootstrapStage(timer, deadlineAt, "admin_entry_gate", () =>
+        serviceClient
+          .from("organization_memberships")
+          .select("user_id", { count: "exact", head: true })
+          .eq("org_id", targetOrgId)
+          .eq("org_role", "super_admin")
+          .is("archived_at", null)
+          .not("onboarding_completed_at", "is", null),
+      ),
+    ]),
+  );
 }
 
 async function handleGET(req: NextRequest, timer: Timer) {
@@ -171,7 +283,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       resolveOrganizationId(req, auth.claims, auth.user?.id ?? null),
     );
     orgId = resolvedOrganization.orgId;
-    const { isGridmaster } = resolvedOrganization;
+    const { isGridmaster, fromVerifiedState } = resolvedOrganization;
 
     if (isGridmaster && !orgId) {
       return NextResponse.json({
@@ -201,6 +313,15 @@ async function handleGET(req: NextRequest, timer: Timer) {
     }
     const authorizedOrgId = orgId;
 
+    // An organization named by verified claims or cookies the server checked
+    // has its data loaded while the permission check runs. A refusal returns
+    // before anything loaded is read. One named only by the host waits.
+    const earlyDataOrgId = fromVerifiedState ? authorizedOrgId : null;
+    const earlyData = earlyDataOrgId
+      ? loadBootstrapData(timer, deadlineAt, earlyDataOrgId, auth.user.id)
+      : null;
+    earlyData?.catch(() => {});
+
     const orgAuth = await timeBootstrapStage(timer, deadlineAt, "permissions", () =>
       requireOrgPermissions(req, authorizedOrgId, () => true, {
         allowLockedOrganization: true,
@@ -216,107 +337,9 @@ async function handleGET(req: NextRequest, timer: Timer) {
 
     const serviceClient = orgAuth.serviceClient;
     const [configResults, employeeCountResult, onboardingResult, adminOnboardingResult] =
-      await timeBootstrapStage(timer, deadlineAt, "fanout", () =>
-        Promise.all([
-          // Authorization above is deliberately outside this cache. The cached
-          // value is configuration for one org only; user, membership,
-          // permissions, session, impersonation, sandbox selection, and staff
-          // count remain request-scoped.
-          timeBootstrapStage(timer, deadlineAt, "config", () =>
-            cacheThrough(CacheKey.bootstrapConfig(orgAuth.orgId), TTL.MIDDLEWARE, () =>
-              Promise.all([
-                serviceClient
-                  .from("organizations")
-                  .select(`${ORGANIZATION_COLS}, ${BILLING_ACCESS_SELECT}`)
-                  .eq("id", orgId)
-                  .single(),
-                serviceClient
-                  .from("focus_areas")
-                  .select(FOCUS_AREA_COLS)
-                  .eq("org_id", orgId)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("shift_categories")
-                  .select(SHIFT_CATEGORY_COLS)
-                  .eq("org_id", orgId)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("jobs")
-                  .select(JOB_COLS)
-                  .eq("org_id", orgId)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("indicator_types")
-                  .select(INDICATOR_TYPE_COLS)
-                  .eq("org_id", orgId)
-                  .is("archived_at", null)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("certifications")
-                  .select(NAMED_ITEM_COLS)
-                  .eq("org_id", orgId)
-                  .is("archived_at", null)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("organization_roles")
-                  .select(ORG_ROLE_COLS)
-                  .eq("org_id", orgId)
-                  .is("archived_at", null)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("departments")
-                  .select(DEPARTMENT_COLS)
-                  .eq("org_id", orgId)
-                  .is("archived_at", null)
-                  .order("sort_order", { ascending: true }),
-                serviceClient
-                  .from("coverage_requirements")
-                  .select(COVERAGE_REQ_COLS)
-                  .eq("org_id", orgId),
-                serviceClient
-                  .from("absence_types")
-                  .select(ABSENCE_TYPE_COLS)
-                  .eq("org_id", orgId)
-                  .order("sort_order", { ascending: true }),
-              ]),
-            ),
-          ),
-          // Count only — SetupGuard needs to know an org has staff before it
-          // paints, and joining that question to this fan-out means first paint
-          // no longer waits on the full roster fetch behind it.
-          timeBootstrapStage(timer, deadlineAt, "employee_count", () =>
-            serviceClient
-              .from("employees")
-              .select("id", { count: "exact", head: true })
-              .eq("org_id", orgId)
-              .eq("status", "active"),
-          ),
-          timeBootstrapStage(timer, deadlineAt, "entry_gate", () =>
-            serviceClient
-              .from("organization_memberships")
-              .select("onboarding_completed_at")
-              .eq("user_id", auth.user.id)
-              .eq("org_id", orgAuth.orgId)
-              .maybeSingle(),
-          ),
-          // Whether the organization is open to anyone else yet. A member who
-          // cannot configure the org waits until a super admin has been all the
-          // way through their own onboarding, not merely until the org's
-          // configuration counts as complete: an org can read as configured
-          // while its first super admin is still sitting on their welcome step.
-          // Deliberately outside the cached config slice, so the wait ends on
-          // the next fetch rather than up to a TTL later.
-          timeBootstrapStage(timer, deadlineAt, "admin_entry_gate", () =>
-            serviceClient
-              .from("organization_memberships")
-              .select("user_id", { count: "exact", head: true })
-              .eq("org_id", orgAuth.orgId)
-              .eq("org_role", "super_admin")
-              .is("archived_at", null)
-              .not("onboarding_completed_at", "is", null),
-          ),
-        ]),
-      );
+      earlyData && orgAuth.orgId === earlyDataOrgId
+        ? await earlyData
+        : await loadBootstrapData(timer, deadlineAt, orgAuth.orgId, auth.user.id);
 
     const [
       orgResult,

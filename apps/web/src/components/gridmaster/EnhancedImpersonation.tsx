@@ -20,7 +20,6 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { CloseButton } from "@/components/ui/CloseButton";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
-import { requireCredentialAssurance } from "@/features/account/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 
 export default function EnhancedImpersonation({
@@ -131,8 +130,10 @@ export default function EnhancedImpersonation({
     setLoading(true);
     try {
       const started: { value?: Awaited<ReturnType<typeof startGridmasterImpersonation>> } = {};
+      // No separate assurance preflight: the start route checks fresh proof
+      // before it changes anything, and run() turns its step-up refusal into
+      // the prompt and sends the start again.
       const completed = await stepUp.run(async (accessToken) => {
-        await requireCredentialAssurance(accessToken);
         started.value = await startGridmasterImpersonation(
           {
             targetUserId: selectedUser.id,

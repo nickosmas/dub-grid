@@ -207,6 +207,34 @@ describe("ProfileSecurityScreen", () => {
     expect(screen.queryByRole("button", { name: /^Signed-in devices/ })).not.toBeInTheDocument();
   });
 
+  it("names the iPhone's own unlock methods for app lock", () => {
+    render(<ProfileSecurityScreen />);
+
+    expect(
+      screen.getByText(
+        "Ask for Face ID, Touch ID, or your passcode whenever you return to DubGrid.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not mention Face ID on Android", async () => {
+    vi.resetModules();
+    vi.doMock("react-native", async () =>
+      createReactNativeModule(await import("react"), { platformOS: "android" }),
+    );
+    const AndroidScreen = (await import("./ProfileSecurityScreen")).default;
+
+    render(<AndroidScreen />);
+
+    expect(
+      screen.getByText(
+        "Ask for your fingerprint, face, or screen lock whenever you return to DubGrid.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Face ID/)).not.toBeInTheDocument();
+    vi.doUnmock("react-native");
+  });
+
   it("turns on app lock when the device has biometrics enrolled", async () => {
     render(<ProfileSecurityScreen />);
 

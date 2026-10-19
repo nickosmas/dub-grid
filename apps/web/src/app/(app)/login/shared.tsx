@@ -21,12 +21,14 @@ export { POST_LOGIN_DESTINATION };
  * verification happens against Supabase directly from the browser, so
  * there's no equivalent single request to fold this into for that path.
  */
-export async function resolvePostLoginDestination(): Promise<string> {
+export async function resolvePostLoginDestination(
+  home: string = POST_LOGIN_DESTINATION,
+): Promise<string> {
   const terms = await fetchTermsAcceptanceStatus();
   if (!terms.acceptedCurrentTerms) {
-    return `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
+    return `/accept-terms?next=${encodeURIComponent(home)}`;
   }
-  return POST_LOGIN_DESTINATION;
+  return home;
 }
 
 /**

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { decodeJwt } from "jose";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
@@ -10,11 +11,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { markAuthTransition } from "@/lib/auth-transition";
+import { GRIDMASTER_POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
 import { DubGridLogo } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
+  getBrowserAuthSession,
   recordBrowserSignInCompleted,
   refreshBrowserSession,
   setBrowserSession,
@@ -30,6 +33,14 @@ import {
 import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { withThemeParam, type ThemePreference } from "@/lib/theme-preference";
+
+function carriesGridmasterRole(accessToken: string): boolean {
+  try {
+    return decodeJwt(accessToken).platform_role === "gridmaster";
+  } catch {
+    return false;
+  }
+}
 
 export default function GridmasterLogin({
   initialTheme,
@@ -156,13 +167,21 @@ export default function GridmasterLogin({
   }
 
   async function handleMFAVerified() {
-    // After MFA verification, refresh session and navigate. Must handle a
-    // refresh failure (network/token hiccup) — otherwise the MFA screen hangs
-    // forever with an unhandled rejection. Mirrors the org-login path. (H-3)
-    await settleWithRequestTimeout(refreshBrowserSession());
-    await recordBrowserSignInCompleted();
+    // The refresh exists so the access-token hook stamps platform_role on a
+    // token minted without it, as the login route does on the password path.
+    // The verified session was minted just now, so it normally carries it.
+    // Failures reject on a deadline rather than leave the code screen hanging.
+    let session = await settleWithRequestTimeout(getBrowserAuthSession());
+    if (!session || !carriesGridmasterRole(session.access_token)) {
+      session = await settleWithRequestTimeout(refreshBrowserSession());
+    }
+    if (session) primeSignInQueries(queryClient, session.access_token);
+    const [destination] = await Promise.all([
+      settleWithRequestTimeout(resolvePostLoginDestination(GRIDMASTER_POST_LOGIN_DESTINATION)),
+      recordBrowserSignInCompleted(),
+    ]);
     markAuthTransition();
-    router.replace(await settleWithRequestTimeout(resolvePostLoginDestination()));
+    router.replace(destination);
   }
 
   function handleMFACancel() {

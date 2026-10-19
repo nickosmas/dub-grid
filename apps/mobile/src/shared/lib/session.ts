@@ -2,6 +2,7 @@ import { getStoredValue, removeStoredValue, setStoredValue } from "./local-stora
 
 const LAST_ORG_KEY = "dubgrid-mobile-last-org";
 const PUSH_DEVICE_KEY = "dubgrid-mobile-push-device";
+const PUSH_REGISTRATION_KEY = "dubgrid-mobile-push-registration";
 const HAS_SEEN_ONBOARDING_KEY = "dubgrid-mobile-has-seen-onboarding";
 
 export type StoredPushDevice = {
@@ -97,6 +98,22 @@ export async function saveStoredPushDevice(device: StoredPushDevice | null): Pro
 
 export async function loadStoredPushDevice(): Promise<StoredPushDevice | null> {
   return loadJsonValue<StoredPushDevice>(PUSH_DEVICE_KEY);
+}
+
+/** The last push registration that landed: whose it was and when. */
+export type StoredPushRegistration = {
+  key: string;
+  registeredAt: number;
+};
+
+export async function saveStoredPushRegistration(
+  registration: StoredPushRegistration | null,
+): Promise<void> {
+  await saveJsonValue(PUSH_REGISTRATION_KEY, registration);
+}
+
+export async function loadStoredPushRegistration(): Promise<StoredPushRegistration | null> {
+  return loadJsonValue<StoredPushRegistration>(PUSH_REGISTRATION_KEY);
 }
 
 export async function loadHasSeenOnboarding(): Promise<boolean> {

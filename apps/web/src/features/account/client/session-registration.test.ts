@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSessionRegistration, SessionRegistrationError } from "./session-registration";
+import {
+  createSessionRegistration,
+  markSessionReported,
+  RESTORED_SESSION_REPORT_INTERVAL_MS,
+  SessionRegistrationError,
+  wasSessionReportedRecently,
+} from "./session-registration";
 
 function session(sessionId: string): { access_token: string } {
   const payload = btoa(JSON.stringify({ session_id: sessionId }));
@@ -131,5 +137,53 @@ describe("createSessionRegistration", () => {
       await expect(register(session("session-1"))).rejects.toBeInstanceOf(SessionRegistrationError);
       expect(send).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("restored-session report throttle", () => {
+  function memoryStorage() {
+    const values = new Map<string, string>();
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+    };
+  }
+
+  it("skips a session this tab reported within the interval, and only that session", () => {
+    const storage = memoryStorage();
+    let currentTime = 1_000_000;
+    const now = () => currentTime;
+
+    expect(wasSessionReportedRecently(session("session-1"), { storage, now })).toBe(false);
+    markSessionReported(session("session-1"), { storage, now });
+
+    currentTime += RESTORED_SESSION_REPORT_INTERVAL_MS - 1;
+    expect(wasSessionReportedRecently(session("session-1"), { storage, now })).toBe(true);
+    expect(wasSessionReportedRecently(session("session-2"), { storage, now })).toBe(false);
+
+    currentTime += 1;
+    expect(wasSessionReportedRecently(session("session-1"), { storage, now })).toBe(false);
+  });
+
+  it("reports when storage is unavailable, unreadable, or the token has no session id", () => {
+    const throwing = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    expect(() => markSessionReported(session("session-1"), { storage: throwing })).not.toThrow();
+    expect(wasSessionReportedRecently(session("session-1"), { storage: throwing })).toBe(false);
+    expect(wasSessionReportedRecently(session("session-1"), { storage: null })).toBe(false);
+
+    const garbled = memoryStorage();
+    garbled.setItem("dg_session_reported", "{not json");
+    expect(wasSessionReportedRecently(session("session-1"), { storage: garbled })).toBe(false);
+
+    const storage = memoryStorage();
+    markSessionReported({ access_token: "no-payload" }, { storage });
+    expect(wasSessionReportedRecently({ access_token: "no-payload" }, { storage })).toBe(false);
   });
 });

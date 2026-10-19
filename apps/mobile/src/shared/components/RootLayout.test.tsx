@@ -176,6 +176,9 @@ vi.mock("../navigation/top-level-stack", () => ({
   }),
 }));
 
+const warmSupabaseSession = vi.hoisted(() => vi.fn());
+vi.mock("../lib/supabase", () => ({ warmSupabaseSession }));
+
 const validateMobileEnvSpy = vi.spyOn(envModule, "validateMobileEnv");
 let RootLayout: (typeof import("../../../app/_layout"))["default"];
 
@@ -189,6 +192,11 @@ describe("RootLayout", () => {
     navigationThemeValues.length = 0;
     fontState.loadedMaps.length = 0;
     fontState.result = [true, null];
+  });
+
+  // Reading the stored session overlaps font loading instead of following it.
+  it("starts restoring the session when the layout module loads", () => {
+    expect(warmSupabaseSession).toHaveBeenCalledTimes(1);
   });
 
   it("shows the mobile setup screen when env validation fails", async () => {

@@ -86,6 +86,8 @@ export const CacheKey = {
   mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
   mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
   mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+  /** Only ever holds `true`: a removed member must never read a cached yes. */
+  mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
 
   // Public subdomain lookup (validate-domain)
   orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
@@ -180,6 +182,26 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Pr
       console.warn(`[cache] SET failed for ${key}:`, err instanceof Error ? err.message : err);
     }
   }
+}
+
+/**
+ * Set a value whose loss is a security failure (revocation markers). Unlike
+ * `cacheSet` it throws when the write fails or times out, and in production
+ * when Redis is not configured. Outside production without Redis it does
+ * nothing, as `cacheSet` does.
+ */
+export async function cacheSetOrThrow<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
+  const client = getRedis();
+  if (!client) {
+    if (process.env.NODE_ENV === "production") throw new Error("Redis is not configured");
+    return;
+  }
+  const written = await withTimeout(
+    client.set(redisKey(key), value, { ex: ttlSeconds }).then(() => true),
+    REDIS_TIMEOUT_MS,
+    false,
+  );
+  if (!written) throw new Error(`Cache write timed out for ${key}`);
 }
 
 /**

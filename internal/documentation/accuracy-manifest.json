@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:12ed35019d0407a6d7368835f986fd61826d0d0e59dc4f04aafc6693ac117e92"
+      "evidenceFingerprint": "sha256:30f95dd259f81d92488d9e0695c7029152213e32b40945176c83b301c8ab6a14"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:584efecc226c45e77bd8acae5ce07457669d75cd815aac37de3eb4e9e3373234"
+      "evidenceFingerprint": "sha256:9e38990acae11649f29450fe82fcf69168fa2f6e8a8beaa69e37d36d23ea836f"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cb0588b439a6ccb6d56b0ad714cf684a8f4fa132684373e852aa857d4b170bb0"
+      "evidenceFingerprint": "sha256:d8a8bba3bf4be5ef7abdbb597e512c66e6fb4eb852ed4ac7ffc2ea80ac9574b8"
     },
     {
       "id": "onboarding",
@@ -309,7 +309,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:255cd2b804a61169dd8a28bb69448fb80eb92198898b4f615d2d13c8e6fff5cc"
+      "evidenceFingerprint": "sha256:89439949b58d64f1cfd3dafedae3bbd335d247af9d43434a2b04303f409e97d4"
     },
     {
       "id": "schedule-grid",
@@ -674,7 +674,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ce8b84d067e54416e3f16b566d39719ae114ab9f50f86f931fa733e2e46e092c"
+      "evidenceFingerprint": "sha256:5e61a43efc6d96e12f329f59f7447c3b51b0ac16a8b66df03fe96d543a1e47f0"
     },
     {
       "id": "roster",
@@ -928,7 +928,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5b74815355f0c46468cbf296b65268a6a82530a14ed51b1e183bfa89b436efd2"
+      "evidenceFingerprint": "sha256:90eeef70e71f5c2d5d38ad3dc45a99315794e6a3f2fb478cc58269974f0d110a"
     },
     {
       "id": "coverage",
@@ -1082,7 +1082,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c049f3eaf422b42f354d8d6a1155f0417e5bdcd7a50343a6efa39b730cb8f9d4"
+      "evidenceFingerprint": "sha256:d7966d36f52c3a738b1f42f4dd172e5ed16ccf4d21709f7d691c9127180eadc9"
     },
     {
       "id": "admin-permissions",
@@ -1125,7 +1125,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:760380741e9a3875adc8693e9088ac49eb03ea35ee5dbca7257af3c2c2b964b6"
+      "evidenceFingerprint": "sha256:130f0a1c7ed371c05f14c2112c003decdff873be0d070a0511c29cb640d71297"
     },
     {
       "id": "billing",
@@ -1184,7 +1184,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:369337587bb0b69a03f9a0c37266f63f8a5221e0bff914f1d63bc72ccf281507"
+      "evidenceFingerprint": "sha256:18be51bd34f2d342ba556ca2074e5baec411b24cba3777e63fcb01a531d98ab9"
     },
     {
       "id": "mobile-navigation",
@@ -1268,7 +1268,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7b6333dd61a97d0e39358d66bddcdff303abfe568f0f3b497796b51a458fd2c5"
+      "evidenceFingerprint": "sha256:f72f2e14752202b432a46c56087fc2764f08d8f74731b4d98e68ba49669792d0"
     },
     {
       "id": "alerts",
@@ -1380,7 +1380,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f4260cdcb8cbaac63225f5b11a4e6c183f4561e006c7b9511f9f9a4e253c8749"
+      "evidenceFingerprint": "sha256:f72686fda9a9b65c9e6726d3dbd34b806e9100d3ba4ac5acaa2b9c3bd570ce64"
     },
     {
       "id": "profile",
@@ -1451,7 +1451,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5c007105062ecd3bcf94dcbc0749ab13e60a1e4daf6a6eceffccba0642e2628f"
+      "evidenceFingerprint": "sha256:130e3fc83d50aae06007f27c386d9e8d0f64f33abed3d837cccfe6e474cba480"
     },
     {
       "id": "security-sessions",
@@ -1530,7 +1530,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:14e6e0a4d14478e7ca8ebd1b935e6a11d0e1dc5c4f440d09cd48fb5c67a0db5e"
+      "evidenceFingerprint": "sha256:5399164eadb7572574848d136df56c2b63da7541731cfba3e7615773dd7bdf72"
     },
     {
       "id": "privacy-controls",
@@ -1593,7 +1593,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:101026de2a62a971334d5330671f18643b50224a39de1cec4384be4ccc10a7e4"
+      "evidenceFingerprint": "sha256:fa8c794d4b416a713e5d9757e91788b63dbfc87d83a76d8e944e7e13efc9e182"
     },
     {
       "id": "schedule-rules-display",

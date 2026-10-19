@@ -138,6 +138,21 @@ interface AuthenticatedRequest {
 async function authenticateRequest(
   req: NextRequest,
 ): Promise<AuthenticatedRequest | { response: NextResponse }> {
+  const token = await verifyRequestToken(req);
+  if ("response" in token) return token;
+  return admitVerifiedToken(token);
+}
+
+interface VerifiedRequestToken {
+  session: Session | null;
+  accessToken: string;
+  verified: VerifiedToken;
+}
+
+/** Finds the request's token and checks its signature; nothing more. */
+async function verifyRequestToken(
+  req: NextRequest,
+): Promise<VerifiedRequestToken | { response: NextResponse }> {
   const bearer = extractBearerToken(req);
   let session: Session | null = null;
   let accessToken = bearer;
@@ -155,7 +170,15 @@ async function authenticateRequest(
 
   const verified = await verifyAccessToken(accessToken);
   if (!verified) return { response: expiredSessionResponse() };
+  return { session, accessToken, verified };
+}
 
+/** Applies the revocation markers and the second-factor claim to a genuine token. */
+async function admitVerifiedToken({
+  session,
+  accessToken,
+  verified,
+}: VerifiedRequestToken): Promise<AuthenticatedRequest | { response: NextResponse }> {
   if (await isSessionRevoked(verified)) {
     return {
       response: NextResponse.json(
@@ -223,14 +246,22 @@ export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAu
 export async function requireLiveAuthenticatedSession(
   req: NextRequest,
 ): Promise<SensitiveActionAuthResult> {
-  const auth = await authenticateRequest(req);
-  if ("response" in auth) return auth;
+  const token = await verifyRequestToken(req);
+  if ("response" in token) return token;
 
-  const supabase = createRequestSupabaseClient(req);
+  // The Auth lookup runs alongside the revocation check, but its answer is
+  // read only once the token has been admitted, so a refusal keeps its order.
+  const liveLookup = createRequestSupabaseClient(req).auth.getUser();
+  const auth = await admitVerifiedToken(token);
+  if ("response" in auth) {
+    void liveLookup.catch(() => {});
+    return auth;
+  }
+
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await liveLookup;
 
   if (error) {
     return {

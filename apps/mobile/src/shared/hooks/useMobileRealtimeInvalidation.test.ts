@@ -144,6 +144,9 @@ describe("invalidateMobileRealtimeQueriesForTables", () => {
       ["mobile", "dashboard"],
       ["mobile", "shift-swap-options"],
     ]);
+    for (const [, options] of invalidateQueries.mock.calls) {
+      expect(options).toEqual({ cancelRefetch: false });
+    }
   });
 });
 
@@ -176,5 +179,29 @@ describe("useMobileRealtimeInvalidation", () => {
     ]) {
       expect(keys).toContain(JSON.stringify(expected));
     }
+  });
+});
+
+describe("useMobileRealtimeInvalidation across token refreshes", () => {
+  const tokenFor = (userId: string, version: string) =>
+    `header.${btoa(JSON.stringify({ sub: userId, org_id: "org-1" }))}.${version}`;
+
+  beforeEach(() => {
+    subscribeOrgScopedRealtime.mockClear();
+  });
+
+  it("keeps its channel through a refresh and rejoins for another person", () => {
+    const queryClient = new QueryClient();
+    const { rerender } = renderHook(
+      ({ accessToken }: { accessToken: string }) =>
+        useMobileRealtimeInvalidation({ accessToken, orgId: "org-1", queryClient }),
+      { initialProps: { accessToken: tokenFor("user-1", "v1") } },
+    );
+
+    rerender({ accessToken: tokenFor("user-1", "v2") });
+    expect(subscribeOrgScopedRealtime).toHaveBeenCalledTimes(1);
+
+    rerender({ accessToken: tokenFor("user-2", "v1") });
+    expect(subscribeOrgScopedRealtime).toHaveBeenCalledTimes(2);
   });
 });

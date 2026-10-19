@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { createElement } from "react";
@@ -41,6 +42,67 @@ function buildTrialStartedEmail(
       logoUrl: emailBaseUrl(),
     }),
   );
+}
+
+/**
+ * This GET is polled and refetched by the welcome modal, so a plain
+ * check-send-mark would let two concurrent requests both read sent_at=null and
+ * each send an email. Instead we ATOMICALLY claim the send first: flip
+ * trial_welcome_email_sent_at from NULL in a single UPDATE and only the request
+ * that wins the row (returns it) sends. On failure we roll the claim back so a
+ * later load retries.
+ */
+async function sendTrialWelcomeOnce(input: {
+  service: SupabaseClient;
+  orgId: string;
+  apiKey: string;
+  to: string;
+  org: { name: string; trialEndsAt: string | null; timezone: string | null };
+}): Promise<void> {
+  const { service, orgId, org } = input;
+  const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const claimedAt = new Date().toISOString();
+  const { data: claimed, error: claimError } = await service
+    .from("organizations")
+    .update({ trial_welcome_email_sent_at: claimedAt })
+    .eq("id", orgId)
+    .is("trial_welcome_email_sent_at", null)
+    .select("id")
+    .maybeSingle();
+  if (claimError || !claimed) return;
+
+  // We won the claim, so send exactly once.
+  try {
+    await sendResendEmail({
+      apiKey: input.apiKey,
+      from: fromEmail,
+      to: input.to,
+      subject: sanitizeHeaderValue(`Your DubGrid trial for ${org.name} has started`),
+      html: await buildTrialStartedEmail(org.name, org.trialEndsAt, org.timezone),
+    });
+  } catch (err) {
+    // Roll the claim back (only if it's still ours) so a retry can send.
+    const { error: rollbackError } = await service
+      .from("organizations")
+      .update({ trial_welcome_email_sent_at: null })
+      .eq("id", orgId)
+      .eq("trial_welcome_email_sent_at", claimedAt);
+    if (rollbackError) {
+      // If the rollback itself fails, the claim stays set and the welcome email will
+      // never be resent; surface it so a stuck flag is detectable rather than silent.
+      Sentry.captureException(rollbackError, {
+        extra: { context: "trial-welcome-rollback", orgId },
+      });
+      logger.error(
+        { err: rollbackError, orgId },
+        "Failed to roll back trial-welcome email claim after send failure",
+      );
+    }
+    Sentry.captureException(err, {
+      extra: { context: "trial-welcome-email" },
+    });
+    logger.error({ err }, "Failed to send trial-started email");
+  }
 }
 
 // GET: returns whether the one-time trial welcome modal should show for this
@@ -95,59 +157,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(empty);
   }
 
-  // Lazily send the "trial started" email exactly once. This GET is polled and
-  // refetched by the welcome modal, so a plain check-send-mark would let two
-  // concurrent requests both read sent_at=null and each send an email. Instead
-  // we ATOMICALLY claim the send first: flip trial_welcome_email_sent_at from
-  // NULL in a single UPDATE and only the request that wins the row (returns it)
-  // sends. On failure we roll the claim back so a later load retries.
+  // Lazily send the "trial started" email exactly once. The modal reads only
+  // the state below, never the send, so the send runs after the response.
   if (!org.trial_welcome_email_sent_at) {
     const apiKey = serverEnv?.RESEND_API_KEY;
-    const fromEmail = serverEnv?.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
-    if (apiKey && user.email) {
-      const claimedAt = new Date().toISOString();
-      const { data: claimed, error: claimError } = await service
-        .from("organizations")
-        .update({ trial_welcome_email_sent_at: claimedAt })
-        .eq("id", orgId)
-        .is("trial_welcome_email_sent_at", null)
-        .select("id")
-        .maybeSingle();
-
-      if (!claimError && claimed) {
-        // We won the claim — send exactly once.
-        try {
-          await sendResendEmail({
-            apiKey,
-            from: fromEmail,
-            to: user.email,
-            subject: sanitizeHeaderValue(`Your DubGrid trial for ${org.name} has started`),
-            html: await buildTrialStartedEmail(org.name, org.trial_ends_at, org.timezone ?? null),
-          });
-        } catch (err) {
-          // Roll the claim back (only if it's still ours) so a retry can send.
-          const { error: rollbackError } = await service
-            .from("organizations")
-            .update({ trial_welcome_email_sent_at: null })
-            .eq("id", orgId)
-            .eq("trial_welcome_email_sent_at", claimedAt);
-          if (rollbackError) {
-            // If the rollback itself fails, the claim stays set and the welcome email will
-            // never be resent — surface it so a stuck flag is detectable rather than silent.
-            Sentry.captureException(rollbackError, {
-              extra: { context: "trial-welcome-rollback", orgId },
-            });
-            logger.error(
-              { err: rollbackError, orgId },
-              "Failed to roll back trial-welcome email claim after send failure",
-            );
-          }
-          Sentry.captureException(err, {
-            extra: { context: "trial-welcome-email" },
-          });
-          logger.error({ err }, "Failed to send trial-started email");
-        }
-      }
+    const to = user.email;
+    if (apiKey && to) {
+      after(() =>
+        sendTrialWelcomeOnce({
+          service,
+          orgId,
+          apiKey,
+          to,
+          org: { name: org.name, trialEndsAt: org.trial_ends_at, timezone: org.timezone ?? null },
+        }),
+      );
     }
   }
 

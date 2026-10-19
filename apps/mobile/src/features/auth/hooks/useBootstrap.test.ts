@@ -20,7 +20,8 @@ type QueryOptions = {
   retry: (failureCount: number, error: unknown) => boolean;
   retryDelay: (failureCount: number, error: unknown) => number;
   refetchOnReconnect: boolean;
-  refetchOnWindowFocus: boolean;
+  refetchOnWindowFocus?: boolean;
+  staleTime: number;
 };
 
 function optionsFor(token: string | null): QueryOptions {
@@ -149,7 +150,12 @@ describe("useBootstrap", () => {
     const options = optionsFor("token-123");
 
     expect(options.refetchOnReconnect).toBe(true);
-    expect(options.refetchOnWindowFocus).toBe(true);
+    // The default: a foreground refetches it once it is stale.
+    expect(options.refetchOnWindowFocus).toBeUndefined();
+  });
+
+  it("stays fresh for five minutes, since realtime keeps it current", () => {
+    expect(optionsFor("token-123").staleTime).toBe(5 * 60_000);
   });
 
   it("shares the 'mobile' key prefix so a sign-out cache clear reaches it", () => {

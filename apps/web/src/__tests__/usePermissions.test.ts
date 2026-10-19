@@ -400,7 +400,7 @@ describe("usePermissions hook", () => {
     expect(result.current.role).toBe("super_admin");
   });
 
-  it("refetches once when a membership update reaches every mounted consumer at the same time", async () => {
+  it("shares one membership channel across consumers and token refreshes, refetching only on a real change", async () => {
     signIn({
       platform_role: "none",
       org_role: "admin",
@@ -412,31 +412,53 @@ describe("usePermissions hook", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) =>
       createElement(QueryClientProvider, { client: queryClient }, children);
-    // Ten consumers, ten realtime channels, one shared query.
     const channelsBefore = mockCreateBrowserRealtimeChannel.mock.results.length;
     const hooks = Array.from({ length: 10 }, () => renderHook(() => usePermissions(), { wrapper }));
     await waitFor(() => expect(hooks[0].result.current.isLoading).toBe(false));
-    const fetchesBefore = mockFetchAccountPermissions.mock.calls.length;
 
-    // Every membership channel's handler fires in the same tick, as one
-    // realtime UPDATE on the caller's membership row does.
+    // A refreshed token for the same user must not resubscribe anything.
+    signIn({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "refreshed-token",
+    });
+    hooks.forEach((hook) => hook.rerender());
+
     const membershipHandlers = mockCreateBrowserRealtimeChannel.mock.results
       .slice(channelsBefore)
       .map((entry) => entry.value as { on: ReturnType<typeof vi.fn> })
       .flatMap((channel) => channel.on.mock.calls)
       .filter(([, config]) => (config as { table?: string }).table === "organization_memberships")
-      .map(([, , handler]) => handler as () => void);
-    expect(membershipHandlers).toHaveLength(10);
-    act(() => {
-      for (const handler of membershipHandlers) handler();
-    });
+      .map(([, , handler]) => handler as (payload: unknown) => void);
+    expect(membershipHandlers).toHaveLength(1);
+    expect(mockCreateBrowserRealtimeChannel.mock.results.length - channelsBefore).toBe(2);
+    const [onMembershipUpdate] = membershipHandlers;
+    const fetchesBefore = mockFetchAccountPermissions.mock.calls.length;
+    const row = {
+      user_id: "u-1",
+      org_id: "org-1",
+      org_role: "admin",
+      admin_permissions: ALL_FALSE_PERMS,
+      archived_at: null,
+    };
 
+    // Opening Schedule stamps schedule_last_viewed_at on the same row.
+    act(() => onMembershipUpdate({ new: { ...row, schedule_last_viewed_at: "now" } }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockFetchAccountPermissions.mock.calls.length).toBe(fetchesBefore);
+
+    act(() => onMembershipUpdate({ new: { ...row, org_role: "super_admin" } }));
     await waitFor(() =>
       expect(mockFetchAccountPermissions.mock.calls.length).toBeGreaterThan(fetchesBefore),
     );
     await waitFor(() => expect(hooks[0].result.current.isLoading).toBe(false));
     expect(mockFetchAccountPermissions.mock.calls.length - fetchesBefore).toBe(1);
+
     hooks.forEach((hook) => hook.unmount());
+    expect(mockRemoveBrowserRealtimeChannel).toHaveBeenCalledTimes(2);
   });
 
   it("re-resolves when auth changes to a different user", async () => {

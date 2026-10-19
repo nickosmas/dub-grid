@@ -1,10 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import { fetchScheduleNotes } from "@/features/schedule/client";
 import { queryKeys } from "@/lib/query-keys";
 import type { ScheduleNote } from "@/types";
 
 const NO_NOTES: ScheduleNote[] = [];
+
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function dashboardScheduleNotesQueryOptions(
+  orgId: string,
+  window: { start: string; end: string },
+) {
+  return queryOptions<ScheduleNote[]>({
+    queryKey: [...queryKeys.shifts.all(orgId), "scheduleNotes", window.start, window.end],
+    queryFn: () => fetchScheduleNotes(orgId, window.start, window.end),
+  });
+}
 
 /**
  * The window's schedule notes, requested beside the dashboard's shifts rather
@@ -16,10 +27,7 @@ export function useDashboardScheduleNotes(
   orgId: string,
   window: { start: string; end: string },
 ): ScheduleNote[] {
-  const query = useQuery<ScheduleNote[]>({
-    queryKey: [...queryKeys.shifts.all(orgId), "scheduleNotes", window.start, window.end],
-    queryFn: () => fetchScheduleNotes(orgId, window.start, window.end),
-  });
+  const query = useQuery(dashboardScheduleNotesQueryOptions(orgId, window));
 
   return query.data ?? NO_NOTES;
 }

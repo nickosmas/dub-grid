@@ -6,6 +6,18 @@ const createClient = vi.fn();
 const writeSecurityAuditEvent = vi.fn();
 const endUserSession = vi.fn();
 const verifyAccessToken = vi.fn();
+// Collects each task so a test can run the deferred work, not just see that
+// after() was called.
+const scheduled: Array<() => unknown> = [];
+const after = vi.fn((task: () => unknown) => {
+  scheduled.push(task);
+});
+const runScheduled = () => Promise.all(scheduled.splice(0).map((task) => task()));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit,
@@ -165,37 +177,46 @@ function createSessionClientMock(input?: {
     throw new Error(`Unexpected rpc ${fn}`);
   });
 
+  let heldSession: { access_token: string } | null = null;
+  const signInWithPassword = vi.fn().mockResolvedValue({
+    data: input?.signInError
+      ? {
+          session: null,
+          user: null,
+        }
+      : {
+          session: {
+            access_token: tokenForOrg(
+              input?.signedInOrgId === undefined ? DEFAULT_ORG_ID : input.signedInOrgId,
+            ),
+            refresh_token: "refresh-token",
+            expires_in: 3600,
+            token_type: "bearer",
+          },
+          user: {
+            id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+            email: "manager@dubgrid.com",
+            email_confirmed_at: "2026-04-17T00:00:00.000Z",
+            factors: input?.factors ?? [],
+            user_metadata: {
+              first_name: "Mina",
+              last_name: "Diaz",
+            },
+          },
+        },
+    error: input?.signInError ?? null,
+  });
+
   return {
     rpc,
     auth: {
-      signInWithPassword: vi.fn().mockResolvedValue({
-        data: input?.signInError
-          ? {
-              session: null,
-              user: null,
-            }
-          : {
-              session: {
-                access_token: tokenForOrg(
-                  input?.signedInOrgId === undefined ? DEFAULT_ORG_ID : input.signedInOrgId,
-                ),
-                refresh_token: "refresh-token",
-                expires_in: 3600,
-                token_type: "bearer",
-              },
-              user: {
-                id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
-                email: "manager@dubgrid.com",
-                email_confirmed_at: "2026-04-17T00:00:00.000Z",
-                factors: input?.factors ?? [],
-                user_metadata: {
-                  first_name: "Mina",
-                  last_name: "Diaz",
-                },
-              },
-            },
-        error: input?.signInError ?? null,
+      // Like the real ephemeral client, it holds what sign-in returned.
+      signInWithPassword: vi.fn(async (...args: unknown[]) => {
+        const result = await signInWithPassword(...args);
+        heldSession = result.data.session;
+        return result;
       }),
+      getSession: vi.fn(async () => ({ data: { session: heldSession }, error: null })),
       refreshSession: vi.fn().mockResolvedValue({
         data: {
           session: input?.refreshSession ?? {
@@ -240,6 +261,7 @@ function abandonedRequest() {
 describe("mobile auth login route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scheduled.length = 0;
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     writeSecurityAuditEvent.mockResolvedValue(undefined);
@@ -332,6 +354,91 @@ describe("mobile auth login route", () => {
     expect(await response.json()).toEqual({
       error: "Your account is not associated with that organization.",
     });
+  });
+
+  // The password was accepted, so a session exists whose tokens the phone
+  // never receives; left alone it lists as a signed-in device nobody used.
+  it.each([
+    ["a Gridmaster", { profile: { platform_role: "gridmaster" } }, {}],
+    [
+      "a non-member",
+      {},
+      {
+        memberships: [
+          {
+            org_id: OTHER_ORG_ID,
+            org_name: "Other Org",
+            org_slug: "other-org",
+            is_active: true,
+          },
+        ],
+      },
+    ],
+    [
+      "a member of a locked organization",
+      {
+        organization: {
+          id: DEFAULT_ORG_ID,
+          name: "DubGrid Health",
+          slug: "dubgrid-health",
+          suspended_at: null,
+          subscription_status: "trialing",
+          trial_ends_at: "2026-01-01T00:00:00.000Z",
+        },
+      },
+      {},
+    ],
+  ])("ends the session it created when it refuses %s", async (_who, service, session) => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock(service));
+    verifyAccessToken.mockResolvedValue({
+      userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      sessionId: "session-refused",
+    });
+    const sessionClient = createSessionClientMock(session);
+    createClient.mockReturnValue(sessionClient);
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(verifyAccessToken).toHaveBeenCalledWith(tokenForOrg(DEFAULT_ORG_ID));
+    expect(endUserSession).toHaveBeenCalledWith(
+      "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      "session-refused",
+    );
+  });
+
+  it("ends nothing when the password is wrong", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    createClient.mockReturnValue(
+      createSessionClientMock({ signInError: { message: "Invalid login credentials" } }),
+    );
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "wrong-password",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(401);
+    expect(endUserSession).not.toHaveBeenCalled();
   });
 
   it("returns a generic unavailable message for regular users when trial grace has ended", async () => {
@@ -458,6 +565,8 @@ describe("mobile auth login route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(504);
+    // The refusal record is written before answering, unlike a success.
+    expect(after).not.toHaveBeenCalled();
     // No tokens: handing them back is what leaves the orphan behind.
     expect(payload.session).toBeUndefined();
     expect(endUserSession).toHaveBeenCalledWith(
@@ -520,6 +629,17 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(200);
     expect(endUserSession).not.toHaveBeenCalled();
+    // The success record is written after the response, not before it.
+    expect(after).toHaveBeenCalledOnce();
+    expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
+    await runScheduled();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "security.auth.login",
+        outcome: "succeeded",
+        reason: "accepted",
+      }),
+    );
   });
 
   it("returns an MFA-required login payload without rejecting verified TOTP users", async () => {
@@ -568,6 +688,7 @@ describe("mobile auth login route", () => {
         slug: "dubgrid-health",
       },
     });
+    await runScheduled();
     expect(writeSecurityAuditEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({
         event: "security.auth.login",

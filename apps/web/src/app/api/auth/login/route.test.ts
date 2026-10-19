@@ -9,6 +9,14 @@ const rpc = vi.fn();
 const refreshSession = vi.fn();
 const serviceFrom = vi.fn();
 const deleteSandboxForUser = vi.fn();
+const after = vi.fn((task: () => unknown) => {
+  void task();
+});
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/rate-limit", () => ({
   loginLimiter: {},
@@ -913,6 +921,88 @@ describe("POST /api/auth/login", () => {
 
       expect((await res.json()).didSwitchOrg).toBe(false);
       expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+    });
+
+    it("tears down a leftover sandbox on a sign-in that did not switch", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect((await res.json()).didSwitchOrg).toBe(false);
+      expect(deleteSandboxForUser).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ actor: expect.objectContaining({ id: USER_ID }) }),
+      );
+    });
+
+    it("asks for the terms while the session is still being switched", async () => {
+      signIn({ org_id: OTHER_ORG_ID, org_role: "user" });
+      stubOrgLookup(ORG_ID);
+      const switched = makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      let finishRefresh: (value: unknown) => void = () => {};
+      refreshSession.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishRefresh = resolve;
+        }),
+      );
+
+      const pending = POST(makeRequest("acme.localhost"));
+      await vi.waitFor(() => expect(refreshSession).toHaveBeenCalledOnce());
+      expect(fetchTermsAcceptanceStatus).toHaveBeenCalledExactlyOnceWith(USER_ID);
+      finishRefresh({ data: { session: switched }, error: null });
+
+      expect((await pending).status).toBe(200);
+    });
+
+    it("writes the cookies alongside the terms check rather than after it", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      let answerTerms: (value: unknown) => void = () => {};
+      fetchTermsAcceptanceStatus.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answerTerms = resolve;
+        }),
+      );
+      authCookiesForSession.mockResolvedValueOnce([AUTH_COOKIE]);
+
+      const pending = POST(makeRequest("acme.localhost"));
+      await vi.waitFor(() => expect(authCookiesForSession).toHaveBeenCalledOnce());
+      answerTerms({ acceptedCurrentTerms: true, acceptedVersion: "v1" });
+      const res = await pending;
+
+      expect((await res.json()).sessionCookieSet).toBe(true);
+    });
+
+    it("lands on the destination without cookies when writing them throws", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+      authCookiesForSession.mockRejectedValueOnce(new Error("missing key"));
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.sessionCookieSet).toBe(false);
+      expect(body.destination).toBe("/dashboard");
+    });
+
+    it("drops the early terms check when the sign-in is refused", async () => {
+      signIn({ org_id: OTHER_ORG_ID, org_role: "user" });
+      stubOrgLookup(null);
+      fetchTermsAcceptanceStatus.mockRejectedValueOnce(new Error("profiles down"));
+
+      const res = await POST(makeRequest("missing.localhost"));
+
+      expect(res.status).toBe(403);
+      expect(deleteSandboxForUser).not.toHaveBeenCalled();
+    });
+
+    it("records a completed sign-in after the response", async () => {
+      signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
+
+      await POST(makeRequest("acme.localhost"));
+
+      expect(after).toHaveBeenCalledOnce();
+      expect(writeSecurityAuditEvent).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ outcome: "succeeded", reason: "accepted" }),
+      );
     });
 
     it("leaves the sandbox cookie alone while a second factor is outstanding", async () => {

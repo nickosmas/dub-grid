@@ -35,30 +35,30 @@ export async function signOutFromBrowser(
     }
     return;
   }
-  // Tell the server first, while the session's tokens are still readable.
   // API routes verify tokens locally, so clearing them in the browser alone
-  // would leave this access token usable until it expires — the server has to
-  // record the revocation. Non-fatal: a failure here must never trap the user
-  // in a signed-in state.
-  try {
-    await fetchWithTimeout("/api/auth/sign-out", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // A refusal the server records only after checking it (F-28).
-      body: JSON.stringify(
-        typeof reason === "object"
-          ? {
-              scope: "local",
-              reason: "organization_access_denied",
-              orgSlug: reason.organizationAccessDenied,
-            }
-          : { scope: "local" },
-      ),
-      keepalive: true,
-    });
-  } catch {
-    // Ignore — proceed with the local sign-out regardless.
-  }
+  // would leave this access token usable until it expires: the server has to
+  // record the revocation. The request is sent first, carrying this session's
+  // cookies before the auth client clears them, and the Auth logout runs
+  // alongside it. The route verifies the token itself rather than asking Auth,
+  // so the session ending there first cannot stop the marker being written.
+  // Non-fatal: a failure here must never trap the user in a signed-in state.
+  const revocation = fetchWithTimeout("/api/auth/sign-out", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // A refusal the server records only after checking it (F-28).
+    body: JSON.stringify(
+      typeof reason === "object"
+        ? {
+            scope: "local",
+            reason: "organization_access_denied",
+            orgSlug: reason.organizationAccessDenied,
+          }
+        : { scope: "local" },
+    ),
+    keepalive: true,
+  }).catch(() => {
+    // Ignore: proceed with the local sign-out regardless.
+  });
 
   try {
     const { error } = await settleWithRequestTimeout<
@@ -68,10 +68,12 @@ export async function signOutFromBrowser(
   } finally {
     clearSupabaseBrowserAuthState();
     broadcastBrowserSignOut();
+    await revocation;
   }
 }
 
 export async function completeBrowserPasswordRecovery(): Promise<void> {
+  let revoked = false;
   try {
     const response = await fetchWithTimeout("/api/auth/sign-out", {
       method: "POST",
@@ -79,9 +81,15 @@ export async function completeBrowserPasswordRecovery(): Promise<void> {
       body: JSON.stringify({ scope: "global", reason: "password_recovery" }),
     });
     if (!response.ok) throw new Error("Recovery session revocation failed");
+    revoked = true;
   } finally {
+    // Once every session is revoked the local sign-out only tidies the auth
+    // client, so leaving never waits on it, as mobile's leaveRecovery does. A
+    // failed revocation still needs it to end this session on the auth server.
+    const localSignOut = supabase.auth.signOut({ scope: "local" });
     try {
-      await supabase.auth.signOut({ scope: "local" });
+      if (revoked) void localSignOut.catch(() => {});
+      else await localSignOut;
     } finally {
       clearSupabaseBrowserAuthState();
       broadcastBrowserSignOut();

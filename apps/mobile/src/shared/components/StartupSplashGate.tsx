@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
+import { prefetchHomeQueries } from "../../features/auth/lib/prefetch-home";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
 import { useAppLockState } from "../providers/AppLockProvider";
@@ -72,6 +73,16 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
       clearTimeout(timeout);
     };
   }, []);
+
+  // Home's first queries start as soon as bootstrap names the role, beside
+  // the splash rather than after the tab tree mounts.
+  const hasPrefetchedHomeRef = useRef(false);
+  const bootstrapData = bootstrapQuery.data;
+  useEffect(() => {
+    if (hasPrefetchedHomeRef.current || !accessToken || !bootstrapData) return;
+    hasPrefetchedHomeRef.current = true;
+    prefetchHomeQueries(accessToken, bootstrapData);
+  }, [accessToken, bootstrapData]);
 
   // Bootstrap is part of startup, not part of the tab tree: the tab bar's
   // shape and the Home tab's choice of screen both depend on it, so releasing

@@ -1,4 +1,4 @@
-import { CacheKey, TTL, cacheGetMany, cacheSet, cacheDel } from "@/lib/cache";
+import { CacheKey, TTL, cacheGetMany, cacheSetOrThrow, cacheDel } from "@/lib/cache";
 import { getServiceClient } from "@/lib/supabase-service";
 import { withTimeout } from "@/lib/with-timeout";
 
@@ -46,6 +46,19 @@ export interface RevocableToken {
 const MEMO_TTL_MS = 5_000;
 const memo = new Map<string, { revoked: boolean; expiresAt: number; userId: string }>();
 
+type RevocationMarkers = (number | string | null)[];
+
+/**
+ * The Redis read already under way for a memo key. A cold page fans out its
+ * requests before any of them has an answer to memoize, so they share one
+ * read. A revocation in this isolate marks the read stale, so nothing joins or
+ * memoizes an answer read before it.
+ */
+const inflight = new Map<
+  string,
+  { userId: string; markers: Promise<RevocationMarkers>; stale: boolean }
+>();
+
 /**
  * How long a request will wait on Redis before giving up and treating the
  * session as live.
@@ -68,6 +81,7 @@ const REVOCATION_LOOKUP_TIMEOUT_MS = 250;
 /** Test seam: clears the in-process memo between cases. */
 export function resetRevocationMemo(): void {
   memo.clear();
+  inflight.clear();
 }
 
 function memoKey(token: RevocableToken): string {
@@ -91,14 +105,28 @@ export async function isSessionRevoked(token: RevocableToken): Promise<boolean> 
   const now = Date.now();
   if (cached && cached.expiresAt > now) return cached.revoked;
 
-  const keys = [CacheKey.revokedAfter(token.userId)];
-  if (token.sessionId) keys.push(CacheKey.revokedSession(token.sessionId));
+  let lookup = inflight.get(key);
+  if (!lookup) {
+    const keys = [CacheKey.revokedAfter(token.userId)];
+    if (token.sessionId) keys.push(CacheKey.revokedSession(token.sessionId));
+    const started = {
+      userId: token.userId,
+      markers: withTimeout(
+        cacheGetMany<number | string>(keys),
+        REVOCATION_LOOKUP_TIMEOUT_MS,
+        keys.map(() => null),
+      ),
+      stale: false,
+    };
+    const settle = () => {
+      if (inflight.get(key) === started) inflight.delete(key);
+    };
+    started.markers.then(settle, settle);
+    inflight.set(key, started);
+    lookup = started;
+  }
 
-  const [revokedAfter, revokedSession] = await withTimeout(
-    cacheGetMany<number | string>(keys),
-    REVOCATION_LOOKUP_TIMEOUT_MS,
-    keys.map(() => null),
-  );
+  const [revokedAfter, revokedSession] = await lookup.markers;
 
   let revoked = false;
   if (token.sessionId && revokedSession != null) {
@@ -111,7 +139,9 @@ export async function isSessionRevoked(token: RevocableToken): Promise<boolean> 
     if (Number.isFinite(watermark) && token.issuedAtMs <= watermark) revoked = true;
   }
 
-  memo.set(key, { revoked, expiresAt: now + MEMO_TTL_MS, userId: token.userId });
+  if (!lookup.stale) {
+    memo.set(key, { revoked, expiresAt: now + MEMO_TTL_MS, userId: token.userId });
+  }
   return revoked;
 }
 
@@ -130,6 +160,16 @@ function forgetMemoizedUser(userId: string): void {
   for (const [key, entry] of memo) {
     if (entry.userId === userId) memo.delete(key);
   }
+  for (const [key, entry] of inflight) {
+    if (entry.userId === userId) forgetInflight(key);
+  }
+}
+
+function forgetInflight(key: string): void {
+  const entry = inflight.get(key);
+  if (!entry) return;
+  entry.stale = true;
+  inflight.delete(key);
 }
 
 /**
@@ -140,7 +180,8 @@ function forgetMemoizedUser(userId: string): void {
  */
 export async function revokeSession(sessionId: string): Promise<void> {
   memo.delete(sessionId);
-  await cacheSet(CacheKey.revokedSession(sessionId), Date.now(), TTL.ACCESS_TOKEN);
+  forgetInflight(sessionId);
+  await cacheSetOrThrow(CacheKey.revokedSession(sessionId), Date.now(), TTL.ACCESS_TOKEN);
 
   const { error } = await getServiceClient()
     .from("user_sessions")
@@ -162,7 +203,7 @@ export async function revokeSession(sessionId: string): Promise<void> {
  */
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   forgetMemoizedUser(userId);
-  await cacheSet(CacheKey.revokedAfter(userId), Date.now(), TTL.ACCESS_TOKEN);
+  await cacheSetOrThrow(CacheKey.revokedAfter(userId), Date.now(), TTL.ACCESS_TOKEN);
 
   const { error } = await getServiceClient().from("user_sessions").delete().eq("user_id", userId);
   if (error) throw error;
@@ -232,7 +273,7 @@ export async function revokeOtherUserSessions(
     }
     if (!data || data.length < pageSize) break;
   }
-  for (const sessionId of sessionIds) await revokeSession(sessionId);
+  await Promise.all([...sessionIds].map((sessionId) => revokeSession(sessionId)));
 }
 
 /**

@@ -11,7 +11,12 @@ import type { Session } from "@supabase/supabase-js";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { getMobileAuthIdentity, isSameMobileAuthIdentity } from "../lib/access-token";
 import { registerMobileSessionPresence } from "../lib/api";
-import { reportSessionPresence } from "../lib/session-presence-report";
+import {
+  getSessionPresenceKey,
+  reportSessionPresence,
+  shouldReportSessionPresence,
+  type SessionPresenceMark,
+} from "../lib/session-presence-report";
 import { queryClient } from "../lib/query-client";
 import { getSupabaseClient } from "../lib/supabase";
 
@@ -80,6 +85,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     restoreError: false,
   });
   const lastTrackedAccessTokenRef = useRef<string | null>(null);
+  const lastPresenceRef = useRef<SessionPresenceMark | null>(null);
   const retryRestoreRef = useRef<() => Promise<void>>(async () => undefined);
   const clearSessionRef = useRef<() => Promise<void>>(async () => undefined);
   const supabase = getSupabaseClient();
@@ -131,17 +137,26 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
       if (!session?.access_token) {
         lastTrackedAccessTokenRef.current = null;
+        lastPresenceRef.current = null;
       } else if (lastTrackedAccessTokenRef.current !== session.access_token) {
         const token = session.access_token;
         lastTrackedAccessTokenRef.current = token;
-        const isCurrent = () => lastTrackedAccessTokenRef.current === token;
-        void reportSessionPresence(token, { send: registerMobileSessionPresence, isCurrent }).then(
-          (reported) => {
-            // Forget a token that never got reported, so its next appearance
-            // reports it again.
-            if (!reported && isCurrent()) lastTrackedAccessTokenRef.current = null;
-          },
-        );
+        const sessionKey = getSessionPresenceKey(token);
+        if (shouldReportSessionPresence(lastPresenceRef.current, sessionKey, Date.now())) {
+          const mark = { sessionKey, reportedAt: Date.now() };
+          lastPresenceRef.current = mark;
+          const isCurrent = () => lastTrackedAccessTokenRef.current === token;
+          void reportSessionPresence(token, {
+            send: registerMobileSessionPresence,
+            isCurrent,
+          }).then((reported) => {
+            if (reported) return;
+            // Forget a report that never landed, so the next appearance of
+            // this token, or the session's next token, reports again.
+            if (isCurrent()) lastTrackedAccessTokenRef.current = null;
+            if (lastPresenceRef.current === mark) lastPresenceRef.current = null;
+          });
+        }
       }
 
       setValue({

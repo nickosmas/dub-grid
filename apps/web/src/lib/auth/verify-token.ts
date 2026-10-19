@@ -81,6 +81,12 @@ function supabaseIssuer(): string | null {
   return supabaseUrl ? `${supabaseUrl}/auth/v1` : null;
 }
 
+/** The issuer and audience every Supabase access token must carry, or null when unconfigured. */
+export function supabaseTokenClaimChecks(): { issuer: string; audience: string } | null {
+  const issuer = supabaseIssuer();
+  return issuer ? { issuer, audience: "authenticated" } : null;
+}
+
 /**
  * Pulls the access token off a request.
  *
@@ -112,14 +118,11 @@ export function extractBearerToken(req: NextRequest): string | null {
  */
 export async function verifyAccessToken(token: string): Promise<VerifiedToken | null> {
   const jwks = getSupabaseJwks();
-  const issuer = supabaseIssuer();
-  if (!jwks || !issuer) return null;
+  const claimChecks = supabaseTokenClaimChecks();
+  if (!jwks || !claimChecks) return null;
 
   try {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-      audience: "authenticated",
-    });
+    const { payload } = await jwtVerify(token, jwks, claimChecks);
 
     const claims = payload as VerifiedClaims;
     if (

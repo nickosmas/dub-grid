@@ -13,6 +13,11 @@ const mockHistoryReplaceState = vi.fn();
 const mockToastInfo = vi.fn();
 const mockToastDismiss = vi.fn();
 const mockToastError = vi.fn();
+const mockGetSession = vi.fn();
+
+function sessionFor(claims: Record<string, unknown>) {
+  return { access_token: `header.${btoa(JSON.stringify(claims))}.signature` };
+}
 
 vi.mock("sonner", () => ({
   toast: {
@@ -25,6 +30,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/features/account/client", () => ({
   signOutFromBrowser: (...args: unknown[]) => mockSignOutFromBrowser(...args),
   clearLogoutCleanup: (...args: unknown[]) => mockClearLogoutCleanup(...args),
+  getBrowserAuthSession: (...args: unknown[]) => mockGetSession(...args),
   getBrowserRealtimeChannels: (...args: unknown[]) => mockGetChannels(...args),
   removeBrowserRealtimeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
   untrackBrowserRealtimeChannel: (...args: unknown[]) => mockUntrackChannel(...args),
@@ -54,6 +60,7 @@ describe("RunLogoutTeardown", () => {
     vi.clearAllMocks();
     mockSignOutFromBrowser.mockResolvedValue(undefined);
     mockClearLogoutCleanup.mockResolvedValue({ success: true });
+    mockGetSession.mockResolvedValue(sessionFor({ sub: "gm-1", platform_role: "gridmaster" }));
     mockGetChannels.mockReturnValue([]);
     mockRemoveChannel.mockResolvedValue("ok");
     mockUntrackChannel.mockResolvedValue("ok");
@@ -208,6 +215,22 @@ describe("RunLogoutTeardown", () => {
     renderWithClient(<RunLogoutTeardown scope="global" />);
 
     await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("global"));
+  });
+
+  it("skips the impersonation cleanup for a session that is not a Gridmaster's", async () => {
+    mockGetSession.mockResolvedValue(sessionFor({ sub: "user-1", platform_role: "none" }));
+    renderWithClient(<RunLogoutTeardown scope="local" />);
+
+    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local"));
+    expect(mockClearLogoutCleanup).not.toHaveBeenCalled();
+  });
+
+  it("still asks for the cleanup when the session cannot be read", async () => {
+    mockGetSession.mockRejectedValue(new Error("lock unavailable"));
+    renderWithClient(<RunLogoutTeardown scope="local" />);
+
+    await waitFor(() => expect(mockSignOutFromBrowser).toHaveBeenCalledWith("local"));
+    expect(mockClearLogoutCleanup).toHaveBeenCalledOnce();
   });
 
   it("short-circuits when scope is null (direct /goodbye visit)", async () => {

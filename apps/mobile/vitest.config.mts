@@ -84,7 +84,6 @@ export default defineConfig(async () => {
           "device",
           "secure-store",
           "network",
-          "tracking-transparency",
           "font",
           "asset",
           "local-authentication",

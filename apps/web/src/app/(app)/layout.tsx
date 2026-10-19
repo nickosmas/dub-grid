@@ -9,7 +9,16 @@ import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import { TwoFactorReenrollGate } from "@/components/auth/TwoFactorReenrollGate";
 import SignInPrefetch from "@/components/SignInPrefetch";
 import PostHogProvider from "@/components/PostHogProvider";
-import { isFeatureEnabled } from "@/lib/feature-flags";
+import { preconnect, prefetchDNS } from "react-dom";
+import { getClientFeatureFlags, isFeatureEnabled } from "@/lib/feature-flags";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
+import {
+  getSupabaseUrl,
+  requireSupabasePublishableKey,
+  requireSupabaseUrl,
+} from "@/lib/supabase-keys";
 import "../app-ui.css";
 
 /**
@@ -38,13 +47,55 @@ import "../app-ui.css";
  */
 export const dynamic = "force-dynamic";
 
+function supabaseOrigin(): string | null {
+  try {
+    return new URL(getSupabaseUrl() ?? "").origin;
+  } catch {
+    return null;
+  }
+}
+
+// /api/feature-flags answers signed-in callers only, so the layout seeds the
+// same answer only for a request carrying a validly signed session.
+async function hasVerifiedSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll() {
+        // Server Components cannot mutate cookies.
+      },
+    },
+  });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ? (await verifyAccessToken(session.access_token)) !== null : false;
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const posthogEnabled = await isFeatureEnabled("posthog");
+  // The first auth call and the realtime socket both go to Supabase; opening
+  // the connection with the document saves their DNS and TLS round trips.
+  // supabase-js fetches without credentials, hence the anonymous pool.
+  const supabase = supabaseOrigin();
+  if (supabase) {
+    preconnect(supabase, { crossOrigin: "anonymous" });
+    prefetchDNS(supabase);
+  }
+  const [posthogEnabled, signedIn] = await Promise.all([
+    isFeatureEnabled("posthog"),
+    hasVerifiedSession().catch(() => false),
+  ]);
+  const initialFeatureFlags = signedIn
+    ? { flags: await getClientFeatureFlags(), readAt: Date.now() }
+    : undefined;
 
   return (
     <AuthProvider>
       <PostHogProvider enabled={posthogEnabled}>
-        <QueryProvider>
+        <QueryProvider initialFeatureFlags={initialFeatureFlags}>
           {/* No Suspense boundary here on purpose. It used to wrap this whole
               subtree — every page — to satisfy OnboardingGate's
               useSearchParams(). Next renders a boundary's fallback into the

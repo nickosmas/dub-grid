@@ -20,7 +20,15 @@ vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://fake.upstash.io");
 vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "fake-token");
 
 // Import after mocks are in place
-import { cacheGet, cacheSet, cacheDel, cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import {
+  cacheGet,
+  cacheSet,
+  cacheSetOrThrow,
+  cacheDel,
+  cacheThrough,
+  CacheKey,
+  TTL,
+} from "@/lib/cache";
 
 describe("cache module", () => {
   beforeEach(() => {
@@ -98,6 +106,31 @@ describe("cache module", () => {
     it("does not throw on Redis error", async () => {
       mockSet.mockRejectedValueOnce(new Error("Write error"));
       await expect(cacheSet("key", "value", 60)).resolves.toBeUndefined();
+    });
+  });
+
+  describe("cacheSetOrThrow", () => {
+    it("writes the value with its TTL", async () => {
+      mockSet.mockResolvedValueOnce("OK");
+      await cacheSetOrThrow("key", 1, 60);
+      expect(mockSet).toHaveBeenCalledWith("key", 1, { ex: 60 });
+    });
+
+    it("throws when the write fails, unlike cacheSet", async () => {
+      mockSet.mockRejectedValueOnce(new Error("Redis down"));
+      await expect(cacheSetOrThrow("key", 1, 60)).rejects.toThrow("Redis down");
+    });
+
+    it("throws when the write times out", async () => {
+      vi.useFakeTimers();
+      try {
+        mockSet.mockReturnValueOnce(new Promise(() => {}));
+        const write = expect(cacheSetOrThrow("key", 1, 60)).rejects.toThrow("timed out");
+        await vi.advanceTimersByTimeAsync(2_000);
+        await write;
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useClipPageTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
@@ -8,7 +9,6 @@ import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import InactiveAccountBanner from "@/components/InactiveAccountBanner";
-import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import {
@@ -18,6 +18,9 @@ import {
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/components/AuthProvider";
+
+// Renders nothing until its own query says to, and then only once per trial.
+const TrialWelcomeModal = dynamic(() => import("@/components/TrialWelcomeModal"), { ssr: false });
 
 const APP_ROUTES = [
   "/dashboard",

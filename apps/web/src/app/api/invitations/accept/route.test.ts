@@ -6,6 +6,14 @@ const validateCsrfOrigin = vi.fn();
 const rpc = vi.fn();
 const createRequestSupabaseClient = vi.fn();
 const dispatchNotificationEvent = vi.fn();
+const after = vi.fn((task: () => unknown) => {
+  void task();
+});
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => after(task),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (request: NextRequest) => requireAuthenticatedUser(request),
@@ -57,6 +65,8 @@ describe("POST /api/invitations/accept", () => {
       orgSlug: "calm-haven",
     });
     expect(rpc).toHaveBeenCalledWith("accept_invitation", { p_token: "invite-token" });
+    // Kept alive past the response rather than left as a bare promise.
+    expect(after).toHaveBeenCalledOnce();
     expect(dispatchNotificationEvent).toHaveBeenCalledWith("accepted-user", {
       action: "invitation_accepted",
       orgId: "org-1",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useLatestRef } from "@/hooks/useLatestRef";
+import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
 import { useAuth } from "@/components/AuthProvider";
@@ -24,12 +24,6 @@ import type {
   Department,
   IndicatorType,
 } from "@/types";
-import {
-  fetchShifts,
-  fetchPublishHistory,
-  fetchPublishedDateRanges,
-  fetchRecentPublishHistory,
-} from "@/features/schedule/client";
 import {
   buildPublishedDateSet,
   filterPublishedDates,
@@ -55,6 +49,15 @@ import { hasEffectiveCoverageRequirements } from "@dubgrid/schedule-core";
 import { getScheduleStartForSpan, realignTwoWeekScheduleStart } from "@/lib/schedule-view";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import { formatDateKey } from "@/lib/utils";
+import {
+  dashboardLabelsKey,
+  dashboardPublishHistoryQueryOptions,
+  dashboardPublishedRangesQueryOptions,
+  dashboardRecentChangesQueryOptions,
+  dashboardShiftsQueryOptions,
+  dashboardWindows,
+  isDashboardScheduler,
+} from "./dashboardQueries";
 
 export type ViewMode = "week" | "2weeks";
 
@@ -68,7 +71,6 @@ import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
 import { useDashboardInvitations } from "./useDashboardInvitations";
-import { dashboardScheduleWindow } from "./dashboardScheduleNotes";
 import { useDashboardScheduleNotes } from "./useDashboardScheduleNotes";
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
@@ -95,10 +97,10 @@ type ExpandedPanel = "coverage" | "openShifts" | "staffHours" | "breakdown" | "a
 
 export type DashboardRoleVariant = "user" | "admin" | "super-admin";
 
-// On the user dashboard the hero highlights your current/next shift, which may
-// fall outside the period being browsed. Always load this many days forward
-// from today so the hero can find the genuine next upcoming shift.
-const HERO_LOOKAHEAD_DAYS = 21;
+const NO_SHIFTS: ShiftMap = {};
+const NO_RANGES: { startDate: string; endDate: string }[] = [];
+const NO_PUBLISHES: PublishHistoryEntryWithName[] = [];
+const NO_CHANGES = new Map<string, PublishChange>();
 
 interface DashboardViewProps {
   org: Organization;
@@ -385,21 +387,8 @@ export default function DashboardView({
   }, [alignPeriodStart, viewMode]);
 
   // ─── Data fetching ──────────────────────────────────────
-  const [allShifts, setAllShifts] = useState<ShiftMap>({});
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntryWithName | null>(null);
-  const [activityPublishHistory, setActivityPublishHistory] = useState<
-    PublishHistoryEntryWithName[]
-  >([]);
-  const [shiftsLoading, setShiftsLoading] = useState(true);
-  const [publishedDateRanges, setPublishedDateRanges] = useState<
-    { startDate: string; endDate: string }[]
-  >([]);
-  const [recentPublishedChanges, setRecentPublishedChanges] = useState<Map<string, PublishChange>>(
-    () => new Map(),
-  );
-
   const orgId = org.id;
-  const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
+  const isScheduler = isDashboardScheduler(permissions);
   const publishedAssignmentIdByPair = useMemo(
     () =>
       createAssignmentDefinitionIdByPairMap(allAssignmentDefinitions ?? assignments, {
@@ -415,114 +404,53 @@ export default function DashboardView({
     !isUserDashboardMode && permissions.canManageEmployees,
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    const today = new Date(`${todayKey}T00:00:00`);
-    const heroEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
-    const historyStart = isUserDashboardMode && today < periodStart ? today : periodStart;
-    const historyEnd = isUserDashboardMode && heroEnd > periodEnd ? heroEnd : periodEnd;
-    fetchRecentPublishHistory(orgId, null, true, {
-      startDate: formatDateKey(historyStart),
-      endDate: formatDateKey(historyEnd),
-    })
-      .then((entries) => {
-        if (cancelled) return;
-        const changes = new Map<string, PublishChange>();
-        for (let entryIndex = entries.length - 1; entryIndex >= 0; entryIndex -= 1) {
-          for (const change of entries[entryIndex].changes) {
-            changes.set(`${change.empId}_${change.date}`, change);
-          }
-        }
-        setRecentPublishedChanges(changes);
-      })
-      .catch(() => {
-        if (!cancelled) setRecentPublishedChanges(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isUserDashboardMode, orgId, periodEnd, periodStart, todayKey]);
-
-  const scheduleWindow = useMemo(
-    () =>
-      dashboardScheduleWindow({
-        todayKey,
-        isUserDashboardMode,
-        prevPeriodStart,
-        periodEnd,
-        heroLookaheadDays: HERO_LOOKAHEAD_DAYS,
-      }),
-    [isUserDashboardMode, periodEnd, prevPeriodStart, todayKey],
+  const windows = useMemo(
+    () => dashboardWindows({ todayKey, isUserDashboardMode, periodStart, periodDays }),
+    [isUserDashboardMode, periodDays, periodStart, todayKey],
   );
+  const scheduleWindow = windows.schedule;
   const scheduleNotes = useDashboardScheduleNotes(orgId, scheduleWindow);
 
-  // Stable refs for Maps to avoid re-fetching on every render
-  // (Map objects have no referential stability)
-  const assignmentLabelMapRef = useLatestRef(assignmentLabelMap);
-  const absenceTypeMapRef = useLatestRef(absenceTypeMap);
+  const labelsKey = useMemo(
+    () => dashboardLabelsKey(assignmentLabelMap, absenceTypeMap),
+    [assignmentLabelMap, absenceTypeMap],
+  );
+  const shiftsQuery = useQuery(
+    dashboardShiftsQueryOptions({
+      orgId,
+      isScheduler,
+      window: scheduleWindow,
+      assignmentLabelMap,
+      absenceTypeMap,
+      labelsKey,
+    }),
+  );
+  const publishedRangesQuery = useQuery(
+    dashboardPublishedRangesQueryOptions(orgId, windows.publishedRanges),
+  );
+  // Skipped on the user dashboard: the Activity Feed and the publish banner it
+  // feeds are both admin-only. The permission check mirrors what the route
+  // enforces, so a permissionless admin never fires a request it would 403.
+  const canReadPublishHistory = !isUserDashboardMode && permissions.canViewDashboardAnalytics;
+  const publishHistoryQuery = useQuery({
+    ...dashboardPublishHistoryQueryOptions(orgId, windows.period),
+    enabled: canReadPublishHistory,
+  });
+  const recentChangesQuery = useQuery(
+    dashboardRecentChangesQueryOptions(orgId, windows.recentChanges, isScheduler),
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setShiftsLoading(true);
-
-    const fetchStart = scheduleWindow.start;
-    const fetchEnd = scheduleWindow.end;
-    Promise.all([
-      fetchShifts(
-        orgId,
-        isScheduler,
-        assignmentLabelMapRef.current,
-        absenceTypeMapRef.current,
-        fetchStart,
-        fetchEnd,
-      ),
-      // Widened to cover the previous period too, so the previous-period
-      // coverage % can apply the same published-date filter as the current
-      // period instead of comparing an unfiltered range against a filtered one.
-      fetchPublishedDateRanges(orgId, prevPeriodStartKey, periodEndKey).catch(() => []),
-      // Period-scoped (overlap with the selected window) to match mobile's
-      // Activity Feed, instead of "most recent 20 publishes regardless of
-      // what period they cover."
-      //
-      // Skipped on the user dashboard: the Activity Feed and the publish
-      // banner it feeds are both admin-only, so staff were being handed an
-      // audit trail of who published what purely to discard it. The permission
-      // check mirrors what the route now enforces, so a permissionless admin
-      // never fires a request it would only 403 and swallow.
-      isUserDashboardMode || !permissions.canViewDashboardAnalytics
-        ? Promise.resolve([])
-        : fetchPublishHistory(orgId, 100, 0, {
-            startDate: periodStartKey,
-            endDate: periodEndKey,
-          }).catch(() => []),
-    ])
-      .then(([shifts, publishedRanges, publishRows]) => {
-        if (cancelled) return;
-        setAllShifts(shifts);
-        setPublishedDateRanges(publishedRanges);
-        setPublishHistory(publishRows[0] ?? null);
-        setActivityPublishHistory(publishRows);
-        setShiftsLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) setShiftsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    orgId,
-    isScheduler,
-    isUserDashboardMode,
-    permissions.canViewDashboardAnalytics,
-    todayKey,
-    periodEnd,
-    periodEndKey,
-    periodStartKey,
-    scheduleWindow.start,
-    scheduleWindow.end,
-  ]);
+  const allShifts = shiftsQuery.data ?? NO_SHIFTS;
+  const publishedDateRanges = publishedRangesQuery.data ?? NO_RANGES;
+  const activityPublishHistory = canReadPublishHistory
+    ? (publishHistoryQuery.data ?? NO_PUBLISHES)
+    : NO_PUBLISHES;
+  const publishHistory = activityPublishHistory[0] ?? null;
+  const recentPublishedChanges = recentChangesQuery.data ?? NO_CHANGES;
+  const shiftsLoading =
+    shiftsQuery.isPending ||
+    publishedRangesQuery.isPending ||
+    (canReadPublishHistory && publishHistoryQuery.isPending);
 
   // Shift requests
   const currentEmpId = useMemo(

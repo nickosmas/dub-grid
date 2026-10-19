@@ -134,9 +134,17 @@ async function handleGET(req: NextRequest, timer: Timer) {
       });
     }
 
-    const [inactive, employmentFlags] = await Promise.all([
+    const [inactive, employmentFlags, membershipResult] = await Promise.all([
       orgId ? isCallerInactive(serviceClient, auth.user.id, orgId) : Promise.resolve(false),
       getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
+      orgId
+        ? serviceClient
+            .from("organization_memberships")
+            .select("org_role, admin_permissions")
+            .eq("user_id", auth.user.id)
+            .eq("org_id", orgId)
+            .maybeSingle()
+        : Promise.resolve(null),
     ]);
 
     // The org_role claim trails the database after a promotion: the membership
@@ -151,13 +159,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
     // claim while the membership is valid, so no row here means it was archived
     // after the token was minted.
     if (orgId) {
-      const { data } = await serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", auth.user.id)
-        .eq("org_id", orgId)
-        .maybeSingle();
-
+      const data = membershipResult?.data;
       const dbRole = (data?.org_role as OrganizationRole | null) ?? "user";
       return NextResponse.json({
         permissions: buildPerms(

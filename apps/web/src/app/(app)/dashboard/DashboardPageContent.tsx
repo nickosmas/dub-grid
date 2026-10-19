@@ -7,10 +7,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
-import DashboardView from "@/components/dashboard/DashboardView";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { queryKeys } from "@/lib/query-keys";
+
+// Loaded apart from the page so its download can start during sign-in (see
+// preloadDashboardView) instead of after this route's payload arrives.
+const DashboardView = dynamic(() => import("@/components/dashboard/DashboardView"), {
+  loading: () => <ProgressBar loading />,
+});
 
 const GridmasterPortal = dynamic(() => import("@/components/gridmaster/GridmasterPortal"), {
   loading: () => null,

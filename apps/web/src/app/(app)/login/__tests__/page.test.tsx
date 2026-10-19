@@ -110,13 +110,15 @@ function validateDomainResponse() {
 
 const TARGET_ORG_ID = "11111111-1111-4111-8111-111111111111";
 
-function sessionToken(userId: string, orgId: string, orgSlug: string): string {
-  return `header.${btoa(JSON.stringify({ sub: userId, org_id: orgId, org_slug: orgSlug }))}.signature`;
+function sessionToken(userId: string, orgId: string, orgSlug: string, orgRole = "user"): string {
+  return `header.${btoa(
+    JSON.stringify({ sub: userId, org_id: orgId, org_slug: orgSlug, org_role: orgRole }),
+  )}.signature`;
 }
 
-function browserSession(userId: string, orgId: string, orgSlug: string) {
+function browserSession(userId: string, orgId: string, orgSlug: string, orgRole = "user") {
   return {
-    access_token: sessionToken(userId, orgId, orgSlug),
+    access_token: sessionToken(userId, orgId, orgSlug, orgRole),
     refresh_token: "refresh-token",
     user: { id: userId },
   };
@@ -200,10 +202,12 @@ describe("OrgLogin submit states", () => {
         refresh_token: "refresh-token",
       });
       expect(mockSetSession).not.toHaveBeenCalled();
-      expect(mockExitSandbox).toHaveBeenCalledTimes(1);
+      // The login route cleared the sandbox cookie and tore the sandbox down.
+      expect(mockExitSandbox).not.toHaveBeenCalled();
       expect(mockPrimeSignInQueries).toHaveBeenCalledExactlyOnceWith(
         expect.any(Object),
         sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+        { dashboard: true },
       );
     });
 
@@ -502,6 +506,84 @@ describe("OrgLogin submit states", () => {
     );
   });
 
+  function mfaLoginResponse(orgId: string, orgSlug: string) {
+    return loginResponse({
+      session: { access_token: sessionToken("user-1", orgId, orgSlug), refresh_token: "r" },
+      mfa_required: true,
+      didSwitchOrg: false,
+      destination: null,
+    });
+  }
+
+  it("finishes a Super Admin's second factor with the trial, terms and completion together", async () => {
+    mockGetSession.mockResolvedValue(
+      browserSession("user-1", TARGET_ORG_ID, "calmhaven", "super_admin"),
+    );
+    let finishTrial!: () => void;
+    mockStartTrial.mockReturnValue(
+      new Promise((resolve) => {
+        finishTrial = () => resolve({ success: true });
+      }),
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(mfaLoginResponse(TARGET_ORG_ID, "calmhaven"));
+
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    submitForm(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+
+    await waitFor(() => expect(mockStartTrial).toHaveBeenCalledExactlyOnceWith(TARGET_ORG_ID));
+    // Neither waits on the trial.
+    await waitFor(() => expect(mockFetchTerms).toHaveBeenCalledTimes(1));
+    expect(mockRecordSignInCompleted).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+
+    await act(async () => finishTrial());
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard"));
+  });
+
+  it("does not ask to start a trial for anyone but a Super Admin", async () => {
+    mockGetSession.mockResolvedValue(browserSession("user-1", TARGET_ORG_ID, "calmhaven", "admin"));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(mfaLoginResponse(TARGET_ORG_ID, "calmhaven"));
+
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    submitForm(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard"));
+    expect(mockStartTrial).not.toHaveBeenCalled();
+    expect(mockRecordSignInCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts the trial from the switched session's role, after the switch", async () => {
+    mockGetSession.mockResolvedValue(browserSession("user-1", "org-old", "other", "user"));
+    mockFetchOrganizations.mockResolvedValue({
+      organizations: [{ org_id: TARGET_ORG_ID, org_slug: "calmhaven" }],
+    });
+    mockRefreshSession.mockResolvedValue(
+      browserSession("user-1", TARGET_ORG_ID, "calmhaven", "super_admin"),
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(mfaLoginResponse("org-old", "other"));
+
+    const { container } = renderWithQueryClient(
+      <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+    );
+    submitForm(container);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete MFA" }));
+
+    await waitFor(() => expect(window.location.replace).toHaveBeenCalledWith("/dashboard"));
+    expect(mockStartTrial).toHaveBeenCalledExactlyOnceWith(TARGET_ORG_ID);
+    expect(mockExitSandbox).toHaveBeenCalledTimes(1);
+    for (const call of [mockStartTrial, mockFetchTerms, mockRecordSignInCompleted]) {
+      expect(mockRefreshSession.mock.invocationCallOrder[0]).toBeLessThan(
+        call.mock.invocationCallOrder[0]!,
+      );
+    }
+  });
+
   it("fails closed when MFA switching succeeds but refresh does not", async () => {
     mockGetSession.mockResolvedValue(browserSession("user-1", "org-old", "other"));
     mockFetchOrganizations.mockResolvedValue({
@@ -628,7 +710,9 @@ describe("OrgLogin submit states", () => {
         finishTermsLookup = resolve;
       }),
     );
-    mockGetSession.mockResolvedValue(browserSession("user-1", TARGET_ORG_ID, "calmhaven"));
+    mockGetSession.mockResolvedValue(
+      browserSession("user-1", TARGET_ORG_ID, "calmhaven", "super_admin"),
+    );
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       loginResponse({
         mfa_required: true,

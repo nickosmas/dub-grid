@@ -5,14 +5,18 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
-import { evaluateOrgBillingAccess, ORG_ACCESS_SELECT } from "@/lib/billing-policy";
+import {
+  evaluateOrgBillingAccess,
+  getPlatformBillingPolicy,
+  ORG_ACCESS_SELECT,
+} from "@/lib/billing-policy";
 import { localSupabaseConnectSources } from "@/lib/local-supabase-csp";
 import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
-import { cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { cacheGet, cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
-import { getSupabaseJwks } from "@/lib/auth/verify-token";
+import { getSupabaseJwks, supabaseTokenClaimChecks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
@@ -41,7 +45,7 @@ import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
 /**
  * Per-isolate memo in front of the org-access lookup below.
  *
- * `cacheThrough` still costs a Redis GET on a hit, and this check runs on every
+ * `cacheGet` still costs a Redis GET on a hit, and this check runs on every
  * authenticated navigation — including each RSC request — so a user clicking
  * around paid a network round trip per page. Redis is not always nearby:
  * measured at 340-670ms from one development machine.
@@ -53,6 +57,9 @@ import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
  * remains usable for up to an hour, which is the whole reason for the check.
  */
 const MW_ORG_ACCESS_MEMO_MS = 10_000;
+// Visibility is memoized per person, so the map is bounded by sweeping expired
+// entries once it grows past this, and dropping everything if none had expired.
+const MW_MEMO_MAX_ENTRIES = 5_000;
 type MwOrgAccess = {
   suspended_at: string | null;
   archived_at: string | null;
@@ -61,10 +68,17 @@ type MwOrgAccess = {
   /** The billing policy override columns (see ORG_ACCESS_SELECT). */
   [column: string]: unknown;
 } | null;
-const mwOrgAccessMemo = new Map<string, { value: MwOrgAccess; expiresAt: number }>();
+type MemoEntry<T> = { value: T; expiresAt: number };
+// The organization's own state, read with the service client: the same for
+// every member, so it is safe to share per organization.
+const mwOrgAccessMemo = new Map<string, MemoEntry<NonNullable<MwOrgAccess>>>();
+// Whether this caller can still see the organization, keyed by person and
+// organization. Only `true` is ever kept.
+const mwOrgVisibleMemo = new Map<string, MemoEntry<true>>();
 
-// The platform billing policy is service-only; the org row above is read as the
-// member. The client is built only when the policy memo and Redis both miss.
+// Organization state and the platform billing policy are read with the service
+// client; whether the caller may see the organization is read as the caller.
+// The client is built only when a memo and Redis both miss.
 let platformPolicyServiceClient: ReturnType<typeof createClient> | null = null;
 function platformPolicyClient(): { from: (table: string) => any } {
   return {
@@ -82,9 +96,10 @@ function platformPolicyClient(): { from: (table: string) => any } {
   };
 }
 
-/** Test seam: clears the in-process org-access memo between cases. */
+/** Test seam: clears the in-process org-access memos between cases. */
 export function resetMiddlewareOrgAccessMemo(): void {
   mwOrgAccessMemo.clear();
+  mwOrgVisibleMemo.clear();
 }
 
 function redirectWithCookies(url: URL, source: NextResponse): NextResponse {
@@ -95,26 +110,38 @@ function redirectWithCookies(url: URL, source: NextResponse): NextResponse {
   return redirect;
 }
 
-async function readOrgAccess(
-  orgId: string,
-  load: () => Promise<MwOrgAccess>,
-  refresh = false,
-): Promise<MwOrgAccess> {
+function remember<T>(memo: Map<string, MemoEntry<T>>, key: string, value: T, now: number): void {
+  if (memo.size >= MW_MEMO_MAX_ENTRIES) {
+    for (const [entryKey, entry] of memo) if (entry.expiresAt <= now) memo.delete(entryKey);
+    if (memo.size >= MW_MEMO_MAX_ENTRIES) memo.clear();
+  }
+  memo.set(key, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
+}
+
+/**
+ * Memo, then Redis, then `load`. A null answer is never kept at either level:
+ * for visibility it is one person's lost membership, and the next read must
+ * ask again. `refresh` skips both caches and replaces them with a fresh read.
+ */
+async function readMemoized<T>(
+  memo: Map<string, MemoEntry<T>>,
+  memoKey: string,
+  cacheKey: string,
+  load: () => Promise<T | null>,
+  refresh: boolean,
+): Promise<T | null> {
   const now = Date.now();
   if (!refresh) {
-    const memoized = mwOrgAccessMemo.get(orgId);
+    const memoized = memo.get(memoKey);
     if (memoized && memoized.expiresAt > now) return memoized.value;
   }
-
-  const value = refresh
-    ? await load()
-    : await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
-  // The read is RLS-scoped but the key is per organization: an empty result is
-  // one caller's lost membership, not the organization's state, so it must
-  // never be memoized for the next caller. (Redis stores it as a miss already.)
-  if (value === null) return value;
-  mwOrgAccessMemo.set(orgId, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
-  if (refresh) void cacheSet(CacheKey.mwOrgAccess(orgId), value, TTL.MIDDLEWARE);
+  let value = refresh ? null : await cacheGet<T>(cacheKey);
+  if (value === null) {
+    value = await load();
+    if (value === null) return null;
+    void cacheSet(cacheKey, value, TTL.MIDDLEWARE);
+  }
+  remember(memo, memoKey, value, now);
   return value;
 }
 
@@ -243,6 +270,10 @@ export async function proxy(req: NextRequest) {
       );
 
   const requestHeaders = new Headers(req.headers);
+  // Nothing upstream may claim to have been set by this proxy.
+  for (const name of [...requestHeaders.keys()]) {
+    if (name.startsWith("x-dubgrid-")) requestHeaders.delete(name);
+  }
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
   // Marketing content is canonical on the apex. Organization and Gridmaster
@@ -332,9 +363,10 @@ export async function proxy(req: NextRequest) {
   let claimsVerified = false;
   try {
     const jwks = getSupabaseJwks();
-    if (jwks) {
+    const claimChecks = supabaseTokenClaimChecks();
+    if (jwks && claimChecks) {
       const { payload } = await timer.time("jwt_verify", () =>
-        jwtVerify(session.access_token, jwks),
+        jwtVerify(session.access_token, jwks, claimChecks),
       );
       claims = payload as JWTClaims;
       claimsVerified = true;
@@ -562,12 +594,15 @@ export async function proxy(req: NextRequest) {
     }
   }
 
+  // The organization the caller's token names, before a sandbox swaps in the
+  // copy: RLS answers visibility from the token's claim, never the sandbox.
+  const memberOrgId = claims.org_id;
+
   // ── Sandbox mode override ──────────────────────────────────────────────
   // When a user has an active sandbox cookie, override the org context to
   // the sandbox org id WITHOUT touching the JWT or the current subdomain.
   // The user stays signed in on their real organization subdomain while every
   // org_id-scoped read/write is routed to the sandbox copy.
-  let isInSandbox = false;
   if (!isImpersonating && session?.user?.id) {
     const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
     if (sandboxCookie) {
@@ -597,7 +632,6 @@ export async function proxy(req: NextRequest) {
                 .maybeSingle(),
             );
             if (data) {
-              isInSandbox = true;
               claims = {
                 ...claims,
                 org_id: data.id,
@@ -658,29 +692,56 @@ export async function proxy(req: NextRequest) {
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
-      const orgAccess = await timer.time("mw_org_access", () =>
-        readOrgAccess(
-          claims.org_id!,
-          async () => {
-            const { data, error } = await supabase
-              .from("organizations")
-              .select(ORG_ACCESS_SELECT)
-              .eq("id", claims.org_id!)
-              .maybeSingle();
-            // A lookup failure is an outage, handled below as best-effort; an
-            // empty result is a verdict, so the two must not look the same.
-            if (error) throw error;
-            return (data as MwOrgAccess) ?? null;
-          },
-          pathname === "/billing-required",
-        ),
+      const orgId = claims.org_id;
+      const userId = session.user.id;
+      const refresh = pathname === "/billing-required";
+      // All three are independent, so they are read together; the decisions
+      // below still run in order, visibility first.
+      const [visible, orgAccess, billingPolicy] = await timer.time("mw_org_access", () =>
+        Promise.all([
+          memberOrgId
+            ? readMemoized(
+                mwOrgVisibleMemo,
+                `${userId}:${memberOrgId}`,
+                CacheKey.mwOrgVisible(userId, memberOrgId),
+                async () => {
+                  const { data, error } = await supabase
+                    .from("organizations")
+                    .select("id")
+                    .eq("id", memberOrgId)
+                    .maybeSingle();
+                  // A lookup failure is an outage, handled below as best-effort;
+                  // an empty result is a verdict, so the two must not look the same.
+                  if (error) throw error;
+                  return data ? (true as const) : null;
+                },
+                refresh,
+              )
+            : null,
+          readMemoized(
+            mwOrgAccessMemo,
+            orgId,
+            CacheKey.mwOrgAccess(orgId),
+            async () => {
+              const { data, error } = await platformPolicyClient()
+                .from("organizations")
+                .select(ORG_ACCESS_SELECT)
+                .eq("id", orgId)
+                .maybeSingle();
+              if (error) throw error;
+              return (data as MwOrgAccess) ?? null;
+            },
+            refresh,
+          ),
+          getPlatformBillingPolicy(platformPolicyClient()),
+        ]),
       );
 
-      // The read runs as the caller under RLS, so no row means the organization
-      // is no longer visible to them: the membership was archived (removal,
-      // termination) after this token was issued. Without this, the null row
-      // read as a pending trial and sent the person to the billing gate.
-      if (orgAccess === null) {
+      // The visibility read runs as the caller under RLS, so no row means the
+      // organization is no longer visible to them: the membership was archived
+      // (removal, termination) after this token was issued. Without this, the
+      // null row read as a pending trial and sent the person to the billing gate.
+      if (!visible || orgAccess === null) {
         return NextResponse.redirect(new URL("/login", req.url));
       }
 
@@ -699,7 +760,9 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      const billingAccess = await evaluateOrgBillingAccess(platformPolicyClient(), orgAccess);
+      const billingAccess = await evaluateOrgBillingAccess(platformPolicyClient(), orgAccess, {
+        policy: billingPolicy,
+      });
 
       const canRecoverBilling = getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
 
@@ -747,18 +810,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
-  // Inject headers - Requirement 11.5
-  res.headers.set("x-dubgrid-role", effectiveRole);
-  res.headers.set("x-dubgrid-org-id", claims.org_id ?? "");
-  if (claims.org_slug) {
-    res.headers.set("x-dubgrid-org-slug", claims.org_slug);
-  }
-  if (isImpersonating) {
-    res.headers.set("x-dubgrid-impersonating", "true");
-  }
-  if (isInSandbox) {
-    res.headers.set("x-dubgrid-sandbox", "true");
-  }
   timer.applyTo(res.headers);
   return res;
 }

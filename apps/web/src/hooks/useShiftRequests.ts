@@ -94,6 +94,28 @@ export interface ShiftRequestsData {
   cancel: (requestId: string, empId: string, note?: string) => Promise<boolean>;
 }
 
+/** A label map as a stable string, so a query key changes with its labels rather than its identity. */
+export function serializeLabelMap(map: Map<number, string>): string {
+  return JSON.stringify([...map.entries()].sort((a, b) => a[0] - b[0]));
+}
+
+/** Shared with the sign-in prefetch so both read one cache entry. */
+export function shiftRequestsQueryKey(
+  orgId: string,
+  startDate: string | null,
+  endDate: string | null,
+  includeAllStatuses: boolean,
+  assignmentLabelMapKey: string,
+) {
+  return [
+    ...queryKeys.shiftRequests.all(orgId),
+    startDate ?? "",
+    endDate ?? "",
+    includeAllStatuses ? "all" : "active",
+    assignmentLabelMapKey,
+  ] as const;
+}
+
 export function useShiftRequests(
   orgId: string | null,
   assignmentLabelMap: Map<number, string>,
@@ -115,7 +137,7 @@ export function useShiftRequests(
   // Stabilize the Map reference: serialize to a string key so the query key
   // doesn't change identity every render (Map is compared by reference).
   const assignmentLabelMapKey = useMemo(
-    () => JSON.stringify([...assignmentLabelMap.entries()].sort((a, b) => a[0] - b[0])),
+    () => serializeLabelMap(assignmentLabelMap),
     [assignmentLabelMap],
   );
   const assignmentLabelMapRef = useRef(assignmentLabelMap);
@@ -130,13 +152,13 @@ export function useShiftRequests(
   // reintroducing the per-hook-channel problem the shared helper exists to
   // fix (build plan item 29).
   const query = useQuery({
-    queryKey: [
-      ...queryKeys.shiftRequests.all(orgId ?? "none"),
-      dateRangeStart ?? "",
-      dateRangeEnd ?? "",
-      includeAllStatuses ? "all" : "active",
+    queryKey: shiftRequestsQueryKey(
+      orgId ?? "none",
+      dateRangeStart,
+      dateRangeEnd,
+      includeAllStatuses,
       assignmentLabelMapKey,
-    ],
+    ),
     queryFn: () =>
       fetchShiftRequests(orgId!, assignmentLabelMapRef.current, {
         ...(includeAllStatuses

@@ -5,11 +5,13 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { decodeJwt } from "jose";
 import * as Sentry from "@/lib/sentry";
 import { clearImpersonationCookie } from "@/lib/impersonation";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
 import {
   clearLogoutCleanup,
+  getBrowserAuthSession,
   getBrowserRealtimeChannels,
   removeBrowserRealtimeChannel,
   signOutFromBrowser,
@@ -101,9 +103,13 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
       try {
         queryClient.clear();
         clearImpersonationCookie();
-        await settleWithRequestTimeout(clearLogoutCleanup(), PRE_SIGN_OUT_DEADLINE_MS).catch(() => {
-          // Best-effort; a timed-out session no longer grants access either way.
-        });
+        if (await mayHoldImpersonations()) {
+          await settleWithRequestTimeout(clearLogoutCleanup(), PRE_SIGN_OUT_DEADLINE_MS).catch(
+            () => {
+              // Best-effort; a timed-out session no longer grants access either way.
+            },
+          );
+        }
         await settleWithRequestTimeout(clearRealtimeChannels(), PRE_SIGN_OUT_DEADLINE_MS);
       } catch (err) {
         Sentry.captureException(err);
@@ -172,6 +178,24 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
       )}
     </div>
   );
+}
+
+/**
+ * Logout cleanup only ends a Gridmaster's impersonations and answers anyone
+ * else with a no-op, so it is skipped when the session is known not to be a
+ * Gridmaster's. An unreadable session still asks, leaving the server to decide.
+ */
+async function mayHoldImpersonations(): Promise<boolean> {
+  try {
+    const session = await settleWithRequestTimeout(
+      getBrowserAuthSession(),
+      PRE_SIGN_OUT_DEADLINE_MS,
+    );
+    if (!session) return false;
+    return decodeJwt(session.access_token).platform_role === "gridmaster";
+  } catch {
+    return true;
+  }
 }
 
 async function clearRealtimeChannels(): Promise<void> {

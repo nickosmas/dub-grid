@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAccessTokenExpiry,
   getMobileAuthIdentity,
   getMobileAuthIdentityKey,
+  getSessionIdFromAccessToken,
   getUserIdFromAccessToken,
   isSameMobileAuthIdentity,
 } from "./access-token";
@@ -114,5 +116,19 @@ describe("mobile auth identity", () => {
       userId: "gridmaster-1",
       orgId: null,
     });
+  });
+});
+
+describe("getAccessTokenExpiry and getSessionIdFromAccessToken", () => {
+  it("reads the exp and session_id claims", () => {
+    const token = tokenWithClaims({ sub: "user-1", exp: 1_700_000_000, session_id: "s-1" });
+    expect(getAccessTokenExpiry(token)).toBe(1_700_000_000);
+    expect(getSessionIdFromAccessToken(token)).toBe("s-1");
+  });
+
+  it("is null for a token without them or one it cannot read", () => {
+    expect(getAccessTokenExpiry(tokenWithClaims({ sub: "user-1", exp: "soon" }))).toBeNull();
+    expect(getAccessTokenExpiry("not-a-jwt")).toBeNull();
+    expect(getSessionIdFromAccessToken(null)).toBeNull();
   });
 });

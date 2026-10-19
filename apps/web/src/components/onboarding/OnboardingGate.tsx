@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
@@ -90,9 +91,21 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
  * Safe to call useOrganizationData / useEmployees here since we know
  * there's a valid auth + org context.
  */
-import OnboardingWizard from "./OnboardingWizard";
-import SetupPendingScreen from "./SetupPendingScreen";
 import OrganizationBootstrapRecovery from "./OrganizationBootstrapRecovery";
+
+// This gate wraps every route, /login included, while only a member whose
+// organization is mid-setup ever sees these two; the wizard alone pulls in the
+// settings editors. Both fill the screen, so the splash is what shows while
+// the chunk arrives.
+const workspaceSplash = () => <AuthTransitionScreen phase="workspace" />;
+const OnboardingWizard = dynamic(() => import("./OnboardingWizard"), {
+  ssr: false,
+  loading: workspaceSplash,
+});
+const SetupPendingScreen = dynamic(() => import("./SetupPendingScreen"), {
+  ssr: false,
+  loading: workspaceSplash,
+});
 
 function BillingRedirect({ destination }: { destination: "recovery" | "organization-gate" }) {
   const router = useRouter();

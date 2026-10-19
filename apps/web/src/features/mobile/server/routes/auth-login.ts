@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import {
   MOBILE_LOGIN_SERVER_DEADLINE_MS,
   mobileAuthLoginBodySchema,
@@ -60,6 +60,22 @@ async function discardSession(accessToken: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * A refusal after the password was accepted (a Gridmaster, a non-member, a
+ * locked organization) still created a session, and its tokens never reach the
+ * phone, so nothing else would end it. The ephemeral client holds it in memory.
+ */
+async function discardRefusedSession(
+  sessionClient: ReturnType<typeof createMobileEphemeralAuthClient>,
+): Promise<void> {
+  try {
+    const { data } = await sessionClient.auth.getSession();
+    if (data.session) await discardSession(data.session.access_token);
+  } catch {
+    // Best effort, like discardSession: the refusal is the answer either way.
   }
 }
 
@@ -172,24 +188,29 @@ async function handlePOST(req: NextRequest, timer: Timer) {
 
     // With a second factor enrolled the password step is only challenged;
     // /api/mobile/v1/auth/sign-in-complete records the success. A success
-    // carries its session so no completion call records it again.
+    // carries its session so no completion call records it again. Written
+    // after the response: the write never changes the answer, and the phone
+    // should not wait on it.
     const sessionHash = payload.mfaRequired ? null : sessionHashOf(payload.session.accessToken);
-    await writeSecurityAuditEvent({
-      event: "security.auth.login",
-      outcome: payload.mfaRequired ? "challenged" : "succeeded",
-      reason: payload.mfaRequired ? "second_factor_required" : "accepted",
-      actorId: payload.user.id,
-      orgId: payload.organization.id,
-      metadata: {
-        targetHash: emailHash,
-        sourceHash,
-        surface: "mobile",
-        ...(sessionHash ? { sessionHash } : {}),
-      },
-    });
+    after(() =>
+      writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: payload.mfaRequired ? "challenged" : "succeeded",
+        reason: payload.mfaRequired ? "second_factor_required" : "accepted",
+        actorId: payload.user.id,
+        orgId: payload.organization.id,
+        metadata: {
+          targetHash: emailHash,
+          sourceHash,
+          surface: "mobile",
+          ...(sessionHash ? { sessionHash } : {}),
+        },
+      }),
+    );
 
     return json(mobileAuthLoginResponseSchema.parse(payload));
   } catch (error) {
+    await discardRefusedSession(sessionClient);
     if (error instanceof MobileApiRequestError) {
       await writeSecurityAuditEvent({
         event: "security.auth.login",

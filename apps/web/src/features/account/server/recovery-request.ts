@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { createAnonClient } from "@/lib/api-auth";
@@ -73,38 +74,27 @@ export async function handleRecoveryRequest(request: Request): Promise<Response>
     );
   }
 
+  // Answered before Supabase Auth is asked. It returns at once for an unknown
+  // address but sends mail for a real one, and only a real account can hit its
+  // per-user send interval or a mail failure, so waiting for it, or passing its
+  // 429 or 5xx through, would tell the caller the address has an account.
   const origin = new URL(request.url).origin;
-  const { error } = await createAnonClient().auth.resetPasswordForEmail(parsed.data.email, {
+  after(() => sendRecoveryEmail(parsed.data.email, origin, targetHash));
+  return response({ success: true });
+}
+
+async function sendRecoveryEmail(email: string, origin: string, targetHash: string): Promise<void> {
+  const { error } = await createAnonClient().auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/reset-password`,
   });
-
-  if (error?.status === 429) {
-    await writeSecurityAuditEvent({
-      event: "security.auth.recovery",
-      outcome: "throttled",
-      reason: "rate_limited",
-      metadata: { targetHash },
-    });
-    return response(
-      { success: false, error: "Too many requests. Wait a few minutes and try again." },
-      429,
-    );
-  }
-  if (error && (error.status ?? 0) >= 500) {
-    await writeSecurityAuditEvent({
-      event: "security.auth.recovery",
-      outcome: "failed",
-      reason: "service_unavailable",
-      metadata: { targetHash },
-    });
-    return response({ success: false, error: API_ERRORS.SERVICE_UNAVAILABLE }, 503);
-  }
-
+  const status = error?.status ?? 0;
   await writeSecurityAuditEvent({
     event: "security.auth.recovery",
-    outcome: "succeeded",
-    reason: "accepted",
+    ...(status === 429
+      ? { outcome: "throttled" as const, reason: "rate_limited" as const }
+      : status >= 500
+        ? { outcome: "failed" as const, reason: "service_unavailable" as const }
+        : { outcome: "succeeded" as const, reason: "accepted" as const }),
     metadata: { targetHash },
   });
-  return response({ success: true });
 }

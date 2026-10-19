@@ -80,6 +80,31 @@ export async function isFeatureEnabled(key: string): Promise<boolean> {
 }
 
 /**
+ * Client-visible subset of the kill switches: only the flags with a real UI
+ * trigger, the same keys /api/feature-flags returns. The (app) layout sends it
+ * to every visitor of that route group, so it must never grow a server-only
+ * flag.
+ */
+export interface ClientFeatureFlags {
+  stripe: boolean;
+  csvImport: boolean;
+  csvExport: boolean;
+  reports: boolean;
+  printing: boolean;
+}
+
+export async function getClientFeatureFlags(): Promise<ClientFeatureFlags> {
+  const [stripe, csvImport, csvExport, reports, printing] = await Promise.all([
+    isFeatureEnabled("stripe"),
+    isFeatureEnabled("csv_import"),
+    isFeatureEnabled("csv_export"),
+    isFeatureEnabled("reports"),
+    isFeatureEnabled("printing"),
+  ]);
+  return { stripe, csvImport, csvExport, reports, printing };
+}
+
+/**
  * Call after a gridmaster write so the change is visible before TTL expiry.
  * Clears the shared Redis layer; the caller must also `revalidateTag(
  * PLATFORM_FLAGS_TAG)` to clear this deployment's Data Cache — see the note on

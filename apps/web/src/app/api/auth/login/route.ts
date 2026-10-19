@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { decodeJwt } from "jose";
 import { z } from "zod";
 import {
@@ -60,6 +60,8 @@ type OrchestrationOutcome =
        * the response must clear any sandbox cookie.
        */
       didSwitchOrg: boolean;
+      /** Null when the browser has to set the session itself. */
+      sessionCookies: SessionCookie[] | null;
     }
   | Refusal;
 
@@ -239,7 +241,7 @@ async function refreshGridmasterSession(
 /**
  * Everything that has to happen between a correct password and a usable
  * dashboard: host-selected organization context, trial activation, sandbox
- * teardown, and the terms check.
+ * teardown, the terms check, and the session cookies.
  *
  * All of it is server-side.
  * Only runs for the non-MFA path: MFA-required responses return before this
@@ -255,6 +257,11 @@ async function orchestratePostSignIn(
   let session = initialSession;
   let effectiveClaims = claims;
   let didSwitchOrg = false;
+  // The terms check needs only the person, so it runs while the session is
+  // re-scoped. A refused sign-in discards it; the handler keeps that rejection
+  // from going unhandled, and allSettled below still sees it.
+  const termsCheck = fetchTermsAcceptanceStatus(claims.sub as string);
+  termsCheck.catch(() => {});
   // Kicked off (not awaited) inside the non-gridmaster branch below when
   // applicable, then run concurrently with the terms-check — neither
   // depends on the other's result, and both are already best-effort.
@@ -300,30 +307,29 @@ async function orchestratePostSignIn(
   }
 
   // A fresh login ends the previous session, so any sandbox left over from it
-  // must not be resumed. The client used to await this after switching, because
-  // its hard navigation aborted the request often enough that the sandbox
-  // survived — and a surviving sandbox cookie pins every later request to a
-  // clone of the org the user just left, at an elevated role. Done here there
-  // is nothing to abort, so it runs alongside the other two best-effort steps.
-  const sandboxTeardown: Promise<unknown> = didSwitchOrg
-    ? (async () => {
-        try {
-          await deleteSandboxForUser({
-            serviceClient: getServiceClient(),
-            actor: { id: claims.sub as string } as User,
-          });
-        } catch {
-          // Non-fatal: never block sign-in on sandbox teardown.
-        }
-      })()
-    : Promise.resolve();
+  // must not be resumed, whether or not this sign-in switched organizations.
+  // The client used to do this itself, and its hard navigation aborted the
+  // request often enough that the sandbox survived; a surviving sandbox cookie
+  // pins every later request to a clone at an elevated role. Done here there
+  // is nothing to abort, so it runs alongside the other best-effort steps.
+  const sandboxTeardown = (async () => {
+    try {
+      await deleteSandboxForUser({
+        serviceClient: getServiceClient(),
+        actor: { id: claims.sub as string } as User,
+      });
+    } catch {
+      // Non-fatal: never block sign-in on sandbox teardown.
+    }
+  })();
 
   const home = isGridmaster ? GRIDMASTER_POST_LOGIN_DESTINATION : POST_LOGIN_DESTINATION;
   let destination: string = home;
-  const [, , termsResult] = await Promise.allSettled([
+  const [, , termsResult, cookiesResult] = await Promise.allSettled([
     trialPromise,
     sandboxTeardown,
-    fetchTermsAcceptanceStatus(claims.sub as string),
+    termsCheck,
+    authCookiesForSession(req, session),
   ]);
   // Best-effort: a rejection here means the user lands on the destination
   // without a ToS check this turn. They'll be re-checked next sign-in.
@@ -331,7 +337,8 @@ async function orchestratePostSignIn(
     destination = `/accept-terms?next=${encodeURIComponent(home)}`;
   }
 
-  return { ok: true, session, destination, didSwitchOrg };
+  const sessionCookies = cookiesResult.status === "fulfilled" ? cookiesResult.value : null;
+  return { ok: true, session, destination, didSwitchOrg, sessionCookies };
 }
 
 /**
@@ -578,7 +585,7 @@ export async function POST(req: NextRequest) {
     session = outcome.session;
     destination = outcome.destination;
     didSwitchOrg = outcome.didSwitchOrg;
-    sessionCookies = await timer.time("session_cookies", () => authCookiesForSession(req, session));
+    sessionCookies = outcome.sessionCookies;
   }
 
   // The tokens still go to the client, which brings its auth client up to date
@@ -621,19 +628,23 @@ export async function POST(req: NextRequest) {
       : null;
   const signedInClaims = didSwitchOrg ? decodeJwt(session.access_token) : claims;
   const sessionOrgId = typeof signedInClaims.org_id === "string" ? signedInClaims.org_id : null;
-  await writeSecurityAuditEvent({
-    event: "security.auth.login",
-    outcome: challenge ? "challenged" : "succeeded",
-    reason: challenge ?? "accepted",
-    actorId: data.user.id,
-    orgId: !challenge || !loginHost || claims.org_slug === loginHost ? sessionOrgId : null,
-    // A completed sign-in carries its session, so the completion endpoint
-    // never records the same sign-in a second time.
-    metadata: {
-      targetHash: emailHash,
-      surface: "web",
-      ...(!challenge && sessionId ? { sessionHash: hashSessionId(sessionId) } : {}),
-    },
-  });
+  // The record does not change the answer, and the write swallows its own
+  // failures, so it lands after the response.
+  after(() =>
+    writeSecurityAuditEvent({
+      event: "security.auth.login",
+      outcome: challenge ? "challenged" : "succeeded",
+      reason: challenge ?? "accepted",
+      actorId: data.user.id,
+      orgId: !challenge || !loginHost || claims.org_slug === loginHost ? sessionOrgId : null,
+      // A completed sign-in carries its session, so the completion endpoint
+      // never records the same sign-in a second time.
+      metadata: {
+        targetHash: emailHash,
+        surface: "web",
+        ...(!challenge && sessionId ? { sessionHash: hashSessionId(sessionId) } : {}),
+      },
+    }),
+  );
   return res;
 }
