@@ -5,10 +5,11 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { decodeJwt } from "jose";
 import { extractJwtClaims } from "@dubgrid/authz";
 import { useAuth } from "@/components/AuthProvider";
+import { primeDashboardQueries } from "@/components/dashboard/dashboardQueries";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import { gridmasterDashboardQueryOptions } from "@/features/gridmaster/queries";
 import { getOrganizationBootstrapQueryPolicy } from "@/features/organization/client/api";
-import { accountPermissionsQueryOptions } from "@/features/permissions/client";
+import { accountPermissionsQueryOptions, getUserViewActive } from "@/features/permissions/client";
 import { employeesQueryOptions } from "@/hooks/useEmployees";
 import { orgContextQueryOptions } from "@/hooks/useOrganizationData";
 import { termsAcceptanceQueryOptions } from "@/hooks/useTermsAcceptanceStatus";
@@ -64,6 +65,29 @@ export function primeSignInQueries(queryClient: QueryClient, accessToken: string
   void queryClient.prefetchQuery(employeesQueryOptions(target.orgId));
   if (target.isSuperAdmin) {
     void queryClient.prefetchQuery(organizationBillingQueryOptions(target.orgId));
+  }
+  void primeDefaultDashboard(queryClient, target);
+}
+
+/**
+ * The dashboard's own data depends on the organization (its id, labels and
+ * entry gate) and the caller's permissions, so it starts as soon as those two
+ * answer rather than once the view has mounted behind them and employees.
+ */
+async function primeDefaultDashboard(queryClient: QueryClient, target: SignInTarget) {
+  try {
+    const [bootstrap, access] = await Promise.all([
+      queryClient.fetchQuery(bootstrapQueryOptions()),
+      queryClient.fetchQuery(accountPermissionsQueryOptions(target.userId, target.orgId)),
+    ]);
+    primeDashboardQueries(queryClient, {
+      bootstrap,
+      access,
+      userViewActive: getUserViewActive(),
+      now: new Date(),
+    });
+  } catch {
+    // The screens that read these ask for them, and report the failure, themselves.
   }
 }
 

@@ -230,6 +230,19 @@ function useOrgContext(enabled: boolean): OrgContext {
   }, [impersonation, query.isPending, query.data]);
 }
 
+/** Each absence type's grid label; shared with the sign-in prefetch so both ask the schedule API alike. */
+export function buildAbsenceTypeLabelMap(
+  absenceTypes: readonly AbsenceType[],
+  shiftDisplayMode: Organization["shiftDisplayMode"] | undefined,
+): Map<number, string> {
+  return new Map(
+    absenceTypes.map((absenceType) => [
+      absenceType.id,
+      shiftDisplayMode === "name" ? absenceType.name || absenceType.label : absenceType.label,
+    ]),
+  );
+}
+
 export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
   const queryClient = useQueryClient();
   const enabled = options?.enabled ?? true;
@@ -411,15 +424,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   );
 
   const absenceTypeMap = useMemo(
-    () =>
-      new Map(
-        allAbsenceTypes.map((absenceType) => [
-          absenceType.id,
-          org?.shiftDisplayMode === "name"
-            ? absenceType.name || absenceType.label
-            : absenceType.label,
-        ]),
-      ),
+    () => buildAbsenceTypeLabelMap(allAbsenceTypes, org?.shiftDisplayMode),
     [allAbsenceTypes, org?.shiftDisplayMode],
   );
 

@@ -10,6 +10,7 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { useAuth } from "@/components/AuthProvider";
 import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { primeSignInQueries } from "@/components/SignInPrefetch";
+import { preloadDashboardView } from "@/components/dashboard/preloadDashboardView";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
@@ -316,6 +317,7 @@ export default function OrgLogin({
     setLoading(true);
     setHandoffFailed(false);
     setGridmasterPortalRequired(false);
+    preloadDashboardView();
 
     try {
       // The server route does the whole post-sign-in sequence: re-scoping the
