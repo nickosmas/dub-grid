@@ -65,8 +65,8 @@ export function joinBoxShadows(...values: Array<string | undefined>): string | u
 
 export const SINGLE_SHIFT_PILL_RADIUS = 8;
 export const MULTI_SHIFT_PILL_RADIUS = 6;
-export const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 24;
-export const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 20;
+export const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 18;
+export const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 16;
 export const BULK_SELECTION_RING_PADDING = 2;
 
 export function areGridCellIdsEqual(

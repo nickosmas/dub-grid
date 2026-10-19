@@ -702,6 +702,8 @@ export function createShiftSeries(
   endDate: string | null,
   maxOccurrences: number | null,
   _options?: { onProgress?: (progress: number) => void },
+  /** Skip days that already hold a shift, except `originDate`, the day being repeated. */
+  overwrite?: { keepExisting: boolean; originDate: string },
 ): Promise<ShiftSeries> {
   return requestScheduleManage<{ series: ShiftSeries }>({
     action: "createShiftSeries",
@@ -714,6 +716,8 @@ export function createShiftSeries(
     startDate,
     endDate,
     maxOccurrences,
+    keepExisting: overwrite?.keepExisting,
+    originDate: overwrite?.originDate,
   }).then((data) => data.series);
 }
 
@@ -724,12 +728,15 @@ export function updateSeriesAllShifts(
   /** Optional: also return this one cell's post-write state (see CellEcho). */
   echoCell?: { employeeId: string; date: string },
   echo?: CellEcho,
+  /** Limits the write to these dates (inclusive); see seriesScopeRange. */
+  range?: { fromDate?: string; toDate?: string },
 ): Promise<EchoedCells | null> {
   return requestManageWithEcho({
     action: "updateSeriesAllShifts",
     orgId,
     seriesId,
     input,
+    ...range,
     echoCell,
     echo: serializeEcho(echo),
   });
@@ -741,11 +748,14 @@ export function deleteShiftSeries(
   /** Optional: also return this one cell's post-write state (see CellEcho). */
   echoCell?: { employeeId: string; date: string },
   echo?: CellEcho,
+  /** Limits the removal to these dates (inclusive); see seriesScopeRange. */
+  range?: { fromDate?: string; toDate?: string },
 ): Promise<{ deletedCount: number; cells: EchoedCells | null }> {
   return requestScheduleManage<{ deletedCount: number; cells?: EchoedCells }>({
     action: "deleteShiftSeries",
     orgId,
     seriesId,
+    ...range,
     echoCell,
     echo: serializeEcho(echo),
   }).then((data) => ({ deletedCount: data.deletedCount, cells: data.cells ?? null }));

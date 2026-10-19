@@ -113,6 +113,7 @@ import {
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
 } from "@/lib/assignable-shifts";
 import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import { seriesScopeRange } from "@/lib/series-dates";
 import {
   buildScheduleCellEntryFromInput,
   deriveAssignmentDefinitionIdsFromScheduleCellInput as deriveAssignmentIdsFromScheduleCellInput,
@@ -598,10 +599,6 @@ function SchedulerContent({
     count: number;
     dateRange: string;
     cellKeys: string[];
-  } | null>(null);
-  const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{
-    seriesId: string;
-    shiftCount: number;
   } | null>(null);
   const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
@@ -1956,7 +1953,6 @@ function SchedulerContent({
     setEditSessionDraft(null);
     setPendingPasteOver(null);
     setPendingClearShift(null);
-    setPendingSeriesDelete(null);
     setContextMenu(null);
     setIsBulkDeleteMode(false);
     setShowBulkDeleteReview(false);
@@ -4728,12 +4724,18 @@ function SchedulerContent({
           session.draftShift,
         );
 
-        if (seriesScope === "all" && workingBaseShift?.seriesId && initialIdentityChanged) {
+        if (
+          seriesScope &&
+          seriesScope !== "this" &&
+          workingBaseShift?.seriesId &&
+          initialIdentityChanged
+        ) {
           // The series write is followed by a per-cell write below, which needs
           // this cell's post-series version. Ask the series endpoint to echo
           // just that one cell — this used to refetch the entire loaded window
           // to read a single number.
           const echoCell = { employeeId: panel.empId, date: formatDateKey(panel.date) };
+          const range = seriesScopeRange(seriesScope, echoCell.date);
           const seriesEcho = {
             isScheduler: canEditShiftsRef.current,
             assignmentLabelMap: assignmentLabelMapRef.current,
@@ -4743,7 +4745,7 @@ function SchedulerContent({
           let seriesCells: EchoedCells | null = null;
           if (shiftIsDeleted(session.draftShift)) {
             seriesCells = (
-              await deleteShiftSeries(workingBaseShift.seriesId, orgId, echoCell, seriesEcho)
+              await deleteShiftSeries(workingBaseShift.seriesId, orgId, echoCell, seriesEcho, range)
             ).cells;
           } else if (session.draftShift) {
             seriesCells = await updateSeriesAllShifts(
@@ -4752,6 +4754,7 @@ function SchedulerContent({
               orgId,
               echoCell,
               seriesEcho,
+              range,
             );
           }
 
@@ -4983,58 +4986,6 @@ function SchedulerContent({
     ],
   );
 
-  const handleConfirmSeriesDelete = useCallback(async () => {
-    if (!pendingSeriesDelete || !org) return;
-    if (!guardActiveSession()) return;
-    try {
-      const { deletedCount } = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
-      const fetchWindow = loadedShiftWindowRef.current;
-      const fetched = await fetchShifts(
-        org.id,
-        canEditShifts,
-        assignmentLabelMapRef.current,
-        absenceTypeMapRef.current,
-        fetchWindow.start,
-        fetchWindow.end,
-        segmentCompatibility,
-      );
-      // Diffed against the grid as it is now, so the only differences are the
-      // fetched window's and peers are not told about cells it never covered.
-      const prevShifts = shiftsRef.current;
-      const shiftData = replaceWithinWindow(prevShifts, fetched, fetchWindow);
-      shiftsRef.current = shiftData;
-      setShifts(shiftData);
-      const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
-      // Detect removed shifts
-      for (const k of Object.keys(prevShifts)) {
-        if (!shiftData[k]) shiftUpdates[k] = null;
-      }
-      // Detect changed shifts
-      for (const [k, v] of Object.entries(shiftData)) {
-        if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
-          shiftUpdates[k] = v;
-        }
-      }
-      if (Object.keys(shiftUpdates).length > 0) {
-        broadcastDraftChanged({ shifts: shiftUpdates });
-      }
-      toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
-    } catch (err) {
-      toast.error("We couldn't remove that repeating shift. Try again.");
-      Sentry.captureException(err);
-    } finally {
-      setPendingSeriesDelete(null);
-      closeEditPanel();
-    }
-  }, [
-    pendingSeriesDelete,
-    org,
-    canEditShifts,
-    broadcastDraftChanged,
-    closeEditPanel,
-    guardActiveSession,
-  ]);
-
   const handleRepeatConfirm = useCallback(
     async (
       frequency: SeriesFrequency,
@@ -5043,6 +4994,7 @@ function SchedulerContent({
       endDate: string | null,
       maxOccurrences: number | null,
       previewTotal: number,
+      keepExisting: boolean,
     ) => {
       if (!editPanel || !org) return;
       const cellKey = `${editPanel.empId}_${formatDateKey(editPanel.date)}`;
@@ -5116,6 +5068,7 @@ function SchedulerContent({
               });
             },
           },
+          { keepExisting, originDate: formatDateKey(editPanel.date) },
         );
         updateScheduleOperation("repeat_series", {
           progress: 95,
@@ -8290,20 +8243,6 @@ function SchedulerContent({
               onCancel={() => {
                 setShowAutoFillConfirm(false);
                 setAutoFillPreview(null);
-              }}
-            />
-          )}
-
-          {pendingSeriesDelete && (
-            <ConfirmDialog
-              title="Delete Shift Series?"
-              message={`This will mark ${pendingSeriesDelete.shiftCount} shift${pendingSeriesDelete.shiftCount === 1 ? "" : "s"} for deletion. They will be permanently removed when you publish.`}
-              confirmLabel="Delete"
-              variant="danger"
-              onConfirm={handleConfirmSeriesDelete}
-              onCancel={() => {
-                setPendingSeriesDelete(null);
-                closeEditPanel();
               }}
             />
           )}

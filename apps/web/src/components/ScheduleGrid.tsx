@@ -2906,15 +2906,24 @@ const SectionBlock = memo(function SectionBlock({
                                                   bottom: 0,
                                                   left: 0,
                                                   display: "flex",
+                                                  // Initials stack upright so the wing costs one
+                                                  // letter of width rather than two or three.
+                                                  // Upright glyphs advance about 1.2em, so the
+                                                  // negative spacing keeps three initials
+                                                  // inside a draft pill's 40px.
+                                                  writingMode: "vertical-rl",
+                                                  textOrientation: "upright",
+                                                  whiteSpace: "nowrap",
                                                   alignItems: "center",
+                                                  justifyContent: "center",
                                                   fontSize: "var(--dg-fs-footnote)",
                                                   fontWeight: 600,
                                                   lineHeight: 1,
                                                   background: singleCrossFocusPalette.background,
                                                   color: singleCrossFocusPalette.color,
                                                   borderRadius: `${singleCrossFocusWingRadius}px 0 0 ${singleCrossFocusWingRadius}px`,
-                                                  padding: "0 3px",
-                                                  letterSpacing: "0.02em",
+                                                  padding: "0 2px",
+                                                  letterSpacing: "-0.2em",
                                                   pointerEvents: "none",
                                                 }}
                                               >
@@ -3396,7 +3405,11 @@ const SectionBlock = memo(function SectionBlock({
                                                         bottom: 0,
                                                         left: 0,
                                                         display: "flex",
+                                                        writingMode: "vertical-rl",
+                                                        textOrientation: "upright",
+                                                        whiteSpace: "nowrap",
                                                         alignItems: "center",
+                                                        justifyContent: "center",
                                                         fontSize: "var(--dg-fs-micro)",
                                                         fontWeight: 600,
                                                         lineHeight: 1,
@@ -3404,8 +3417,8 @@ const SectionBlock = memo(function SectionBlock({
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
                                                         borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
-                                                        padding: "0 2px",
-                                                        letterSpacing: "0.02em",
+                                                        padding: "0 1px",
+                                                        letterSpacing: "-0.2em",
                                                         pointerEvents: "none",
                                                       }}
                                                     >
@@ -3738,15 +3751,19 @@ const SectionBlock = memo(function SectionBlock({
                                           bottom: 0,
                                           left: 0,
                                           display: "flex",
+                                          writingMode: "vertical-rl",
+                                          textOrientation: "upright",
+                                          whiteSpace: "nowrap",
                                           alignItems: "center",
+                                          justifyContent: "center",
                                           fontSize: "var(--dg-fs-footnote)",
                                           fontWeight: 600,
                                           lineHeight: 1,
                                           background: deletedCrossFocusPalette.background,
                                           color: deletedCrossFocusPalette.color,
                                           borderRadius: `${deletedCrossFocusWingRadius}px 0 0 ${deletedCrossFocusWingRadius}px`,
-                                          padding: "0 3px",
-                                          letterSpacing: "0.02em",
+                                          padding: "0 2px",
+                                          letterSpacing: "-0.2em",
                                           pointerEvents: "none",
                                         }}
                                       >

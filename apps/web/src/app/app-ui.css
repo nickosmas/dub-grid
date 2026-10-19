@@ -446,6 +446,29 @@
   background: var(--dg-color-brand);
   color: var(--dg-color-on-brand-text);
 }
+/* Two columns of segments; the 1px gap over the border color draws the dividers. */
+.dg-segment.dg-segment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  height: auto;
+  background: var(--dg-color-border);
+}
+.dg-segment-grid .dg-segment-btn {
+  height: var(--dg-toolbar-h);
+  min-width: 0;
+  background: var(--dg-color-surface);
+  border-left: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-segment-grid .dg-segment-btn:hover {
+  background: var(--dg-color-border-light);
+}
+.dg-segment-grid .dg-segment-btn.active {
+  background: var(--dg-color-brand);
+}
 .dg-span-tabs {
   display: flex;
   align-items: stretch;

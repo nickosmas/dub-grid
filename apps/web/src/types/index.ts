@@ -410,7 +410,8 @@ export interface ScheduleCellStateEntry {
 export type ShiftMap = Record<string, ScheduleCellStateEntry>;
 
 export type SeriesFrequency = "daily" | "weekly" | "biweekly";
-export type SeriesScope = "this" | "all";
+/** Which occurrences of a repeating shift an edit or removal reaches. */
+export type SeriesScope = "this" | "previous" | "following" | "all";
 
 export interface RecurringShift {
   id: string;
