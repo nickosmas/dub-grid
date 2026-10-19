@@ -1177,6 +1177,26 @@ describe("ShiftEditPanel", () => {
       );
     });
 
+    it("keeps an untimed general shift picked first ahead of a timed shift", async () => {
+      const { onSelect } = renderAddingSecondShift(
+        { id: 3, label: "X", segment: crossWingSegment },
+        ["07:00", "15:00"],
+        ["15:00", "23:00"],
+      );
+      const user = await openSecondShiftPicker();
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          segments: [
+            { shiftId: null, jobId: 101, position: 0, isMentored: false },
+            { shiftId: 11, jobId: 102, position: 1, isMentored: false },
+          ],
+        }),
+        undefined,
+      );
+    });
+
     it("keeps the first shift's custom time on it when it moves second", async () => {
       const { onSelect } = renderAddingSecondShift(
         { id: 2, label: "E", segment: eveningSegment },

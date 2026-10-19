@@ -383,7 +383,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1f07d8dc1a46cb8021833e4fa8f739fbee9c8f7634e3e1dedac3a692309e7f89"
+      "evidenceFingerprint": "sha256:e2ad76b8d3a4951c302e66e558ecf38abb106608f3cf0a8bfbe24f39c945e179"
     },
     {
       "id": "draft-publish",
@@ -494,7 +494,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0cf31b596520bb0aec836e3734072efc680d5f706b2232699171c91a88dfc0df"
+      "evidenceFingerprint": "sha256:c5a02b7e384862574d1a2747c26573f54438b401bdcbe43b84c360f7a4fb2033"
     },
     {
       "id": "realtime",

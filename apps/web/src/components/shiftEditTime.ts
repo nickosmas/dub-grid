@@ -63,9 +63,10 @@ export function addOneHour(time: string): string {
 
 /**
  * Puts a cell's shifts in start-time order, moving each `|`-separated custom
- * time with its shift. A shift with no start time sorts after a timed one, and
- * equal starts keep their order. Returns the inputs untouched when the order
- * already holds.
+ * time with its shift, and equal starts keep their order. Only a general shift
+ * can lack a start time, and it has no place on the clock, so then the order
+ * the shifts were picked in stands. Returns the inputs untouched when the
+ * order already holds.
  */
 export function orderSegmentsByStartTime<T>(
   segments: T[],
@@ -82,16 +83,14 @@ export function orderSegmentsByStartTime<T>(
     return start ? normalizeTime(start) : null;
   };
 
+  const startTimes = segments.map((_, index) => startOf(index));
+  if (!startTimes.every((start): start is string => start != null)) {
+    return { segments, customStartTime, customEndTime };
+  }
+
   const order = segments
     .map((_, index) => index)
-    .sort((left, right) => {
-      const leftStart = startOf(left);
-      const rightStart = startOf(right);
-      if (leftStart == null || rightStart == null) {
-        return (leftStart == null ? 1 : 0) - (rightStart == null ? 1 : 0);
-      }
-      return leftStart.localeCompare(rightStart);
-    });
+    .sort((left, right) => startTimes[left].localeCompare(startTimes[right]));
   if (order.every((index, position) => index === position)) {
     return { segments, customStartTime, customEndTime };
   }

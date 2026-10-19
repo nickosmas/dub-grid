@@ -39,15 +39,21 @@ describe("orderSegmentsByStartTime", () => {
     ]);
   });
 
-  it("puts a shift without a start time after a timed one", () => {
-    expect(orderSegmentsByStartTime(["general", "evening"], null, null, startOf).segments).toEqual([
-      "evening",
-      "general",
-    ]);
-    expect(orderSegmentsByStartTime(["day", "general"], null, null, startOf).segments).toEqual([
-      "day",
-      "general",
-    ]);
+  it("keeps the picking order when a general shift has no start time", () => {
+    const generalFirst = ["general", "evening"];
+    expect(orderSegmentsByStartTime(generalFirst, null, null, startOf).segments).toBe(generalFirst);
+    const generalSecond = ["evening", "general"];
+    expect(orderSegmentsByStartTime(generalSecond, null, null, startOf).segments).toBe(
+      generalSecond,
+    );
+  });
+
+  it("orders a general shift by its custom start time", () => {
+    expect(orderSegmentsByStartTime(["evening", "general"], "|06:00", "|10:00", startOf)).toEqual({
+      segments: ["general", "evening"],
+      customStartTime: "06:00|",
+      customEndTime: "10:00|",
+    });
   });
 
   it("keeps two shifts without times in the order they were picked", () => {
