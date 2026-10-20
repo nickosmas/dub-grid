@@ -100,7 +100,7 @@ export interface ShiftCategory {
   /** Preset color inherited by scheduled jobs unless they override this shift. */
   color?: string | null;
   sortOrder: number;
-  /** FK to focus_areas.id. NULL = global category (for general/off-day codes). */
+  /** FK to focus_areas.id. NULL = global category (for general and absence codes). */
   focusAreaId?: number | null;
   /** Break duration in minutes. Overrides focus area default. NULL = inherit from focus area. */
   breakMinutes?: number | null;
@@ -289,17 +289,17 @@ export interface ScheduleCellSnapshot extends ScheduleCellInput {
   assignmentIds: number[];
   segments: ScheduleCellSegmentSnapshot[];
   /**
-   * The off day a worked cell carries for the rest of the day (item 45).
+   * The absence a worked cell carries for the rest of the day (item 45).
    * `absenceTypeId` stays a whole-day absence only, so readers that test it
-   * without the kind never mistake D/Bereavement for an off day.
+   * without the kind never mistake D/Bereavement for a whole-day absence.
    */
-  offDayAbsenceTypeId?: number | null;
+  restOfDayAbsenceTypeId?: number | null;
 }
 
 export type RecurringScheduleDraft = Record<string, Record<number, ScheduleCellInput | null>>;
 
 /**
- * An absence type: off-day definitions (Off, Sick, Vacation, etc.).
+ * An absence type: Off, Sick, Vacation and the like.
  * Separate from worked assignments — an absence is the absence of a shift, not a type of shift.
  */
 export interface AbsenceType {

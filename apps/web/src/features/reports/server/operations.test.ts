@@ -1122,7 +1122,7 @@ describe("operations reports", () => {
           "Shift breakdown",
           "Job breakdown",
           "Schedule notes",
-          "Published off days",
+          "Published absences",
           "Unscheduled days",
           "Approved impact",
           "All request activity",

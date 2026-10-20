@@ -171,10 +171,11 @@ runtime evidence.
 - Employees / staff records, focus areas, certifications, employment
   status
 - Schedules: recurring shifts, published schedule entries, draft state,
-  shift snapshots for audit history. A cell holds worked shifts, an off
-  day, or up to two worked shifts plus an off day for the rest of the day
+  shift snapshots for audit history. A cell holds worked shifts, an
+  absence, or up to two worked shifts plus an absence for the rest of the
+  day
 - Shift requests (pickup/swap/call-off) and their approval/status events
-- Absences / off-day types (`absence_types`)
+- Absence types (`absence_types`)
 - Coverage and reporting aggregates
 - Notifications
 - Billing/subscription state (Stripe customer, subscription, trial status)

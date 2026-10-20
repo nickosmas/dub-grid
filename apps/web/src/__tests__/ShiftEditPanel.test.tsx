@@ -1593,15 +1593,15 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText("Select an end date.")).toBeInTheDocument();
     });
 
-    it("shows the absence repeat flow for off days", async () => {
+    it("shows the repeat flow for absences", async () => {
       const user = userEvent.setup();
 
       render(<RepeatAbsenceFlowPanel />);
 
       await user.click(screen.getByRole("button", { name: "Make this repeating" }));
 
-      expect(screen.getByText("Repeating Off Day")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Create Repeating Off Day" })).toBeInTheDocument();
+      expect(screen.getByText("Repeating Absence")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create Repeating Absence" })).toBeInTheDocument();
     });
 
     it("renders the repeat preview badge with split grid labels in name mode", async () => {
@@ -1647,7 +1647,7 @@ describe("ShiftEditPanel", () => {
       const user = await submitRepeat(onRepeatConfirm);
 
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
-      expect(dialog).toHaveTextContent("2 of these days already have a shift or off day.");
+      expect(dialog).toHaveTextContent("2 of these days already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
 
       await user.click(within(dialog).getByRole("button", { name: choice }));
@@ -1662,7 +1662,7 @@ describe("ShiftEditPanel", () => {
       await submitRepeat(onRepeatConfirm);
 
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
-      expect(dialog).toHaveTextContent("Some of these days may already have a shift or off day.");
+      expect(dialog).toHaveTextContent("Some of these days may already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
     });
   });

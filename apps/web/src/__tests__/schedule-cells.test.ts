@@ -218,7 +218,7 @@ describe("mapNormalizedScheduleCellRowToScheduleEntry", () => {
   });
 });
 
-describe("a worked cell with an off day (item 45)", () => {
+describe("a worked cell with a rest-of-day absence (item 45)", () => {
   const segmentCompatibility = createShiftJobCompatibilityMaps({
     assignments,
     shiftCategories,
@@ -249,7 +249,7 @@ describe("a worked cell with an off day (item 45)", () => {
     };
   }
 
-  it("keeps the off day apart from the whole-day absence id", () => {
+  it("keeps the rest-of-day absence apart from the whole-day absence id", () => {
     const entry = mapNormalizedScheduleCellRowToScheduleEntry(
       makeCell({ snapshots: [workedSnapshot("draft", 7), workedSnapshot("published", null)] }),
       { isScheduler: true, assignmentLabelMap: new Map([[1, "DST"]]), segmentCompatibility },
@@ -259,14 +259,14 @@ describe("a worked cell with an off day (item 45)", () => {
       kind: "worked",
       assignmentIds: [1],
       absenceTypeId: null,
-      offDayAbsenceTypeId: 7,
+      restOfDayAbsenceTypeId: 7,
     });
-    expect(entry?.published).toMatchObject({ absenceTypeId: null, offDayAbsenceTypeId: null });
+    expect(entry?.published).toMatchObject({ absenceTypeId: null, restOfDayAbsenceTypeId: null });
     expect(entry?.absenceTypeId).toBeNull();
     expect(entry?.draftKind).toBe("modified");
   });
 
-  it("round-trips the off day between a snapshot and saved input", () => {
+  it("round-trips the rest-of-day absence between a snapshot and saved input", () => {
     const snapshot = resolveScheduleCellSnapshotFromInput(
       {
         kind: "worked",
@@ -280,7 +280,7 @@ describe("a worked cell with an off day (item 45)", () => {
       { segmentCompatibility },
     );
 
-    expect(snapshot).toMatchObject({ absenceTypeId: null, offDayAbsenceTypeId: 7 });
+    expect(snapshot).toMatchObject({ absenceTypeId: null, restOfDayAbsenceTypeId: 7 });
     expect(scheduleCellSnapshotToInput(snapshot)).toMatchObject({
       kind: "worked",
       absenceTypeId: 7,

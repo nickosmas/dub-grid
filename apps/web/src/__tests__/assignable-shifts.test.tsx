@@ -797,7 +797,7 @@ describe("ShiftPicker combined options", () => {
     );
 
     expect(screen.queryByText("Legacy General")).not.toBeInTheDocument();
-    expect(screen.getByText("Off Days")).toBeInTheDocument();
+    expect(screen.getByText("Absences")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "VAC - Vacation" })).toBeInTheDocument();
   });
 

@@ -524,13 +524,13 @@ export default function ShiftPicker({
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              Off Days
+              Absences
               <span style={countPill}>{absenceTypes.length}</span>
               <div style={headingLine} />
             </div>
             <div
               role="group"
-              aria-label="Off day options"
+              aria-label="Absence options"
               style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}
             >
               {absenceTypes.map((at) => {

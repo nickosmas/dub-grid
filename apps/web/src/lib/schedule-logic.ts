@@ -229,7 +229,7 @@ export type DailyTallies = Record<number, Tally>;
  * Uses schedule option IDs to determine section membership — only assignments
  * whose ID is in `sectionCodeIds` are counted. This prevents cross-focus-area
  * miscounting when different sections share the same label (e.g. "D").
- * Only assignments with a categoryId are counted (off-days and uncategorized entries are excluded).
+ * Only assignments with a categoryId are counted (absences and uncategorized entries are excluded).
  */
 export function computeDailyTallies(
   employees: Employee[],

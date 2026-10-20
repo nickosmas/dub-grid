@@ -348,7 +348,7 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
-  it("saves a worked shift with an off day for the rest of the day (item 45)", async () => {
+  it("saves a worked shift with an absence for the rest of the day (item 45)", async () => {
     userRpc.mockResolvedValue({ error: null });
 
     const response = await POST(
@@ -382,7 +382,7 @@ describe("POST /api/schedule/manage", () => {
   });
 
   it.each(["createShiftSeries", "updateSeriesAllShifts"])(
-    "refuses an off day on a repeating shift (%s) before writing",
+    "refuses an absence on a repeating shift (%s) before writing",
     async (action) => {
       const response = await POST(
         makeRequest({
@@ -398,7 +398,9 @@ describe("POST /api/schedule/manage", () => {
       );
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: expect.stringMatching(/off day/) });
+      expect(await response.json()).toMatchObject({
+        error: expect.stringMatching(/absence for the rest of the day/),
+      });
       expect(userRpc).not.toHaveBeenCalled();
     },
   );

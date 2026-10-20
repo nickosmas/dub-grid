@@ -415,7 +415,7 @@ export function getPresetByBg(bgHex: string): PredefinedColor {
   };
 }
 
-/** Legacy mapping for off-days and default transparent assignments */
+/** Legacy mapping for absences and default transparent assignments */
 export const TRANSPARENT_BORDER = "transparent";
 
 // ── Shared grid constants ────────────────────────────────────────────────────

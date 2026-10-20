@@ -629,7 +629,7 @@ export default function AbsenceTypesSettings({
           <EmptyState
             size="compact"
             title="No absence types yet"
-            description="Create the off-day and calloff labels your schedulers use."
+            description="Create the absence and call-off labels your schedulers use."
             action={
               canManageScheduleDefinitions ? (
                 <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">

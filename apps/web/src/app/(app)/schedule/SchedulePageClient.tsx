@@ -3881,7 +3881,7 @@ function SchedulerContent({
     [getPublishedRequestShift, getPublishedShiftTimeRanges, hasDateAndTimeStarted],
   );
 
-  /** True if the published shift has at least one categorized, non-off-day shift code. */
+  /** True if the published shift has at least one categorized shift code that is not an absence. */
   const isPublishedRequestableShift = useCallback(
     (empId: string, date: Date): boolean => {
       const publishedShift = getPublishedRequestShift(empId, date);
@@ -5022,7 +5022,7 @@ function SchedulerContent({
       startScheduleOperation({
         kind: "repeat_series",
         title:
-          absenceTypeId != null ? "Creating repeating off day..." : "Creating repeating shift...",
+          absenceTypeId != null ? "Creating repeating absence..." : "Creating repeating shift...",
         detail:
           previewTotal > 0
             ? `Creating ${previewTotal} scheduled occurrence${previewTotal === 1 ? "" : "s"} for ${currentLabel}.`
@@ -5039,7 +5039,7 @@ function SchedulerContent({
         if (pendingNeedsPersist) {
           updateScheduleOperation("repeat_series", {
             progress: 12,
-            detail: `Saving the current ${absenceTypeId != null ? "off day" : "shift"} before creating the repeating pattern...`,
+            detail: `Saving the current ${absenceTypeId != null ? "absence" : "shift"} before creating the repeating pattern...`,
           });
           await upsertShift(
             editPanel.empId,

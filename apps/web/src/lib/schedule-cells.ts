@@ -121,7 +121,7 @@ export function buildScheduleCellSnapshot(
     fromRecurring: args.fromRecurring ?? false,
     label: buildSnapshotLabel(args, orderedSegments),
     assignmentIds: args.kind === "worked" ? [...(args.assignmentIds ?? [])] : [],
-    offDayAbsenceTypeId: args.kind === "worked" ? (args.absenceTypeId ?? null) : null,
+    restOfDayAbsenceTypeId: args.kind === "worked" ? (args.absenceTypeId ?? null) : null,
   };
 }
 
@@ -150,7 +150,7 @@ export function scheduleCellSnapshotToInput(
     })),
     absenceTypeId:
       snapshot.kind === "worked"
-        ? (snapshot.offDayAbsenceTypeId ?? null)
+        ? (snapshot.restOfDayAbsenceTypeId ?? null)
         : (snapshot.absenceTypeId ?? null),
     customStartTime: snapshot.customStartTime ?? null,
     customEndTime: snapshot.customEndTime ?? null,
@@ -314,7 +314,7 @@ export function classifyScheduleCellDraft(args: {
   const matchesPublished =
     draft.kind === published.kind &&
     draft.absenceTypeId === published.absenceTypeId &&
-    (draft.offDayAbsenceTypeId ?? null) === (published.offDayAbsenceTypeId ?? null) &&
+    (draft.restOfDayAbsenceTypeId ?? null) === (published.restOfDayAbsenceTypeId ?? null) &&
     draft.customStartTime === published.customStartTime &&
     draft.customEndTime === published.customEndTime &&
     normalizedSegmentsEqual(draft, published);

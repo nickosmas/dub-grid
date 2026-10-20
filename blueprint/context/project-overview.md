@@ -79,7 +79,7 @@ shipped. Item 40 is in progress. Item 45 is planned.
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
-| 45   | Planned     | A worked shift plus an off day in one cell, such as D/Bereavement or D/E/Sick.                                                  |
+| 45   | Planned     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 
 Item 40 is split:
 
@@ -132,20 +132,20 @@ Item 44 is split, and every part has shipped:
 
 Item 45 is split; 45a has shipped:
 
-- **45a - Data model:** shipped; a worked cell may carry one off day,
+- **45a - Data model:** shipped; a worked cell may carry one absence,
   through draft, publish, publish history and import (migration 082).
   Nothing on screen shows it until 45b.
-- **45b - Web editor and grid:** planned; the panel adds an off day beside
+- **45b - Web editor and grid:** planned; the panel adds an absence beside
   one or two shifts and can record when the last shift ended, and a
   three-item cell gets a taller row. Needs an approved mockup first.
 - **45c - Other web surfaces:** planned; Month, phone Day, print (a taller
   row), dashboard, person page, coverage, reports, export and calendar.
 - **45d - Mobile app:** planned.
 - **45e - Shift requests:** planned; time off on half a double shift keeps
-  the off day, and swap, pickup and open-shift staffing respect a mixed cell.
+  the absence, and swap, pickup and open-shift staffing respect a mixed cell.
 
-The off day always comes last and carries no hours; at most two worked
-shifts share a cell with it (owner decisions, 2026-10-19).
+The absence always comes last and carries no hours; at most two worked
+shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -195,8 +195,8 @@ endpoints remain internal.
 
 - organization, employee or open-shift identity, date, shift, job, and absence
   facts
-- a cell holds worked shifts, an off day, or (item 45, planned) up to two
-  worked shifts plus an off day for the rest of the day
+- a cell holds worked shifts, an absence, or (item 45) up to two worked
+  shifts plus an absence for the rest of the day
 - draft and published state with optimistic versioning
 - snapshot fields are the source of truth for schedule-cell audit history
 - recurring shifts generate bounded series through the normal draft workflow

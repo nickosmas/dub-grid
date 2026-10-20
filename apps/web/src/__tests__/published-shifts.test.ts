@@ -60,7 +60,7 @@ describe("published shift helpers", () => {
       label: "DAY/EVE",
       assignmentIds: [1, 2],
       absenceTypeId: null,
-      offDayAbsenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
       startTime: "06:30",
       endTime: "22:00",
       durationHours: 14,
@@ -68,14 +68,14 @@ describe("published shift helpers", () => {
     });
   });
 
-  it("keeps a worked cell's off day without adding hours or turning it into an absence", () => {
+  it("keeps a worked cell's rest-of-day absence without adding hours or turning the cell into an absence", () => {
     const entry = resolvePublishedScheduleEntry(
       {
         emp_id: "emp-1",
         date: "2026-04-13",
         resolvedAssignmentIds: [1],
         published_absence_type_id: null,
-        published_off_day_absence_type_id: 5,
+        published_rest_of_day_absence_type_id: 5,
         published_custom_start_time: "07:00",
         published_custom_end_time: "11:00",
       },
@@ -87,12 +87,12 @@ describe("published shift helpers", () => {
       kind: "shift",
       label: "DAY",
       absenceTypeId: null,
-      offDayAbsenceTypeId: 5,
+      restOfDayAbsenceTypeId: 5,
       durationHours: 4,
     });
   });
 
-  it("maps a published worked snapshot's off day apart from its whole-day absence", () => {
+  it("maps a published worked snapshot's rest-of-day absence apart from a whole-day absence", () => {
     const row = mapNormalizedScheduleCellToPublishedShiftRow(
       {
         id: "cell-1",
@@ -128,7 +128,7 @@ describe("published shift helpers", () => {
 
     expect(row).toMatchObject({
       published_absence_type_id: null,
-      published_off_day_absence_type_id: 5,
+      published_rest_of_day_absence_type_id: 5,
     });
   });
 

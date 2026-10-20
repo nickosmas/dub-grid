@@ -152,8 +152,8 @@ async function changeRows(historyId: string, empId: string) {
   return rows;
 }
 
-describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
-  it("keeps the off day on a worked draft, with its segment", async () => {
+describe.skipIf(!reachable)("a worked cell can carry a rest-of-day absence (082)", () => {
+  it("keeps the absence on a worked draft, with its segment", async () => {
     await asSuperAdmin(async (fixture) => {
       await writeDraft(fixture, DAYS[0], "worked", { absenceId: fixture.absence_id });
       expect(await draftSnapshot(fixture, DAYS[0])).toEqual({
@@ -164,7 +164,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("leaves a plain worked cell and a whole-day off day as they were", async () => {
+  it("leaves a plain worked cell and a whole-day absence as they were", async () => {
     await asSuperAdmin(async (fixture) => {
       await writeDraft(fixture, DAYS[0], "worked");
       await writeDraft(fixture, DAYS[1], "absence", { absenceId: fixture.absence_id });
@@ -181,7 +181,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("still refuses a whole-day off day with segments", async () => {
+  it("still refuses a whole-day absence with segments", async () => {
     await asSuperAdmin(async (fixture) => {
       await expect(
         writeDraft(fixture, DAYS[2], "absence", { segments: true, absenceId: fixture.absence_id }),
@@ -189,7 +189,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("resolves a worked state with an off day, and refuses one from another organization", async () => {
+  it("resolves a worked state with an absence, and refuses one from another organization", async () => {
     await asSuperAdmin(async (fixture) => {
       await db.query("SET LOCAL ROLE postgres");
       const state = (absenceTypeId: number) =>
@@ -218,7 +218,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("publishes the off day and records it in the change row", async () => {
+  it("publishes the absence and records it in the change row", async () => {
     await asSuperAdmin(async (fixture) => {
       await writeDraft(fixture, DAYS[0], "worked", { absenceId: fixture.absence_id });
       const historyId = await publish(fixture, DAYS[0]);
@@ -238,7 +238,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("publishes an off day added to a published shift as one change", async () => {
+  it("publishes an absence added to a published shift as one change", async () => {
     await asSuperAdmin(async (fixture) => {
       await writeDraft(fixture, DAYS[1], "worked");
       await publish(fixture, DAYS[1]);
@@ -277,7 +277,7 @@ describe.skipIf(!reachable)("a worked cell can carry an off day (082)", () => {
     });
   });
 
-  it("builds the cell state with the off day on a worked cell only", async () => {
+  it("builds the cell state with the absence on a worked cell only", async () => {
     await asSuperAdmin(async (fixture) => {
       const {
         rows: [row],

@@ -27,11 +27,11 @@ export function getScheduleEntryAbsenceTypeId(entry: ScheduleEntryLike): number 
 }
 
 /**
- * The off day a worked cell carries for the rest of the day, such as the
+ * The absence a worked cell carries for the rest of the day, such as the
  * Bereavement in D/Bereavement. It lives only in `state`, so a whole-day
  * absence and an entry without state both return null.
  */
-export function getScheduleEntryOffDayAbsenceTypeId(entry: ScheduleEntryLike): number | null {
+export function getScheduleEntryRestOfDayAbsenceTypeId(entry: ScheduleEntryLike): number | null {
   return entry.state?.kind === "worked" ? (entry.state.absenceTypeId ?? null) : null;
 }
 

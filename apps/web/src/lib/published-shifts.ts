@@ -34,8 +34,8 @@ export interface PublishedShiftRow {
   resolvedAssignmentIds: number[] | null;
   resolvedSegments?: PublishedScheduleSegment[];
   published_absence_type_id: number | null;
-  /** The off day a worked cell carries for the rest of the day (item 45). */
-  published_off_day_absence_type_id?: number | null;
+  /** The absence a worked cell carries for the rest of the day (item 45). */
+  published_rest_of_day_absence_type_id?: number | null;
   published_custom_start_time: string | null;
   published_custom_end_time: string | null;
 }
@@ -58,8 +58,8 @@ export interface PublishedScheduleEntry {
   label: string;
   assignmentIds: number[];
   absenceTypeId: number | null;
-  /** On a shift entry, the off day for the rest of the day; it adds no hours. */
-  offDayAbsenceTypeId?: number | null;
+  /** On a shift entry, the absence for the rest of the day; it adds no hours. */
+  restOfDayAbsenceTypeId?: number | null;
   startTime: string | null;
   endTime: string | null;
   durationHours: number;
@@ -152,7 +152,7 @@ export function mapNormalizedScheduleCellToPublishedShiftRow(
       publishedSnapshot.state_kind === "absence"
         ? (publishedSnapshot.absence_type_id ?? null)
         : null,
-    published_off_day_absence_type_id:
+    published_rest_of_day_absence_type_id:
       publishedSnapshot.state_kind === "worked"
         ? (publishedSnapshot.absence_type_id ?? null)
         : null,
@@ -451,7 +451,7 @@ export function resolvePublishedScheduleEntry(
     label,
     assignmentIds: assignmentIds,
     absenceTypeId: null,
-    offDayAbsenceTypeId: row.published_off_day_absence_type_id ?? null,
+    restOfDayAbsenceTypeId: row.published_rest_of_day_absence_type_id ?? null,
     startTime,
     endTime,
     durationHours,

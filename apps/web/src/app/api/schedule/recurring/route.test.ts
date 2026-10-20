@@ -102,7 +102,7 @@ describe("POST /api/schedule/recurring", () => {
       action: "saveRecurringShifts",
       effectiveFrom: "2026-09-21",
     },
-  ])("refuses an off day on a recurring shift ($action) before writing (item 45)", async (body) => {
+  ])("refuses an absence on a recurring shift ($action) before writing (item 45)", async (body) => {
     const rpc = vi.fn();
     requireOrgPermissions.mockResolvedValue({
       actor: { id: ACTOR_ID, email: null },
@@ -126,7 +126,9 @@ describe("POST /api/schedule/recurring", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: expect.stringMatching(/off day/) });
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/absence for the rest of the day/),
+    });
     expect(rpc).not.toHaveBeenCalled();
   });
 });

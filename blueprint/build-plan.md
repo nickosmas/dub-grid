@@ -866,22 +866,22 @@
   - [x] 44g. **Seat and revenue history** - append-only seat and invoice
         history and a report that states its own start date. Needs a
         migration.
-- [ ] 45. **A worked shift plus an off day in one cell** - someone who works
-      part of a day, including part of a double shift, can have an off day
-      (absence type) for the rest of it, shown and saved as one cell such as
-      D/Bereavement or D/E/Sick. The off day always comes last, and the last
-      worked shift can record when it actually ended. Worked parts keep their
-      times, hours and coverage; the off day counts as an absence in reports
-      with no hours. A cell with three items gets a taller row on screen and
-      in print. Owner decisions, 2026-10-19: at most two worked shifts plus
-      one off day; asking for time off from part of a shift in the app is
-      out of scope.
-  - [x] 45a. **Data model** - a worked cell may carry one off day: contract,
-        a migration relaxing the snapshot check and keeping the off day in
+- [ ] 45. **A worked shift plus an absence in one cell** - someone who works
+      part of a day, including part of a double shift, can have an absence
+      (an absence type) for the rest of it, shown and saved as one cell such
+      as D/Bereavement or D/E/Sick. The absence always comes last, and the
+      last worked shift can record when it actually ended. Worked parts keep
+      their times, hours and coverage; the absence counts in reports with no
+      hours. A cell with three items gets a taller row on screen and in
+      print. Owner decisions, 2026-10-19: at most two worked shifts plus one
+      absence; asking for time off from part of a shift in the app is out of
+      scope. Always called an absence (owner, 2026-10-20).
+  - [x] 45a. **Data model** - a worked cell may carry one absence: contract,
+        a migration relaxing the snapshot check and keeping the absence in
         the save, state, sync, import and publish functions, and the shared
         accessors and mappers. A mixed cell round-trips through draft,
         publish and publish history. Needs a migration.
-  - [ ] 45b. **Web editor and grid** - the panel adds an off day beside one
+  - [ ] 45b. **Web editor and grid** - the panel adds an absence beside one
         or two shifts and can record when the last shift ended; grid pills,
         labels, publish-diff badges, copy, paste and drag keep every part;
         the overlap check covers worked parts only; a three-item cell gets a
@@ -892,5 +892,5 @@
   - [ ] 45d. **Mobile app** - schedule, shift detail and dashboard show
         every part of a mixed cell.
   - [ ] 45e. **Shift requests** - time off on half a double shift keeps the
-        off day; swap, pickup and open-shift staffing respect a mixed cell
+        absence; swap, pickup and open-shift staffing respect a mixed cell
         instead of discarding it.

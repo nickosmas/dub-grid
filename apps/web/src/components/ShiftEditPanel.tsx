@@ -174,7 +174,7 @@ interface ShiftEditPanelProps {
       targetSegmentIndex?: number;
     },
   ) => void | Promise<unknown>;
-  /** Available absence types for off-day selection. */
+  /** The absence types the picker offers. */
   absenceTypes?: AbsenceType[];
   /** Currently active absence type ID on this cell. */
   currentAbsenceTypeId?: number | null;
@@ -3903,7 +3903,7 @@ export default function ShiftEditPanel({
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                     </svg>
                     {isAbsence
-                      ? "Remove off day"
+                      ? "Remove absence"
                       : currentLabels.length > 1
                         ? "Remove all shifts"
                         : "Remove shift"}
@@ -4193,7 +4193,7 @@ export default function ShiftEditPanel({
               disabled={isCreatingRepeatSeries}
             >
               <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
-                {isAbsence ? "Create Repeating Off Day" : "Create Repeating Shift"}
+                {isAbsence ? "Create Repeating Absence" : "Create Repeating Shift"}
               </ButtonLoading>
             </Button>
           </div>
@@ -4259,14 +4259,14 @@ export default function ShiftEditPanel({
         <ConfirmDialog
           title={
             isAbsence
-              ? "Remove Off Day?"
+              ? "Remove Absence?"
               : pendingDelete.type === "all" && currentLabels.length > 1
                 ? "Remove All Shifts?"
                 : "Remove Shift?"
           }
           message={
             (isAbsence
-              ? `Remove off day "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+              ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
               : pendingDelete.type === "pill"
                 ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
                 : currentLabels.length > 1

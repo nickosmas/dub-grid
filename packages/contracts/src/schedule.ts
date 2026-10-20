@@ -29,7 +29,7 @@ export const scheduleCellStateSchema = z
           path: ["segments"],
         });
       }
-      // A worked cell's absenceTypeId is its off day for the rest of the day,
+      // A worked cell's absenceTypeId is its absence for the rest of the day,
       // such as the Bereavement in D/Bereavement (item 45).
       return;
     }

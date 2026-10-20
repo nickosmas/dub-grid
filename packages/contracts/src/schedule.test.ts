@@ -4,7 +4,7 @@ import { scheduleCellStateSchema } from "./schedule";
 const segment = { shiftId: 1, jobId: 10, position: 0 };
 
 describe("scheduleCellStateSchema", () => {
-  it("accepts a worked cell with an off day for the rest of the day (item 45)", () => {
+  it("accepts a worked cell with an absence for the rest of the day (item 45)", () => {
     const parsed = scheduleCellStateSchema.safeParse({
       kind: "worked",
       segments: [segment],
@@ -14,7 +14,7 @@ describe("scheduleCellStateSchema", () => {
     expect(parsed.data).toMatchObject({ kind: "worked", absenceTypeId: 7 });
   });
 
-  it("still refuses a worked cell with no segments, even with an off day", () => {
+  it("still refuses a worked cell with no segments, even with an absence", () => {
     expect(
       scheduleCellStateSchema.safeParse({ kind: "worked", segments: [], absenceTypeId: 7 }).success,
     ).toBe(false);

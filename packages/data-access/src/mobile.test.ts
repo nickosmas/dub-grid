@@ -581,7 +581,7 @@ describe("fetchMobileManagementRosterRows", () => {
 });
 
 describe("fetchPublishedMobileScheduleRows", () => {
-  it("keeps a worked cell's off day in its state (item 45)", async () => {
+  it("keeps a worked cell's rest-of-day absence in its state (item 45)", async () => {
     const row = {
       id: "cell-1",
       emp_id: "emp-1",

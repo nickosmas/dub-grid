@@ -210,7 +210,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Shift breakdown" },
           { label: "Job breakdown" },
           { label: "Schedule notes" },
-          { label: "Published off days" },
+          { label: "Published absences" },
           { label: "Unscheduled days" },
           { label: "Approved impact" },
           { label: "All request activity" },

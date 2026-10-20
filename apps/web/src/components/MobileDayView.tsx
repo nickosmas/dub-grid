@@ -436,7 +436,7 @@ export default function MobileDayView({
                     // general key for a section without one.
                     const noteMarks = noteMarksForKey?.(emp.id, date, sectionId ?? undefined) ?? [];
 
-                    // Check for absence (off-day) entry first
+                    // Check for an absence entry first
                     const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                     const absenceType =
                       absenceTypeId != null ? (absenceTypeMap?.get(absenceTypeId) ?? null) : null;

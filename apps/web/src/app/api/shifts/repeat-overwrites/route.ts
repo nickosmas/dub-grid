@@ -17,7 +17,7 @@ interface OverwriteCandidate {
   snapshots: Array<{ snapshot_kind: string; state_kind: string }> | null;
 }
 
-/** What an editor sees, the draft else the published state, is a shift or off day. */
+/** What an editor sees, the draft else the published state, is a shift or absence. */
 function holdsEntry(cell: OverwriteCandidate): boolean {
   const snapshots = cell.snapshots ?? [];
   const shown =

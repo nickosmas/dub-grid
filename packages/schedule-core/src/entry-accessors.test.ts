@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getScheduleEntryAbsenceTypeId,
-  getScheduleEntryOffDayAbsenceTypeId,
+  getScheduleEntryRestOfDayAbsenceTypeId,
 } from "./entry-accessors";
 import type { ScheduleEntryLike } from "./types";
 
@@ -19,23 +19,23 @@ function entryWithState(kind: "worked" | "absence", absenceTypeId: number | null
   } as unknown as ScheduleEntryLike;
 }
 
-describe("off-day accessors (item 45)", () => {
-  it("reads the off day of a worked cell, which is not a whole-day absence", () => {
+describe("rest-of-day absence accessors (item 45)", () => {
+  it("reads the rest-of-day absence of a worked cell, which is not a whole-day absence", () => {
     const entry = entryWithState("worked", 7);
-    expect(getScheduleEntryOffDayAbsenceTypeId(entry)).toBe(7);
+    expect(getScheduleEntryRestOfDayAbsenceTypeId(entry)).toBe(7);
     expect(getScheduleEntryAbsenceTypeId(entry)).toBeNull();
   });
 
-  it("reads a whole-day absence as an absence, not an off day", () => {
+  it("reads a whole-day absence as an absence, not a rest-of-day one", () => {
     const entry = entryWithState("absence", 7);
     expect(getScheduleEntryAbsenceTypeId(entry)).toBe(7);
-    expect(getScheduleEntryOffDayAbsenceTypeId(entry)).toBeNull();
+    expect(getScheduleEntryRestOfDayAbsenceTypeId(entry)).toBeNull();
   });
 
-  it("has no off day without state or on a plain worked cell", () => {
+  it("has no rest-of-day absence without state or on a plain worked cell", () => {
     expect(
-      getScheduleEntryOffDayAbsenceTypeId({ absenceTypeId: 7 } as unknown as ScheduleEntryLike),
+      getScheduleEntryRestOfDayAbsenceTypeId({ absenceTypeId: 7 } as unknown as ScheduleEntryLike),
     ).toBeNull();
-    expect(getScheduleEntryOffDayAbsenceTypeId(entryWithState("worked", null))).toBeNull();
+    expect(getScheduleEntryRestOfDayAbsenceTypeId(entryWithState("worked", null))).toBeNull();
   });
 });

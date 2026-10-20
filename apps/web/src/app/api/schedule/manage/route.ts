@@ -380,7 +380,7 @@ function normalizeScheduleInput(
       position: index,
       isMentored: segment.isMentored ?? false,
     })),
-    // The off day for the rest of the day, such as D/Bereavement (item 45).
+    // The absence for the rest of the day, such as D/Bereavement (item 45).
     absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
@@ -389,10 +389,11 @@ function normalizeScheduleInput(
   };
 }
 
-const SERIES_OFF_DAY_ERROR = "A repeating shift can't include an off day for the rest of the day.";
+const SERIES_REST_OF_DAY_ABSENCE_ERROR =
+  "A repeating shift can't include an absence for the rest of the day.";
 
-/** Repeating shifts don't take a worked shift plus an off day yet (item 45a). */
-function seriesHasOffDay(input: ScheduleCellInput): boolean {
+/** Repeating shifts don't take a worked shift plus an absence yet (item 45a). */
+function seriesHasRestOfDayAbsence(input: ScheduleCellInput): boolean {
   return input.kind === "worked" && input.absenceTypeId != null;
 }
 
@@ -1421,8 +1422,8 @@ export async function POST(req: NextRequest) {
             { status: 400 },
           );
         }
-        if (seriesHasOffDay(normalizedInput)) {
-          return NextResponse.json({ error: SERIES_OFF_DAY_ERROR }, { status: 400 });
+        if (seriesHasRestOfDayAbsence(normalizedInput)) {
+          return NextResponse.json({ error: SERIES_REST_OF_DAY_ABSENCE_ERROR }, { status: 400 });
         }
 
         const { data: createdSeriesId, error } = await auth.userClient.rpc("create_shift_series", {
@@ -1510,8 +1511,8 @@ export async function POST(req: NextRequest) {
             { status: 400 },
           );
         }
-        if (seriesHasOffDay(normalizedInput)) {
-          return NextResponse.json({ error: SERIES_OFF_DAY_ERROR }, { status: 400 });
+        if (seriesHasRestOfDayAbsence(normalizedInput)) {
+          return NextResponse.json({ error: SERIES_REST_OF_DAY_ABSENCE_ERROR }, { status: 400 });
         }
 
         const { error } = await auth.userClient.rpc("update_series_all_shifts", {
