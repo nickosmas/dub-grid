@@ -365,7 +365,8 @@ function buildStateFromSnapshot(
           position: segment.position,
           isMentored: segment.is_mentored ?? false,
         })),
-        absenceTypeId: null,
+        // On a worked cell this is the off day for the rest of the day (082).
+        absenceTypeId: snapshot.absence_type_id ?? null,
         customStartTime: snapshot.custom_start_time ?? null,
         customEndTime: snapshot.custom_end_time ?? null,
         seriesId: null,

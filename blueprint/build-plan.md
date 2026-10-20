@@ -876,7 +876,7 @@
       in print. Owner decisions, 2026-10-19: at most two worked shifts plus
       one off day; asking for time off from part of a shift in the app is
       out of scope.
-  - [ ] 45a. **Data model** - a worked cell may carry one off day: contract,
+  - [x] 45a. **Data model** - a worked cell may carry one off day: contract,
         a migration relaxing the snapshot check and keeping the off day in
         the save, state, sync, import and publish functions, and the shared
         accessors and mappers. A mixed cell round-trips through draft,

@@ -288,6 +288,12 @@ export interface ScheduleCellSnapshot extends ScheduleCellInput {
    */
   assignmentIds: number[];
   segments: ScheduleCellSegmentSnapshot[];
+  /**
+   * The off day a worked cell carries for the rest of the day (item 45).
+   * `absenceTypeId` stays a whole-day absence only, so readers that test it
+   * without the kind never mistake D/Bereavement for an off day.
+   */
+  offDayAbsenceTypeId?: number | null;
 }
 
 export type RecurringScheduleDraft = Record<string, Record<number, ScheduleCellInput | null>>;

@@ -493,7 +493,8 @@ function normalizeScheduleCellState(
         isMentored: segment.isMentored ?? false,
       })),
     ...(state.focusAreaId !== undefined ? { focusAreaId: state.focusAreaId ?? null } : {}),
-    absenceTypeId: null,
+    // On a worked cell this is the off day for the rest of the day (item 45).
+    absenceTypeId: state.absenceTypeId ?? null,
     customStartTime: state.customStartTime ?? null,
     customEndTime: state.customEndTime ?? null,
     seriesId,

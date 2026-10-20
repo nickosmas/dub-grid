@@ -60,10 +60,75 @@ describe("published shift helpers", () => {
       label: "DAY/EVE",
       assignmentIds: [1, 2],
       absenceTypeId: null,
+      offDayAbsenceTypeId: null,
       startTime: "06:30",
       endTime: "22:00",
       durationHours: 14,
       segments: [],
+    });
+  });
+
+  it("keeps a worked cell's off day without adding hours or turning it into an absence", () => {
+    const entry = resolvePublishedScheduleEntry(
+      {
+        emp_id: "emp-1",
+        date: "2026-04-13",
+        resolvedAssignmentIds: [1],
+        published_absence_type_id: null,
+        published_off_day_absence_type_id: 5,
+        published_custom_start_time: "07:00",
+        published_custom_end_time: "11:00",
+      },
+      assignmentById,
+      new Map([[5, "Bereavement"]]),
+    );
+
+    expect(entry).toMatchObject({
+      kind: "shift",
+      label: "DAY",
+      absenceTypeId: null,
+      offDayAbsenceTypeId: 5,
+      durationHours: 4,
+    });
+  });
+
+  it("maps a published worked snapshot's off day apart from its whole-day absence", () => {
+    const row = mapNormalizedScheduleCellToPublishedShiftRow(
+      {
+        id: "cell-1",
+        emp_id: "emp-1",
+        date: "2026-04-14",
+        org_id: "org-1",
+        version: 1,
+        snapshots: [
+          {
+            id: "snap-1",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "published",
+            state_kind: "worked",
+            absence_type_id: 5,
+            custom_start_time: null,
+            custom_end_time: null,
+            segments: [
+              {
+                id: "seg-1",
+                snapshot_id: "snap-1",
+                org_id: "org-1",
+                position: 0,
+                shift_id: 1,
+                job_id: 10,
+              },
+            ],
+          },
+        ],
+      },
+      new Map(),
+    );
+
+    expect(row).toMatchObject({
+      published_absence_type_id: null,
+      published_off_day_absence_type_id: 5,
     });
   });
 

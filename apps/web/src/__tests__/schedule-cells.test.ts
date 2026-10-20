@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
-import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+import {
+  mapNormalizedScheduleCellRowToScheduleEntry,
+  resolveScheduleCellSnapshotFromInput,
+  scheduleCellSnapshotToInput,
+} from "@/lib/schedule-cells";
 import type { DbScheduleCell } from "@/lib/db/types";
 import type { JobDefinition, ShiftCategory, AssignmentDefinition } from "@/types";
 
@@ -211,5 +215,77 @@ describe("mapNormalizedScheduleCellRowToScheduleEntry", () => {
     });
     expect(entry?.draft).toMatchObject({ kind: "deleted" });
     expect(entry?.published).toMatchObject({ kind: "worked", label: "DST" });
+  });
+});
+
+describe("a worked cell with an off day (item 45)", () => {
+  const segmentCompatibility = createShiftJobCompatibilityMaps({
+    assignments,
+    shiftCategories,
+    jobs,
+    shiftDisplayMode: "code",
+  });
+
+  function workedSnapshot(kind: "draft" | "published", absenceTypeId: number | null) {
+    return {
+      id: `snap-${kind}`,
+      cell_id: "cell-1",
+      org_id: "org-1",
+      snapshot_kind: kind,
+      state_kind: "worked" as const,
+      absence_type_id: absenceTypeId,
+      custom_start_time: null,
+      custom_end_time: null,
+      segments: [
+        {
+          id: `seg-${kind}`,
+          snapshot_id: `snap-${kind}`,
+          org_id: "org-1",
+          position: 0,
+          shift_id: 10,
+          job_id: 100,
+        },
+      ],
+    };
+  }
+
+  it("keeps the off day apart from the whole-day absence id", () => {
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+      makeCell({ snapshots: [workedSnapshot("draft", 7), workedSnapshot("published", null)] }),
+      { isScheduler: true, assignmentLabelMap: new Map([[1, "DST"]]), segmentCompatibility },
+    );
+
+    expect(entry?.effective).toMatchObject({
+      kind: "worked",
+      assignmentIds: [1],
+      absenceTypeId: null,
+      offDayAbsenceTypeId: 7,
+    });
+    expect(entry?.published).toMatchObject({ absenceTypeId: null, offDayAbsenceTypeId: null });
+    expect(entry?.absenceTypeId).toBeNull();
+    expect(entry?.draftKind).toBe("modified");
+  });
+
+  it("round-trips the off day between a snapshot and saved input", () => {
+    const snapshot = resolveScheduleCellSnapshotFromInput(
+      {
+        kind: "worked",
+        segments: [{ shiftId: 10, jobId: 100, position: 0, isMentored: false }],
+        absenceTypeId: 7,
+        customStartTime: "07:00",
+        customEndTime: "12:00",
+        seriesId: null,
+        fromRecurring: false,
+      },
+      { segmentCompatibility },
+    );
+
+    expect(snapshot).toMatchObject({ absenceTypeId: null, offDayAbsenceTypeId: 7 });
+    expect(scheduleCellSnapshotToInput(snapshot)).toMatchObject({
+      kind: "worked",
+      absenceTypeId: 7,
+      customStartTime: "07:00",
+      customEndTime: "12:00",
+    });
   });
 });

@@ -6,6 +6,7 @@ import {
   fetchMobilePeopleRows,
   fetchMobileRoleRows,
   fetchScheduleCellQueryRows,
+  fetchPublishedMobileScheduleRows,
   fetchMobileScheduleNoteRows,
   fetchMobileIndicatorTypeRows,
   fetchMobilePublishHistoryRows,
@@ -576,5 +577,59 @@ describe("fetchMobileManagementRosterRows", () => {
       [0, pageSize - 1],
       [pageSize, pageSize * 2 - 1],
     ]);
+  });
+});
+
+describe("fetchPublishedMobileScheduleRows", () => {
+  it("keeps a worked cell's off day in its state (item 45)", async () => {
+    const row = {
+      id: "cell-1",
+      emp_id: "emp-1",
+      date: "2026-04-14",
+      org_id: "org-1",
+      version: 1,
+      focus_area_id: null,
+      employees: { id: "emp-1", first_name: "Ada", last_name: "Lane", org_id: "org-1" },
+      snapshots: [
+        {
+          id: "snap-1",
+          cell_id: "cell-1",
+          org_id: "org-1",
+          snapshot_kind: "published",
+          state_kind: "worked",
+          absence_type_id: 9,
+          custom_start_time: "07:00",
+          custom_end_time: "11:00",
+          segments: [
+            {
+              id: "seg-1",
+              snapshot_id: "snap-1",
+              org_id: "org-1",
+              position: 0,
+              shift_id: 1,
+              job_id: 10,
+            },
+          ],
+        },
+      ],
+    };
+    const chain: Record<string, unknown> = {};
+    for (const method of ["select", "eq", "gte", "lte", "order"])
+      chain[method] = vi.fn(() => chain);
+    chain.range = vi.fn(async () => ({ data: [row], error: null }));
+    const client = { from: vi.fn(() => chain) } as unknown as SupabaseClient;
+
+    const [published] = await fetchPublishedMobileScheduleRows(client, {
+      orgId: "org-1",
+      startDate: "2026-04-14",
+      endDate: "2026-04-14",
+    });
+
+    expect(published?.state).toMatchObject({
+      kind: "worked",
+      absenceTypeId: 9,
+      customStartTime: "07:00",
+      segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+    });
   });
 });

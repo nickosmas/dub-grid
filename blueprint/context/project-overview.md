@@ -130,10 +130,11 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
-Item 45 is split, and nothing has shipped:
+Item 45 is split; 45a has shipped:
 
-- **45a - Data model:** planned; a worked cell may carry one off day,
-  through draft, publish and publish history. Needs a migration.
+- **45a - Data model:** shipped; a worked cell may carry one off day,
+  through draft, publish, publish history and import (migration 082).
+  Nothing on screen shows it until 45b.
 - **45b - Web editor and grid:** planned; the panel adds an off day beside
   one or two shifts and can record when the last shift ended, and a
   three-item cell gets a taller row. Needs an approved mockup first.

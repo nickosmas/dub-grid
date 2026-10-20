@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:165d2c646b09a8b788830a721484d2f01b429ba5b6f48d871a1b54b09fca1d56",
+  "sourceDigest": "sha256:750f5541561fabb1b0957ed6e244b1191dd089baeb6872e2014d64a30723fdb9",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4595,6 +4595,16 @@
       "sha256": "33b7bb979fb888edb9126e4b531772a003e70ff3afced18ef197c49b7df8825e",
       "source": {
         "path": "supabase/migrations/081_internal_accounts.sql"
+      }
+    },
+    {
+      "id": "migration:082_worked_cell_off_day.sql",
+      "version": "082",
+      "name": "worked_cell_off_day",
+      "file": "082_worked_cell_off_day.sql",
+      "sha256": "8c963fd5a0a44ce223c833c7411649cea74abc67e22ac4c42deb91bef02595a1",
+      "source": {
+        "path": "supabase/migrations/082_worked_cell_off_day.sql"
       }
     }
   ],

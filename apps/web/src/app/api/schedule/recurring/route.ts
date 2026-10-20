@@ -52,6 +52,10 @@ function logScheduleAudit(
   }
 }
 
+// Recurring shifts don't take a worked shift plus an off day yet (item 45a).
+const RECURRING_OFF_DAY_ERROR =
+  "A recurring shift can't include an off day for the rest of the day.";
+
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
 const requestSchema = z.discriminatedUnion("action", [
@@ -321,6 +325,9 @@ export async function POST(req: NextRequest) {
             { status: 400 },
           );
         }
+        if (data.input.kind === "worked" && data.input.absenceTypeId != null) {
+          return NextResponse.json({ error: RECURRING_OFF_DAY_ERROR }, { status: 400 });
+        }
 
         const { error } = await auth.userClient.rpc("upsert_recurring_shift", {
           p_emp_id: data.employeeId,
@@ -391,6 +398,13 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        if (
+          data.changes.some(
+            (change) => change.input?.kind === "worked" && change.input.absenceTypeId != null,
+          )
+        ) {
+          return NextResponse.json({ error: RECURRING_OFF_DAY_ERROR }, { status: 400 });
+        }
         const invalid = data.changes.find(
           (change) => change.input?.kind === "worked" && (change.input.segments?.length ?? 0) === 0,
         );

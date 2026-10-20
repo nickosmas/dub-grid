@@ -29,13 +29,8 @@ export const scheduleCellStateSchema = z
           path: ["segments"],
         });
       }
-      if (state.absenceTypeId != null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Worked schedule cells cannot include an absence type",
-          path: ["absenceTypeId"],
-        });
-      }
+      // A worked cell's absenceTypeId is its off day for the rest of the day,
+      // such as the Bereavement in D/Bereavement (item 45).
       return;
     }
 

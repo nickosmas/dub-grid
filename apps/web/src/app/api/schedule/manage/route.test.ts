@@ -348,6 +348,61 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
+  it("saves a worked shift with an off day for the rest of the day (item 45)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+          absenceTypeId: 7,
+          customStartTime: "07:00",
+          customEndTime: "11:00",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({
+        p_state_kind: "worked",
+        p_shift_ids: [3],
+        p_job_ids: [30],
+        p_absence_type_id: 7,
+        p_custom_start_time: "07:00",
+        p_custom_end_time: "11:00",
+      }),
+    );
+  });
+
+  it.each(["createShiftSeries", "updateSeriesAllShifts"])(
+    "refuses an off day on a repeating shift (%s) before writing",
+    async (action) => {
+      const response = await POST(
+        makeRequest({
+          ...seriesRequest,
+          action,
+          seriesId: "33333333-3333-4333-8333-333333333333",
+          input: {
+            kind: "worked",
+            segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+            absenceTypeId: 7,
+          },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: expect.stringMatching(/off day/) });
+      expect(userRpc).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects a mismatched org id when the caller has no sandbox and requireOrgPermissions denies it", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const employeeId = "22222222-2222-4222-8222-222222222222";
