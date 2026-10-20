@@ -64,9 +64,84 @@ export function joinBoxShadows(...values: Array<string | undefined>): string | u
 }
 
 export const SINGLE_SHIFT_PILL_RADIUS = 8;
-export const MULTI_SHIFT_PILL_RADIUS = 6;
 export const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 18;
-export const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 16;
+
+/** Space between a double shift's pills when they sit side by side. */
+export const SIDE_BY_SIDE_SHIFT_GAP = 4;
+export const STACKED_SHIFT_GAP = 4;
+/** Room a change chip on a lower stacked pill needs: half its height, clear of the pill above. */
+export const STACKED_SHIFT_CHIP_GAP = 10;
+const CELL_INSETS = 8;
+/**
+ * The narrowest pill that still holds a single shift's marks without one
+ * covering another: the change chip from the left, the mentored M in the
+ * corner and the words between them.
+ */
+export const MIN_SIDE_BY_SIDE_PILL_WIDTH = { code: 76, name: 140 } as const;
+
+/** Whether a cell's shifts stack, because side by side each pill would be too narrow. */
+export function stacksShifts(columnWidth: number, pillCount: number, isNameMode: boolean): boolean {
+  if (pillCount < 2) return false;
+  const pillWidth =
+    (columnWidth - CELL_INSETS - (pillCount - 1) * SIDE_BY_SIDE_SHIFT_GAP) / pillCount;
+  return pillWidth < MIN_SIDE_BY_SIDE_PILL_WIDTH[isNameMode ? "name" : "code"];
+}
+
+/** A row holding stacked shifts sets its cells' height here; other rows keep the grid's. */
+export const ROW_CELL_HEIGHT_VAR = "--dg-grid-row-cell-height";
+export const GRID_CELL_HEIGHT = `var(${ROW_CELL_HEIGHT_VAR}, var(--dg-grid-cell-height))`;
+
+/** Room a pill keeps above its words for the lower half of a raised change chip. */
+export const RAISED_CHIP_RESERVE = 9;
+
+export interface DoubleShiftCellContent {
+  /** Pills one above the other: all of them when stacked, one when side by side. */
+  pillsDown: number;
+  isNameMode: boolean;
+  /** Name mode puts the job on a line of its own; code mode keeps it beside the shift. */
+  hasSecondary: boolean;
+  hasTime: boolean;
+  hasNotes: boolean;
+  /** A change chip, whose lower half the pill keeps clear above its words. */
+  hasChip: boolean;
+}
+
+// 2px of padding and a 1px border at top and bottom, plus a little air.
+const PILL_FRAME = "8px";
+const NOTE_STRIP = "14px";
+
+/**
+ * Height a double shift's cell needs: each pill as tall as its lines need,
+ * from the same type tokens the pill uses, so a row grows only as far as its
+ * content does rather than a whole extra row per shift.
+ */
+export function doubleShiftCellHeight({
+  pillsDown,
+  isNameMode,
+  hasSecondary,
+  hasTime,
+  hasNotes,
+  hasChip,
+}: DoubleShiftCellContent): string {
+  const lines = isNameMode
+    ? [
+        // A name with nothing beneath it may take two lines.
+        `var(--dg-fs-caption) * 1.2 * ${hasSecondary || hasTime || hasNotes ? 1 : 2}`,
+        hasSecondary ? "1px + var(--dg-fs-footnote) * 1.3" : null,
+        hasTime ? "1px + var(--dg-fs-footnote)" : null,
+      ]
+    : ["var(--dg-fs-title) * 1.2", hasTime ? "1px + var(--dg-fs-footnote)" : null];
+  // A time line or a job line ends with the dots; otherwise they take a strip.
+  const strip = hasNotes && !hasTime && !(isNameMode && hasSecondary) ? NOTE_STRIP : null;
+  const pill = [...lines, strip, PILL_FRAME].filter(Boolean).join(" + ");
+  // One chip at most rides on a pill: its room above that pill's words, and a
+  // wider gap when it sits on a lower pill.
+  const chipRoom = hasChip
+    ? RAISED_CHIP_RESERVE - 2 + (pillsDown > 1 ? STACKED_SHIFT_CHIP_GAP - STACKED_SHIFT_GAP : 0)
+    : 0;
+  return `calc(${CELL_INSETS}px + ${pillsDown} * (${pill}) + ${(pillsDown - 1) * STACKED_SHIFT_GAP + chipRoom}px)`;
+}
+
 export const BULK_SELECTION_RING_PADDING = 2;
 
 export function areGridCellIdsEqual(

@@ -4,6 +4,8 @@ import {
   formatPublishedMetadata,
   publishCellLevelBadge,
   publishedAtFormatter,
+  doubleShiftCellHeight,
+  stacksShifts,
 } from "./gridHelpers";
 
 const newBadge = { kind: "new" as const, text: "New", detail: "Added N." };
@@ -92,5 +94,55 @@ describe("formatPublishedMetadata", () => {
     expect(publishedAtFormatter("UTC")).toBe(publishedAtFormatter("UTC"));
     expect(publishedAtFormatter(undefined)).toBe(publishedAtFormatter(null));
     expect(publishedAtFormatter("UTC")).not.toBe(publishedAtFormatter("Asia/Kolkata"));
+  });
+});
+
+describe("stacksShifts", () => {
+  it("keeps a single shift and a wide column's pair side by side", () => {
+    expect(stacksShifts(84, 1, false)).toBe(false);
+    // One week at 1440px: each pill keeps a single pill's 76px.
+    expect(stacksShifts(172, 2, false)).toBe(false);
+  });
+
+  it("stacks a pair whose pills would be narrower than a single shift's", () => {
+    // Two weeks at 1440px: two 34px halves.
+    expect(stacksShifts(84, 2, false)).toBe(true);
+    expect(stacksShifts(164, 2, false)).toBe(false);
+    expect(stacksShifts(160, 2, true)).toBe(true);
+  });
+});
+
+describe("doubleShiftCellHeight", () => {
+  const base = {
+    pillsDown: 2,
+    isNameMode: false,
+    hasSecondary: true,
+    hasTime: false,
+    hasNotes: false,
+    hasChip: false,
+  };
+
+  it("adds only the lines a double shift shows", () => {
+    expect(doubleShiftCellHeight(base)).toBe(
+      "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 8px) + 4px)",
+    );
+    // The time line ends with the dots, so notes add no strip of their own.
+    expect(doubleShiftCellHeight({ ...base, hasTime: true, hasNotes: true })).toBe(
+      "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 1px + var(--dg-fs-footnote) + 8px) + 4px)",
+    );
+  });
+
+  it("gives an untimed pill's notes a strip and a chip room above the words", () => {
+    expect(doubleShiftCellHeight({ ...base, hasNotes: true })).toContain("+ 14px");
+    // Room above one pill's words, and a wider gap in case it rides the lower pill.
+    expect(doubleShiftCellHeight({ ...base, hasChip: true })).toBe(
+      "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 8px) + 17px)",
+    );
+  });
+
+  it("sizes a side-by-side pair as one pill tall", () => {
+    expect(doubleShiftCellHeight({ ...base, pillsDown: 1 })).toBe(
+      "calc(8px + 1 * (var(--dg-fs-title) * 1.2 + 8px) + 0px)",
+    );
   });
 });

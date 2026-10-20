@@ -1,7 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import { MaybeHint } from "@/components/ui/hint";
 import type { IndicatorType } from "@/types";
-import { MAX_VISIBLE_NOTE_DOTS, NOTE_DOT_GAP, NOTE_DOT_SIZE, NOTE_LANE_HEIGHT } from "./badges";
+import {
+  MAX_VISIBLE_NOTE_DOTS,
+  NOTE_DOT_GAP,
+  NOTE_DOT_SIZE,
+  NOTE_LANE_HEIGHT,
+  NOTE_LANE_INSET,
+} from "./badges";
 import { ScheduleNoteIcon } from "./noteIcon";
 import { getPublishDiffTone } from "./publishDiffPill";
 
@@ -96,7 +102,7 @@ export function NoteDots({
   placement = "lane",
   rimColor = "var(--dg-color-text)",
   isDark = false,
-  narrow = false,
+  corner = false,
   style,
 }: {
   marks: ScheduleNoteMark[];
@@ -112,10 +118,11 @@ export function NoteDots({
   rimColor?: string;
   isDark?: boolean;
   /**
-   * A half of a double shift: about 30px inside in the 2 Weeks view, too little
-   * for two dots and a count, so the count takes the second dot's place.
+   * A grid pill's strip: the strip stays in flow as the room the words leave,
+   * and the dots sit NOTE_LANE_INSET inside the pill's bottom-right corner, as
+   * the mentored M sits in its top-right. The pill must be positioned.
    */
-  narrow?: boolean;
+  corner?: boolean;
   style?: CSSProperties;
 }) {
   if (marks.length === 0) return null;
@@ -127,10 +134,7 @@ export function NoteDots({
 
   if (placement !== "inline") {
     const label = marks.map(labelOf).join(", ");
-    const { shown, hidden } = splitNoteMarks(
-      marks,
-      narrow && marks.length > MAX_VISIBLE_NOTE_DOTS ? 1 : MAX_VISIBLE_NOTE_DOTS,
-    );
+    const { shown, hidden } = splitNoteMarks(marks);
     const placementStyle: CSSProperties =
       placement === "lane"
         ? {
@@ -154,7 +158,14 @@ export function NoteDots({
           <span
             role="img"
             aria-label={marks.length > 1 ? `${marks.length} notes: ${label}` : label}
-            style={{ display: "flex", alignItems: "center", gap: NOTE_DOT_GAP }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: NOTE_DOT_GAP,
+              ...(corner
+                ? { position: "absolute", right: NOTE_LANE_INSET, bottom: NOTE_LANE_INSET }
+                : null),
+            }}
           >
             {shown.map((mark) => (
               <span

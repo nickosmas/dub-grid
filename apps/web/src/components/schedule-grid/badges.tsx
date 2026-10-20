@@ -41,8 +41,8 @@ export const NOTE_DOT_GAP = 3;
 export const MAX_VISIBLE_NOTE_DOTS = 2;
 /** The strip a pill with notes keeps along its bottom for them. */
 export const NOTE_LANE_HEIGHT = 13;
-/** How far inside a pill's edge its note dots end. */
-export const NOTE_LANE_INSET = 6;
+/** How far inside a pill's bottom-right corner its note dots sit, as the mentored M sits in the top-right. */
+export const NOTE_LANE_INSET = 2;
 
 /** Horizontal run a shift's note dots claim for `count` notes; a count takes about a dot's room. */
 export function noteMarksWidth(count: number): number {

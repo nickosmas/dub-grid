@@ -108,6 +108,7 @@ import {
   GridDiffBadge,
   MentoredShiftBadge,
   LOCK_CORNER_CLEARANCE,
+  MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
   noteMarksWidth,
   NOTE_LANE_INSET,
@@ -143,9 +144,15 @@ import {
   mentoredFlagsFromPublishState,
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
-  MULTI_SHIFT_PILL_RADIUS,
   SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
-  MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
+  GRID_CELL_HEIGHT,
+  ROW_CELL_HEIGHT_VAR,
+  SIDE_BY_SIDE_SHIFT_GAP,
+  STACKED_SHIFT_CHIP_GAP,
+  STACKED_SHIFT_GAP,
+  doubleShiftCellHeight,
+  RAISED_CHIP_RESERVE,
+  stacksShifts,
 } from "./schedule-grid/gridHelpers";
 
 import type { ShiftDragData } from "./DraggableShift";
@@ -303,6 +310,8 @@ interface SectionBlockProps {
   ) => void;
   nameColWidth: number;
   colWidth: number;
+  /** A day column's laid-out width: `colWidth` is its minimum, and columns share any spare room. */
+  dayColumnWidth: number;
   fitToContainer?: boolean;
   highlightEmpIds?: Set<string>;
   focusAreas: FocusArea[];
@@ -968,6 +977,7 @@ const SectionBlock = memo(function SectionBlock({
   handleCellClick,
   nameColWidth,
   colWidth,
+  dayColumnWidth,
   fitToContainer = false,
   highlightEmpIds,
   focusAreas,
@@ -1959,6 +1969,37 @@ const SectionBlock = memo(function SectionBlock({
               const roleAbbrs = getRoleAbbrs(emp.roleIds, orgRoles, true);
               const roleNames = getRoleAbbrs(emp.roleIds, orgRoles, false);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
+              // An absence is one pill even when its name holds a "/".
+              // A double shift makes the row as tall as its fullest cell needs.
+              // Read once here; the cells below reuse them by index.
+              const rowShiftLabels = weekDates.map((date) => shiftForKey(emp.id, date));
+              const rowAbsenceTypeIds = weekDates.map(
+                (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
+              );
+              const doubleShiftHeights = new Set<string>();
+              for (const [index, date] of weekDates.entries()) {
+                if (rowAbsenceTypeIds[index] != null) continue;
+                const labels = rowShiftLabels[index]?.split("/") ?? [];
+                if (labels.length < 2) continue;
+                const ids = assignmentIdsForKey?.(emp.id, date) ?? [];
+                doubleShiftHeights.add(
+                  doubleShiftCellHeight({
+                    pillsDown: stacksShifts(dayColumnWidth, labels.length, isNameMode)
+                      ? labels.length
+                      : 1,
+                    isNameMode,
+                    hasSecondary: labels.some(
+                      (label, i) => !!getDisplayPartsByIdOrLabel(label, ids[i]).secondaryLabel,
+                    ),
+                    hasTime: !!getCustomShiftTimes?.(emp.id, date),
+                    hasNotes:
+                      (noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? []).length > 0,
+                    hasChip:
+                      draftKindForKey?.(emp.id, date) != null ||
+                      (!!showPublishDiffOverlay && publishDiffForKey?.(emp.id, date) != null),
+                  }),
+                );
+              }
 
               return (
                 <div
@@ -1981,6 +2022,11 @@ const SectionBlock = memo(function SectionBlock({
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
+                    ...(doubleShiftHeights.size > 0
+                      ? {
+                          [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...doubleShiftHeights].join(", ")})`,
+                        }
+                      : null),
                   }}
                 >
                   {/* Name cell */}
@@ -2090,7 +2136,10 @@ const SectionBlock = memo(function SectionBlock({
                       const dateKey = formatDateKey(date);
                       const cellKey = `${emp.id}_${dateKey}`;
                       const isToday = dateKey === todayKey;
-                      const shiftLabel = shiftForKey(emp.id, date);
+                      const shiftLabel = rowShiftLabels[index];
+                      const isDoubleShiftCell =
+                        rowAbsenceTypeIds[index] == null &&
+                        (shiftLabel?.split("/").length ?? 0) > 1;
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
@@ -2127,7 +2176,7 @@ const SectionBlock = memo(function SectionBlock({
                       const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                       const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
                       const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
-                      const currentAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const currentAbsenceTypeId = rowAbsenceTypeIds[index];
                       const publishedAbsenceTypeId =
                         publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
                       const cellAbsenceType =
@@ -2288,7 +2337,7 @@ const SectionBlock = memo(function SectionBlock({
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
                           style={{
-                            height: "var(--dg-grid-cell-height)",
+                            height: GRID_CELL_HEIGHT,
                             background: isBulkSelected
                               ? "var(--dg-color-brand-bg)"
                               : showDiffCellTint
@@ -2317,6 +2366,11 @@ const SectionBlock = memo(function SectionBlock({
                             style={{
                               zIndex: showDiffCellTint ? 4 : undefined,
                               overflow: "visible",
+                              // In a row grown for a double shift, everything
+                              // else keeps the normal height, centred.
+                              ...(isDoubleShiftCell
+                                ? null
+                                : { height: "var(--dg-grid-cell-height)" }),
                             }}
                           >
                             {isBulkSelected && (
@@ -3110,12 +3164,7 @@ const SectionBlock = memo(function SectionBlock({
                                                 indicatorTypes={indicatorTypes}
                                                 rimColor={singleForegroundColor}
                                                 isDark={isDarkTheme}
-                                                // With the pill's own padding, the dots end
-                                                // NOTE_LANE_INSET inside its edge in either mode.
-                                                style={{
-                                                  paddingRight:
-                                                    NOTE_LANE_INSET - (isNameMode ? 6 : 3),
-                                                }}
+                                                corner
                                               />
                                             )}
                                             {(draftBadge || publishBadge) && (
@@ -3153,10 +3202,10 @@ const SectionBlock = memo(function SectionBlock({
                                     );
                                   }
 
-                                  // Multi-pill: render each shift as a separate vertical pill.
-                                  // Every raised badge needs real room above the pills. Letting it
-                                  // hang from the standard 3px inset pushed its top 5px outside
-                                  // the cell, where neighbouring rows could cover it.
+                                  // Multi-pill: each shift is its own pill, drawn like a single
+                                  // shift's. They sit side by side while the column leaves each
+                                  // one a single pill's width, and stack in a taller row when it
+                                  // does not; halves about 30px wide had marks over their words.
                                   const multiPillBadges = labels.map(
                                     (_, labelIndex) =>
                                       (showsDraftBadge &&
@@ -3174,9 +3223,14 @@ const SectionBlock = memo(function SectionBlock({
                                           })
                                         : null),
                                   );
-                                  const multiTopInset = 3;
-                                  const multiSideInset = 3;
-                                  const multiBottomInset = 3;
+                                  const stackShifts = stacksShifts(
+                                    dayColumnWidth,
+                                    labels.length,
+                                    isNameMode,
+                                  );
+                                  const multiTopInset = 4;
+                                  const multiSideInset = 4;
+                                  const multiBottomInset = 4;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
                                   // Each pill draws its own shift's notes when the
                                   // cell's segments line up with its pills.
@@ -3205,7 +3259,7 @@ const SectionBlock = memo(function SectionBlock({
                                             leftInset: multiSideInset,
                                             topDividerInset,
                                             leadingDividerInset,
-                                            pillRadius: MULTI_SHIFT_PILL_RADIUS,
+                                            pillRadius: SINGLE_SHIFT_PILL_RADIUS,
                                           })}
                                         />
                                       )}
@@ -3241,16 +3295,29 @@ const SectionBlock = memo(function SectionBlock({
                                             />
                                           )}
                                           <div
+                                            data-shift-layout={
+                                              stackShifts ? "stacked" : "side-by-side"
+                                            }
                                             style={{
-                                              display: "flex",
-                                              flexDirection: "row",
-                                              // Two hairlines butted together read
-                                              // as one thick rule; 2px keeps the
-                                              // pills legibly separate.
-                                              gap: 2,
+                                              // A grid, so a pill padded clear of its M
+                                              // stays the same size as its neighbour.
+                                              display: "grid",
+                                              // Stacked, each pill is at least as tall as
+                                              // its own lines and they share any spare room.
+                                              ...(stackShifts
+                                                ? {
+                                                    gridTemplateRows: `repeat(${labels.length}, minmax(min-content, 1fr))`,
+                                                  }
+                                                : {
+                                                    gridTemplateColumns: `repeat(${labels.length}, minmax(0, 1fr))`,
+                                                  }),
+                                              gap: stackShifts
+                                                ? multiPillBadges.slice(1).some(Boolean)
+                                                  ? STACKED_SHIFT_CHIP_GAP
+                                                  : STACKED_SHIFT_GAP
+                                                : SIDE_BY_SIDE_SHIFT_GAP,
                                               flex: 1,
                                               minHeight: 0,
-                                              alignItems: "stretch",
                                             }}
                                           >
                                             {labels.map((label, li) => {
@@ -3308,6 +3375,10 @@ const SectionBlock = memo(function SectionBlock({
                                                     themeSurface,
                                                   );
                                               const pillBadge = multiPillBadges[li];
+                                              // The cell's own chip rides on the first pill.
+                                              const pillHasChip =
+                                                !!pillBadge ||
+                                                (li === 0 && !!(draftBadge || publishBadge));
                                               const pillBorder = draftPillBorderKind
                                                 ? getDraftBorder(
                                                     draftPillBorderKind,
@@ -3336,7 +3407,7 @@ const SectionBlock = memo(function SectionBlock({
                                               const multiCrossFocusPill =
                                                 isCross && crossHomeFaLi ? crossHomeFaLi : null;
                                               const multiCrossFocusWingRadius =
-                                                MULTI_SHIFT_PILL_RADIUS -
+                                                SINGLE_SHIFT_PILL_RADIUS -
                                                 (draftPillBorderKind ? 2 : 1);
                                               const multiCrossFocusPalette =
                                                 getCrossFocusBadgePalette({
@@ -3354,6 +3425,10 @@ const SectionBlock = memo(function SectionBlock({
                                               const multiDisplayLabel = displayParts.primaryLabel;
                                               const isMentoredPill =
                                                 cellSegments[li]?.isMentored ?? false;
+                                              const multiSidePadding = isNameMode ? 6 : 3;
+                                              const multiPaddingLeft = multiCrossFocusPill
+                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                : multiSidePadding;
                                               const pillSegment = notesPerPill
                                                 ? cellSegments[li]
                                                 : undefined;
@@ -3387,7 +3462,6 @@ const SectionBlock = memo(function SectionBlock({
                                                     indicatorTypes={indicatorTypes}
                                                     rimColor={multiForegroundColor}
                                                     isDark={isDarkTheme}
-                                                    narrow
                                                     placement="line"
                                                   />
                                                 ) : null;
@@ -3402,7 +3476,7 @@ const SectionBlock = memo(function SectionBlock({
                                                       ? effectiveColorLi
                                                       : "var(--dg-color-surface)",
                                                     border: pillBorder,
-                                                    borderRadius: MULTI_SHIFT_PILL_RADIUS,
+                                                    borderRadius: SINGLE_SHIFT_PILL_RADIUS,
                                                     color: multiForegroundColor,
                                                     boxShadow:
                                                       publishRingStatus === "new" ||
@@ -3418,12 +3492,12 @@ const SectionBlock = memo(function SectionBlock({
                                                     justifyContent: "center",
                                                     gap: 1,
                                                     fontSize: isNameMode
-                                                      ? "var(--dg-fs-micro)"
-                                                      : "var(--dg-fs-caption)",
+                                                      ? "var(--dg-fs-caption)"
+                                                      : "var(--dg-fs-title)",
                                                     fontWeight: 600,
                                                     position: "relative",
-                                                    // A sibling pill otherwise paints over the
-                                                    // raised chip at their shared edge.
+                                                    // The pill above otherwise paints over the
+                                                    // raised chip in the gap between them.
                                                     zIndex: pillBadge ? 2 : 1,
                                                     cursor: "pointer",
                                                     textDecoration:
@@ -3433,14 +3507,13 @@ const SectionBlock = memo(function SectionBlock({
                                                     lineHeight: 1.2,
                                                     overflow: pillBadge ? "visible" : "hidden",
                                                     minWidth: 0,
-                                                    padding: isNameMode ? "2px 4px" : "2px 3px",
-                                                    paddingTop: 2,
-                                                    paddingLeft: multiCrossFocusPill
-                                                      ? MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                                      : isNameMode
-                                                        ? 4
-                                                        : 3,
-                                                    paddingRight: isNameMode ? 4 : 3,
+                                                    padding: isNameMode ? "2px 6px" : "2px 3px",
+                                                    // Words start below a raised chip's lower half.
+                                                    paddingTop: pillHasChip
+                                                      ? RAISED_CHIP_RESERVE
+                                                      : 2,
+                                                    paddingLeft: multiPaddingLeft,
+                                                    paddingRight: multiSidePadding,
                                                   }}
                                                 >
                                                   {pillBadge && (
@@ -3448,7 +3521,8 @@ const SectionBlock = memo(function SectionBlock({
                                                       badge={{
                                                         ...pillBadge,
                                                         topOffset: 0,
-                                                        leftOffset: 4,
+                                                        // Clears the mentored M on a single pill's width.
+                                                        leftOffset: 2,
                                                         overlapPillEdge: true,
                                                         showChangeTooltip:
                                                           !showShiftDetailHoverCards,
@@ -3468,14 +3542,14 @@ const SectionBlock = memo(function SectionBlock({
                                                         whiteSpace: "nowrap",
                                                         alignItems: "center",
                                                         justifyContent: "center",
-                                                        fontSize: "var(--dg-fs-micro)",
+                                                        fontSize: "var(--dg-fs-footnote)",
                                                         fontWeight: 600,
                                                         lineHeight: 1,
                                                         background:
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
                                                         borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
-                                                        padding: "0 1px",
+                                                        padding: "0 2px",
                                                         letterSpacing: "-0.2em",
                                                         pointerEvents: "none",
                                                       }}
@@ -3487,12 +3561,11 @@ const SectionBlock = memo(function SectionBlock({
                                                   )}
                                                   {isMentoredPill && (
                                                     <MentoredShiftBadge
-                                                      compact
                                                       rightInset={
-                                                        // Only the last pill shares
-                                                        // the cell's corner with
-                                                        // the lock avatar.
-                                                        li === labels.length - 1
+                                                        // Only the pill in the cell's
+                                                        // top-right corner shares it
+                                                        // with the lock avatar.
+                                                        li === (stackShifts ? 0 : labels.length - 1)
                                                           ? cornerLockClearance || undefined
                                                           : undefined
                                                       }
@@ -3514,6 +3587,21 @@ const SectionBlock = memo(function SectionBlock({
                                                         : showMultiSecondaryLine
                                                           ? 1
                                                           : 0,
+                                                      // The first line shares the corner's height,
+                                                      // so it alone keeps the M's room on both
+                                                      // sides: clear of it and still centred.
+                                                      ...(isMentoredPill
+                                                        ? {
+                                                            paddingLeft: Math.max(
+                                                              0,
+                                                              MENTORED_CORNER_CLEARANCE -
+                                                                multiPaddingLeft,
+                                                            ),
+                                                            paddingRight:
+                                                              MENTORED_CORNER_CLEARANCE -
+                                                              multiSidePadding,
+                                                          }
+                                                        : null),
                                                       maxWidth: "100%",
                                                       minWidth: 0,
                                                       overflow: "hidden",
@@ -3564,7 +3652,7 @@ const SectionBlock = memo(function SectionBlock({
                                                       <span
                                                         aria-hidden="true"
                                                         style={{
-                                                          fontSize: "var(--dg-fs-micro)",
+                                                          fontSize: "var(--dg-fs-footnote)",
                                                           fontWeight: 700,
                                                           opacity: 0.5,
                                                           lineHeight: 1.3,
@@ -3584,12 +3672,11 @@ const SectionBlock = memo(function SectionBlock({
                                                       >
                                                         <span
                                                           style={{
-                                                            fontSize: "var(--dg-fs-micro)",
+                                                            fontSize: multiIsThreeRow
+                                                              ? "var(--dg-fs-micro)"
+                                                              : "var(--dg-fs-footnote)",
                                                             fontWeight: 700,
                                                             opacity: 0.78,
-                                                            // A split shift is half the width but the
-                                                            // full cell height, so three rows fit on
-                                                            // the same budget as the single pill.
                                                             lineHeight: multiIsThreeRow ? 1.2 : 1.3,
                                                             whiteSpace: "nowrap",
                                                             overflow: "hidden",
@@ -3607,7 +3694,9 @@ const SectionBlock = memo(function SectionBlock({
                                                     <NoteDotsLine dots={pillLineDots}>
                                                       <span
                                                         style={{
-                                                          fontSize: "var(--dg-fs-micro)",
+                                                          fontSize: multiIsThreeRow
+                                                            ? "var(--dg-fs-micro)"
+                                                            : "var(--dg-fs-footnote)",
                                                           fontWeight: 500,
                                                           opacity: 0.7,
                                                           lineHeight: 1,
@@ -3641,11 +3730,7 @@ const SectionBlock = memo(function SectionBlock({
                                                       indicatorTypes={indicatorTypes}
                                                       rimColor={multiForegroundColor}
                                                       isDark={isDarkTheme}
-                                                      narrow
-                                                      style={{
-                                                        paddingRight:
-                                                          NOTE_LANE_INSET - (isNameMode ? 4 : 3),
-                                                      }}
+                                                      corner
                                                     />
                                                   )}
                                                 </div>
@@ -3657,7 +3742,7 @@ const SectionBlock = memo(function SectionBlock({
                                               badge={{
                                                 ...(draftBadge ?? publishBadge!),
                                                 topOffset: 0,
-                                                leftOffset: 4,
+                                                leftOffset: 2,
                                                 overlapPillEdge: true,
                                                 showChangeTooltip: !showShiftDetailHoverCards,
                                               }}
@@ -3853,7 +3938,7 @@ const SectionBlock = memo(function SectionBlock({
                                       indicatorTypes={indicatorTypes}
                                       rimColor="var(--dg-color-danger-dark)"
                                       isDark={isDarkTheme}
-                                      style={{ paddingRight: NOTE_LANE_INSET }}
+                                      corner
                                     />
                                   </div>
                                 );
@@ -4411,6 +4496,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     hasStackedCellContent: false,
   });
   const { nameColWidth, colWidth, fitToContainer } = gridLayout;
+  const dayColumnWidth = Math.max(
+    colWidth,
+    Math.floor(((containerWidth ?? 0) - nameColWidth) / (spanWeeks * 7)),
+  );
   const hasAnySections = renderedDepartmentSections.length > 0;
   const hasHighlightedSearch = (highlightEmpIds?.size ?? 0) > 0;
 
@@ -4564,6 +4653,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     handleCellClick={handleCellClick}
                     nameColWidth={nameColWidth}
                     colWidth={colWidth}
+                    dayColumnWidth={dayColumnWidth}
                     fitToContainer={fitToContainer}
                     highlightEmpIds={highlightEmpIds}
                     focusAreas={focusAreas}

@@ -150,18 +150,6 @@ describe("NoteDots corner dots", () => {
     ).toBeInTheDocument();
   });
 
-  it("lets the count take the second dot's place on a narrow pill", () => {
-    const three = render(<NoteDots marks={published(3)} indicatorTypes={types} narrow />);
-    expect(dots(three.container)).toHaveLength(1);
-    expect(three.container.querySelector("[data-note-more]")?.textContent).toBe("+2");
-    expect(three.getByLabelText("3 notes: Readings, Shower, Float")).toBeInTheDocument();
-    three.unmount();
-
-    const two = render(<NoteDots marks={published(2)} indicatorTypes={types} narrow />);
-    expect(dots(two.container)).toHaveLength(2);
-    expect(two.container.querySelector("[data-note-more]")).toBeNull();
-  });
-
   it("draws every state at the same size, its ring inside the dot", () => {
     const { container } = render(
       <NoteDots
