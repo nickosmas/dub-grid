@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AdminPermissions, DirectoryPerson, EmployeeStatus, OrganizationRole } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
@@ -47,21 +47,28 @@ export async function GET(req: NextRequest) {
     const canSeeContactDetails = canSeePermissions || orgAuth.permissions.canViewEmployeeDetails;
     const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
     const offset = parsed.data.offset ?? 0;
-    const { data, error } = await serviceClient.rpc("get_org_directory", {
-      // Use the auth-effective orgId — when the caller is in sandbox
-      // mode, this is the sandbox id, not the body's real-org id.
-      p_org_id: orgAuth.orgId,
-      p_limit: limit,
-      p_offset: offset,
-    });
+    const [{ data, error }, hiddenUserIds] = await Promise.all([
+      serviceClient.rpc("get_org_directory", {
+        // Use the auth-effective orgId — when the caller is in sandbox
+        // mode, this is the sandbox id, not the body's real-org id.
+        p_org_id: orgAuth.orgId,
+        p_limit: limit,
+        p_offset: offset,
+      }),
+      fetchHiddenPeople(orgAuth),
+    ]);
     if (error) throw error;
 
     const rows = (data ?? []) as Record<string, unknown>[];
     // A full page suggests more rows may exist; the client re-checks by
-    // fetching the next page and stopping once it comes back short.
+    // fetching the next page and stopping once it comes back short. Paging
+    // counts the function's rows, so hidden people dropped below never shift
+    // the next page's offset.
     const hasMore = rows.length === limit;
+    const hidden = new Set(hiddenUserIds);
+    const visibleRows = rows.filter((row) => !hidden.has((row.user_id as string | null) ?? ""));
 
-    const directory = rows.map((row: Record<string, unknown>) => {
+    const directory = visibleRows.map((row: Record<string, unknown>) => {
       const scheduledDepartmentIds =
         (row.scheduled_department_ids as number[] | undefined) ??
         (row.employee_department_ids as number[] | undefined) ??

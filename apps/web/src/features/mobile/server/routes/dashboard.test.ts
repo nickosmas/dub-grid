@@ -20,8 +20,11 @@ const fetchMobileAcceptedInvitationRows = vi.fn();
 const fetchProfileNameRowsByIds = vi.fn();
 const fetchMobileScheduleComparisonRows = vi.fn();
 
+const fetchMobileHiddenPeople = vi.fn(async (..._args: unknown[]) => [] as string[]);
+const fetchHiddenEmployeeIds = vi.fn(async (..._args: unknown[]) => [] as string[]);
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
+  fetchMobileHiddenPeople: (...args: unknown[]) => fetchMobileHiddenPeople(...args),
   resolveMobileDateRange,
   fetchMobileCoverageSummary,
   fetchMobileShiftRequests,
@@ -29,6 +32,7 @@ vi.mock("@/features/mobile/server", () => ({
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
+  fetchHiddenEmployeeIds: (...args: unknown[]) => fetchHiddenEmployeeIds(...args),
   fetchMobilePublishHistoryRows,
   fetchMobileAcceptedInvitationRows,
   fetchProfileNameRowsByIds,
@@ -85,6 +89,42 @@ describe("mobile dashboard route", () => {
     });
   });
 
+  it("leaves a hidden staff member's changes out of the activity feed", async () => {
+    mockAuth({ role: "admin", canEditShifts: true });
+    const change = (empId: string) => ({
+      empId,
+      date: "2026-05-12",
+      kind: "new",
+      fromState: null,
+      toState: null,
+    });
+    fetchMobilePublishHistoryRows.mockResolvedValue([
+      {
+        published_by: "publisher-1",
+        start_date: "2026-05-11",
+        end_date: "2026-05-17",
+        published_at: "2026-05-12T09:00:00.000Z",
+        change_count: 2,
+        changes: [change("emp-1"), change("emp-qa")],
+      },
+    ]);
+    fetchMobileHiddenPeople.mockResolvedValueOnce(["qa-person"]);
+    fetchHiddenEmployeeIds.mockResolvedValueOnce(["emp-qa"]);
+
+    const { GET } = await import("./dashboard");
+    const response = await GET({
+      nextUrl: new URL(
+        "http://localhost/api/mobile/v1/dashboard?startDate=2026-05-11&endDate=2026-05-17",
+      ),
+    } as never);
+    const body = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(200);
+    expect(fetchHiddenEmployeeIds).toHaveBeenCalledWith({}, "org-1", ["qa-person"]);
+    expect(body).toContain("1 shift added");
+    expect(body).not.toContain("2 shifts added");
+  });
+
   it("returns a dashboard payload for an admin", async () => {
     mockAuth({ role: "admin", canEditShifts: true });
     fetchMobileCoverageSummary.mockResolvedValue({
@@ -128,6 +168,8 @@ describe("mobile dashboard route", () => {
       scheduleRows: [],
     });
 
+    fetchMobileHiddenPeople.mockResolvedValueOnce(["qa-person"]);
+
     const { GET } = await import("./dashboard");
     const response = await GET({
       nextUrl: new URL(
@@ -137,6 +179,9 @@ describe("mobile dashboard route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    // One lookup serves every loader that reads shifts or staff.
+    expect(fetchMobileHiddenPeople).toHaveBeenCalledTimes(1);
+    expect(fetchMobileOpenShiftContext).toHaveBeenCalledWith({}, "org-1", ["qa-person"]);
     expect(payload.range).toEqual({ startDate: "2026-05-11", endDate: "2026-05-17" });
     expect(payload.overtimeThresholdHours).toBe(40);
     expect(payload.coverageBySection).toEqual([
@@ -159,12 +204,18 @@ describe("mobile dashboard route", () => {
         timeZone: "America/Los_Angeles",
         startDate: "2026-05-11",
         endDate: "2026-05-17",
+        hiddenUserIds: ["qa-person"],
       },
     );
     expect(fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
     expect(fetchMobileScheduleComparisonRows).toHaveBeenCalledWith(
       {},
-      { orgId: "org-1", startDate: "2026-05-11", endDate: "2026-05-17" },
+      {
+        orgId: "org-1",
+        startDate: "2026-05-11",
+        endDate: "2026-05-17",
+        hiddenUserIds: ["qa-person"],
+      },
     );
     expect(payload.metrics.draftSummary).toEqual({
       newCount: 0,

@@ -3,6 +3,7 @@ import {
   resolveBillingPolicy,
   type ResolvedBillingPolicy,
 } from "@dubgrid/domain";
+import { fetchInternalUserIds } from "@dubgrid/data-access";
 import { getPlatformBillingPolicy } from "@/lib/billing-policy";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
@@ -238,6 +239,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
     profileChangeRequests,
     termsCount,
     consentCount,
+    internalUserIds,
   ] = await Promise.all([
     selectRealOrganizations(serviceClient),
     selectRows(
@@ -313,6 +315,7 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
     ),
     countRows(serviceClient, "terms_acceptances"),
     countRows(serviceClient, "cookie_consents"),
+    fetchInternalUserIds(serviceClient),
   ]);
 
   return {
@@ -322,6 +325,8 @@ async function loadOversightFactsUncached(serviceClient: QueryClient) {
     memberships,
     employees: employeeRecords.filter((row) => !row.archived_at),
     employeeRecords,
+    /** Never billed; the seat counts below leave them out. */
+    internalUserIds: new Set(internalUserIds),
     invitations,
     scheduleCells,
     shiftRequests,
@@ -614,25 +619,27 @@ export async function loadGridmasterOrgBilling(
   serviceClient: QueryClient,
   orgId: string,
 ): Promise<GridmasterBillingOrgSummary | null> {
-  const [orgResult, subscriptionResult, employeesResult, membershipsResult] = await Promise.all([
-    serviceClient
-      .from("organizations")
-      .select(ORGANIZATION_WITH_BILLING_COLS)
-      .eq("id", orgId)
-      .eq("workspace_kind", "real")
-      .maybeSingle(),
-    serviceClient
-      .from("subscriptions")
-      .select(SUBSCRIPTION_BILLING_COLS)
-      .eq("org_id", orgId)
-      .maybeSingle(),
-    serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
-    serviceClient
-      .from("organization_memberships")
-      .select("user_id")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-  ]);
+  const [orgResult, subscriptionResult, employeesResult, membershipsResult, internalUserIds] =
+    await Promise.all([
+      serviceClient
+        .from("organizations")
+        .select(ORGANIZATION_WITH_BILLING_COLS)
+        .eq("id", orgId)
+        .eq("workspace_kind", "real")
+        .maybeSingle(),
+      serviceClient
+        .from("subscriptions")
+        .select(SUBSCRIPTION_BILLING_COLS)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+      serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
+      serviceClient
+        .from("organization_memberships")
+        .select("user_id")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      fetchInternalUserIds(serviceClient),
+    ]);
   for (const result of [orgResult, subscriptionResult, employeesResult, membershipsResult]) {
     if (result.error) throw result.error;
   }
@@ -647,6 +654,7 @@ export async function loadGridmasterOrgBilling(
       appUsers: countBillableSeats(
         employees as SeatEmployee[],
         (membershipsResult.data ?? []) as SeatMembership[],
+        new Set(internalUserIds),
       ),
       employeeCount: employees.filter((row) => !row.archived_at).length,
     },
@@ -712,6 +720,7 @@ function billableAppUserCountForOrg(facts: OversightFacts, orgId: string): numbe
   return countBillableSeats(
     facts.employeeRecords.filter((row) => row.org_id === orgId) as SeatEmployee[],
     facts.memberships.filter((row) => row.org_id === orgId) as SeatMembership[],
+    facts.internalUserIds,
   );
 }
 

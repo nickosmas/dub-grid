@@ -84,6 +84,11 @@ export function PersonAccountCard({
           <PersonSubheading>Account state</PersonSubheading>
           <PersonFieldGrid>
             <PersonField
+              label="Internal account"
+              value={profile.isInternal ? "Yes, hidden from clients" : null}
+              empty="No"
+            />
+            <PersonField
               label="Deactivated"
               value={
                 profile.deactivatedAt

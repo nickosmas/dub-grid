@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
-import { getSwapOptions } from "./shift-swap-options";
+import { fetchHiddenInternalUserIds } from "@dubgrid/data-access";
+import { INTERNAL_IDS, VIEWERS, internalProfilesFrom } from "@/__tests__/helpers/internal-people";
+import { fetchActiveEmployeeIds, getSwapOptions } from "./shift-swap-options";
 
 function entry(input: {
   employeeId: string;
@@ -87,5 +90,50 @@ describe("getSwapOptions", () => {
         entries: [requester, candidate],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("fetchActiveEmployeeIds", () => {
+  const STAFF = [
+    { id: "member", user_id: "member-1" },
+    { id: "qa", user_id: "qa-person" },
+    { id: "no-account", user_id: null },
+  ];
+
+  function staffQuery() {
+    let rows = STAFF;
+    const query = {
+      select: () => query,
+      eq: () => query,
+      is: () => query,
+      or: (filter: string) => {
+        const dropped = filter.match(/not\.in\.\((.*)\)$/)?.[1]?.split(",") ?? [];
+        rows = rows.filter((row) => row.user_id === null || !dropped.includes(row.user_id));
+        return query;
+      },
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data: rows, error: null }).then(resolve),
+    };
+    return query;
+  }
+
+  async function poolFor(viewer: (typeof VIEWERS)[keyof typeof VIEWERS]) {
+    const client = {
+      from: internalProfilesFrom(INTERNAL_IDS, staffQuery),
+    } as unknown as SupabaseClient;
+    const hidden = await fetchHiddenInternalUserIds(client, {
+      userId: viewer.actor.id,
+      isGridmaster: viewer.isGridmaster,
+    });
+    return [...(await fetchActiveEmployeeIds(client, "org-1", hidden))];
+  }
+
+  it("never offers a client an internal account as a partner", async () => {
+    expect(await poolFor(VIEWERS.client)).toEqual(["member", "no-account"]);
+  });
+
+  it("keeps internal accounts for an internal viewer and a Gridmaster", async () => {
+    expect(await poolFor(VIEWERS.internal)).toEqual(["member", "qa", "no-account"]);
+    expect(await poolFor(VIEWERS.gridmaster)).toEqual(["member", "qa", "no-account"]);
   });
 });

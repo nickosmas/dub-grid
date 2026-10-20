@@ -24,6 +24,7 @@ interface ShiftWithEmployee {
 export async function fetchWeeklyShiftHours(
   orgId: string,
   weeks: number = 12,
+  hiddenStaffIds: ReadonlySet<string> = new Set(),
 ): Promise<WeeklyShiftHours[]> {
   const end = new Date();
   const start = new Date();
@@ -39,6 +40,7 @@ export async function fetchWeeklyShiftHours(
   const weekMap = new Map<string, { totalHours: number; shiftCount: number }>();
 
   for (const row of data as PublishedShiftRow[]) {
+    if (hiddenStaffIds.has(row.emp_id)) continue;
     const publishedEntry = resolvePublishedScheduleEntry(row, new Map());
     if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 
@@ -68,6 +70,7 @@ export async function fetchEmployeeUtilization(
   orgId: string,
   weeks: number = 4,
   limit: number = 15,
+  hiddenStaffIds: ReadonlySet<string> = new Set(),
 ): Promise<EmployeeUtilization[]> {
   const end = new Date();
   const start = new Date();
@@ -84,6 +87,7 @@ export async function fetchEmployeeUtilization(
   const rows = data as unknown as ShiftWithEmployee[];
 
   for (const row of rows) {
+    if (hiddenStaffIds.has(row.emp_id)) continue;
     const publishedEntry = resolvePublishedScheduleEntry(
       row as unknown as PublishedShiftRow,
       new Map(),

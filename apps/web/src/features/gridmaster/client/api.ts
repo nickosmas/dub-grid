@@ -407,6 +407,22 @@ export function resetGridmasterPersonTwoFactor(
   );
 }
 
+/** Marks an account internal (hidden from clients) or a client account again. */
+export function setGridmasterPersonInternal(
+  userId: string,
+  input: { isInternal: boolean; reason: string },
+  accessToken?: string,
+): Promise<{ success: true; isInternal: boolean }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/internal`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
+}
+
 export type GridmasterPersonSecurityAction =
   | { action: "endSession"; sessionId: string }
   | { action: "forgetDevice"; deviceId: string }

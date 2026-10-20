@@ -6,10 +6,11 @@ import {
   MobileApiAuthorizationError,
 } from "@dubgrid/mobile-api-core";
 import {
+  fetchMobileHiddenPeople,
   fetchMobileScheduleEntries,
   fetchMobileScheduleNotes,
-  resolveMobileDateRange,
   requireMobileAuth,
+  resolveMobileDateRange,
 } from "@/features/mobile/server";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 
@@ -39,7 +40,11 @@ export async function GET(req: NextRequest) {
   }
   try {
     const payload = await loadMobileOrgSchedulePayload(auth, range, {
-      fetchMobileScheduleEntries,
+      fetchMobileScheduleEntries: async (serviceClient, scope) =>
+        fetchMobileScheduleEntries(serviceClient, {
+          ...scope,
+          hiddenUserIds: await fetchMobileHiddenPeople(auth),
+        }),
       fetchMobileScheduleNotes,
     });
     return json(mobileOrgScheduleResponseSchema.parse(payload));

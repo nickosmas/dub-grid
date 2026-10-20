@@ -24,6 +24,7 @@ import type {
   DbShiftCategory,
 } from "@dubgrid/db-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withoutHiddenStaff } from "./internal-people";
 
 const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 const SHIFT_CATEGORY_COLS =
@@ -1025,6 +1026,8 @@ export async function fetchScheduleCellQueryRows(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
   pageSize: number = MOBILE_SCHEDULE_CELL_PAGE_SIZE,
 ): Promise<MobileScheduleCellQueryRow[]> {
@@ -1047,6 +1050,8 @@ async function fetchScheduleCellQueryPage(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
   from: number,
   to: number,
@@ -1086,12 +1091,13 @@ async function fetchScheduleCellQueryPage(
             is_mentored
           )
         ),
-        employees!inner(id, first_name, last_name, org_id, seniority, focus_area_ids)
+        employees!inner(id, user_id, first_name, last_name, org_id, seniority, focus_area_ids)
       `,
     )
     .eq("org_id", input.orgId)
     .gte("date", input.startDate)
     .lte("date", input.endDate);
+  query = withoutHiddenStaff(query, input.hiddenUserIds ?? [], "employees");
 
   if (input.employeeId) {
     query = query.eq("emp_id", input.employeeId);
@@ -1115,6 +1121,8 @@ export async function fetchPublishedMobileScheduleRows(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
 ): Promise<MobilePublishedScheduleRow[]> {
   const rows = await fetchScheduleCellQueryRows(serviceClient, input);
@@ -1131,6 +1139,8 @@ export async function fetchMobileScheduleComparisonRows(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
 ): Promise<MobileScheduleComparisonRow[]> {
   const rows = await fetchScheduleCellQueryRows(serviceClient, input);
@@ -1149,6 +1159,8 @@ export async function fetchMobileEffectiveScheduleRows(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
 ): Promise<MobilePublishedScheduleRow[]> {
   const rows = await fetchScheduleCellQueryRows(serviceClient, input);
@@ -1161,6 +1173,7 @@ export async function fetchMobileEffectiveScheduleRows(
 export async function fetchMobileOpenShiftContextRows(
   serviceClient: SupabaseClient,
   orgId: string,
+  hiddenUserIds: readonly string[] = [],
 ): Promise<MobileOpenShiftContextRows> {
   const [assignmentSeedRows, organizationResult, coverageResult, employeeResult] =
     await Promise.all([
@@ -1171,12 +1184,15 @@ export async function fetchMobileOpenShiftContextRows(
         .eq("id", orgId)
         .maybeSingle(),
       serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
-      serviceClient
-        .from("employees")
-        .select(EMPLOYEE_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .eq("status", "active"),
+      withoutHiddenStaff(
+        serviceClient
+          .from("employees")
+          .select(EMPLOYEE_COLS)
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .eq("status", "active"),
+        hiddenUserIds,
+      ),
     ]);
 
   if (organizationResult.error) throw organizationResult.error;

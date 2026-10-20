@@ -8,6 +8,7 @@ import { loadMobileShiftRequestHistoryPayload } from "@dubgrid/mobile-api-core";
 import logger from "@/lib/logger";
 import {
   fetchLinkedEmployeeForUser,
+  fetchMobileHiddenPeople,
   fetchMobileShiftRequestHistory,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -28,7 +29,11 @@ export async function GET(req: NextRequest) {
   try {
     const payload = await loadMobileShiftRequestHistoryPayload(auth, parsed.data, {
       fetchLinkedEmployeeForUser,
-      fetchMobileShiftRequestHistory,
+      fetchMobileShiftRequestHistory: async (serviceClient, input) =>
+        fetchMobileShiftRequestHistory(serviceClient, {
+          ...input,
+          hiddenUserIds: await fetchMobileHiddenPeople(auth),
+        }),
     });
 
     return NextResponse.json(mobileShiftRequestHistoryResponseSchema.parse(payload));

@@ -15,9 +15,17 @@ const insertMobileAuditLogEntry = vi.fn();
 const sendInvitationEmail = vi.fn();
 const getInvitationEmailConfig = vi.fn();
 
-vi.mock("@/features/mobile/server", () => ({ requireMobileAuth }));
+vi.mock("@/features/mobile/server", async () => ({
+  requireMobileAuth,
+  fetchMobileHiddenPeople: (
+    await vi.importActual<typeof import("@/features/mobile/server/auth")>(
+      "@/features/mobile/server/auth",
+    )
+  ).fetchMobileHiddenPeople,
+}));
 
-vi.mock("@dubgrid/data-access", () => ({
+vi.mock("@dubgrid/data-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
   createMobileEmployeeInvitationRow,
   fetchMobileDepartmentRows,
   fetchMobileManagementRosterRows,
@@ -42,6 +50,8 @@ vi.mock("@/features/mobile/server/invitation-email", async () => {
 });
 
 vi.mock("@/lib/logger", () => ({ default: { warn: vi.fn(), error: vi.fn() } }));
+
+import { internalProfilesFrom } from "@/__tests__/helpers/internal-people";
 
 const ACTOR_ID = "55555555-5555-4555-8555-555555555555";
 const MEMBER_USER_ID = "33333333-3333-4333-8333-333333333333";
@@ -86,6 +96,11 @@ function makeInvitationRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+let internalIds: string[] = [];
+const SERVICE_CLIENT = {
+  from: (table: string) => internalProfilesFrom(internalIds)(table),
+};
+
 function mockAuth(overrides: Record<string, unknown> = {}) {
   requireMobileAuth.mockResolvedValue({
     currentOrg: {
@@ -94,7 +109,7 @@ function mockAuth(overrides: Record<string, unknown> = {}) {
       timezone: "America/Chicago",
     },
     permissions: { canManageUsers: true, canManageEmployees: true },
-    serviceClient: {},
+    serviceClient: SERVICE_CLIENT,
     user: { id: ACTOR_ID, email: "admin@example.com" },
     ...overrides,
   });
@@ -111,6 +126,7 @@ function makeRequest(body: Record<string, unknown> | null, method: string, path 
 describe("mobile management-users routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    internalIds = [];
     mockAuth();
     getInvitationEmailConfig.mockReturnValue({ apiKey: "key", from: "DubGrid <a@b.c>" });
     sendInvitationEmail.mockResolvedValue(undefined);
@@ -124,6 +140,27 @@ describe("mobile management-users routes", () => {
   });
 
   describe("GET", () => {
+    it("leaves an internal member out for a client and keeps them for a Gridmaster", async () => {
+      internalIds = [MEMBER_USER_ID];
+      fetchMobileManagementRosterRows.mockResolvedValue({
+        memberships: [makeMembershipRow()],
+        invitations: [makeInvitationRow()],
+      });
+      const { GET } = await import("./management-users");
+
+      mockAuth();
+      const forClient = await (await GET(makeRequest(null, "GET"))).json();
+      expect(
+        forClient.managementUsers.map((user: { userId: string | null }) => user.userId),
+      ).toEqual([null]);
+
+      mockAuth({
+        permissions: { canManageUsers: true, canManageEmployees: true, isGridmaster: true },
+      });
+      const forGridmaster = await (await GET(makeRequest(null, "GET"))).json();
+      expect(forGridmaster.managementUsers).toHaveLength(2);
+    });
+
     // Management-only people have no employees row, which is exactly why the
     // staff directory endpoint can't be reused for this list.
     it("returns members and pending invitations under one composite key each", async () => {
@@ -197,7 +234,7 @@ describe("mobile management-users routes", () => {
       expect(response.status).toBe(200);
       expect(payload.result).toBe("invitation_sent");
       expect(createMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({
           employeeId: null,
           email: "new@example.com",
@@ -246,7 +283,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(502);
       expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({ invitationId: INVITATION_ID }),
       );
     });
@@ -292,7 +329,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(200);
       expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({ userId: MEMBER_USER_ID, orgRole: "user", departmentIds: [9] }),
       );
     });
@@ -327,7 +364,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(200);
       expect(replaceMobilePendingInvitationAccessRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({ invitationId: INVITATION_ID, roleToAssign: "super_admin" }),
       );
       expect(updateMobileInvitationAssignmentsRow).not.toHaveBeenCalled();
@@ -372,7 +409,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(502);
       expect(rollbackMobilePendingInvitationAccessReplacement).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({
           rotatedToken: "rotated-token",
           previousToken: "original-token",
@@ -447,7 +484,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(200);
       expect(updateMobileMembershipAccessRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({ departmentIds: [], deptAdminIds: [] }),
       );
       expect(revokeMobileEmployeeInvitationRow).not.toHaveBeenCalled();
@@ -465,7 +502,7 @@ describe("mobile management-users routes", () => {
 
       expect(response.status).toBe(200);
       expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-        {},
+        SERVICE_CLIENT,
         expect.objectContaining({ invitationId: INVITATION_ID }),
       );
       expect(updateMobileMembershipAccessRow).not.toHaveBeenCalled();

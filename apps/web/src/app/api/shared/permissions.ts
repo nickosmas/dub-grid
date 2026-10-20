@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { buildPermissionContext } from "@dubgrid/authz";
+import { fetchHiddenEmployeeIds, fetchHiddenInternalUserIds } from "@dubgrid/data-access";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
@@ -572,4 +573,18 @@ export async function requireOrgPermissions(
     userClient,
     orgId,
   };
+}
+
+/** The user ids this request's viewer must not be shown: internal (QA) accounts, unless they may see them. */
+export function fetchHiddenPeople(auth: AuthorizedOrgRequest): Promise<string[]> {
+  return fetchHiddenInternalUserIds(auth.serviceClient, {
+    userId: auth.actor.id,
+    isGridmaster: auth.permissions.isGridmaster,
+  });
+}
+
+/** The staff ids, in this request's organization, whose shifts its viewer must not be shown. */
+export async function fetchHiddenStaffIds(auth: AuthorizedOrgRequest): Promise<Set<string>> {
+  const hiddenUserIds = await fetchHiddenPeople(auth);
+  return new Set(await fetchHiddenEmployeeIds(auth.serviceClient, auth.orgId, hiddenUserIds));
 }

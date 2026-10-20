@@ -11,7 +11,12 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
-import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import {
+  fetchHiddenStaffIds,
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { withoutHiddenRequests } from "@dubgrid/data-access";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -792,7 +797,10 @@ export async function POST(req: NextRequest) {
         const isScheduler = auth.permissions.canEditShifts;
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
         const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
+        const [assignmentIdByPair, hiddenStaffIds] = await Promise.all([
+          fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
 
         const buildPage = (from: number, to: number) => {
           let query = auth.serviceClient
@@ -819,6 +827,7 @@ export async function POST(req: NextRequest) {
 
         const shifts: Record<string, unknown> = {};
         for (const row of rows) {
+          if (hiddenStaffIds.has(row.emp_id)) continue;
           const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
             isScheduler,
             assignmentLabelMap,
@@ -918,9 +927,17 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
+        const [assignmentIdByPair, hiddenStaffIds] = await Promise.all([
+          fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
 
-        const openShifts = ((rows ?? []) as Record<string, unknown>[])
+        const openShifts = withoutHiddenRequests(
+          (rows ?? []) as Array<
+            Record<string, unknown> & { requester_emp_id: string; target_emp_id: string | null }
+          >,
+          hiddenStaffIds,
+        )
           .map((row): GridOpenShift | null => {
             const requester = row.requester as {
               first_name: string;

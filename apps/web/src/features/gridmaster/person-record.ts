@@ -14,6 +14,8 @@ export interface GridmasterPersonProfile {
   firstName: string | null;
   lastName: string | null;
   platformRole: string;
+  /** Internal (QA) account, hidden from organization members who are not internal. */
+  isInternal: boolean;
   mfaEnabled: boolean;
   termsVersion: string | null;
   termsAcceptedAt: string | null;

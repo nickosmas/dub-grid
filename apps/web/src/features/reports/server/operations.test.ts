@@ -1596,6 +1596,7 @@ describe("report reads page past the API row cap", () => {
     const { filterOptions } = await loadOperationsReportFilterOptions(client, {
       orgId: "11111111-1111-4111-8111-111111111111",
       range: { startDate: "2026-09-01", endDate: "2026-09-07" },
+      hiddenUserIds: [],
     });
 
     // The employee list is longer than one page, so every row survived.

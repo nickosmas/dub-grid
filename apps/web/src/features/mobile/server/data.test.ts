@@ -1192,6 +1192,56 @@ describe("fetchMobileScheduleEntries", () => {
     expect(serviceClient.from).toHaveBeenCalledWith("employees");
   });
 
+  it("does not rebuild a deleted shift for a person the viewer must not see", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "QA",
+      last_name: "Admin",
+      org_id: "org-1",
+      user_id: "qa-person",
+    };
+    const serviceClient = createServiceClientForSchedule(employee, {
+      assignmentFocusAreaId: 12,
+      scheduleCells: [],
+      shiftIds: [101],
+      publishHistory: [
+        {
+          published_by: "user-1",
+          start_date: "2026-04-22",
+          end_date: "2026-04-22",
+          published_at: "2026-04-21T18:30:00.000Z",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: employee.id,
+              date: "2026-04-22",
+              kind: "deleted",
+              from_state: {
+                kind: "worked",
+                segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: null,
+            },
+          ],
+        },
+      ],
+    });
+    const range = { orgId: "org-1", startDate: "2026-04-22", endDate: "2026-04-22" };
+
+    expect(await fetchMobileScheduleEntries(serviceClient as never, range)).toHaveLength(1);
+    expect(
+      await fetchMobileScheduleEntries(serviceClient as never, {
+        ...range,
+        hiddenUserIds: ["qa-person"],
+      }),
+    ).toEqual([]);
+  });
+
   it("keeps focus areas off absences and general segments while retaining them on regular segments", async () => {
     const employee = {
       id: "196d610f-2283-486c-a9e0-197852969a31",
@@ -1702,6 +1752,28 @@ describe("fetchMobileScheduleEntries", () => {
 });
 
 describe("fetchMobileShiftRequests", () => {
+  it("leaves out a request whose target the viewer must not see", async () => {
+    const base = createServiceClientForShiftRequests();
+    // The hidden person's staff record is the request's target.
+    const staffLookup = createThenableQuery({
+      data: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => (table === "employees" ? staffLookup : base.from(table))),
+    };
+    const input = { orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90" };
+
+    expect(await fetchMobileShiftRequests(serviceClient as never, input)).toHaveLength(1);
+    expect(
+      await fetchMobileShiftRequests(serviceClient as never, {
+        ...input,
+        hiddenUserIds: ["qa-person"],
+      }),
+    ).toEqual([]);
+    expect(staffLookup.in).toHaveBeenCalledWith("user_id", ["qa-person"]);
+  });
+
   it("returns mobile request segments with job names and focus area labels", async () => {
     const serviceClient = createServiceClientForShiftRequests();
 

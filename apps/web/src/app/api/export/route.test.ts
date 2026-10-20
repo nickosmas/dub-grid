@@ -9,7 +9,8 @@ const isFeatureEnabled = vi.fn();
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -32,7 +33,9 @@ function makeRequest(orgId: string) {
   return new NextRequest(url);
 }
 
-function createServiceClientMock() {
+function createServiceClientMock(
+  tables: { employees?: Array<Record<string, unknown>>; internalIds?: string[] } = {},
+) {
   const orgIdFilters: string[] = [];
   const auditInsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -42,8 +45,21 @@ function createServiceClientMock() {
         return { insert: auditInsert };
       }
 
+      let rows: Array<Record<string, unknown>> =
+        table === "employees"
+          ? (tables.employees ?? [])
+          : table === "profiles"
+            ? (tables.internalIds ?? []).map((id) => ({ id }))
+            : [];
       const query = {
         select() {
+          return query;
+        },
+        or(filter: string) {
+          const dropped = filter.match(/not\.in\.\((.*)\)$/)?.[1]?.split(",") ?? [];
+          rows = rows.filter(
+            (row) => row.user_id == null || !dropped.includes(String(row.user_id)),
+          );
           return query;
         },
         eq(column: string, value: string) {
@@ -63,7 +79,7 @@ function createServiceClientMock() {
           onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
         ) {
-          return Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+          return Promise.resolve({ data: rows, error: null }).then(onfulfilled, onrejected);
         },
       };
       return query;
@@ -85,7 +101,12 @@ describe("GET /api/export", () => {
 
   it("exports and audits the effective sandbox Organization, never the raw query id", async () => {
     const { serviceClient, orgIdFilters, auditInsert } = createServiceClientMock();
-    requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID, serviceClient });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: SANDBOX_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
 
     const { GET } = await import("./route");
     const response = await GET(makeRequest(REQUESTED_ORG_ID));
@@ -94,6 +115,31 @@ describe("GET /api/export", () => {
     expect(orgIdFilters).toContain(SANDBOX_ORG_ID);
     expect(orgIdFilters).not.toContain(REQUESTED_ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
+  });
+
+  it("leaves internal accounts out of a client's staff export, not a Gridmaster's", async () => {
+    const employees = [
+      { id: "e1", first_name: "Rosa", last_name: "Member", user_id: "member-1" },
+      { id: "e2", first_name: "QA", last_name: "Admin", user_id: "qa-person" },
+      { id: "e3", first_name: "Ida", last_name: "NoAccount", user_id: null },
+    ];
+    const { GET } = await import("./route");
+    async function exportFor(isGridmaster: boolean) {
+      const { serviceClient } = createServiceClientMock({ employees, internalIds: ["qa-person"] });
+      requireOrgPermissions.mockResolvedValue({
+        orgId: REQUESTED_ORG_ID,
+        serviceClient,
+        actor: { id: "user-1" },
+        permissions: { isGridmaster },
+      });
+      return (await GET(makeRequest(REQUESTED_ORG_ID))).text();
+    }
+
+    const forClient = await exportFor(false);
+    expect(forClient).toContain("Rosa");
+    expect(forClient).toContain("Ida");
+    expect(forClient).not.toContain("QA");
+    expect(await exportFor(true)).toContain("QA");
   });
 
   it("gates staff export on employee details and schedule export on shift editing", async () => {

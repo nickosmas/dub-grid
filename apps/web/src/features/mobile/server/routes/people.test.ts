@@ -6,9 +6,14 @@ const validateStaffOrgReferences = vi.fn();
 const insertMobileAuditLogEntry = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 
-vi.mock("@/features/mobile/server", () => ({
+vi.mock("@/features/mobile/server", async () => ({
   requireMobileAuth,
   fetchMobilePeople,
+  fetchMobileHiddenPeople: (
+    await vi.importActual<typeof import("@/features/mobile/server/auth")>(
+      "@/features/mobile/server/auth",
+    )
+  ).fetchMobileHiddenPeople,
 }));
 
 vi.mock("@/lib/staff-validation", async (importOriginal) => {
@@ -19,13 +24,16 @@ vi.mock("@/lib/staff-validation", async (importOriginal) => {
   };
 });
 
-vi.mock("@dubgrid/data-access", () => ({
+vi.mock("@dubgrid/data-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
   insertMobileAuditLogEntry: (...args: unknown[]) => insertMobileAuditLogEntry(...args),
 }));
 
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
+
+import { internalProfilesFrom } from "@/__tests__/helpers/internal-people";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const ACTOR_ID = "22222222-2222-4222-8222-222222222222";
@@ -96,6 +104,73 @@ describe("mobile people route", () => {
     vi.clearAllMocks();
   });
 
+  describe("internal accounts", () => {
+    const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    const [MEMBER, QA_PERSON, QA_VIEWER, CLIENT, GRIDMASTER] = [1, 2, 3, 4, 5].map(uuid);
+    const internalIds = [QA_PERSON, QA_VIEWER];
+    const VIEWERS = {
+      client: { actor: { id: CLIENT }, isGridmaster: false },
+      internal: { actor: { id: QA_VIEWER }, isGridmaster: false },
+      gridmaster: { actor: { id: GRIDMASTER }, isGridmaster: true },
+    };
+    const person = (id: string, userId: string | null) => ({
+      id,
+      employeeNumber: 1,
+      firstName: id,
+      lastName: "Person",
+      employmentType: "full_time",
+      phone: "",
+      email: "",
+      status: "active",
+      certificationId: null,
+      roleIds: [],
+      seniority: 1,
+      focusAreaIds: [],
+      departmentIds: [],
+      deptAdminIds: [],
+      contactNotes: "",
+      statusChangedAt: null,
+      statusNote: "",
+      userId,
+      version: 1,
+    });
+
+    async function peopleFor(viewer: (typeof VIEWERS)["client"]) {
+      requireMobileAuth.mockResolvedValue({
+        currentOrg: { id: ORG_ID },
+        user: viewer.actor,
+        permissions: {
+          isGridmaster: viewer.isGridmaster,
+          canManageEmployees: true,
+          canViewStaff: true,
+          canViewEmployeeDetails: true,
+        },
+        serviceClient: { from: internalProfilesFrom(internalIds) },
+      });
+      fetchMobilePeople.mockResolvedValue([
+        person(uuid(11), MEMBER),
+        person(uuid(12), QA_PERSON),
+        person(uuid(13), null),
+      ]);
+      const { GET } = await import("./people");
+      const response = await GET({
+        nextUrl: new URL("http://localhost/api/mobile/v1/people"),
+      } as never);
+      const { people } = (await response.json()) as { people: Array<{ id: string }> };
+      return people.map((entry) => entry.id);
+    }
+
+    it("leaves them out for a client", async () => {
+      expect(await peopleFor(VIEWERS.client)).toEqual([uuid(11), uuid(13)]);
+    });
+
+    it("keeps them for an internal viewer and a Gridmaster", async () => {
+      const everyone = [uuid(11), uuid(12), uuid(13)];
+      expect(await peopleFor(VIEWERS.internal)).toEqual(everyone);
+      expect(await peopleFor(VIEWERS.gridmaster)).toEqual(everyone);
+    });
+  });
+
   it("rejects users without staff visibility", async () => {
     requireMobileAuth.mockResolvedValue({
       permissions: {
@@ -120,6 +195,7 @@ describe("mobile people route", () => {
       currentOrg: {
         id: "org-1",
       },
+      user: { id: ACTOR_ID },
       permissions: {
         canManageEmployees: true,
         canViewStaff: true,
@@ -127,7 +203,7 @@ describe("mobile people route", () => {
         // so a real manager always carries it.
         canViewEmployeeDetails: true,
       },
-      serviceClient: {},
+      serviceClient: { from: internalProfilesFrom([]) },
     });
     fetchMobilePeople.mockResolvedValue([
       {
@@ -165,7 +241,10 @@ describe("mobile people route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(fetchMobilePeople).toHaveBeenCalledWith({}, "org-1");
+    expect(fetchMobilePeople).toHaveBeenCalledWith(
+      expect.objectContaining({ from: expect.any(Function) }),
+      "org-1",
+    );
     expect(payload.people).toEqual([
       {
         id: "00000000-0000-0000-0000-000000000001",
@@ -209,7 +288,7 @@ describe("mobile people route", () => {
         canViewStaff: true,
         canViewEmployeeDetails: false,
       },
-      serviceClient: {},
+      serviceClient: { from: internalProfilesFrom([]) },
     });
     fetchMobilePeople.mockResolvedValue([
       {

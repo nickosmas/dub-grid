@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { isFeatureEnabled } from "@/lib/feature-flags";
@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
       orgId: auth.orgId,
       range,
       filters,
+      hiddenUserIds: await fetchHiddenPeople(auth),
     });
     const filename = `reports-${parsed.data.report}-${range.startDate}-${range.endDate}.${parsed.data.format}`;
 

@@ -7,7 +7,12 @@ import {
   settleShiftRequestAfterTransition,
   type ShiftRequestSettlement,
 } from "@dubgrid/data-access";
-import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import {
+  fetchHiddenStaffIds,
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { withoutHiddenRequests } from "@dubgrid/data-access";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchSegmentResolutionMaps } from "@/app/api/shared/schedule";
@@ -371,13 +376,19 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const { assignmentIdByPair, segmentCompatibility } = await fetchSegmentResolutionMaps(
-          auth.serviceClient,
-          data.orgId,
+        const [{ assignmentIdByPair, segmentCompatibility }, hiddenStaffIds] = await Promise.all([
+          fetchSegmentResolutionMaps(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
+        const visibleRows = withoutHiddenRequests(
+          (rows ?? []) as Array<
+            Record<string, unknown> & { requester_emp_id: string; target_emp_id: string | null }
+          >,
+          hiddenStaffIds,
         );
 
         return NextResponse.json({
-          requests: ((rows ?? []) as Record<string, unknown>[]).map((row) => {
+          requests: visibleRows.map((row) => {
             const requester = row.requester as {
               first_name: string;
               last_name: string;

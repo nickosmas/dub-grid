@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { isFeatureEnabled } from "@/lib/feature-flags";
@@ -54,11 +54,13 @@ export async function GET(req: NextRequest) {
         ? await loadOperationsReportFilterOptions(auth.serviceClient, {
             orgId: auth.orgId,
             range,
+            hiddenUserIds: await fetchHiddenPeople(auth),
           })
         : await loadOperationsReport(auth.serviceClient, {
             orgId: auth.orgId,
             range,
             filters,
+            hiddenUserIds: await fetchHiddenPeople(auth),
           });
 
     return NextResponse.json(payload, {

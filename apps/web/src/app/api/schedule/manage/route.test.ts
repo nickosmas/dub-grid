@@ -88,8 +88,11 @@ function captureNoteClearing() {
   return { deleted, softDeleted };
 }
 
+const fetchHiddenStaffIds = vi.fn(async (..._args: unknown[]) => new Set<string>());
+
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  fetchHiddenStaffIds: (...args: unknown[]) => fetchHiddenStaffIds(...args),
   // The sandbox redirect resolves the effective org before permission checks;
   // defaults to a pass-through (see beforeEach) so most tests can use the
   // body orgId unchanged. Tests exercising the sandbox redirect itself
@@ -432,13 +435,69 @@ describe("POST /api/schedule/manage", () => {
   // object itself is thenable, matching the real Supabase query builder.
   function chainableQuery(result: { data: unknown; error: unknown }) {
     const query: Record<string, ReturnType<typeof vi.fn>> = {};
-    for (const method of ["select", "eq", "gte", "lte", "is", "or", "in", "order", "range"]) {
+    for (const method of [
+      "select",
+      "eq",
+      "gte",
+      "lte",
+      "is",
+      "or",
+      "in",
+      "not",
+      "order",
+      "range",
+    ]) {
       query[method] = vi.fn(() => query);
     }
     (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
       resolve(result);
     return query;
   }
+
+  it("leaves a hidden staff member's call-off out of the open shifts", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const calloff = (id: string, empId: string) => ({
+      id,
+      org_id: orgId,
+      type: "pickup",
+      status: "open",
+      requester_emp_id: empId,
+      requester_shift_date: "2026-08-03",
+      requester_state: {
+        kind: "absence",
+        segments: [],
+        absenceTypeId: 1,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      target_emp_id: null,
+      parent_request_id: "parent-1",
+      created_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:00:00.000Z",
+      expires_at: "2026-08-10T00:00:00.000Z",
+      requester: { first_name: "A", last_name: "B", focus_area_ids: [4] },
+    });
+    serviceFrom.mockReturnValue(
+      chainableQuery({ data: [calloff("r-1", "emp-1"), calloff("r-2", "emp-qa")], error: null }),
+    );
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set(["emp-qa"]));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchCalloffOpenShifts",
+        orgId,
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+        assignmentLabels: [],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const { openShifts } = (await response.json()) as { openShifts: Array<{ id: string }> };
+    expect(openShifts.map((shift) => shift.id)).toEqual(["r-1"]);
+  });
 
   it("paginates fetchShifts through the service client and maps a short page into shifts", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
@@ -497,6 +556,55 @@ describe("POST /api/schedule/manage", () => {
     expect(query.order).toHaveBeenCalledWith("date", { ascending: true });
     expect(query.range).toHaveBeenCalledWith(0, 499);
     expect(body.shifts[`${empId}_2026-08-02`]).toBeDefined();
+  });
+
+  it("leaves a hidden staff member's cells out of fetchShifts", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const shown = "22222222-2222-4222-8222-222222222222";
+    const hidden = "33333333-3333-4333-8333-333333333333";
+    const cell = (empId: string) => ({
+      id: `cell-${empId}`,
+      emp_id: empId,
+      date: "2026-08-02",
+      org_id: orgId,
+      version: 0,
+      series_id: null,
+      from_recurring: false,
+      created_by: null,
+      updated_by: null,
+      created_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:00:00.000Z",
+      snapshots: [
+        {
+          id: `snap-${empId}`,
+          cell_id: `cell-${empId}`,
+          org_id: orgId,
+          snapshot_kind: "published",
+          state_kind: "absence",
+          absence_type_id: 5,
+          custom_start_time: null,
+          custom_end_time: null,
+          segments: [],
+        },
+      ],
+    });
+    serviceFrom.mockReturnValue(chainableQuery({ data: [cell(shown), cell(hidden)], error: null }));
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set([hidden]));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchShifts",
+        orgId,
+        isScheduler: true,
+        assignmentLabels: [],
+        absenceTypeLabels: [[5, "Vacation"]],
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+      }),
+    );
+
+    const body = await response.json();
+    expect(Object.keys(body.shifts)).toEqual([`${shown}_2026-08-02`]);
   });
 
   function draftedCellQuery(orgId: string, empId: string) {

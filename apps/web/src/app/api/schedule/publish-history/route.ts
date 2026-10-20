@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenStaffIds, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { withoutHiddenStaffRows } from "@dubgrid/data-access";
 import { apiErrorResponse } from "@/lib/error-handling";
 import {
   toNotePublishChanges,
@@ -84,6 +85,7 @@ export async function GET(req: NextRequest) {
       schedule_publish_changes: ScheduleChangeRow[];
       published_at: string;
     }[];
+    const hiddenStaffIds = await fetchHiddenStaffIds(auth);
     const publisherIds = [...new Set(rows.map((row) => row.published_by))];
     const publisherNames = new Map<string, string>();
 
@@ -109,19 +111,23 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      entries: rows.map((row) => ({
-        id: row.id,
-        publishedBy: row.published_by,
-        publishedByName: publisherNames.get(row.published_by) ?? "Unknown",
-        startDate: row.start_date,
-        endDate: row.end_date,
-        changeCount: row.change_count,
-        changes: toPublishChanges(row.schedule_publish_changes),
-        // Notes are counted in change_count, so the panel needs them to explain
-        // a publish that changed nothing else.
-        noteChanges: toNotePublishChanges(row.schedule_publish_changes),
-        publishedAt: row.published_at,
-      })),
+      entries: rows.map((row) => {
+        // A hidden person's changes leave the list and its count alike.
+        const changes = withoutHiddenStaffRows(row.schedule_publish_changes, hiddenStaffIds);
+        return {
+          id: row.id,
+          publishedBy: row.published_by,
+          publishedByName: publisherNames.get(row.published_by) ?? "Unknown",
+          startDate: row.start_date,
+          endDate: row.end_date,
+          changeCount: row.change_count - (row.schedule_publish_changes.length - changes.length),
+          changes: toPublishChanges(changes),
+          // Notes are counted in change_count, so the panel needs them to explain
+          // a publish that changed nothing else.
+          noteChanges: toNotePublishChanges(changes),
+          publishedAt: row.published_at,
+        };
+      }),
     });
   } catch (error) {
     return apiErrorResponse(error, "We couldn't load publish history. Refresh and try again.");

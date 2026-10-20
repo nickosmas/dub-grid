@@ -44,6 +44,41 @@ describe("readDraftChangedBroadcast", () => {
   });
 });
 
+describe("readDraftChangedBroadcast, people the viewer is not shown", () => {
+  const payload = {
+    senderSessionId: "peer",
+    shifts: { "emp-1_2026-09-21": null, "emp-qa_2026-09-21": null },
+    notes: { "emp-1_2026-09-21_4": [], "emp-qa_2026-09-21_4": [] },
+  };
+
+  it("drops cells and notes for staff outside the viewer's list", () => {
+    expect(
+      readDraftChangedBroadcast(payload, { ...editor, visibleEmployeeIds: new Set(["emp-1"]) }),
+    ).toEqual({
+      shifts: { "emp-1_2026-09-21": null },
+      notes: { "emp-1_2026-09-21_4": [] },
+      refetch: false,
+    });
+  });
+
+  it("applies nothing, and asks for nothing, when only hidden staff changed", () => {
+    expect(
+      readDraftChangedBroadcast(
+        { senderSessionId: "peer", shifts: { "emp-qa_2026-09-21": null } },
+        { ...editor, visibleEmployeeIds: new Set(["emp-1"]) },
+      ),
+    ).toEqual({ shifts: undefined, notes: undefined, refetch: false });
+  });
+
+  it("keeps everything before the staff list has loaded", () => {
+    expect(readDraftChangedBroadcast(payload, editor)).toEqual({
+      shifts: payload.shifts,
+      notes: payload.notes,
+      refetch: false,
+    });
+  });
+});
+
 describe("readDraftChangedBroadcast, ordering", () => {
   const cell = (version: number) => ({ version }) as never;
 

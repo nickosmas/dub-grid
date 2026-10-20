@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenStaffIds, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { fetchEmployeeUtilization, fetchWeeklyShiftHours } from "@/lib/analytics";
 import * as Sentry from "@/lib/sentry";
 import logger from "@/lib/logger";
@@ -35,9 +35,10 @@ export async function GET(req: NextRequest) {
 
   try {
     // Effective (sandbox-redirected) org, not the raw body orgId (M-1).
+    const hiddenStaffIds = await fetchHiddenStaffIds(auth);
     const [weeklyShiftHours, employeeUtilization] = await Promise.all([
-      fetchWeeklyShiftHours(auth.orgId, weeks),
-      fetchEmployeeUtilization(auth.orgId, weeks),
+      fetchWeeklyShiftHours(auth.orgId, weeks, hiddenStaffIds),
+      fetchEmployeeUtilization(auth.orgId, weeks, undefined, hiddenStaffIds),
     ]);
 
     return NextResponse.json({ weeklyShiftHours, employeeUtilization });

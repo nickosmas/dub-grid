@@ -7,7 +7,11 @@ import {
 } from "@dubgrid/contracts";
 import { loadMobilePeoplePayload, MobileApiAuthorizationError } from "@dubgrid/mobile-api-core";
 import { insertMobileAuditLogEntry } from "@dubgrid/data-access";
-import { fetchMobilePeople, requireMobileAuth } from "@/features/mobile/server";
+import {
+  fetchMobileHiddenPeople,
+  fetchMobilePeople,
+  requireMobileAuth,
+} from "@/features/mobile/server";
 import { employeeToRow, rowToEmployee } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
@@ -96,7 +100,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const payload = await loadMobilePeoplePayload(auth, {
-      fetchMobilePeople,
+      fetchMobilePeople: async (serviceClient, orgId) => {
+        const [people, hiddenUserIds] = await Promise.all([
+          fetchMobilePeople(serviceClient, orgId),
+          fetchMobileHiddenPeople(auth),
+        ]);
+        const hidden = new Set(hiddenUserIds);
+        return people.filter((person) => !person.userId || !hidden.has(person.userId));
+      },
       mapEmployeeToMobilePerson,
     });
 

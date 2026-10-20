@@ -12,6 +12,7 @@ import {
   forceLogoutGridmasterUser,
   reinstateGridmasterUser,
   resetGridmasterPersonTwoFactor,
+  setGridmasterPersonInternal,
   changeGridmasterPersonEmail,
   sendGridmasterPasswordReset,
   terminateGridmasterUser,
@@ -45,6 +46,7 @@ type AccountDialog =
   | "editName"
   | "changeEmail"
   | "mfaReset"
+  | "internal"
   | null;
 
 function personKey(target: GridmasterPersonTarget) {
@@ -73,6 +75,7 @@ export default function GridmasterPersonView({
   const [nameDraft, setNameDraft] = useState({ firstName: "", lastName: "" });
   const [emailDraft, setEmailDraft] = useState("");
   const [resetReason, setResetReason] = useState("");
+  const [internalReason, setInternalReason] = useState("");
 
   const personQuery = useQuery({
     queryKey: personKey(target),
@@ -152,6 +155,7 @@ export default function GridmasterPersonView({
       setDialog(null);
       setTerminateReason("");
       setResetReason("");
+      setInternalReason("");
       refresh();
     } catch (error: unknown) {
       toast.error(formatClientErrorMessage(error, failure));
@@ -250,6 +254,13 @@ export default function GridmasterPersonView({
           Change sign-in email
         </Button>
       ) : null}
+      <Button
+        className="dg-btn dg-btn-secondary"
+        onClick={() => setDialog("internal")}
+        disabled={busy}
+      >
+        {profile?.isInternal ? "Show to clients" : "Hide from clients"}
+      </Button>
       {primaryOrgId && !terminated ? (
         <Button
           className="dg-btn dg-btn-secondary"
@@ -287,11 +298,14 @@ export default function GridmasterPersonView({
   const editNameConfirm = dialog === "editName";
   const changeEmailConfirm = dialog === "changeEmail";
   const mfaResetConfirm = dialog === "mfaReset";
+  const internalConfirm = dialog === "internal";
+  const markingInternal = !profile?.isInternal;
   const nextEmail = emailDraft.trim();
   const closeDialog = () => {
     setDialog(null);
     setTerminateReason("");
     setResetReason("");
+    setInternalReason("");
   };
 
   return (
@@ -571,6 +585,49 @@ export default function GridmasterPersonView({
               (userId, accessToken) => resetGridmasterPersonTwoFactor(userId, reason, accessToken),
               "Two-factor reset. They set it up again at their next sign-in.",
               "We couldn't reset their two-factor. Try again.",
+            );
+          }}
+          onCancel={closeDialog}
+        />
+      )}
+      {internalConfirm && !stepUp.dialog && (
+        <ConfirmDialog
+          title={markingInternal ? "Hide from clients" : "Show to clients"}
+          message={
+            <div className="flex flex-col gap-3">
+              <span>
+                {markingInternal
+                  ? `Mark ${name} as an internal account? Their staff record, shifts, requests and access stop showing to everyone in their organizations except other internal accounts and Gridmasters, and they stop counting as a billed seat.`
+                  : `Make ${name} a client account again? Their staff record, shifts and requests show to their organizations again, and they count as a billed seat.`}
+              </span>
+              <textarea
+                className="dg-input resize-y"
+                aria-label="Reason for the change"
+                placeholder="Reason (required, recorded in the audit log)"
+                value={internalReason}
+                onChange={(event) => setInternalReason(event.target.value)}
+                rows={3}
+              />
+            </div>
+          }
+          confirmLabel={markingInternal ? "Hide from clients" : "Show to clients"}
+          variant="warning"
+          isLoading={busy}
+          onConfirm={() => {
+            const reason = internalReason.trim();
+            if (!reason) {
+              toast.error("Give a reason for the change.");
+              return;
+            }
+            return runAssured(
+              (userId, accessToken) =>
+                setGridmasterPersonInternal(
+                  userId,
+                  { isInternal: markingInternal, reason },
+                  accessToken,
+                ),
+              markingInternal ? "Hidden from clients" : "Shown to clients again",
+              "We couldn't change that account. Try again.",
             );
           }}
           onCancel={closeDialog}

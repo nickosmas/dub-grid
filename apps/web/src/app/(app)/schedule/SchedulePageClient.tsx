@@ -444,6 +444,11 @@ function SchedulerContent({
     () => [...employees, ...inactiveEmployees, ...removedEmployees],
     [employees, inactiveEmployees, removedEmployees],
   );
+  // Who a peer's draft broadcast may touch on this grid; see readDraftChangedBroadcast.
+  const visibleEmployeeIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
+  visibleEmployeeIdsRef.current = empLoading
+    ? undefined
+    : new Set(employeeDirectory.map((employee) => employee.id));
   const employeeNameById = useMemo(
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
@@ -2337,6 +2342,7 @@ function SchedulerContent({
               editorSessionId: editorSessionIdRef.current,
               canEditShifts: canEditShiftsRef.current,
               currentShifts: shiftsRef.current,
+              visibleEmployeeIds: visibleEmployeeIdsRef.current,
             });
             if (!actions) return;
 

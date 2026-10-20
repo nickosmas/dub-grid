@@ -48,6 +48,8 @@ export type AuditAction =
   | "user.calendar_feed_revoked"
   | "user.login_lock_cleared"
   | "user.mfa_reset"
+  | "user.marked_internal"
+  | "user.marked_client"
   | "user.password_reset_sent"
   // Invitations
   | "invitation.sent"

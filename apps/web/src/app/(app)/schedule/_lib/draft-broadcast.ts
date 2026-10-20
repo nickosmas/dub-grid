@@ -32,6 +32,24 @@ export interface DraftChangedViewer {
   canEditShifts: boolean;
   /** The cells this viewer already holds, so an older one can be recognized. */
   currentShifts?: ShiftMap;
+  /**
+   * The staff this viewer is shown. A peer who may see internal accounts can
+   * broadcast their drafts; cells and notes for anyone else are dropped.
+   * Absent until the staff list has loaded.
+   */
+  visibleEmployeeIds?: ReadonlySet<string>;
+}
+
+/** Cell and note keys both start with the staff id: `${empId}_${date}[...]`. */
+function onlyVisibleStaff<Value>(
+  entries: Record<string, Value> | undefined,
+  visibleEmployeeIds: ReadonlySet<string> | undefined,
+): Record<string, Value> | undefined {
+  if (!entries || !visibleEmployeeIds) return entries;
+  const kept = Object.fromEntries(
+    Object.entries(entries).filter(([key]) => visibleEmployeeIds.has(key.split("_")[0] ?? "")),
+  );
+  return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
 export interface DraftChangedActions {
@@ -88,8 +106,12 @@ export function readDraftChangedBroadcast(
     viewer.canEditShifts && payload.shifts
       ? (payload.shifts as Record<string, ShiftMap[string] | null>)
       : undefined;
-  const shifts = offered ? keepNewerCells(offered, viewer.currentShifts) : undefined;
-  const notes = payload.notes ? (payload.notes as ScheduleNoteMap) : undefined;
+  const visibleOffer = onlyVisibleStaff(offered, viewer.visibleEmployeeIds);
+  const shifts = visibleOffer ? keepNewerCells(visibleOffer, viewer.currentShifts) : undefined;
+  const notes = onlyVisibleStaff(
+    payload.notes ? (payload.notes as ScheduleNoteMap) : undefined,
+    viewer.visibleEmployeeIds,
+  );
   const carriedADiff = Boolean(payload.shifts || payload.notes);
 
   return { shifts, notes, refetch: !carriedADiff };

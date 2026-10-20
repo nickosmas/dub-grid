@@ -326,10 +326,11 @@ describe("fetchScheduleCellQueryRows", () => {
   function makeCellClient(pages: Array<{ data: unknown[] | null; error: unknown }>) {
     const range = vi.fn(async () => pages.shift() ?? { data: [], error: null });
     const chain = {
-      select: vi.fn(() => chain),
+      select: vi.fn((_columns: string) => chain),
       eq: vi.fn(() => chain),
       gte: vi.fn(() => chain),
       lte: vi.fn(() => chain),
+      or: vi.fn((_filter: string, _options?: unknown) => chain),
       order: vi.fn((_column: string) => chain),
       range,
     };
@@ -368,6 +369,25 @@ describe("fetchScheduleCellQueryRows", () => {
     expect(result).toHaveLength(1);
     expect(range).toHaveBeenCalledTimes(1);
     expect(chain.eq).toHaveBeenCalledWith("emp_id", "emp-7");
+  });
+
+  it("leaves out the shifts of hidden people through the staff embed", async () => {
+    const { client, chain } = makeCellClient([{ data: [], error: null }]);
+
+    await fetchScheduleCellQueryRows(client, { ...input, hiddenUserIds: ["qa-1", "qa-2"] }, 2);
+
+    expect(chain.select.mock.calls[0]?.[0]).toMatch(/employees!inner\(id, user_id,/);
+    expect(chain.or).toHaveBeenCalledWith("user_id.is.null,user_id.not.in.(qa-1,qa-2)", {
+      referencedTable: "employees",
+    });
+  });
+
+  it("filters nothing when no one is hidden", async () => {
+    const { client, chain } = makeCellClient([{ data: [], error: null }]);
+
+    await fetchScheduleCellQueryRows(client, { ...input, hiddenUserIds: [] }, 2);
+
+    expect(chain.or).not.toHaveBeenCalled();
   });
 
   it("surfaces a page error instead of returning a partial range", async () => {

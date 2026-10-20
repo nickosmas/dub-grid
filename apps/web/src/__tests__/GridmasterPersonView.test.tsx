@@ -121,6 +121,7 @@ function linkedRecord(overrides: Partial<GridmasterPersonRecord> = {}): Gridmast
       firstName: "Ada",
       lastName: "Lovelace",
       platformRole: "none",
+      isInternal: false,
       mfaEnabled: true,
       termsVersion: "2026-05",
       termsAcceptedAt: "2026-01-03T00:00:00.000Z",

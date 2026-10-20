@@ -6,12 +6,14 @@ const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const settleShiftRequestAfterTransition = vi.fn();
 
+const fetchHiddenStaffIds = vi.fn(async (..._args: unknown[]) => new Set<string>());
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  fetchHiddenStaffIds: (...args: unknown[]) => fetchHiddenStaffIds(...args),
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({
@@ -25,7 +27,8 @@ vi.mock("@/features/notifications/server", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
-vi.mock("@dubgrid/data-access", () => ({
+vi.mock("@dubgrid/data-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
   settleShiftRequestAfterTransition: (...args: unknown[]) =>
     settleShiftRequestAfterTransition(...args),
 }));
@@ -130,6 +133,51 @@ describe("POST /api/schedule/requests", () => {
 
     expect(response.status).toBe(200);
     expect(requestsQuery.or).not.toHaveBeenCalled();
+  });
+
+  it("leaves out requests a hidden staff member made or is the target of", async () => {
+    const request = (id: string, requester: string, target: string | null) => ({
+      id,
+      org_id: ORG_ID,
+      type: target ? "swap" : "callout",
+      status: "pending",
+      requester_emp_id: requester,
+      requester_shift_date: "2026-10-20",
+      requester_state: {
+        kind: "absence",
+        segments: [],
+        absenceTypeId: 1,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      target_emp_id: target,
+      target_shift_date: null,
+      target_state: null,
+      created_at: "2026-10-19T00:00:00.000Z",
+      updated_at: "2026-10-19T00:00:00.000Z",
+      expires_at: "2026-10-27T00:00:00.000Z",
+      requester: { first_name: "A", last_name: "B" },
+      target: null,
+    });
+    const requestsQuery = mockFetchContext({ isGridmaster: false, canApproveShiftRequests: true });
+    (requestsQuery as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
+      resolve({
+        data: [
+          request("r-1", "emp-1", null),
+          request("r-2", "emp-qa", null),
+          request("r-3", "emp-1", "emp-qa"),
+        ],
+        error: null,
+      });
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set(["emp-qa"]));
+
+    const response = await POST(fetchRequest());
+
+    expect(response.status).toBe(200);
+    const { requests } = (await response.json()) as { requests: Array<{ id: string }> };
+    expect(requests.map((entry) => entry.id)).toEqual(["r-1"]);
   });
 
   it("falls back to the open pool for a caller with no employee record", async () => {

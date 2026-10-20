@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { loadOrganizationBillingSummary } from "./server";
 
 // Sandbox orgs no longer get a synthetic billing summary — billing surfaces the
@@ -143,12 +143,34 @@ function createQueryClient(
           }),
         };
       }
+      if (table === "profiles") {
+        // The internal-account lookup behind the seat count.
+        return { select: () => ({ eq: async () => ({ data: internalProfiles, error: null }) }) };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   };
 }
 
+let internalProfiles: Array<{ id: string }> = [];
+
 describe("loadOrganizationBillingSummary", () => {
+  beforeEach(() => {
+    internalProfiles = [];
+  });
+
+  it("bills no internal account, as staff or as a manager", async () => {
+    internalProfiles = [{ id: "linked-user" }, { id: "manager-user" }];
+    const summary = await loadOrganizationBillingSummary(
+      createQueryClient() as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
+      "org-1",
+      { canManageBilling: true },
+    );
+
+    // Only the active employee with no account is left to bill.
+    expect(summary.appUserCount).toBe(1);
+  });
+
   it("maps the org, subscription, app-user count, and recent operations", async () => {
     const summary = await loadOrganizationBillingSummary(
       createQueryClient() as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],

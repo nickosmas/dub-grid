@@ -39,4 +39,16 @@ describe("countBillableSeats", () => {
   it("ignores memberships without a user", () => {
     expect(countBillableSeats([], [{ user_id: null }])).toBe(0);
   });
+
+  it("never bills an internal account, as staff or as a member", () => {
+    const internal = new Set(["qa-staff", "qa-manager"]);
+    const employees = [active("u1"), active("qa-staff")];
+    const memberships = [{ user_id: "u1" }, { user_id: "qa-staff" }, { user_id: "qa-manager" }];
+    expect(countBillableSeats(employees, memberships)).toBe(3);
+    expect(countBillableSeats(employees, memberships, internal)).toBe(1);
+  });
+
+  it("still bills staff with no account when internal accounts are listed", () => {
+    expect(countBillableSeats([active(), active()], [], new Set(["qa-staff"]))).toBe(2);
+  });
 });

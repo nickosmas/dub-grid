@@ -739,6 +739,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d, ctx) => `Reset two-factor for ${who(d, ctx, "a team member")}`,
   },
+  "user.marked_internal": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Marked ${who(d, ctx, "an account")} as internal`,
+  },
+  "user.marked_client": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Made ${who(d, ctx, "an account")} a client account again`,
+  },
   "user.password_reset_sent": {
     category: "access",
     severity: "warning",

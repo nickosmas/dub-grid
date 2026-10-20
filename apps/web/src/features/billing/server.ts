@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchInternalUserIds } from "@dubgrid/data-access";
 import { isLiveSubscriptionStatus } from "@dubgrid/domain";
 import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
@@ -262,6 +263,7 @@ export async function countBillableAppUsers(
   const [
     { data: employees, error: employeesError },
     { data: memberships, error: membershipsError },
+    internalUserIds,
   ] = await Promise.all([
     serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
     serviceClient
@@ -269,6 +271,7 @@ export async function countBillableAppUsers(
       .select("user_id")
       .eq("org_id", orgId)
       .is("archived_at", null),
+    fetchInternalUserIds(serviceClient),
   ]);
   if (employeesError) throw employeesError;
   if (membershipsError) throw membershipsError;
@@ -276,6 +279,7 @@ export async function countBillableAppUsers(
   return countBillableSeats(
     (employees ?? []) as SeatEmployee[],
     (memberships ?? []) as SeatMembership[],
+    new Set(internalUserIds),
   );
 }
 
