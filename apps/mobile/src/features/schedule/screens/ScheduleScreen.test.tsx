@@ -2371,27 +2371,26 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Job Lead")).toBeInTheDocument();
   });
 
-  it("keeps the open shifts section with an empty state when there are no open items", () => {
+  // Home is not the dashboard: a section with nothing to act on is left out
+  // rather than shown as an empty state.
+  it("leaves the open shifts section off Home when there are no open items", () => {
     shiftRequests = shiftRequests.filter((request) => request.type !== "pickup");
     openShifts = [];
 
     render(<HomeScheduleScreen />);
 
-    const section = screen.getByTestId("me-open-shifts-empty");
-    expect(within(section).getByText("Open shifts")).toBeInTheDocument();
-    expect(within(section).getByText("No open shifts")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Open shifts carousel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
+    expect(screen.queryByText("No open shifts")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
   });
 
-  it("keeps the cover requests section with an empty state when nothing needs a response", () => {
+  it("leaves the cover requests section off Home when nothing needs a response", () => {
     shiftRequests = [];
 
     render(<HomeScheduleScreen />);
 
-    const section = screen.getByTestId("me-cover-requests-empty");
-    expect(within(section).getByText("Needs your response")).toBeInTheDocument();
-    expect(within(section).getByText("All caught up")).toBeInTheDocument();
+    expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
+    expect(screen.queryByText("All caught up")).not.toBeInTheDocument();
   });
 
   it("accepts and declines shift cover requests from Home", async () => {
