@@ -150,6 +150,9 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   everywhere (Before and After, every distinguishing field, compared with the
   original), and an organization can hide change details and the publisher's
   name from staff.
+- Staffing check: the Schedule page's Coverage panel checks the draft against
+  the coverage requirements and the published schedule, and offers exact,
+  one-click suggestions that fix gaps or explains why nobody can fill them.
 - Documentation truth and drift prevention: public documentation and the
   living engineering references describe the current `dev` through
   source-derived inventories and a machine-checked accuracy manifest, with

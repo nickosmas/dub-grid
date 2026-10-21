@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash db287e76fe1343e850fb1af0d94b462791e0b35420b520586324e3aa7b2e6b86 -->
+<!-- blueprint:source-hash 02a4dab6705b284db8b939550b8a1131bb15852f5d63923103adcee33abd1bda -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress.
+shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress. Item 47 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,6 +81,7 @@ shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress.
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | In progress | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | In progress | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
+| 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
 
@@ -182,6 +183,27 @@ spelled out, 12-hour times with hours, focus area, absence), under Before and
 After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
+
+Item 47 is split; none has shipped:
+
+- **47a - Matrix and changes since publish:** planned; the Coverage panel
+  shows each requirement's staffed and needed counts by day, short or over,
+  for the draft and the published schedule, with a detail per cell. No
+  migration.
+- **47b - What changed:** planned; each cell names the draft changes behind
+  it.
+- **47c - Suggestion engine:** planned; a tested schedule-core function that
+  proposes moves back, restores, assignments and waiting pickups, measures
+  each on a copy of the schedule, and says why nobody fits when nothing does.
+  Needs the weekly hours and minimum rest decisions.
+- **47d - Suggestions in the panel:** planned; apply and undo through the
+  draft, approve behind a confirmation, and the opened and closed counts in
+  the Publish dialog. Approve needs the approval-replaces-draft fix first.
+
+Every staffing insight is measured on the schedule and must be exact; an
+approval publishes at once and replaces any earlier draft of the cells it
+writes, with a warning first (owner decisions, 2026-10-21). Design
+reference: the "Staffing check panel" canvas.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

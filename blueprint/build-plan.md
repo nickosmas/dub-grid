@@ -932,3 +932,32 @@
         log shows each schedule edit as Before and After with names. Its
         rows store only the new state, so the save must record the previous
         one: an extra read per save or a migration (owner decision).
+- [ ] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
+      check of the draft: a focus area by day matrix (staffed / needed,
+      short, over, staff short per day), the draft compared with the
+      published schedule (gaps opened and closed), a detail for each cell
+      with Before and After and what changed, and ranked suggestions that
+      fix gaps in one click or explain why nothing can. Every insight is
+      measured on the schedule and must be exact (owner, 2026-10-21).
+      Design reference: the "Staffing check panel" canvas.
+  - [ ] 47a. **Matrix and changes since publish** - replaces the card list:
+        status per requirement including over, for the draft and the
+        published schedule; Whole draft and Changes since publish views;
+        cell detail with Before and After, still needed, Fill a spot (the
+        existing staffing modal) and Show in grid. People without edit
+        rights see published dates only and no suggestions. No migration.
+  - [ ] 47b. **What changed** - each cell names the draft changes behind
+        it (moved, removed, added, given an absence), from the draft versus
+        published difference.
+  - [ ] 47c. **Suggestion engine** - a tested schedule-core function:
+        undo a move that opened a gap and made an over, restore a removed
+        shift with no absence or request, assign qualified free people
+        within hours and rest limits, waiting pickup requests, and repeating
+        weekday gaps; impact measured by applying each to a copy; a reason
+        for every qualified person when nothing fits. No UI. Needs the
+        weekly hours and minimum rest decisions.
+  - [ ] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
+        ways to fix per cell, apply and undo through the normal draft save,
+        approve through the existing request approval behind a confirmation,
+        and the opened and closed counts in the Publish dialog. Approve
+        needs the approval-replaces-draft fix first.
