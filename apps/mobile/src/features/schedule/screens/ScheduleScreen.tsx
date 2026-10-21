@@ -59,6 +59,7 @@ import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/Schedule
 import { ScheduleDateTile } from "../components/ScheduleDateTile";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
+import { ShiftChangeWas } from "../components/ShiftChangeView";
 import {
   getMySchedule,
   getOrgSchedule,
@@ -2376,6 +2377,26 @@ function getPreviousShiftSummary(
   return parts.length > 0 ? { prefix: "Was", text: parts.join(" · ") } : null;
 }
 
+/**
+ * The day's "Was" block when the server sent the whole day's change (item
+ * 46d), told once per day; otherwise the older one-line summary.
+ */
+function PreviousChange({
+  entry,
+  change,
+  firstOfDay,
+}: {
+  entry: MobileScheduleEntry;
+  change: MobileScheduleSegmentChange | null | undefined;
+  firstOfDay: boolean;
+}) {
+  const shiftChange = entry.change?.shiftChange ?? null;
+  if (shiftChange && shiftChange.kind !== "none") {
+    return firstOfDay ? <ShiftChangeWas change={shiftChange} /> : null;
+  }
+  return <PreviousShiftRow change={change} />;
+}
+
 function PreviousShiftRow({
   change,
   inverse = false,
@@ -2915,9 +2936,11 @@ function UpcomingShiftsSection({
                       Unscheduled
                     </Text>
                     {group.deletedEntries.map((entry) => (
-                      <PreviousShiftRow
+                      <PreviousChange
                         key={`${entry.employeeId}:${entry.date}`}
+                        entry={entry}
                         change={entry.change}
+                        firstOfDay
                       />
                     ))}
                   </View>
@@ -3003,7 +3026,15 @@ function UpcomingShiftsSection({
                               <ScheduleNoteLabels
                                 notes={getSegmentScheduleNotes(item.entry, item.segment)}
                               />
-                              <PreviousShiftRow change={change} />
+                              <PreviousChange
+                                entry={item.entry}
+                                change={change}
+                                firstOfDay={
+                                  group.items.findIndex(
+                                    (candidate) => candidate.entry === item.entry,
+                                  ) === itemIndex
+                                }
+                              />
                             </View>
                           </PressableRow>
                         </Fragment>
@@ -3040,7 +3071,7 @@ function UpcomingShiftsSection({
                       <Fragment key={`${entry.employeeId}:${entry.date}`}>
                         <UpcomingShiftDashedDivider />
                         <View style={styles.upcomingDeletedHistoryRow}>
-                          <PreviousShiftRow change={entry.change} />
+                          <PreviousChange entry={entry} change={entry.change} firstOfDay />
                         </View>
                       </Fragment>
                     ))}

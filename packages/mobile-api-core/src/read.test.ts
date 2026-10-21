@@ -299,7 +299,19 @@ describe("schedule payloads and what staff may see (46f)", () => {
       kind: "modified",
       isNewAddition: false,
       previousPresentation: null,
+      shiftChange: null,
     });
+  });
+
+  it("leaves out a removed shift's entry when what changed is hidden, since it is the removed shift", async () => {
+    const removed = {
+      ...(entry(null) as object),
+      change: { kind: "deleted", previousPresentation },
+    } as never;
+    fetchMobileScheduleEntries.mockResolvedValueOnce([entry(null), removed]);
+    const payload = await loadForStaff({ staffSeeShiftChanges: false });
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0]!.change?.kind).toBe("modified");
   });
 
   it("keeps both for an editor and for a super admin whatever the organization chose", async () => {

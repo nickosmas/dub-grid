@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 45 are
-shipped. Item 40 is in progress. Item 46 is in progress. Item 47 is planned.
+Items appear in build-plan order. Items 1 through 39 and 41 through 46 are
+shipped. Item 40 is in progress. Item 47 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -80,7 +80,7 @@ shipped. Item 40 is in progress. Item 46 is in progress. Item 47 is planned.
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
-| 46   | In progress | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
+| 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
@@ -159,7 +159,7 @@ Item 45 is split, and every part has shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
 
-Item 46 is split; 46a, 46b, 46c, 46e, 46f, 46g and 46h have shipped:
+Item 46 is split, and every part has shipped:
 
 - **46a - Shared change model and formatter:** shipped; one schedule-core
   function turns a cell's original and current state into Before and After sides,
@@ -172,8 +172,10 @@ Item 46 is split; 46a, 46b, 46c, 46e, 46f, 46g and 46h have shipped:
 - **46c - Web dashboards and records:** shipped; the staff dashboard "Was" block
   (fixing the production path that drops time and focus area), the admin
   "My schedule" tooltip and the Gridmaster person record.
-- **46d - Mobile:** Your week "Was" blocks and the "What changed" sheet with
-  the day bar; 45d has shipped.
+- **46d - Mobile:** shipped; Your Week shows a "Was" block once per changed
+  day and shift detail opens "What changed" with Before and After and the
+  day bar, from a whole-day change the server computes with the shared
+  model. With what changed hidden, a removed shift's entry is left out.
 - **46e - Schedule-change alerts:** shipped; each person whose shifts a
   publish changed (except the publisher) gets one alert listing every
   changed day against what was published before, as a compact push and,

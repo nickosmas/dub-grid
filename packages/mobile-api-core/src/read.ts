@@ -172,7 +172,7 @@ export function withScheduleIndicators<TEntry extends { employeeId: string; date
 function withScheduleVisibility<
   TEntry extends {
     publishedByName: string | null;
-    change: { previousPresentation: unknown } | null;
+    change: { kind: string; previousPresentation: unknown; shiftChange?: unknown } | null;
   },
 >(entries: TEntry[], permissions: MobilePublisherViewerPermissions, org: MobileScheduleViewerOrg) {
   const { showChangeDetails, showPublisher } = scheduleViewerVisibility(
@@ -185,14 +185,19 @@ function withScheduleVisibility<
     org,
   );
   if (showChangeDetails && showPublisher) return entries;
-  return entries.map((entry) => ({
-    ...entry,
-    publishedByName: showPublisher ? entry.publishedByName : null,
-    change:
-      showChangeDetails || !entry.change
-        ? entry.change
-        : { ...entry.change, previousPresentation: null },
-  }));
+  return (
+    entries
+      // A removed shift's entry is the removed shift itself, so it goes.
+      .filter((entry) => showChangeDetails || entry.change?.kind !== "deleted")
+      .map((entry) => ({
+        ...entry,
+        publishedByName: showPublisher ? entry.publishedByName : null,
+        change:
+          showChangeDetails || !entry.change
+            ? entry.change
+            : { ...entry.change, previousPresentation: null, shiftChange: null },
+      }))
+  );
 }
 
 export type MobilePeopleContext = MobileServiceContext & {

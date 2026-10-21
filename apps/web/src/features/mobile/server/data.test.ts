@@ -1142,6 +1142,15 @@ describe("fetchMobileScheduleEntries", () => {
         previousPresentation: { shiftName: "Day Shift", startTime: "07:00" },
       },
     });
+
+    // 46d: the whole day Before and After, nothing for a first publication.
+    const sideText = (date: string, side: "before" | "after") =>
+      byDate.get(date)?.change?.shiftChange?.[side].items.map((item) => item.plain);
+    expect(byDate.get("2026-04-19")?.change?.shiftChange).toBeNull();
+    expect(byDate.get("2026-04-20")?.change?.shiftChange?.kind).toBe("single");
+    expect(sideText("2026-04-20", "before")).toEqual([expect.stringMatching(/^Day Shift/)]);
+    expect(sideText("2026-04-20", "after")).toEqual([expect.stringMatching(/^Evening Shift/)]);
+    expect(sideText("2026-04-21", "after")).toEqual([]);
   });
 
   it("returns deleted regular and absence entries when their schedule cells no longer exist", async () => {

@@ -895,7 +895,7 @@
         absence; swap, pickup and open-shift staffing respect a mixed cell
         instead of discarding it. Someone absent for the rest of a day takes
         no more work that day (owner, 2026-10-21).
-- [ ] 46. **Clear shift-change descriptions** - every shift change reads the
+- [x] 46. **Clear shift-change descriptions** - every shift change reads the
       same detailed way on web, mobile, alerts and records: Before and After
       headings, every field that tells the shifts apart (shift, job spelled
       out, 12-hour times with hours, focus area, absence), compared against
@@ -916,7 +916,7 @@
   - [x] 46c. **Web dashboards and records** - the staff dashboard "Was"
         block (fixing the production path that drops time and focus area),
         the admin "My schedule" tooltip, and the Gridmaster person record.
-  - [ ] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
+  - [x] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
         sheet with the day bar, including job and rest-of-day absence.
         After 45d.
   - [x] 46e. **Schedule-change alerts** - one alert per person per publish

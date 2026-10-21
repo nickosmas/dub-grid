@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b6738d9a00e90ae6fab31a55b5ea802da766020fc8291aa571a7ea4f877891d7"
+      "evidenceFingerprint": "sha256:0139244e929b6ae786942b8664439653089e706de75724b96b1b2d05f25466f8"
     },
     {
       "id": "draft-publish",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e7b3325b47e69aa40b6d51811c0e3bccf56b1410961b5938893203ee446b1eb1"
+      "evidenceFingerprint": "sha256:d786b0caa4c56875fb6bf4caa5c9ff501f54fd6cf1732bec762d8c92214adb29"
     },
     {
       "id": "dashboard",
@@ -1277,7 +1277,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d78ca320d550836e287762ab5ac2747fb8b0434cef7424215b6ea09459045b85"
+      "evidenceFingerprint": "sha256:9b3fae4c7e624e3d6b9312fe6b446698cde86c58c25fd8b17604878a5db1c5bb"
     },
     {
       "id": "alerts",
@@ -2030,7 +2030,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d9e99db27f02dfb7e63e5ed3199ce99068e973b8cfce8c1308a0948b93435550"
+      "evidenceFingerprint": "sha256:b030c24d9e3ea79a61bc4bfa70f50e82b24d54c3ffd53425f5654281fbe7efd1"
     },
     {
       "id": "integrations-exports",

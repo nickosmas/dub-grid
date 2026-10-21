@@ -100,7 +100,13 @@ import {
   type CoverageGap,
   type CoverageTotals,
   type SegmentsForEmployeeDate,
+  cellStateToChangeDay,
+  describeShiftChange,
+  selectOriginalCellChange,
+  type ShiftChange,
+  type ShiftChangeResolvers,
 } from "@dubgrid/schedule-core";
+import { fetchShiftChangeResolvers } from "@/lib/server/schedule-context";
 import { normalizeCoverageRuleConfig, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 
 type EmbeddedEmployee = {
@@ -841,6 +847,38 @@ function findPublishedChangeForCell(
   return null;
 }
 
+/**
+ * A cell's whole day Before and After (item 46d): its earliest in-window
+ * "from" against its newest "to", since staff are assumed to have seen
+ * nothing in between, as on the web. Null for a first publication and for a
+ * cell that ended where it started.
+ */
+function describeCellPublishChange(
+  history: MobilePublishHistoryEntry[],
+  employeeId: string,
+  date: string,
+  resolvers: ShiftChangeResolvers,
+): ShiftChange | null {
+  const changes = history
+    .flatMap((entry) =>
+      entry.changes.filter((change) => change.empId === employeeId && change.date === date),
+    )
+    .reverse();
+  const original = selectOriginalCellChange(
+    changes.map((change) => ({
+      fromState: change.fromState ?? null,
+      toState: change.toState ?? null,
+    })),
+  );
+  if (!original) return null;
+  const change = describeShiftChange(
+    cellStateToChangeDay(original.fromState, resolvers),
+    cellStateToChangeDay(original.toState, resolvers),
+    { date },
+  );
+  return change.kind === "none" ? null : change;
+}
+
 function getMissingDeletedPublishedChanges(
   history: MobilePublishHistoryEntry[],
   rows: MobileScheduleComparisonRow[],
@@ -901,17 +939,24 @@ export async function fetchMobileScheduleEntries(
     hiddenUserIds?: readonly string[];
   },
 ): Promise<MobileScheduleEntry[]> {
-  const [assignmentDetailsByPair, absenceMap, focusAreaNameMap, jobNameMap, publishHistory] =
-    await Promise.all([
-      fetchAssignmentDetailsMap(serviceClient, input.orgId),
-      fetchAbsenceLabelMap(serviceClient, input.orgId),
-      fetchFocusAreaNameMap(serviceClient, input.orgId),
-      fetchJobNameMap(serviceClient, input.orgId),
-      fetchMobilePublishHistory(serviceClient, input.orgId, {
-        startDate: input.startDate,
-        endDate: input.endDate,
-      }),
-    ]);
+  const [
+    assignmentDetailsByPair,
+    absenceMap,
+    focusAreaNameMap,
+    jobNameMap,
+    publishHistory,
+    shiftChangeResolvers,
+  ] = await Promise.all([
+    fetchAssignmentDetailsMap(serviceClient, input.orgId),
+    fetchAbsenceLabelMap(serviceClient, input.orgId),
+    fetchFocusAreaNameMap(serviceClient, input.orgId),
+    fetchJobNameMap(serviceClient, input.orgId),
+    fetchMobilePublishHistory(serviceClient, input.orgId, {
+      startDate: input.startDate,
+      endDate: input.endDate,
+    }),
+    fetchShiftChangeResolvers(serviceClient, input.orgId),
+  ]);
   const data = await fetchMobileScheduleComparisonRowsData(serviceClient, input);
   const missingDeletedChanges = getMissingDeletedPublishedChanges(publishHistory, data, input);
   const missingDeletedEmployees = await fetchMobileEmployeeRowsByIds(
@@ -1098,6 +1143,15 @@ export async function fetchMobileScheduleEntries(
             kind: publishedChange.kind,
             isNewAddition: publishedChange.isNewAddition,
             previousPresentation,
+            shiftChange:
+              publishedChange.kind === "new" && !publishedChange.isNewAddition
+                ? null
+                : describeCellPublishChange(
+                    publishHistory,
+                    row.employees.id,
+                    row.date as string,
+                    shiftChangeResolvers,
+                  ),
           }
         : null,
       publishedAt: publishEntry?.publishedAt ?? null,
