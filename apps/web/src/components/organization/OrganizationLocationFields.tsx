@@ -112,6 +112,7 @@ function AddressLine1Input({
   const [panelOpen, setPanelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [enteredIndex, setEnteredIndex] = useState<number | null>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const [suggestions, setSuggestions] = useState<GoogleAutocompleteSuggestion[]>([]);
 
@@ -365,7 +366,11 @@ function AddressLine1Input({
             const selected = suggestions[activeIndex]?.placePrediction;
             if (!selected) return;
             event.preventDefault();
-            void handleSelectPrediction(selected);
+            if (enteredIndex !== null) return;
+            // A click spins through the row's own latch; Enter never presses
+            // the row, so it marks the row loading itself.
+            setEnteredIndex(activeIndex);
+            void handleSelectPrediction(selected).finally(() => setEnteredIndex(null));
           } else if (event.key === "Escape") {
             event.preventDefault();
             closePanel();
@@ -424,6 +429,7 @@ function AddressLine1Input({
                           </span>
                         }
                         spinnerSize={14}
+                        loading={enteredIndex === index}
                         onMouseDown={(event) => event.preventDefault()}
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => handleSelectPrediction(prediction)}

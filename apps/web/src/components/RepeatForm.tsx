@@ -80,7 +80,7 @@ interface RepeatFormProps {
 }
 
 export interface RepeatFormHandle {
-  submit: () => void;
+  submit: () => Promise<void>;
 }
 
 type EndType = "never" | "on_date" | "after_n";
@@ -481,7 +481,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   useImperativeHandle(
     ref,
     () => ({
-      submit: () => void handleConfirm(),
+      submit: () => handleConfirm(),
     }),
     [handleConfirm],
   );

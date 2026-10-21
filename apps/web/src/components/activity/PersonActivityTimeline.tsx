@@ -13,7 +13,7 @@ import {
   summarizeCategories,
 } from "@/lib/activity-log-utils";
 import CustomSelect from "@/components/CustomSelect";
-import { CloseButton } from "@/components/ui/CloseButton";
+import { SearchClearButton, clearSearchOnEscape } from "@/components/ui/search-clear";
 import { isDateInPeriod } from "@/lib/activity-period";
 import { getAuditCategoryOptions, type AuditCategory } from "@/lib/audit/registry";
 import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
@@ -166,15 +166,9 @@ export function PersonActivityTimeline({
               aria-label="Search activity"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
             />
-            {searchQuery && (
-              <CloseButton
-                size="sm"
-                onClick={() => setSearchQuery("")}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 -translate-y-1/2"
-              />
-            )}
+            {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
           </div>
           <CustomSelect
             style={{ flex: "1 1 auto" }}

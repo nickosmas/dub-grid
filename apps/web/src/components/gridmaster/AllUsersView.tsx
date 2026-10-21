@@ -11,7 +11,11 @@ import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 import { toDarkPillColors } from "@/lib/colors";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { MaybeHint } from "@/components/ui/hint";
 import { fetchGridmasterUsers, type GridmasterPersonTarget } from "@/features/gridmaster/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -299,33 +303,24 @@ export default function AllUsersView({
                 top: "50%",
                 transform: "translateY(-50%)",
                 color: "var(--dg-color-text-faint)",
+                pointerEvents: "none",
               }}
             />
             <input
               className="dg-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={clearSearchOnEscape(() => setSearch(""))}
               placeholder="Search"
+              aria-label="Search users"
               style={{
                 paddingLeft: 32,
-                paddingRight: search ? 30 : 12,
+                paddingRight: search ? SEARCH_CLEAR_PADDING : 12,
                 fontSize: "var(--dg-fs-caption)",
                 border: "1px solid var(--dg-color-border-light)",
               }}
             />
-            {search && (
-              <CloseButton
-                size="sm"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                style={{
-                  position: "absolute",
-                  right: 4,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
-              />
-            )}
+            {search && <SearchClearButton onClear={() => setSearch("")} />}
           </div>
         </div>
       </div>

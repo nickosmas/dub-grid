@@ -102,7 +102,6 @@ export function PresetColorPicker({
               if (!disabled) setOpen((prev) => !prev);
             }}
             disabled={disabled}
-            title={active.name}
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-controls={open ? popupId : undefined}
@@ -242,7 +241,6 @@ export function PresetColorPicker({
                               setOpen(false);
                             }}
                             disabled={disabled}
-                            title={color.name}
                             aria-label={color.name}
                             style={{
                               width: 28,

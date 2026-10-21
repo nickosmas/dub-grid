@@ -117,8 +117,8 @@ export function useEmployees(orgId: string | null): EmployeesData {
   const handleAddEmployee = useCallback(
     async (dataList: Omit<Employee, "id" | "seniority">[]) => {
       if (!orgId) return;
+      const added: Employee[] = [];
       try {
-        const added: Employee[] = [];
         for (const data of dataList) {
           const maxSen = Math.max(
             ...allEmployeesRef.current.map((e) => e.seniority),
@@ -133,9 +133,17 @@ export function useEmployees(orgId: string | null): EmployeesData {
         invalidateEmployees();
         return added;
       } catch (err) {
-        toast.error(formatClientErrorMessage(err, "We couldn't add employee. Try again."));
         Sentry.captureException(err);
-        return undefined;
+        if (added.length === 0) {
+          toast.error(formatClientErrorMessage(err, "We couldn't add employee. Try again."));
+          return undefined;
+        }
+        // Rows are inserted one at a time, so some may already exist. Show
+        // them, and close the form rather than let a retry add them twice.
+        setAllLocal((prev) => [...prev, ...added]);
+        invalidateEmployees();
+        toast.error(`Added ${added.length} of ${dataList.length} employees. Add the rest again.`);
+        return added;
       }
     },
     [orgId, invalidateEmployees],
@@ -155,7 +163,8 @@ export function useEmployees(orgId: string | null): EmployeesData {
       try {
         const savedEmployee = await updateEmployee(emp, orgId, emp.version);
         setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
-        toast.success("Employee saved");
+        // One id, so a reorder's many saves show one toast.
+        toast.success("Employee saved", { id: "employee-saved" });
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -167,7 +176,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error("Employee changed elsewhere. Review the latest values and try again.");
           return false;
         }
-        setAllLocal(prevAll);
+        // Restore only this row: a reorder saves many rows at once, and the
+        // others may have succeeded.
+        const previous = prevAll.find((row) => row.id === emp.id);
+        if (previous) {
+          setAllLocal((prev) => prev.map((row) => (row.id === emp.id ? previous : row)));
+        }
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
         return false;

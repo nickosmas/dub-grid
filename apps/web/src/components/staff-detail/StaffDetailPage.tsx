@@ -485,11 +485,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   // ── Status action handlers ──────────────────────────────────────────────────
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
   const statusStepUp = useSharedStepUp();
-  const runStatusChange = (action: (accessToken?: string) => Promise<boolean>) => {
+  const runStatusChange = (action: (accessToken?: string) => Promise<boolean>) =>
     statusStepUp.run(action).catch((err) => {
       toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
     });
-  };
 
   const handleDeactivate = useCallback(
     async (empId: string, note?: string, accessToken?: string) => {
@@ -1070,6 +1069,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     onRemove={(empId, note) =>
                       runStatusChange((token) => handleRemove(empId, note, token))
                     }
+                    stepUpOpen={Boolean(statusStepUp.dialog)}
                     variant="page"
                   />
                 </div>

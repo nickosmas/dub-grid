@@ -17,7 +17,11 @@ import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
@@ -305,22 +309,15 @@ export default function EnhancedImpersonation({
                 className="dg-input"
                 value={orgSearch}
                 onChange={(e) => setOrgSearch(e.target.value)}
+                onKeyDown={clearSearchOnEscape(() => setOrgSearch(""))}
                 placeholder="Search organizations…"
-                style={{ width: "100%", paddingRight: orgSearch ? 30 : undefined }}
+                aria-label="Search organizations"
+                style={{
+                  width: "100%",
+                  paddingRight: orgSearch ? SEARCH_CLEAR_PADDING : undefined,
+                }}
               />
-              {orgSearch && (
-                <CloseButton
-                  size="sm"
-                  onClick={() => setOrgSearch("")}
-                  aria-label="Clear search"
-                  style={{
-                    position: "absolute",
-                    right: 4,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              )}
+              {orgSearch && <SearchClearButton onClear={() => setOrgSearch("")} />}
             </div>
             <div style={{ maxHeight: 200, overflowY: "auto" }}>
               {filteredOrgs.length === 0 ? (
@@ -591,22 +588,12 @@ export default function EnhancedImpersonation({
                 className="dg-input"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={clearSearchOnEscape(() => setSearch(""))}
                 placeholder="Search by email…"
-                style={{ width: "100%", paddingRight: search ? 30 : undefined }}
+                aria-label="Search users by email"
+                style={{ width: "100%", paddingRight: search ? SEARCH_CLEAR_PADDING : undefined }}
               />
-              {search && (
-                <CloseButton
-                  size="sm"
-                  onClick={() => setSearch("")}
-                  aria-label="Clear search"
-                  style={{
-                    position: "absolute",
-                    right: 4,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              )}
+              {search && <SearchClearButton onClear={() => setSearch("")} />}
             </div>
 
             {usersQuery.isLoading ? (

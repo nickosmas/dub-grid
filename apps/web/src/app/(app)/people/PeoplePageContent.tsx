@@ -172,8 +172,9 @@ function PeopleContent() {
               focusAreaLabel={org?.focusAreaLabel}
               certificationLabel={org?.certificationLabel}
               onAdd={async (dataList: NewEmployeeData[]) => {
-                await handleAddEmployee(dataList);
-                setShowAddModal(false);
+                // A failed add keeps the modal and its typed rows for a retry.
+                const added = await handleAddEmployee(dataList);
+                if (added) setShowAddModal(false);
               }}
               onClose={() => setShowAddModal(false)}
             />

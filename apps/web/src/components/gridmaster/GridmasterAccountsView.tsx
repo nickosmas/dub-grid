@@ -9,7 +9,11 @@ import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import Modal from "@/components/Modal";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   demoteGridmasterAccount,
@@ -335,22 +339,16 @@ export default function GridmasterAccountsView({
             className="dg-input"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={clearSearchOnEscape(() => setSearch(""))}
             placeholder="Search"
             aria-label="Search gridmaster accounts"
             style={{
               width: "100%",
-              paddingRight: search ? 30 : undefined,
+              paddingRight: search ? SEARCH_CLEAR_PADDING : undefined,
               fontSize: "var(--dg-fs-caption)",
             }}
           />
-          {search && (
-            <CloseButton
-              size="sm"
-              onClick={() => setSearch("")}
-              aria-label="Clear search"
-              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
-            />
-          )}
+          {search && <SearchClearButton onClear={() => setSearch("")} />}
         </div>
       </Form>
 

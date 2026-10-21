@@ -41,7 +41,7 @@ interface OpenShiftsCardProps {
   maxVisible?: number;
   periodLabel?: string;
   onExpand?: () => void;
-  onVolunteer?: (shift: OpenShift) => void;
+  onVolunteer?: (shift: OpenShift) => void | Promise<unknown>;
 }
 
 export default function OpenShiftsCard({
@@ -221,7 +221,7 @@ export default function OpenShiftsCard({
                       <Button
                         onClick={(e) => {
                           e.preventDefault();
-                          onVolunteer(shift);
+                          return onVolunteer(shift);
                         }}
                         style={{
                           fontSize: "var(--dg-type-control-size)",

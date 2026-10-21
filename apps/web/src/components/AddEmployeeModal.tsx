@@ -60,7 +60,8 @@ interface AddEmployeeModalProps {
   certifications: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
-  onAdd: (employees: NewEmployeeData[]) => void;
+  /** Return the add's promise so the button shows it working. */
+  onAdd: (employees: NewEmployeeData[]) => void | Promise<unknown>;
   onClose: () => void;
 }
 
@@ -182,7 +183,7 @@ export default function AddEmployeeModal({
 
   const handleSubmit = useCallback(() => {
     if (validRows.length === 0) return;
-    onAdd(
+    return onAdd(
       validRows.map((r) => ({
         firstName: normalizeStaffName(r.firstName),
         lastName: normalizeStaffName(r.lastName),

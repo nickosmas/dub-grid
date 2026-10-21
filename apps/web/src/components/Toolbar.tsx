@@ -13,7 +13,11 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -113,12 +117,7 @@ interface ToolbarProps {
 function ClearSearchButton({ onClick }: { onClick: () => void }) {
   return (
     <Hint content={hint("Clear search")} side="bottom">
-      <CloseButton
-        size="sm"
-        onClick={onClick}
-        aria-label="Clear search"
-        style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
-      />
+      <SearchClearButton onClear={onClick} />
     </Hint>
   );
 }
@@ -634,8 +633,15 @@ export default function Toolbar({
                 placeholder="Search staff…"
                 value={staffSearch}
                 onChange={(e) => onStaffSearchChange(e.target.value)}
+                onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
+                aria-label="Search staff"
                 className="dg-input"
-                style={{ paddingLeft: 30, width: "100%", borderRadius: "var(--dg-btn-radius)" }}
+                style={{
+                  paddingLeft: 30,
+                  paddingRight: staffSearch ? SEARCH_CLEAR_PADDING : 12,
+                  width: "100%",
+                  borderRadius: "var(--dg-btn-radius)",
+                }}
               />
               {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
             </div>
@@ -909,9 +915,12 @@ export default function Toolbar({
               placeholder="Search staff…"
               value={staffSearch}
               onChange={(e) => onStaffSearchChange(e.target.value)}
+              onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
+              aria-label="Search staff"
               className="dg-input"
               style={{
                 paddingLeft: 30,
+                paddingRight: staffSearch ? SEARCH_CLEAR_PADDING : 12,
                 width: "100%",
                 borderRadius: "var(--dg-btn-radius)",
               }}

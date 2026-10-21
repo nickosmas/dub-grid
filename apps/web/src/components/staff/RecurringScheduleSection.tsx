@@ -8,6 +8,11 @@ import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -1043,8 +1048,10 @@ export function RecurringScheduleSection({
             placeholder="Search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
+            aria-label="Search people"
             style={{
-              padding: `7px ${searchQuery ? 30 : 10}px 7px 32px`,
+              padding: `7px ${searchQuery ? SEARCH_CLEAR_PADDING : 10}px 7px 32px`,
               border: "1px solid var(--dg-color-border)",
               borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
@@ -1061,14 +1068,7 @@ export function RecurringScheduleSection({
               event.currentTarget.style.borderColor = "var(--dg-color-border)";
             }}
           />
-          {searchQuery && (
-            <CloseButton
-              size="sm"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
-              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
-            />
-          )}
+          {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
         </div>
       </div>
 

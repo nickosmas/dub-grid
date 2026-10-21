@@ -3,7 +3,7 @@ import { Employee } from "@/types";
 
 interface UseStaffReorderOptions {
   sorted: Employee[];
-  onSave: (emp: Employee) => void;
+  onSave: (emp: Employee) => unknown;
 }
 
 export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
@@ -20,16 +20,20 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
     setPendingOrder([...sorted]);
   }, [sorted]);
 
-  const saveOrder = useCallback(() => {
+  const saveOrder = useCallback(async () => {
     if (!pendingOrder) return;
-    pendingOrder.forEach((emp, i) => {
-      if (emp.seniority !== i + 1) {
-        onSave({ ...emp, seniority: i + 1 });
-      }
-    });
+    await Promise.all(
+      pendingOrder.flatMap((emp, i) =>
+        emp.seniority === i + 1 ? [] : [onSave({ ...emp, seniority: i + 1 })],
+      ),
+    );
     setIsReordering(false);
     setPendingOrder(null);
   }, [pendingOrder, onSave]);
+
+  const discardReorder = useCallback(() => {
+    setPendingOrder([...sorted]);
+  }, [sorted]);
 
   const cancelReorder = useCallback(() => {
     setIsReordering(false);
@@ -56,6 +60,7 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
     isDirty,
     enterReorder,
     saveOrder,
+    discardReorder,
     cancelReorder,
     moveEmployee,
     displayList,

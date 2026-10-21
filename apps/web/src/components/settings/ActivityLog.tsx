@@ -7,7 +7,7 @@ import { formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { fetchAuditLogDayCounts, fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
-import { CloseButton } from "@/components/ui/CloseButton";
+import { SearchClearButton, clearSearchOnEscape } from "@/components/ui/search-clear";
 import { Pagination } from "@/components/ui/pagination";
 import { queryKeys } from "@/lib/query-keys";
 import { countActors, groupByDay, summarizeCategories } from "@/lib/activity-log-utils";
@@ -120,6 +120,7 @@ export default function ActivityLog({
       setPage(0);
     };
   };
+  const clearSearch = () => resetPage(setSearchQuery)("");
 
   const error = activityQuery.error
     ? formatClientErrorMessage(activityQuery.error, "We couldn't load activity right now.")
@@ -178,18 +179,9 @@ export default function ActivityLog({
                 setSearchQuery(event.target.value);
                 setPage(0);
               }}
+              onKeyDown={clearSearchOnEscape(clearSearch)}
             />
-            {searchQuery && (
-              <CloseButton
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setPage(0);
-                }}
-                aria-label="Clear search"
-                className="absolute right-1 top-1/2 -translate-y-1/2"
-              />
-            )}
+            {searchQuery && <SearchClearButton onClear={clearSearch} />}
           </div>
           <CustomSelect
             style={{ flex: "1 1 auto" }}

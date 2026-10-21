@@ -63,6 +63,7 @@ export function PasswordInput({
       <Button
         type="button"
         onClick={onToggle}
+        disabled={disabled}
         className="dg-password-input__toggle"
         aria-label={showPassword ? "Hide password" : "Show password"}
       >

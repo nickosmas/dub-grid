@@ -11,12 +11,14 @@ export interface EmployeeStatusActionsProps {
   canEdit: boolean;
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
-  onActivate: (empId: string) => void;
-  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (empId: string, note?: string) => void | Promise<unknown>;
+  onActivate: (empId: string) => void | Promise<unknown>;
+  onRemove: (empId: string, note?: string) => void | Promise<unknown>;
   variant: "panel" | "page";
   /** Stretches the active button to fill its container, for an equal-width row of actions. */
   fillWidth?: boolean;
+  /** Hides the confirmation while a step-up prompt asks for fresh proof. */
+  stepUpOpen?: boolean;
 }
 
 type DeactivateOutcome = "inactive" | "remove";
@@ -30,17 +32,30 @@ export function EmployeeStatusActions({
   onRemove,
   variant,
   fillWidth = false,
+  stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
   const [note, setNote] = useState(employee.statusNote || "");
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
+  // The confirmation unmounts while a step-up prompt shows, which drops its
+  // own latch, so the pending state lives here to survive the round trip.
+  const [pending, setPending] = useState(false);
 
   const isActive = employee.status === "active";
   const displayName = getEmployeeDisplayName(employee);
   // Management-only employees have an `employees` row but no focus areas —
   // they're not on the schedule grid (see ProfilePage's isOnSchedule).
   const isScheduled = employee.focusAreaIds.length > 0;
+
+  async function runPending(action: () => unknown) {
+    setPending(true);
+    try {
+      await action();
+    } finally {
+      setPending(false);
+    }
+  }
 
   function resetDeactivateForm() {
     setShowDeactivateConfirm(false);
@@ -56,9 +71,11 @@ export function EmployeeStatusActions({
   // One modal asks Temporary vs Permanent. The primary button's verb + variant
   // flips with the radio so the confirm action always echoes the outcome.
   if (isActive && showDeactivateConfirm) {
+    if (stepUpOpen) return null;
     const isRemove = outcome === "remove";
     return (
       <ConfirmDialog
+        isLoading={pending}
         title={`Deactivate ${displayName}?`}
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -138,16 +155,14 @@ export function EmployeeStatusActions({
         }
         confirmLabel={isRemove ? "Remove" : "Mark inactive"}
         variant={isRemove ? "danger" : "warning"}
-        onConfirm={() => {
+        onConfirm={async () => {
           const trimmedNote = note.trim() || undefined;
-          if (isRemove) {
-            // Revoking any linked org membership happens server-side, atomically
-            // with the status change (see /api/employees/status) — not as a
-            // second client call, so the two can't diverge on partial failure.
-            onRemove(employee.id, trimmedNote);
-          } else {
-            onDeactivate(employee.id, trimmedNote);
-          }
+          // Revoking any linked org membership happens server-side, atomically
+          // with the status change (see /api/employees/status) — not as a
+          // second client call, so the two can't diverge on partial failure.
+          await runPending(() =>
+            isRemove ? onRemove(employee.id, trimmedNote) : onDeactivate(employee.id, trimmedNote),
+          );
           resetDeactivateForm();
         }}
         onCancel={resetDeactivateForm}
@@ -202,14 +217,15 @@ export function EmployeeStatusActions({
           </Button>
         </div>
       )}
-      {showActivateConfirm && (
+      {showActivateConfirm && !stepUpOpen && (
         <ConfirmDialog
+          isLoading={pending}
           title="Activate Staff Member?"
           message={`Activate ${displayName}? They will return to active staff lists.`}
           confirmLabel="Activate"
           variant="warning"
-          onConfirm={() => {
-            onActivate(employee.id);
+          onConfirm={async () => {
+            await runPending(() => onActivate(employee.id));
             setShowActivateConfirm(false);
           }}
           onCancel={() => setShowActivateConfirm(false)}
