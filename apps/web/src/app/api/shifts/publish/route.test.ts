@@ -14,6 +14,19 @@ const membershipMaybeSingle = vi.fn();
 const profileMaybeSingle = vi.fn();
 const organizationMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
+const notifyPublishedShiftChanges = vi.fn();
+const afterCallbacks: Array<() => unknown> = [];
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (callback: () => unknown) => {
+    afterCallbacks.push(callback);
+  },
+}));
+
+vi.mock("@/features/notifications/server/publish-alerts", () => ({
+  notifyPublishedShiftChanges: (...args: unknown[]) => notifyPublishedShiftChanges(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: vi.fn(() => ({})),
@@ -232,6 +245,32 @@ describe("POST /api/shifts/publish", () => {
           endDate: "2026-04-18",
           summary,
         }),
+      }),
+    );
+  });
+
+  it("sends each changed person's alert after the response, without the publish waiting on it", async () => {
+    afterCallbacks.length = 0;
+    fetchScheduleDraftBreakdown.mockResolvedValue({ totalChanges: 1 });
+    publishScheduleDirect.mockResolvedValue("history-1");
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        startDate: "2026-04-12",
+        endDate: "2026-04-18",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(notifyPublishedShiftChanges).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(1);
+    await afterCallbacks[0]!();
+    expect(notifyPublishedShiftChanges).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        publishHistoryId: "history-1",
+        actorId: "22222222-2222-4222-8222-222222222222",
       }),
     );
   });

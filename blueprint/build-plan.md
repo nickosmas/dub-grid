@@ -919,7 +919,7 @@
   - [ ] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
         sheet with the day bar, including job and rest-of-day absence.
         After 45d.
-  - [ ] 46e. **Schedule-change alerts** - one alert per person per publish
+  - [x] 46e. **Schedule-change alerts** - one alert per person per publish
         listing every changed day, a compact push, and an email with Before
         and After. Needs a migration (the alert is written in the publish
         function).

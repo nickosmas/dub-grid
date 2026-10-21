@@ -159,7 +159,7 @@ Item 45 is split, and every part has shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
 
-Item 46 is split; 46a, 46b, 46c, 46f and 46g have shipped:
+Item 46 is split; 46a, 46b, 46c, 46e, 46f and 46g have shipped:
 
 - **46a - Shared change model and formatter:** shipped; one schedule-core
   function turns a cell's original and current state into Before and After sides,
@@ -174,8 +174,12 @@ Item 46 is split; 46a, 46b, 46c, 46f and 46g have shipped:
   "My schedule" tooltip and the Gridmaster person record.
 - **46d - Mobile:** Your week "Was" blocks and the "What changed" sheet with
   the day bar; 45d has shipped.
-- **46e - Schedule-change alerts:** one alert per person per publish listing
-  every changed day, a compact push, and an email; needs a migration.
+- **46e - Schedule-change alerts:** shipped; each person whose shifts a
+  publish changed (except the publisher) gets one alert listing every
+  changed day against what was published before, as a compact push and,
+  under their schedule email preference, an email with Before and After.
+  It never names the publisher, names the days only when the organization
+  hides what changed, and replaces "Schedule updated" (migration 087).
 - **46f - Staff visibility setting:** shipped; Settings > Display decides
   whether staff see what each changed shift was and who published (both on
   by default). Hidden, staff keep a plain New, Changed or Removed mark and
@@ -381,7 +385,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `085`.
+  checksum-locked through `087`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

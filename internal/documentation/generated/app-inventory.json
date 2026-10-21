@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:cb531ce4dd68d96a40066e0e03348075ac5c97d05e7763b28b1f17c5f6da5173",
+  "sourceDigest": "sha256:de3001ff4e528a2481cd4e9b2b2c6ff74cdb5013131ebd84fd3d2abe2f277ab5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4645,6 +4645,16 @@
       "sha256": "eadb679d72fad68141d6b2f87271a0b143934acef9b5a8b0cf5de93ae9973b37",
       "source": {
         "path": "supabase/migrations/086_approval_replaces_draft.sql"
+      }
+    },
+    {
+      "id": "migration:087_publish_alerts_leave_the_database.sql",
+      "version": "087",
+      "name": "publish_alerts_leave_the_database",
+      "file": "087_publish_alerts_leave_the_database.sql",
+      "sha256": "9f4e4544168b5c43241a00d76f225c32ec98338540a1d1f5df9cbe555d3745aa",
+      "source": {
+        "path": "supabase/migrations/087_publish_alerts_leave_the_database.sql"
       }
     }
   ],

@@ -157,7 +157,6 @@ import {
   countShiftsAddedToPublishedCell,
 } from "@/lib/draft-utils";
 import { exportScheduleCSV, withRestOfDayAbsence } from "@/lib/export-csv";
-import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
 import {
   getScheduleStartForSpan,
@@ -5859,14 +5858,6 @@ function SchedulerContent({
       setShowPublishDiff(false);
       closeEditPanel();
       toast.success("Schedule published");
-
-      // Notify affected employees about the published schedule
-      queueNotification({
-        action: "schedule_published",
-        orgId: org.id,
-        startDate: formatDateKey(startDate),
-        endDate: formatDateKey(endDate),
-      });
 
       // Tell other tabs/users to refetch before we refetch ourselves, so a
       // slow local refresh can't leave them stale.

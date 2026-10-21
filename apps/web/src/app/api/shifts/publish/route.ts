@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchShiftChangeResolvers } from "@/app/api/shared/schedule";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -12,6 +13,7 @@ import {
   recordNotePublishChanges,
 } from "@/lib/server/schedule-draft-safety";
 import logger from "@/lib/logger";
+import { notifyPublishedShiftChanges } from "@/features/notifications/server/publish-alerts";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -140,6 +142,20 @@ export async function POST(req: NextRequest) {
         summary: publishedSummary,
       },
     });
+
+    // Each changed person's alert is sent after the response, so a slow send
+    // never holds up a publish that has already committed (item 46e).
+    if (publishHistoryId) {
+      after(() =>
+        notifyPublishedShiftChanges({
+          serviceClient,
+          orgId,
+          publishHistoryId,
+          actorId: user.id,
+          loadResolvers: () => fetchShiftChangeResolvers(serviceClient, orgId),
+        }),
+      );
+    }
 
     return NextResponse.json({ success: true, summary: publishedSummary });
   } catch (err) {
