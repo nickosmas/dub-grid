@@ -908,7 +908,7 @@
         After sides (fields, highlights, hours, totals, labels, breaks,
         Added/Removed, archived names, overnight weekdays), with the
         original taken from the earliest in-window publish. Tested; no UI.
-  - [ ] 46b. **Web schedule surfaces** - grid chip tooltips, hover card with
+  - [x] 46b. **Web schedule surfaces** - grid chip tooltips, hover card with
         the day bar, deleted pill, the edit panel's unsaved-changes summary
         (paired by identity, not position), and Publish History (every
         segment's times, archived shifts by name).

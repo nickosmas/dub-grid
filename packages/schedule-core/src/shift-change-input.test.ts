@@ -84,6 +84,7 @@ describe("splitSegmentTimes", () => {
     expect(splitSegmentTimes("|12:00")).toEqual([null, "12:00"]);
     expect(splitSegmentTimes("07:00:00")).toEqual(["07:00"]);
     expect(splitSegmentTimes(null)).toEqual([]);
+    expect(splitSegmentTimes('"07:00"|bad')).toEqual([null, null]);
   });
 });
 
@@ -151,6 +152,24 @@ describe("cellStateToChangeDay", () => {
       shiftName: null,
       jobName: "Charge Nurse",
       focusAreaName: null,
+    });
+  });
+
+  it("shows the job alone when a definition gives no shift name", () => {
+    const local: ShiftChangeResolvers = {
+      ...resolvers,
+      segment: () => ({
+        shiftName: null,
+        jobName: "Day Shift",
+        focusAreaId: SKILLED_NURSING,
+        defaultStart: "07:00",
+        defaultEnd: "15:00",
+      }),
+    };
+    expect(cellStateToChangeDay(worked(), local).items[0]).toMatchObject({
+      shiftName: null,
+      jobName: "Day Shift",
+      focusAreaName: "Skilled Nursing",
     });
   });
 

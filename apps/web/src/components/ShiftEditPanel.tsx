@@ -53,6 +53,8 @@ import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
+import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
+import { buildShiftChangeResolvers, describeCellStateChange } from "@/lib/shift-change-web";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
   buildShiftDiffDescriptors,
@@ -586,6 +588,18 @@ export default function ShiftEditPanel({
     ],
   );
 
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments,
+        shiftCategories,
+        jobs,
+        absenceTypes,
+        focusAreas: focusAreas ?? [],
+      }),
+    [assignments, shiftCategories, jobs, absenceTypes, focusAreas],
+  );
+
   function segmentsMatchInitial(): boolean {
     if (currentSegments.length !== initialSegments.length) return false;
     return currentSegments.every((segment, index) => {
@@ -742,6 +756,29 @@ export default function ShiftEditPanel({
     : null;
   const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
   const timeSummary = hasTimeEdit ? describeTimeChange() : null;
+  // Compared with the cell as the panel opened, paired by what each shift is.
+  const unsavedChange =
+    hasShiftEdit || hasTimeEdit
+      ? describeCellStateChange(
+          buildPanelInput({
+            segments: initialSegments,
+            absenceTypeId: initialAbsenceTypeId,
+            customStartTime: initialCustomStartTime,
+            customEndTime: initialCustomEndTime,
+            restOfDayAbsenceTypeId: initialRestOfDayAbsenceTypeId,
+          }),
+          buildPanelInput({
+            segments: currentSegments,
+            absenceTypeId: currentAbsenceTypeId ?? null,
+            customStartTime: customStartTime ?? null,
+            customEndTime: customEndTime ?? null,
+            restOfDayAbsenceTypeId: currentRestOfDayAbsenceTypeId,
+          }),
+          formatDateKey(modal.date),
+          shiftChangeResolvers,
+        )
+      : null;
+  const showsUnsavedChange = !!unsavedChange && unsavedChange.kind !== "none";
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
@@ -4493,9 +4530,15 @@ export default function ShiftEditPanel({
                   lineHeight: 1.4,
                 }}
               >
-                {shiftSummary && <div>{shiftSummary}</div>}
-                {restOfDaySummary && <div>{restOfDaySummary}</div>}
-                {timeSummary && <div>{timeSummary}</div>}
+                {showsUnsavedChange ? (
+                  <ShiftChangeCard change={unsavedChange} layout="stacked" className="mb-1.5" />
+                ) : (
+                  <>
+                    {shiftSummary && <div>{shiftSummary}</div>}
+                    {restOfDaySummary && <div>{restOfDaySummary}</div>}
+                    {timeSummary && <div>{timeSummary}</div>}
+                  </>
+                )}
                 {noteSummary && <div>{noteSummary}</div>}
               </div>
             )}

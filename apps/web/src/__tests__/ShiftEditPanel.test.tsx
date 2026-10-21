@@ -1900,7 +1900,10 @@ describe("ShiftEditPanel", () => {
       const { rerender } = render(panelElement(base, onSelect, onClose));
       rerender(panelElement({ ...base, currentRestOfDayAbsenceTypeId: 8 }, onSelect, onClose));
 
-      expect(screen.getByText("Rest of the day: added Sick")).toBeInTheDocument();
+      expect(screen.getByText("Before")).toBeInTheDocument();
+      expect(screen.getByText("After")).toBeInTheDocument();
+      expect(screen.getByText("Sick (rest of day)")).toBeInTheDocument();
+      expect(screen.getByText("Added")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Undo" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(

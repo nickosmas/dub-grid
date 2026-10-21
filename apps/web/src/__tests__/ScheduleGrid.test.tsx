@@ -762,11 +762,12 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.left).toBe("4px");
     expect(badge?.style.zIndex).toBe("10");
 
-    expect(badge?.getAttribute("aria-label")).toContain("Was Night Shift.");
+    expect(badge?.getAttribute("aria-label")).toContain("Was Night Shift · North");
 
     fireEvent.mouseEnter(pill!);
     await waitFor(() => {
-      expect(screen.getByText(/Was Night Shift\./)).toBeInTheDocument();
+      expect(screen.getByText("Was")).toBeInTheDocument();
+      expect(screen.getByText("Night Shift")).toBeInTheDocument();
       expect(screen.getByText(/Published .*by Mina\./)).toBeInTheDocument();
     });
   });
@@ -1430,12 +1431,17 @@ describe("ScheduleGrid", () => {
     const archivedEvening = {
       ...twoPillAssignmentDefinitions[2],
       name: "Evening Shift · Supervisor",
+      categoryId: 2,
       jobId: 103,
       archivedAt: "2024-01-08T00:00:00.000Z",
     };
     renderGrid({
       assignments: [currentDay],
       historicalAssignments: [archivedEvening],
+      shiftCategories: [
+        ...shiftCategories,
+        { id: 2, orgId: "org-1", name: "Evening Shift", sortOrder: 2 },
+      ],
       jobs: [{ id: 103, name: "Supervisor" } as JobDefinition],
       shiftForKey: () => "D",
       assignmentIdsForKey: () => [1],
@@ -1448,7 +1454,7 @@ describe("ScheduleGrid", () => {
           kind: "worked",
           segments: [
             { shiftId: 1, jobId: 101, position: 0 },
-            { shiftId: 1, jobId: 103, position: 1 },
+            { shiftId: 2, jobId: 103, position: 1 },
           ],
           absenceTypeId: null,
           customStartTime: null,
@@ -1474,7 +1480,9 @@ describe("ScheduleGrid", () => {
       .getAllByRole("gridcell")[0]
       .querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.getAttribute("aria-label")).toContain("Was Evening Shift · Supervisor.");
+    expect(badge?.getAttribute("aria-label")).toContain(
+      "Shift 2: Evening Shift (archived) · Supervisor · North (removed)",
+    );
     expect(badge?.getAttribute("aria-label")).not.toContain("Supervisor · Supervisor");
   });
 
@@ -3535,8 +3543,8 @@ describe("ScheduleGrid", () => {
       Number.parseFloat(deletedPill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
 
-    expect(deletedPill?.getAttribute("aria-label")).toContain("Deleted N.");
-    expect(badge?.getAttribute("aria-label")).toContain("Deleted N.");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Removed: Night Shift · North");
+    expect(badge?.getAttribute("aria-label")).toContain("Removed: Night Shift · North");
   });
 
   it("keeps author labels visible for publish diffs when authors are enabled", () => {

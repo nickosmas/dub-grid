@@ -417,9 +417,10 @@ function buildSide(
     breakBefore: breaks[index],
     bar: null,
   }));
+  const timed = items.filter((item) => item.minutes != null);
   const totalMinutes =
-    multi && items.length > 0
-      ? items.reduce((total, item) => total + (item.minutes ?? 0), 0)
+    multi && timed.length > 0
+      ? timed.reduce((total, item) => total + (item.minutes ?? 0), 0)
       : null;
   return { items, totalMinutes };
 }

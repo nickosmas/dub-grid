@@ -4,6 +4,7 @@ import { normalizeTimeValue } from "./schedule-time";
 import type { ShiftChangeDayInput, ShiftChangeItemInput } from "./shift-change";
 
 export interface ShiftChangeSegmentDefinition {
+  /** Null shows the job alone, e.g. a shift-only job whose name is the shift's. */
   shiftName: string | null;
   jobName: string;
   shiftArchived?: boolean;
@@ -26,10 +27,16 @@ export const UNKNOWN_SHIFT_NAME = "Unknown shift";
 export const UNKNOWN_JOB_NAME = "Unknown job";
 export const UNKNOWN_ABSENCE_NAME = "Unknown absence";
 
-/** Splits "07:00|15:00" per segment, keeping empty parts in place ("|12:00" leaves the first empty). */
+/**
+ * Splits "07:00|15:00" per segment, keeping empty parts in place ("|12:00"
+ * leaves the first empty). A part that is not a time reads as empty.
+ */
 export function splitSegmentTimes(value: string | null | undefined): Array<string | null> {
   if (!value) return [];
-  return value.split("|").map((part) => normalizeTimeValue(part));
+  return value.split("|").map((part) => {
+    const time = normalizeTimeValue(part);
+    return time && /^\d{2}:\d{2}$/.test(time) ? time : null;
+  });
 }
 
 function absenceItem(
@@ -74,7 +81,8 @@ export function cellStateToChangeDay(
     return {
       kind: "shift",
       key: buildShiftJobPairKey(segment.shiftId, segment.jobId),
-      shiftName: segment.shiftId == null ? null : (definition?.shiftName ?? UNKNOWN_SHIFT_NAME),
+      shiftName:
+        segment.shiftId == null ? null : definition ? definition.shiftName : UNKNOWN_SHIFT_NAME,
       jobName: definition?.jobName ?? UNKNOWN_JOB_NAME,
       shiftArchived: definition?.shiftArchived,
       jobArchived: definition?.jobArchived,

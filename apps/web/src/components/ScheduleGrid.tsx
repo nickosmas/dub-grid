@@ -26,6 +26,15 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import type { ShiftChange } from "@dubgrid/schedule-core";
+import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
+import {
+  buildShiftChangeResolvers,
+  cellStateFromParts,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 import { formatDateKey } from "@/lib/utils";
 import {
   computeDailyTallies,
@@ -678,6 +687,7 @@ function ShiftDetailHoverCard({
   requestLabel,
   status,
   changeDetails,
+  changes = [],
   publicationLabel,
   children,
 }: {
@@ -690,6 +700,8 @@ function ShiftDetailHoverCard({
   status: string | null;
   /** Per-cell change explanations, already scoped to the affected segment(s). */
   changeDetails: string[];
+  /** The cell's changes as Before and After; replaces `changeDetails` when present. */
+  changes?: Array<{ view: ShiftChange; draft: boolean }>;
   publicationLabel: string | null;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
@@ -699,6 +711,9 @@ function ShiftDetailHoverCard({
   const triggerRef = useRef<HTMLDivElement | null>(null);
 
   if (!enabled) return children;
+  const shownChanges = changes.filter((change) => change.view.kind !== "none");
+  const hasRichChanges = shownChanges.length > 0;
+  const hasMultiChange = shownChanges.some((change) => change.view.kind === "multi");
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -727,7 +742,7 @@ function ShiftDetailHoverCard({
           showArrow
           style={{
             display: "block",
-            width: 300,
+            width: hasMultiChange ? 340 : 300,
             maxWidth: "calc(100vw - 32px)",
             padding: 0,
             border: "1px solid var(--dg-color-border)",
@@ -823,41 +838,94 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
-              {(indicators.length > 0 ||
-                requestLabel ||
-                status ||
-                changeDetails.length > 0 ||
-                publicationLabel) && (
+              {hasRichChanges ? (
                 <div
                   style={{
                     paddingTop: 10,
                     borderTop: "1px solid var(--dg-color-border-light)",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 3,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-text-muted)",
+                    gap: 8,
                   }}
                 >
-                  {/* An indicator describes the shift, not the change, so it stays
-                      beside a change's details rather than giving way to them. */}
                   {indicators.length > 0 ? (
-                    <div>Schedule notes: {indicators.join(", ")}</div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      Schedule notes: {indicators.join(", ")}
+                    </div>
                   ) : null}
-                  {changeDetails.length === 0 && requestLabel ? (
-                    <div>Request: {requestLabel}</div>
-                  ) : null}
-                  {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
-                  {changeDetails.map((detail) => (
-                    <div key={detail} style={{ whiteSpace: "pre-line" }}>
-                      {detail}
+                  {shownChanges.map(({ view, draft }, index) => (
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {draft ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                          }}
+                        >
+                          Not published yet. Staff still see the published shift.
+                        </div>
+                      ) : null}
+                      {view.kind === "multi" ? (
+                        <ShiftChangeCard change={view} layout="stacked" showDayBar />
+                      ) : (
+                        <ShiftChangeWas change={view} />
+                      )}
                     </div>
                   ))}
-                  {changeDetails.length === 0 && publicationLabel ? (
-                    <div>{publicationLabel}</div>
+                  {publicationLabel ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                        whiteSpace: "pre-line",
+                      }}
+                    >
+                      {publicationLabel}
+                    </div>
                   ) : null}
                 </div>
-              )}
+              ) : null}
+              {!hasRichChanges &&
+                (indicators.length > 0 ||
+                  requestLabel ||
+                  status ||
+                  changeDetails.length > 0 ||
+                  publicationLabel) && (
+                  <div
+                    style={{
+                      paddingTop: 10,
+                      borderTop: "1px solid var(--dg-color-border-light)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
+                  >
+                    {/* An indicator describes the shift, not the change, so it stays
+                      beside a change's details rather than giving way to them. */}
+                    {indicators.length > 0 ? (
+                      <div>Schedule notes: {indicators.join(", ")}</div>
+                    ) : null}
+                    {changeDetails.length === 0 && requestLabel ? (
+                      <div>Request: {requestLabel}</div>
+                    ) : null}
+                    {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
+                    {changeDetails.map((detail) => (
+                      <div key={detail} style={{ whiteSpace: "pre-line" }}>
+                        {detail}
+                      </div>
+                    ))}
+                    {changeDetails.length === 0 && publicationLabel ? (
+                      <div>{publicationLabel}</div>
+                    ) : null}
+                  </div>
+                )}
             </div>
           </div>
         </PopoverContent>
@@ -1260,6 +1328,17 @@ const SectionBlock = memo(function SectionBlock({
     for (const job of jobs) map.set(job.id, job);
     return map;
   }, [jobs]);
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: [...historicalAssignments, ...assignments],
+        shiftCategories,
+        jobs,
+        absenceTypes: absenceTypeMap ? [...absenceTypeMap.values()] : [],
+        focusAreas,
+      }),
+    [historicalAssignments, assignments, shiftCategories, jobs, absenceTypeMap, focusAreas],
+  );
 
   const getStyleByIdOrLabel = useMemo(
     () =>
@@ -2221,6 +2300,50 @@ const SectionBlock = memo(function SectionBlock({
                         publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
                       const publishedRestOfDayAbsenceTypeId =
                         publishedRestOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const publishChangeView =
+                        showsPublishDiff && publishDiff && publishChangeHasStates(publishDiff)
+                          ? describeCellStateChange(
+                              publishDiff.fromState,
+                              publishDiff.toState,
+                              dateKey,
+                              shiftChangeResolvers,
+                            )
+                          : null;
+                      // A changed or deleted draft needs its published cell to compare
+                      // with; without it, the older badge text stands.
+                      const hasPublishedCell =
+                        publishedSegments.length > 0 || publishedAbsenceTypeId != null;
+                      const draftChangeView =
+                        draftKind && (draftKind === "new" || hasPublishedCell)
+                          ? describeCellStateChange(
+                              cellStateFromParts({
+                                segments: publishedSegments,
+                                absenceTypeId: publishedAbsenceTypeId,
+                                restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                customTimes: publishedCustomTimes,
+                              }),
+                              draftKind === "deleted"
+                                ? null
+                                : cellStateFromParts({
+                                    segments: cellSegments,
+                                    absenceTypeId: currentAbsenceTypeId,
+                                    restOfDayAbsenceTypeId,
+                                    customTimes,
+                                  }),
+                              dateKey,
+                              shiftChangeResolvers,
+                            )
+                          : null;
+                      const publishChangeText = publishChangeView
+                        ? formatShiftChangeWasText(publishChangeView)
+                        : null;
+                      const draftChangeText = draftChangeView
+                        ? formatShiftChangeWasText(draftChangeView)
+                        : null;
+                      const hoverChanges = [
+                        ...(draftChangeView ? [{ view: draftChangeView, draft: true }] : []),
+                        ...(publishChangeView ? [{ view: publishChangeView, draft: false }] : []),
+                      ];
                       const cellAbsenceType =
                         currentAbsenceTypeId != null
                           ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
@@ -2724,7 +2847,7 @@ const SectionBlock = memo(function SectionBlock({
                                         tooltip: buildPublishTooltip({
                                           publishDiff: publishDiff!,
                                           resolvePublisherName,
-                                          detail: publishCellBadge.detail,
+                                          detail: publishChangeText ?? publishCellBadge.detail,
                                           timeZone: publicationTimeZone,
                                         }),
                                       }
@@ -2756,7 +2879,7 @@ const SectionBlock = memo(function SectionBlock({
                                         source: "draft",
                                         kind: draftCellBadge.kind,
                                         text: draftCellBadge.text,
-                                        tooltip: draftCellBadge.detail,
+                                        tooltip: draftChangeText ?? draftCellBadge.detail,
                                       }
                                     : null;
 
@@ -2782,10 +2905,12 @@ const SectionBlock = memo(function SectionBlock({
                                           ? buildPublishTooltip({
                                               publishDiff,
                                               resolvePublisherName,
-                                              detail: descriptor.detail,
+                                              detail: publishChangeText ?? descriptor.detail,
                                               timeZone: publicationTimeZone,
                                             })
-                                          : descriptor.detail,
+                                          : source === "draft"
+                                            ? (draftChangeText ?? descriptor.detail)
+                                            : descriptor.detail,
                                     };
                                   };
 
@@ -2981,6 +3106,7 @@ const SectionBlock = memo(function SectionBlock({
                                           requestLabel={activeRequestLabel}
                                           status={hoverStatus}
                                           changeDetails={singleHoverChangeDetails}
+                                          changes={hoverChanges}
                                           publicationLabel={publicationLabel}
                                         >
                                           <div
@@ -3441,6 +3567,7 @@ const SectionBlock = memo(function SectionBlock({
                                         requestLabel={activeRequestLabel}
                                         status={hoverStatus}
                                         changeDetails={multiHoverChangeDetails}
+                                        changes={hoverChanges}
                                         publicationLabel={publicationLabel}
                                       >
                                         <div
@@ -4120,7 +4247,7 @@ const SectionBlock = memo(function SectionBlock({
                                     ? buildPublishTooltip({
                                         publishDiff,
                                         resolvePublisherName,
-                                        detail: `Deleted ${deletedLabel}.`,
+                                        detail: publishChangeText ?? `Deleted ${deletedLabel}.`,
                                         timeZone: publicationTimeZone,
                                       })
                                     : undefined;
@@ -4284,6 +4411,7 @@ const SectionBlock = memo(function SectionBlock({
                                     requestLabel={null}
                                     status="Deleted"
                                     changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                    changes={hoverChanges}
                                     publicationLabel={publicationLabel}
                                   >
                                     {deletedPill}

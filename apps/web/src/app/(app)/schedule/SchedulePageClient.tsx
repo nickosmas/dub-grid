@@ -113,6 +113,7 @@ import {
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
 } from "@/lib/assignable-shifts";
 import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import { mergeCellPublishChanges } from "@/lib/shift-change-web";
 import { seriesScopeRange } from "@/lib/series-dates";
 import {
   buildScheduleCellEntryFromInput,
@@ -1813,24 +1814,27 @@ function SchedulerContent({
       outOfWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
     );
 
-  // Build a lookup map from in-window publish history changes for O(1) access.
-  // Iterate oldest→newest so the most recent publish wins per cell key.
+  // One change per cell, compared with the cell before its first in-window
+  // publish: staff are assumed to have seen none of the versions in between.
   const publishChangesMap = useMemo(() => {
     if (inWindowPublishHistory.length === 0) return null;
-    const map = new Map<
-      string,
-      PublishChange & { publishedAt: string; publishedBy: string | null }
-    >();
-    // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
+    type DatedChange = PublishChange & { publishedAt: string; publishedBy: string | null };
+    const byCell = new Map<string, DatedChange[]>();
+    // inWindowPublishHistory is newest-first; collect each cell's changes oldest first.
     for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
       const entry = inWindowPublishHistory[i];
       for (const change of entry.changes) {
-        map.set(`${change.empId}_${change.date}`, {
-          ...change,
-          publishedAt: entry.publishedAt,
-          publishedBy: entry.publishedBy,
-        });
+        const key = `${change.empId}_${change.date}`;
+        const dated = { ...change, publishedAt: entry.publishedAt, publishedBy: entry.publishedBy };
+        const list = byCell.get(key);
+        if (list) list.push(dated);
+        else byCell.set(key, [dated]);
       }
+    }
+    const map = new Map<string, DatedChange>();
+    for (const [key, changes] of byCell) {
+      const merged = mergeCellPublishChanges(changes);
+      if (merged) map.set(key, merged);
     }
     return map;
   }, [inWindowPublishHistory]);
@@ -8352,6 +8356,7 @@ function SchedulerContent({
               focusAreas={focusAreas}
               employees={employeeDirectory}
               absenceTypes={allAbsenceTypes}
+              allAssignmentDefinitions={allAssignmentDefinitions}
             />
           )}
           {activeOperation && (

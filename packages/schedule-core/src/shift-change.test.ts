@@ -296,6 +296,16 @@ describe("describeShiftChange, whole days", () => {
     expect(change.kind).toBe("none");
   });
 
+  it("gives no total when no item has known times", () => {
+    const change = describeShiftChange(
+      { items: [shift({ start: null, end: null }), evening()] },
+      { items: [shift({ start: null, end: null })] },
+      { date: DATES.thu },
+    );
+    expect(change.after.totalMinutes).toBeNull();
+    expect(change.before.totalMinutes).toBe(8 * 60);
+  });
+
   it("gives an empty side no total", () => {
     const change = describeShiftChange(
       { items: [] },
