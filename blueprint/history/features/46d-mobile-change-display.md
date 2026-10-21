@@ -1,7 +1,7 @@
 # 46d - Mobile change display
 
 **Type:** Feature
-**Status:** in progress
+**Status:** complete
 **Branch:** `feature/46d-mobile-change-display` (cut from `dev` at 90f480cd)
 
 ### Goal
@@ -42,8 +42,25 @@ day bar in shift detail.
       and removed days; shift detail's footer opens "What changed" with the
       card and the day bar. Both fall back to the older summary without
       `shiftChange`.
-- [ ] **4. Simulator check.** A published change for the QA staff account,
+- [x] **4. Simulator check.** A published change for the QA staff account,
       seen in Your Week and the shift detail sheet on the iOS simulator.
+
+### Evidence
+
+iOS simulator (iPhone 16 Pro Max), 2026-10-21, the main checkout's Metro
+and web server at `a191bbd1`, signed in as `qa-regular` in Calm Haven. QA
+Regular's Sat, Oct 24 was republished from Day Shift to Evening Shift:
+
+- Your Week shows the Evening Shift with its Edited chip and, under it, a
+  WAS heading, "Day Shift" and "7:00 AM - 3:30 PM (8.5 hrs) · Skilled
+  Nursing".
+- Shift detail shows a "What changed" row; its sheet shows BEFORE (Day
+  Shift, 7:00 AM - 3:30 PM (8.5 hrs) · Skilled Nursing) and AFTER (Evening
+  Shift, Sat 3:30 PM - Sun 12:00 AM (8.5 hrs) · Skilled Nursing) with the
+  shift and times marked. A single-shift day has no day bar, as on the web
+  (the bar is for days with more than one item). The footer names the
+  publisher, staff's default under 46f.
+- The day was put back to Day Shift afterwards with a second publish.
 
 ### Verify
 
