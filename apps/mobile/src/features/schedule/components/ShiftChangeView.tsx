@@ -8,9 +8,11 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
   mobileRadii,
+  mobileRadius,
   mobileSpace,
   mobileTabularText,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -27,6 +29,22 @@ function hoursText(minutes: number): string {
 
 function sideHeading(heading: string, side: ShiftChangeSide): string {
   return side.totalMinutes != null ? `${heading} · ${hoursText(side.totalMinutes)}` : heading;
+}
+
+const SEPARATOR = " · ";
+
+/**
+ * The detail as lines, split where the model joins its fields: the times
+ * with their hours on one line, the focus area on the next, so a narrow row
+ * never breaks a name in two.
+ */
+function detailLines(parts: TextPart[]): TextPart[][] {
+  const lines: TextPart[][] = [[]];
+  for (const part of parts) {
+    if (part.text === SEPARATOR) lines.push([]);
+    else lines[lines.length - 1]!.push(part);
+  }
+  return lines.filter((line) => line.length > 0);
 }
 
 function Parts({
@@ -53,10 +71,12 @@ function ItemLines({
   item,
   styles,
   highlight,
+  compact = false,
 }: {
   item: ShiftChangeItem;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
+  compact?: boolean;
 }) {
   const changedStyle = highlight ? styles.changed : styles.unchanged;
   return (
@@ -83,10 +103,19 @@ function ItemLines({
           </View>
         ) : null}
       </View>
-      <Parts parts={item.title} style={styles.itemTitle} changedStyle={changedStyle} />
-      {item.detail.length > 0 ? (
-        <Parts parts={item.detail} style={styles.itemDetail} changedStyle={changedStyle} />
-      ) : null}
+      <Parts
+        parts={item.title}
+        style={compact ? styles.compactTitle : styles.itemTitle}
+        changedStyle={changedStyle}
+      />
+      {detailLines(item.detail).map((line, index) => (
+        <Parts
+          key={index}
+          parts={line}
+          style={compact ? styles.compactDetail : styles.itemDetail}
+          changedStyle={changedStyle}
+        />
+      ))}
     </View>
   );
 }
@@ -95,10 +124,12 @@ function SideItems({
   side,
   styles,
   highlight,
+  compact = false,
 }: {
   side: ShiftChangeSide;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
+  compact?: boolean;
 }) {
   if (side.items.length === 0) {
     return (
@@ -110,7 +141,13 @@ function SideItems({
   return (
     <View style={styles.items}>
       {side.items.map((item, index) => (
-        <ItemLines key={index} item={item} styles={styles} highlight={highlight} />
+        <ItemLines
+          key={index}
+          item={item}
+          styles={styles}
+          highlight={highlight}
+          compact={compact}
+        />
       ))}
     </View>
   );
@@ -219,10 +256,17 @@ export function ShiftChangeWas({ change }: { change: ShiftChange }) {
       accessibilityLabel={`Was: ${change.before.items.length === 0 ? "No shift" : change.before.items.map((item) => item.plain).join("; ")}`}
       style={styles.was}
     >
-      <Text fit="fixed" style={styles.heading}>
-        {sideHeading("WAS", change.before)}
-      </Text>
-      <SideItems side={change.before} styles={styles} highlight={false} />
+      <View style={styles.wasHeader}>
+        <Text fit="fixed" style={styles.heading}>
+          WAS
+        </Text>
+        {change.before.totalMinutes != null ? (
+          <Text fit="fixed" style={styles.wasTotal}>
+            {hoursText(change.before.totalMinutes)}
+          </Text>
+        ) : null}
+      </View>
+      <SideItems side={change.before} styles={styles} highlight={false} compact />
     </View>
   );
 }
@@ -249,7 +293,7 @@ function createStyles(colors: MobileColors) {
       ...mobileText.micro,
       ...mobileTabularText,
       color: colors.textMuted,
-      letterSpacing: 0.6,
+      letterSpacing: 0.8,
     },
     afterHeading: {
       color: colors.brand,
@@ -349,6 +393,33 @@ function createStyles(colors: MobileColors) {
     },
     was: {
       gap: mobileSpace.xs,
+      marginTop: mobileSpace.sm,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
+      borderRadius: mobileRadius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.surfaceSecondary,
+    },
+    wasHeader: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: mobileSpace.sm,
+    },
+    wasTotal: {
+      ...mobileText.caption,
+      ...mobileTabularText,
+      color: colors.textSecondary,
+    },
+    compactTitle: {
+      ...mobileTextWeighted("meta", "semibold"),
+      color: colors.textPrimary,
+    },
+    compactDetail: {
+      ...mobileText.meta,
+      ...mobileTabularText,
+      color: colors.textSecondary,
     },
   });
 }
