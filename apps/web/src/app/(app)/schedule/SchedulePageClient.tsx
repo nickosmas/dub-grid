@@ -6104,13 +6104,15 @@ function SchedulerContent({
       employeeId: string,
       targetDateKey: string,
     ): StaffingScheduleState | null => {
-      const effective = shifts[`${employeeId}_${targetDateKey}`]?.effective ?? null;
+      const entry = shifts[`${employeeId}_${targetDateKey}`];
+      const effective = entry?.effective ?? null;
       return effective
         ? {
             kind: effective.kind,
             segments: effective.segments,
             assignmentIds: effective.assignmentIds,
             absenceTypeId: effective.absenceTypeId ?? null,
+            restOfDayAbsenceTypeId: entry?.restOfDayAbsenceTypeId ?? null,
             customStartTime: effective.customStartTime ?? null,
             customEndTime: effective.customEndTime ?? null,
             seriesId: effective.seriesId ?? null,

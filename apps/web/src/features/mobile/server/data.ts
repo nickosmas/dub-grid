@@ -1497,6 +1497,16 @@ function buildMobileOpenShiftsFromGaps(
       const employeeScheduleRow = rowByEmployeeDate.get(
         `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
       );
+      if (
+        employeeScheduleRow?.state.kind === "worked" &&
+        employeeScheduleRow.state.absenceTypeId != null
+      ) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason: "You are absent for the rest of this day.",
+        };
+      }
+
       const employeeTimeRanges = employeeScheduleRow
         ? getScheduleRowTimeRanges({
             row: employeeScheduleRow,

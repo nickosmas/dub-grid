@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:720f5f70c4a6778224f167d8d54cef252dda539f265d4c04bc943048ef0c23e8",
+  "sourceDigest": "sha256:1480aa9663c40ad4a7a6d9e5466f7567b716dcd06cc90074aabfac034fc0324a",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4625,6 +4625,16 @@
       "sha256": "32dc0a5eccfb61ead760090df401529b826b4b99f0342e025fee9a0712a888ce",
       "source": {
         "path": "supabase/migrations/084_staff_schedule_visibility.sql"
+      }
+    },
+    {
+      "id": "migration:085_requests_keep_rest_of_day_absence.sql",
+      "version": "085",
+      "name": "requests_keep_rest_of_day_absence",
+      "file": "085_requests_keep_rest_of_day_absence.sql",
+      "sha256": "9fcc666f0f4aa63026c75b12e78780c4b1bb6e5cf3737ca1e04eac14f8001430",
+      "source": {
+        "path": "supabase/migrations/085_requests_keep_rest_of_day_absence.sql"
       }
     }
   ],

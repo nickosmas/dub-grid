@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:592b3c6e19e119ffa9d401ffa6f7e41bef308aab725a9a0d2a5e2ac2f51587f1"
+      "evidenceFingerprint": "sha256:d7139c9b61c316ee0fe7c58d33c51c6c0ae0fc93b0d0050ec0936c48e0c0fdef"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:abf2eec5127818f072bccda8aed86ebae31fba85c2130d8596f03a43197355a2"
+      "evidenceFingerprint": "sha256:b85bd3f9dc3b6c2715baadb7fcc027d41baabfbae586137f6a3d120106388969"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ad76687b65d7d656aa6be9511e92c29b49ccb758128e7fdd0e140d94379b86da"
+      "evidenceFingerprint": "sha256:fd9a64e1617f9979ef9c893004e4ee38bb40bd2dc07451bef9f4f7261a2dccf9"
     },
     {
       "id": "onboarding",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a06ff9bcc741d1545f55797c8ae3e6bef740ee5608a64377e0c8d6f12450050e"
+      "evidenceFingerprint": "sha256:43023f57592436664bc14483ce3f58fbdb4550cb4f07c8d1ab6057a98facebe7"
     },
     {
       "id": "draft-publish",
@@ -441,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:70d5c3e5b068ef0eaadb069bea6d21b4733fbbc58d11ecfa1e1f2c85c83d559b"
+      "evidenceFingerprint": "sha256:3851927f6a6533d2bc2b14d00e16d195d18861f8cff887b559b66581a70a2953"
     },
     {
       "id": "recurring-shifts",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7d8e4e115b1f7b443fe691d577dac087314d793d446e14e0194d23d02e476942"
+      "evidenceFingerprint": "sha256:771b8e410766cdce2852436f762c6a73fef0c5c8931efe4dc0373314b23ecec9"
     },
     {
       "id": "realtime",
@@ -542,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b427181fdd6aaa356745eee6b4ac0647470acaf6216046468c1aaad9b10aa95f"
+      "evidenceFingerprint": "sha256:655185d526c93413b339e0372d40c553e3c51cfdef5bd26f278434e2653573ff"
     },
     {
       "id": "shift-requests",
@@ -570,6 +570,7 @@
           "claims": [
             "pickup, swap and time off; pickup offers your own shift",
             "web Drop shift and Swap; app shift detail; requester cancels while open or awaiting approval",
+            "a day with an absence for the rest of the day keeps it through requests; nobody absent for the rest of a day takes another shift that day",
             "statuses and their meanings; 72-hour expiry, may be unavailable",
             "teammate accepts first for swaps and named pickups; approval publishes directly; party approver auto-approves",
             "approved time off leaves the shift open; a published fill settles it",
@@ -593,7 +594,8 @@
             "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
             "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
-            "apps/web/src/components/dashboard/UserDashboard.tsx"
+            "apps/web/src/components/dashboard/UserDashboard.tsx",
+            "supabase/migrations/085_requests_keep_rest_of_day_absence.sql"
           ],
           "testFiles": [
             "apps/web/src/__tests__/ShiftRequestBoard.test.tsx",
@@ -601,13 +603,14 @@
             "apps/web/src/__tests__/finalize-scheduler-staffed-calloffs.integration.test.ts",
             "packages/domain/src/shift-request-copy.test.ts",
             "apps/web/src/app/api/cron/expire-requests/route.test.ts",
-            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx"
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx",
+            "apps/web/src/__tests__/shift-requests-rest-of-day-absence.integration.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d3b484dcaf2b83cb79abf7f39db62080e08d4971691d0262297860eb514b641c"
+      "evidenceFingerprint": "sha256:6e00f754557eac354c31c93699b7b6dece8727054a99ea7ffae6843f97588d41"
     },
     {
       "id": "dashboard",
@@ -1921,7 +1924,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:36dbe6888d7fa729ea77f47fda73cf54e78d95ed086c265e3ba97c079376b519"
+      "evidenceFingerprint": "sha256:180e7f365e4ae4d7f89a26bf1c6d8a303b16e529973cdbe5956e442fc70c9f69"
     },
     {
       "id": "coverage-open-shifts",
@@ -1972,7 +1975,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:bb12c745ba08ecdcb34716c73ee17c58c951f7d223fea37a88d928a3f03f7711"
+      "evidenceFingerprint": "sha256:56c30e495034b5efbee5577ee3be60f291ecef27c299ec699ad77f3b8eb28788"
     },
     {
       "id": "mobile-schedule",
@@ -2083,7 +2086,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:22c7ebcdb472459eacb9d7bdd5c7156c53d27741e2cf2864a9b03a2ac5418286"
+      "evidenceFingerprint": "sha256:f6614c1eb886c63e08c2c9406e51ba9d1228f5dabe668c32721d9cb30d957946"
     }
   ],
   "surfaceExclusions": [

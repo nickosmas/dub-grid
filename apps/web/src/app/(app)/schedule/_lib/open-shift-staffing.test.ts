@@ -207,6 +207,27 @@ describe("buildOpenShiftStaffingCandidates", () => {
     ]);
   });
 
+  it("leaves out someone absent for the rest of the day, even with no overlap", () => {
+    const evening: StaffingScheduleState = {
+      kind: "worked",
+      segments: [{ shiftId: 2, jobId: 11, position: 0, isMentored: false }],
+      assignmentIds: [101],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+    const candidates = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      openShift: gap({ eligibleAssignmentDefinitionIds: [100] }),
+      employees: [employee({ id: "evening" }), employee({ id: "evening-sick" })],
+      scheduleByEmployeeId: new Map([
+        ["evening", evening],
+        ["evening-sick", { ...evening, restOfDayAbsenceTypeId: 9 }],
+      ]),
+    });
+    expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["evening"]);
+  });
+
   it("excludes duration-only general work and checks general work that has times", () => {
     const office: AssignmentDefinition = {
       id: 102,

@@ -866,7 +866,7 @@
   - [x] 44g. **Seat and revenue history** - append-only seat and invoice
         history and a report that states its own start date. Needs a
         migration.
-- [ ] 45. **A worked shift plus an absence in one cell** - someone who works
+- [x] 45. **A worked shift plus an absence in one cell** - someone who works
       part of a day, including part of a double shift, can have an absence
       (an absence type) for the rest of it, shown and saved as one cell such
       as D/Bereavement or D/E/Sick. The absence always comes last, and the
@@ -891,9 +891,10 @@
         coverage tallies, reports, CSV export and calendar feed.
   - [x] 45d. **Mobile app** - schedule, shift detail and dashboard show
         every part of a mixed cell.
-  - [ ] 45e. **Shift requests** - time off on half a double shift keeps the
+  - [x] 45e. **Shift requests** - time off on half a double shift keeps the
         absence; swap, pickup and open-shift staffing respect a mixed cell
-        instead of discarding it.
+        instead of discarding it. Someone absent for the rest of a day takes
+        no more work that day (owner, 2026-10-21).
 - [ ] 46. **Clear shift-change descriptions** - every shift change reads the
       same detailed way on web, mobile, alerts and records: Before and After
       headings, every field that tells the shifts apart (shift, job spelled

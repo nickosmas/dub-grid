@@ -1964,6 +1964,80 @@ describe("fetchMobileOpenShifts", () => {
     }
   });
 
+  it("marks an open shift unavailable to someone absent for the rest of that day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const employeeId = "196d610f-2283-486c-a9e0-197852969a31";
+      const serviceClient = createServiceClientForOpenShifts({
+        minStaff: 2,
+        scheduleCells: [
+          {
+            id: "cell-1",
+            emp_id: employeeId,
+            date: "2026-04-16",
+            org_id: "org-1",
+            focus_area_id: 12,
+            version: 1,
+            series_id: null,
+            from_recurring: false,
+            created_by: null,
+            updated_by: null,
+            created_at: null,
+            updated_at: null,
+            snapshots: [
+              {
+                id: "published-snapshot",
+                cell_id: "cell-1",
+                org_id: "org-1",
+                snapshot_kind: "published",
+                state_kind: "worked",
+                absence_type_id: 5,
+                custom_start_time: null,
+                custom_end_time: null,
+                segments: [
+                  {
+                    id: "segment-0",
+                    snapshot_id: "published-snapshot",
+                    org_id: "org-1",
+                    position: 0,
+                    shift_id: 101,
+                    job_id: 91,
+                    is_mentored: false,
+                  },
+                ],
+              },
+            ],
+            employees: { id: employeeId, first_name: "Nic", last_name: "Kosmas", org_id: "org-1" },
+          },
+        ],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: employeeId,
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toHaveLength(1);
+      expect(openShifts[0]).toMatchObject({
+        canVolunteer: false,
+        volunteerBlockReason: "You are absent for the rest of this day.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not count pending volunteers from another focus area against a mobile open shift", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));

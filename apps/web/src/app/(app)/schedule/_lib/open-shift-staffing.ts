@@ -17,6 +17,8 @@ export interface StaffingScheduleState {
   segments: ScheduleCellSegmentInput[];
   assignmentIds: number[];
   absenceTypeId: number | null;
+  /** A worked cell's absence for the rest of the day. */
+  restOfDayAbsenceTypeId?: number | null;
   customStartTime: string | null;
   customEndTime: string | null;
   seriesId?: string | null;
@@ -232,6 +234,9 @@ export function buildOpenShiftStaffingCandidates({
         return [];
       }
       const existingState = scheduleByEmployeeId.get(employee.id) ?? null;
+      // Someone absent for the rest of the day takes no more work that day
+      // (owner, 2026-10-21).
+      if (existingState?.restOfDayAbsenceTypeId != null) return [];
       const existingRanges = getStaffingStateTimeRanges(existingState, context);
       const existingAlignedRanges = getStaffingStateAlignedTimeRanges(existingState, context);
       // Work with only a duration (a shiftless job with no start and end) has

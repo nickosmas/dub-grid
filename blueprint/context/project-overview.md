@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress. Item 47 is planned.
+Items appear in build-plan order. Items 1 through 39 and 41 through 45 are
+shipped. Item 40 is in progress. Item 46 is in progress. Item 47 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,7 +79,7 @@ shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress.
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
-| 45   | In progress | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
+| 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | In progress | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
@@ -132,7 +132,7 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
-Item 45 is split; 45a to 45d have shipped:
+Item 45 is split, and every part has shipped:
 
 - **45a - Data model:** shipped; a worked cell may carry one absence,
   through draft, publish, publish history and import (migration 082).
@@ -150,11 +150,14 @@ Item 45 is split; 45a to 45d have shipped:
   and the admin Home card show the absence after the shifts, from an
   optional `restOfDayAbsence` the server adds to each entry; hours are
   unchanged.
-- **45e - Shift requests:** planned; time off on half a double shift keeps
-  the absence, and swap, pickup and open-shift staffing respect a mixed cell.
+- **45e - Shift requests:** shipped; a mixed cell can be offered, swapped
+  or called off, and an approval keeps the absence on the shifts left
+  behind (or for the whole day when none are). Someone absent for the rest
+  of a day is not offered and cannot claim, volunteer for or swap into
+  another shift that day (migration 085).
 
 The absence always comes last and carries no hours; at most two worked
-shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20).
+shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
 
 Item 46 is split; 46a, 46b, 46c, 46f and 46g have shipped:
 
@@ -378,7 +381,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `084`.
+  checksum-locked through `085`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.
