@@ -174,6 +174,40 @@ describe("MyScheduleCard", () => {
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
+  it("puts the absence for the rest of the day after the shift and says it", () => {
+    const base = makeEntry({ date: "2026-05-11" });
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-11" },
+        entries: [
+          {
+            ...base,
+            state: { ...base.state, absenceTypeId: 8 },
+            presentation: {
+              ...base.presentation,
+              restOfDayAbsence: {
+                absenceTypeId: 8,
+                label: "S",
+                name: "Sick",
+                color: "#FEE2E2",
+                borderColor: "#FCA5A5",
+                textColor: "#991B1B",
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" onOpenDay={vi.fn()} />);
+
+    const day = screen.getByRole("button", {
+      name: "Monday, May 11. Sick for the rest of the day",
+    });
+    expect(day.textContent!.indexOf("Sick")).toBeGreaterThan(day.textContent!.indexOf("Day Shift"));
+  });
+
   it("shows the empty state when the query has no range at all", () => {
     useQuery.mockReturnValue({
       isLoading: false,

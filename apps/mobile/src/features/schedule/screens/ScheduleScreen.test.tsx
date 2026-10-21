@@ -219,6 +219,32 @@ beforeAll(async () => {
   TeamScheduleScreen = module.TeamScheduleScreen;
 });
 
+// A worked cell with an absence for the rest of the day (item 45), in the
+// payload's presentation shape, since that is where the absence travels.
+function withRestOfDaySick(entry: ReturnType<typeof createScheduleEntry>) {
+  return {
+    ...entry,
+    presentation: {
+      label: entry.shiftLabel,
+      shiftName: entry.shiftName,
+      focusAreaId: entry.focusAreaId,
+      focusAreaName: entry.focusAreaName,
+      displayFocusAreaName: entry.displayFocusAreaName,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      segments: entry.segments,
+      restOfDayAbsence: {
+        absenceTypeId: 8,
+        label: "S",
+        name: "Sick",
+        color: "#FEE2E2",
+        borderColor: "#FCA5A5",
+        textColor: "#991B1B",
+      },
+    },
+  };
+}
+
 describe("ScheduleScreen", () => {
   let mutationSpy: any;
   let invalidateQueriesSpy: any;
@@ -2431,6 +2457,31 @@ describe("ScheduleScreen", () => {
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
+  });
+
+  it("lists the absence for the rest of the day after the shift in Your Week and the hero", () => {
+    meScheduleEntries = [withRestOfDaySick(createScheduleEntry())];
+
+    render(<HomeScheduleScreen />);
+
+    const row = screen.getByTestId("upcoming-rest-of-day-row-2026-04-16");
+    expect(row).toHaveTextContent("Sick");
+    expect(row).toHaveTextContent("Rest of the day");
+    const hero = screen.getByTestId("me-hero-card");
+    expect(within(hero).getByText("Sick")).toBeInTheDocument();
+    expect(hero.textContent!.indexOf("Sick")).toBeGreaterThan(hero.textContent!.indexOf("Mentor"));
+  });
+
+  it("puts the absence for the rest of the day after the shift on a team row", () => {
+    teamScheduleEntries = teamScheduleEntries.map((entry, index) =>
+      index === 0 ? withRestOfDaySick(entry) : entry,
+    );
+
+    render(<TeamScheduleScreen />);
+
+    const sickPill = screen.getByLabelText("Absence Sick");
+    const row = sickPill.closest("[data-testid], div")!.parentElement!;
+    expect(row.textContent!.indexOf("Sick")).toBeGreaterThan(row.textContent!.indexOf("Mentor"));
   });
 
   it("shows job-focused team rows and opens shift detail from the Schedule tab", () => {

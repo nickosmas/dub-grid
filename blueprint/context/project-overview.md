@@ -132,7 +132,7 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
-Item 45 is split; 45a, 45b and 45c have shipped:
+Item 45 is split; 45a to 45d have shipped:
 
 - **45a - Data model:** shipped; a worked cell may carry one absence,
   through draft, publish, publish history and import (migration 082).
@@ -146,7 +146,10 @@ Item 45 is split; 45a, 45b and 45c have shipped:
   exports, the calendar feed and the activity log show the absence after
   the shifts, at no hours. Coverage, hours, Month and the person page
   already handled it.
-- **45d - Mobile app:** planned.
+- **45d - Mobile app:** shipped; Your Week, the team list, shift detail
+  and the admin Home card show the absence after the shifts, from an
+  optional `restOfDayAbsence` the server adds to each entry; hours are
+  unchanged.
 - **45e - Shift requests:** planned; time off on half a double shift keeps
   the absence, and swap, pickup and open-shift staffing respect a mixed cell.
 
@@ -167,7 +170,7 @@ Item 46 is split; 46a, 46b, 46c and 46g have shipped:
   (fixing the production path that drops time and focus area), the admin
   "My schedule" tooltip and the Gridmaster person record.
 - **46d - Mobile:** Your week "Was" blocks and the "What changed" sheet with
-  the day bar; after 45d.
+  the day bar; 45d has shipped.
 - **46e - Schedule-change alerts:** one alert per person per publish listing
   every changed day, a compact push, and an email; needs a migration.
 - **46f - Staff visibility setting:** show staff what changed, and show who

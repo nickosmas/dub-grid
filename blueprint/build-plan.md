@@ -889,7 +889,7 @@
   - [x] 45c. **Other web surfaces** - Month view, the phone Day view, print
         (a taller row for a three-item cell), dashboard, person page,
         coverage tallies, reports, CSV export and calendar feed.
-  - [ ] 45d. **Mobile app** - schedule, shift detail and dashboard show
+  - [x] 45d. **Mobile app** - schedule, shift detail and dashboard show
         every part of a mixed cell.
   - [ ] 45e. **Shift requests** - time off on half a double shift keeps the
         absence; swap, pickup and open-shift staffing respect a mixed cell

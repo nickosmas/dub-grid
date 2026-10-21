@@ -145,6 +145,8 @@ function createServiceClientForSchedule(
   employeeRelation: unknown,
   options?: {
     absenceTypeId?: number | null;
+    /** A worked cell's absence for the rest of the day (item 45). */
+    restOfDayAbsenceTypeId?: number | null;
     customEndTime?: string | null;
     customStartTime?: string | null;
     jobIds?: number[];
@@ -309,7 +311,7 @@ function createServiceClientForSchedule(
             org_id: "org-1",
             snapshot_kind: "published",
             state_kind: options?.absenceTypeId != null ? "absence" : "worked",
-            absence_type_id: options?.absenceTypeId ?? null,
+            absence_type_id: options?.absenceTypeId ?? options?.restOfDayAbsenceTypeId ?? null,
             custom_start_time: options?.customStartTime ?? null,
             custom_end_time: options?.customEndTime ?? null,
             segments:
@@ -790,6 +792,48 @@ describe("fetchMobilePeople", () => {
 });
 
 describe("fetchMobileScheduleEntries", () => {
+  it("names a worked cell's absence for the rest of the day without making it a segment", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+    };
+    const fetch = (restOfDayAbsenceTypeId: number | null) =>
+      fetchMobileScheduleEntries(
+        createServiceClientForSchedule(employee, {
+          shiftIds: [101],
+          restOfDayAbsenceTypeId,
+        }) as never,
+        {
+          orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+          startDate: "2026-04-18",
+          endDate: "2026-04-24",
+          employeeId: employee.id,
+        },
+      );
+
+    const [mixed] = await fetch(56);
+    const [plain] = await fetch(null);
+
+    expect(mixed.state).toMatchObject({ kind: "worked", absenceTypeId: 56 });
+    expect(mixed.presentation.restOfDayAbsence).toEqual({
+      absenceTypeId: 56,
+      label: "X",
+      name: "Off",
+      color: "#fef3c7",
+      borderColor: "#f59e0b",
+      textColor: "#92400e",
+    });
+    expect(mixed.presentation.segments).toEqual(plain.presentation.segments);
+    expect(mixed.presentation).toMatchObject({
+      label: "D",
+      startTime: plain.presentation.startTime,
+      endTime: plain.presentation.endTime,
+    });
+    expect(plain.presentation.restOfDayAbsence).toBeNull();
+  });
+
   it.each([
     {
       name: "object relations returned by many-to-one embeds",

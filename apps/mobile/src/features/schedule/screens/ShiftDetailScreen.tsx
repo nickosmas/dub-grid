@@ -98,6 +98,7 @@ import {
 } from "../lib/schedule";
 import { scheduleNoteGroups } from "../lib/scheduleNotes";
 import {
+  buildRestOfDayAbsenceChip,
   describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
 } from "../lib/scheduleScreenChips";
@@ -774,6 +775,8 @@ export default function ShiftDetailScreen() {
       : "";
   const isViewingOtherEmployee = Boolean(shiftEntry && shiftEntry.employeeId !== linkedEmployeeId);
   const detailTitleChip = !hasMultipleSegments ? jobChip : null;
+  // A worked cell's absence for the rest of the day (item 45), after its shifts.
+  const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, shiftEntry);
   // Same rule the home card applies: when the chip already names the thing (an
   // absence type, a general shift), the heading above it would only repeat the
   // word, so the eyebrow and the pill carry it alone.
@@ -1435,7 +1438,8 @@ export default function ShiftDetailScreen() {
                         <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                       </View>
                     ) : null}
-                    {!hasSplitShift && (shouldRenderTitlePills || shiftEntry.change) ? (
+                    {!hasSplitShift &&
+                    (shouldRenderTitlePills || shiftEntry.change || restOfDayChip) ? (
                       <View style={styles.detailHeroPillRow}>
                         {detailTitleChip || primarySegment?.isMentored ? (
                           <DetailHeaderJobPill
@@ -1443,6 +1447,7 @@ export default function ShiftDetailScreen() {
                             isMentored={primarySegment?.isMentored === true}
                           />
                         ) : null}
+                        {restOfDayChip ? <DetailJobPill chip={restOfDayChip} /> : null}
                         {!shouldShowDetailTitle ? (
                           <ShiftChangeBadge change={hasSplitShift ? null : shiftEntry.change} />
                         ) : null}
@@ -1466,11 +1471,6 @@ export default function ShiftDetailScreen() {
                   variant="detail"
                 />
               ) : null}
-              {hasSplitShift && canCreateRequestsForShift ? (
-                <Text style={styles.detailSplitNotice}>
-                  Drop and swap actions apply to the shift you choose.
-                </Text>
-              ) : null}
               {!hasMultipleSegments && timeRange ? (
                 <DetailInfoRow
                   iconName="time-outline"
@@ -1487,6 +1487,19 @@ export default function ShiftDetailScreen() {
                   tone="green"
                   value={focusAreaName}
                 />
+              ) : null}
+              {restOfDayChip ? (
+                <DetailInfoRow
+                  iconName="calendar-clear-outline"
+                  label="Rest of the day"
+                  tone="green"
+                  value={restOfDayChip.label}
+                />
+              ) : null}
+              {hasSplitShift && canCreateRequestsForShift ? (
+                <Text style={styles.detailSplitNotice}>
+                  Drop and swap actions apply to the shift you choose.
+                </Text>
               ) : null}
               <ScheduleNotesDetailRow entry={shiftEntry} />
             </View>

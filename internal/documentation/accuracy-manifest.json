@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e6b18b8520f910f996eb7c8aba7ff284ba67c10a2c5d4eebe4be6d122322e616"
+      "evidenceFingerprint": "sha256:0c370937892e04ec27542ca6f1641d0884ca6c93c03f32fc3da3ac4940683a86"
     },
     {
       "id": "draft-publish",
@@ -607,7 +607,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:afe2012048b1e43e47b82d3f15c3a33f7e71e41ba572cc1c17326fa22e8fc241"
+      "evidenceFingerprint": "sha256:bfc58776792617de77d0b3090071b750cde39478a83037b8b7136c9e2cef0e96"
     },
     {
       "id": "dashboard",
@@ -1272,7 +1272,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8cc86ee0cacb3b2ad10566455130c39d208d11404a9808076018af10094c44b4"
+      "evidenceFingerprint": "sha256:a6583ebd3edef4925a410057f406af729ce6373911ec36d864329434fb12b7af"
     },
     {
       "id": "alerts",
@@ -1998,7 +1998,8 @@
             "week and month navigation with focus-area filtering",
             "shift detail shows schedule facts and supports drop, pickup, call-off, and swap requests",
             "mobile schedule surfaces explain loading, unavailable, unlinked, error, and retry states",
-            "schedule authoring and publication remain web-only"
+            "schedule authoring and publication remain web-only",
+            "a shift with an absence for the rest of the day: the absence after the shifts in Your Week, the team schedule and shift details, no hours"
           ],
           "sourceFiles": [
             "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
@@ -2024,7 +2025,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d2854604b639b27de0b8362c72e864b0f9dc11657b7bac32c8147967a54a190b"
+      "evidenceFingerprint": "sha256:b7896787da192237724bdc2020fb8cfc3a1911e25a589c9ca533c27891f33d86"
     },
     {
       "id": "integrations-exports",

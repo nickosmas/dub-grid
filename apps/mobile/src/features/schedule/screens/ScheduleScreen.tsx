@@ -177,6 +177,7 @@ import {
   getMeHeroShiftmates,
   getMeHeroSupplementalSplitSegments,
   getRequestDateLabel,
+  buildRestOfDayAbsenceChip,
   getScheduleEntrySegmentChange,
   summariseScheduleSegment,
   type MobileScheduleSegmentChange,
@@ -2580,6 +2581,10 @@ export function MeHeroCard({
   // and pill that restated it as three lines.
   const isAbsenceHero = visibleTypeChip?.kind === "absence";
   const typeChip = isAbsenceHero ? null : visibleTypeChip;
+  // A featured shift's absence for the rest of the day sits beside its pill.
+  const heroRestOfDayChip = isAbsenceHero
+    ? null
+    : buildRestOfDayAbsenceChip(mobileColors, isDark, featuredItem.entry);
   const heroTitle = isAbsenceHero ? visibleTypeChip.label : shiftName;
   const shouldShowShiftName = isAbsenceHero || shouldShowMePrimaryTitle(shiftName, typeChip);
   const timeRange = getScheduleItemTimeRange(featuredItem);
@@ -2642,7 +2647,7 @@ export function MeHeroCard({
                 ) : null}
               </View>
             ) : null}
-            {typeChip ? (
+            {typeChip || heroRestOfDayChip ? (
               <View style={styles.meHeroRoleRow}>
                 <MeTypePill
                   chip={typeChip}
@@ -2651,6 +2656,9 @@ export function MeHeroCard({
                   isMentored={featuredItem.segment.isMentored === true}
                   titleScale="hero"
                 />
+                {heroRestOfDayChip ? (
+                  <MeTypePill chip={heroRestOfDayChip} compact inverseLabel titleScale="hero" />
+                ) : null}
               </View>
             ) : featuredItem.segment.isMentored ? (
               <MentoredPill />
@@ -3000,6 +3008,33 @@ function UpcomingShiftsSection({
                           </PressableRow>
                         </Fragment>
                       );
+                    })}
+                    {[...new Set(group.items.map((item) => item.entry))].map((entry) => {
+                      // A worked cell's absence for the rest of the day (item
+                      // 45) is its own row after the cell's shifts.
+                      const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
+                      return restOfDayChip ? (
+                        <Fragment key={`${entry.employeeId}:${entry.date}:rest-of-day`}>
+                          <UpcomingShiftDashedDivider />
+                          <PressableRow
+                            onPress={() => onPressEntry(entry)}
+                            style={styles.upcomingShiftRow}
+                          >
+                            <View
+                              style={styles.upcomingShiftCopy}
+                              testID={`upcoming-rest-of-day-row-${group.date}`}
+                            >
+                              <MeTypePill chip={restOfDayChip} compact />
+                              <Text
+                                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                style={styles.upcomingShiftArea}
+                              >
+                                Rest of the day
+                              </Text>
+                            </View>
+                          </PressableRow>
+                        </Fragment>
+                      ) : null;
                     })}
                     {group.deletedEntries.map((entry) => (
                       <Fragment key={`${entry.employeeId}:${entry.date}`}>
@@ -3645,10 +3680,15 @@ function TeamShiftMemberRow({
     : isSplitEntry
       ? getSegmentScheduleNotes(entry, segment)
       : scheduleNotesForRow(entry.indicators, tabFocusAreaId);
+  // A worked cell's absence for the rest of the day follows the shift's pill.
+  const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
   const rolePill =
-    roleChip || isMentored ? (
+    roleChip || isMentored || restOfDayChip ? (
       <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
-        <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
+        {roleChip || isMentored ? (
+          <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
+        ) : null}
+        {restOfDayChip ? <JobPill chip={restOfDayChip} compact eyebrowDisplay="outside" /> : null}
       </View>
     ) : null;
 

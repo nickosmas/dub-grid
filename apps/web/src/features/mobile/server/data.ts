@@ -975,6 +975,10 @@ export async function fetchMobileScheduleEntries(
           : [];
       const absenceTypeId = candidateState.kind === "absence" ? candidateState.absenceTypeId : null;
       const absence = absenceTypeId != null ? (absenceMap.get(absenceTypeId) ?? null) : null;
+      const restOfDayAbsenceTypeId =
+        candidateState.kind === "worked" ? (candidateState.absenceTypeId ?? null) : null;
+      const restOfDay =
+        restOfDayAbsenceTypeId != null ? (absenceMap.get(restOfDayAbsenceTypeId) ?? null) : null;
       const primaryAssignmentDetails =
         jobIds.length > 0
           ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
@@ -1053,6 +1057,17 @@ export async function fetchMobileScheduleEntries(
           null,
         shiftTextColor: absence?.textColor ?? primaryAssignmentDetails?.textColor ?? null,
         segments,
+        restOfDayAbsence:
+          restOfDayAbsenceTypeId != null && restOfDay
+            ? {
+                absenceTypeId: restOfDayAbsenceTypeId,
+                label: restOfDay.label,
+                name: restOfDay.name ?? restOfDay.label,
+                color: restOfDay.color ?? null,
+                borderColor: restOfDay.borderColor ?? restOfDay.color ?? null,
+                textColor: restOfDay.textColor ?? null,
+              }
+            : null,
       };
     };
 

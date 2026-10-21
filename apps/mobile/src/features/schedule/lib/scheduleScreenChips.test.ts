@@ -1,6 +1,9 @@
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { describe, expect, it } from "vitest";
+import { mobileColors } from "../../../shared/theme/tokens";
+import { buildWeeklyHoursSummary } from "./schedule";
 import {
+  buildRestOfDayAbsenceChip,
   getScheduleEntrySegmentChange,
   getScheduleSegmentAlignmentKey,
 } from "./scheduleScreenChips";
@@ -185,5 +188,47 @@ describe("getScheduleEntrySegmentChange", () => {
       kind: "modified",
       previousSegment: day,
     });
+  });
+});
+
+describe("buildRestOfDayAbsenceChip", () => {
+  const sick = {
+    absenceTypeId: 8,
+    label: "S",
+    name: "Sick",
+    color: "#FEE2E2",
+    borderColor: "#FCA5A5",
+    textColor: "#991B1B",
+  };
+
+  function mixed(): MobileScheduleEntry {
+    const cell = entry([day], null);
+    return {
+      ...cell,
+      state: { ...cell.state, absenceTypeId: sick.absenceTypeId } as MobileScheduleEntry["state"],
+      presentation: { ...cell.presentation, restOfDayAbsence: sick },
+    };
+  }
+
+  it("is an absence chip in the absence's own colours", () => {
+    expect(buildRestOfDayAbsenceChip(mobileColors, false, mixed())).toMatchObject({
+      kind: "absence",
+      eyebrowLabel: "Absence",
+      label: "Sick",
+      backgroundColor: "#FEE2E2",
+      textColor: "#991B1B",
+    });
+  });
+
+  it("is null for a cell without one", () => {
+    expect(buildRestOfDayAbsenceChip(mobileColors, false, entry([day], null))).toBeNull();
+    expect(buildRestOfDayAbsenceChip(mobileColors, false, null)).toBeNull();
+  });
+
+  it("adds no hours: the week counts only the shift", () => {
+    expect(buildWeeklyHoursSummary([mixed()], 40).scheduledHours).toBe(
+      buildWeeklyHoursSummary([entry([day], null)], 40).scheduledHours,
+    );
+    expect(buildWeeklyHoursSummary([mixed()], 40).scheduledHours).toBeGreaterThan(0);
   });
 });

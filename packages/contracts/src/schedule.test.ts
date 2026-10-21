@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scheduleCellStateSchema } from "./schedule";
+import { resolvedSchedulePresentationSchema, scheduleCellStateSchema } from "./schedule";
 
 const segment = { shiftId: 1, jobId: 10, position: 0 };
 
@@ -32,5 +32,30 @@ describe("scheduleCellStateSchema", () => {
       scheduleCellStateSchema.safeParse({ kind: "deleted", segments: [], absenceTypeId: 7 })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("resolvedSchedulePresentationSchema", () => {
+  const base = { label: "D", startTime: "07:00", endTime: "15:00", segments: [] };
+  const sick = {
+    absenceTypeId: 8,
+    label: "S",
+    name: "Sick",
+    color: "#fee2e2",
+    borderColor: "#fca5a5",
+    textColor: "#991b1b",
+  };
+
+  it("accepts an absence for the rest of the day, none, or a payload from before item 45", () => {
+    expect(
+      resolvedSchedulePresentationSchema.parse({ ...base, restOfDayAbsence: sick }),
+    ).toMatchObject({
+      restOfDayAbsence: sick,
+    });
+    expect(
+      resolvedSchedulePresentationSchema.parse({ ...base, restOfDayAbsence: null })
+        .restOfDayAbsence,
+    ).toBeNull();
+    expect(resolvedSchedulePresentationSchema.parse(base).restOfDayAbsence).toBeUndefined();
   });
 });

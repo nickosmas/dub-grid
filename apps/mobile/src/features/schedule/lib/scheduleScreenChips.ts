@@ -333,6 +333,27 @@ export function buildAbsenceChip(
   };
 }
 
+/**
+ * The chip for a worked cell's absence for the rest of the day (item 45),
+ * shown after its shifts; null when the cell has none.
+ */
+export function buildRestOfDayAbsenceChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  entry:
+    | { presentation?: Pick<MobileScheduleEntry["presentation"], "restOfDayAbsence"> | null }
+    | null
+    | undefined,
+): JobChip | null {
+  const absence = entry?.presentation?.restOfDayAbsence;
+  if (!absence) return null;
+  return buildAbsenceChip(mobileColors, isDark, absence.name || absence.label, {
+    shiftColor: absence.color,
+    shiftBorderColor: absence.borderColor,
+    shiftTextColor: absence.textColor,
+  });
+}
+
 export function hasMentoredSegments(
   segments: ReadonlyArray<{ isMentored?: boolean | null }> | null | undefined,
 ): boolean {
