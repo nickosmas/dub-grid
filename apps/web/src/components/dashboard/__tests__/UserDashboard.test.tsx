@@ -462,7 +462,7 @@ describe("UserDashboard", () => {
         name: "Claim",
       }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Your Week")).toBeInTheDocument();
+    expect(screen.getByText("Your week")).toBeInTheDocument();
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     const todayDateTile = screen.getByTestId("user-dashboard-date-tile-today");
     const weekPills = within(myWeek).getAllByTestId("user-dashboard-week-pills");

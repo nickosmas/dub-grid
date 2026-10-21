@@ -2858,7 +2858,7 @@ function UpcomingShiftsSection({
   return (
     <View style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>Your Week</Text>
+        <Text style={styles.upcomingSectionTitle}>Your week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
             <Text fit="compact" style={styles.upcomingHoursBadgeText}>
@@ -3247,9 +3247,6 @@ function OpenShiftsSection({
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
             label="Claim"
-            leadingAccessory={
-              <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
-            }
             loading={isVolunteerLoading}
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
@@ -3335,14 +3332,8 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
+          icon={isPendingVolunteerRequest ? "hourglass-outline" : undefined}
           label={isPendingVolunteerRequest ? "Pending approval" : "Claim"}
-          leadingAccessory={
-            <Ionicons
-              color={mobileColors.brand}
-              name={isPendingVolunteerRequest ? "hourglass-outline" : "add-circle-outline"}
-              size={18}
-            />
-          }
           loading={isClaimLoading}
           onPress={() => runAction(() => onClaim(item.request.id))}
           tone="secondary"

@@ -547,7 +547,7 @@ describe("ScheduleScreen", () => {
       openShiftCarouselText.indexOf("Nurse"),
     );
 
-    expect(screen.getByText("Your Week")).toBeInTheDocument();
+    expect(screen.getByText("Your week")).toBeInTheDocument();
     expect(screen.getByText("24h this week")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-date-dot-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
@@ -656,7 +656,7 @@ describe("ScheduleScreen", () => {
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
     expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
   });
 
@@ -684,7 +684,7 @@ describe("ScheduleScreen", () => {
     render(<HomeScheduleScreen />);
 
     expect(screen.getByTestId("me-empty-schedule-state")).toBeInTheDocument();
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
     expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Previous shift:/)).toBeNull();
   });

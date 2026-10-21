@@ -184,8 +184,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroBadgeDotScheduled: {
       backgroundColor: "#BFDBFE",
     },
+    // A light neutral like its green and blue siblings: the hero is the same
+    // deep blue in every status, where `textMuted` grey all but disappeared.
     meHeroBadgeDotMuted: {
-      backgroundColor: mobileColors.textMuted,
+      backgroundColor: "#CBD5E1",
     },
     meHeroBadgeText: {
       ...mobileText.label,
@@ -531,8 +533,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textPrimary,
     },
+    // Regular weight so the focus area reads as detail under the bold shift
+    // name rather than as a second heading, as it does on the Requests card.
     upcomingShiftArea: {
-      ...mobileText.rowTitle,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     upcomingShiftTime: {
@@ -582,7 +586,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     scheduleRowMeta: {
-      ...mobileText.rowTitle,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     scheduleRowContext: {
@@ -600,7 +604,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     scheduleRowTimeText: {
-      ...mobileTextWeighted("rowTitle", "medium"),
+      ...mobileText.body,
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },

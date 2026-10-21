@@ -2794,7 +2794,7 @@ function MyWeekSection({
     <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">{isTwoWeekView ? "Your Schedule" : "Your Week"}</div>
+          <div className="dg-card-title">{isTwoWeekView ? "Your schedule" : "Your week"}</div>
           <div className="dg-card-subtitle">
             {hoursLabel ? (
               <span className="dg-tabular-nums">{hoursLabel}</span>

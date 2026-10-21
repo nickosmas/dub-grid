@@ -195,11 +195,11 @@ export function FilterButton({
       fullWidth
       icon="options-outline"
       label="Filter"
-      trailingAccessory={<NumericBadge count={activeCount} tone="onAccent" />}
+      trailingAccessory={<NumericBadge count={activeCount} tone="brand" />}
       onPress={onPress}
       size="sm"
-      // Promotes to a solid brand fill once any filter is on, so an active
-      // filter set is visible without opening the sheet.
+      // Promotes to the brand fill once any filter is on, so an active filter
+      // set is visible without opening the sheet.
       tone={activeCount > 0 ? "primary" : "neutral"}
     />
   );

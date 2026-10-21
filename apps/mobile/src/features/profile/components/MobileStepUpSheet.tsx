@@ -52,7 +52,7 @@ export function MobileStepUpSheet({
           <Button
             disabled={isBusy}
             label="Cancel"
-            tone="secondary"
+            tone="neutral"
             onPress={() => {
               if (!inFlight.current) onCancel();
             }}
