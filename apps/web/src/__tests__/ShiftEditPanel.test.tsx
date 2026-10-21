@@ -1873,16 +1873,62 @@ describe("ShiftEditPanel", () => {
       );
     });
 
-    it("removes the absence with Remove all shifts", async () => {
+    it("removes the shift and the absence together, naming both", async () => {
       const user = userEvent.setup();
       const { onSelect } = renderDay({ currentRestOfDayAbsenceTypeId: 8 });
 
-      await user.click(screen.getByRole("button", { name: "Remove all shifts" }));
+      await user.click(screen.getByRole("button", { name: "Remove shift and absence" }));
       const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent("Sick for the rest of the day");
+      expect(dialog).toHaveTextContent("Remove Shift and Absence?");
+      expect(dialog).toHaveTextContent('the absence "Sick"');
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(null, undefined);
+    });
+
+    it("names two shifts and an absence on the whole-cell remove", async () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      expect(screen.getByRole("button", { name: "Remove shifts and absence" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove all shifts" })).toBeNull();
+    });
+
+    it("calls two shifts without an absence both shifts", async () => {
+      const user = userEvent.setup();
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remove both shifts" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Remove Both Shifts?");
+    });
+
+    it("spells out Remove on each shift and on the absence", () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      const cards = document.querySelectorAll<HTMLElement>("[data-shift-edit-card]");
+      expect(cards).toHaveLength(2);
+      for (const card of cards) {
+        expect(within(card).getByRole("button", { name: /^Remove / })).toHaveTextContent(
+          /^Remove$/,
+        );
+      }
+      const absenceCard = document.querySelector<HTMLElement>("[data-rest-of-day-absence-card]");
+      expect(
+        within(absenceCard!).getByRole("button", { name: "Remove Sick for the rest of the day" }),
+      ).toHaveTextContent(/^Remove$/);
     });
 
     it("names the added absence in the summary and undoes it", async () => {

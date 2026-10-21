@@ -51,7 +51,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
-import { Check, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, Trash2, User } from "lucide-react";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import { buildShiftChangeResolvers, describeCellStateChange } from "@/lib/shift-change-web";
@@ -3112,35 +3112,7 @@ export default function ShiftEditPanel({
                     </MaybeHint>
                   ) : null}
                 </div>
-                {/* Per-pill remove button */}
-                {allowShiftEdits && (
-                  <Button
-                    onClick={() => setPendingDelete({ type: "pill", index: i })}
-                    aria-label={`Remove ${previewLabel}`}
-                    style={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                      width: 22,
-                      height: 22,
-                      borderRadius: 5,
-                      border: "none",
-                      background: "rgba(0,0,0,0.12)",
-                      color: s.text,
-                      fontSize: "var(--dg-fs-body)",
-                      lineHeight: 1,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    ×
-                  </Button>
-                )}
-                {/* Note dots — left side to avoid × button */}
-                {renderNoteDots(pillNoteTypes, "left")}
+                {renderNoteDots(pillNoteTypes)}
               </div>
               {/* Card body: default time, per-pill custom time editor, + indicators */}
               <div
@@ -3255,6 +3227,21 @@ export default function ShiftEditPanel({
                 {renderWorkedUntil(i, { start: defaultStart, end: defaultEnd })}
                 {/* Inline indicators for this shift's focus area */}
                 {renderInlineIndicators(shiftWingId, cardNoteShift)}
+                {allowShiftEdits && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      paddingTop: 8,
+                      borderTop: "1px solid var(--dg-color-border-light)",
+                      display: "flex",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    {renderCardRemoveButton(`Remove ${previewLabel}`, () =>
+                      setPendingDelete({ type: "pill", index: i }),
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -3511,32 +3498,6 @@ export default function ShiftEditPanel({
               {absenceLabel}
             </span>
           </MaybeHint>
-          {allowShiftEdits && (
-            <Button
-              onClick={() => setPendingDelete({ type: "restOfDay" })}
-              aria-label={`Remove ${absenceLabel} for the rest of the day`}
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                width: 22,
-                height: 22,
-                borderRadius: 5,
-                border: "none",
-                background: "rgba(0,0,0,0.12)",
-                color: colors.text,
-                fontSize: "var(--dg-fs-body)",
-                lineHeight: 1,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontFamily: "inherit",
-              }}
-            >
-              ×
-            </Button>
-          )}
         </div>
         <div
           style={{
@@ -3546,11 +3507,20 @@ export default function ShiftEditPanel({
             fontSize: "var(--dg-fs-footnote)",
             color: "var(--dg-color-text-subtle)",
             fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
           }}
         >
           <span className="dg-tabular-nums">
             {from ? `Rest of the day, from ${fmt12h(from)}` : "Rest of the day"}
           </span>
+          {allowShiftEdits &&
+            renderCardRemoveButton(`Remove ${absenceLabel} for the rest of the day`, () =>
+              setPendingDelete({ type: "restOfDay" }),
+            )}
         </div>
       </div>
     );
@@ -3564,6 +3534,48 @@ export default function ShiftEditPanel({
     !hasRestOfDayAbsence &&
     absenceTypes.length > 0 &&
     (!seriesId || seriesScope === "this");
+
+  // Names what the whole-cell remove takes away: "all shifts" read as if it
+  // kept the absence beside them.
+  function removeAllCopy(): { label: string; title: string } {
+    if (isAbsence) return { label: "Remove absence", title: "Remove Absence?" };
+    const many = currentLabels.length > 1;
+    if (hasRestOfDayAbsence) {
+      return many
+        ? { label: "Remove shifts and absence", title: "Remove Shifts and Absence?" }
+        : { label: "Remove shift and absence", title: "Remove Shift and Absence?" };
+    }
+    return many
+      ? { label: "Remove both shifts", title: "Remove Both Shifts?" }
+      : { label: "Remove shift", title: "Remove Shift?" };
+  }
+  const quotedShiftLabels = currentLabels.map((label) => `"${label}"`).join(" and ");
+
+  function renderCardRemoveButton(ariaLabel: string, onClick: () => void) {
+    return (
+      <Button
+        onClick={onClick}
+        aria-label={ariaLabel}
+        className="dg-btn dg-btn-ghost"
+        style={{
+          height: "auto",
+          minHeight: 0,
+          padding: "4px 8px",
+          marginRight: -8,
+          fontSize: "var(--dg-fs-footnote)",
+          fontWeight: 600,
+          color: "var(--dg-color-danger)",
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <Trash2 size={12} strokeWidth={2.5} aria-hidden />
+        Remove
+      </Button>
+    );
+  }
 
   function renderAddButton(label: string, onClick: () => void, spanBoth: boolean) {
     return (
@@ -4199,11 +4211,7 @@ export default function ShiftEditPanel({
                       <path d="M14 11v6" />
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                     </svg>
-                    {isAbsence
-                      ? "Remove absence"
-                      : currentLabels.length > 1 || hasRestOfDayAbsence
-                        ? "Remove all shifts"
-                        : "Remove shift"}
+                    {removeAllCopy().label}
                   </Button>
                 </div>
               )}
@@ -4575,10 +4583,10 @@ export default function ShiftEditPanel({
       {pendingDelete && (
         <ConfirmDialog
           title={
-            isAbsence || pendingDelete.type === "restOfDay"
+            pendingDelete.type === "restOfDay"
               ? "Remove Absence?"
-              : pendingDelete.type === "all" && (currentLabels.length > 1 || hasRestOfDayAbsence)
-                ? "Remove All Shifts?"
+              : pendingDelete.type === "all"
+                ? removeAllCopy().title
                 : "Remove Shift?"
           }
           message={
@@ -4589,9 +4597,9 @@ export default function ShiftEditPanel({
                 : pendingDelete.type === "pill"
                   ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
                   : hasRestOfDayAbsence
-                    ? `Remove all shifts (${currentLabels.join(", ")}) and ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}?`
+                    ? `Remove the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}" from ${modal.empName} on ${formatDate(modal.date)}?`
                     : currentLabels.length > 1
-                      ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
+                      ? `Remove both shifts, ${quotedShiftLabels}, from ${modal.empName} on ${formatDate(modal.date)}?`
                       : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`) +
             (seriesId ? seriesScopeRemovalNote(seriesScope) : "")
           }
