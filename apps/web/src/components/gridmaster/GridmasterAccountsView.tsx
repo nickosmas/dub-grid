@@ -32,6 +32,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
   if (!deactivatedAt) return null;
@@ -412,7 +413,7 @@ export default function GridmasterAccountsView({
                         <MaybeHint
                           content={
                             account.lastSignInAt
-                              ? new Date(account.lastSignInAt).toLocaleString()
+                              ? formatDateTimeLabel(account.lastSignInAt)
                               : "Never"
                           }
                           side="bottom"

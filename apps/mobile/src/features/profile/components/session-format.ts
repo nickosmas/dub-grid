@@ -42,15 +42,21 @@ export function formatSessionLocation(session: MobileProfileSession): string {
 
 /** "Last active" / "First seen" timestamps, in the device's own locale. */
 export function formatSessionTimestamp(value: string): string {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour12: true,
+  });
 }
 
 export function formatSessionLastActive(value: string): string {
   const date = new Date(value);
   const now = new Date();
-  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-    date,
-  );
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
   const startOf = (candidate: Date) =>
     new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate());
   const dayDifference = Math.round((startOf(now).getTime() - startOf(date).getTime()) / 86_400_000);
@@ -63,6 +69,7 @@ export function formatSessionLastActive(value: string): string {
     year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   }).format(date);
 }
 

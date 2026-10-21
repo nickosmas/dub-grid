@@ -13,7 +13,7 @@ import { fetchPublishHistory } from "@/features/schedule/client";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { formatRelativeTime } from "@/lib/utils";
+import { fmt12h, formatRelativeTime } from "@/lib/utils";
 import type {
   NotePublishChange,
   PublishHistoryEntryWithName,
@@ -188,15 +188,18 @@ function resolveLabel(
   return "";
 }
 
-/** Strip seconds from "HH:MM:SS" → "HH:MM" */
+/** "07:00" → "7:00 AM"; a multi-shift "07:00|15:00" reads each part. */
 function fmtTime(t: string): string {
-  const parts = t.split(":");
-  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : t;
+  return t
+    .split("|")
+    .filter(Boolean)
+    .map((part) => fmt12h(part))
+    .join(" / ");
 }
 
 /** Format a time range concisely */
 function fmtTimeRange(start?: string | null, end?: string | null): string {
-  if (start && end) return `${fmtTime(start)}–${fmtTime(end)}`;
+  if (start && end) return `${fmtTime(start)} - ${fmtTime(end)}`;
   if (start) return fmtTime(start);
   if (end) return fmtTime(end);
   return "";

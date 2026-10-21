@@ -53,6 +53,7 @@ import type {
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 type ShiftCellPopoverProps = {
   anchorRef: HTMLElement | null;
@@ -946,7 +947,7 @@ export function RecurringScheduleSection({
                     opacity: 0.75,
                   }}
                 >
-                  Draft saved {new Date(savedDraftTimestamp).toLocaleString()}
+                  Draft saved {formatDateTimeLabel(savedDraftTimestamp)}
                 </span>
               )}
             </div>

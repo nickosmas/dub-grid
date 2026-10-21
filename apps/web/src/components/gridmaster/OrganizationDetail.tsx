@@ -100,6 +100,7 @@ import {
   updateGridmasterSubscription,
 } from "@/features/gridmaster/client";
 import { gmTdStyle } from "@/components/gridmaster/table-styles";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 export type OrganizationDetailTab =
   | "overview"
@@ -365,7 +366,7 @@ export default function OrganizationDetail({
                 label="Last login"
                 value={
                   orgHealthQuery.data.supportSnapshot.lastLoginAt
-                    ? new Date(orgHealthQuery.data.supportSnapshot.lastLoginAt).toLocaleString()
+                    ? formatDateTimeLabel(orgHealthQuery.data.supportSnapshot.lastLoginAt)
                     : "Never"
                 }
               />
@@ -373,9 +374,7 @@ export default function OrganizationDetail({
                 label="Last publish"
                 value={
                   orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt
-                    ? new Date(
-                        orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt,
-                      ).toLocaleString()
+                    ? formatDateTimeLabel(orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt)
                     : "—"
                 }
               />
@@ -383,9 +382,9 @@ export default function OrganizationDetail({
                 label="Settings change"
                 value={
                   orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt
-                    ? new Date(
+                    ? formatDateTimeLabel(
                         orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt,
-                      ).toLocaleString()
+                      )
                     : "—"
                 }
               />

@@ -76,5 +76,6 @@ export function formatDateTimeLabel(value: string | Date): string {
   return date.toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
   });
 }

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash d5e8bdfdb8dec5dc6d0258243a15b2bbfbaad024ebdb8e0579eaec351acc1b03 -->
+<!-- blueprint:source-hash db287e76fe1343e850fb1af0d94b462791e0b35420b520586324e3aa7b2e6b86 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -152,7 +152,7 @@ Item 45 is split; 45a, 45b and 45c have shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20).
 
-Item 46 is split; 46a, 46b and 46c have shipped:
+Item 46 is split; 46a, 46b, 46c and 46g have shipped:
 
 - **46a - Shared change model and formatter:** shipped; one schedule-core
   function turns a cell's original and current state into Before and After sides,
@@ -172,7 +172,7 @@ Item 46 is split; 46a, 46b and 46c have shipped:
 - **46f - Staff visibility setting:** show staff what changed, and show who
   published; hidden on the server as well as on screen; needs a migration
   and the hidden-state decisions.
-- **46g - 12-hour sweep:** any remaining 24-hour time shown to people uses
+- **46g - 12-hour sweep:** shipped; any remaining 24-hour time shown to people uses
   the shared 12-hour format.
 - **46h - Activity log Before and After:** planned; needs the previous
   state recorded at save time (owner decision).

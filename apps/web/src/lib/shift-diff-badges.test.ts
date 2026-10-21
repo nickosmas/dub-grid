@@ -173,7 +173,7 @@ describe("buildShiftDiffDescriptors — mentored flag", () => {
 
     expect(result.pillDiffs[0]?.badge?.text).toBe("Time");
     expect(result.pillDiffs[0]?.badge?.detail).toBe(
-      "Changed custom time 07:00-15:00 to 08:00-16:00. Marked mentored.",
+      "Changed custom time 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM. Marked mentored.",
     );
   });
 

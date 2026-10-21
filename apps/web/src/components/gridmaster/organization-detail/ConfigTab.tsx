@@ -1,4 +1,5 @@
 import { toDarkPillColors } from "@/lib/colors";
+import { fmt12h } from "@/lib/utils";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import {
@@ -192,7 +193,9 @@ export function ConfigTab({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {hasTime ? `${shift.startTime ?? "—"} – ${shift.endTime ?? "—"}` : "—"}
+                        {hasTime
+                          ? `${shift.startTime ? fmt12h(shift.startTime) : "—"} - ${shift.endTime ? fmt12h(shift.endTime) : "—"}`
+                          : "—"}
                       </td>
                       <td
                         style={{

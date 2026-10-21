@@ -100,7 +100,7 @@ function PrintBrandLockup({
 }
 
 function formatPrintedAt(date: Date): string {
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}`;
 }
 
 function getFocusAreaInitials(name: string): string {

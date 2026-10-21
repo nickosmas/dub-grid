@@ -1,4 +1,8 @@
-import { alignSegmentsToBefore, unclaimedBeforeIndices } from "@dubgrid/schedule-core";
+import {
+  alignSegmentsToBefore,
+  formatScheduleTimeValue,
+  unclaimedBeforeIndices,
+} from "@dubgrid/schedule-core";
 
 export type ShiftDiffBorderKind = "new" | "modified" | null;
 
@@ -80,8 +84,9 @@ function hasTimeRange(range: ShiftDiffTimeRange | undefined): boolean {
 function formatTimeRange(range: ShiftDiffTimeRange | undefined): string {
   const start = normalizeTimeValue(range?.start);
   const end = normalizeTimeValue(range?.end);
-  if (start && end) return `${start}-${end}`;
-  return start ?? end ?? "";
+  if (start && end) return `${formatScheduleTimeValue(start)} - ${formatScheduleTimeValue(end)}`;
+  const one = start ?? end;
+  return one ? formatScheduleTimeValue(one) : "";
 }
 
 function normalizeShiftLabelValue(value: string | null | undefined): string | null {

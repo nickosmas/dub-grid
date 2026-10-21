@@ -1225,7 +1225,7 @@ describe("operations reports", () => {
           "End time",
           "Mentoring hours",
         ],
-        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "07:00", "15:00", 8],
+        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "7:00 AM", "3:00 PM", 8],
       },
       {
         report: "coverage",

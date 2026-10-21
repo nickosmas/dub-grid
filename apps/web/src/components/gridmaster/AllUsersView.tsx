@@ -19,6 +19,7 @@ import { gmHeaderStyle, gmTableStyle, gmTdStyle } from "@/components/gridmaster/
 import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPersonView";
 import { StaffWithoutAccountSearch } from "@/components/gridmaster/person/StaffWithoutAccountSearch";
 import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -433,9 +434,7 @@ export default function AllUsersView({
                         }}
                       >
                         <MaybeHint
-                          content={
-                            u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never"
-                          }
+                          content={u.lastSignInAt ? formatDateTimeLabel(u.lastSignInAt) : "Never"}
                           side="bottom"
                         >
                           <span>{formatRelativeDate(u.lastSignInAt)}</span>

@@ -23,6 +23,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 function SecurityCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
@@ -76,7 +77,7 @@ function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString();
+  return formatDateTimeLabel(date);
 }
 
 function formatRelative(value: string | null | undefined): string {
@@ -812,10 +813,8 @@ export default function GridmasterSecurityView({
                             {entry.targetUserId}
                           </td>
                           <td style={gmTdStyle}>{entry.justification || "—"}</td>
-                          <td style={gmTdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
-                          <td style={gmTdStyle}>
-                            {entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}
-                          </td>
+                          <td style={gmTdStyle}>{formatDateTime(entry.createdAt)}</td>
+                          <td style={gmTdStyle}>{formatDateTime(entry.endedAt)}</td>
                         </tr>
                       );
                     })}

@@ -5,7 +5,7 @@ import { deflateSync, inflateSync } from "node:zlib";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ScheduleCellState } from "@dubgrid/contracts";
-import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
+import { formatScheduleTimeRange, formatScheduleTimeValue } from "@dubgrid/schedule-core";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
@@ -1056,8 +1056,8 @@ export function buildOperationsReportPayload(
                 ? "No shift"
                 : (shiftNameById.get(segment.shiftId) ?? "Unknown shift"),
             job: jobById.get(segment.jobId) ?? "Unknown job",
-            startTime: segment.startTime ?? "",
-            endTime: segment.endTime ?? "",
+            startTime: segment.startTime ? formatScheduleTimeValue(segment.startTime) : "",
+            endTime: segment.endTime ? formatScheduleTimeValue(segment.endTime) : "",
             mentoringHours: roundHours(getSegmentDurationHours(segment)),
           },
         ];

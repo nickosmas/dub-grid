@@ -1057,7 +1057,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.textContent).toBe("Edited");
 
     expect(badge?.getAttribute("aria-label")).toContain(
-      "Changed custom time 07:00-15:00 to 08:00-16:00.",
+      "Changed custom time 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
     );
   });
 
@@ -3421,7 +3421,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.top).toBe("0px");
     expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
-    expect(badge?.getAttribute("aria-label")).toContain("Added custom time 08:00-16:00.");
+    expect(badge?.getAttribute("aria-label")).toContain("Added custom time 8:00 AM - 4:00 PM.");
   });
 
   it("shows the meaningful edit badge when a draft adds a second shift alongside other edits", () => {
@@ -3468,7 +3468,7 @@ describe("ScheduleGrid", () => {
 
     expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toContain(
-      "Changed custom time for D 07:00-15:00 to 08:00-16:00.",
+      "Changed custom time for D 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
     );
   });
 

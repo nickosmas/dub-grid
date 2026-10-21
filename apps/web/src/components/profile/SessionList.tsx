@@ -70,9 +70,11 @@ function formatSessionLocation(session: UserSession): string {
 function formatLastActive(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-    date,
-  );
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
   const startOf = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
   const dayDifference = Math.round((startOf(now).getTime() - startOf(date).getTime()) / 86_400_000);
 
@@ -84,6 +86,7 @@ function formatLastActive(dateStr: string): string {
     year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   }).format(date);
 }
 

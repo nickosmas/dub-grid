@@ -255,7 +255,7 @@ export function formatRelativeTime(date: Date | string): string {
 }
 
 function formatRelativeTimeClock(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 export function arraysEqual<T>(a: T[], b: T[]): boolean {

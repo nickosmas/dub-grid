@@ -31,6 +31,7 @@ import { AccessInsignia } from "./AccessInsignia";
 import { StaffPanelFooter } from "./StaffPanelFooter";
 import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
 import { hasSavedScheduleAssignment } from "./capability-state";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -1013,7 +1014,7 @@ export function ManagementStaffPanel({
                           <MaybeHint
                             content={
                               person.lastSignInAt
-                                ? new Date(person.lastSignInAt).toLocaleString()
+                                ? formatDateTimeLabel(person.lastSignInAt)
                                 : undefined
                             }
                             side="bottom"
