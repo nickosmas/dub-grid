@@ -894,3 +894,38 @@
   - [ ] 45e. **Shift requests** - time off on half a double shift keeps the
         absence; swap, pickup and open-shift staffing respect a mixed cell
         instead of discarding it.
+- [ ] 46. **Clear shift-change descriptions** - every shift change reads the
+      same detailed way on web, mobile, alerts and records: Before and After
+      headings, every field that tells the shifts apart (shift, job spelled
+      out, 12-hour times with hours, focus area, absence), compared against
+      the original published shift, whole-day blocks with Shift 1 / Shift 2 /
+      Absence labels for multi-item days, and break lines for split doubles.
+      An organization can hide change details and the publisher's name from
+      staff. Design reference: the "Shift change display" canvas (owner
+      decisions, 2026-10-20 and 2026-10-21).
+  - [x] 46a. **Shared change model and formatter** - one schedule-core
+        function turns a cell's original and current state into Before and
+        After sides (fields, highlights, hours, totals, labels, breaks,
+        Added/Removed, archived names, overnight weekdays), with the
+        original taken from the earliest in-window publish. Tested; no UI.
+  - [ ] 46b. **Web schedule surfaces** - grid chip tooltips, hover card with
+        the day bar, deleted pill, the edit panel's unsaved-changes summary
+        (paired by identity, not position), and Publish History (every
+        segment's times, archived shifts by name).
+  - [ ] 46c. **Web dashboards and records** - the staff dashboard "Was"
+        block (fixing the production path that drops time and focus area),
+        the admin "My schedule" tooltip, the organization activity log
+        (Before and After, names), and the Gridmaster person record.
+  - [ ] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
+        sheet with the day bar, including job and rest-of-day absence.
+        After 45d.
+  - [ ] 46e. **Schedule-change alerts** - one alert per person per publish
+        listing every changed day, a compact push, and an email with Before
+        and After. Needs a migration (the alert is written in the publish
+        function).
+  - [ ] 46f. **Staff visibility setting** - two organization settings: show
+        staff what changed, and show who published. Hidden on the server as
+        well as on screen. Needs a migration and the hidden-state decisions
+        (no mark or a plain "Changed" mark; summary alert or none).
+  - [ ] 46g. **12-hour sweep** - any remaining 24-hour time shown to people
+        (settings, reports, import) uses the shared 12-hour format.

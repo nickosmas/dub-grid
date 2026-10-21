@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 1c82ee55025d1acc1690d565ff715e564129dc7591c004fe577c72d5cb0b2bf7 -->
+<!-- blueprint:source-hash 8eea7a097f5fdee5c3c2ed9d558f70ca840c93be42cfb250bd1ab9b5845b85ec -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress. Item 45 is in progress.
+shipped. Item 40 is in progress. Item 45 is in progress. Item 46 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -80,6 +80,7 @@ shipped. Item 40 is in progress. Item 45 is in progress.
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | In progress | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
+| 46   | In progress | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 
 Item 40 is split:
 
@@ -151,6 +152,36 @@ Item 45 is split; 45a, 45b and 45c have shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20).
 
+Item 46 is split; 46a has shipped:
+
+- **46a - Shared change model and formatter:** shipped; one schedule-core
+  function turns a cell's original and current state into Before and After sides,
+  with the original taken from the earliest in-window publish. Tested; no
+  UI.
+- **46b - Web schedule surfaces:** grid chip tooltips, the hover card with
+  the day bar, the deleted pill, the edit panel's unsaved-changes summary
+  (paired by identity), and Publish History (every segment's times, archived
+  shifts by name).
+- **46c - Web dashboards and records:** the staff dashboard "Was" block
+  (fixing the production path that drops time and focus area), the admin
+  "My schedule" tooltip, the organization activity log and the Gridmaster
+  person record.
+- **46d - Mobile:** Your week "Was" blocks and the "What changed" sheet with
+  the day bar; after 45d.
+- **46e - Schedule-change alerts:** one alert per person per publish listing
+  every changed day, a compact push, and an email; needs a migration.
+- **46f - Staff visibility setting:** show staff what changed, and show who
+  published; hidden on the server as well as on screen; needs a migration
+  and the hidden-state decisions.
+- **46g - 12-hour sweep:** any remaining 24-hour time shown to people uses
+  the shared 12-hour format.
+
+A shift change shows every field that tells the two sides apart (shift, job
+spelled out, 12-hour times with hours, focus area, absence), under Before and
+After headings; the arrow is only for compact spaces such as push. Staff are
+assumed to have seen nothing in between publishes. Design reference: the
+"Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
+
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
 endpoints remain internal.
@@ -163,7 +194,8 @@ endpoints remain internal.
 - `subdomain` (text) - organization routing boundary
 - `name` (text) - customer-facing organization name
 - terminology and configuration fields - organization-specific labels and
-  settings
+  settings, including what staff see after a publish (change details,
+  publisher name; item 46f)
 - `workspace_kind` - the only approved use of the word "workspace" in product
   data
 - has many memberships, employees, schedule records, requests, notifications,
@@ -286,6 +318,8 @@ billing policy with per-organization overrides.
   `organization`; "workspace" is reserved for the literal `workspace_kind`
   field. Customers say "schedule notes"; code keeps `indicator`.
 - Schedule data uses tabular numerals.
+- Times shown to people are 12-hour (`7:00 AM - 3:00 PM`); a shift crossing
+  midnight names both days (`Wed 11:00 PM - Thu 7:00 AM`).
 - Mobile has native primitives and motion while preserving the same product
   hierarchy and accessibility contract as web.
 
