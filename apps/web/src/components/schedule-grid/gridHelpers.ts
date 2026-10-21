@@ -94,8 +94,8 @@ export const GRID_CELL_HEIGHT = `var(${ROW_CELL_HEIGHT_VAR}, var(--dg-grid-cell-
 /** Room a pill keeps above its words for the lower half of a raised change chip. */
 export const RAISED_CHIP_RESERVE = 9;
 
-export interface DoubleShiftCellContent {
-  /** Pills one above the other: all of them when stacked, one when side by side. */
+export interface ShiftCellContent {
+  /** Pills one above the other: all of them when stacked, one when side by side or single. */
   pillsDown: number;
   isNameMode: boolean;
   /** Name mode puts the job on a line of its own; code mode keeps it beside the shift. */
@@ -111,18 +111,18 @@ const PILL_FRAME = "8px";
 const NOTE_STRIP = "14px";
 
 /**
- * Height a double shift's cell needs: each pill as tall as its lines need,
- * from the same type tokens the pill uses, so a row grows only as far as its
- * content does rather than a whole extra row per shift.
+ * Height a shift's cell needs: each pill as tall as its lines and its notes'
+ * row need, from the same type tokens the pill uses, so a row grows only as
+ * far as its content does rather than a whole extra row per shift.
  */
-export function doubleShiftCellHeight({
+export function shiftCellHeight({
   pillsDown,
   isNameMode,
   hasSecondary,
   hasTime,
   hasNotes,
   hasChip,
-}: DoubleShiftCellContent): string {
+}: ShiftCellContent): string {
   const lines = isNameMode
     ? [
         // A name with nothing beneath it may take two lines.
@@ -131,8 +131,8 @@ export function doubleShiftCellHeight({
         hasTime ? "1px + var(--dg-fs-footnote)" : null,
       ]
     : ["var(--dg-fs-title) * 1.2", hasTime ? "1px + var(--dg-fs-footnote)" : null];
-  // A time line or a job line ends with the dots; otherwise they take a strip.
-  const strip = hasNotes && !hasTime && !(isNameMode && hasSecondary) ? NOTE_STRIP : null;
+  // Notes always take a row of their own, never the end of a line.
+  const strip = hasNotes ? NOTE_STRIP : null;
   const pill = [...lines, strip, PILL_FRAME].filter(Boolean).join(" + ");
   // One chip at most rides on a pill: its room above that pill's words, and a
   // wider gap when it sits on a lower pill.
@@ -140,6 +140,20 @@ export function doubleShiftCellHeight({
     ? RAISED_CHIP_RESERVE - 2 + (pillsDown > 1 ? STACKED_SHIFT_CHIP_GAP - STACKED_SHIFT_GAP : 0)
     : 0;
   return `calc(${CELL_INSETS}px + ${pillsDown} * (${pill}) + ${(pillsDown - 1) * STACKED_SHIFT_GAP + chipRoom}px)`;
+}
+
+/**
+ * Whether a single shift's pill outgrows the normal cell: its notes' row
+ * below a second line of text (a time, or a job spelled out) needs more room
+ * than 43px. A one-line pill with notes still fits.
+ */
+export function singleShiftNeedsRoom({
+  isNameMode,
+  hasSecondary,
+  hasTime,
+  hasNotes,
+}: Omit<ShiftCellContent, "pillsDown" | "hasChip">): boolean {
+  return hasNotes && (hasTime || (isNameMode && hasSecondary));
 }
 
 export const BULK_SELECTION_RING_PADDING = 2;

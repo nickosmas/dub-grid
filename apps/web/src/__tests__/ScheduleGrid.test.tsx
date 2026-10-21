@@ -333,10 +333,44 @@ function getGridBody(name: string): HTMLElement {
   return body;
 }
 
+// A fit line's size: its token at the line's fit scale (gridFit.ts).
+const fitSize = (token: string) => `calc(${token} * var(--dg-grid-fit-scale, 1))`;
+const FIT_TITLE = fitSize("var(--dg-fs-title)");
+const FIT_FOOTNOTE = fitSize("var(--dg-fs-footnote)");
+const FIT_MICRO = fitSize("var(--dg-fs-micro)");
+
+// Marks on a pill that are not its text.
+const PILL_MARKS =
+  "[data-mentored-badge], [data-draft-badge], [data-publish-badge], [data-note-dots], [data-request-fold]";
+
+// Every word on a pill sits in a fit line, so it shrinks rather than being cut.
+function expectPillTextToFit(cell: HTMLElement) {
+  const pills = Array.from(cell.querySelectorAll<HTMLElement>("[data-shift-pill]"));
+  expect(pills.length).toBeGreaterThan(0);
+  for (const pill of pills) {
+    const walker = document.createTreeWalker(pill, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const host = node.parentElement as HTMLElement;
+      // The focus-area wing's initials run vertically beside the words.
+      if (!node.textContent?.trim() || host.closest(PILL_MARKS) || host.style.writingMode) {
+        continue;
+      }
+      expect(host.closest("[data-pill-fit]"), node.textContent).not.toBeNull();
+    }
+    for (const el of Array.from(pill.querySelectorAll<HTMLElement>("*"))) {
+      if (el.closest(PILL_MARKS)) continue;
+      expect(el.style.textOverflow).not.toBe("ellipsis");
+      expect(el.getAttribute("style") ?? "").not.toContain("line-clamp");
+    }
+  }
+}
+
 // Note dots sit in the pill's flow, so text has to make room for them.
 function expectNoteDotsInFlow(cell: HTMLElement) {
   for (const dots of cell.querySelectorAll<HTMLElement>("[data-note-dots]")) {
     expect(dots.style.position).toBe("");
+    // A row of their own, never the end of a line of text.
+    expect(dots.dataset.noteDots).toBe("lane");
   }
 }
 
@@ -2115,10 +2149,16 @@ describe("ScheduleGrid", () => {
     expect(dots?.style.right).toBe("2px");
     expect(dots?.style.bottom).toBe("2px");
     expect(lane?.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    // A one-line pill with notes still fits the normal cell.
+    expect(
+      (firstCell.closest('[role="row"]') as HTMLElement).style.getPropertyValue(
+        "--dg-grid-row-cell-height",
+      ),
+    ).toBe("");
     expectNoteDotsInFlow(firstCell);
   });
 
-  it("ends a custom-time line with the notes, since it leaves no strip to spare", () => {
+  it("puts a timed pill's notes on a row of their own and grows the row to fit", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -2128,12 +2168,18 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
-    const line = pill.querySelector<HTMLElement>('[data-note-dots="line"]');
+    const row = firstCell.closest('[role="row"]') as HTMLElement;
+    const content = firstCell.querySelector<HTMLElement>(".dg-grid-cell__content");
 
-    expect(pill.querySelector('[data-note-dots="lane"]')).toBeNull();
-    expect(line?.parentElement?.textContent).toMatch(/–/);
-    expect(line?.parentElement?.style.display).toBe("flex");
+    // The time keeps its line; the dots take the strip below it.
+    expect(pill.querySelector('[data-note-dots="lane"]')?.parentElement).toBe(pill);
+    expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(
+      "1px + var(--dg-fs-footnote) + 14px",
+    );
+    // This cell grows with the row rather than holding the normal height.
+    expect(content?.style.height).toBe("");
     expectNoteDotsInFlow(firstCell);
+    expectPillTextToFit(firstCell);
   });
 
   it("shows two dots and a count on a double shift's pill with more than two notes", () => {
@@ -2281,6 +2327,7 @@ describe("ScheduleGrid", () => {
       expect(absencePill.style.borderRadius).toBe("0 8px 8px 0");
       expect(absencePill.style.marginLeft).toBe("");
       expect(absencePill.parentElement!.style.gap).toBe("0");
+      expectPillTextToFit(firstCell);
     });
 
     it("stacks after two shifts and grows only its row", () => {
@@ -2860,6 +2907,7 @@ describe("ScheduleGrid", () => {
       top: "0px",
       borderRadius: "6px 0 0 6px",
     });
+    expectPillTextToFit(firstCell);
   });
 
   it("keeps the cross-focus wing curved beneath a left-anchored badge", () => {
@@ -4666,15 +4714,19 @@ describe("ScheduleGrid", () => {
     expect(authorPill).not.toBeNull();
     expect(dayLabel.closest('[data-shift-pill="multi"]')).not.toBeNull();
     expect(nightLabel.closest('[data-shift-pill="multi"]')).not.toBeNull();
-    expect(dayLabel.style.display).toBe("-webkit-box");
+    // A long name is a fit line: it shrinks to its pill, and is never
+    // clamped or broken inside a word.
+    expect(dayLabel.hasAttribute("data-pill-fit")).toBe(true);
+    expect(dayLabel.style.display).toBe("block");
     expect(dayLabel.style.textAlign).toBe("center");
-    expect(dayLabel.style.maxWidth).toBe("100%");
-    expect(dayLabel.style.overflowWrap).toBe("break-word");
+    expect(dayLabel.style.width).toBe("100%");
+    expect(dayLabel.style.overflowWrap).toBe("normal");
     expect(dayLabel.style.overflow).toBe("hidden");
     expect(dayLabel.style.lineHeight).toBe("1.2");
-    expect(dayLabel.getAttribute("style")).toContain("-webkit-line-clamp: 1");
-    expect(nightLabel.style.display).toBe("-webkit-box");
-    expect(nightLabel.style.overflowWrap).toBe("break-word");
+    expect(dayLabel.getAttribute("style")).not.toContain("line-clamp");
+    expect(nightLabel.hasAttribute("data-pill-fit")).toBe(true);
+    expect(nightLabel.style.overflowWrap).toBe("normal");
+    expectPillTextToFit(firstCell);
   });
 
   // A pill carrying shift, job and a custom time is three lines of type in a
@@ -4742,20 +4794,51 @@ describe("ScheduleGrid", () => {
     const job = Array.from(pill.querySelectorAll("span")).find(
       (span) => span.textContent === "S",
     ) as HTMLElement;
-    const shift = Array.from(pill.querySelectorAll("span")).find(
-      (span) => span.textContent === "D",
-    ) as HTMLElement;
+    const line = job.closest("[data-pill-fit]") as HTMLElement;
 
     expect(time).toBeTruthy();
     // Code mode: one- or two-character labels share a line, separated by a
-    // middot, so the time gets a line of its own without a row each.
-    expect(shift.parentElement).toBe(job.parentElement);
-    expect(shift.parentElement).toHaveStyle({ flexDirection: "row" });
-    expect(shift.parentElement?.textContent).toBe("D·S");
-    // The smaller job code sits on the shift code's baseline, not its centre.
-    expect(shift.parentElement).toHaveStyle({ alignItems: "baseline" });
+    // middot, so the time gets a line of its own without a row each. The
+    // line shrinks as one, the job code inline on the shift code's baseline.
+    expect(job.parentElement).toBe(line);
+    expect(line.textContent).toBe("D·S");
+    expect(line.style.fontSize).toBe(FIT_TITLE);
+    expect(job.style.fontSize).toBe(FIT_FOOTNOTE);
+    expect(job.style.display).toBe("");
+    expect(time.closest("[data-pill-fit]")).not.toBe(line);
     expect(time.parentElement).toBe(pill);
-    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+    expectPillTextToFit(firstCell);
+  });
+
+  it("shrinks an over-wide time line to its pill instead of cutting it", () => {
+    observedWidth = 1600;
+    // jsdom has no layout: the time line is 100px at full size in 60px of room.
+    const fitScaleOf = (el: Element) =>
+      Number((el as HTMLElement).style.getPropertyValue("--dg-grid-fit-scale") || 1);
+    const natural = vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (
+      this: Element,
+    ) {
+      const isTime = this.hasAttribute("data-pill-fit") && this.textContent?.includes("–");
+      return isTime ? 100 * fitScaleOf(this) : 0;
+    });
+    const room = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(60);
+    try {
+      renderGrid({ getCustomShiftTimes: () => ({ start: "07:30", end: "15:30" }) });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const lines = Array.from(firstCell.querySelectorAll<HTMLElement>("[data-pill-fit]"));
+      const time = lines.find((line) => line.textContent?.includes("–")) as HTMLElement;
+
+      expect(fitScaleOf(time)).toBeCloseTo(0.6);
+      expect(time.style.textOverflow).toBe("");
+      expect(time).toHaveTextContent("7:30–3:30");
+      expect(lines.filter((line) => line !== time).every((line) => fitScaleOf(line) === 1)).toBe(
+        true,
+      );
+    } finally {
+      natural.mockRestore();
+      room.mockRestore();
+    }
   });
 
   it("gives shift, job and custom time a row each in name mode", () => {
@@ -4825,9 +4908,11 @@ describe("ScheduleGrid", () => {
     expect(shift.parentElement).toBe(job.parentElement);
     expect(shift.parentElement).toHaveStyle({ flexDirection: "column" });
     expect(shift.parentElement?.textContent).toBe("DaySupervisor");
-    // Stepped down a size so three rows fit the 52px cell instead of clipping.
-    expect(job).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
-    expect(time).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
+    // Stepped down a size so three rows fit the 52px cell, and each a fit line.
+    expect(job.style.fontSize).toBe(FIT_MICRO);
+    expect(time.style.fontSize).toBe(FIT_MICRO);
+    expect([shift, job, time].every((span) => span.hasAttribute("data-pill-fit"))).toBe(true);
+    expectPillTextToFit(firstCell);
   });
 
   it("keeps shift and job on separate rows in name mode without a custom time", () => {
@@ -4956,13 +5041,10 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement;
 
     // Code mode shares the line whether or not a time follows.
-    expect(job.parentElement).toHaveStyle({ flexDirection: "row" });
-    expect(job.parentElement?.textContent).toBe("D·S");
-    expect(job.parentElement).toHaveStyle({ alignItems: "baseline" });
-    const shift = Array.from(pill.querySelectorAll("span")).find(
-      (span) => span.textContent === "D",
-    ) as HTMLElement;
-    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+    const line = job.parentElement as HTMLElement;
+    expect(line.hasAttribute("data-pill-fit")).toBe(true);
+    expect(line.textContent).toBe("D·S");
+    expect(line.style.fontSize).toBe(FIT_TITLE);
   });
 
   describe("pinned date row", () => {

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { MaybeHint } from "@/components/ui/hint";
 import type { IndicatorType } from "@/types";
 import {
@@ -108,12 +108,12 @@ export function NoteDots({
   marks: ScheduleNoteMark[];
   indicatorTypes: IndicatorType[];
   /**
-   * Where a pill's dots go, always in flow so text makes room for them:
-   * `lane` is a strip along the bottom of a flex-column pill, the dots
-   * right-aligned in it; `line` ends a row of text that has no strip to spare.
-   * `inline` lists an icon per note beside a name, outside the grid.
+   * Where a pill's dots go: `lane` is a row of their own along the bottom of a
+   * flex-column pill, in flow so the words leave room for it, the dots
+   * right-aligned in it; `inline` lists an icon per note beside a name,
+   * outside the grid.
    */
-  placement?: "lane" | "line" | "inline";
+  placement?: "lane" | "inline";
   /** The pill's text colour, which rims a published dot and colours the count. */
   rimColor?: string;
   isDark?: boolean;
@@ -135,14 +135,6 @@ export function NoteDots({
   if (placement !== "inline") {
     const label = marks.map(labelOf).join(", ");
     const { shown, hidden } = splitNoteMarks(marks);
-    const placementStyle: CSSProperties =
-      placement === "lane"
-        ? {
-            alignSelf: "stretch",
-            height: NOTE_LANE_HEIGHT,
-            justifyContent: "flex-end",
-          }
-        : {};
     return (
       <div
         data-note-dots={placement}
@@ -150,7 +142,9 @@ export function NoteDots({
           display: "flex",
           alignItems: "center",
           flexShrink: 0,
-          ...placementStyle,
+          alignSelf: "stretch",
+          height: NOTE_LANE_HEIGHT,
+          justifyContent: "flex-end",
           ...style,
         }}
       >
@@ -219,38 +213,6 @@ export function NoteDots({
           </MaybeHint>
         );
       })}
-    </div>
-  );
-}
-
-/**
- * A line of pill text that ends with the pill's note dots, for a pill whose
- * second line leaves no room for a strip. Without dots the line is unchanged.
- */
-export function NoteDotsLine({
-  dots,
-  style,
-  children,
-}: {
-  dots: ReactNode;
-  style?: CSSProperties;
-  children: ReactNode;
-}) {
-  if (!dots) return <>{children}</>;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
-        maxWidth: "100%",
-        minWidth: 0,
-        ...style,
-      }}
-    >
-      {children}
-      {dots}
     </div>
   );
 }

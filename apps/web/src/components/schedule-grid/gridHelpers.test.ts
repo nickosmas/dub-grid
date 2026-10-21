@@ -4,7 +4,8 @@ import {
   formatPublishedMetadata,
   publishCellLevelBadge,
   publishedAtFormatter,
-  doubleShiftCellHeight,
+  shiftCellHeight,
+  singleShiftNeedsRoom,
   joinedCustomTimes,
   stacksShifts,
 } from "./gridHelpers";
@@ -113,7 +114,7 @@ describe("stacksShifts", () => {
   });
 });
 
-describe("doubleShiftCellHeight", () => {
+describe("shiftCellHeight", () => {
   const base = {
     pillsDown: 2,
     isNameMode: false,
@@ -124,27 +125,60 @@ describe("doubleShiftCellHeight", () => {
   };
 
   it("adds only the lines a double shift shows", () => {
-    expect(doubleShiftCellHeight(base)).toBe(
-      "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 8px) + 4px)",
-    );
-    // The time line ends with the dots, so notes add no strip of their own.
-    expect(doubleShiftCellHeight({ ...base, hasTime: true, hasNotes: true })).toBe(
+    expect(shiftCellHeight(base)).toBe("calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 8px) + 4px)");
+    expect(shiftCellHeight({ ...base, hasTime: true })).toBe(
       "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 1px + var(--dg-fs-footnote) + 8px) + 4px)",
     );
   });
 
-  it("gives an untimed pill's notes a strip and a chip room above the words", () => {
-    expect(doubleShiftCellHeight({ ...base, hasNotes: true })).toContain("+ 14px");
+  it("gives notes a row of their own, even below a time line", () => {
+    expect(shiftCellHeight({ ...base, hasNotes: true })).toContain("+ 14px");
+    expect(shiftCellHeight({ ...base, hasTime: true, hasNotes: true })).toBe(
+      "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 1px + var(--dg-fs-footnote) + 14px + 8px) + 4px)",
+    );
+  });
+
+  it("keeps a chip room above the words", () => {
     // Room above one pill's words, and a wider gap in case it rides the lower pill.
-    expect(doubleShiftCellHeight({ ...base, hasChip: true })).toBe(
+    expect(shiftCellHeight({ ...base, hasChip: true })).toBe(
       "calc(8px + 2 * (var(--dg-fs-title) * 1.2 + 8px) + 17px)",
     );
   });
 
-  it("sizes a side-by-side pair as one pill tall", () => {
-    expect(doubleShiftCellHeight({ ...base, pillsDown: 1 })).toBe(
+  it("sizes a side-by-side pair, or a single pill, as one pill tall", () => {
+    expect(shiftCellHeight({ ...base, pillsDown: 1 })).toBe(
       "calc(8px + 1 * (var(--dg-fs-title) * 1.2 + 8px) + 0px)",
     );
+  });
+
+  it("gives a timed single pill with notes its time line and the notes' row", () => {
+    expect(shiftCellHeight({ ...base, pillsDown: 1, hasTime: true, hasNotes: true })).toBe(
+      "calc(8px + 1 * (var(--dg-fs-title) * 1.2 + 1px + var(--dg-fs-footnote) + 14px + 8px) + 0px)",
+    );
+  });
+
+  it("gives a name-mode pill with a job and notes one name line, the job line and the row", () => {
+    expect(shiftCellHeight({ ...base, pillsDown: 1, isNameMode: true, hasNotes: true })).toBe(
+      "calc(8px + 1 * (var(--dg-fs-caption) * 1.2 * 1 + 1px + var(--dg-fs-footnote) * 1.3 + 14px + 8px) + 0px)",
+    );
+  });
+});
+
+describe("singleShiftNeedsRoom", () => {
+  const single = { isNameMode: false, hasSecondary: false, hasTime: false, hasNotes: false };
+
+  it("grows a pill whose notes' row sits below a second line", () => {
+    expect(singleShiftNeedsRoom({ ...single, hasTime: true, hasNotes: true })).toBe(true);
+    expect(
+      singleShiftNeedsRoom({ ...single, isNameMode: true, hasSecondary: true, hasNotes: true }),
+    ).toBe(true);
+  });
+
+  it("leaves a one-line pill with notes, or two lines without notes, at the normal height", () => {
+    expect(singleShiftNeedsRoom({ ...single, hasNotes: true })).toBe(false);
+    // Code mode keeps the job beside the shift, on the same line.
+    expect(singleShiftNeedsRoom({ ...single, hasSecondary: true, hasNotes: true })).toBe(false);
+    expect(singleShiftNeedsRoom({ ...single, hasTime: true })).toBe(false);
   });
 });
 

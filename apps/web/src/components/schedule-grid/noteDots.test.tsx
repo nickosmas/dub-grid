@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { IndicatorType } from "@/types";
 import { NOTE_DOT_SIZE, NOTE_LANE_HEIGHT, noteMarksWidth } from "./badges";
-import { NoteDots, NoteDotsLine, splitNoteMarks, type ScheduleNoteMark } from "./noteDots";
+import { NoteDots, splitNoteMarks, type ScheduleNoteMark } from "./noteDots";
 
 const indicatorTypes: IndicatorType[] = [
   { id: 1, orgId: "org-1", name: "Float", color: "#ff0000", sortOrder: 1 },
@@ -27,31 +27,6 @@ describe("NoteDots placement", () => {
     expect(container.querySelector("[data-note-mark=published]")).not.toBeNull();
     expect(container.querySelector("[data-note-icon]")).toBeNull();
   });
-
-  it("ends a line of text with the dots, taking no strip", () => {
-    const { container } = render(
-      <NoteDots
-        marks={[{ indicatorTypeId: 1, state: "published" }]}
-        indicatorTypes={indicatorTypes}
-        placement="line"
-      />,
-    );
-    const dots = container.querySelector<HTMLElement>("[data-note-dots]")!;
-    expect(dots.dataset.noteDots).toBe("line");
-    expect(dots.style.position).toBe("");
-    expect(dots.style.height).toBe("");
-    expect(dots.style.flexShrink).toBe("0");
-  });
-
-  it("leaves a line unchanged when it has no dots to end it", () => {
-    const { container } = render(
-      <NoteDotsLine dots={null}>
-        <span>8a–4p</span>
-      </NoteDotsLine>,
-    );
-    expect(container.innerHTML).toBe("<span>8a–4p</span>");
-  });
-
   it("lets inline dots flow with the row where nothing is positioned", () => {
     const { container, getByLabelText } = render(
       <NoteDots

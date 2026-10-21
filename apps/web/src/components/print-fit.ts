@@ -24,10 +24,15 @@ export const PRINT_FIT_MIN_SCALE = 0.3;
 
 const MAX_PASSES = 3;
 
-/** The scale that brings `natural` within `available`, never above 1. */
-export function fitScale(available: number, natural: number, current = 1): number {
+/** The scale that brings `natural` within `available`, never above 1 or below `floor`. */
+export function fitScale(
+  available: number,
+  natural: number,
+  current = 1,
+  floor = PRINT_FIT_MIN_SCALE,
+): number {
   if (natural <= available + 0.5 || natural <= 0) return current;
-  return Math.max(PRINT_FIT_MIN_SCALE, (current * available) / natural);
+  return Math.max(floor, (current * available) / natural);
 }
 
 export function fitPrintText(root: ParentNode): void {

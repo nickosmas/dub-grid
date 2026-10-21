@@ -133,7 +133,8 @@ import {
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
-import { NoteDots, NoteDotsLine, type ScheduleNoteMark } from "./schedule-grid/noteDots";
+import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
+import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import {
   initialGridMount,
   nextGridMount,
@@ -170,7 +171,8 @@ import {
   SIDE_BY_SIDE_SHIFT_GAP,
   STACKED_SHIFT_CHIP_GAP,
   STACKED_SHIFT_GAP,
-  doubleShiftCellHeight,
+  shiftCellHeight,
+  singleShiftNeedsRoom,
   RAISED_CHIP_RESERVE,
   stacksShifts,
 } from "./schedule-grid/gridHelpers";
@@ -1179,6 +1181,22 @@ const SectionBlock = memo(function SectionBlock({
     };
   }, [fitToContainer, weekDates.length]);
 
+  // Pill text shrinks to fit its pill rather than being cut. Every render
+  // refits, so newly mounted rows, a resized day column and new data are
+  // covered; the fonts arriving late is the one change no render follows.
+  useLayoutEffect(() => {
+    if (gridRef.current) fitGridText(gridRef.current);
+  });
+  useEffect(() => {
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled && gridRef.current) fitGridText(gridRef.current);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Everything the sticky group needs beyond CSS is discrete state measured when
   // layout changes, never per scroll frame: the header grid's width, the early
   // release inset, and whether the group is currently stuck (it must layer above
@@ -2072,36 +2090,58 @@ const SectionBlock = memo(function SectionBlock({
               const roleNames = getRoleAbbrs(emp.roleIds, orgRoles, false);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
               // An absence is one pill even when its name holds a "/".
-              // A double shift makes the row as tall as its fullest cell needs.
-              // Read once here; the cells below reuse them by index.
+              // A cell whose content needs more than the normal height (a double
+              // shift, or a pill whose notes' row sits below a second line) makes
+              // the row as tall as its fullest cell needs. Read once here; the
+              // cells below reuse them by index.
               const rowShiftLabels = weekDates.map((date) => shiftForKey(emp.id, date));
               const rowAbsenceTypeIds = weekDates.map(
                 (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
               );
-              const doubleShiftHeights = new Set<string>();
+              const grownCellHeights = new Set<string>();
+              const rowCellGrows = weekDates.map(() => false);
               for (const [index, date] of weekDates.entries()) {
                 if (rowAbsenceTypeIds[index] != null) continue;
                 const labels = rowShiftLabels[index]?.split("/") ?? [];
                 // A rest-of-day absence (item 45) is one more pill, after the shifts.
                 const pillCount =
                   labels.length + (restOfDayAbsenceTypeIdForKey?.(emp.id, date) != null ? 1 : 0);
-                if (pillCount < 2) continue;
+                if (pillCount < 1) continue;
+                const hasTime = !!getCustomShiftTimes?.(emp.id, date);
+                // Most cells hold one shift on one line, which never outgrows the
+                // cell; skip the rest of the lookups for them on every render.
+                if (pillCount === 1 && !hasTime && !isNameMode) continue;
                 const ids = assignmentIdsForKey?.(emp.id, date) ?? [];
-                doubleShiftHeights.add(
-                  doubleShiftCellHeight({
-                    pillsDown: stacksShifts(dayColumnWidth, pillCount, isNameMode) ? pillCount : 1,
-                    isNameMode,
-                    hasSecondary: labels.some(
-                      (label, i) => !!getDisplayPartsByIdOrLabel(label, ids[i]).secondaryLabel,
-                    ),
-                    hasTime: !!getCustomShiftTimes?.(emp.id, date),
-                    hasNotes:
-                      (noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? []).length > 0,
-                    hasChip:
-                      draftKindForKey?.(emp.id, date) != null ||
-                      (!!showPublishDiffOverlay && publishDiffForKey?.(emp.id, date) != null),
-                  }),
-                );
+                const content = {
+                  isNameMode,
+                  hasSecondary: labels.some(
+                    (label, i) => !!getDisplayPartsByIdOrLabel(label, ids[i]).secondaryLabel,
+                  ),
+                  hasTime,
+                  hasNotes:
+                    (noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? []).length > 0,
+                };
+                if (pillCount > 1) {
+                  grownCellHeights.add(
+                    shiftCellHeight({
+                      ...content,
+                      pillsDown: stacksShifts(dayColumnWidth, pillCount, isNameMode)
+                        ? pillCount
+                        : 1,
+                      hasChip:
+                        draftKindForKey?.(emp.id, date) != null ||
+                        (!!showPublishDiffOverlay && publishDiffForKey?.(emp.id, date) != null),
+                    }),
+                  );
+                } else if (singleShiftNeedsRoom(content)) {
+                  // A single pill's chip rides over its edge, so it reserves no room.
+                  grownCellHeights.add(
+                    shiftCellHeight({ ...content, pillsDown: 1, hasChip: false }),
+                  );
+                } else {
+                  continue;
+                }
+                rowCellGrows[index] = true;
               }
 
               return (
@@ -2125,9 +2165,9 @@ const SectionBlock = memo(function SectionBlock({
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
-                    ...(doubleShiftHeights.size > 0
+                    ...(grownCellHeights.size > 0
                       ? {
-                          [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...doubleShiftHeights].join(", ")})`,
+                          [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...grownCellHeights].join(", ")})`,
                         }
                       : null),
                   }}
@@ -2254,11 +2294,6 @@ const SectionBlock = memo(function SectionBlock({
                         restOfDayAbsenceTypeId != null
                           ? restOfDayAbsenceType?.name || restOfDayAbsenceType?.label || "Absence"
                           : null;
-                      const isDoubleShiftCell =
-                        rowAbsenceTypeIds[index] == null &&
-                        (shiftLabel?.split("/").length ?? 0) +
-                          (restOfDayAbsenceTypeId != null ? 1 : 0) >
-                          1;
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
@@ -2547,9 +2582,9 @@ const SectionBlock = memo(function SectionBlock({
                             style={{
                               zIndex: showDiffCellTint ? 4 : undefined,
                               overflow: "visible",
-                              // In a row grown for a double shift, everything
-                              // else keeps the normal height, centred.
-                              ...(isDoubleShiftCell
+                              // In a row grown for one cell's content, every
+                              // other cell keeps the normal height, centred.
+                              ...(rowCellGrows[index]
                                 ? null
                                 : { height: "var(--dg-grid-cell-height)" }),
                             }}
@@ -3061,23 +3096,8 @@ const SectionBlock = memo(function SectionBlock({
                                     const singleDisplayLabel = displayParts.primaryLabel;
                                     const singleIsMentored =
                                       !isAbsence && (cellSegments[0]?.isMentored ?? false);
-                                    // A one-line pill keeps a strip along its bottom for its
-                                    // notes. A second line of text leaves no strip to spare,
-                                    // so that line ends with the dots instead.
+                                    // Notes always take a row of their own, below every line of text.
                                     const singleHasNotes = noteMarks.length > 0;
-                                    const singleNotesEndLine =
-                                      !!customTimes ||
-                                      (showSingleSecondaryLine && !singleInlinesSecondary);
-                                    const singleLineDots =
-                                      singleHasNotes && singleNotesEndLine ? (
-                                        <NoteDots
-                                          marks={noteMarks}
-                                          indicatorTypes={indicatorTypes}
-                                          rimColor={singleForegroundColor}
-                                          isDark={isDarkTheme}
-                                          placement="line"
-                                        />
-                                      ) : null;
                                     const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
                                     return (
                                       <>
@@ -3220,60 +3240,38 @@ const SectionBlock = memo(function SectionBlock({
                                             <div
                                               style={{
                                                 display: "flex",
-                                                flexDirection: singleInlinesSecondary
-                                                  ? "row"
-                                                  : "column",
-                                                // Inline, the job code sits on the shift code's
-                                                // baseline rather than floating at its optical
-                                                // centre, which reads as one label instead of two.
-                                                alignItems: singleInlinesSecondary
-                                                  ? "baseline"
-                                                  : "center",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                alignSelf: "stretch",
                                                 justifyContent: "center",
-                                                flexWrap: "nowrap",
-                                                gap: singleInlinesSecondary
-                                                  ? 2
-                                                  : showSingleSecondaryLine
+                                                gap:
+                                                  showSingleSecondaryLine && !singleInlinesSecondary
                                                     ? 1
                                                     : 0,
-                                                maxWidth: "100%",
                                                 minWidth: 0,
                                                 overflow: "hidden",
                                               }}
                                             >
                                               <span
-                                                style={
-                                                  isNameMode
-                                                    ? {
-                                                        fontSize: "var(--dg-fs-caption)",
-                                                        fontWeight: 600,
-                                                        lineHeight: singleIsThreeRow ? 1.15 : 1.2,
-                                                        textAlign: "center" as const,
-                                                        maxWidth: "100%",
-                                                        overflowWrap: "break-word" as const,
-                                                        display: "-webkit-box",
-                                                        WebkitBoxOrient: "vertical" as const,
-                                                        // Notes take the strip a second
-                                                        // line would have used.
-                                                        WebkitLineClamp:
-                                                          showSingleSecondaryLine ||
-                                                          customTimes ||
-                                                          singleHasNotes
-                                                            ? 1
-                                                            : 2,
-                                                        overflow: "hidden",
-                                                      }
-                                                    : {
-                                                        fontSize: "var(--dg-fs-title)",
-                                                        fontWeight: 600,
-                                                        lineHeight: 1.2,
-                                                        whiteSpace: "nowrap",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%",
-                                                        minWidth: 0,
-                                                      }
-                                                }
+                                                data-pill-fit=""
+                                                style={{
+                                                  ...gridFitLine(
+                                                    isNameMode
+                                                      ? "var(--dg-fs-caption)"
+                                                      : "var(--dg-fs-title)",
+                                                    // A name alone in its pill may take two lines.
+                                                    {
+                                                      wrap:
+                                                        isNameMode &&
+                                                        !showSingleSecondaryLine &&
+                                                        !customTimes &&
+                                                        !singleHasNotes,
+                                                    },
+                                                  ),
+                                                  fontWeight: 600,
+                                                  lineHeight:
+                                                    isNameMode && singleIsThreeRow ? 1.15 : 1.2,
+                                                }}
                                               >
                                                 {singleDisplayLabel}
                                                 {!customTimes && isOvernight && (
@@ -3288,94 +3286,92 @@ const SectionBlock = memo(function SectionBlock({
                                                     +1
                                                   </sup>
                                                 )}
+                                                {singleInlinesSecondary && (
+                                                  <>
+                                                    <span
+                                                      aria-hidden="true"
+                                                      style={{
+                                                        fontSize:
+                                                          gridFitSize("var(--dg-fs-footnote)"),
+                                                        fontWeight: 700,
+                                                        opacity: 0.5,
+                                                        margin: "0 2px",
+                                                      }}
+                                                    >
+                                                      ·
+                                                    </span>
+                                                    <span
+                                                      style={{
+                                                        fontSize:
+                                                          gridFitSize("var(--dg-fs-footnote)"),
+                                                        fontWeight: 700,
+                                                        color:
+                                                          "color-mix(in srgb, currentColor 78%, transparent)",
+                                                      }}
+                                                    >
+                                                      {displayParts.secondaryLabel}
+                                                    </span>
+                                                  </>
+                                                )}
                                               </span>
-                                              {singleInlinesSecondary && (
+                                              {showSingleSecondaryLine &&
+                                              !singleInlinesSecondary ? (
                                                 <span
-                                                  aria-hidden="true"
+                                                  data-pill-fit=""
                                                   style={{
-                                                    fontSize: "var(--dg-fs-footnote)",
-                                                    fontWeight: 700,
-                                                    lineHeight: 1.3,
-                                                    opacity: 0.5,
-                                                    flexShrink: 0,
-                                                  }}
-                                                >
-                                                  ·
-                                                </span>
-                                              )}
-                                              {showSingleSecondaryLine ? (
-                                                <NoteDotsLine
-                                                  dots={
-                                                    !customTimes && !singleInlinesSecondary
-                                                      ? singleLineDots
-                                                      : null
-                                                  }
-                                                >
-                                                  <span
-                                                    style={{
-                                                      fontSize: singleIsThreeRow
+                                                    ...gridFitLine(
+                                                      singleIsThreeRow
                                                         ? "var(--dg-fs-micro)"
                                                         : "var(--dg-fs-footnote)",
-                                                      fontWeight: 700,
-                                                      lineHeight: singleIsThreeRow ? 1.2 : 1.3,
-                                                      opacity: 0.78,
-                                                      whiteSpace: "nowrap",
-                                                      overflow: "hidden",
-                                                      textOverflow: "ellipsis",
-                                                      maxWidth: "100%",
-                                                      minWidth: 0,
-                                                    }}
-                                                  >
-                                                    {displayParts.secondaryLabel}
-                                                  </span>
-                                                </NoteDotsLine>
+                                                    ),
+                                                    fontWeight: 700,
+                                                    lineHeight: singleIsThreeRow ? 1.2 : 1.3,
+                                                    opacity: 0.78,
+                                                  }}
+                                                >
+                                                  {displayParts.secondaryLabel}
+                                                </span>
                                               ) : null}
                                             </div>
                                             {customTimes && (
-                                              <NoteDotsLine
-                                                dots={singleLineDots}
-                                                style={{ marginTop: singleTimeMarginTop }}
-                                              >
-                                                <span
-                                                  style={{
-                                                    fontSize: singleIsThreeRow
+                                              <span
+                                                data-pill-fit=""
+                                                style={{
+                                                  ...gridFitLine(
+                                                    singleIsThreeRow
                                                       ? "var(--dg-fs-micro)"
                                                       : "var(--dg-fs-footnote)",
-                                                    fontWeight: 500,
-                                                    lineHeight: 1,
-                                                    marginTop: singleLineDots
-                                                      ? 0
-                                                      : singleTimeMarginTop,
-                                                    opacity: 0.7,
-                                                    letterSpacing: "0.02em",
-                                                  }}
-                                                >
-                                                  {fmt12hShort(customTimes.start)}–
-                                                  {fmt12hShort(customTimes.end)}
-                                                  {isOvernight && (
-                                                    <sup
-                                                      style={{
-                                                        fontSize: "0.7em",
-                                                        fontWeight: 700,
-                                                        marginLeft: 1,
-                                                        opacity: 1,
-                                                      }}
-                                                    >
-                                                      +1
-                                                    </sup>
-                                                  )}
-                                                </span>
-                                              </NoteDotsLine>
+                                                  ),
+                                                  fontWeight: 500,
+                                                  lineHeight: 1,
+                                                  marginTop: singleTimeMarginTop,
+                                                  opacity: 0.7,
+                                                  letterSpacing: "0.02em",
+                                                }}
+                                              >
+                                                {fmt12hShort(customTimes.start)}–
+                                                {fmt12hShort(customTimes.end)}
+                                                {isOvernight && (
+                                                  <sup
+                                                    style={{
+                                                      fontSize: "0.7em",
+                                                      fontWeight: 700,
+                                                      marginLeft: 1,
+                                                      opacity: 1,
+                                                    }}
+                                                  >
+                                                    +1
+                                                  </sup>
+                                                )}
+                                              </span>
                                             )}
-                                            {!singleNotesEndLine && (
-                                              <NoteDots
-                                                marks={noteMarks}
-                                                indicatorTypes={indicatorTypes}
-                                                rimColor={singleForegroundColor}
-                                                isDark={isDarkTheme}
-                                                corner
-                                              />
-                                            )}
+                                            <NoteDots
+                                              marks={noteMarks}
+                                              indicatorTypes={indicatorTypes}
+                                              rimColor={singleForegroundColor}
+                                              isDark={isDarkTheme}
+                                              corner
+                                            />
                                             {(draftBadge || publishBadge) && (
                                               <GridDiffBadge
                                                 badge={{
@@ -3396,7 +3392,7 @@ const SectionBlock = memo(function SectionBlock({
                                             // The name shares the pill's bottom row with a
                                             // note strip, so it stops short of the dots.
                                             rightInset={
-                                              singleHasNotes && !singleNotesEndLine
+                                              singleHasNotes
                                                 ? singleSideInset +
                                                   1 +
                                                   NOTE_LANE_INSET +
@@ -3750,19 +3746,6 @@ const SectionBlock = memo(function SectionBlock({
                                                   ? noteMarks
                                                   : [];
                                               const pillHasNotes = pillNoteMarks.length > 0;
-                                              const pillNotesEndLine =
-                                                !!hasTime ||
-                                                (showMultiSecondaryLine && !multiInlinesSecondary);
-                                              const pillLineDots =
-                                                pillHasNotes && pillNotesEndLine ? (
-                                                  <NoteDots
-                                                    marks={pillNoteMarks}
-                                                    indicatorTypes={indicatorTypes}
-                                                    rimColor={multiForegroundColor}
-                                                    isDark={isDarkTheme}
-                                                    placement="line"
-                                                  />
-                                                ) : null;
 
                                               return (
                                                 <div
@@ -3884,17 +3867,13 @@ const SectionBlock = memo(function SectionBlock({
                                                   <div
                                                     style={{
                                                       display: "flex",
-                                                      flexDirection: multiInlinesSecondary
-                                                        ? "row"
-                                                        : "column",
-                                                      alignItems: multiInlinesSecondary
-                                                        ? "baseline"
-                                                        : "center",
+                                                      flexDirection: "column",
+                                                      alignItems: "center",
+                                                      alignSelf: "stretch",
                                                       justifyContent: "center",
-                                                      flexWrap: "nowrap",
-                                                      gap: multiInlinesSecondary
-                                                        ? 2
-                                                        : showMultiSecondaryLine
+                                                      gap:
+                                                        showMultiSecondaryLine &&
+                                                        !multiInlinesSecondary
                                                           ? 1
                                                           : 0,
                                                       // The first line shares the corner's height,
@@ -3912,37 +3891,28 @@ const SectionBlock = memo(function SectionBlock({
                                                               multiSidePadding,
                                                           }
                                                         : null),
-                                                      maxWidth: "100%",
                                                       minWidth: 0,
                                                       overflow: "hidden",
                                                     }}
                                                   >
                                                     <span
-                                                      style={
-                                                        isNameMode
-                                                          ? {
-                                                              textAlign: "center" as const,
-                                                              maxWidth: "100%",
-                                                              overflowWrap: "break-word" as const,
-                                                              display: "-webkit-box",
-                                                              WebkitBoxOrient: "vertical" as const,
-                                                              WebkitLineClamp:
-                                                                showMultiSecondaryLine ||
-                                                                hasTime ||
-                                                                pillHasNotes
-                                                                  ? 1
-                                                                  : 2,
-                                                              overflow: "hidden",
-                                                              lineHeight: 1.2,
-                                                            }
-                                                          : {
-                                                              whiteSpace: "nowrap",
-                                                              overflow: "hidden",
-                                                              textOverflow: "ellipsis",
-                                                              maxWidth: "100%",
-                                                              minWidth: 0,
-                                                            }
-                                                      }
+                                                      data-pill-fit=""
+                                                      style={{
+                                                        ...gridFitLine(
+                                                          isNameMode
+                                                            ? "var(--dg-fs-caption)"
+                                                            : "var(--dg-fs-title)",
+                                                          // A name alone in its pill may take two lines.
+                                                          {
+                                                            wrap:
+                                                              isNameMode &&
+                                                              !showMultiSecondaryLine &&
+                                                              !hasTime &&
+                                                              !pillHasNotes,
+                                                          },
+                                                        ),
+                                                        lineHeight: 1.2,
+                                                      }}
                                                     >
                                                       {multiDisplayLabel}
                                                       {!hasTime && isPillOvernight && (
@@ -3957,92 +3927,97 @@ const SectionBlock = memo(function SectionBlock({
                                                           +1
                                                         </sup>
                                                       )}
+                                                      {multiInlinesSecondary && (
+                                                        <>
+                                                          <span
+                                                            aria-hidden="true"
+                                                            style={{
+                                                              fontSize:
+                                                                gridFitSize(
+                                                                  "var(--dg-fs-footnote)",
+                                                                ),
+                                                              fontWeight: 700,
+                                                              opacity: 0.5,
+                                                              margin: "0 2px",
+                                                            }}
+                                                          >
+                                                            ·
+                                                          </span>
+                                                          <span
+                                                            style={{
+                                                              fontSize:
+                                                                gridFitSize(
+                                                                  "var(--dg-fs-footnote)",
+                                                                ),
+                                                              fontWeight: 700,
+                                                              color:
+                                                                "color-mix(in srgb, currentColor 78%, transparent)",
+                                                            }}
+                                                          >
+                                                            {displayParts.secondaryLabel}
+                                                          </span>
+                                                        </>
+                                                      )}
                                                     </span>
-                                                    {multiInlinesSecondary && (
+                                                    {showMultiSecondaryLine &&
+                                                    !multiInlinesSecondary ? (
                                                       <span
-                                                        aria-hidden="true"
+                                                        data-pill-fit=""
                                                         style={{
-                                                          fontSize: "var(--dg-fs-footnote)",
-                                                          fontWeight: 700,
-                                                          opacity: 0.5,
-                                                          lineHeight: 1.3,
-                                                          flexShrink: 0,
-                                                        }}
-                                                      >
-                                                        ·
-                                                      </span>
-                                                    )}
-                                                    {showMultiSecondaryLine ? (
-                                                      <NoteDotsLine
-                                                        dots={
-                                                          !hasTime && !multiInlinesSecondary
-                                                            ? pillLineDots
-                                                            : null
-                                                        }
-                                                      >
-                                                        <span
-                                                          style={{
-                                                            fontSize: multiIsThreeRow
+                                                          ...gridFitLine(
+                                                            multiIsThreeRow
                                                               ? "var(--dg-fs-micro)"
                                                               : "var(--dg-fs-footnote)",
-                                                            fontWeight: 700,
-                                                            opacity: 0.78,
-                                                            lineHeight: multiIsThreeRow ? 1.2 : 1.3,
-                                                            whiteSpace: "nowrap",
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis",
-                                                            maxWidth: "100%",
-                                                            minWidth: 0,
-                                                          }}
-                                                        >
-                                                          {displayParts.secondaryLabel}
-                                                        </span>
-                                                      </NoteDotsLine>
+                                                          ),
+                                                          fontWeight: 700,
+                                                          opacity: 0.78,
+                                                          // A split shift is half the width but the
+                                                          // full cell height, so three rows fit on
+                                                          // the same budget as the single pill.
+                                                          lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                        }}
+                                                      >
+                                                        {displayParts.secondaryLabel}
+                                                      </span>
                                                     ) : null}
                                                   </div>
                                                   {hasTime && (
-                                                    <NoteDotsLine dots={pillLineDots}>
-                                                      <span
-                                                        style={{
-                                                          fontSize: multiIsThreeRow
+                                                    <span
+                                                      data-pill-fit=""
+                                                      style={{
+                                                        ...gridFitLine(
+                                                          multiIsThreeRow
                                                             ? "var(--dg-fs-micro)"
                                                             : "var(--dg-fs-footnote)",
-                                                          fontWeight: 500,
-                                                          opacity: 0.7,
-                                                          lineHeight: 1,
-                                                          whiteSpace: "nowrap",
-                                                          overflow: "hidden",
-                                                          textOverflow: "ellipsis",
-                                                          maxWidth: "100%",
-                                                          minWidth: 0,
-                                                        }}
-                                                      >
-                                                        {fmt12hShort(pillTime!.start)}–
-                                                        {fmt12hShort(pillTime!.end)}
-                                                        {isPillOvernight && (
-                                                          <sup
-                                                            style={{
-                                                              fontSize: "0.65em",
-                                                              fontWeight: 700,
-                                                              marginLeft: 1,
-                                                              opacity: 1,
-                                                            }}
-                                                          >
-                                                            +1
-                                                          </sup>
-                                                        )}
-                                                      </span>
-                                                    </NoteDotsLine>
+                                                        ),
+                                                        fontWeight: 500,
+                                                        opacity: 0.7,
+                                                        lineHeight: 1,
+                                                      }}
+                                                    >
+                                                      {fmt12hShort(pillTime!.start)}–
+                                                      {fmt12hShort(pillTime!.end)}
+                                                      {isPillOvernight && (
+                                                        <sup
+                                                          style={{
+                                                            fontSize: "0.65em",
+                                                            fontWeight: 700,
+                                                            marginLeft: 1,
+                                                            opacity: 1,
+                                                          }}
+                                                        >
+                                                          +1
+                                                        </sup>
+                                                      )}
+                                                    </span>
                                                   )}
-                                                  {!pillNotesEndLine && (
-                                                    <NoteDots
-                                                      marks={pillNoteMarks}
-                                                      indicatorTypes={indicatorTypes}
-                                                      rimColor={multiForegroundColor}
-                                                      isDark={isDarkTheme}
-                                                      corner
-                                                    />
-                                                  )}
+                                                  <NoteDots
+                                                    marks={pillNoteMarks}
+                                                    indicatorTypes={indicatorTypes}
+                                                    rimColor={multiForegroundColor}
+                                                    isDark={isDarkTheme}
+                                                    corner
+                                                  />
                                                 </div>
                                               );
                                             })}
@@ -4149,28 +4124,23 @@ const SectionBlock = memo(function SectionBlock({
                                                       />
                                                     )}
                                                     <span
-                                                      style={{
-                                                        whiteSpace: "nowrap",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%",
-                                                        minWidth: 0,
-                                                      }}
+                                                      data-pill-fit=""
+                                                      style={gridFitLine(
+                                                        isNameMode
+                                                          ? "var(--dg-fs-caption)"
+                                                          : "var(--dg-fs-title)",
+                                                      )}
                                                     >
                                                       {absenceLabel}
                                                     </span>
                                                     {lastShiftTime?.end && (
                                                       <span
+                                                        data-pill-fit=""
                                                         style={{
-                                                          fontSize: "var(--dg-fs-footnote)",
+                                                          ...gridFitLine("var(--dg-fs-footnote)"),
                                                           fontWeight: 500,
                                                           opacity: 0.7,
                                                           lineHeight: 1,
-                                                          whiteSpace: "nowrap",
-                                                          overflow: "hidden",
-                                                          textOverflow: "ellipsis",
-                                                          maxWidth: "100%",
-                                                          minWidth: 0,
                                                         }}
                                                       >
                                                         from {fmt12hShort(lastShiftTime.end)}
@@ -4368,8 +4338,9 @@ const SectionBlock = memo(function SectionBlock({
                                       />
                                     )}
                                     <span
+                                      data-pill-fit=""
                                       style={{
-                                        fontSize: "var(--dg-fs-title)",
+                                        ...gridFitLine("var(--dg-fs-title)"),
                                         fontWeight: 600,
                                         lineHeight: 1,
                                       }}
@@ -4440,7 +4411,14 @@ const SectionBlock = memo(function SectionBlock({
                                 );
                               })()
                             ) : (
-                              <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: 2,
+                                }}
+                              >
                                 {shiftLabel === "OFF" && (
                                   <span
                                     style={{
@@ -4458,10 +4436,9 @@ const SectionBlock = memo(function SectionBlock({
                                   marks={noteMarks}
                                   indicatorTypes={indicatorTypes}
                                   isDark={isDarkTheme}
-                                  placement="line"
-                                  style={{ marginLeft: shiftLabel === "OFF" ? 4 : 0 }}
+                                  style={{ alignSelf: "stretch", justifyContent: "center" }}
                                 />
-                              </>
+                              </div>
                             )}
                             {cellEditor && (
                               <MaybeHint
