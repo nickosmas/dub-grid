@@ -385,6 +385,23 @@ export function hasPublishedScheduleContent(row: PublishedShiftRow): boolean {
   return (row.resolvedAssignmentIds?.length ?? 0) > 0 || row.published_absence_type_id != null;
 }
 
+/**
+ * One line for a published cell where a surface writes a single string (CSV,
+ * a calendar summary): the worked label, then its absence for the rest of
+ * the day (item 45), as "D/E / Sick". An absence type the map lacks adds
+ * nothing.
+ */
+export function publishedCellText(
+  entry: Pick<PublishedScheduleEntry, "kind" | "label" | "restOfDayAbsenceTypeId">,
+  absenceTypeById: Map<number, string>,
+): string {
+  const restOfDay =
+    entry.kind === "shift" && entry.restOfDayAbsenceTypeId != null
+      ? absenceTypeById.get(entry.restOfDayAbsenceTypeId)
+      : undefined;
+  return restOfDay ? `${entry.label} / ${restOfDay}` : entry.label;
+}
+
 export function resolvePublishedScheduleEntry(
   row: PublishedShiftRow,
   assignmentById: Map<number, PublishedAssignmentDefinition>,

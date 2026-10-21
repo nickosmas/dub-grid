@@ -28,6 +28,14 @@ function escapeCSVField(value: string): string {
 }
 
 /**
+ * A cell's text with its absence for the rest of the day after the shifts
+ * (item 45), as "Day / Sick"; unchanged without one.
+ */
+export function withRestOfDayAbsence(text: string, absenceLabel: string | undefined): string {
+  return absenceLabel ? `${text} / ${absenceLabel}` : text;
+}
+
+/**
  * Exports the schedule as a CSV file. Rows = employees, columns = dates.
  * Each cell contains the shift code label(s) or absence type label.
  */

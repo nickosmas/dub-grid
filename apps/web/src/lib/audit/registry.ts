@@ -157,6 +157,9 @@ function describeScheduleCell(d: AuditDetails): string | null {
     segments.length > 1 ? `Working, ${pluralize(segments.length, "assignment")}` : "Working",
   );
   if (start && end) parts.push(`${formatClockTime(start)} – ${formatClockTime(end)}`);
+  // A worked cell's absence type is its absence for the rest of the day (item 45).
+  if (typeof input.absenceTypeId === "number")
+    parts.push("then an absence for the rest of the day");
   return parts.join(", ");
 }
 

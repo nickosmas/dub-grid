@@ -21,6 +21,11 @@ vi.mock("@/lib/feature-flags", () => ({
   isFeatureEnabled: (...args: unknown[]) => isFeatureEnabled(...args),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
+const fetchPublishedShiftRows = vi.fn();
+vi.mock("@/lib/published-shifts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/published-shifts")>()),
+  fetchPublishedShiftRows: (...args: unknown[]) => fetchPublishedShiftRows(...args),
+}));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 
 const REQUESTED_ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -34,7 +39,11 @@ function makeRequest(orgId: string) {
 }
 
 function createServiceClientMock(
-  tables: { employees?: Array<Record<string, unknown>>; internalIds?: string[] } = {},
+  tables: {
+    employees?: Array<Record<string, unknown>>;
+    internalIds?: string[];
+    absenceTypes?: Array<Record<string, unknown>>;
+  } = {},
 ) {
   const orgIdFilters: string[] = [];
   const auditInsert = vi.fn().mockResolvedValue({ error: null });
@@ -50,7 +59,9 @@ function createServiceClientMock(
           ? (tables.employees ?? [])
           : table === "profiles"
             ? (tables.internalIds ?? []).map((id) => ({ id }))
-            : [];
+            : table === "absence_types"
+              ? (tables.absenceTypes ?? [])
+              : [];
       const query = {
         select() {
           return query;
@@ -173,6 +184,52 @@ describe("GET /api/export", () => {
         canViewSchedule: true,
       }),
     ).toBe(false);
+  });
+
+  it("writes a shift with an absence for the rest of the day as one cell, absence last", async () => {
+    const { serviceClient } = createServiceClientMock({
+      employees: [{ id: "e1", first_name: "Rosa", last_name: "Member", user_id: null }],
+      absenceTypes: [{ id: 4, label: "Sick" }],
+    });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
+    fetchPublishedShiftRows.mockResolvedValue([
+      {
+        emp_id: "e1",
+        date: "2026-05-04",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [
+          { shiftId: 1, jobId: 2, label: "D", startTime: "07:00", endTime: "15:00" },
+        ],
+        published_absence_type_id: null,
+        published_rest_of_day_absence_type_id: 4,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+      {
+        emp_id: "e1",
+        date: "2026-05-05",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [],
+        published_absence_type_id: 4,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+    ]);
+    const url = new URL("http://localhost/api/export");
+    url.searchParams.set("type", "schedule");
+    url.searchParams.set("orgId", REQUESTED_ORG_ID);
+    url.searchParams.set("startDate", "2026-05-04");
+    url.searchParams.set("endDate", "2026-05-05");
+    const { GET } = await import("./route");
+
+    const csv = await (await GET(new NextRequest(url))).text();
+
+    expect(csv).toContain("Rosa Member,D / Sick,Sick");
   });
 
   it("refuses a schedule range that is not a calendar date", async () => {

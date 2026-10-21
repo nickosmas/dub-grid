@@ -66,6 +66,25 @@ function formatRequestIndicator(request: ShiftRow["requestIndicators"][number]) 
   return `${formatShiftRequestTypeLabel(request.type)} request - ${formatShiftRequestStatusLabel(request.status).toLowerCase()} (${relation})`;
 }
 
+/** An absence: the whole day's, or a worked cell's for the rest of the day after its shifts. */
+function AbsenceChip({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "1px 6px",
+        borderRadius: "var(--dg-radius-xs)",
+        fontSize: "var(--dg-fs-caption)",
+        fontWeight: 700,
+        background: "var(--dg-color-warning-bg)",
+        color: "var(--dg-color-warning)",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function ReadOnlyScheduleView({
   orgId,
   payPeriodStartDate,
@@ -238,21 +257,10 @@ export default function ReadOnlyScheduleView({
                                 </span>
                               </MaybeHint>
                             ))}
+                            {r.absenceLabel && <AbsenceChip label={r.absenceLabel} />}
                           </span>
                         ) : r.absenceLabel ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "1px 6px",
-                              borderRadius: "var(--dg-radius-xs)",
-                              fontSize: "var(--dg-fs-caption)",
-                              fontWeight: 700,
-                              background: "var(--dg-color-warning-bg)",
-                              color: "var(--dg-color-warning)",
-                            }}
-                          >
-                            {r.absenceLabel}
-                          </span>
+                          <AbsenceChip label={r.absenceLabel} />
                         ) : (
                           <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
                         )}

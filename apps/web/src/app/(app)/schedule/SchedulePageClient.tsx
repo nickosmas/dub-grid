@@ -155,7 +155,7 @@ import {
   computeOutOfWindowDraftGroups,
   countShiftsAddedToPublishedCell,
 } from "@/lib/draft-utils";
-import { exportScheduleCSV } from "@/lib/export-csv";
+import { exportScheduleCSV, withRestOfDayAbsence } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
 import {
@@ -2966,6 +2966,25 @@ function SchedulerContent({
       return entry.label ?? null;
     },
     [absenceTypeMap, assignmentLabelMap, assignments, jobs, shiftCategories, shifts],
+  );
+
+  // The CSV cell adds a worked cell's absence for the rest of the day (item
+  // 45), from the same published-or-current side shiftNameForKey reads.
+  const scheduleCsvTextForKey = useCallback(
+    (empId: string, date: Date): string | null => {
+      const text = shiftNameForKey(empId, date);
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!text || !entry) return text;
+      const restOfDayAbsenceTypeId =
+        (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0
+          ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
+          : (entry.restOfDayAbsenceTypeId ?? null);
+      return withRestOfDayAbsence(
+        text,
+        restOfDayAbsenceTypeId != null ? absenceTypeMap.get(restOfDayAbsenceTypeId) : undefined,
+      );
+    },
+    [absenceTypeMap, shiftNameForKey, shifts],
   );
 
   const getAbsenceTypeIdForKey = useCallback(
@@ -7314,7 +7333,7 @@ function SchedulerContent({
                   // export; this client-side one was handing the same roster to
                   // anyone with the page open.
                   canEditShifts && dates.length > 0 && filteredEmployees.length > 0
-                    ? () => exportScheduleCSV(filteredEmployees, dates, shiftNameForKey)
+                    ? () => exportScheduleCSV(filteredEmployees, dates, scheduleCsvTextForKey)
                     : undefined
                 }
                 presenceSlot={
@@ -7421,6 +7440,7 @@ function SchedulerContent({
                 draftKindForKey={draftKindForKey}
                 shiftDisplayMode={org?.shiftDisplayMode}
                 absenceTypeIdForKey={absenceTypeIdForKey}
+                restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
                 absenceTypeMap={absenceTypeObjectMap}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
@@ -8148,6 +8168,7 @@ function SchedulerContent({
               shiftForKey={shiftForKey}
               assignmentIdsForKey={assignmentIdsForKey}
               absenceTypeIdForKey={absenceTypeIdForKey}
+              restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
               absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}

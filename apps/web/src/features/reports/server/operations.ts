@@ -858,7 +858,34 @@ export function buildOperationsReportPayload(
     );
   });
   const shiftEntries = entries.filter((item) => item.entry.kind === "shift");
-  const absenceEntries = entries.filter((item) => item.entry.kind === "absence");
+  // A worked cell's absence for the rest of the day (item 45) counts as an
+  // absence at no hours. Like a whole-day absence it ignores the shift
+  // filters, so it is read from every report entry, not the filtered ones.
+  const restOfDayAbsenceEntries: ResolvedEntry[] = allReportEntries.flatMap((item) => {
+    const absenceTypeId = item.entry.kind === "shift" ? item.entry.restOfDayAbsenceTypeId : null;
+    if (absenceTypeId == null) return [];
+    return [
+      {
+        source: item.source,
+        entry: {
+          ...item.entry,
+          kind: "absence" as const,
+          label: absenceTypeById.get(absenceTypeId) ?? "",
+          assignmentIds: [],
+          absenceTypeId,
+          restOfDayAbsenceTypeId: null,
+          startTime: null,
+          endTime: null,
+          durationHours: 0,
+          segments: [],
+        },
+      },
+    ];
+  });
+  const absenceEntries = [
+    ...entries.filter((item) => item.entry.kind === "absence"),
+    ...restOfDayAbsenceEntries,
+  ];
   const activeEmployees = reportEmployees.filter((employee) => employee.status === "active");
   const overtimeThresholdHours = 40 * Math.ceil(Math.max(1, reportDates.length) / 7);
   const pendingInvitationByEmployeeId = new Map(
@@ -943,7 +970,7 @@ export function buildOperationsReportPayload(
   const staffHours = reportEmployees.map((employee) => {
     const employeeEntries = entries.filter((item) => item.entry.empId === employee.id);
     const workedEntries = employeeEntries.filter((item) => item.entry.kind === "shift");
-    const absenceCount = employeeEntries.filter((item) => item.entry.kind === "absence").length;
+    const absenceCount = absenceEntries.filter((item) => item.entry.empId === employee.id).length;
     const scheduledHours = roundHours(
       workedEntries.reduce(
         (sum, item) =>
@@ -1472,7 +1499,7 @@ export function buildOperationsReportPayload(
     rows: reportEmployees.map((employee) => {
       const cells: Record<string, string> = {};
       for (const date of reportDates) {
-        const labels = entries
+        const labels = [...entries, ...restOfDayAbsenceEntries]
           .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
           .map((item) => item.entry.label);
         // Shift labels lead so a cell stays readable when it carries no notes.

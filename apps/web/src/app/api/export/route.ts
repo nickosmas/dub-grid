@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
   fetchPublishedShiftRows,
+  publishedCellText,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -175,7 +176,7 @@ async function exportSchedule(
   for (const row of shifts as PublishedShiftRow[]) {
     const entry = resolvePublishedScheduleEntry(row, new Map(), absenceTypeById);
     if (!entry) continue;
-    shiftIndex.set(`${entry.empId}:${entry.date}`, entry.label);
+    shiftIndex.set(`${entry.empId}:${entry.date}`, publishedCellText(entry, absenceTypeById));
   }
 
   const headers = [

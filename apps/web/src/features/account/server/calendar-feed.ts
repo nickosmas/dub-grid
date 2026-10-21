@@ -9,6 +9,7 @@ import type { CalendarFeedEmployee } from "@/features/account/server/calendar-su
 import { generateICS } from "@/lib/ical";
 import {
   fetchPublishedShiftRows,
+  publishedCellText,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -70,16 +71,19 @@ export async function renderPublishedEmployeeCalendar(
       }
 
       if (!entry.startTime || !entry.endTime) return [];
+      // The absence for the rest of the day rides on the shift's own event;
+      // an all-day event would claim the hours worked.
+      const text = publishedCellText(entry, absenceTypeById);
       const endDate =
         entry.endTime <= entry.startTime ? addDaysToIsoDate(entry.date, 1) : entry.date;
       return [
         {
           uid: `shift-${entry.empId}-${entry.date}-${entry.segments?.map((segment) => `${segment.shiftId ?? "shiftless"}-${segment.jobId}`).join("-") ?? "worked"}@dubgrid.com`,
-          summary: `${entry.label} (DubGrid)`,
+          summary: `${text} (DubGrid)`,
           dtstart: { date: entry.date, time: entry.startTime },
           dtend: { date: endDate, time: entry.endTime },
           timeZone: employee.timeZone,
-          description: `${employee.firstName} ${employee.lastName}: ${entry.label}`,
+          description: `${employee.firstName} ${employee.lastName}: ${text}`,
         },
       ];
     });

@@ -284,7 +284,7 @@ describe("rest-of-day absence diffs (item 45)", () => {
     expect(result.restOfDayDiff).toBeNull();
     expect(result.cellBadge).toEqual({
       kind: "modified",
-      text: "Edited",
+      text: "Changed",
       detail: "Removed Sick for the rest of the day.",
     });
   });

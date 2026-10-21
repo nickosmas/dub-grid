@@ -727,10 +727,17 @@ function buildScheduleItemsFromShiftMap(input: {
     });
 
     const rawSegments = absenceTypeId != null ? [] : getWorkedSegments(entry);
+    // A worked cell's absence for the rest of the day (item 45), its last item.
+    // A removed cell's history line already names it in "Was ...".
+    const restOfDayAbsenceTypeId =
+      absenceTypeId == null && rawSegments.length > 0 && !isDeletedHistory
+        ? (entry.restOfDayAbsenceTypeId ?? null)
+        : null;
     const badges = resolveCellChangeBadges({
       entry: isDeletedHistory ? null : entry,
       publishChange: publishedChange,
-      pillCount: absenceTypeId != null ? 1 : rawSegments.length,
+      pillCount:
+        absenceTypeId != null ? 1 : rawSegments.length + (restOfDayAbsenceTypeId != null ? 1 : 0),
       publishedAssignmentIdByPair: input.assignmentIdByPair,
       resolveAssignmentLabel: (assignmentId) => {
         const assignment = input.assignmentById.get(assignmentId);
@@ -808,6 +815,26 @@ function buildScheduleItemsFromShiftMap(input: {
         dayNoteMarks,
       });
     });
+
+    if (restOfDayAbsenceTypeId != null) {
+      const absence = input.absenceTypeById.get(restOfDayAbsenceTypeId) ?? null;
+      items.push({
+        avatarSeed,
+        date,
+        dateKey: parsedKey.dateKey,
+        employeeId: parsedKey.employeeId,
+        employeeName,
+        entry,
+        key: `${key}:rest-of-day-absence`,
+        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
+        segmentIndex: rawSegments.length,
+        changeBadge: badgeForPill(rawSegments.length),
+        isDeletedHistory,
+        previousLabel,
+        noteMarks: [],
+        dayNoteMarks,
+      });
+    }
   }
 
   return items.sort(compareScheduleItems);
@@ -850,7 +877,15 @@ function getPreviousChangeSummary(input: {
       return parts.filter((part): part is string => Boolean(part)).join(" · ");
     });
 
-  if (summaries.length > 0) return summaries.join("; ");
+  // A worked cell's absence for the rest of the day (item 45) ends the summary.
+  const restOfDay =
+    change.fromRestOfDayAbsenceTypeId != null
+      ? `${input.absenceTypeById.get(change.fromRestOfDayAbsenceTypeId)?.name ?? "Absence"} for the rest of the day`
+      : null;
+  const withRestOfDay = (parts: string[]) =>
+    [...parts, ...(restOfDay ? [restOfDay] : [])].join("; ");
+
+  if (summaries.length > 0) return withRestOfDay(summaries);
 
   const previousSegments = change.fromState?.segments ?? [];
   const stateSummaries = previousSegments.map((segment) => {
@@ -858,7 +893,7 @@ function getPreviousChangeSummary(input: {
     const job = segment.jobId != null ? (input.jobById.get(segment.jobId) ?? null) : null;
     return shift?.name ?? job?.name ?? "Shift";
   });
-  return stateSummaries.length > 0 ? stateSummaries.join("; ") : null;
+  return stateSummaries.length > 0 ? withRestOfDay(stateSummaries) : null;
 }
 
 function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJobSegment>> {

@@ -1507,6 +1507,94 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
+  it("lists the absence for the rest of the day after the shift and keeps the shift in the hero", () => {
+    const sick = {
+      id: 5,
+      orgId: "org-1",
+      label: "S",
+      name: "Sick",
+      color: "#fee2e2",
+      border: "#fca5a5",
+      text: "#991b1b",
+      sortOrder: 1,
+      archivedAt: null,
+    };
+    const todayKey = formatDateKey(new Date());
+    const shiftMap = makeShiftMap(todayKey);
+    shiftMap[`emp-1_${todayKey}`] = {
+      ...shiftMap[`emp-1_${todayKey}`]!,
+      restOfDayAbsenceTypeId: sick.id,
+      publishedRestOfDayAbsenceTypeId: sick.id,
+    };
+
+    render(
+      <UserDashboard
+        {...makeProps({
+          absenceTypeById: new Map([[sick.id, sick]]),
+          allShifts: shiftMap,
+          currentPeriodShifts: shiftMap,
+        })}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    const weekText = myWeek.textContent ?? "";
+    expect(weekText.indexOf("Sick")).toBeGreaterThan(weekText.indexOf("Day shift"));
+    expect(within(myWeek).getAllByText("Sick")).toHaveLength(1);
+    const hero = screen.getByTestId("user-dashboard-hero");
+    expect(within(hero).getByText("Day shift")).toBeInTheDocument();
+    expect(within(hero).queryByText("Sick")).not.toBeInTheDocument();
+  });
+
+  it("names a removed shift's absence in its Your Week history line", () => {
+    const props = makeProps({
+      absenceTypeById: new Map([
+        [
+          5,
+          {
+            id: 5,
+            orgId: "org-1",
+            label: "S",
+            name: "Sick",
+            color: "#fee2e2",
+            border: "#fca5a5",
+            text: "#991b1b",
+            sortOrder: 1,
+            archivedAt: null,
+          },
+        ],
+      ]),
+    });
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                from: [101],
+                fromRestOfDayAbsenceTypeId: 5,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(
+      within(myWeek).getByLabelText(
+        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care; Sick for the rest of the day",
+      ),
+    ).toBeInTheDocument();
+    expect(within(myWeek).queryByText("Sick")).not.toBeInTheDocument();
+  });
+
   it("shows only the empty state in a brand-new published week", () => {
     const props = makeProps();
 

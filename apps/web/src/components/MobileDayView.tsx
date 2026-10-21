@@ -55,6 +55,8 @@ interface MobileDayViewProps {
   useCompactRoleCertificationLabels?: boolean;
   /** Returns the absence type ID for a given cell, or null if not an absence. */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** A worked cell's absence for the rest of the day (item 45), drawn after its shifts. */
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Map from absence type ID to AbsenceType for color/label resolution. */
   absenceTypeMap?: Map<number, AbsenceType>;
 }
@@ -87,6 +89,7 @@ export default function MobileDayView({
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
   absenceTypeIdForKey,
+  restOfDayAbsenceTypeIdForKey,
   absenceTypeMap,
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
@@ -440,33 +443,33 @@ export default function MobileDayView({
                     const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                     const absenceType =
                       absenceTypeId != null ? (absenceTypeMap?.get(absenceTypeId) ?? null) : null;
+                    const restOfDayAbsenceTypeId = absenceType
+                      ? null
+                      : (restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null);
+                    const restOfDayAbsenceType =
+                      restOfDayAbsenceTypeId != null
+                        ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null)
+                        : null;
+                    const absencePill = (absence: AbsenceType) => {
+                      const resolved = resolveShiftPillColors(
+                        { color: absence.color, text: absence.text, border: absence.border },
+                        isDarkTheme,
+                      );
+                      return {
+                        label: isNameMode ? absence.name || absence.label : absence.label,
+                        bg: resolved.color,
+                        text: resolved.text,
+                        border: resolved.border,
+                        foreignInitials: null,
+                        foreignBg: null,
+                        foreignText: null,
+                      };
+                    };
 
                     // Build pills for all codes (supports split shifts)
                     // For absence cells, synthesize a single pill from the absence type
                     const pills = absenceType
-                      ? [
-                          (() => {
-                            const resolved = resolveShiftPillColors(
-                              {
-                                color: absenceType.color,
-                                text: absenceType.text,
-                                border: absenceType.border,
-                              },
-                              isDarkTheme,
-                            );
-                            return {
-                              label: isNameMode
-                                ? absenceType.name || absenceType.label
-                                : absenceType.label,
-                              bg: resolved.color,
-                              text: resolved.text,
-                              border: resolved.border,
-                              foreignInitials: null,
-                              foreignBg: null,
-                              foreignText: null,
-                            };
-                          })(),
-                        ]
+                      ? [absencePill(absenceType)]
                       : codeIds.map((id, idx) => {
                           const sc = assignmentById.get(id);
                           if (!sc) {
@@ -529,6 +532,8 @@ export default function MobileDayView({
                             foreignText,
                           };
                         });
+                    // The absence for the rest of the day comes after the shifts.
+                    if (restOfDayAbsenceType) pills.push(absencePill(restOfDayAbsenceType));
 
                     return (
                       <Button

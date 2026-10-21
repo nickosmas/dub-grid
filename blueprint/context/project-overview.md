@@ -130,7 +130,7 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
-Item 45 is split; 45a and 45b have shipped:
+Item 45 is split; 45a, 45b and 45c have shipped:
 
 - **45a - Data model:** shipped; a worked cell may carry one absence,
   through draft, publish, publish history and import (migration 082).
@@ -139,8 +139,11 @@ Item 45 is split; 45a and 45b have shipped:
   and the Week and 2 Weeks grid draws it last, stacking a three-item cell in
   a taller row. Drafts, publish, copy and drag keep every part (migration
   083).
-- **45c - Other web surfaces:** planned; Month, phone Day, print (a taller
-  row), dashboard, person page, coverage, reports, export and calendar.
+- **45c - Other web surfaces:** shipped; the phone-width schedule, print
+  (a taller row for a three-item cell), both dashboards, reports, both CSV
+  exports, the calendar feed and the activity log show the absence after
+  the shifts, at no hours. Coverage, hours, Month and the person page
+  already handled it.
 - **45d - Mobile app:** planned.
 - **45e - Shift requests:** planned; time off on half a double shift keeps
   the absence, and swap, pickup and open-shift staffing respect a mixed cell.

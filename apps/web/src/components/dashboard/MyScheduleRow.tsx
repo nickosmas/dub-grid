@@ -302,6 +302,7 @@ function buildMyScheduleDay(input: {
           ...entry,
           assignmentIds: entry.publishedAssignmentDefinitionIds,
           absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+          restOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
           customStartTime: entry.publishedCustomStartTime ?? null,
           customEndTime: entry.publishedCustomEndTime ?? null,
           label: entry.publishedLabel,
@@ -314,6 +315,7 @@ function buildMyScheduleDay(input: {
           draftKind: null,
           segments: publishedChange?.fromSegments ?? [],
           absenceTypeId: publishedChange?.fromAbsenceTypeId ?? null,
+          restOfDayAbsenceTypeId: publishedChange?.fromRestOfDayAbsenceTypeId ?? null,
           customStartTime: publishedChange?.fromCustomStart ?? null,
           customEndTime: publishedChange?.fromCustomEnd ?? null,
           publishedAssignmentDefinitionIds: [],
@@ -328,8 +330,8 @@ function buildMyScheduleDay(input: {
     publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
   };
 
-  if (displayEntry.absenceTypeId != null) {
-    const absence = input.absenceTypeById.get(displayEntry.absenceTypeId) ?? null;
+  const absenceShift = (absenceTypeId: number, fallbackLabel: string): MyScheduleShift => {
+    const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
     const resolved = absence
       ? resolveShiftPillColors(
           { color: absence.color, text: absence.text, border: absence.border },
@@ -337,25 +339,27 @@ function buildMyScheduleDay(input: {
         )
       : null;
     return {
+      label: absence?.name ?? fallbackLabel,
+      jobName: null,
+      timeRange: null,
+      background: resolved?.color ?? "var(--dg-color-bg-secondary)",
+      border: resolved?.border ?? "var(--dg-color-border)",
+      textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
+      badge: null,
+      borderKind: null,
+      focusAreaId: null,
+      noteShift: null,
+      noteMarks: [],
+    };
+  };
+
+  if (displayEntry.absenceTypeId != null) {
+    return {
       key: dateKey,
       dateKey,
       date: input.date,
       shifts: attachChangeBadges(
-        [
-          {
-            label: absence?.name ?? displayEntry.label ?? "Away",
-            jobName: null,
-            timeRange: null,
-            background: resolved?.color ?? "var(--dg-color-bg-secondary)",
-            border: resolved?.border ?? "var(--dg-color-border)",
-            textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
-            badge: null,
-            borderKind: null,
-            focusAreaId: null,
-            noteShift: null,
-            noteMarks: [],
-          },
-        ],
+        [absenceShift(displayEntry.absenceTypeId, displayEntry.label || "Away")],
         badgeInput,
       ),
     };
@@ -382,11 +386,18 @@ function buildMyScheduleDay(input: {
     });
   }
 
+  // The absence for the rest of the day comes after the shifts (item 45).
+  const restOfDayAbsenceTypeId = displayEntry.restOfDayAbsenceTypeId ?? null;
+  const shifts =
+    restOfDayAbsenceTypeId != null && workedShifts.length > 0
+      ? [...workedShifts, absenceShift(restOfDayAbsenceTypeId, "Absence")]
+      : workedShifts;
+
   return {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: attachChangeBadges(workedShifts, badgeInput),
+    shifts: attachChangeBadges(shifts, badgeInput),
   };
 }
 

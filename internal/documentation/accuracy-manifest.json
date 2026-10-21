@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:883ec713e374264ed2404f807c21601c710fc818c3a86b71b1808c033d009dc4"
+      "evidenceFingerprint": "sha256:ff2e1034b939215923b61d2099d8e10aab15293371adee11f8aa2df8393d8426"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:be20b695c37ea8b6b725a53a6651d982e31bb23431a379a861da2468973c4608"
+      "evidenceFingerprint": "sha256:fe81f05b756124af92c7024ae2e8e201f028759a3cdd15d8ddc2183e56a379f1"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3ed5027fed14e0d5db23cd067cd1d45e6b54a61271fc632e49919e7f194a105b"
+      "evidenceFingerprint": "sha256:08e839cf93d486ce10268dc32a7e30afc2a80aa5d9799eaee6ad5a1bc0eaf58c"
     },
     {
       "id": "onboarding",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:853224275d296847c20b0983d7d9d0bba79d1cc04d15220952efd09e72c4f1d2"
+      "evidenceFingerprint": "sha256:1068913b69d4ad64734beed093a9ff07bf847f0ae0f49f0319cdd45301bc1420"
     },
     {
       "id": "draft-publish",
@@ -441,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5a920e64be7b091470d46af34bf28e39c903c53ea643e24b4594693aed945071"
+      "evidenceFingerprint": "sha256:5f3e167750c6fc11e5334758484dd6f377852da53a21a3c26af973d721c2a677"
     },
     {
       "id": "recurring-shifts",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:48c0fbeb2aa570b50574b0c503f9ade7cb37d201d8b16adc2f14b353cf443a6b"
+      "evidenceFingerprint": "sha256:b87b8389c51181d01f70e43abe9edf39d74428f5580427adb7fdd13c69859b9f"
     },
     {
       "id": "realtime",
@@ -542,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:644381844b5a5310d014fd6b0caf2adec920a280845ac255ee3df452e91efc4e"
+      "evidenceFingerprint": "sha256:722ea148e4114b295c0d79177cbdf1ea379b17d9f25c6a2eaf5928507d0a4cf8"
     },
     {
       "id": "shift-requests",
@@ -607,7 +607,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:824137070178bee7eee47a02506ced69d5462c30c8fc590e593b14641a5f6532"
+      "evidenceFingerprint": "sha256:9dd557a557205042e016b0214c98c26099db501422778b86165bab116cb1269b"
     },
     {
       "id": "dashboard",
@@ -678,7 +678,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5e61a43efc6d96e12f329f59f7447c3b51b0ac16a8b66df03fe96d543a1e47f0"
+      "evidenceFingerprint": "sha256:c546f96f43ff2ffd7117319a73b957ed7679a59c9b170314ff09c4486f902258"
     },
     {
       "id": "roster",
@@ -1361,7 +1361,8 @@
             "who can run reports; Admin default; may be unavailable; web only",
             "report, range, filters, generate and refresh; pay period requirement; roster reports take no range",
             "the fourteen reports; staff hours and staff activity columns; empty published message",
-            "PDF and CSV export once rows exist"
+            "PDF and CSV export once rows exist",
+            "a shift with an absence for the rest of the day: shift hours, one absence at no hours, listed in absences and the matrix"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/reports/ReportsPageContent.tsx",
@@ -1384,7 +1385,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:400b24627672e3c7df6e0fba0e1f38ed2ddde22b399b131da2b7761d59679370"
+      "evidenceFingerprint": "sha256:ca0b3872be88c2761fd527fe970ad2624136cba7e59441451c4253dd3d171bb8"
     },
     {
       "id": "profile",
@@ -1759,7 +1760,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3474caae4b4097c04a21efba8d5d186101758728599edea1715da276e956c2ec"
+      "evidenceFingerprint": "sha256:e1630ad3b2f33e79192acb002de48a3be0b441cb5187e10e52aa1704e9f98f98"
     },
     {
       "id": "departments-focus-areas",
@@ -1920,7 +1921,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ff332416879cce0ea48a79ea6fc77f1d1af07daeedf0525885c02b16f0d5ec8f"
+      "evidenceFingerprint": "sha256:0b444f153c7a9ac3ad4467d15f837aa40dc913d3543fa62ce5fff39d77b5efec"
     },
     {
       "id": "coverage-open-shifts",
@@ -1971,7 +1972,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:5f1792808bae6098e04a44b50996e8138ad7fc1ef026992b4acdcfc8216e7f7c"
+      "evidenceFingerprint": "sha256:bb8e5be15339d6e4ce88b0c9594de1931dd55d5af4e2fedb41ba0a1ac4dbd969"
     },
     {
       "id": "mobile-schedule",
@@ -2050,7 +2051,8 @@
             "no public API",
             "personal calendar subscription on web and app: contents, window, create, replace, disable, eligibility",
             "print options and browser PDF; may be unavailable",
-            "schedule, staff and report exports, where and who; may be unavailable"
+            "schedule, staff and report exports, where and who; may be unavailable",
+            "a shift with an absence for the rest of the day: one calendar event at the shift's times naming the absence; schedule export reads shift then absence"
           ],
           "sourceFiles": [
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
@@ -2080,7 +2082,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:de8055d2ebead93400f3b9a1aac2709db565d55c3b729f6326ab79c4e1a2f511"
+      "evidenceFingerprint": "sha256:3a3da082e46da64268181d7f5264827bbd8a5b3b5991db680db49ae0822b6de9"
     }
   ],
   "surfaceExclusions": [

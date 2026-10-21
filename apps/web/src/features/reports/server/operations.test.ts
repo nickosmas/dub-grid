@@ -316,6 +316,71 @@ describe("operations reports", () => {
     );
   });
 
+  describe("absence for the rest of the day", () => {
+    function sourceWithRestOfDaySick() {
+      const source = buildSource();
+      return buildSource({
+        jobs: [...source.jobs, { id: 71, name: "Med Tech" }],
+        publishedRows: [
+          { ...source.publishedRows[0], published_rest_of_day_absence_type_id: 50 },
+          source.publishedRows[1],
+        ],
+      });
+    }
+
+    it("counts it as an absence with no hours", () => {
+      const payload = buildOperationsReportPayload(sourceWithRestOfDaySick(), {
+        startDate: "2026-05-03",
+        endDate: "2026-05-04",
+      });
+
+      expect(payload.reports.staffHours[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        scheduledHours: 8,
+        shiftCount: 1,
+        absenceCount: 1,
+      });
+      expect(payload.reports.staffActivity.summaries[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        publishedAbsenceDays: 1,
+        absenceBreakdown: expect.stringContaining("Sick"),
+      });
+      expect(payload.reports.absencesCalloffs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "absence",
+            employeeName: "Avery Ng",
+            date: "2026-05-03",
+            absenceType: "Sick",
+          }),
+        ]),
+      );
+      expect(payload.reports.shiftPeriodSummary).toMatchObject({
+        totalAbsences: 2,
+        totalShifts: 1,
+        totalScheduledHours: 8,
+      });
+      expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe(
+        "DAY Caregiver / Sick / Late / Training",
+      );
+    });
+
+    it("keeps it when a job filter leaves the shift out, as for a whole-day absence", () => {
+      const payload = buildOperationsReportPayload(
+        sourceWithRestOfDaySick(),
+        { startDate: "2026-05-03", endDate: "2026-05-04" },
+        { jobIds: [71] },
+      );
+
+      expect(payload.filters.jobIds).toEqual([71]);
+      expect(payload.reports.staffHours[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        scheduledHours: 0,
+        absenceCount: 1,
+      });
+    });
+  });
+
   it("attributes removed employees in historical schedule reports without restoring them to the current roster", () => {
     const removedEmployee = {
       ...buildSource().employees[0],

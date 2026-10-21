@@ -76,12 +76,9 @@ vi.mock("@/lib/db/mappers", () => ({
   }),
 }));
 
+const mapNormalizedScheduleCellRowToScheduleEntry = vi.fn();
 vi.mock("@/lib/schedule-cells", () => ({
-  mapNormalizedScheduleCellRowToScheduleEntry: () => ({
-    assignmentIds: [101],
-    absenceTypeId: null,
-    draftKind: "modified",
-  }),
+  mapNormalizedScheduleCellRowToScheduleEntry: () => mapNormalizedScheduleCellRowToScheduleEntry(),
 }));
 
 vi.mock("@/lib/shift-job-segments", () => ({
@@ -116,6 +113,11 @@ function makeRequest(search = `orgId=${ORG_ID}&startDate=2026-05-04&endDate=2026
 describe("GET /api/gridmaster/schedule", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mapNormalizedScheduleCellRowToScheduleEntry.mockReturnValue({
+      assignmentIds: [101],
+      absenceTypeId: null,
+      draftKind: "modified",
+    });
     requireGridmasterSession.mockResolvedValue({
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
@@ -135,7 +137,7 @@ describe("GET /api/gridmaster/schedule", () => {
         ]);
       }
       if (table === "absence_types") {
-        return makeQuery([]);
+        return makeQuery([{ id: 4, org_id: ORG_ID, label: "S", name: "Sick", archived_at: null }]);
       }
       if (table === "coverage_requirements") {
         return makeQuery([
@@ -237,6 +239,21 @@ describe("GET /api/gridmaster/schedule", () => {
           ],
         }),
       ],
+    });
+  });
+  it("labels a worked cell's absence for the rest of the day beside its shifts", async () => {
+    mapNormalizedScheduleCellRowToScheduleEntry.mockReturnValue({
+      assignmentIds: [101],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: 4,
+      draftKind: null,
+    });
+
+    const body = await (await GET(makeRequest())).json();
+
+    expect(body.shifts[0]).toMatchObject({
+      assignments: ["Day · Registered Nurse"],
+      absenceLabel: expect.stringMatching(/^(S|Sick)$/),
     });
   });
 });

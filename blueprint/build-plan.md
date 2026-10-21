@@ -886,7 +886,7 @@
         labels, publish-diff badges, copy, paste and drag keep every part;
         the overlap check covers worked parts only; a three-item cell gets a
         taller row. Needs an approved mockup first.
-  - [ ] 45c. **Other web surfaces** - Month view, the phone Day view, print
+  - [x] 45c. **Other web surfaces** - Month view, the phone Day view, print
         (a taller row for a three-item cell), dashboard, person page,
         coverage tallies, reports, CSV export and calendar feed.
   - [ ] 45d. **Mobile app** - schedule, shift detail and dashboard show

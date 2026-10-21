@@ -266,14 +266,16 @@ export function buildShiftDiffDescriptors(
 
   const label = (id: number) => input.resolveAbsenceLabel?.(id) ?? "an absence";
   if (after == null) {
-    // No pill is left to carry the change, so the cell says what went.
+    // No pill is left to carry the change, so the cell says what went, as
+    // "Changed" like a removed segment, which keeps the marker on the cell
+    // while its shifts survive.
     const detail = `Removed ${label(before!)} for the rest of the day.`;
     return {
       ...result,
       restOfDayDiff: null,
       cellBadge: result.cellBadge
         ? { ...result.cellBadge, detail: `${result.cellBadge.detail} ${detail}` }
-        : { kind: "modified", text: "Edited", detail },
+        : { kind: "modified", text: "Changed", detail },
     };
   }
   return {
