@@ -185,6 +185,7 @@ import { isDeepEqual } from "@/lib/deep-equal";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
+  hiddenPublishDiffDescriptors,
   type ShiftDiffBadgeDescriptor,
   type ShiftDiffBorderKind,
   type ShiftDiffTimeRange,
@@ -2800,72 +2801,74 @@ const SectionBlock = memo(function SectionBlock({
                                   // derive both id lists and both history
                                   // label lists on every render for nothing.
                                   const publishDiffSummary = isPubDiff
-                                    ? (() => {
-                                        const publishFrom =
-                                          isPubDiff.from ??
-                                          assignmentIdsFromPublishState(
-                                            isPubDiff.fromState,
-                                            publishedAssignmentIdByPair,
-                                          );
-                                        const publishTo =
-                                          isPubDiff.to ??
-                                          assignmentIdsFromPublishState(
-                                            isPubDiff.toState,
-                                            publishedAssignmentIdByPair,
-                                          );
-                                        return buildShiftDiffDescriptors({
-                                          before: {
-                                            assignmentIds: publishFrom,
-                                            absenceTypeId:
-                                              isPubDiff.fromAbsenceTypeId ??
-                                              absenceTypeIdFromPublishState(isPubDiff.fromState),
-                                            restOfDayAbsenceTypeId:
-                                              isPubDiff.fromRestOfDayAbsenceTypeId ??
-                                              restOfDayAbsenceTypeIdFromPublishState(
+                                    ? isPubDiff.detailsHidden && isPubDiff.kind !== "deleted"
+                                      ? hiddenPublishDiffDescriptors(isPubDiff.kind, labels.length)
+                                      : (() => {
+                                          const publishFrom =
+                                            isPubDiff.from ??
+                                            assignmentIdsFromPublishState(
+                                              isPubDiff.fromState,
+                                              publishedAssignmentIdByPair,
+                                            );
+                                          const publishTo =
+                                            isPubDiff.to ??
+                                            assignmentIdsFromPublishState(
+                                              isPubDiff.toState,
+                                              publishedAssignmentIdByPair,
+                                            );
+                                          return buildShiftDiffDescriptors({
+                                            before: {
+                                              assignmentIds: publishFrom,
+                                              absenceTypeId:
+                                                isPubDiff.fromAbsenceTypeId ??
+                                                absenceTypeIdFromPublishState(isPubDiff.fromState),
+                                              restOfDayAbsenceTypeId:
+                                                isPubDiff.fromRestOfDayAbsenceTypeId ??
+                                                restOfDayAbsenceTypeIdFromPublishState(
+                                                  isPubDiff.fromState,
+                                                ),
+                                              timeRanges: timeRangesFromPublishState(
+                                                isPubDiff.fromState,
+                                                isPubDiff.fromCustomStart,
+                                                isPubDiff.fromCustomEnd,
+                                                publishFrom.length,
+                                              ),
+                                              isMentoredFlags: mentoredFlagsFromPublishState(
                                                 isPubDiff.fromState,
                                               ),
-                                            timeRanges: timeRangesFromPublishState(
-                                              isPubDiff.fromState,
-                                              isPubDiff.fromCustomStart,
-                                              isPubDiff.fromCustomEnd,
-                                              publishFrom.length,
-                                            ),
-                                            isMentoredFlags: mentoredFlagsFromPublishState(
-                                              isPubDiff.fromState,
-                                            ),
-                                          },
-                                          after: {
-                                            assignmentIds: publishTo,
-                                            absenceTypeId:
-                                              isPubDiff.toAbsenceTypeId ??
-                                              absenceTypeIdFromPublishState(isPubDiff.toState),
-                                            restOfDayAbsenceTypeId:
-                                              isPubDiff.toRestOfDayAbsenceTypeId ??
-                                              restOfDayAbsenceTypeIdFromPublishState(
+                                            },
+                                            after: {
+                                              assignmentIds: publishTo,
+                                              absenceTypeId:
+                                                isPubDiff.toAbsenceTypeId ??
+                                                absenceTypeIdFromPublishState(isPubDiff.toState),
+                                              restOfDayAbsenceTypeId:
+                                                isPubDiff.toRestOfDayAbsenceTypeId ??
+                                                restOfDayAbsenceTypeIdFromPublishState(
+                                                  isPubDiff.toState,
+                                                ),
+                                              timeRanges: timeRangesFromPublishState(
+                                                isPubDiff.toState,
+                                                isPubDiff.toCustomStart,
+                                                isPubDiff.toCustomEnd,
+                                                publishTo.length,
+                                              ),
+                                              isMentoredFlags: mentoredFlagsFromPublishState(
                                                 isPubDiff.toState,
                                               ),
-                                            timeRanges: timeRangesFromPublishState(
-                                              isPubDiff.toState,
-                                              isPubDiff.toCustomStart,
-                                              isPubDiff.toCustomEnd,
-                                              publishTo.length,
-                                            ),
-                                            isMentoredFlags: mentoredFlagsFromPublishState(
-                                              isPubDiff.toState,
-                                            ),
-                                          },
-                                          beforeShiftLabels:
-                                            snapshotLabels(isPubDiff.fromSegments) ??
-                                            publishFrom.map(resolveHistoryShiftLabel),
-                                          afterShiftLabels:
-                                            snapshotLabels(isPubDiff.toSegments) ??
-                                            cellCodeIds.map(resolveHistoryShiftLabel),
-                                          resolveAssignmentDefinitionLabel:
-                                            resolveHistoryShiftLabel,
-                                          resolveAbsenceLabel: (absenceTypeId) =>
-                                            absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
-                                        });
-                                      })()
+                                            },
+                                            beforeShiftLabels:
+                                              snapshotLabels(isPubDiff.fromSegments) ??
+                                              publishFrom.map(resolveHistoryShiftLabel),
+                                            afterShiftLabels:
+                                              snapshotLabels(isPubDiff.toSegments) ??
+                                              cellCodeIds.map(resolveHistoryShiftLabel),
+                                            resolveAssignmentDefinitionLabel:
+                                              resolveHistoryShiftLabel,
+                                            resolveAbsenceLabel: (absenceTypeId) =>
+                                              absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
+                                          });
+                                        })()
                                     : null;
 
                                   const publishCellBadge = isPubDiff
@@ -4178,7 +4181,8 @@ const SectionBlock = memo(function SectionBlock({
                             ) : (draftKind === "deleted" && publishedLabel) ||
                               (showsPublishDiff &&
                                 publishDiff?.kind === "deleted" &&
-                                ((publishDiff.from ?? []).length > 0 ||
+                                (publishDiff.detailsHidden ||
+                                  (publishDiff.from ?? []).length > 0 ||
                                   publishDiff.fromAbsenceTypeId != null ||
                                   publishDiff.fromState?.kind === "worked" ||
                                   publishDiff.fromState?.kind === "absence")) ? (
@@ -4193,31 +4197,40 @@ const SectionBlock = memo(function SectionBlock({
                                 const publishDeletedAbsenceTypeId =
                                   publishDiff?.fromAbsenceTypeId ??
                                   absenceTypeIdFromPublishState(publishDiff?.fromState);
+                                // The organization may hide what was removed
+                                // from staff (item 46f); the pill still says
+                                // that something was.
                                 const deletedLabel = isDraftDelete
                                   ? publishedLabel!
-                                  : publishDeletedAbsenceTypeId != null
-                                    ? (() => {
-                                        const at = absenceTypeMap?.get(
-                                          Number(publishDeletedAbsenceTypeId),
-                                        );
-                                        return at ? (isNameMode ? at.name : at.label) : "?";
-                                      })()
-                                    : publishDeletedFromIds
-                                        .map((id) => {
-                                          const sc = assignmentById.get(id);
-                                          return sc
-                                            ? isNameMode
-                                              ? sc.name || sc.label
-                                              : sc.label
-                                            : "?";
-                                        })
-                                        .join("/");
+                                  : publishDiff?.detailsHidden
+                                    ? "Removed"
+                                    : publishDeletedAbsenceTypeId != null
+                                      ? (() => {
+                                          const at = absenceTypeMap?.get(
+                                            Number(publishDeletedAbsenceTypeId),
+                                          );
+                                          return at ? (isNameMode ? at.name : at.label) : "?";
+                                        })()
+                                      : publishDeletedFromIds
+                                          .map((id) => {
+                                            const sc = assignmentById.get(id);
+                                            return sc
+                                              ? isNameMode
+                                                ? sc.name || sc.label
+                                                : sc.label
+                                              : "?";
+                                          })
+                                          .join("/");
                                 const deletedTooltip =
                                   !isDraftDelete && publishDiff
                                     ? buildPublishTooltip({
                                         publishDiff,
                                         resolvePublisherName,
-                                        detail: publishChangeText ?? `Deleted ${deletedLabel}.`,
+                                        detail:
+                                          publishChangeText ??
+                                          (publishDiff.detailsHidden
+                                            ? "Removed since the last publish."
+                                            : `Deleted ${deletedLabel}.`),
                                         timeZone: publicationTimeZone,
                                       })
                                     : undefined;

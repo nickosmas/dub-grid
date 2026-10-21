@@ -3595,6 +3595,38 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Removed: Night Shift · North");
   });
 
+  it("marks a hidden removal without naming the shift, with the publisher it was sent (46f)", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "deleted",
+        detailsHidden: true,
+        fromState: null,
+        toState: null,
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const deletedPill = firstCell.querySelector(
+      '[data-shift-pill="deleted"]',
+    ) as HTMLElement | null;
+
+    expect(deletedPill).not.toBeNull();
+    expect(deletedPill?.textContent).toContain("Removed");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Removed since the last publish.");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Mina");
+    expect(deletedPill?.getAttribute("aria-label")).not.toMatch(/Day Shift|Night Shift/);
+  });
+
   it("keeps author labels visible for publish diffs when authors are enabled", () => {
     observedWidth = 1600;
 

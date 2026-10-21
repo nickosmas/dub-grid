@@ -136,6 +136,17 @@ async function publish(fixture: Fixture, date: string) {
 }
 
 async function changeRows(historyId: string, empId: string) {
+  // Only service-role code reads change rows since 084, so read as the owner
+  // and go back to the caller for the rest of the test.
+  await db.query("RESET ROLE");
+  try {
+    return await readChangeRows(historyId, empId);
+  } finally {
+    await db.query("SET LOCAL ROLE authenticated");
+  }
+}
+
+async function readChangeRows(historyId: string, empId: string) {
   const { rows } = await db.query<{
     kind: string;
     from_absence: number | null;

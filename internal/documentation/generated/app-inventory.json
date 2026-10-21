@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:8f049f9d12d9f578be978ea24a6b809f55ad5dbe94794b0438d3d1ae419ac42f",
+  "sourceDigest": "sha256:720f5f70c4a6778224f167d8d54cef252dda539f265d4c04bc943048ef0c23e8",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4615,6 +4615,16 @@
       "sha256": "addab503b90a59a17b5ec68b75fe0890373f0791cc4abf4e410e191de0b6ed5c",
       "source": {
         "path": "supabase/migrations/083_move_shift_keeps_absence.sql"
+      }
+    },
+    {
+      "id": "migration:084_staff_schedule_visibility.sql",
+      "version": "084",
+      "name": "staff_schedule_visibility",
+      "file": "084_staff_schedule_visibility.sql",
+      "sha256": "32dc0a5eccfb61ead760090df401529b826b4b99f0342e025fee9a0712a888ce",
+      "source": {
+        "path": "supabase/migrations/084_staff_schedule_visibility.sql"
       }
     }
   ],

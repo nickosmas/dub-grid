@@ -1,6 +1,7 @@
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
+  hiddenPublishDiffDescriptors,
   type ShiftDiffBadgeDescriptor,
   type ShiftDiffDescriptorResult,
 } from "@/lib/shift-diff-badges";
@@ -127,6 +128,9 @@ function buildPublishDiff(
   change: PublishChange,
   input: ResolveCellChangeBadgesInput,
 ): ShiftDiffDescriptorResult {
+  if (change.detailsHidden && change.kind !== "deleted") {
+    return hiddenPublishDiffDescriptors(change.kind, input.pillCount);
+  }
   const from =
     change.from ??
     assignmentIdsFromPublishState(change.fromState, input.publishedAssignmentIdByPair);

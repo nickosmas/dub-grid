@@ -19,6 +19,7 @@ vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
 import { GET } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
+const ALL_VISIBLE = { showChangeDetails: true, showPublisher: true };
 
 function makeRequest(query: Record<string, string>) {
   const url = new URL("http://localhost/api/schedule/publish-history/recent");
@@ -117,6 +118,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));
@@ -165,6 +167,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -182,6 +185,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: false },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -192,7 +196,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
     expect(body.entries).toEqual([
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        // A viewer who cannot open the publish history is not told who
+        // A viewer the organization hides the publisher from is not told who
         // published; the time and the changes are what the grid needs.
         publishedBy: null,
         startDate: "2026-05-04",
@@ -231,6 +235,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true, canPublishSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -238,6 +243,87 @@ describe("GET /api/schedule/publish-history/recent", () => {
 
     expect(response.status).toBe(200);
     expect(body.entries[0].publishedBy).toBe("22222222-2222-4222-8222-222222222222");
+  });
+
+  it("folds and withholds what changed from a viewer the organization hides it from", async () => {
+    const serviceClient = createServiceClient();
+    const worked = (shiftId: number) => ({
+      kind: "worked",
+      segments: [{ shiftId, jobId: 7, position: 0 }],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
+    const change = (
+      empId: string,
+      kind: string,
+      from: ReturnType<typeof worked> | null,
+      to: ReturnType<typeof worked> | null,
+    ) => ({
+      emp_id: empId,
+      date: "2026-05-05",
+      kind,
+      from_state: from,
+      to_state: to,
+      from_absence_type_id: null,
+      to_absence_type_id: null,
+      updated_by: "editor-1",
+      from_custom_start: null,
+      from_custom_end: null,
+      to_custom_start: null,
+      to_custom_end: null,
+    });
+    const entry = (id: string, publishedAt: string, changes: ReturnType<typeof change>[]) => ({
+      id,
+      org_id: ORG_ID,
+      published_by: "22222222-2222-4222-8222-222222222222",
+      start_date: "2026-05-04",
+      end_date: "2026-05-10",
+      change_count: changes.length,
+      schedule_publish_changes: changes,
+      published_at: publishedAt,
+    });
+    publishHistoryLimit.mockResolvedValueOnce({
+      data: [
+        entry("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "2026-05-07T17:00:00.000Z", [
+          change("emp-reverted", "modified", worked(2), worked(1)),
+          change("emp-added", "modified", worked(1), worked(2)),
+        ]),
+        entry("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "2026-05-06T17:00:00.000Z", [
+          change("emp-reverted", "modified", worked(1), worked(2)),
+          change("emp-added", "new", null, worked(1)),
+        ]),
+      ],
+      error: null,
+    });
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient,
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+      scheduleVisibility: { showChangeDetails: false, showPublisher: false },
+    });
+
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
+    const { entries } = await response.json();
+
+    // A shift edited and edited back is no change at all; one added and then
+    // edited is still new. Neither row carries the earlier shift or its editor.
+    for (const current of entries) {
+      expect(current.publishedBy).toBeNull();
+      expect(current.changes).toHaveLength(1);
+      expect(current.changes[0]).toMatchObject({
+        empId: "emp-added",
+        kind: "new",
+        detailsHidden: true,
+        fromState: null,
+        updatedBy: null,
+      });
+    }
+    expect(entries[0].changes[0].toState).toEqual(worked(2));
   });
 
   it("returns published note changes separately from cell changes", async () => {
@@ -284,6 +370,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -362,6 +449,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -420,6 +508,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -477,6 +566,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: ALL_VISIBLE,
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));

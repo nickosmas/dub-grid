@@ -106,6 +106,8 @@ type DashboardScheduleItem = {
   /** The change chip this pill carries, resolved the way the grid resolves it. */
   changeBadge: CellChangeBadge | null;
   isDeletedHistory: boolean;
+  /** A removal the organization hides the details of (item 46f): "Shift removed" only. */
+  removalHidden?: boolean;
   /** The older summary, for changes stored without their cell states. */
   previousLabel: string | null;
   /** The cell's change against its original, for the Was card. */
@@ -713,8 +715,13 @@ function buildScheduleItemsFromShiftMap(input: {
   // Cells a publication removed have no shift-map row, so their last
   // published presentation is rebuilt here for the history line.
   const historyKeys = new Set<string>();
+  const hiddenRemovals: string[] = [];
   for (const [key, change] of input.recentPublishedChanges) {
     if (change.kind !== "deleted" || entries.has(key)) continue;
+    if (change.detailsHidden) {
+      hiddenRemovals.push(key);
+      continue;
+    }
     historyKeys.add(key);
     entries.set(key, {
       label: "",
@@ -754,7 +761,7 @@ function buildScheduleItemsFromShiftMap(input: {
     const publishedChange = input.recentPublishedChanges.get(key) ?? null;
     const isDeletedHistory = historyKeys.has(key);
     const previousChange =
-      publishedChange && publishChangeHasStates(publishedChange)
+      publishedChange && !publishedChange.detailsHidden && publishChangeHasStates(publishedChange)
         ? describeCellStateChange(
             publishedChange.fromState,
             publishedChange.toState,
@@ -762,16 +769,17 @@ function buildScheduleItemsFromShiftMap(input: {
             input.shiftChangeResolvers,
           )
         : null;
-    const legacySummary = previousChange
-      ? null
-      : getPreviousChangeSummary({
-          absenceTypeById: input.absenceTypeById,
-          assignmentById: input.assignmentById,
-          change: publishedChange,
-          focusAreaById: input.focusAreaById,
-          jobById: input.jobById,
-          shiftById: input.shiftById,
-        });
+    const legacySummary =
+      previousChange || publishedChange?.detailsHidden
+        ? null
+        : getPreviousChangeSummary({
+            absenceTypeById: input.absenceTypeById,
+            assignmentById: input.assignmentById,
+            change: publishedChange,
+            focusAreaById: input.focusAreaById,
+            jobById: input.jobById,
+            shiftById: input.shiftById,
+          });
     const previousLabel = legacySummary;
     const previousText = previousChange ? formatShiftChangeWasText(previousChange) : null;
 
@@ -890,6 +898,39 @@ function buildScheduleItemsFromShiftMap(input: {
         dayNoteMarks,
       });
     }
+  }
+
+  for (const key of hiddenRemovals) {
+    const parsedKey = parseShiftMapKey(key);
+    if (!parsedKey) continue;
+    const employee = input.employeeById.get(parsedKey.employeeId);
+    const entry: ScheduleCellStateEntry = {
+      label: "",
+      assignmentIds: [],
+      isDraft: false,
+      draftKind: null,
+      publishedAssignmentDefinitionIds: [],
+      publishedLabel: "",
+    };
+    items.push({
+      avatarSeed: employee ? resolveAvatarSeed(employee) : parsedKey.employeeId,
+      date: new Date(`${parsedKey.dateKey}T00:00:00`),
+      dateKey: parsedKey.dateKey,
+      employeeId: parsedKey.employeeId,
+      employeeName: employee ? formatEmployeeName(employee) : "Staff",
+      entry,
+      key: `${key}:removed`,
+      segment: buildAbsenceSegment(entry, null, parsedKey.dateKey, input.isDarkTheme),
+      segmentIndex: 0,
+      changeBadge: null,
+      isDeletedHistory: true,
+      removalHidden: true,
+      previousLabel: null,
+      previousChange: null,
+      previousText: null,
+      noteMarks: [],
+      dayNoteMarks: [],
+    });
   }
 
   // A day's change is told once, on its first changed item, rather than
@@ -2852,7 +2893,18 @@ function MyWeekSection({
                 {deletedItems
                   .filter((item, index) => !item.previousChange || index === 0)
                   .map((item) =>
-                    item.previousChange && item.previousChange.kind !== "none" ? (
+                    item.removalHidden ? (
+                      <div
+                        key={item.key}
+                        style={{
+                          color: "var(--dg-color-text-muted)",
+                          fontSize: 12,
+                          marginTop: activeItems.length > 0 ? 8 : 4,
+                        }}
+                      >
+                        Shift removed
+                      </div>
+                    ) : item.previousChange && item.previousChange.kind !== "none" ? (
                       <ShiftChangeWas
                         key={item.key}
                         change={item.previousChange}

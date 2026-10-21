@@ -2,15 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import {
-  canSeeSchedulePublisher,
-  fetchHiddenStaffIds,
-  requireOrgPermissions,
-} from "@/app/api/shared/permissions";
+import { fetchHiddenStaffIds, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { withoutHiddenStaffRows } from "@dubgrid/data-access";
 import {
   toNotePublishChanges,
   toPublishChanges,
+  withoutChangeDetails,
   type ScheduleChangeRow,
 } from "@/lib/db/publish-history";
 import logger from "@/lib/logger";
@@ -172,7 +169,7 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    const showPublisher = canSeeSchedulePublisher(auth.permissions);
+    const { showChangeDetails, showPublisher } = auth.scheduleVisibility;
     const hiddenStaffIds = await fetchHiddenStaffIds(auth);
     const entries = (data ?? []).map((row: Record<string, unknown>) => {
       const allChanges = row.schedule_publish_changes as ScheduleChangeRow[];
@@ -183,17 +180,24 @@ export async function GET(req: NextRequest) {
         startDate: row.start_date as string,
         endDate: row.end_date as string,
         changeCount: (row.change_count as number) - (allChanges.length - changes.length),
-        changes: toPublishChanges(changes),
+        changes: toPublishChanges(changes).map((change) =>
+          showPublisher ? change : { ...change, updatedBy: null },
+        ),
         // Kept beside the cell changes rather than mixed in: a note carries no
         // cell state, and nothing downstream should have to guess which of the
         // two a change row describes.
-        noteChanges: toNotePublishChanges(changes),
+        noteChanges: toNotePublishChanges(changes).map((change) =>
+          showPublisher ? change : { ...change, updatedBy: null },
+        ),
         publishedAt: row.published_at as string,
       };
     });
     const priorPeriods = await fetchPriorPublishedPeriods(auth.serviceClient, auth.orgId, entries);
 
-    return NextResponse.json({ entries: addNewAdditionFlags(entries, priorPeriods) });
+    const flagged = addNewAdditionFlags(entries, priorPeriods);
+    return NextResponse.json({
+      entries: showChangeDetails ? flagged : withoutChangeDetails(flagged),
+    });
   } catch (error) {
     logger.error(
       { err: error, route: "schedule/publish-history/recent" },

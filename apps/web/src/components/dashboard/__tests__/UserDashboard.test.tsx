@@ -603,6 +603,62 @@ describe("UserDashboard", () => {
     ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
   });
 
+  it("marks a hidden edit without saying what the shift was (46f)", () => {
+    const todayKey = formatDateKey(new Date());
+    render(
+      <UserDashboard
+        {...makeProps({
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${todayKey}`,
+              {
+                empId: "emp-1",
+                date: todayKey,
+                kind: "modified" as const,
+                detailsHidden: true,
+                fromState: null,
+              },
+            ],
+          ]),
+        })}
+      />,
+    );
+
+    const hero = screen.getByTestId("user-dashboard-hero");
+    expect(within(hero).getByLabelText("Edited shift")).toHaveTextContent("Edited");
+    expect(within(hero).queryByText(/^Was/)).not.toBeInTheDocument();
+    expect(within(hero).queryByLabelText(/Previous shift/)).not.toBeInTheDocument();
+  });
+
+  it("says only that a shift was removed when the details are hidden (46f)", () => {
+    const props = makeProps();
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                detailsHidden: true,
+                fromState: null,
+                toState: null,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getByText("Shift removed")).toBeInTheDocument();
+    expect(within(myWeek).queryByText(/^Was/)).not.toBeInTheDocument();
+  });
+
   it("shows a removed shift's Was card from its stored state, once", () => {
     const props = makeProps();
     const deletedDate = formatDateKey(props.periodDates[1]!);

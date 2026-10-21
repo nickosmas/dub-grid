@@ -22,6 +22,7 @@ import {
   type ScheduleNoteStatus,
 } from "@dubgrid/schedule-core";
 import type { Organization, PlatformRole } from "@dubgrid/domain";
+import { scheduleViewerVisibility } from "@dubgrid/authz";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export class MobileApiAuthorizationError extends Error {
@@ -84,16 +85,26 @@ export type MobileBootstrapContext = MobileServiceContext &
     user: MobileUserLike;
   };
 
-type MobilePublisherViewerPermissions = Pick<MobilePermissionsLike, "canPublishSchedule" | "level">;
+type MobilePublisherViewerPermissions = Pick<
+  MobilePermissionsLike,
+  "canPublishSchedule" | "canEditShifts" | "level"
+>;
+
+type MobileScheduleViewerOrg = Pick<
+  Organization,
+  "id" | "staffSeeShiftChanges" | "staffSeePublisher"
+>;
 
 type MobileNoteViewerPermissions = Pick<MobilePermissionsLike, "canEditShifts" | "canEditNotes">;
 
 export type MobileMeScheduleContext = MobileServiceContext & {
+  currentOrg: MobileScheduleViewerOrg;
   user: Pick<MobileUserLike, "id">;
   permissions: MobilePublisherViewerPermissions & MobileNoteViewerPermissions;
 };
 
 export type MobileOrgScheduleContext = MobileServiceContext & {
+  currentOrg: MobileScheduleViewerOrg;
   permissions: Pick<
     MobilePermissionsLike,
     "canViewSchedule" | "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees"
@@ -154,23 +165,34 @@ export function withScheduleIndicators<TEntry extends { employeeId: string; date
 }
 
 /**
- * Who published a shift is process detail for the people who publish: the web
- * keeps its publish history behind `canPublishSchedule` (or super admin), so
- * the mobile payload keeps the publisher's name behind the same gate. The
- * publish time stays for everyone; it says whether the schedule is current.
+ * What a viewer may see about a publish (item 46f): who published, and what
+ * each shift changed from. The web routes apply the same rule; the publish
+ * time stays for everyone, since it says whether the schedule is current.
  */
-export function canSeeSchedulePublisher(permissions: MobilePublisherViewerPermissions): boolean {
-  return permissions.canPublishSchedule || permissions.level >= 3;
-}
-
-function withoutPublisherName<TEntry extends { publishedByName: string | null }>(
-  entries: TEntry[],
-  permissions: MobilePublisherViewerPermissions,
-): TEntry[] {
-  if (canSeeSchedulePublisher(permissions)) return entries;
-  return entries.map((entry) =>
-    entry.publishedByName === null ? entry : { ...entry, publishedByName: null },
+function withScheduleVisibility<
+  TEntry extends {
+    publishedByName: string | null;
+    change: { previousPresentation: unknown } | null;
+  },
+>(entries: TEntry[], permissions: MobilePublisherViewerPermissions, org: MobileScheduleViewerOrg) {
+  const { showChangeDetails, showPublisher } = scheduleViewerVisibility(
+    {
+      canEditShifts: permissions.canEditShifts,
+      canPublishSchedule: permissions.canPublishSchedule,
+      isSuperAdmin: permissions.level >= 3,
+      isGridmaster: false,
+    },
+    org,
   );
+  if (showChangeDetails && showPublisher) return entries;
+  return entries.map((entry) => ({
+    ...entry,
+    publishedByName: showPublisher ? entry.publishedByName : null,
+    change:
+      showChangeDetails || !entry.change
+        ? entry.change
+        : { ...entry.change, previousPresentation: null },
+  }));
 }
 
 export type MobilePeopleContext = MobileServiceContext & {
@@ -466,9 +488,10 @@ export async function loadMobileMeSchedulePayload(
       departmentIds: linkedEmployee.departmentIds,
     },
     range,
-    entries: withoutPublisherName(
+    entries: withScheduleVisibility(
       withScheduleIndicators(entries, notes, auth.permissions),
       auth.permissions,
+      auth.currentOrg,
     ),
   };
 }
@@ -500,9 +523,10 @@ export async function loadMobileOrgSchedulePayload(
 
   return {
     range,
-    entries: withoutPublisherName(
+    entries: withScheduleVisibility(
       withScheduleIndicators(entries, notes, auth.permissions),
       auth.permissions,
+      auth.currentOrg,
     ),
   };
 }

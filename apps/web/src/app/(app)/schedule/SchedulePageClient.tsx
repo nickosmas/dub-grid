@@ -6358,12 +6358,9 @@ function SchedulerContent({
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
         cellEditors: editingCells,
-        // Who published is process detail for the people who publish, the same
-        // viewers who can open the publish history; everyone else reads the
-        // time alone, as on mobile.
-        resolvePublisherName: canNavigatePublishHistory
-          ? (userId: string) => auditNames.get(userId) ?? null
-          : undefined,
+        // The server sends a publisher only to a viewer the organization lets
+        // see it (item 46f); everyone else reads the time alone.
+        resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
         openShifts,
         activeFocusArea,
         highlightEmpIds: searchMatchedEmployeeIds,

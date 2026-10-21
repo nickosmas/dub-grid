@@ -43,6 +43,12 @@ export async function POST(req: NextRequest) {
       return orgAuth.response;
     }
 
+    // These names say who published and who edited each cell, which the
+    // organization may keep from staff (item 46f).
+    if (!orgAuth.scheduleVisibility.showPublisher) {
+      return NextResponse.json({ names: {} });
+    }
+
     const ids = Array.from(new Set(parsed.data.ids));
     const { orgId, serviceClient } = orgAuth;
 

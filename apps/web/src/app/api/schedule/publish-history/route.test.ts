@@ -137,6 +137,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
@@ -155,6 +156,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, limit: "5", offset: "10" }));
@@ -245,6 +247,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));
@@ -264,6 +267,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));
@@ -281,6 +285,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     await GET(makeRequest({ orgId: ORG_ID }));

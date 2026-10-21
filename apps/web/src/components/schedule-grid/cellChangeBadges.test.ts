@@ -471,3 +471,42 @@ describe("resolveCellChangeBadges: absence for the rest of the day", () => {
     expect(result.pillBadges[0]?.detail).toContain("rest of the day");
   });
 });
+
+describe("resolveCellChangeBadges: details the organization hides (46f)", () => {
+  const published = { assignmentIds: [DAY], publishedAssignmentDefinitionIds: [DAY] };
+
+  it("marks a hidden edit as changed without naming the earlier shift", () => {
+    const { pillBadges } = resolve({
+      entry: published,
+      publishChange: {
+        kind: "modified",
+        detailsHidden: true,
+        fromState: null,
+        toState: workedState([segment(10, 0)]),
+      },
+      pillCount: 1,
+    });
+
+    expect(pillBadges[0]).toMatchObject({
+      kind: "modified",
+      text: "Changed",
+      detail: "Changed since the last publish.",
+    });
+    expect(pillBadges[0]?.detail).not.toMatch(/Night|Day/);
+  });
+
+  it("marks a hidden addition as new on every pill", () => {
+    const { pillBadges } = resolve({
+      entry: { assignmentIds: [DAY, NIGHT], publishedAssignmentDefinitionIds: [DAY, NIGHT] },
+      publishChange: {
+        kind: "new",
+        isNewAddition: true,
+        detailsHidden: true,
+        toState: workedState([segment(10, 0), segment(20, 1)]),
+      },
+      pillCount: 2,
+    });
+
+    expect(pillBadges.map((badge) => badge?.text)).toEqual(["New", "New"]);
+  });
+});

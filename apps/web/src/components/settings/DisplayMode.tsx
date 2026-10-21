@@ -375,11 +375,19 @@ export default function DisplayMode({
   const [useCompactLabels, setUseCompactLabels] = useState(
     organization.useCompactRoleCertificationLabels ?? false,
   );
+  const [staffSeeShiftChanges, setStaffSeeShiftChanges] = useState(
+    organization.staffSeeShiftChanges ?? true,
+  );
+  const [staffSeePublisher, setStaffSeePublisher] = useState(
+    organization.staffSeePublisher ?? true,
+  );
   const [saving, setSaving] = useState(false);
   const isModified =
     selected !== organization.shiftDisplayMode ||
     showShiftDetailHoverCards !== (organization.showShiftDetailHoverCards ?? true) ||
-    useCompactLabels !== (organization.useCompactRoleCertificationLabels ?? false);
+    useCompactLabels !== (organization.useCompactRoleCertificationLabels ?? false) ||
+    staffSeeShiftChanges !== (organization.staffSeeShiftChanges ?? true) ||
+    staffSeePublisher !== (organization.staffSeePublisher ?? true);
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -396,6 +404,8 @@ export default function DisplayMode({
           shiftDisplayMode: selected,
           showShiftDetailHoverCards,
           useCompactRoleCertificationLabels: useCompactLabels,
+          staffSeeShiftChanges,
+          staffSeePublisher,
         },
       });
       onSave(result.organization);
@@ -405,6 +415,8 @@ export default function DisplayMode({
         setSelected(result.organization.shiftDisplayMode);
         setShowShiftDetailHoverCards(result.organization.showShiftDetailHoverCards ?? true);
         setUseCompactLabels(result.organization.useCompactRoleCertificationLabels ?? false);
+        setStaffSeeShiftChanges(result.organization.staffSeeShiftChanges ?? true);
+        setStaffSeePublisher(result.organization.staffSeePublisher ?? true);
         toast.info("Display settings were refreshed to the latest saved value.");
       }
     } catch (err) {
@@ -413,16 +425,28 @@ export default function DisplayMode({
     } finally {
       setSaving(false);
     }
-  }, [organization, selected, showShiftDetailHoverCards, useCompactLabels, onSave]);
+  }, [
+    organization,
+    selected,
+    showShiftDetailHoverCards,
+    useCompactLabels,
+    staffSeeShiftChanges,
+    staffSeePublisher,
+    onSave,
+  ]);
 
   const handleCancel = useCallback(() => {
     setSelected(organization.shiftDisplayMode);
     setShowShiftDetailHoverCards(organization.showShiftDetailHoverCards ?? true);
     setUseCompactLabels(organization.useCompactRoleCertificationLabels ?? false);
+    setStaffSeeShiftChanges(organization.staffSeeShiftChanges ?? true);
+    setStaffSeePublisher(organization.staffSeePublisher ?? true);
   }, [
     organization.shiftDisplayMode,
     organization.showShiftDetailHoverCards,
     organization.useCompactRoleCertificationLabels,
+    organization.staffSeeShiftChanges,
+    organization.staffSeePublisher,
   ]);
 
   const modes = DISPLAY_MODES;
@@ -645,6 +669,42 @@ export default function DisplayMode({
 
         <div
           style={{
+            padding: "16px 18px 0",
+            borderTop: "1px solid var(--dg-color-border-light)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 700,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          What staff see after a publish
+        </div>
+        <StaffVisibilityRow
+          title="What changed"
+          description={
+            staffSeeShiftChanges
+              ? "Staff see what each changed shift was before, as well as what it is now."
+              : "Staff see that a shift is new, changed or removed, but not what it was before."
+          }
+          checked={staffSeeShiftChanges}
+          onChange={setStaffSeeShiftChanges}
+          disabled={saving}
+          ariaLabel="Show staff what changed"
+        />
+        <StaffVisibilityRow
+          title="Who published"
+          description={
+            staffSeePublisher
+              ? "Staff see who published the schedule and when."
+              : "Staff see when the schedule was published, but not who published it."
+          }
+          checked={staffSeePublisher}
+          onChange={setStaffSeePublisher}
+          disabled={saving}
+          ariaLabel="Show staff who published"
+        />
+
+        <div
+          style={{
             padding: "14px 18px",
             borderTop: "1px solid var(--dg-color-border-light)",
             display: "flex",
@@ -673,6 +733,58 @@ export default function DisplayMode({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** One "What staff see" switch. People who edit or publish the schedule always see both. */
+function StaffVisibilityRow({
+  title,
+  description,
+  checked,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px 18px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 18,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+      <Switch checked={checked} onChange={onChange} disabled={disabled} ariaLabel={ariaLabel} />
     </div>
   );
 }

@@ -322,6 +322,12 @@ export interface PublishChange {
   kind: "new" | "modified" | "deleted";
   /** True when this `new` change was added after an earlier publication covered its date. */
   isNewAddition?: boolean;
+  /**
+   * The organization hides what changed from this viewer (item 46f): every
+   * "from" field is null and the kind is already folded across the window,
+   * so show a plain mark and nothing about the earlier shift.
+   */
+  detailsHidden?: boolean;
   from?: number[];
   to?: number[];
   fromState?: ScheduleCellState | null;
@@ -361,7 +367,7 @@ export interface NotePublishChange {
 
 export interface PublishHistoryEntry {
   id: string;
-  /** Null for a viewer who cannot open the publish history; see `canSeeSchedulePublisher`. */
+  /** Null for a viewer the organization hides the publisher from; see `scheduleViewerVisibility`. */
   publishedBy: string | null;
   startDate: string;
   endDate: string;
@@ -372,7 +378,8 @@ export interface PublishHistoryEntry {
 }
 
 export interface PublishHistoryEntryWithName extends PublishHistoryEntry {
-  publishedByName: string;
+  /** Null when the organization hides who published from this viewer (item 46f). */
+  publishedByName: string | null;
 }
 
 export interface ScheduleCellStateEntry {

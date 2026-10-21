@@ -564,3 +564,29 @@ function buildShiftOnlyDiffDescriptors(
     },
   };
 }
+
+/**
+ * The mark a published change carries when the organization hides what
+ * changed from this viewer (item 46f): New or Changed, saying nothing about
+ * the earlier shift. A removal is the deleted pill's own mark.
+ */
+export function hiddenPublishDiffDescriptors(
+  kind: "new" | "modified",
+  pillCount: number,
+): ShiftDiffDescriptorResult {
+  if (kind === "new") {
+    const badge: ShiftDiffBadgeDescriptor = {
+      kind: "new",
+      text: "New",
+      detail: "Added since the last publish.",
+    };
+    return {
+      pillDiffs: Array.from({ length: pillCount }, () => ({ borderKind: "new" as const, badge })),
+      cellBadge: badge,
+    };
+  }
+  return {
+    pillDiffs: [],
+    cellBadge: { kind: "modified", text: "Changed", detail: "Changed since the last publish." },
+  };
+}

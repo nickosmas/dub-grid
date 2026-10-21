@@ -4,6 +4,7 @@ import { mobileColors } from "../../../shared/theme/tokens";
 import { buildWeeklyHoursSummary } from "./schedule";
 import {
   buildRestOfDayAbsenceChip,
+  describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
   getScheduleSegmentAlignmentKey,
 } from "./scheduleScreenChips";
@@ -105,6 +106,20 @@ describe("getScheduleSegmentAlignmentKey", () => {
 
   it("gives an absence segment no key", () => {
     expect(getScheduleSegmentAlignmentKey(absence)).toBeNull();
+  });
+});
+
+describe("a change whose details the organization hides (46f)", () => {
+  it("keeps the edited mark and says nothing of the earlier shift", () => {
+    const hidden: MobileScheduleEntry["change"] = {
+      kind: "modified",
+      isNewAddition: false,
+      previousPresentation: null,
+    };
+    const edited = entry([day], hidden);
+
+    expect(getScheduleEntrySegmentChange(edited, day)).toEqual(hidden);
+    expect(describeScheduleEntryChanges(edited)).toEqual([]);
   });
 });
 

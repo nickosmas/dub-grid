@@ -35,7 +35,6 @@ const expectedAuthenticatedSecurityDefiners = [
   "get_notifications",
   "get_org_directory",
   "get_org_users",
-  "get_publish_history",
   "get_schedule_last_viewed",
   "get_tenant_stats",
   "get_unread_notification_count",

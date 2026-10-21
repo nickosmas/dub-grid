@@ -355,7 +355,7 @@ function buildMyScheduleDay(input: {
         });
 
   const publishChangeView =
-    publishedChange && publishChangeHasStates(publishedChange)
+    publishedChange && !publishedChange.detailsHidden && publishChangeHasStates(publishedChange)
       ? describeCellStateChange(
           publishedChange.fromState,
           publishedChange.toState,

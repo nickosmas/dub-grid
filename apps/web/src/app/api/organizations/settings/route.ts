@@ -43,6 +43,8 @@ const bodySchema = z.object({
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
   showShiftDetailHoverCards: z.boolean().optional(),
   useCompactRoleCertificationLabels: z.boolean().optional(),
+  staffSeeShiftChanges: z.boolean().optional(),
+  staffSeePublisher: z.boolean().optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
     .string()
@@ -344,6 +346,8 @@ export async function PUT(req: NextRequest) {
         fields.showShiftDetailHoverCards ?? currentOrg.showShiftDetailHoverCards,
       useCompactRoleCertificationLabels:
         fields.useCompactRoleCertificationLabels ?? currentOrg.useCompactRoleCertificationLabels,
+      staffSeeShiftChanges: fields.staffSeeShiftChanges ?? currentOrg.staffSeeShiftChanges,
+      staffSeePublisher: fields.staffSeePublisher ?? currentOrg.staffSeePublisher,
       timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
@@ -405,6 +409,12 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("useCompactRoleCertificationLabels")) {
       update.use_compact_role_certification_labels = nextOrg.useCompactRoleCertificationLabels;
+    }
+    if (changeKeys.has("staffSeeShiftChanges")) {
+      update.staff_see_shift_changes = nextOrg.staffSeeShiftChanges;
+    }
+    if (changeKeys.has("staffSeePublisher")) {
+      update.staff_see_publisher = nextOrg.staffSeePublisher;
     }
     if (changeKeys.has("timezone")) {
       update.timezone = nextOrg.timezone;

@@ -1,3 +1,4 @@
+import { scheduleViewerVisibility } from "@dubgrid/authz";
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileDashboardResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
@@ -83,6 +84,15 @@ export async function GET(req: NextRequest) {
         currentOrg: { id: auth.currentOrg.id, timezone: auth.currentOrg.timezone },
         effectiveRole: getEffectiveMobileRole(auth.permissions.role),
         canEditSchedule: auth.permissions.canEditShifts,
+        canSeePublisher: scheduleViewerVisibility(
+          {
+            canEditShifts: auth.permissions.canEditShifts,
+            canPublishSchedule: auth.permissions.canPublishSchedule,
+            isSuperAdmin: auth.permissions.level >= 3,
+            isGridmaster: false,
+          },
+          auth.currentOrg,
+        ).showPublisher,
         serviceClient: auth.serviceClient,
       },
       range,

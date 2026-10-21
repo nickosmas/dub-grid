@@ -146,6 +146,8 @@ export function rowToOrganization(row: DbOrganization): Organization {
     ...rowToOrganizationTerminology(row),
     shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? "code",
     showShiftDetailHoverCards: row.show_shift_detail_hover_cards ?? true,
+    staffSeeShiftChanges: row.staff_see_shift_changes ?? true,
+    staffSeePublisher: row.staff_see_publisher ?? true,
     useCompactRoleCertificationLabels: row.use_compact_role_certification_labels ?? false,
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,

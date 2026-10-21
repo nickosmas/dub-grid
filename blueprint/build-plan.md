@@ -922,7 +922,7 @@
         listing every changed day, a compact push, and an email with Before
         and After. Needs a migration (the alert is written in the publish
         function).
-  - [ ] 46f. **Staff visibility setting** - two organization settings: show
+  - [x] 46f. **Staff visibility setting** - two organization settings: show
         staff what changed, and show who published. Hidden on the server as
         well as on screen. Needs a migration and the hidden-state decisions
         (no mark or a plain "Changed" mark; summary alert or none).
