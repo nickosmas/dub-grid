@@ -26,6 +26,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { tintStripeCss } from "@/lib/absence-stripes";
 
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
@@ -76,7 +77,7 @@ function AbsenceChip({ label }: { label: string }) {
         borderRadius: "var(--dg-radius-xs)",
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 700,
-        background: "var(--dg-color-warning-bg)",
+        background: tintStripeCss("var(--dg-color-warning-bg)", "var(--dg-color-warning)"),
         color: "var(--dg-color-warning)",
       }}
     >

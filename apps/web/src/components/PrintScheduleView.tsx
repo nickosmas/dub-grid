@@ -36,6 +36,8 @@ import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
 import { PrintShiftPill, type PrintShiftPillProps } from "@/components/PrintShiftPill";
+import { absenceStripeFill } from "@/lib/absence-stripes";
+import { attachedPillSeams, gapBefore, timesMeet } from "@/lib/attached-pill";
 import { fitPrintText, PRINT_FIT_LINE as FIT_TEXT } from "@/components/print-fit";
 import {
   buildPrintDocument,
@@ -122,6 +124,17 @@ function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | 
 // The print window carries none of the app's CSS variables, so every colour
 // here is a literal. An archived or unknown indicator prints in plain grey.
 const PRINT_UNKNOWN_INDICATOR = "#94A3B8";
+
+const PRINT_PILL_GAP = "0.15em";
+
+/**
+ * An absence prints in its light stripes with a dashed edge, so it still reads
+ * as an absence when the browser drops background graphics.
+ */
+function printAbsenceFill(absence: AbsenceType) {
+  const fill = absenceStripeFill(absence.color, false);
+  return { background: fill.background, color: fill.text, border: `1px dashed ${fill.border}` };
+}
 
 function printedIndicatorIds(marks: ScheduleNoteMark[]): number[] {
   return marks.map((mark) => mark.indicatorTypeId);
@@ -326,15 +339,14 @@ function PrintSection({
         {
           primaryLabel: isNameMode ? absence.name || absence.label : assignment,
           time: customTimes,
-          background: absence.color,
-          color: absence.text,
-          border: `1px solid ${borderColor(absence.text)}`,
+          ...printAbsenceFill(absence),
         },
       ];
     }
 
     // "/" joins the segments of a worked cell, so it is what splits it into pills.
     const labels = assignment.split("/");
+    const spans: { start?: string | null; end?: string | null }[] = [];
     const workedPills: CellPill[] = labels.map((label, li) => {
       const codeId = cellCodeIds[li];
       const style = getStyleByIdOrLabel(label, codeId);
@@ -348,6 +360,14 @@ function PrintSection({
         ? getReadableTextOnSurface(style.color, style.text)
         : style.text;
       const wingPalette = getCrossFocusBadgePalette(style);
+      const ownTime =
+        customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
+      const category =
+        entry?.categoryId != null ? (categoryById.get(entry.categoryId) ?? null) : null;
+      spans.push({
+        start: ownTime?.start || entry?.defaultStartTime || category?.startTime,
+        end: ownTime?.end || entry?.defaultEndTime || category?.endTime,
+      });
       return {
         primaryLabel: displayParts.primaryLabel,
         secondaryLabel: displayParts.secondaryLabel,
@@ -368,17 +388,28 @@ function PrintSection({
     // The absence for the rest of the day prints after the shifts, with no time.
     const restOfDay =
       restOfDayAbsenceTypeId != null ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null) : null;
-    if (!restOfDay) return workedPills;
-    return [
-      ...workedPills,
-      {
-        primaryLabel: isNameMode ? restOfDay.name || restOfDay.label : restOfDay.label,
-        time: null,
-        background: restOfDay.color,
-        color: restOfDay.text,
-        border: `1px solid ${borderColor(restOfDay.text)}`,
-      },
-    ];
+    const pills: CellPill[] = restOfDay
+      ? [
+          ...workedPills,
+          {
+            primaryLabel: isNameMode ? restOfDay.name || restOfDay.label : restOfDay.label,
+            time: null,
+            ...printAbsenceFill(restOfDay),
+          },
+        ]
+      : workedPills;
+    // Pills touch only when connected in time: a shift that runs straight into
+    // the next, or the last shift and the absence that starts as it ends.
+    const axis = pills.length >= 3 ? "stacked" : "side-by-side";
+    const seams = attachedPillSeams(axis, [
+      ...spans.slice(1).map((span, li) => timesMeet(spans[li].end, span.start)),
+      ...(restOfDay ? [true] : []),
+    ]);
+    return pills.map((pill, pi) => ({
+      ...pill,
+      seams: seams[pi],
+      spacing: gapBefore(pi, seams[pi], axis, PRINT_PILL_GAP),
+    }));
   }
 
   return (
@@ -593,7 +624,6 @@ function PrintSection({
                           flexDirection: stacksPills ? "column" : "row",
                           alignItems: "stretch",
                           justifyContent: "center",
-                          gap: "0.15em",
                           padding: `0.3em ${cellInsetX}`,
                           position: "relative",
                         }}

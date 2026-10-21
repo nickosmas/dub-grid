@@ -30,7 +30,8 @@ describe("AbsenceTypesSettings previews", () => {
 
     const preview = document.querySelector('[data-absence-type-preview="code"]');
     expect(preview).toHaveTextContent("VAC");
-    expect(preview).toHaveStyle({ background: "rgb(226, 232, 240)" });
+    // An absence preview is drawn in its own color, striped.
+    expect((preview as HTMLElement).style.background).toContain("repeating-linear-gradient(135deg");
     expect(screen.getByText("Vacation Leave")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /vac vacation leave/i })).toHaveAttribute(
       "aria-expanded",
@@ -51,7 +52,8 @@ describe("AbsenceTypesSettings previews", () => {
 
     const preview = document.querySelector('[data-absence-type-preview="name"]');
     expect(preview).toHaveTextContent("Vacation Leave");
-    expect(preview).toHaveStyle({ background: "rgb(226, 232, 240)" });
+    // An absence preview is drawn in its own color, striped.
+    expect((preview as HTMLElement).style.background).toContain("repeating-linear-gradient(135deg");
     expect(screen.getAllByText("Vacation Leave")).toHaveLength(1);
   });
 });

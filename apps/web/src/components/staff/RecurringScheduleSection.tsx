@@ -22,8 +22,8 @@ import {
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   toDarkPillColors,
-  visiblePillBorder,
 } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import {
   deleteRecurringDraft,
   fetchRecurringShifts,
@@ -383,19 +383,14 @@ function RecurringShiftPill({
   }
 
   const isNameMode = shiftDisplayMode === "name";
+  const absenceFill =
+    !assignment && absenceType ? absenceStripeFill(absenceType.color, isDarkTheme) : null;
   const rawPillBackground = assignment?.color ?? absenceType!.color;
   const rawPillText = assignment?.text ?? absenceType!.text;
-  const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
-  const pillBackground = darkPill?.bg ?? rawPillBackground;
-  const pillText = darkPill?.text ?? rawPillText;
-  // absence_types.border_color defaults to 'transparent', so a stored border is
-  // not necessarily a visible one — derive from the text colour when it isn't,
-  // the way every other pill surface does via resolveShiftPillColors.
-  const fallbackBorder = `1px solid ${
-    !darkPill && absenceType
-      ? visiblePillBorder(absenceType.border, pillText)
-      : borderColor(pillText)
-  }`;
+  const darkPill = isDarkTheme && !absenceFill ? toDarkPillColors(rawPillBackground) : null;
+  const pillBackground = absenceFill?.background ?? darkPill?.bg ?? rawPillBackground;
+  const pillText = absenceFill?.text ?? darkPill?.text ?? rawPillText;
+  const fallbackBorder = `1px solid ${absenceFill?.border ?? borderColor(pillText)}`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,

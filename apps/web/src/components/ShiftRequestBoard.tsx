@@ -18,7 +18,7 @@ import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import CustomSelect from "@/components/CustomSelect";
@@ -475,10 +475,7 @@ export default function ShiftRequestBoard({
     const absenceType =
       isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
     const absenceTypeColors = absenceType
-      ? resolveShiftPillColors(
-          { color: absenceType.color, text: absenceType.text, border: absenceType.border },
-          isDarkTheme,
-        )
+      ? absenceStripeFill(absenceType.color, isDarkTheme)
       : null;
     // Segments only carry names once the server resolved them; fall back to
     // resolving the assignment ids through the full-name map, and only then
@@ -588,7 +585,7 @@ export default function ShiftRequestBoard({
                 fontWeight: 600,
                 padding: "2px 8px",
                 borderRadius: "var(--dg-radius-sm)",
-                background: absenceTypeColors?.color || "var(--dg-color-surface-alt)",
+                background: absenceTypeColors?.background || "var(--dg-color-surface-alt)",
                 color: absenceTypeColors?.text || "var(--dg-color-text-primary)",
                 border: `1px solid ${absenceTypeColors?.border || "var(--dg-color-border)"}`,
               }}

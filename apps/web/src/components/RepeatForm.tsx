@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useTheme } from "next-themes";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
 import {
@@ -327,6 +329,10 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   ref,
 ) {
   const isAbsence = absenceType != null || selectionInput?.kind === "absence";
+  const { resolvedTheme } = useTheme();
+  const absenceFill = absenceType
+    ? absenceStripeFill(absenceType.color, resolvedTheme === "dark")
+    : null;
   const [frequency, setFrequency] = useState<SeriesFrequency>("weekly");
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
   const todayStr = formatLocalDate(new Date());
@@ -377,9 +383,9 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     };
   }, [absenceType, shiftCategory, assignment, shiftJob, shiftLabel]);
   const previewBackground =
-    absenceType?.color ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
-  const previewText = absenceType?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
-  const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--dg-color-border)";
+    absenceFill?.background ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
+  const previewText = absenceFill?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
+  const previewBorder = absenceFill?.border ?? assignment?.border ?? "var(--dg-color-border)";
 
   function toggleDay(day: number) {
     setDaysOfWeek((prev) =>

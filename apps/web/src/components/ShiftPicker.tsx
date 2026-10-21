@@ -16,6 +16,7 @@ import {
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
 import { borderColor, toDarkPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { MaybeHint } from "@/components/ui/hint";
@@ -535,9 +536,8 @@ export default function ShiftPicker({
             >
               {absenceTypes.map((at) => {
                 const isActive = currentAbsenceTypeId === at.id;
-                const darkAt = isDarkTheme ? toDarkPillColors(at.color) : null;
-                const atColor = darkAt?.bg ?? at.color;
-                const atText = darkAt?.text ?? at.text;
+                const atFill = absenceStripeFill(at.color, isDarkTheme);
+                const atText = atFill.text;
                 return (
                   <Button
                     key={at.id}
@@ -547,7 +547,7 @@ export default function ShiftPicker({
                     }}
                     aria-pressed={isActive}
                     aria-label={`${at.label} - ${at.name}`}
-                    style={getOptionButtonStyle(atColor, atText, at.border, isActive)}
+                    style={getOptionButtonStyle(atFill.background, atText, atFill.border, isActive)}
                     onMouseEnter={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";

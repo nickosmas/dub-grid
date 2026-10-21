@@ -7,6 +7,7 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import { getReadableTextOnSurface } from "@/lib/colors";
+import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
 import {
   MENTORED_CORNER_CLEARANCE,
   REQUEST_FOLD_CLEARANCE,
@@ -2174,7 +2175,7 @@ describe("ScheduleGrid", () => {
 
     expect(pills[0].parentElement?.dataset.shiftLayout).toBe("stacked");
     expect(pills[0].parentElement?.style.gridTemplateRows).toBe(
-      "repeat(2, minmax(min-content, 1fr))",
+      "minmax(min-content, 1fr) minmax(min-content, 1fr)",
     );
     expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toMatch(
@@ -2263,7 +2264,15 @@ describe("ScheduleGrid", () => {
       expect(pills[pills.length - 1]).toBe(absencePill);
       expect(absencePill).toHaveTextContent("SICK");
       expect(absencePill).toHaveTextContent("from 11");
-      expect(absencePill.style.background).toBe("rgb(255, 228, 230)");
+      expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
+      // Attached: they touch, with no border or rounding where they meet.
+      const shiftPill = pills[pills.length - 2];
+      expect(shiftPill.style.borderRightStyle).toBe("none");
+      expect(shiftPill.style.borderRadius).toBe("8px 0 0 8px");
+      expect(absencePill.style.borderLeftStyle).toBe("none");
+      expect(absencePill.style.borderRadius).toBe("0 8px 8px 0");
+      expect(absencePill.style.marginLeft).toBe("");
+      expect(absencePill.parentElement!.style.gap).toBe("0");
     });
 
     it("stacks after two shifts and grows only its row", () => {
@@ -2283,9 +2292,118 @@ describe("ScheduleGrid", () => {
       const row = firstCell.closest('[role="row"]') as HTMLElement;
 
       expect(layout.dataset.shiftLayout).toBe("stacked");
-      expect(layout.style.gridTemplateRows).toBe("repeat(3, minmax(min-content, 1fr))");
+      // One line each, so the three share the height equally.
+      expect(layout.style.gridTemplateRows).toBe(
+        "minmax(min-content, 1fr) minmax(min-content, 1fr) minmax(min-content, 1fr)",
+      );
       expect(layout.lastElementChild?.getAttribute("data-shift-pill")).toBe("rest-of-day-absence");
       expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 3 * (");
+      // These shifts have no times, so they never meet and keep their gap;
+      // the absence starts where the last shift ends, so it joins that one.
+      const [first, second, absence] = Array.from(layout.children) as HTMLElement[];
+      expect(first.style.border).toContain("solid");
+      expect(first.style.borderRadius).toBe("8px");
+      expect(second.style.marginTop).toBe("4px");
+      expect(second.style.borderTopStyle).not.toBe("none");
+      expect(second.style.borderBottomStyle).toBe("none");
+      expect(second.style.borderRadius).toBe("8px 8px 0 0");
+      expect(absence.style.borderTopStyle).toBe("none");
+      expect(absence.style.borderRadius).toBe("0 0 8px 8px");
+      expect(absence.style.marginTop).toBe("");
+    });
+
+    it.each([
+      ["joins", "15:00", true],
+      ["keeps apart", "16:00", false],
+    ])("%s a double shift whose second part starts at %s", (_, secondStart, joined) => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        getCustomShiftTimes: () => ({
+          start: "07:00",
+          end: "23:00",
+          perPill: [
+            { start: "07:00", end: "15:00" },
+            { start: secondStart, end: "23:00" },
+          ],
+        }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const [first, second] = Array.from(
+        firstCell.querySelectorAll<HTMLElement>('[data-shift-pill="multi"]'),
+      );
+      const seam = first.parentElement!.dataset.shiftLayout === "stacked" ? "Bottom" : "Right";
+      expect(first.style.getPropertyValue(`border-${seam.toLowerCase()}-style`) === "none").toBe(
+        joined,
+      );
+      expect(second.style.marginTop === "" && second.style.marginLeft === "").toBe(joined);
+    });
+
+    it("joins a shift with no custom time to the next through its default end", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions.map((assignment) =>
+          assignment.id === 3
+            ? { ...assignment, defaultStartTime: "15:30", defaultEndTime: "00:00" }
+            : assignment,
+        ),
+        shiftForKey: () => "E/N",
+        assignmentIdsForKey: () => [3, 2],
+        // An unset custom time is stored empty, not null.
+        getCustomShiftTimes: () => ({
+          start: "|00:00",
+          end: "|09:00",
+          perPill: [
+            { start: "", end: "" },
+            { start: "00:00", end: "09:00" },
+          ],
+        }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const [evening, night] = Array.from(
+        firstCell.querySelectorAll<HTMLElement>('[data-shift-pill="multi"]'),
+      );
+      const stacked = evening.parentElement!.dataset.shiftLayout === "stacked";
+      expect(
+        evening.style.getPropertyValue(stacked ? "border-bottom-style" : "border-right-style"),
+      ).toBe("none");
+      expect(night.style.getPropertyValue(stacked ? "border-top-style" : "border-left-style")).toBe(
+        "none",
+      );
+    });
+
+    it("gives a stacked one-line shift less height than a pill with a time", () => {
+      observedWidth = 640;
+
+      renderGrid({
+        spanWeeks: 2,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "E/N",
+        assignmentIdsForKey: () => [3, 2],
+        getCustomShiftTimes: () => ({
+          start: "|00:00",
+          end: "|09:00",
+          perPill: [
+            { start: "", end: "" },
+            { start: "00:00", end: "09:00" },
+          ],
+        }),
+      });
+
+      const layout = screen
+        .getAllByRole("gridcell")[0]
+        .querySelector<HTMLElement>('[data-shift-layout="stacked"]')!;
+      expect(layout.style.gridTemplateRows).toBe(
+        "minmax(min-content, 1fr) minmax(min-content, 2fr)",
+      );
     });
 
     it("badges the absence pill, not the shift, when only the absence is new", () => {
@@ -2311,8 +2429,8 @@ describe("ScheduleGrid", () => {
       const shiftPill = firstCell.querySelector<HTMLElement>('[data-shift-pill="multi"]')!;
 
       // A draft "New" is the dashed border, on the absence pill alone.
-      expect(absencePill.style.border).toContain("dashed");
-      expect(shiftPill.style.border).not.toContain("dashed");
+      expect(absencePill.style.borderRight).toContain("dashed");
+      expect(shiftPill.style.borderLeft).not.toContain("dashed");
       expect(shiftPill.querySelector("[data-draft-badge]")).toBeNull();
     });
 
@@ -3237,7 +3355,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
 
-  it("borders absence pills in light mode even when the stored border is transparent", () => {
+  it("stripes an absence pill in its own color and borders it even when the stored border is transparent", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -3265,8 +3383,10 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
 
+    const stripes = resolveAbsenceStripes("#FDE68A", false);
     expect(pill?.textContent).toContain("VAC");
-    expect(pill?.style.borderColor).toBe("rgba(146, 64, 14, 0.35)");
+    expect(pill?.style.background).toContain("repeating-linear-gradient(135deg");
+    expect(pill?.style.borderColor).toBe(stripes.border.replace(/,/g, ", "));
   });
 
   it("keeps draft time-only changes compact and shows the time badge in-cell", () => {

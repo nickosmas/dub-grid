@@ -7,7 +7,8 @@ import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@
 import { Button } from "@/components/Button";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
-import { toDarkPillColors, resolveShiftPillColors, darkenColor } from "@/lib/colors";
+import { toDarkPillColors, darkenColor } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
@@ -2824,20 +2825,14 @@ export default function ShiftEditPanel({
       const at = absenceTypes.find((a) => a.id === currentAbsenceTypeId);
       if (!at) return null;
       const absenceLabel = at.name || at.label;
-      const atResolved = resolveShiftPillColors(
-        { color: at.color, text: at.text, border: at.border },
-        isDarkTheme,
-      );
+      const atResolved = absenceStripeFill(at.color, isDarkTheme);
       return (
         <div
           style={{
-            background: atResolved.color,
+            background: atResolved.background,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
-              fallback:
-                atResolved.border === "transparent"
-                  ? `1.5px solid ${darkenColor(atResolved.color, 0.25)}`
-                  : `1.5px solid ${atResolved.border}`,
+              fallback: `1.5px solid ${atResolved.border}`,
             }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
@@ -3433,10 +3428,7 @@ export default function ShiftEditPanel({
     );
     if (!absence) return null;
     const absenceLabel = absence.name || absence.label;
-    const colors = resolveShiftPillColors(
-      { color: absence.color, text: absence.text, border: absence.border },
-      isDarkTheme,
-    );
+    const colors = absenceStripeFill(absence.color, isDarkTheme);
     const from = lastShiftEndTime();
     const diff = panelDiff.restOfDayDiff ?? null;
     return (
@@ -3446,10 +3438,7 @@ export default function ShiftEditPanel({
         style={{
           border: getPanelDiffBorder({
             diffKind: diff?.borderKind ?? null,
-            fallback:
-              colors.border === "transparent"
-                ? `1.5px solid ${darkenColor(colors.color, 0.25)}`
-                : `1.5px solid ${colors.border}`,
+            fallback: `1.5px solid ${colors.border}`,
           }),
           borderRadius: shiftEditCardOuterRadius,
           position: "relative",
@@ -3460,7 +3449,7 @@ export default function ShiftEditPanel({
         {renderShiftDiffBadge(diff?.badge ?? null)}
         <div
           style={{
-            background: colors.color,
+            background: colors.background,
             minHeight: 44,
             padding: "8px 12px",
             display: "flex",

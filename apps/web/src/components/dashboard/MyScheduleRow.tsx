@@ -17,6 +17,15 @@ import { MaybeHint } from "@/components/ui/hint";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
+import {
+  attachedPillSeams,
+  gapBefore,
+  seamBorders,
+  seamRadius,
+  timesMeet,
+  type PillSeam,
+} from "@/lib/attached-pill";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type {
@@ -94,6 +103,10 @@ type MyScheduleShift = {
   focusAreaId: number | null;
   noteShift: ScheduleNoteShift | null;
   noteMarks: ScheduleNoteMark[];
+  startTime: string | null;
+  endTime: string | null;
+  /** Edges where this pill touches its neighbour (connected in time). */
+  seams: PillSeam[];
 };
 
 function capShiftText(value: string): string {
@@ -161,12 +174,10 @@ function getDelimitedValue(
   count: number,
 ): string | null {
   if (!value) return null;
-  const parts = value
-    .split("|")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length > 1) return parts[index] ?? null;
-  return count <= 1 ? (parts[0] ?? null) : null;
+  // An unset part is stored empty ("|00:00"), so keep the positions.
+  const parts = value.split("|").map((part) => part.trim());
+  if (parts.length > 1) return parts[index] || null;
+  return count <= 1 ? parts[0] || null : null;
 }
 
 function buildWorkedShifts(input: {
@@ -234,6 +245,9 @@ function buildWorkedShifts(input: {
       // A cell stored before segments names its shift through the assignment.
       noteShift: noteShiftOf(segment.jobId != null ? segment : assignment),
       noteMarks: [],
+      startTime,
+      endTime,
+      seams: [],
     });
   });
 
@@ -332,17 +346,12 @@ function buildMyScheduleDay(input: {
 
   const absenceShift = (absenceTypeId: number, fallbackLabel: string): MyScheduleShift => {
     const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
-    const resolved = absence
-      ? resolveShiftPillColors(
-          { color: absence.color, text: absence.text, border: absence.border },
-          input.isDarkTheme,
-        )
-      : null;
+    const resolved = absence ? absenceStripeFill(absence.color, input.isDarkTheme) : null;
     return {
       label: absence?.name ?? fallbackLabel,
       jobName: null,
       timeRange: null,
-      background: resolved?.color ?? "var(--dg-color-bg-secondary)",
+      background: resolved?.background ?? "var(--dg-color-bg-secondary)",
       border: resolved?.border ?? "var(--dg-color-border)",
       textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
       badge: null,
@@ -350,6 +359,9 @@ function buildMyScheduleDay(input: {
       focusAreaId: null,
       noteShift: null,
       noteMarks: [],
+      startTime: null,
+      endTime: null,
+      seams: [],
     };
   };
 
@@ -388,10 +400,20 @@ function buildMyScheduleDay(input: {
 
   // The absence for the rest of the day comes after the shifts (item 45).
   const restOfDayAbsenceTypeId = displayEntry.restOfDayAbsenceTypeId ?? null;
-  const shifts =
-    restOfDayAbsenceTypeId != null && workedShifts.length > 0
-      ? [...workedShifts, absenceShift(restOfDayAbsenceTypeId, "Absence")]
-      : workedShifts;
+  const hasRestOfDay = restOfDayAbsenceTypeId != null && workedShifts.length > 0;
+  const shifts = hasRestOfDay
+    ? [...workedShifts, absenceShift(restOfDayAbsenceTypeId, "Absence")]
+    : workedShifts;
+  // Pills touch only when connected in time; the absence starts as the last shift ends.
+  const seams = attachedPillSeams("stacked", [
+    ...workedShifts
+      .slice(1)
+      .map((shift, index) => timesMeet(workedShifts[index].endTime, shift.startTime)),
+    ...(hasRestOfDay ? [true] : []),
+  ]);
+  shifts.forEach((shift, index) => {
+    shift.seams = seams[index];
+  });
 
   return {
     key: dateKey,
@@ -559,11 +581,13 @@ function isCrowdedByPill(shift: MyScheduleShift, cellWidth: number): boolean {
 
 function ShiftPill({
   shift,
+  index,
   alignLeft,
   indicatorTypes,
   height,
 }: {
   shift: MyScheduleShift;
+  index: number;
   alignLeft: boolean;
   indicatorTypes: DashboardContentProps["indicatorTypes"];
   height: number;
@@ -582,10 +606,14 @@ function ShiftPill({
         justifyContent: "center",
         textAlign: alignLeft ? "left" : undefined,
         padding: "8px",
-        borderRadius: "var(--dg-radius-sm, 6px)",
-        border: shift.borderKind
-          ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
-          : `1px solid ${shift.border}`,
+        borderRadius: seamRadius("var(--dg-radius-sm, 6px)", shift.seams),
+        ...seamBorders(
+          shift.borderKind
+            ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
+            : `1px solid ${shift.border}`,
+          shift.seams,
+        ),
+        ...gapBefore(index, shift.seams, "stacked", 4),
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
@@ -765,7 +793,6 @@ function DayBox({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 4,
             marginTop: 4,
             justifyContent: "flex-start",
             flex: 1,
@@ -777,6 +804,7 @@ function DayBox({
             day.shifts.map((shift, index) => (
               <ShiftPill
                 key={index}
+                index={index}
                 shift={shift}
                 alignLeft={alignLeft}
                 indicatorTypes={indicatorTypes}

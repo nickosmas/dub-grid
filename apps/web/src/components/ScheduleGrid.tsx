@@ -85,7 +85,6 @@ import {
   getReadableTextOnSurface,
   resolveShiftPillColors,
   toDarkPillColors,
-  visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
 import {
@@ -93,8 +92,18 @@ import {
   lightColorTokens,
   darkColorTokens,
   getAvatarTone,
+  absenceStripeCss,
+  resolveAbsenceStripes,
 } from "@dubgrid/design-tokens";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import {
+  attachedPillSeams,
+  seamBorders,
+  gapBefore,
+  seamRadius,
+  timesMeet,
+} from "@/lib/attached-pill";
+import { tintStripeCss } from "@/lib/absence-stripes";
 import {
   buildShiftJobPairKey,
   createAssignmentDefinitionIdByPairMap,
@@ -2338,6 +2347,9 @@ const SectionBlock = memo(function SectionBlock({
                       const firstStyle = hasDraggableEntry
                         ? getStyleByIdOrLabel(shiftLabel.split("/")[0], cellCodeIds[0])
                         : null;
+                      const dragAbsenceStripes = cellAbsenceType
+                        ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
+                        : null;
                       const leadingDividerInset = index === 0 ? 0 : 1;
                       // Only the cell's own top divider eats into its box. The
                       // header/open-shifts stroke above row 0 lives in that
@@ -2496,12 +2508,14 @@ const SectionBlock = memo(function SectionBlock({
                                     seriesId: null,
                                     fromRecurring: false,
                                   },
-                                  pillColor:
-                                    cellAbsenceType?.color ??
-                                    firstStyle?.color ??
-                                    "var(--dg-color-bg)",
+                                  pillColor: dragAbsenceStripes
+                                    ? absenceStripeCss(
+                                        dragAbsenceStripes.stripeA,
+                                        dragAbsenceStripes.stripeB,
+                                      )
+                                    : (firstStyle?.color ?? "var(--dg-color-bg)"),
                                   pillText:
-                                    cellAbsenceType?.text ??
+                                    dragAbsenceStripes?.text ??
                                     firstStyle?.text ??
                                     "var(--dg-color-text-muted)",
                                 }}
@@ -2785,11 +2799,17 @@ const SectionBlock = memo(function SectionBlock({
                                           text: cellAbsenceType!.text,
                                         }
                                       : getStyleByIdOrLabel(label, cellCodeIds[0]);
-                                    const darkPillStyle = isDarkTheme
-                                      ? toDarkPillColors(style.color)
+                                    const absenceStripes = isAbsence
+                                      ? resolveAbsenceStripes(style.color, isDarkTheme)
                                       : null;
-                                    const effectiveColor = darkPillStyle?.bg ?? style.color;
-                                    const effectiveText = darkPillStyle?.text ?? style.text;
+                                    const darkPillStyle =
+                                      isDarkTheme && !absenceStripes
+                                        ? toDarkPillColors(style.color)
+                                        : null;
+                                    const effectiveColor =
+                                      absenceStripes?.stripeA ?? darkPillStyle?.bg ?? style.color;
+                                    const effectiveText =
+                                      absenceStripes?.text ?? darkPillStyle?.text ?? style.text;
                                     const codeEntry0 =
                                       cellCodeIds[0] != null
                                         ? assignmentById.get(cellCodeIds[0])
@@ -2846,11 +2866,8 @@ const SectionBlock = memo(function SectionBlock({
                                           themeSurface,
                                         );
                                     // Compute effective border: draft indicators use dashed border.
-                                    // Absence pills derive theirs from the resolved text like every
-                                    // other pill — their stored border is the "transparent"
-                                    // sentinel, which would render as no border at all in light mode.
-                                    const absenceBorder = isAbsence
-                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : visiblePillBorder(cellAbsenceType!.border, singleForegroundColor)}`
+                                    const absenceBorder = absenceStripes
+                                      ? `1px solid ${absenceStripes.border}`
                                       : `1px solid ${borderColor(singleForegroundColor)}`;
                                     const effectiveBorder = singleDraftBorderKind
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)
@@ -2974,9 +2991,14 @@ const SectionBlock = memo(function SectionBlock({
                                               right: `${singleSideInset}px`,
                                               bottom: `${singleBottomInset}px`,
                                               left: insetFromVisibleCellLeft(singleSideInset),
-                                              background: singleUsesShiftColor
-                                                ? effectiveColor
-                                                : "var(--dg-color-surface)",
+                                              background: !singleUsesShiftColor
+                                                ? "var(--dg-color-surface)"
+                                                : absenceStripes
+                                                  ? absenceStripeCss(
+                                                      absenceStripes.stripeA,
+                                                      absenceStripes.stripeB,
+                                                    )
+                                                  : effectiveColor,
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
                                               border: effectiveBorder,
                                               borderRadius: SINGLE_SHIFT_PILL_RADIUS,
@@ -3307,6 +3329,73 @@ const SectionBlock = memo(function SectionBlock({
                                     pillCount,
                                     isNameMode,
                                   );
+                                  const multiPillGap = stackShifts
+                                    ? multiPillBadges.slice(1).some(Boolean) || !!restOfDayPillBadge
+                                      ? STACKED_SHIFT_CHIP_GAP
+                                      : STACKED_SHIFT_GAP
+                                    : SIDE_BY_SIDE_SHIFT_GAP;
+                                  // Neighbouring pills touch when one runs straight into
+                                  // the next; the rest-of-day absence always starts where
+                                  // the last shift ends.
+                                  const pillSpans = labels.map((_, li) => {
+                                    const code =
+                                      cellCodeIds[li] != null
+                                        ? assignmentById.get(cellCodeIds[li])
+                                        : undefined;
+                                    const category =
+                                      code?.categoryId != null
+                                        ? categoryById.get(code.categoryId)
+                                        : undefined;
+                                    const own =
+                                      customTimes?.perPill?.[li] ??
+                                      (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                    // An unset custom time is stored as "", not null.
+                                    return {
+                                      start:
+                                        own?.start || code?.defaultStartTime || category?.startTime,
+                                      end: own?.end || code?.defaultEndTime || category?.endTime,
+                                    };
+                                  });
+                                  const pillJoins = [
+                                    ...pillSpans
+                                      .slice(1)
+                                      .map((span, li) => timesMeet(pillSpans[li].end, span.start)),
+                                    ...(restOfDayAbsenceTypeId != null ? [true] : []),
+                                  ];
+                                  // Stacked, each pill's share of spare height follows its
+                                  // line count, so a one-line shift stays short beside a
+                                  // pill carrying a time or a job.
+                                  const pillLines = [
+                                    ...labels.map((label, li) => {
+                                      const own =
+                                        customTimes?.perPill?.[li] ??
+                                        (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                      const secondary = !!getDisplayPartsByIdOrLabel(
+                                        label,
+                                        cellCodeIds[li],
+                                      ).secondaryLabel;
+                                      return (
+                                        1 +
+                                        (own?.start || own?.end ? 1 : 0) +
+                                        (secondary && isNameMode ? 1 : 0)
+                                      );
+                                    }),
+                                    ...(restOfDayAbsenceTypeId != null
+                                      ? [
+                                          1 +
+                                            ((
+                                              customTimes?.perPill?.[labels.length - 1] ??
+                                              (labels.length === 1 && !customTimes?.perPill
+                                                ? customTimes
+                                                : null)
+                                            )?.end
+                                              ? 1
+                                              : 0),
+                                        ]
+                                      : []),
+                                  ];
+                                  const pillAxis = stackShifts ? "stacked" : "side-by-side";
+                                  const pillSeams = attachedPillSeams(pillAxis, pillJoins);
                                   const multiTopInset = 4;
                                   const multiSideInset = 4;
                                   const multiBottomInset = 4;
@@ -3386,17 +3475,17 @@ const SectionBlock = memo(function SectionBlock({
                                               // its own lines and they share any spare room.
                                               ...(stackShifts
                                                 ? {
-                                                    gridTemplateRows: `repeat(${pillCount}, minmax(min-content, 1fr))`,
+                                                    gridTemplateRows: pillLines
+                                                      .map(
+                                                        (lines) =>
+                                                          `minmax(min-content, ${lines}fr)`,
+                                                      )
+                                                      .join(" "),
                                                   }
                                                 : {
                                                     gridTemplateColumns: `repeat(${pillCount}, minmax(0, 1fr))`,
                                                   }),
-                                              gap: stackShifts
-                                                ? multiPillBadges.slice(1).some(Boolean) ||
-                                                  !!restOfDayPillBadge
-                                                  ? STACKED_SHIFT_CHIP_GAP
-                                                  : STACKED_SHIFT_GAP
-                                                : SIDE_BY_SIDE_SHIFT_GAP,
+                                              gap: 0,
                                               flex: 1,
                                               minHeight: 0,
                                             }}
@@ -3460,6 +3549,7 @@ const SectionBlock = memo(function SectionBlock({
                                               const pillHasChip =
                                                 !!pillBadge ||
                                                 (li === 0 && !!(draftBadge || publishBadge));
+                                              const pillSeam = pillSeams[li];
                                               const pillBorder = draftPillBorderKind
                                                 ? getDraftBorder(
                                                     draftPillBorderKind,
@@ -3556,8 +3646,17 @@ const SectionBlock = memo(function SectionBlock({
                                                     background: multiUsesShiftColor
                                                       ? effectiveColorLi
                                                       : "var(--dg-color-surface)",
-                                                    border: pillBorder,
-                                                    borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                                    ...seamBorders(pillBorder, pillSeam),
+                                                    ...gapBefore(
+                                                      li,
+                                                      pillSeam,
+                                                      pillAxis,
+                                                      multiPillGap,
+                                                    ),
+                                                    borderRadius: seamRadius(
+                                                      SINGLE_SHIFT_PILL_RADIUS,
+                                                      pillSeam,
+                                                    ),
                                                     color: multiForegroundColor,
                                                     boxShadow:
                                                       publishRingStatus === "new" ||
@@ -3629,7 +3728,10 @@ const SectionBlock = memo(function SectionBlock({
                                                         background:
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
-                                                        borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
+                                                        borderRadius: seamRadius(
+                                                          multiCrossFocusWingRadius,
+                                                          [...pillSeam, "right"],
+                                                        ),
                                                         padding: "0 2px",
                                                         letterSpacing: "-0.2em",
                                                         pointerEvents: "none",
@@ -3821,25 +3923,23 @@ const SectionBlock = memo(function SectionBlock({
                                               (() => {
                                                 // The absence for the rest of the day, after the
                                                 // shifts; from when the last shift ended, if known.
-                                                const absenceColor =
-                                                  restOfDayAbsenceType?.color ??
-                                                  "var(--dg-color-bg)";
-                                                const absenceText =
-                                                  restOfDayAbsenceType?.text ??
-                                                  "var(--dg-color-text-primary)";
-                                                const darkAbsence =
-                                                  isDarkTheme && restOfDayAbsenceType
-                                                    ? toDarkPillColors(absenceColor)
-                                                    : null;
-                                                const absenceBg = darkAbsence?.bg ?? absenceColor;
-                                                const absenceFg = darkAbsence?.text ?? absenceText;
+                                                const stripes = restOfDayAbsenceType
+                                                  ? resolveAbsenceStripes(
+                                                      restOfDayAbsenceType.color,
+                                                      isDarkTheme,
+                                                    )
+                                                  : null;
+                                                const absenceBg = stripes
+                                                  ? absenceStripeCss(
+                                                      stripes.stripeA,
+                                                      stripes.stripeB,
+                                                    )
+                                                  : "var(--dg-color-bg)";
+                                                const absenceFg =
+                                                  stripes?.text ?? "var(--dg-color-text-primary)";
                                                 const absenceBorder =
-                                                  isDarkTheme || !restOfDayAbsenceType
-                                                    ? borderColor(absenceFg)
-                                                    : visiblePillBorder(
-                                                        restOfDayAbsenceType.border,
-                                                        absenceFg,
-                                                      );
+                                                  stripes?.border ?? borderColor(absenceFg);
+                                                const absenceSeam = pillSeams[labels.length];
                                                 const lastShiftTime =
                                                   customTimes?.perPill?.[labels.length - 1] ??
                                                   (labels.length === 1 && !customTimes?.perPill
@@ -3856,19 +3956,31 @@ const SectionBlock = memo(function SectionBlock({
                                                     style={{
                                                       flex: 1,
                                                       background: absenceBg,
-                                                      border: restOfDayDraftDiff?.borderKind
-                                                        ? getDraftBorder(
-                                                            restOfDayDraftDiff.borderKind,
-                                                            `1px solid ${absenceBorder}`,
-                                                          )
-                                                        : `1px solid ${absenceBorder}`,
+                                                      ...seamBorders(
+                                                        restOfDayDraftDiff?.borderKind
+                                                          ? getDraftBorder(
+                                                              restOfDayDraftDiff.borderKind,
+                                                              `1px solid ${absenceBorder}`,
+                                                            )
+                                                          : `1px solid ${absenceBorder}`,
+                                                        absenceSeam,
+                                                      ),
+                                                      ...gapBefore(
+                                                        labels.length,
+                                                        absenceSeam,
+                                                        pillAxis,
+                                                        multiPillGap,
+                                                      ),
                                                       boxShadow: restOfDayPublishDiff?.borderKind
                                                         ? getPublishDiffRing(
                                                             restOfDayPublishDiff.borderKind,
                                                             borderColor(absenceFg),
                                                           )
                                                         : "none",
-                                                      borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                                      borderRadius: seamRadius(
+                                                        SINGLE_SHIFT_PILL_RADIUS,
+                                                        absenceSeam,
+                                                      ),
                                                       color: absenceFg,
                                                       display: "flex",
                                                       flexDirection: "column",
@@ -4057,7 +4169,13 @@ const SectionBlock = memo(function SectionBlock({
                                       right: "4px",
                                       bottom: "4px",
                                       left: insetFromVisibleCellLeft(4),
-                                      background: "var(--dg-color-danger-bg)",
+                                      background:
+                                        publishDeletedAbsenceTypeId != null
+                                          ? tintStripeCss(
+                                              "var(--dg-color-danger-bg)",
+                                              "var(--dg-color-danger-dark)",
+                                            )
+                                          : "var(--dg-color-danger-bg)",
                                       border: isDraftDelete
                                         ? "2px dashed var(--dg-color-danger-dark)"
                                         : "1px solid var(--dg-color-danger-border)",

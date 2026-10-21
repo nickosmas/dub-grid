@@ -129,7 +129,8 @@ describe("PrintScheduleView", () => {
     expect(pills.length).toBe(7);
     for (const pill of pills) {
       const surface = pill.closest("div[style*='border-radius']") as HTMLElement | null;
-      expect(surface?.style.background).toBe("rgb(253, 230, 138)");
+      expect(surface?.style.background).toContain("repeating-linear-gradient(135deg");
+      expect(surface?.style.borderStyle).toBe("dashed");
     }
   });
 
@@ -361,7 +362,10 @@ describe("PrintScheduleView", () => {
         "S",
       ]);
       expect(cellPills(mixed)[0].textContent).toContain("7");
-      expect(cellPills(mixed)[1].style.background).toBe("rgb(254, 226, 226)");
+      expect(cellPills(mixed)[1].style.background).toContain("repeating-linear-gradient(135deg");
+      // The absence starts where the shift ends, so the two touch.
+      expect(cellPills(mixed)[0].style.borderRightStyle).toBe("none");
+      expect(cellPills(mixed)[1].style.borderLeftStyle).toBe("none");
       expect(cellPills(triple)).toHaveLength(3);
       expect(cellPills(triple)[2].textContent).toBe("S");
     });

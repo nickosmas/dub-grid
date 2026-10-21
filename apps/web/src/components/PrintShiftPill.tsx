@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { PRINT_FIT_LINE } from "@/components/print-fit";
+import { seamBorders, seamRadius, type PillSeam } from "@/lib/attached-pill";
 import { fmt12hShort } from "@/lib/utils";
 
 export interface PrintPillWing {
@@ -22,6 +23,10 @@ export interface PrintShiftPillProps {
   isNameMode: boolean;
   /** Puts the wing above the label, as a double shift's pills are too narrow for a side wing. */
   wingOnTop: boolean;
+  /** Edges where this pill touches its neighbour, which drop their border and rounding. */
+  seams?: readonly PillSeam[];
+  /** Space before this pill when it does not touch the one before it. */
+  spacing?: CSSProperties;
 }
 
 // The print window has no app CSS variables, so the corners are literal, in em
@@ -51,6 +56,8 @@ export function PrintShiftPill({
   variant,
   isNameMode,
   wingOnTop,
+  seams = [],
+  spacing,
 }: PrintShiftPillProps) {
   const isMulti = variant === "multi";
   const hasTime = !!time && !!(time.start || time.end);
@@ -68,9 +75,10 @@ export function PrintShiftPill({
         flexDirection: wingOnTop ? "column" : "row",
         background,
         color,
-        border,
-        borderRadius: PILL_RADIUS[variant],
+        ...seamBorders(border, seams),
+        borderRadius: seamRadius(PILL_RADIUS[variant], seams),
         overflow: "hidden",
+        ...spacing,
       }}
     >
       {wing && (

@@ -266,3 +266,83 @@ export function resolveShiftPillColors(style: ShiftPillColors, isDark: boolean):
   const dark = toDarkPillColors(style.color);
   return { color: dark.bg, text: dark.text, border: borderColor(dark.text) };
 }
+
+export interface AbsenceStripeColors {
+  stripeA: string;
+  stripeB: string;
+  text: string;
+  border: string;
+}
+
+const ABSENCE_STRIPE_WIDTH = 6;
+// Approved: the Sick preset #FECACA pairs with #FEE2E2, a 45% mix toward white.
+const LIGHT_STRIPE_MIX = 0.45;
+const DARK_STRIPE_MIX = 0.4;
+const DARK_STRIPE_TARGET = "#18181B";
+// Red's approved pair sits at 1.18:1. Pale presets (Ice, Pearl, Cloud) mixed
+// toward white land near 1.05:1, where the stripes disappear.
+const MIN_STRIPE_SEPARATION = 1.15;
+const STRIPE_NUDGE_TARGET = "#1E293B";
+const MIN_TEXT_CONTRAST = 4.5;
+
+function mixHex(from: string, to: string, amount: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * amount,
+    g: a.g + (b.g - a.g) * amount,
+    b: a.b + (b.b - a.b) * amount,
+  });
+}
+
+function separateStripes(base: string, stripeB: string): string {
+  let stripeA = base;
+  for (
+    let step = 1;
+    contrastRatio(stripeA, stripeB) < MIN_STRIPE_SEPARATION && step <= 50;
+    step++
+  ) {
+    stripeA = mixHex(base, STRIPE_NUDGE_TARGET, step / 100);
+  }
+  return stripeA;
+}
+
+// A deep tone of the stripe's own hue, darkened until it clears 4.5:1 on the
+// darker stripe; the lighter stripe then clears it too.
+function deepToneText(stripeA: string): string {
+  const { h, s } = rgbToHsl(hexToRgb(stripeA));
+  const saturation = Math.min(s, 0.65);
+  for (let lightness = 0.3; lightness >= 0; lightness -= 0.02) {
+    const candidate = rgbToHex(hslToRgb({ h, s: saturation, l: lightness }));
+    if (contrastRatio(candidate, stripeA) >= MIN_TEXT_CONTRAST) return candidate;
+  }
+  return "#0F172A";
+}
+
+/**
+ * The two stripe tints, text and border for an absence pill, derived from the
+ * absence type's own color. Text clears 4.5:1 against both stripes: the
+ * stripe nearer the text's lightness is always `stripeA`, so it is the one
+ * checked.
+ */
+export function resolveAbsenceStripes(color: string, isDark: boolean): AbsenceStripeColors {
+  const base = normalizeHex(color);
+  if (isDark) {
+    const dark = toDarkPillColors(base);
+    return {
+      stripeA: dark.bg,
+      stripeB: mixHex(dark.bg, DARK_STRIPE_TARGET, DARK_STRIPE_MIX),
+      text: dark.text,
+      border: borderColor(dark.text),
+    };
+  }
+  const stripeB = mixHex(base, "#FFFFFF", LIGHT_STRIPE_MIX);
+  const stripeA = separateStripes(base, stripeB);
+  const text = deepToneText(stripeA);
+  return { stripeA, stripeB, text, border: borderColor(text) };
+}
+
+export function absenceStripeCss(stripeA: string, stripeB: string): string {
+  const w = ABSENCE_STRIPE_WIDTH;
+  return `repeating-linear-gradient(135deg, ${stripeA} 0, ${stripeA} ${w}px, ${stripeB} ${w}px, ${stripeB} ${w * 2}px)`;
+}

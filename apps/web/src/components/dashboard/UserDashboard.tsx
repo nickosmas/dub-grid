@@ -24,6 +24,7 @@ import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
@@ -941,15 +942,10 @@ function buildAbsenceSegment(
   isDarkTheme: boolean,
 ): DashboardScheduleSegment {
   const label = absence?.name ?? absence?.label ?? entry.label ?? "Away";
-  const resolved = absence
-    ? resolveShiftPillColors(
-        { color: absence.color, text: absence.text, border: absence.border },
-        isDarkTheme,
-      )
-    : null;
+  const resolved = absence ? absenceStripeFill(absence.color, isDarkTheme) : null;
   return {
     assignment: null,
-    backgroundColor: resolved?.color ?? "var(--dg-color-bg-secondary)",
+    backgroundColor: resolved?.background ?? "var(--dg-color-bg-secondary)",
     borderColor: resolved?.border ?? "var(--dg-color-border)",
     chipLabel: label,
     dateKey,

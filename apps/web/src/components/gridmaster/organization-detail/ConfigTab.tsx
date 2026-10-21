@@ -1,4 +1,5 @@
-import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
+import { toDarkPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import {
   type AbsenceType,
@@ -364,13 +365,7 @@ export function ConfigTab({
               </thead>
               <tbody>
                 {activeAbsenceTypes.map((at0) => {
-                  const at = {
-                    ...at0,
-                    ...resolveShiftPillColors(
-                      { color: at0.color, text: at0.text, border: at0.border },
-                      isDarkTheme,
-                    ),
-                  };
+                  const at = { ...at0, ...absenceStripeFill(at0.color, isDarkTheme) };
                   return (
                     <tr key={at0.id}>
                       <td
@@ -390,7 +385,7 @@ export function ConfigTab({
                             borderRadius: "var(--dg-radius-md)",
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 700,
-                            background: at.color,
+                            background: at.background,
                             color: at.text,
                             border: `1.5px solid ${at.border}`,
                           }}
@@ -421,7 +416,7 @@ export function ConfigTab({
                             width: 20,
                             height: 20,
                             borderRadius: "var(--dg-radius-xs)",
-                            background: at.color,
+                            background: at.background,
                             border: `1px solid ${at.border}`,
                             verticalAlign: "middle",
                           }}

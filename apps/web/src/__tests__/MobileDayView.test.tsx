@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
 import MobileDayView from "@/components/MobileDayView";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import type {
@@ -151,7 +152,7 @@ describe("MobileDayView absence for the rest of the day", () => {
     );
   }
 
-  it("draws the absence after the shift, in its own colours", () => {
+  it("draws the absence after the shift, striped in its own colour and joined to it", () => {
     renderMixed();
 
     const day = screen.getByText("D").closest("button")!;
@@ -160,7 +161,12 @@ describe("MobileDayView absence for the rest of the day", () => {
         span.children.length === 0 && (span.textContent === "D" || span.textContent === "S"),
     );
     expect(pills.map((pill) => pill.textContent)).toEqual(["D", "S"]);
-    expect(pills[1]).toHaveStyle({ color: "#991B1B" });
+    const [shiftPill, absencePill] = pills.map((pill) => pill.closest<HTMLElement>("button > *")!);
+    const stripes = resolveAbsenceStripes(sick.color, false);
+    expect(absencePill).toHaveStyle({ color: stripes.text });
+    expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
+    expect(shiftPill.style.borderBottomStyle).toBe("none");
+    expect(absencePill.style.borderTopStyle).toBe("none");
   });
 
   it("counts only the shift in the tally", () => {
