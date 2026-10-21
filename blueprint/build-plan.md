@@ -912,10 +912,9 @@
         the day bar, deleted pill, the edit panel's unsaved-changes summary
         (paired by identity, not position), and Publish History (every
         segment's times, archived shifts by name).
-  - [ ] 46c. **Web dashboards and records** - the staff dashboard "Was"
+  - [x] 46c. **Web dashboards and records** - the staff dashboard "Was"
         block (fixing the production path that drops time and focus area),
-        the admin "My schedule" tooltip, the organization activity log
-        (Before and After, names), and the Gridmaster person record.
+        the admin "My schedule" tooltip, and the Gridmaster person record.
   - [ ] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
         sheet with the day bar, including job and rest-of-day absence.
         After 45d.
@@ -929,3 +928,7 @@
         (no mark or a plain "Changed" mark; summary alert or none).
   - [ ] 46g. **12-hour sweep** - any remaining 24-hour time shown to people
         (settings, reports, import) uses the shared 12-hour format.
+  - [ ] 46h. **Activity log Before and After** - the organization activity
+        log shows each schedule edit as Before and After with names. Its
+        rows store only the new state, so the save must record the previous
+        one: an extra read per save or a migration (owner decision).

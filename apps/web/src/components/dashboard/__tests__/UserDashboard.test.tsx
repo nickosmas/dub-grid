@@ -603,6 +603,44 @@ describe("UserDashboard", () => {
     ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
   });
 
+  it("shows a removed shift's Was card from its stored state, once", () => {
+    const props = makeProps();
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                fromState: {
+                  kind: "worked" as const,
+                  segments: [{ shiftId: 10, jobId: 7, position: 0 }],
+                  absenceTypeId: null,
+                  customStartTime: null,
+                  customEndTime: "12:00",
+                  seriesId: null,
+                  fromRecurring: false,
+                },
+                toState: null,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getAllByText("Was")).toHaveLength(1);
+    expect(within(myWeek).getByText("Removed")).toBeInTheDocument();
+    expect(within(myWeek).getByText("Day shift Care")).toBeInTheDocument();
+    expect(within(myWeek).getByText(/12:00 AM - 12:00 PM \(12 hrs\)/)).toBeInTheDocument();
+  });
+
   it("flows Working with and split follow-up shifts naturally instead of pinning to the hero bottom", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));

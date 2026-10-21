@@ -102,6 +102,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
+        focusAreas={focusAreas}
         periodDates={periodDates}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

@@ -40,6 +40,13 @@ import type {
   ShiftMap,
   ScheduleNoteShift,
 } from "@/types";
+import type { ShiftChangeResolvers } from "@dubgrid/schedule-core";
+import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Every day cell shares one width, never below this: the longest time range
@@ -65,6 +72,7 @@ const APPROX_NAME_CHAR_WIDTH = 6.6;
 // in a week-sized cell; the cell links through to the schedule for the full value.
 const MAX_SHIFT_TEXT_LENGTH = 64;
 
+const NO_FOCUS_AREAS: NonNullable<MyScheduleRowProps["focusAreas"]> = [];
 const NO_NOTES: DashboardContentProps["scheduleNotes"] = [];
 const NO_INDICATOR_TYPES: DashboardContentProps["indicatorTypes"] = [];
 
@@ -80,6 +88,7 @@ type MyScheduleRowProps = Pick<
   jobs?: DashboardContentProps["jobs"];
   publishedAssignmentIdByPair?: DashboardContentProps["publishedAssignmentIdByPair"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
+  focusAreas?: DashboardContentProps["focusAreas"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
@@ -262,6 +271,8 @@ function attachChangeBadges(
     assignmentById: Map<number, AssignmentDefinition>;
     absenceTypeById: Map<number, AbsenceType>;
     publishedAssignmentIdByPair: Map<string, number>;
+    /** The published change as "Was ..." text, which replaces the older detail. */
+    publishChangeText: string | null;
   },
 ): MyScheduleShift[] {
   const badges = resolveCellChangeBadges({
@@ -278,11 +289,17 @@ function attachChangeBadges(
       return absence ? absence.name || absence.label : "?";
     },
   });
-  return shifts.map((shift, index) => ({
-    ...shift,
-    badge: badges.pillBadges[index] ?? null,
-    borderKind: badges.pillBorderKinds[index] ?? null,
-  }));
+  return shifts.map((shift, index) => {
+    const badge = badges.pillBadges[index] ?? null;
+    return {
+      ...shift,
+      badge:
+        badge && badge.source === "publish" && input.publishChangeText
+          ? { ...badge, detail: input.publishChangeText }
+          : badge,
+      borderKind: badges.pillBorderKinds[index] ?? null,
+    };
+  });
 }
 
 function buildMyScheduleDay(input: {
@@ -298,6 +315,7 @@ function buildMyScheduleDay(input: {
   publishedAssignmentIdByPair: Map<string, number>;
   scheduleNotes: DashboardContentProps["scheduleNotes"];
   isScheduleEditor: boolean;
+  shiftChangeResolvers: ShiftChangeResolvers;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
@@ -336,12 +354,22 @@ function buildMyScheduleDay(input: {
           publishedLabel: "",
         });
 
+  const publishChangeView =
+    publishedChange && publishChangeHasStates(publishedChange)
+      ? describeCellStateChange(
+          publishedChange.fromState,
+          publishedChange.toState,
+          dateKey,
+          input.shiftChangeResolvers,
+        )
+      : null;
   const badgeInput = {
     entry,
     publishedChange,
     assignmentById: input.assignmentById,
     absenceTypeById: input.absenceTypeById,
     publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
+    publishChangeText: publishChangeView ? formatShiftChangeWasText(publishChangeView) : null,
   };
 
   const absenceShift = (absenceTypeId: number, fallbackLabel: string): MyScheduleShift => {
@@ -436,6 +464,7 @@ function buildMyScheduleDays(input: {
   publishedAssignmentIdByPair: Map<string, number>;
   scheduleNotes: DashboardContentProps["scheduleNotes"];
   isScheduleEditor: boolean;
+  shiftChangeResolvers: ShiftChangeResolvers;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
@@ -451,6 +480,7 @@ function buildMyScheduleDays(input: {
       publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
       scheduleNotes: input.scheduleNotes,
       isScheduleEditor: input.isScheduleEditor,
+      shiftChangeResolvers: input.shiftChangeResolvers,
     }),
   );
 }
@@ -825,6 +855,7 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
+  focusAreas = NO_FOCUS_AREAS,
   periodDates,
   periodLabel,
   isManagementOnly = false,
@@ -849,6 +880,17 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: [...assignmentById.values()],
+        shiftCategories,
+        jobs,
+        absenceTypes: [...absenceTypeById.values()],
+        focusAreas,
+      }),
+    [assignmentById, shiftCategories, jobs, absenceTypeById, focusAreas],
+  );
   const days = useMemo(
     () =>
       currentEmpId
@@ -865,6 +907,7 @@ export default function MyScheduleRow({
             publishedAssignmentIdByPair: assignmentIdByPair,
             scheduleNotes,
             isScheduleEditor,
+            shiftChangeResolvers,
           })
         : [],
     [
@@ -880,6 +923,7 @@ export default function MyScheduleRow({
       assignmentIdByPair,
       scheduleNotes,
       isScheduleEditor,
+      shiftChangeResolvers,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);

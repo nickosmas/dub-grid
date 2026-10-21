@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 3d6adad54f8da9ee38ab321a617583559c4789541b872cbb4ce724b3adcdeff0 -->
+<!-- blueprint:source-hash d5e8bdfdb8dec5dc6d0258243a15b2bbfbaad024ebdb8e0579eaec351acc1b03 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -152,7 +152,7 @@ Item 45 is split; 45a, 45b and 45c have shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20).
 
-Item 46 is split; 46a and 46b have shipped:
+Item 46 is split; 46a, 46b and 46c have shipped:
 
 - **46a - Shared change model and formatter:** shipped; one schedule-core
   function turns a cell's original and current state into Before and After sides,
@@ -162,10 +162,9 @@ Item 46 is split; 46a and 46b have shipped:
   the day bar, the deleted pill, the edit panel's unsaved-changes summary
   (paired by identity), and Publish History (every segment's times, archived
   shifts by name).
-- **46c - Web dashboards and records:** the staff dashboard "Was" block
+- **46c - Web dashboards and records:** shipped; the staff dashboard "Was" block
   (fixing the production path that drops time and focus area), the admin
-  "My schedule" tooltip, the organization activity log and the Gridmaster
-  person record.
+  "My schedule" tooltip and the Gridmaster person record.
 - **46d - Mobile:** Your week "Was" blocks and the "What changed" sheet with
   the day bar; after 45d.
 - **46e - Schedule-change alerts:** one alert per person per publish listing
@@ -175,6 +174,8 @@ Item 46 is split; 46a and 46b have shipped:
   and the hidden-state decisions.
 - **46g - 12-hour sweep:** any remaining 24-hour time shown to people uses
   the shared 12-hour format.
+- **46h - Activity log Before and After:** planned; needs the previous
+  state recorded at save time (owner decision).
 
 A shift change shows every field that tells the two sides apart (shift, job
 spelled out, 12-hour times with hours, focus area, absence), under Before and

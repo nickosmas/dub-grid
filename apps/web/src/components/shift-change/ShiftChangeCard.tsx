@@ -233,7 +233,7 @@ export function ShiftChangeCard({
         className,
       )}
     >
-      <div className="bg-bg-secondary/50 px-3.5 py-3">
+      <div className="bg-bg px-3.5 py-3">
         <SideBlock
           heading="Before"
           side={change.before}
@@ -264,12 +264,7 @@ export function ShiftChangeCard({
 export function ShiftChangeWas({ change, className }: { change: ShiftChange; className?: string }) {
   if (change.kind === "none") return null;
   return (
-    <div
-      className={cn(
-        "rounded-[8px] border border-border-light bg-bg-secondary/50 px-3 py-2.5",
-        className,
-      )}
-    >
+    <div className={cn("rounded-[8px] border border-border-light bg-bg px-3 py-2.5", className)}>
       <SideBlock
         heading="Was"
         side={change.before}
