@@ -159,7 +159,7 @@ Item 45 is split, and every part has shipped:
 The absence always comes last and carries no hours; at most two worked
 shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
 
-Item 46 is split; 46a, 46b, 46c, 46e, 46f and 46g have shipped:
+Item 46 is split; 46a, 46b, 46c, 46e, 46f, 46g and 46h have shipped:
 
 - **46a - Shared change model and formatter:** shipped; one schedule-core
   function turns a cell's original and current state into Before and After sides,
@@ -188,8 +188,10 @@ Item 46 is split; 46a, 46b, 46c, 46e, 46f and 46g have shipped:
   edits or publishes the schedule always sees both.
 - **46g - 12-hour sweep:** shipped; any remaining 24-hour time shown to people uses
   the shared 12-hour format.
-- **46h - Activity log Before and After:** planned; needs the previous
-  state recorded at save time (owner decision).
+- **46h - Activity log Before and After:** shipped; each single-cell save
+  records the cell as it stood before (one extra read, no migration), and
+  the organization activity log names the person and shows Before and
+  After. Rows saved earlier show the new shift only.
 
 A shift change shows every field that tells the two sides apart (shift, job
 spelled out, 12-hour times with hours, focus area, absence), under Before and

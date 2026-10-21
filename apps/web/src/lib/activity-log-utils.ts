@@ -9,7 +9,12 @@
 
 import type { FullAuditLogEntry } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
-import { addDaysToIsoDate, formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import {
+  addDaysToIsoDate,
+  formatDate,
+  formatShiftChangeCompact,
+  getIsoDateInTimeZone,
+} from "@dubgrid/schedule-core";
 import {
   AuditDetails,
   flattenDetails,
@@ -101,6 +106,11 @@ export function describeAuditEvent(action: string, details: Record<string, unkno
 // ---------------------------------------------------------------------------
 
 export function formatDetails(entry: ActivityEntryLike & { action: string }): DetailItem[] {
+  // A schedule edit that recorded its earlier state reads as Before -> After
+  // (item 46h); the details dialog draws the full card instead.
+  if (entry.shiftChange && entry.shiftChange.kind !== "none") {
+    return [{ label: "Change", value: formatShiftChangeCompact(entry.shiftChange) }];
+  }
   const details = detailsOf(entry);
   if (Object.keys(details).length === 0) return [];
 

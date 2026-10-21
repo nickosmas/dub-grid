@@ -6,6 +6,8 @@ import { resolveAuditActionScope } from "@/lib/audit/audience";
 import { authorizeAuditLogRead } from "@/lib/audit/authorize";
 import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 import { enrichAuditRows } from "@/lib/audit/enrich";
+import { withShiftChanges } from "@/lib/audit/shift-changes";
+import { fetchShiftChangeResolvers } from "@/app/api/shared/schedule";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -78,7 +80,10 @@ export async function GET(req: NextRequest) {
     };
 
     const rows = await fetchFilteredAuditRows(reader.serviceClient, filters);
-    const entries = await enrichAuditRows(reader.serviceClient, rows);
+    const entries = await withShiftChanges(
+      await enrichAuditRows(reader.serviceClient, rows),
+      (orgId) => fetchShiftChangeResolvers(reader.serviceClient, orgId),
+    );
 
     return NextResponse.json({
       entries,

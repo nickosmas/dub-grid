@@ -3,6 +3,7 @@
 import React from "react";
 import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
+import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import type { FullAuditLogEntry } from "@/types";
 import { formatDateTime } from "@/lib/audit/details";
@@ -90,7 +91,9 @@ export function ActivityDetailsDialog({
           <div id="activity-changes-title" className="dg-type-content-group-heading">
             What changed
           </div>
-          {details.length > 0 ? (
+          {entry.shiftChange && entry.shiftChange.kind !== "none" ? (
+            <ShiftChangeCard change={entry.shiftChange} layout="stacked" showDayBar />
+          ) : details.length > 0 ? (
             <DetailRows
               rows={details.map((detail): [string, React.ReactNode] => [
                 detail.label,

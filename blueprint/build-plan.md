@@ -929,7 +929,7 @@
         (no mark or a plain "Changed" mark; summary alert or none).
   - [x] 46g. **12-hour sweep** - any remaining 24-hour time shown to people
         (settings, reports, import) uses the shared 12-hour format.
-  - [ ] 46h. **Activity log Before and After** - the organization activity
+  - [x] 46h. **Activity log Before and After** - the organization activity
         log shows each schedule edit as Before and After with names. Its
         rows store only the new state, so the save must record the previous
         one: an extra read per save or a migration (owner decision).

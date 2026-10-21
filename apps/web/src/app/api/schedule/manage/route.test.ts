@@ -348,6 +348,70 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
+  it("records the cell as it stood before an edit, for the activity log (46h)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+    serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "get_schedule_cell_snapshot_payload" || args.p_snapshot_kind !== "published") {
+        return { data: [], error: null };
+      }
+      return {
+        data: [
+          {
+            version: 4,
+            focus_area_id: null,
+            series_id: null,
+            from_recurring: false,
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: "08:00",
+            custom_end_time: null,
+            shift_ids: [3],
+            job_ids: [30],
+            is_mentored_flags: [false],
+          },
+        ],
+        error: null,
+      };
+    });
+    const auditInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const previousFrom = serviceFrom.getMockImplementation();
+    serviceFrom.mockImplementation((table: string) =>
+      table === "audit_log" ? { insert: auditInsert } : previousFrom?.(table),
+    );
+    const input = { kind: "absence", segments: [], absenceTypeId: 7 };
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        expectedVersion: 4,
+        input,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "shift.updated",
+        details: {
+          input: expect.objectContaining({ kind: "absence", absenceTypeId: 7 }),
+          before: {
+            kind: "worked",
+            segments: [{ shiftId: 3, jobId: 30, position: 0, isMentored: false }],
+            focusAreaId: null,
+            absenceTypeId: null,
+            customStartTime: "08:00",
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        },
+      }),
+    );
+  });
+
   it("keeps a rest-of-day absence when only the times change (item 45)", async () => {
     userRpc.mockResolvedValue({ error: null });
     serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {

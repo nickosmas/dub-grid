@@ -18,6 +18,7 @@ import type {
   ShiftRequestType,
   ResolvedBillingPolicy,
 } from "@dubgrid/domain";
+import type { ShiftChange } from "@dubgrid/schedule-core";
 export type {
   AdminPermissions,
   AssignableOrganizationRole,
@@ -1210,6 +1211,8 @@ export interface FullAuditLogEntry {
   targetEmail: string | null;
   details: Record<string, unknown>;
   createdAt: string;
+  /** A schedule edit's Before and After, when the edit recorded them (item 46h). */
+  shiftChange?: ShiftChange | null;
 }
 
 /**

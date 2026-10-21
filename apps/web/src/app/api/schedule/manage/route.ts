@@ -9,7 +9,7 @@ import type {
 } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
-import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
 import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
 import {
   fetchHiddenStaffIds,
@@ -656,8 +656,57 @@ async function fetchScheduleCellSnapshotPayload(
     shift_ids: Array<number | null>;
     job_ids: number[];
     is_mentored_flags: boolean[];
+    custom_start_time: string | null;
+    custom_end_time: string | null;
   }>;
   return rows[0] ?? null;
+}
+
+type SnapshotPayload = NonNullable<Awaited<ReturnType<typeof fetchScheduleCellSnapshotPayload>>>;
+
+/** A stored snapshot as the shared cell state; null for an empty or deleted cell. */
+function cellStateFromSnapshotPayload(payload: SnapshotPayload | null): ScheduleCellState | null {
+  if (!payload || payload.state_kind === "deleted") return null;
+  return {
+    kind: payload.state_kind,
+    segments: (payload.shift_ids ?? []).map((shiftId, position) => ({
+      shiftId,
+      jobId: payload.job_ids[position]!,
+      position,
+      isMentored: payload.is_mentored_flags?.[position] ?? false,
+    })),
+    focusAreaId: payload.focus_area_id,
+    absenceTypeId: payload.absence_type_id,
+    customStartTime: payload.custom_start_time ?? null,
+    customEndTime: payload.custom_end_time ?? null,
+    seriesId: payload.series_id,
+    fromRecurring: payload.from_recurring,
+  };
+}
+
+/**
+ * The cell as it stood before this save, its draft when it has one, else what
+ * is published, so the activity log can show Before and After (item 46h). The
+ * save's version check means a save that succeeds replaced exactly this.
+ * Undefined when the read fails: the log then records the new state alone,
+ * and the save goes ahead.
+ */
+async function readCellStateForAudit(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+): Promise<ScheduleCellState | null | undefined> {
+  try {
+    const [draft, published] = await Promise.all([
+      fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "draft"),
+      fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "published"),
+    ]);
+    return cellStateFromSnapshotPayload(draft ?? published);
+  } catch (error) {
+    logger.error({ error, orgId }, "Schedule audit before-state read failed");
+    return undefined;
+  }
 }
 
 /**
@@ -1065,6 +1114,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const before = await readCellStateForAudit(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+        );
         await writeShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
@@ -1084,7 +1139,7 @@ export async function POST(req: NextRequest) {
           action: data.expectedVersion !== undefined ? "shift.updated" : "shift.created",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: { input: data.input },
+          details: { input: data.input, before },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1152,6 +1207,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const before = await readCellStateForAudit(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+        );
         await deleteShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
@@ -1168,7 +1229,7 @@ export async function POST(req: NextRequest) {
           action: "shift.deleted",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: {},
+          details: { before },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1203,6 +1264,12 @@ export async function POST(req: NextRequest) {
         // sees an optimistic-conflict error and refetches.
         await Promise.all(
           data.shifts.map(async (shift) => {
+            const before = await readCellStateForAudit(
+              auth.serviceClient,
+              data.orgId,
+              shift.employeeId,
+              shift.date,
+            );
             await deleteShiftSnapshot(auth.userClient, {
               orgId: data.orgId,
               employeeId: shift.employeeId,
@@ -1219,7 +1286,7 @@ export async function POST(req: NextRequest) {
               action: "shift.deleted",
               resourceType: "shift",
               resourceId: `${shift.employeeId}:${shift.date}`,
-              details: {},
+              details: { before },
             });
           }),
         );
@@ -1263,6 +1330,7 @@ export async function POST(req: NextRequest) {
             : publishedPayload?.state_kind === "worked"
               ? publishedPayload
               : null;
+        const timesBefore = cellStateFromSnapshotPayload(draftPayload ?? publishedPayload);
         if (!sourcePayload) {
           return NextResponse.json(
             { error: "Cannot set custom times without a worked schedule cell" },
@@ -1308,7 +1376,18 @@ export async function POST(req: NextRequest) {
           action: "shift.updated",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: { customStartTime: data.customStartTime, customEndTime: data.customEndTime },
+          details: {
+            customStartTime: data.customStartTime,
+            customEndTime: data.customEndTime,
+            before: timesBefore,
+            input: timesBefore
+              ? {
+                  ...timesBefore,
+                  customStartTime: data.customStartTime,
+                  customEndTime: data.customEndTime,
+                }
+              : null,
+          },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1333,6 +1412,10 @@ export async function POST(req: NextRequest) {
         const state = normalizeScheduleInput(data.input);
         const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
           getScheduleCellStorage(state);
+        const [before, targetBefore] = await Promise.all([
+          readCellStateForAudit(auth.serviceClient, data.orgId, data.sourceEmpId, data.sourceDate),
+          readCellStateForAudit(auth.serviceClient, data.orgId, data.targetEmpId, data.targetDate),
+        ]);
         const { error } = await auth.userClient.rpc("move_shift", {
           p_org_id: data.orgId,
           p_source_emp_id: data.sourceEmpId,
@@ -1386,6 +1469,9 @@ export async function POST(req: NextRequest) {
             targetEmpId: data.targetEmpId,
             targetDate: data.targetDate,
             dragMode: data.dragMode ?? "move",
+            before,
+            targetBefore,
+            input: state,
           },
         });
         return NextResponse.json({ success: true });

@@ -40,6 +40,8 @@ export async function enrichAuditRows<TId = number>(
     if (!resourceId) continue;
     if (resourceType === "employee") {
       employeeTargetIds.add(resourceId);
+    } else if (resourceType === "shift") {
+      employeeTargetIds.add(resourceId.split(":")[0]!);
     } else if (resourceType === "user" || resourceType === "organization_membership") {
       profileTargetIds.add(resourceId);
     } else if (resourceType === "invitation") {
@@ -182,6 +184,9 @@ function resolveTargetIdentity(input: {
   let entity: AuditEntityLabel | undefined;
   if (input.resourceType === "employee") {
     entity = input.employeeLabels.get(input.resourceId);
+  } else if (input.resourceType === "shift") {
+    // A schedule cell is `employeeId:date`; name the person whose day it is.
+    entity = input.employeeLabels.get(input.resourceId.split(":")[0]!);
   } else if (input.resourceType === "user" || input.resourceType === "organization_membership") {
     entity = input.profileLabels.get(input.resourceId);
   } else if (input.resourceType === "invitation") {

@@ -524,6 +524,9 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "schedule",
     severity: "delete",
     headline: (_d, ctx) => `Removed a shift${onDate(ctx)}`,
+    // The removed shift is the recorded earlier state, which the log draws as
+    // Before and After rather than as raw fields.
+    details: () => [],
   },
   "shift.moved": {
     category: "schedule",
