@@ -252,6 +252,85 @@ describe("POST /api/schedule/requests", () => {
     );
   });
 
+  describe("reading the days an approval would replace", () => {
+    const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
+
+    function draftCellsRequest() {
+      return new NextRequest("http://localhost/api/schedule/requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "fetchShiftRequestDraftCells",
+          orgId: ORG_ID,
+          requestId: REQUEST_ID,
+        }),
+      });
+    }
+
+    it("returns the changed days for an approver, as the RPC lists them", async () => {
+      const rpc = vi.fn(async () => ({
+        data: [
+          { emp_id: "emp-1", shift_date: "2026-10-28" },
+          { emp_id: "emp-2", shift_date: "2026-10-30" },
+        ],
+        error: null,
+      }));
+      requireOrgPermissions.mockImplementation(async () => ({
+        userClient: { rpc },
+        actor: { id: "admin-user" },
+        orgId: ORG_ID,
+        permissions: { canApproveShiftRequests: true },
+      }));
+
+      const response = await POST(draftCellsRequest());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        success: true,
+        draftCells: [
+          { empId: "emp-1", date: "2026-10-28" },
+          { empId: "emp-2", date: "2026-10-30" },
+        ],
+      });
+      expect(rpc).toHaveBeenCalledWith("shift_request_draft_cells", {
+        p_request_id: REQUEST_ID,
+      });
+      expect(requireOrgPermissions).toHaveBeenCalledWith(
+        expect.anything(),
+        ORG_ID,
+        expect.any(Function),
+        { gridmasterNeedsImpersonation: true },
+      );
+      const allows = requireOrgPermissions.mock.calls[0][2] as (p: object) => boolean;
+      expect(allows({ canApproveShiftRequests: true })).toBe(true);
+      expect(allows({ canApproveShiftRequests: false, canEditShifts: true })).toBe(false);
+    });
+
+    it("refuses a caller who cannot approve requests", async () => {
+      requireOrgPermissions.mockImplementation(async () => ({
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      }));
+
+      const response = await POST(draftCellsRequest());
+
+      expect(response.status).toBe(403);
+    });
+
+    it("fails rather than reporting no changes when the check fails", async () => {
+      const rpc = vi.fn(async () => ({ data: null, error: new Error("boom") }));
+      requireOrgPermissions.mockImplementation(async () => ({
+        userClient: { rpc },
+        actor: { id: "admin-user" },
+        orgId: ORG_ID,
+        permissions: { canApproveShiftRequests: true },
+      }));
+
+      const response = await POST(draftCellsRequest());
+
+      expect(response.status).toBeGreaterThanOrEqual(500);
+    });
+  });
+
   describe("settling a request an approver is party to", () => {
     const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
 

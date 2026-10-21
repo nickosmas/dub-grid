@@ -1,13 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import {
+  ApprovalDraftWarning,
+  loadApprovalDraftWarning,
+} from "@/components/shift-requests/approval-draft-warning";
 import { Button } from "@/components/Button";
 import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import type { ShiftRequest } from "@/types";
 import type { OpenShift } from "@/lib/dashboard-stats";
+
+interface ItemAction {
+  label: string;
+  onClick: () => void | Promise<unknown>;
+  /** Read before the confirmation opens, so it shows what the action will replace. */
+  prepare?: () => Promise<{ warning: string[] }>;
+}
 
 export interface ActionItem {
   id: string;
@@ -16,8 +27,8 @@ export interface ActionItem {
   subtitle: string;
   urgency: "high" | "medium" | "low";
   href?: string;
-  action?: { label: string; onClick: () => void | Promise<unknown> };
-  secondaryAction?: { label: string; onClick: () => void | Promise<unknown> };
+  action?: ItemAction;
+  secondaryAction?: ItemAction;
 }
 
 const URGENCY_DOT: Record<string, string> = {
@@ -63,6 +74,7 @@ export function buildActionItems({
   openShifts,
   draftTotal,
   currentEmpId,
+  orgId = null,
   onResolve,
   onRespond,
   onClaim,
@@ -75,6 +87,7 @@ export function buildActionItems({
   openShifts: OpenShift[];
   draftTotal: number;
   currentEmpId: string | null;
+  orgId?: string | null;
   onResolve?: (id: string, approved: boolean) => Promise<boolean>;
   onRespond?: (id: string, empId: string, accept: boolean) => Promise<boolean>;
   onClaim?: (id: string, empId: string) => Promise<boolean>;
@@ -93,7 +106,11 @@ export function buildActionItems({
         subtitle: `${shiftName} \u00B7 ${req.requesterShiftDate}`,
         urgency: "high",
         action: onResolve
-          ? { label: "Approve", onClick: () => onResolve(req.id, true) }
+          ? {
+              label: "Approve",
+              onClick: () => onResolve(req.id, true),
+              prepare: async () => ({ warning: await loadApprovalDraftWarning(orgId, req) }),
+            }
           : undefined,
         secondaryAction: onResolve
           ? { label: "Reject", onClick: () => onResolve(req.id, false) }
@@ -191,16 +208,23 @@ const TYPE_LABELS: Record<string, string> = {
 const TYPE_ORDER = ["approval", "coverage_gap", "draft", "swap_proposal", "pickup"];
 
 function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boolean }) {
-  const [pendingAction, setPendingAction] = useState<{
-    label: string;
-    onClick: () => void | Promise<unknown>;
-  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<(ItemAction & { warning?: string[] }) | null>(
+    null,
+  );
   const [isRunning, setIsRunning] = useState(false);
   const confirmationTitle = pendingAction
     ? `${pendingAction.label} request?`
     : "Confirm request action?";
   const confirmationVariant =
-    pendingAction?.label === "Reject" || pendingAction?.label === "Decline" ? "danger" : "info";
+    pendingAction?.label === "Reject" || pendingAction?.label === "Decline"
+      ? "danger"
+      : pendingAction?.warning?.length
+        ? "warning"
+        : "info";
+
+  async function openConfirmation(action: ItemAction) {
+    setPendingAction(action.prepare ? { ...action, ...(await action.prepare()) } : action);
+  }
 
   async function confirmAction() {
     if (!pendingAction || isRunning) return;
@@ -223,6 +247,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           message={
             <>
               {pendingAction.label} <strong>{item.title}</strong>?
+              <ApprovalDraftWarning lines={pendingAction.warning ?? []} />
             </>
           }
           title={confirmationTitle}
@@ -281,7 +306,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
             {item.action && (
               <Button
                 disabled={isRunning}
-                onClick={() => setPendingAction(item.action ?? null)}
+                onClick={() => (item.action ? openConfirmation(item.action) : undefined)}
                 style={{
                   fontSize: "var(--dg-type-control-size)",
                   fontWeight: 600,
@@ -299,7 +324,9 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
             {item.secondaryAction && (
               <Button
                 disabled={isRunning}
-                onClick={() => setPendingAction(item.secondaryAction ?? null)}
+                onClick={() =>
+                  item.secondaryAction ? openConfirmation(item.secondaryAction) : undefined
+                }
                 style={{
                   fontSize: "var(--dg-type-control-size)",
                   fontWeight: 600,

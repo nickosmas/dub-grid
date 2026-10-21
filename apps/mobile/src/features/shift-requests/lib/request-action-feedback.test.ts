@@ -21,6 +21,61 @@ describe("getMobileRequestActionFeedback", () => {
       }).message,
     ).toBe("Claim this open shift? As an admin, this goes on the schedule right away.");
   });
+
+  describe("approving over unpublished changes", () => {
+    const approve = { action: "resolve", approved: true };
+    const pickup = {
+      type: "pickup" as const,
+      status: "pending_approval" as const,
+      requesterEmpId: "emp-1",
+      requesterName: "Laura Marshall",
+      targetEmpId: "emp-2",
+      targetName: "Jane Morgan",
+    };
+
+    it("names each person's changed days before approving", () => {
+      const feedback = getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: approve,
+        request: { ...pickup, draftCells: [{ empId: "emp-2", date: "2026-10-28" }] },
+      });
+
+      expect(feedback.warning).toEqual([
+        "Jane Morgan has unpublished changes on Wed, Oct 28.",
+        "Approving publishes this request now and replaces those changes.",
+      ]);
+    });
+
+    it("still warns when the check failed", () => {
+      const feedback = getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: approve,
+        request: { ...pickup, draftCells: null },
+      });
+
+      expect(feedback.warning?.[0]).toBe(
+        "These days couldn't be checked for unpublished changes. Approving publishes this request now and replaces any there are.",
+      );
+    });
+
+    it("says nothing when nothing would be replaced, or nothing was checked", () => {
+      for (const request of [{ ...pickup, draftCells: [] }, pickup]) {
+        expect(
+          getMobileRequestActionFeedback({ requestId: "r1", body: approve, request }).warning,
+        ).toEqual([]);
+      }
+    });
+
+    it("never warns on a rejection", () => {
+      const feedback = getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: { action: "resolve", approved: false },
+        request: { ...pickup, draftCells: [{ empId: "emp-2", date: "2026-10-28" }] },
+      });
+
+      expect(feedback.warning).toBeUndefined();
+    });
+  });
 });
 
 describe("getMobileRequestActionSuccessToast", () => {

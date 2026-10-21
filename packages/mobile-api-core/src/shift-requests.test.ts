@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MobileShiftRequest } from "@dubgrid/contracts";
 import {
   createMobileShiftRequest,
+  loadMobileShiftRequestsPayload,
   updateMobileShiftRequest,
   type MobileShiftRequestSettlement,
   type MobileShiftRequestsContext,
@@ -161,5 +163,65 @@ describe("updateMobileShiftRequest", () => {
       updateMobileShiftRequest(auth, REQUEST_ID, { action: "resolve", approved: true }, deps),
     ).resolves.toEqual({ autoApproved: false });
     expect(deps.settleShiftRequestAfterTransition).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadMobileShiftRequestsPayload", () => {
+  const PENDING_ID = "44444444-4444-4444-8444-444444444444";
+  const APPROVED_ID = "55555555-5555-4555-8555-555555555555";
+
+  function payloadFor(
+    permissions: Partial<MobileShiftRequestsContext["permissions"]>,
+    rpcResult: unknown,
+  ) {
+    const { auth, rpc } = makeContext(rpcResult);
+    auth.permissions = { ...auth.permissions, ...permissions };
+    const requests = [
+      { id: PENDING_ID, status: "pending_approval" },
+      { id: APPROVED_ID, status: "approved" },
+    ] as MobileShiftRequest[];
+    const load = loadMobileShiftRequestsPayload(
+      auth,
+      {},
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => null),
+        fetchMobileOpenShifts: vi.fn(async () => []),
+        fetchMobileScheduleEntries: vi.fn(async () => []),
+        fetchMobileShiftRequests: vi.fn(async () => requests),
+      },
+    );
+    return { load, rpc };
+  }
+
+  it("gives an approver the changed days of each request awaiting approval", async () => {
+    const { load, rpc } = payloadFor(
+      { canApproveShiftRequests: true },
+      { data: [{ emp_id: EMP_ID, shift_date: "2026-10-28" }], error: null },
+    );
+
+    const { requests } = await load;
+
+    expect(requests[0].draftCells).toEqual([{ empId: EMP_ID, date: "2026-10-28" }]);
+    expect(requests[1]).not.toHaveProperty("draftCells");
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("shift_request_draft_cells", { p_request_id: PENDING_ID });
+  });
+
+  it("marks a failed check as null so the warning still shows", async () => {
+    const { load } = payloadFor(
+      { canApproveShiftRequests: true },
+      { data: null, error: new Error("boom") },
+    );
+
+    expect((await load).requests[0].draftCells).toBeNull();
+  });
+
+  it("does not check for a viewer who cannot approve", async () => {
+    const { load, rpc } = payloadFor({ canEditShifts: true }, { data: [], error: null });
+
+    const { requests } = await load;
+
+    expect(requests[0]).not.toHaveProperty("draftCells");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

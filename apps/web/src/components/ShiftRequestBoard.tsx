@@ -14,6 +14,10 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import {
+  ApprovalDraftWarning,
+  loadApprovalDraftWarning,
+} from "@/components/shift-requests/approval-draft-warning";
 import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
@@ -791,7 +795,8 @@ export default function ShiftRequestBoard({
           key="approve"
           className="dg-btn dg-btn-primary"
           disabled={hasRunningAction}
-          onClick={() =>
+          onClick={async () => {
+            const warning = await loadApprovalDraftWarning(orgId, req);
             setPendingConfirmation({
               confirmLabel: "Approve",
               key: `approve:${req.id}`,
@@ -805,6 +810,7 @@ export default function ShiftRequestBoard({
                       Your note: <em>{note}</em>
                     </>
                   ) : null}
+                  <ApprovalDraftWarning lines={warning} />
                 </>
               ),
               onConfirm: async () => {
@@ -813,9 +819,9 @@ export default function ShiftRequestBoard({
                 return done;
               },
               title: "Approve request?",
-              variant: "info",
-            })
-          }
+              variant: warning.length ? "warning" : "info",
+            });
+          }}
           style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Approve

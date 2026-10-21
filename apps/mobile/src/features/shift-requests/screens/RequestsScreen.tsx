@@ -29,6 +29,7 @@ import {
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import { SectionNotice } from "../../people/components/SectionNotice";
 import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
@@ -1109,6 +1110,10 @@ export default function RequestsScreen() {
         visible={isResolveConfirmation}
         onDismiss={() => setRequestActionConfirmation(null)}
       >
+        <SectionNotice
+          messages={requestActionConfirmation?.feedback.warning ?? []}
+          tone="warning"
+        />
         <ProfileTextInput
           accessibilityLabel={`Note to ${resolveNoteRecipients}? (Optional)`}
           label={`Note to ${resolveNoteRecipients} (optional)`}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:1480aa9663c40ad4a7a6d9e5466f7567b716dcd06cc90074aabfac034fc0324a",
+  "sourceDigest": "sha256:cb531ce4dd68d96a40066e0e03348075ac5c97d05e7763b28b1f17c5f6da5173",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4635,6 +4635,16 @@
       "sha256": "9fcc666f0f4aa63026c75b12e78780c4b1bb6e5cf3737ca1e04eac14f8001430",
       "source": {
         "path": "supabase/migrations/085_requests_keep_rest_of_day_absence.sql"
+      }
+    },
+    {
+      "id": "migration:086_approval_replaces_draft.sql",
+      "version": "086",
+      "name": "approval_replaces_draft",
+      "file": "086_approval_replaces_draft.sql",
+      "sha256": "eadb679d72fad68141d6b2f87271a0b143934acef9b5a8b0cf5de93ae9973b37",
+      "source": {
+        "path": "supabase/migrations/086_approval_replaces_draft.sql"
       }
     }
   ],

@@ -90,6 +90,11 @@ const requestSchema = z
       note: z.string().trim().max(1000).optional(),
     }),
     z.object({
+      action: z.literal("fetchShiftRequestDraftCells"),
+      orgId: z.string().uuid(),
+      requestId: z.string().uuid(),
+    }),
+    z.object({
       action: z.literal("cancelShiftRequest"),
       orgId: z.string().uuid(),
       requestId: z.string().uuid(),
@@ -609,6 +614,33 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true });
+      }
+
+      case "fetchShiftRequestDraftCells": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canApproveShiftRequests,
+          { gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: rows, error } = await auth.userClient.rpc("shift_request_draft_cells", {
+          p_request_id: data.requestId,
+        });
+        if (error) {
+          throw error;
+        }
+
+        const draftCells = ((rows ?? []) as { emp_id: string; shift_date: string }[]).map(
+          (row) => ({ empId: row.emp_id, date: row.shift_date }),
+        );
+        return NextResponse.json({ success: true, draftCells });
       }
 
       case "cancelShiftRequest": {

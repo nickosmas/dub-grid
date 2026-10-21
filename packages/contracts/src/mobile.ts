@@ -669,6 +669,16 @@ export const mobileShiftRequestSchema = z.object({
   resolvedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /**
+   * For an approver, on a request awaiting approval: the days it would
+   * publish whose draft differs from what is published. Absent when not
+   * checked (not an approver, or not awaiting approval); null when the check
+   * failed, which must still warn.
+   */
+  draftCells: z
+    .array(z.object({ empId: z.string().uuid(), date: z.string().date() }))
+    .nullable()
+    .optional(),
 });
 
 // Same thresholds as web's computeOpenShifts (apps/web/src/lib/

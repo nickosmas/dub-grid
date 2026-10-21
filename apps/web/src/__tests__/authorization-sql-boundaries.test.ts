@@ -55,6 +55,7 @@ const expectedAuthenticatedSecurityDefiners = [
   "resolve_shift_request",
   "respond_to_shift_request",
   "set_gridmaster_account_deactivated",
+  "shift_request_draft_cells",
   "set_job_shift_overrides",
   "start_impersonation",
   "start_trial_for_org",

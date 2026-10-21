@@ -6,8 +6,9 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 
 /**
- * What saving this section would take away. The mobile counterpart of web's
- * `SectionNotice`, so both apps say it in the same words in the same place.
+ * What saving this section would do: `danger` for something taken away,
+ * `warning` for something replaced or not happening. The mobile counterpart of
+ * web's `SectionNotice`, so both apps say it in the same words in the same place.
  *
  * Consequences of the save, not properties of a field. Validation stays as the
  * plain red hint the choice groups and inputs already carry, so a filled box
@@ -15,18 +16,28 @@ import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/the
  *
  * `messages` is a list so a section can only ever raise one box.
  */
-export function SectionNotice({ messages }: { messages: string[] }) {
+export function SectionNotice({
+  messages,
+  tone = "danger",
+}: {
+  messages: string[];
+  tone?: "danger" | "warning";
+}) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const styles = useMemo(() => createStyles(mobileColors, tone), [mobileColors, tone]);
 
   if (messages.length === 0) return null;
 
   return (
     <View accessibilityRole="summary" style={styles.notice}>
-      <Ionicons color={mobileColors.dangerText} name="warning" size={16} />
+      <Ionicons
+        color={tone === "warning" ? mobileColors.warningText : mobileColors.dangerText}
+        name="warning"
+        size={16}
+      />
       <View style={styles.messages}>
         {messages.map((message) => (
-          <AppText key={message} tone="danger" variant="meta">
+          <AppText key={message} tone={tone} variant="meta">
             {message}
           </AppText>
         ))}
@@ -35,12 +46,12 @@ export function SectionNotice({ messages }: { messages: string[] }) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, tone: "danger" | "warning") =>
   StyleSheet.create({
     notice: {
       alignItems: "center",
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
+      backgroundColor: tone === "warning" ? mobileColors.warningSoft : mobileColors.dangerSoft,
+      borderColor: tone === "warning" ? mobileColors.warningBorder : mobileColors.dangerBorder,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
       flexDirection: "row",
