@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:de3001ff4e528a2481cd4e9b2b2c6ff74cdb5013131ebd84fd3d2abe2f277ab5",
+  "sourceDigest": "sha256:1f0bdafbbf45fb1e66b5fd78ba81730dcaf04e751e1185500f8ac9f1a6f05444",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4655,6 +4655,16 @@
       "sha256": "9f4e4544168b5c43241a00d76f225c32ec98338540a1d1f5df9cbe555d3745aa",
       "source": {
         "path": "supabase/migrations/087_publish_alerts_leave_the_database.sql"
+      }
+    },
+    {
+      "id": "migration:088_open_pickup_claims.sql",
+      "version": "088",
+      "name": "open_pickup_claims",
+      "file": "088_open_pickup_claims.sql",
+      "sha256": "7d0a0e68ecea5ed56cc9fa36ac32dcc4b51a2a9b06d214eca76887a122e98fc9",
+      "source": {
+        "path": "supabase/migrations/088_open_pickup_claims.sql"
       }
     }
   ],

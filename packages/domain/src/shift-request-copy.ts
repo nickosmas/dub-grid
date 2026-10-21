@@ -8,6 +8,11 @@ export type ShiftRequestCopyInput = {
   requesterName: string;
   targetEmpId: string | null;
   targetName: string | null;
+  /** On a pickup with a target: set when it was offered to that teammate,
+   *  null when they claimed it from the open board. */
+  absenceTypeId?: number | null;
+  /** Set on the open pickup a call-off leaves behind. */
+  parentRequestId?: string | null;
 };
 
 export type ShiftRequestCopy = {
@@ -47,6 +52,12 @@ export function describeShiftRequest(
     subtitle = target ? `Asked ${target} to swap shifts` : "Asked to swap shifts";
   } else if (request.type === "calloff") {
     subtitle = "Asked for time off";
+  } else if (request.parentRequestId != null) {
+    subtitle = target
+      ? `Called off this shift, and ${target} claimed it`
+      : "Called off this shift, so it's open for pickup";
+  } else if (target && request.absenceTypeId === null) {
+    subtitle = `Offered this shift for pickup, and ${target} claimed it`;
   } else if (target) {
     subtitle = `Offered to cover ${targetIsViewer ? "your" : possessive(target)} shift`;
   } else {

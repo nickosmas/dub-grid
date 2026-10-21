@@ -573,7 +573,7 @@
             "a day with an absence for the rest of the day keeps it through requests; nobody absent for the rest of a day takes another shift that day",
             "statuses and their meanings; 72-hour expiry, may be unavailable",
             "teammate accepts first for swaps and named pickups; approval publishes directly; party approver auto-approves",
-            "approved time off leaves the shift open; a published fill settles it",
+            "approved time off leaves the shift open; a teammate can claim it, or a published fill settles it",
             "request board tabs and history filters; app Requests tabs and visibility",
             "alerts on new, approved, rejected, expired",
             "approval needs permission; Super Admin always"
@@ -595,7 +595,8 @@
             "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
             "apps/web/src/components/dashboard/UserDashboard.tsx",
-            "supabase/migrations/085_requests_keep_rest_of_day_absence.sql"
+            "supabase/migrations/085_requests_keep_rest_of_day_absence.sql",
+            "supabase/migrations/088_open_pickup_claims.sql"
           ],
           "testFiles": [
             "apps/web/src/__tests__/ShiftRequestBoard.test.tsx",
@@ -604,13 +605,14 @@
             "packages/domain/src/shift-request-copy.test.ts",
             "apps/web/src/app/api/cron/expire-requests/route.test.ts",
             "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx",
-            "apps/web/src/__tests__/shift-requests-rest-of-day-absence.integration.test.ts"
+            "apps/web/src/__tests__/shift-requests-rest-of-day-absence.integration.test.ts",
+            "apps/web/src/__tests__/open-pickup-claims.integration.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:46e2338daff0d6d8a988c4dea3281fc5277b442606b2389343584fe97259fafa"
+      "evidenceFingerprint": "sha256:e7b3325b47e69aa40b6d51811c0e3bccf56b1410961b5938893203ee446b1eb1"
     },
     {
       "id": "dashboard",

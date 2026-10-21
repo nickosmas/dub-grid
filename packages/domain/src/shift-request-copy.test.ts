@@ -56,6 +56,37 @@ describe("describeShiftRequest", () => {
     );
   });
 
+  it("says who claimed an open pickup", () => {
+    const claimed = { ...swap, type: "pickup" as const, absenceTypeId: null };
+    expect(describeShiftRequest(claimed, null).subtitle).toBe(
+      "Offered this shift for pickup, and Jane Morgan claimed it",
+    );
+    expect(describeShiftRequest(claimed, "emp-2").subtitle).toBe(
+      "Offered this shift for pickup, and you claimed it",
+    );
+    expect(describeShiftRequest({ ...claimed, absenceTypeId: 4 }, "emp-2").subtitle).toBe(
+      "Offered to cover your shift",
+    );
+  });
+
+  it("describes the open shift a call-off leaves, before and after a claim", () => {
+    const open = {
+      ...swap,
+      type: "pickup" as const,
+      targetEmpId: null,
+      targetName: null,
+      absenceTypeId: null,
+      parentRequestId: "calloff-1",
+    };
+    expect(describeShiftRequest(open, null).subtitle).toBe(
+      "Called off this shift, so it's open for pickup",
+    );
+    expect(
+      describeShiftRequest({ ...open, targetEmpId: "emp-2", targetName: "Jane Morgan" }, "emp-2")
+        .subtitle,
+    ).toBe("Called off this shift, and you claimed it");
+  });
+
   it("keeps a trailing s possessive readable", () => {
     expect(
       describeShiftRequest({ ...swap, requesterName: "Thomas Andrews" }, null).requesterShiftLabel,
