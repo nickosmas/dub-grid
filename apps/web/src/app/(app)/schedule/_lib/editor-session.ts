@@ -295,7 +295,11 @@ export function shiftEditableIdentityMatches(
       ? segmentIdentitiesMatch(leftSegments, rightSegments)
       : numberArraysMatch(left?.assignmentIds ?? [], right?.assignmentIds ?? []);
 
-  return segmentsMatch && (left?.absenceTypeId ?? null) === (right?.absenceTypeId ?? null);
+  return (
+    segmentsMatch &&
+    (left?.absenceTypeId ?? null) === (right?.absenceTypeId ?? null) &&
+    (left?.restOfDayAbsenceTypeId ?? null) === (right?.restOfDayAbsenceTypeId ?? null)
+  );
 }
 
 export function computeScheduleEntryDraftKind(entry: ShiftMap[string]): DraftKind {
@@ -314,7 +318,9 @@ export function computeScheduleEntryDraftKind(entry: ShiftMap[string]): DraftKin
   const assignmentsMatch = hasSegmentIdentity
     ? segmentIdentitiesMatch(entry.segments ?? [], publishedSegments)
     : numberArraysMatch(entry.assignmentIds, publishedAssignmentIds);
-  const absMatch = (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
+  const absMatch =
+    (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null) &&
+    (entry.restOfDayAbsenceTypeId ?? null) === (entry.publishedRestOfDayAbsenceTypeId ?? null);
   const startMatch = (entry.customStartTime ?? null) === (entry.publishedCustomStartTime ?? null);
   const endMatch = (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
 

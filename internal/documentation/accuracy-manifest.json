@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:01c7326f9ad8511043ce45fa09c93506663ff974170d0d23f3b5080fce1b47e6"
+      "evidenceFingerprint": "sha256:883ec713e374264ed2404f807c21601c710fc818c3a86b71b1808c033d009dc4"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ce38dbe3ff4af66d428bbb1f71840249cd8b0178c83a529ba6b74857ae1558a8"
+      "evidenceFingerprint": "sha256:be20b695c37ea8b6b725a53a6651d982e31bb23431a379a861da2468973c4608"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9a3c1b55cd41590ad9ba336b39cc99c67c579d4b2da574629b696b5bc2b6ca46"
+      "evidenceFingerprint": "sha256:3ed5027fed14e0d5db23cd067cd1d45e6b54a61271fc632e49919e7f194a105b"
     },
     {
       "id": "onboarding",
@@ -340,6 +340,7 @@
             "toolbar views, navigation, pay-period alignment, focus tabs, sort, search highlights, coverage",
             "Month is read-only; phones show one day",
             "panel Confirm and Undo, remove actions, right-click and keyboard copy and paste",
+            "absence for the rest of the day: Add an absence, up to two shifts plus one absence, absence last, Worked until, no repeating",
             "drag moves, Shift-drag copies, qualification check",
             "open shift staffing and claims",
             "Tools menu items; print options and legends; print may be unavailable",
@@ -383,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ae6dbef4c6d302375db192e5dbc01f77f7daefc317ff11dfb5c45bcde2f84013"
+      "evidenceFingerprint": "sha256:853224275d296847c20b0983d7d9d0bba79d1cc04d15220952efd09e72c4f1d2"
     },
     {
       "id": "draft-publish",
@@ -440,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1bb0816f35eebee6bd774a020d22ad1bdedced5638effc8a074f84a6b0f65928"
+      "evidenceFingerprint": "sha256:5a920e64be7b091470d46af34bf28e39c903c53ea643e24b4594693aed945071"
     },
     {
       "id": "recurring-shifts",
@@ -494,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cc59a96efb0de6de16f11599e654e36348a5e4ed6aece5a903ef0b4fa2622438"
+      "evidenceFingerprint": "sha256:48c0fbeb2aa570b50574b0c503f9ade7cb37d201d8b16adc2f14b353cf443a6b"
     },
     {
       "id": "realtime",
@@ -541,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9227bd661ef6287563aaba1ecc4118dd15a8498fc458ed411b0fe437ae07c2f7"
+      "evidenceFingerprint": "sha256:644381844b5a5310d014fd6b0caf2adec920a280845ac255ee3df452e91efc4e"
     },
     {
       "id": "shift-requests",
@@ -606,7 +607,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b8545f1dbbff335be1e32c48a8299a5b36b0894262e1532e77350e61470d2dec"
+      "evidenceFingerprint": "sha256:824137070178bee7eee47a02506ced69d5462c30c8fc590e593b14641a5f6532"
     },
     {
       "id": "dashboard",
@@ -983,7 +984,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:69d81414a7fa5229a07002cbecb4e5dfc34a0a0d096cfe382ee7f8de5f78d4ee"
+      "evidenceFingerprint": "sha256:d839f23e0d7a92fe5c6428c52a478457e2642eb5dd5bc734d783085bebcf10b2"
     },
     {
       "id": "terminology",
@@ -1810,7 +1811,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c80c34a5f8c4d1aecfad6039720c1de7b8096f7db1a8b4c8bb56f19b323999a7"
+      "evidenceFingerprint": "sha256:2cd46e6c3d9602c3742000e297068a19c4c5a82009e7edde3e515f07d7fe6249"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1919,7 +1920,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:9b670a9b8e6517ca05d66ac423ef873c6750a38e98d3e399313004fa07f9bfac"
+      "evidenceFingerprint": "sha256:ff332416879cce0ea48a79ea6fc77f1d1af07daeedf0525885c02b16f0d5ec8f"
     },
     {
       "id": "coverage-open-shifts",
@@ -1970,7 +1971,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:53c364363006acbbc3dff4835de707e7f6e27ffb81cadd0bcba17ceb169fa2c3"
+      "evidenceFingerprint": "sha256:5f1792808bae6098e04a44b50996e8138ad7fc1ef026992b4acdcfc8216e7f7c"
     },
     {
       "id": "mobile-schedule",
@@ -2079,7 +2080,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:5a076eab05050ca95121636112b1e6e210ab8a879ab2bad886fe6d5ea036d0ed"
+      "evidenceFingerprint": "sha256:de8055d2ebead93400f3b9a1aac2709db565d55c3b729f6326ab79c4e1a2f511"
     }
   ],
   "surfaceExclusions": [

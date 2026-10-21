@@ -12,6 +12,8 @@ export type ShiftDiffTimeRange = {
 export type ShiftDiffState = {
   assignmentIds?: number[] | null;
   absenceTypeId?: number | null;
+  /** A worked cell's absence for the rest of the day (item 45), its last pill. */
+  restOfDayAbsenceTypeId?: number | null;
   timeRanges?: ShiftDiffTimeRange[] | null;
   isMentoredFlags?: boolean[] | null;
 };
@@ -30,6 +32,8 @@ export type ShiftPillDiffDescriptor = {
 export type ShiftDiffDescriptorResult = {
   pillDiffs: ShiftPillDiffDescriptor[];
   cellBadge: ShiftDiffBadgeDescriptor | null;
+  /** The rest-of-day absence pill's own diff (item 45); null when it did not change. */
+  restOfDayDiff?: ShiftPillDiffDescriptor | null;
 };
 
 type BuildShiftDiffDescriptorsInput = {
@@ -253,6 +257,45 @@ export function expandDelimitedTimeRanges(
 }
 
 export function buildShiftDiffDescriptors(
+  input: BuildShiftDiffDescriptorsInput,
+): ShiftDiffDescriptorResult {
+  const result = buildShiftOnlyDiffDescriptors(input);
+  const before = input.before.restOfDayAbsenceTypeId ?? null;
+  const after = input.after.restOfDayAbsenceTypeId ?? null;
+  if (before === after) return { ...result, restOfDayDiff: null };
+
+  const label = (id: number) => input.resolveAbsenceLabel?.(id) ?? "an absence";
+  if (after == null) {
+    // No pill is left to carry the change, so the cell says what went.
+    const detail = `Removed ${label(before!)} for the rest of the day.`;
+    return {
+      ...result,
+      restOfDayDiff: null,
+      cellBadge: result.cellBadge
+        ? { ...result.cellBadge, detail: `${result.cellBadge.detail} ${detail}` }
+        : { kind: "modified", text: "Edited", detail },
+    };
+  }
+  return {
+    ...result,
+    restOfDayDiff:
+      before == null
+        ? {
+            borderKind: "new",
+            badge: {
+              kind: "new",
+              text: "New",
+              detail: `Added ${label(after)} for the rest of the day.`,
+            },
+          }
+        : {
+            borderKind: "modified",
+            badge: { kind: "modified", text: "Edited", detail: `Was ${label(before)}.` },
+          },
+  };
+}
+
+function buildShiftOnlyDiffDescriptors(
   input: BuildShiftDiffDescriptorsInput,
 ): ShiftDiffDescriptorResult {
   const beforeAssignmentDefinitionIds = [...(input.before.assignmentIds ?? [])];

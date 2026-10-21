@@ -204,7 +204,7 @@ const documentedUppercaseStyleCounts = {
 const documentedOpacityTextCounts = {
   "components/PublishHistoryPanel.tsx": 1,
   "components/RepeatForm.tsx": 1,
-  "components/ScheduleGrid.tsx": 7,
+  "components/ScheduleGrid.tsx": 8,
   "components/ShiftEditPanel.tsx": 4,
   "components/ShiftPicker.tsx": 1,
   "components/dashboard/MyScheduleRow.tsx": 1,

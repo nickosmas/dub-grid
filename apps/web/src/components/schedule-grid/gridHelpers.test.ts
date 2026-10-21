@@ -5,6 +5,7 @@ import {
   publishCellLevelBadge,
   publishedAtFormatter,
   doubleShiftCellHeight,
+  joinedCustomTimes,
   stacksShifts,
 } from "./gridHelpers";
 
@@ -144,5 +145,31 @@ describe("doubleShiftCellHeight", () => {
     expect(doubleShiftCellHeight({ ...base, pillsDown: 1 })).toBe(
       "calc(8px + 1 * (var(--dg-fs-title) * 1.2 + 8px) + 0px)",
     );
+  });
+});
+
+describe("joinedCustomTimes", () => {
+  it("keeps the second shift's time, as when the last shift has a Worked until", () => {
+    expect(
+      joinedCustomTimes({
+        start: "",
+        end: "",
+        perPill: [
+          { start: "", end: "" },
+          { start: "15:30", end: "19:00" },
+        ],
+      }),
+    ).toEqual({ customStartTime: "|15:30", customEndTime: "|19:00" });
+  });
+
+  it("keeps a single shift's time", () => {
+    expect(joinedCustomTimes({ start: "07:00", end: "11:30" })).toEqual({
+      customStartTime: "07:00",
+      customEndTime: "11:30",
+    });
+  });
+
+  it("gives no times for a cell without any", () => {
+    expect(joinedCustomTimes(null)).toEqual({ customStartTime: null, customEndTime: null });
   });
 });

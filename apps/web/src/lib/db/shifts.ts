@@ -156,7 +156,8 @@ async function resolveScheduleCellStorage(
     jobIds: orderedSegments.map((segment) => segment.jobId),
     isMentoredFlags: orderedSegments.map((segment) => segment.isMentored ?? false),
     assignmentIds: await resolveAssignmentDefinitionIdsForSegments(orgId, orderedSegments),
-    absenceTypeId: null,
+    // A worked cell's rest-of-day absence (item 45).
+    absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
   };
@@ -303,7 +304,7 @@ export async function upsertShift(
     customEndTime,
   } = await resolveScheduleCellStorage(orgId, input);
   // Client-side overlap check for immediate feedback
-  if (assignmentIds.length >= 2 && absenceTypeId == null) {
+  if (assignmentIds.length >= 2 && input.kind === "worked") {
     const overlap = await checkAssignmentDefinitionOverlap(orgId, assignmentIds);
     if (overlap) {
       throw new Error(

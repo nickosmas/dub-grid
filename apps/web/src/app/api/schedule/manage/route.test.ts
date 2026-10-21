@@ -348,6 +348,48 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
+  it("keeps a rest-of-day absence when only the times change (item 45)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+    serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "get_schedule_cell_snapshot_payload" || args.p_snapshot_kind !== "draft") {
+        return { data: [], error: null };
+      }
+      return {
+        data: [
+          {
+            version: 2,
+            focus_area_id: null,
+            series_id: null,
+            from_recurring: false,
+            state_kind: "worked",
+            absence_type_id: 7,
+            shift_ids: [3],
+            job_ids: [30],
+            is_mentored_flags: [false],
+          },
+        ],
+        error: null,
+      };
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShiftTimes",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        customStartTime: "07:00",
+        customEndTime: "11:00",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({ p_state_kind: "worked", p_absence_type_id: 7 }),
+    );
+  });
+
   it("saves a worked shift with an absence for the rest of the day (item 45)", async () => {
     userRpc.mockResolvedValue({ error: null });
 

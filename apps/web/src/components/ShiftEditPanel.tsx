@@ -31,8 +31,14 @@ import {
 } from "@/types";
 import CustomSelect from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
-import { fmt12h, subtractOneHour, addOneHour, orderSegmentsByStartTime } from "./shiftEditTime";
-import { PillTimeEditor } from "./PillTimeEditor";
+import {
+  fmt12h,
+  subtractOneHour,
+  addOneHour,
+  orderSegmentsByStartTime,
+  withLastShiftEnd,
+} from "./shiftEditTime";
+import { PillTimeEditor, WorkedUntilField } from "./PillTimeEditor";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
@@ -104,6 +110,8 @@ interface ShiftEditPanelProps {
   publishedAssignmentIds?: number[];
   /** Published absence type ID — used to compare current content against live schedule state. */
   publishedAbsenceTypeId?: number | null;
+  /** Published rest-of-day absence on a worked cell (item 45). */
+  publishedRestOfDayAbsenceTypeId?: number | null;
   /** Published custom start time override — used for published-vs-current diff badges. */
   publishedCustomStartTime?: string | null;
   /** Published custom end time override — used for published-vs-current diff badges. */
@@ -178,6 +186,8 @@ interface ShiftEditPanelProps {
   absenceTypes?: AbsenceType[];
   /** Currently active absence type ID on this cell. */
   currentAbsenceTypeId?: number | null;
+  /** The absence a worked cell carries for the rest of the day (item 45). */
+  currentRestOfDayAbsenceTypeId?: number | null;
   /** Cross-date overlap warnings to display (non-blocking). */
   overlapWarnings?: string[];
   /** When true, overlap warnings block saving (admin can override). */
@@ -325,6 +335,7 @@ export default function ShiftEditPanel({
   onCustomTimeChange,
   publishedAssignmentIds = [],
   publishedAbsenceTypeId = null,
+  publishedRestOfDayAbsenceTypeId = null,
   publishedCustomStartTime = null,
   publishedCustomEndTime = null,
   draftKind = null,
@@ -352,6 +363,7 @@ export default function ShiftEditPanel({
   onSubmitSwap,
   absenceTypes = [],
   currentAbsenceTypeId,
+  currentRestOfDayAbsenceTypeId = null,
   overlapWarnings = [],
   enforceConflicts = false,
   shiftDisplayMode = "code",
@@ -375,12 +387,15 @@ export default function ShiftEditPanel({
   const { closing, close } = useSlideoverClose(onClose);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<
-    { type: "all" } | { type: "pill"; index: number } | null
+    { type: "all" } | { type: "pill"; index: number } | { type: "restOfDay" } | null
   >(null);
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const isAbsence = currentAbsenceTypeId != null;
+  const hasRestOfDayAbsence = currentRestOfDayAbsenceTypeId != null;
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
+  // The picker is open to choose the absence for the rest of the day, not a shift.
+  const [pickingRestOfDayAbsence, setPickingRestOfDayAbsence] = useState(false);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
   const [activeRequestMode, setActiveRequestMode] = useState<EditModalState["requestMode"] | null>(
     modal.requestMode ?? null,
@@ -450,6 +465,7 @@ export default function ShiftEditPanel({
   const [initialAssignmentIds] = useState(() => [...currentAssignmentIds]);
   const [initialSegments] = useState(() => currentSegments.map((segment) => ({ ...segment })));
   const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
+  const [initialRestOfDayAbsenceTypeId] = useState(() => currentRestOfDayAbsenceTypeId ?? null);
   const [initialCustomStartTime] = useState(() => customStartTime ?? null);
   const [initialCustomEndTime] = useState(() => customEndTime ?? null);
   // Notes are tracked per focus area and shift. A shift added while editing
@@ -506,6 +522,9 @@ export default function ShiftEditPanel({
         before: {
           assignmentIds: hasPublishedBaseline ? publishedAssignmentIds : initialAssignmentIds,
           absenceTypeId: hasPublishedBaseline ? publishedAbsenceTypeId : initialAbsenceTypeId,
+          restOfDayAbsenceTypeId: hasPublishedBaseline
+            ? publishedRestOfDayAbsenceTypeId
+            : initialRestOfDayAbsenceTypeId,
           timeRanges: hasPublishedBaseline
             ? expandDelimitedTimeRanges(
                 publishedCustomStartTime,
@@ -521,6 +540,7 @@ export default function ShiftEditPanel({
         after: {
           assignmentIds: currentAssignmentIds,
           absenceTypeId: currentAbsenceTypeId ?? null,
+          restOfDayAbsenceTypeId: currentRestOfDayAbsenceTypeId,
           timeRanges: expandDelimitedTimeRanges(
             customStartTime,
             customEndTime,
@@ -547,14 +567,17 @@ export default function ShiftEditPanel({
       hasPublishedBaseline,
       publishedAssignmentIds,
       publishedAbsenceTypeId,
+      publishedRestOfDayAbsenceTypeId,
       publishedCustomStartTime,
       publishedCustomEndTime,
       initialAssignmentIds,
       initialAbsenceTypeId,
+      initialRestOfDayAbsenceTypeId,
       initialCustomStartTime,
       initialCustomEndTime,
       currentAssignmentIds,
       currentAbsenceTypeId,
+      currentRestOfDayAbsenceTypeId,
       customStartTime,
       customEndTime,
       assignableShiftDisplayMap,
@@ -577,9 +600,11 @@ export default function ShiftEditPanel({
   }
 
   // Derive whether any edits have been made since panel opened
+  const hasRestOfDayEdit = currentRestOfDayAbsenceTypeId !== initialRestOfDayAbsenceTypeId;
   const hasShiftEdit =
     currentShift !== initialShift ||
     (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
+    hasRestOfDayEdit ||
     !segmentsMatchInitial();
   const hasTimeEdit =
     (customStartTime ?? null) !== initialCustomStartTime ||
@@ -702,6 +727,18 @@ export default function ShiftEditPanel({
     return tokens.size > 0 ? `Notes: ${[...tokens].join(", ")}` : null;
   }
 
+  const absenceName = (id: number | null) => {
+    if (id == null) return null;
+    const absence = absenceTypes.find((candidate) => candidate.id === id);
+    return absence ? absence.name || absence.label : "an absence";
+  };
+  const restOfDaySummary = hasRestOfDayEdit
+    ? initialRestOfDayAbsenceTypeId == null
+      ? `Rest of the day: added ${absenceName(currentRestOfDayAbsenceTypeId)}`
+      : currentRestOfDayAbsenceTypeId == null
+        ? `Rest of the day: ${absenceName(initialRestOfDayAbsenceTypeId)} removed`
+        : `Rest of the day: ${absenceName(initialRestOfDayAbsenceTypeId)} \u2192 ${absenceName(currentRestOfDayAbsenceTypeId)}`
+    : null;
   const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
   const timeSummary = hasTimeEdit ? describeTimeChange() : null;
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
@@ -712,6 +749,8 @@ export default function ShiftEditPanel({
     absenceTypeId: number | null;
     customStartTime: string | null;
     customEndTime: string | null;
+    /** The rest-of-day absence to keep beside the shifts; the cell's current one by default. */
+    restOfDayAbsenceTypeId?: number | null;
   }): ScheduleCellInput | null {
     if (args.absenceTypeId != null) {
       return {
@@ -737,7 +776,10 @@ export default function ShiftEditPanel({
         position: segment.position ?? index,
         isMentored: segment.isMentored ?? false,
       })),
-      absenceTypeId: null,
+      absenceTypeId:
+        args.restOfDayAbsenceTypeId !== undefined
+          ? args.restOfDayAbsenceTypeId
+          : currentRestOfDayAbsenceTypeId,
       customStartTime:
         args.segments.length === 1
           ? getFirstTimeSegment(args.customStartTime)
@@ -775,13 +817,18 @@ export default function ShiftEditPanel({
 
   function handleUndo() {
     // Revert absence type if it changed
-    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId || currentShift !== initialShift) {
+    if (
+      (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
+      currentShift !== initialShift ||
+      hasRestOfDayEdit
+    ) {
       onSelect(
         buildPanelInput({
           segments: initialSegments,
           absenceTypeId: initialAbsenceTypeId,
           customStartTime: initialCustomStartTime,
           customEndTime: initialCustomEndTime,
+          restOfDayAbsenceTypeId: initialRestOfDayAbsenceTypeId,
         }),
       );
     }
@@ -841,13 +888,17 @@ export default function ShiftEditPanel({
   // Any other shift, general or regular, earlier or later, can be the second
   // half of a double shift. Overlaps are left to the same-day overlap warning,
   // which blocks saving only when the organization enforces conflicts.
-  const isAddingSecondShift = showPicker && currentAssignmentIds.length === 1;
+  const isAddingSecondShift =
+    showPicker && !pickingRestOfDayAbsence && currentAssignmentIds.length === 1;
   const firstShiftId = isAddingSecondShift ? currentAssignmentIds[0] : null;
 
-  const pickerAssignmentDefinitions = isAddingSecondShift
-    ? assignments.filter((sc) => sc.id !== firstShiftId)
-    : assignments;
+  const pickerAssignmentDefinitions = pickingRestOfDayAbsence
+    ? []
+    : isAddingSecondShift
+      ? assignments.filter((sc) => sc.id !== firstShiftId)
+      : assignments;
 
+  // A cell carries at most one absence, so a second shift's picker offers none.
   const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
 
   // A double shift reads in time order whichever half was picked first.
@@ -3169,6 +3220,7 @@ export default function ShiftEditPanel({
                       />
                     );
                   })()}
+                {renderWorkedUntil(i, { start: defaultStart, end: defaultEnd })}
                 {/* Inline indicators for this shift's focus area */}
                 {renderInlineIndicators(shiftWingId, cardNoteShift)}
               </div>
@@ -3323,6 +3375,204 @@ export default function ShiftEditPanel({
           );
         })}
       </div>
+    );
+  }
+
+  /** Where the last worked shift ends: its custom end, else its default end. */
+  function lastShiftEndTime(): string | null {
+    const lastIndex = currentSegments.length - 1;
+    if (lastIndex < 0) return null;
+    const customEnd = parseMultiTimes(customEndTime, currentSegments.length)[lastIndex];
+    if (customEnd) return customEnd;
+    const lastId = currentAssignmentIds[lastIndex];
+    const assignment =
+      lastId != null
+        ? assignments.find((candidate) => candidate.id === lastId)
+        : assignments.find((candidate) => candidate.label === currentLabels[lastIndex]);
+    return resolveDefaultTimes(assignment).end;
+  }
+
+  /** "Worked until" on the last shift, beside an absence for the rest of the day. */
+  function renderWorkedUntil(
+    index: number,
+    defaults: { start: string | null; end: string | null },
+  ) {
+    if (
+      !hasRestOfDayAbsence ||
+      !allowShiftEdits ||
+      !onCustomTimeChange ||
+      index !== currentSegments.length - 1
+    ) {
+      return null;
+    }
+    const count = currentSegments.length;
+    const start = parseMultiTimes(customStartTime, count)[index] ?? defaults.start;
+    const end = parseMultiTimes(customEndTime, count)[index] ?? defaults.end;
+    return (
+      <WorkedUntilField
+        start={start}
+        end={end}
+        onChange={(workedUntil) => {
+          const next = withLastShiftEnd(
+            customStartTime ?? null,
+            customEndTime ?? null,
+            count,
+            defaults.start,
+            workedUntil,
+          );
+          onCustomTimeChange(next.customStartTime, next.customEndTime);
+        }}
+      />
+    );
+  }
+
+  function renderRestOfDayAbsenceCard() {
+    if (!hasActiveShift || currentRestOfDayAbsenceTypeId == null) return null;
+    const absence = absenceTypes.find(
+      (candidate) => candidate.id === currentRestOfDayAbsenceTypeId,
+    );
+    if (!absence) return null;
+    const absenceLabel = absence.name || absence.label;
+    const colors = resolveShiftPillColors(
+      { color: absence.color, text: absence.text, border: absence.border },
+      isDarkTheme,
+    );
+    const from = lastShiftEndTime();
+    const diff = panelDiff.restOfDayDiff ?? null;
+    return (
+      <div
+        data-rest-of-day-absence-card
+        data-shift-edit-card-diff={diff?.borderKind ?? undefined}
+        style={{
+          border: getPanelDiffBorder({
+            diffKind: diff?.borderKind ?? null,
+            fallback:
+              colors.border === "transparent"
+                ? `1.5px solid ${darkenColor(colors.color, 0.25)}`
+                : `1.5px solid ${colors.border}`,
+          }),
+          borderRadius: shiftEditCardOuterRadius,
+          position: "relative",
+          marginTop: currentLabels.length > 1 ? 10 : 0,
+          marginBottom: 16,
+        }}
+      >
+        {renderShiftDiffBadge(diff?.badge ?? null)}
+        <div
+          style={{
+            background: colors.color,
+            minHeight: 44,
+            padding: "8px 12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: `${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius} 0 0`,
+            position: "relative",
+          }}
+        >
+          <MaybeHint content={absenceLabel} side="top">
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: "var(--dg-fs-heading)",
+                color: colors.text,
+                maxWidth: "calc(100% - 48px)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {absenceLabel}
+            </span>
+          </MaybeHint>
+          {allowShiftEdits && (
+            <Button
+              onClick={() => setPendingDelete({ type: "restOfDay" })}
+              aria-label={`Remove ${absenceLabel} for the rest of the day`}
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                width: 22,
+                height: 22,
+                borderRadius: 5,
+                border: "none",
+                background: "rgba(0,0,0,0.12)",
+                color: colors.text,
+                fontSize: "var(--dg-fs-body)",
+                lineHeight: 1,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "inherit",
+              }}
+            >
+              ×
+            </Button>
+          )}
+        </div>
+        <div
+          style={{
+            padding: "10px 12px",
+            background: "var(--dg-color-surface)",
+            borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--dg-color-text-subtle)",
+            fontWeight: 500,
+          }}
+        >
+          <span className="dg-tabular-nums">
+            {from ? `Rest of the day, from ${fmt12h(from)}` : "Rest of the day"}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const canAddShift = allowShiftEdits && !isAbsence && currentLabels.length < 2;
+  const canAddRestOfDayAbsence =
+    allowShiftEdits &&
+    hasActiveShift &&
+    !isAbsence &&
+    !hasRestOfDayAbsence &&
+    absenceTypes.length > 0 &&
+    (!seriesId || seriesScope === "this");
+
+  function renderAddButton(label: string, onClick: () => void, spanBoth: boolean) {
+    return (
+      <Button
+        onClick={onClick}
+        className="dg-btn dg-btn-ghost"
+        style={{
+          gridColumn: spanBoth ? "1 / -1" : undefined,
+          minWidth: 0,
+          fontSize: "var(--dg-fs-caption)",
+          padding: "9px 12px",
+          border: "1px dashed var(--dg-color-border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ flexShrink: 0 }}
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+      </Button>
     );
   }
 
@@ -3727,9 +3977,13 @@ export default function ShiftEditPanel({
                         onSave={(start, end) => onCustomTimeChange(start, end)}
                         onRemove={() => onCustomTimeChange(null, null)}
                       />
+                      {renderWorkedUntil(0, defaults)}
                     </div>
                   );
                 })()}
+
+              {/* The absence for the rest of the day comes after the shifts (item 45) */}
+              {renderRestOfDayAbsenceCard()}
 
               {!hasActiveShift && !allowShiftEdits && (
                 <div
@@ -3795,11 +4049,16 @@ export default function ShiftEditPanel({
                   <div style={{ marginBottom: 16 }}>
                     <div style={sectionLabel}>Repeating</div>
                     <Hint
-                      content={hint("Create a recurring pattern (daily, weekly, biweekly)")}
+                      content={hint(
+                        hasRestOfDayAbsence
+                          ? "A shift with an absence for the rest of the day can't repeat"
+                          : "Create a recurring pattern (daily, weekly, biweekly)",
+                      )}
                       side="top"
                     >
                       <Button
                         data-tour="edit-panel-repeat-btn"
+                        disabled={hasRestOfDayAbsence}
                         onClick={() => {
                           setShowRepeatForm(true);
                         }}
@@ -3832,6 +4091,18 @@ export default function ShiftEditPanel({
                         {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
                       </Button>
                     </Hint>
+                    {hasRestOfDayAbsence && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        A shift with an absence for the rest of the day can&apos;t repeat. Remove
+                        the absence to make it repeating.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3904,45 +4175,40 @@ export default function ShiftEditPanel({
                     </svg>
                     {isAbsence
                       ? "Remove absence"
-                      : currentLabels.length > 1
+                      : currentLabels.length > 1 || hasRestOfDayAbsence
                         ? "Remove all shifts"
                         : "Remove shift"}
                   </Button>
                 </div>
               )}
 
-              {/* Add another shift: hidden at the maximum of two, or on an absence */}
-              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (
-                <div style={{ marginTop: 8 }}>
-                  <Button
-                    onClick={() => setShowPicker(true)}
-                    className="dg-btn dg-btn-ghost"
-                    style={{
-                      width: "100%",
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "9px 12px",
-                      border: "1px dashed var(--dg-color-border)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Add another shift
-                  </Button>
+              {/* Add another shift (hidden at two shifts or on a whole-day absence) and Add an
+                  absence (hidden once there is one, and on a series edited beyond this date,
+                  which the server refuses) */}
+              {(canAddShift || canAddRestOfDayAbsence) && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {canAddShift &&
+                    renderAddButton(
+                      "Add another shift",
+                      () => setShowPicker(true),
+                      !canAddRestOfDayAbsence,
+                    )}
+                  {canAddRestOfDayAbsence &&
+                    renderAddButton(
+                      "Add an absence",
+                      () => {
+                        setPickingRestOfDayAbsence(true);
+                        setShowPicker(true);
+                      },
+                      !canAddShift,
+                    )}
                 </div>
               )}
 
@@ -4065,7 +4331,10 @@ export default function ShiftEditPanel({
               {/* Back button when we already have an active shift */}
               {hasActiveShift && (
                 <Button
-                  onClick={() => setShowPicker(false)}
+                  onClick={() => {
+                    setShowPicker(false);
+                    setPickingRestOfDayAbsence(false);
+                  }}
                   className="dg-btn dg-btn-ghost"
                   style={{
                     fontSize: "var(--dg-fs-caption)",
@@ -4115,6 +4384,21 @@ export default function ShiftEditPanel({
                     defaultShiftEnabled={defaultShiftEnabled}
                     onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
+                      if (pickingRestOfDayAbsence) {
+                        onSelect(
+                          buildPanelInput({
+                            segments: currentSegments,
+                            absenceTypeId: null,
+                            customStartTime: customStartTime ?? null,
+                            customEndTime: customEndTime ?? null,
+                            restOfDayAbsenceTypeId: at.id,
+                          }),
+                          seriesId ? seriesScope : undefined,
+                        );
+                        setPickingRestOfDayAbsence(false);
+                        setShowPicker(false);
+                        return;
+                      }
                       onSelect(
                         buildPanelInput({
                           segments: [],
@@ -4212,7 +4496,7 @@ export default function ShiftEditPanel({
               background: "var(--dg-color-surface)",
             }}
           >
-            {(shiftSummary || timeSummary || noteSummary) && (
+            {(shiftSummary || restOfDaySummary || timeSummary || noteSummary) && (
               <div
                 style={{
                   fontSize: "var(--dg-fs-badge)",
@@ -4221,6 +4505,7 @@ export default function ShiftEditPanel({
                 }}
               >
                 {shiftSummary && <div>{shiftSummary}</div>}
+                {restOfDaySummary && <div>{restOfDaySummary}</div>}
                 {timeSummary && <div>{timeSummary}</div>}
                 {noteSummary && <div>{noteSummary}</div>}
               </div>
@@ -4258,20 +4543,24 @@ export default function ShiftEditPanel({
       {pendingDelete && (
         <ConfirmDialog
           title={
-            isAbsence
+            isAbsence || pendingDelete.type === "restOfDay"
               ? "Remove Absence?"
-              : pendingDelete.type === "all" && currentLabels.length > 1
+              : pendingDelete.type === "all" && (currentLabels.length > 1 || hasRestOfDayAbsence)
                 ? "Remove All Shifts?"
                 : "Remove Shift?"
           }
           message={
             (isAbsence
               ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
-              : pendingDelete.type === "pill"
-                ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
-                : currentLabels.length > 1
-                  ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
-                  : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`) +
+              : pendingDelete.type === "restOfDay"
+                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}? The shifts stay.`
+                : pendingDelete.type === "pill"
+                  ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                  : hasRestOfDayAbsence
+                    ? `Remove all shifts (${currentLabels.join(", ")}) and ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}?`
+                    : currentLabels.length > 1
+                      ? `Remove all shifts (${currentLabels.join(", ")}) from ${modal.empName} on ${formatDate(modal.date)}?`
+                      : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`) +
             (seriesId ? seriesScopeRemovalNote(seriesScope) : "")
           }
           confirmLabel="Remove"
@@ -4280,6 +4569,17 @@ export default function ShiftEditPanel({
             if (pendingDelete.type === "all") {
               onSelect(null, seriesId ? seriesScope : undefined);
               if (onCustomTimeChange) onCustomTimeChange(null, null);
+            } else if (pendingDelete.type === "restOfDay") {
+              onSelect(
+                buildPanelInput({
+                  segments: currentSegments,
+                  absenceTypeId: null,
+                  customStartTime: customStartTime ?? null,
+                  customEndTime: customEndTime ?? null,
+                  restOfDayAbsenceTypeId: null,
+                }),
+                seriesId ? seriesScope : undefined,
+              );
             } else {
               const removedIdx = pendingDelete.index;
               const remainingSegments = currentSegments.filter((_, j) => j !== removedIdx);

@@ -652,6 +652,7 @@ async function fetchScheduleCellSnapshotPayload(
     series_id: string | null;
     from_recurring: boolean;
     state_kind: "worked" | "absence" | "deleted";
+    absence_type_id: number | null;
     shift_ids: Array<number | null>;
     job_ids: number[];
     is_mentored_flags: boolean[];
@@ -1278,7 +1279,8 @@ export async function POST(req: NextRequest) {
           p_shift_ids: sourcePayload.shift_ids ?? [],
           p_job_ids: sourcePayload.job_ids ?? [],
           p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
-          p_absence_type_id: null,
+          // A worked cell's rest-of-day absence (item 45) survives a time edit.
+          p_absence_type_id: sourcePayload.absence_type_id ?? null,
           p_custom_start_time: data.customStartTime,
           p_custom_end_time: data.customEndTime,
           p_series_id: sourcePayload.series_id ?? null,

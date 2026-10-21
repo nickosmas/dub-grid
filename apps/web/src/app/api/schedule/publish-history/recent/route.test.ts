@@ -208,6 +208,8 @@ describe("GET /api/schedule/publish-history/recent", () => {
             toState: null,
             fromAbsenceTypeId: null,
             toAbsenceTypeId: null,
+            fromRestOfDayAbsenceTypeId: null,
+            toRestOfDayAbsenceTypeId: null,
             updatedBy: null,
             fromCustomStart: null,
             fromCustomEnd: null,

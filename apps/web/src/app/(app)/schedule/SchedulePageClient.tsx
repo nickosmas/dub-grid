@@ -3051,6 +3051,19 @@ function SchedulerContent({
     [shifts],
   );
 
+  // A worked cell's absence for the rest of the day (item 45), drawn as its last pill.
+  const restOfDayAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.restOfDayAbsenceTypeId ?? null,
+    [shifts],
+  );
+
+  const publishedRestOfDayAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.publishedRestOfDayAbsenceTypeId ?? null,
+    [shifts],
+  );
+
   /** Full AbsenceType object map for grid cell styling (includes archived for historical cells) */
   const absenceTypeObjectMap = useMemo(
     () => new Map(allAbsenceTypes.map((at) => [at.id, at])),
@@ -4355,11 +4368,8 @@ function SchedulerContent({
           toast.warning("Removed assignments that are no longer available.");
           return false;
         }
-        if (
-          entry.kind === "absence" &&
-          entry.absenceTypeId != null &&
-          !absenceTypeMapRef.current.has(entry.absenceTypeId)
-        ) {
+        // A whole-day absence, or a worked cell's absence for the rest of the day.
+        if (entry.absenceTypeId != null && !absenceTypeMapRef.current.has(entry.absenceTypeId)) {
           toast.error("That absence type is no longer available.");
           return false;
         }
@@ -4591,11 +4601,7 @@ function SchedulerContent({
         }
       }
 
-      if (
-        input.kind === "absence" &&
-        input.absenceTypeId != null &&
-        !absenceTypeMapRef.current.has(input.absenceTypeId)
-      ) {
+      if (input.absenceTypeId != null && !absenceTypeMapRef.current.has(input.absenceTypeId)) {
         toast.error("That absence type is no longer available.");
         return currentShift;
       }
@@ -6358,6 +6364,8 @@ function SchedulerContent({
           publishedLabelForKey,
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
+          restOfDayAbsenceTypeIdForKey,
+          publishedRestOfDayAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
           publishedMetadataForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
@@ -6407,6 +6415,8 @@ function SchedulerContent({
       publishedLabelForKey,
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
+      restOfDayAbsenceTypeIdForKey,
+      publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffKindForKey,
       publishedMetadataForKey,
       canRenderAuthorNames,
@@ -7918,6 +7928,12 @@ function SchedulerContent({
                   ?.publishedAbsenceTypeId ??
                 null
               }
+              publishedRestOfDayAbsenceTypeId={
+                panelShiftEntry?.publishedRestOfDayAbsenceTypeId ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedRestOfDayAbsenceTypeId ??
+                null
+              }
               publishedCustomStartTime={
                 panelShiftEntry?.publishedCustomStartTime ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
@@ -8010,6 +8026,7 @@ function SchedulerContent({
               shiftDisplayMode={org?.shiftDisplayMode}
               absenceTypes={absenceTypes}
               currentAbsenceTypeId={panelCurrentAbsenceTypeId}
+              currentRestOfDayAbsenceTypeId={panelShiftEntry?.restOfDayAbsenceTypeId ?? null}
             />
           )}
 

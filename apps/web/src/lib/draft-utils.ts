@@ -84,13 +84,15 @@ export function countShiftsAddedToPublishedEntry(entry: ShiftMap[string]): numbe
   return countShiftsAddedToPublishedCell(
     {
       segments: toSegments(entry.publishedSegments, entry.publishedAssignmentDefinitionIds),
-      absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+      // Whichever absence the cell carries: a rest-of-day one changing (item 45)
+      // keeps an added shift an edit.
+      absenceTypeId: entry.publishedAbsenceTypeId ?? entry.publishedRestOfDayAbsenceTypeId ?? null,
       customStartTime: entry.publishedCustomStartTime ?? null,
       customEndTime: entry.publishedCustomEndTime ?? null,
     },
     {
       segments: toSegments(entry.segments, entry.assignmentIds),
-      absenceTypeId: entry.absenceTypeId ?? null,
+      absenceTypeId: entry.absenceTypeId ?? entry.restOfDayAbsenceTypeId ?? null,
       customStartTime: entry.customStartTime ?? null,
       customEndTime: entry.customEndTime ?? null,
     },

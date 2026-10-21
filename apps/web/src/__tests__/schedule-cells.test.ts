@@ -263,6 +263,10 @@ describe("a worked cell with a rest-of-day absence (item 45)", () => {
     });
     expect(entry?.published).toMatchObject({ absenceTypeId: null, restOfDayAbsenceTypeId: null });
     expect(entry?.absenceTypeId).toBeNull();
+    expect(entry).toMatchObject({
+      restOfDayAbsenceTypeId: 7,
+      publishedRestOfDayAbsenceTypeId: null,
+    });
     expect(entry?.draftKind).toBe("modified");
   });
 

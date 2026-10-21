@@ -881,7 +881,7 @@
         the save, state, sync, import and publish functions, and the shared
         accessors and mappers. A mixed cell round-trips through draft,
         publish and publish history. Needs a migration.
-  - [ ] 45b. **Web editor and grid** - the panel adds an absence beside one
+  - [x] 45b. **Web editor and grid** - the panel adds an absence beside one
         or two shifts and can record when the last shift ended; grid pills,
         labels, publish-diff badges, copy, paste and drag keep every part;
         the overlap check covers worked parts only; a three-item cell gets a

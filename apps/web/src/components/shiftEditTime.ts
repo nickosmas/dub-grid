@@ -103,3 +103,28 @@ export function orderSegmentsByStartTime<T>(
     customEndTime: join(order.map((index) => ends[index])),
   };
 }
+
+/**
+ * Sets when the last of a cell's shifts actually ended ("Worked until", item
+ * 45), leaving every other shift's `|`-separated times alone. The time editor
+ * saves a start and end together, so the last shift's start fills from its
+ * custom or default start.
+ */
+export function withLastShiftEnd(
+  customStartTime: string | null,
+  customEndTime: string | null,
+  shiftCount: number,
+  lastDefaultStart: string | null,
+  workedUntil: string,
+): { customStartTime: string | null; customEndTime: string | null } {
+  const split = (time: string | null) =>
+    Array.from({ length: shiftCount }, (_, index) => time?.split("|")[index] || null);
+  const join = (times: Array<string | null>) =>
+    times.every((time) => !time) ? null : times.map((time) => time ?? "").join("|");
+  const starts = split(customStartTime);
+  const ends = split(customEndTime);
+  const last = shiftCount - 1;
+  starts[last] = starts[last] ?? lastDefaultStart;
+  ends[last] = workedUntil;
+  return { customStartTime: join(starts), customEndTime: join(ends) };
+}

@@ -104,3 +104,47 @@ describe("publish change rows", () => {
     expect(isNotePublishChangeRow(cellRow)).toBe(false);
   });
 });
+
+describe("rest-of-day absences in publish change rows (item 45)", () => {
+  const segments = [{ shiftId: 1, jobId: 2, position: 0, isMentored: false }];
+
+  it("never reads a worked cell's absence as a whole-day absence", () => {
+    const [change] = toPublishChanges([
+      makeRow({
+        kind: "modified",
+        from_state: { kind: "worked", segments },
+        to_state: { kind: "worked", segments, absenceTypeId: 9 },
+        to_absence_type_id: 9,
+      }),
+    ]);
+    expect(change).toMatchObject({
+      fromAbsenceTypeId: null,
+      toAbsenceTypeId: null,
+      fromRestOfDayAbsenceTypeId: null,
+      toRestOfDayAbsenceTypeId: 9,
+    });
+  });
+
+  it("reads a whole-day absence as before, including rows without state", () => {
+    const [stated, legacy] = toPublishChanges([
+      makeRow({
+        to_state: { kind: "absence", segments: [], absenceTypeId: 4 },
+        to_absence_type_id: 4,
+      }),
+      makeRow({ to_absence_type_id: 4 }),
+    ]);
+    expect(stated).toMatchObject({ toAbsenceTypeId: 4, toRestOfDayAbsenceTypeId: null });
+    expect(legacy).toMatchObject({ toAbsenceTypeId: 4, toRestOfDayAbsenceTypeId: null });
+  });
+
+  it("keeps a change that only adds the absence instead of dropping it as a no-op", () => {
+    const changes = toPublishChanges([
+      makeRow({
+        kind: "modified",
+        from_state: { kind: "worked", segments },
+        to_state: { kind: "worked", segments, absenceTypeId: 9 },
+      }),
+    ]);
+    expect(changes).toHaveLength(1);
+  });
+});

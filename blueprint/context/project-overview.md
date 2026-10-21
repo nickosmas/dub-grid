@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress. Item 45 is planned.
+shipped. Item 40 is in progress. Item 45 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,7 +79,7 @@ shipped. Item 40 is in progress. Item 45 is planned.
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
-| 45   | Planned     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
+| 45   | In progress | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 
 Item 40 is split:
 
@@ -130,14 +130,15 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
-Item 45 is split; 45a has shipped:
+Item 45 is split; 45a and 45b have shipped:
 
 - **45a - Data model:** shipped; a worked cell may carry one absence,
   through draft, publish, publish history and import (migration 082).
-  Nothing on screen shows it until 45b.
-- **45b - Web editor and grid:** planned; the panel adds an absence beside
-  one or two shifts and can record when the last shift ended, and a
-  three-item cell gets a taller row. Needs an approved mockup first.
+- **45b - Web editor and grid:** shipped; the panel adds an absence beside
+  one or two shifts and records when the last shift ended ("Worked until"),
+  and the Week and 2 Weeks grid draws it last, stacking a three-item cell in
+  a taller row. Drafts, publish, copy and drag keep every part (migration
+  083).
 - **45c - Other web surfaces:** planned; Month, phone Day, print (a taller
   row), dashboard, person page, coverage, reports, export and calendar.
 - **45d - Mobile app:** planned.
@@ -311,7 +312,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `079`.
+  checksum-locked through `083`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

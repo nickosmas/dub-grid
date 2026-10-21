@@ -30,7 +30,7 @@ interface Fixture {
   other_org_absence_id: number;
 }
 
-const DAYS = ["2031-02-03", "2031-02-04", "2031-02-05", "2031-02-10"];
+const DAYS = ["2031-02-03", "2031-02-04", "2031-02-05", "2031-02-10", "2031-02-11", "2031-02-12"];
 
 /** Runs `body` as a Calm Haven Super Admin inside a transaction that is always rolled back. */
 async function asSuperAdmin(body: (fixture: Fixture) => Promise<void>) {
@@ -276,6 +276,36 @@ describe.skipIf(!reachable)("a worked cell can carry a rest-of-day absence (082)
       });
     });
   });
+
+  it.each(["move", "copy"])(
+    "keeps the absence when a worked cell is dragged (%s, 083)",
+    async (dragMode) => {
+      await asSuperAdmin(async (fixture) => {
+        await writeDraft(fixture, DAYS[4], "worked", { absenceId: fixture.absence_id });
+        await db.query(
+          `SELECT public.move_shift(
+             $1::uuid, $2::uuid, $3::date, $2::uuid, $4::date, 'worked',
+             $5::bigint[], $6::bigint[], $7::bigint, NULL, NULL, $8, NULL, NULL, TRUE
+           )`,
+          [
+            fixture.org_id,
+            fixture.emp_id,
+            DAYS[4],
+            DAYS[5],
+            [fixture.shift_id],
+            [fixture.job_id],
+            fixture.absence_id,
+            dragMode,
+          ],
+        );
+        expect(await draftSnapshot(fixture, DAYS[5])).toEqual({
+          state_kind: "worked",
+          absence_type_id: fixture.absence_id,
+          segments: 1,
+        });
+      });
+    },
+  );
 
   it("builds the cell state with the absence on a worked cell only", async () => {
     await asSuperAdmin(async (fixture) => {

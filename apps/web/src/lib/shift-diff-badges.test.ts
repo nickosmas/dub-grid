@@ -242,3 +242,60 @@ describe("buildShiftDiffDescriptors — removed split-shift segments", () => {
     });
   });
 });
+
+describe("rest-of-day absence diffs (item 45)", () => {
+  const base = {
+    resolveAssignmentDefinitionLabel: () => "D",
+    resolveAbsenceLabel: (id: number) => (id === 9 ? "Sick" : "Vacation"),
+  };
+
+  it("marks an added rest-of-day absence new on its own pill", () => {
+    const result = buildShiftDiffDescriptors({
+      ...base,
+      before: { assignmentIds: [1] },
+      after: { assignmentIds: [1], restOfDayAbsenceTypeId: 9 },
+    });
+    expect(result.restOfDayDiff).toEqual({
+      borderKind: "new",
+      badge: { kind: "new", text: "New", detail: "Added Sick for the rest of the day." },
+    });
+    expect(result.pillDiffs[0]?.badge ?? null).toBeNull();
+  });
+
+  it("marks a changed rest-of-day absence edited", () => {
+    const result = buildShiftDiffDescriptors({
+      ...base,
+      before: { assignmentIds: [1], restOfDayAbsenceTypeId: 7 },
+      after: { assignmentIds: [1], restOfDayAbsenceTypeId: 9 },
+    });
+    expect(result.restOfDayDiff?.badge).toEqual({
+      kind: "modified",
+      text: "Edited",
+      detail: "Was Vacation.",
+    });
+  });
+
+  it("says on the cell when a rest-of-day absence was removed", () => {
+    const result = buildShiftDiffDescriptors({
+      ...base,
+      before: { assignmentIds: [1], restOfDayAbsenceTypeId: 9 },
+      after: { assignmentIds: [1] },
+    });
+    expect(result.restOfDayDiff).toBeNull();
+    expect(result.cellBadge).toEqual({
+      kind: "modified",
+      text: "Edited",
+      detail: "Removed Sick for the rest of the day.",
+    });
+  });
+
+  it("adds nothing when the rest-of-day absence is unchanged", () => {
+    const result = buildShiftDiffDescriptors({
+      ...base,
+      before: { assignmentIds: [1], restOfDayAbsenceTypeId: 9 },
+      after: { assignmentIds: [1], restOfDayAbsenceTypeId: 9 },
+    });
+    expect(result.restOfDayDiff).toBeNull();
+    expect(result.cellBadge).toBeNull();
+  });
+});

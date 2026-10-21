@@ -328,8 +328,12 @@ export interface PublishChange {
   toState?: ScheduleCellState | null;
   fromSegments?: ShiftJobSegment[];
   toSegments?: ShiftJobSegment[];
+  /** A whole-day absence only; a worked cell's absence is in the rest-of-day fields. */
   fromAbsenceTypeId?: number | null;
   toAbsenceTypeId?: number | null;
+  /** The absence a worked cell carries for the rest of the day (item 45). */
+  fromRestOfDayAbsenceTypeId?: number | null;
+  toRestOfDayAbsenceTypeId?: number | null;
   updatedBy?: string | null;
   fromCustomStart?: string | null;
   fromCustomEnd?: string | null;
@@ -401,6 +405,13 @@ export interface ScheduleCellStateEntry {
   absenceTypeId?: number | null;
   /** Published absence type ID. */
   publishedAbsenceTypeId?: number | null;
+  /**
+   * The absence a worked cell carries for the rest of the day (item 45), such
+   * as the Sick in D/E/Sick. Separate from `absenceTypeId`, which is whole-day.
+   */
+  restOfDayAbsenceTypeId?: number | null;
+  /** Published rest-of-day absence type ID. */
+  publishedRestOfDayAbsenceTypeId?: number | null;
   /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
   version?: number;
   /** UUID of the user who created this shift. */

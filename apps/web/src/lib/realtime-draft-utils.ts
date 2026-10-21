@@ -26,6 +26,8 @@ function normalizeShiftEntry(entry: ShiftMap[string] | null) {
     publishedCustomEndTime: entry.publishedCustomEndTime ?? null,
     absenceTypeId: entry.absenceTypeId ?? null,
     publishedAbsenceTypeId: entry.publishedAbsenceTypeId ?? null,
+    restOfDayAbsenceTypeId: entry.restOfDayAbsenceTypeId ?? null,
+    publishedRestOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
     version: entry.version,
     createdBy: entry.createdBy ?? null,
     updatedBy: entry.updatedBy ?? null,

@@ -384,6 +384,35 @@ export function absenceTypeIdFromPublishState(
   return state?.kind === "absence" ? state.absenceTypeId : null;
 }
 
+/**
+ * A cell's stored custom times, `|`-joined per shift, from the grid's split
+ * form. A drag sends these, so a second shift's time (such as "Worked until")
+ * moves with it rather than only the first shift's.
+ */
+export function joinedCustomTimes(
+  customTimes: { start: string; end: string; perPill?: { start: string; end: string }[] } | null,
+): { customStartTime: string | null; customEndTime: string | null } {
+  if (!customTimes) return { customStartTime: null, customEndTime: null };
+  const join = (parts: string[]) => (parts.some(Boolean) ? parts.join("|") : null);
+  if (customTimes.perPill) {
+    return {
+      customStartTime: join(customTimes.perPill.map((pill) => pill.start)),
+      customEndTime: join(customTimes.perPill.map((pill) => pill.end)),
+    };
+  }
+  return {
+    customStartTime: customTimes.start || null,
+    customEndTime: customTimes.end || null,
+  };
+}
+
+/** A worked cell's absence for the rest of the day (item 45). */
+export function restOfDayAbsenceTypeIdFromPublishState(
+  state: ScheduleCellState | null | undefined,
+): number | null {
+  return state?.kind === "worked" ? (state.absenceTypeId ?? null) : null;
+}
+
 /** Per-segment mentored flags in pill order, so a published mentored toggle gets its badge. */
 export function mentoredFlagsFromPublishState(
   state: ScheduleCellState | null | undefined,

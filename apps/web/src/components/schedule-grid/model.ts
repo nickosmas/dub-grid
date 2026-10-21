@@ -62,6 +62,8 @@ export interface ScheduleGridAccessors {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,
     date: Date,

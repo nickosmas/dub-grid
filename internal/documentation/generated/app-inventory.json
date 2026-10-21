@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:750f5541561fabb1b0957ed6e244b1191dd089baeb6872e2014d64a30723fdb9",
+  "sourceDigest": "sha256:8f049f9d12d9f578be978ea24a6b809f55ad5dbe94794b0438d3d1ae419ac42f",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4605,6 +4605,16 @@
       "sha256": "8c963fd5a0a44ce223c833c7411649cea74abc67e22ac4c42deb91bef02595a1",
       "source": {
         "path": "supabase/migrations/082_worked_cell_off_day.sql"
+      }
+    },
+    {
+      "id": "migration:083_move_shift_keeps_absence.sql",
+      "version": "083",
+      "name": "move_shift_keeps_absence",
+      "file": "083_move_shift_keeps_absence.sql",
+      "sha256": "addab503b90a59a17b5ec68b75fe0890373f0791cc4abf4e410e191de0b6ed5c",
+      "source": {
+        "path": "supabase/migrations/083_move_shift_keeps_absence.sql"
       }
     }
   ],

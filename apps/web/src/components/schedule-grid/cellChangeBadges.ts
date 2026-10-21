@@ -8,6 +8,7 @@ import type { DraftKind, PublishChange, ScheduleCellStateEntry, ShiftJobSegment 
 import { getGridDiffBadgeLabel, type GridDiffBadgeConfig } from "./badges";
 import {
   absenceTypeIdFromPublishState,
+  restOfDayAbsenceTypeIdFromPublishState,
   assignmentIdsFromPublishState,
   cellLevelDiffBadge,
   cellShowsDraftDiffBadge,
@@ -94,6 +95,7 @@ function buildDraftDiff(
     before: {
       assignmentIds: publishedIds,
       absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+      restOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
       isMentoredFlags: sortedSegments(entry.publishedSegments).map(
         (segment) => segment.isMentored ?? false,
       ),
@@ -106,6 +108,7 @@ function buildDraftDiff(
     after: {
       assignmentIds: currentIds,
       absenceTypeId: entry.absenceTypeId ?? null,
+      restOfDayAbsenceTypeId: entry.restOfDayAbsenceTypeId ?? null,
       isMentoredFlags: sortedSegments(entry.segments).map((segment) => segment.isMentored ?? false),
       timeRanges: expandDelimitedTimeRanges(
         entry.customStartTime,
@@ -133,6 +136,9 @@ function buildPublishDiff(
     before: {
       assignmentIds: from,
       absenceTypeId: change.fromAbsenceTypeId ?? absenceTypeIdFromPublishState(change.fromState),
+      restOfDayAbsenceTypeId:
+        change.fromRestOfDayAbsenceTypeId ??
+        restOfDayAbsenceTypeIdFromPublishState(change.fromState),
       timeRanges: timeRangesFromPublishState(
         change.fromState,
         change.fromCustomStart,
@@ -144,6 +150,8 @@ function buildPublishDiff(
     after: {
       assignmentIds: to,
       absenceTypeId: change.toAbsenceTypeId ?? absenceTypeIdFromPublishState(change.toState),
+      restOfDayAbsenceTypeId:
+        change.toRestOfDayAbsenceTypeId ?? restOfDayAbsenceTypeIdFromPublishState(change.toState),
       timeRanges: timeRangesFromPublishState(
         change.toState,
         change.toCustomStart,

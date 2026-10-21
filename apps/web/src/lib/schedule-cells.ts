@@ -371,6 +371,10 @@ export function buildScheduleCellEntry(args: {
     absenceTypeId: effective?.kind === "absence" ? (effective.absenceTypeId ?? null) : null,
     publishedAbsenceTypeId:
       published?.kind === "absence" ? (published.absenceTypeId ?? null) : null,
+    restOfDayAbsenceTypeId:
+      effective?.kind === "worked" ? (effective.restOfDayAbsenceTypeId ?? null) : null,
+    publishedRestOfDayAbsenceTypeId:
+      published?.kind === "worked" ? (published.restOfDayAbsenceTypeId ?? null) : null,
     version: args.version,
     createdBy: args.createdBy ?? null,
     updatedBy: args.updatedBy ?? null,

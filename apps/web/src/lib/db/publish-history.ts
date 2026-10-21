@@ -45,7 +45,23 @@ function stateIdentityKey(state: PublishChange["fromState"]): string {
     .sort((left, right) => left.position - right.position)
     .map(segmentIdentityKey)
     .join("|");
-  return `worked:${segments}:${state.customStartTime ?? ""}:${state.customEndTime ?? ""}`;
+  // A worked cell's absenceTypeId is its rest-of-day absence (item 45).
+  return `worked:${segments}:${state.customStartTime ?? ""}:${state.customEndTime ?? ""}:${state.absenceTypeId ?? ""}`;
+}
+
+/**
+ * Splits a change row's absence id by the state it belongs to. Since 082 the
+ * row also records a worked cell's rest-of-day absence there, so only an
+ * absence state makes it a whole-day absence. Rows without state predate both.
+ */
+function splitAbsenceTypeId(
+  state: PublishChange["fromState"],
+  absenceTypeId: number | null,
+): { wholeDay: number | null; restOfDay: number | null } {
+  if (!state) return { wholeDay: absenceTypeId, restOfDay: null };
+  if (state.kind === "absence") return { wholeDay: absenceTypeId, restOfDay: null };
+  if (state.kind === "worked") return { wholeDay: null, restOfDay: absenceTypeId };
+  return { wholeDay: null, restOfDay: null };
 }
 
 /**
@@ -76,6 +92,8 @@ export function toPublishChanges(rows: ScheduleChangeRow[] | null | undefined): 
     .map((row) => {
       const fromState = row.from_state as PublishChange["fromState"];
       const toState = row.to_state as PublishChange["toState"];
+      const fromAbsence = splitAbsenceTypeId(fromState, row.from_absence_type_id);
+      const toAbsence = splitAbsenceTypeId(toState, row.to_absence_type_id);
       return {
         empId: row.emp_id,
         date: row.date,
@@ -84,8 +102,10 @@ export function toPublishChanges(rows: ScheduleChangeRow[] | null | undefined): 
         toState,
         fromSegments: fromState?.segments as ShiftJobSegment[] | undefined,
         toSegments: toState?.segments as ShiftJobSegment[] | undefined,
-        fromAbsenceTypeId: row.from_absence_type_id,
-        toAbsenceTypeId: row.to_absence_type_id,
+        fromAbsenceTypeId: fromAbsence.wholeDay,
+        toAbsenceTypeId: toAbsence.wholeDay,
+        fromRestOfDayAbsenceTypeId: fromAbsence.restOfDay,
+        toRestOfDayAbsenceTypeId: toAbsence.restOfDay,
         updatedBy: row.updated_by,
         fromCustomStart: row.from_custom_start,
         fromCustomEnd: row.from_custom_end,

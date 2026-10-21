@@ -265,6 +265,8 @@ interface RenderGridOptions {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,
     date: Date,
@@ -393,6 +395,8 @@ function renderGrid(options: RenderGridOptions = {}) {
       publishedLabelForKey: options.publishedLabelForKey,
       publishedAssignmentIdsForKey: options.publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey: options.publishedAbsenceTypeIdForKey,
+      restOfDayAbsenceTypeIdForKey: options.restOfDayAbsenceTypeIdForKey,
+      publishedRestOfDayAbsenceTypeIdForKey: options.publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffForKey: options.publishDiffForKey as any,
       publishedMetadataForKey: options.publishedMetadataForKey,
       createdByNameForKey: options.createdByNameForKey,
@@ -2218,6 +2222,175 @@ describe("ScheduleGrid", () => {
     expect(pills[0].parentElement?.style.gridTemplateColumns).toBe("repeat(2, minmax(0, 1fr))");
     // One pill tall, so the row keeps the grid's height unless a pill's lines need more.
     expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 1 * (");
+  });
+
+  describe("a rest-of-day absence (item 45)", () => {
+    const sick: AbsenceType = {
+      id: 9,
+      orgId: "org-1",
+      label: "SICK",
+      name: "Sick",
+      color: "#FFE4E6",
+      border: "#FDA4AF",
+      text: "#9F1239",
+      sortOrder: 1,
+    };
+    const absenceTypeMap = new Map([[sick.id, sick]]);
+
+    it("sits side by side after a single shift in a wide column, with when it starts", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        getCustomShiftTimes: () => ({ start: "07:00", end: "11:00" }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+      const pills = Array.from(absencePill.parentElement!.children) as HTMLElement[];
+
+      expect(absencePill.parentElement?.dataset.shiftLayout).toBe("side-by-side");
+      expect(absencePill.parentElement?.style.gridTemplateColumns).toBe(
+        "repeat(2, minmax(0, 1fr))",
+      );
+      expect(pills[pills.length - 1]).toBe(absencePill);
+      expect(absencePill).toHaveTextContent("SICK");
+      expect(absencePill).toHaveTextContent("from 11");
+      expect(absencePill.style.background).toBe("rgb(255, 228, 230)");
+    });
+
+    it("stacks after two shifts and grows only its row", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const layout = firstCell.querySelector<HTMLElement>("[data-shift-layout]")!;
+      const row = firstCell.closest('[role="row"]') as HTMLElement;
+
+      expect(layout.dataset.shiftLayout).toBe("stacked");
+      expect(layout.style.gridTemplateRows).toBe("repeat(3, minmax(min-content, 1fr))");
+      expect(layout.lastElementChild?.getAttribute("data-shift-pill")).toBe("rest-of-day-absence");
+      expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 3 * (");
+    });
+
+    it("badges the absence pill, not the shift, when only the absence is new", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        publishedRestOfDayAbsenceTypeIdForKey: () => null,
+        draftKindForKey: () => "modified",
+        publishedAssignmentIdsForKey: () => [1],
+        publishedLabelForKey: () => "D",
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+      const shiftPill = firstCell.querySelector<HTMLElement>('[data-shift-pill="multi"]')!;
+
+      // A draft "New" is the dashed border, on the absence pill alone.
+      expect(absencePill.style.border).toContain("dashed");
+      expect(shiftPill.style.border).not.toContain("dashed");
+      expect(shiftPill.querySelector("[data-draft-badge]")).toBeNull();
+    });
+
+    it("badges the absence pill new when a publish added only the absence", () => {
+      observedWidth = 1440;
+      const worked = (absenceTypeId: number | null) => ({
+        kind: "worked" as const,
+        segments: [{ shiftId: 10, jobId: 101, position: 0 }],
+        absenceTypeId,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      });
+
+      renderGrid({
+        spanWeeks: 1,
+        showPublishDiffOverlay: true,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        publishedRestOfDayAbsenceTypeIdForKey: () => 9,
+        publishDiffForKey: () => ({
+          empId: "emp-1",
+          date: "2024-01-07",
+          kind: "modified",
+          fromState: worked(null),
+          toState: worked(9),
+          toRestOfDayAbsenceTypeId: 9,
+          publishedAt: "2024-01-07T12:00:00.000Z",
+          publishedBy: "user-1",
+        }),
+        resolvePublisherName: () => "Mina",
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+
+      expect(absencePill.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+    });
+
+    it("names the absence in the cell's accessible label", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+      });
+
+      expect(screen.getAllByRole("gridcell")[0]).toHaveAccessibleName(
+        expect.stringMatching(/D\/N, then Sick for the rest of the day$/),
+      );
+    });
+
+    it("leaves a cell without one as it was", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => null,
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      expect(firstCell.querySelector('[data-shift-pill="single"]')).not.toBeNull();
+      expect(firstCell.querySelector('[data-shift-pill="rest-of-day-absence"]')).toBeNull();
+    });
   });
 
   it("gives a double shift's cell notes to its last pill when segments do not line up", () => {

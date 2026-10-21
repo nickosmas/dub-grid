@@ -160,7 +160,13 @@ function resolveLabel(
         assignmentIdByPair,
       );
       if (derivedIds.length > 0) {
-        return derivedIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/");
+        const shifts = derivedIds.map((id) => assignmentLabelMap.get(id) ?? "?");
+        // A worked cell's absence for the rest of the day reads last: D/E/Sick.
+        const restOfDay =
+          state.absenceTypeId != null
+            ? [absenceTypeMap.get(state.absenceTypeId) ?? `Absence #${state.absenceTypeId}`]
+            : [];
+        return [...shifts, ...restOfDay].join("/");
       }
     }
   }
