@@ -55,7 +55,7 @@ function StatusTag({ item }: { item: ShiftChangeItem }) {
   return (
     <span
       className={cn(
-        "whitespace-nowrap rounded-full px-2 py-px text-[11px] font-bold",
+        "whitespace-nowrap rounded-full px-2 py-px text-[length:var(--dg-fs-micro)] font-bold",
         item.status === "removed"
           ? "bg-bg-secondary text-text-secondary"
           : "bg-brand-bg text-accent-text",
@@ -87,7 +87,7 @@ function ChangeItem({ item, tone }: { item: ShiftChangeItem; tone: SideTone }) {
   return (
     <div className="flex flex-col gap-0.5">
       {hasKicker ? (
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted">
+        <div className="flex items-center gap-1.5 text-[length:var(--dg-fs-micro)] font-semibold text-text-muted">
           {item.label ? <span>{LABEL_TEXT[item.label]}</span> : null}
           <StatusTag item={item} />
         </div>
@@ -138,7 +138,7 @@ function DayBar({
           segments.push(
             <span
               key={`gap-${index}`}
-              className="absolute inset-y-0 flex items-center justify-center border border-dashed border-border bg-surface text-[11px] text-text-muted"
+              className="absolute inset-y-0 flex items-center justify-center border border-dashed border-border bg-surface text-[length:var(--dg-fs-micro)] text-text-muted"
               style={width(item.bar.from - item.breakBefore.minutes, item.bar.from)}
             >
               Break
@@ -150,7 +150,7 @@ function DayBar({
             <span
               key={`item-${index}`}
               className={cn(
-                "absolute inset-y-0 flex items-center overflow-hidden whitespace-nowrap border-r-2 border-surface px-1.5 text-[11px] font-semibold",
+                "absolute inset-y-0 flex items-center overflow-hidden whitespace-nowrap border-r-2 border-surface px-1.5 text-[length:var(--dg-fs-micro)] font-semibold",
                 item.kind === "absence"
                   ? "bg-[repeating-linear-gradient(135deg,var(--dg-color-border-light)_0,var(--dg-color-border-light)_6px,var(--dg-color-bg-secondary)_6px,var(--dg-color-bg-secondary)_12px)] text-text-secondary"
                   : "bg-brand-bg text-accent-text",
@@ -184,7 +184,7 @@ function SideBlock({
     <div className="flex min-w-0 flex-col gap-2.5">
       <div
         className={cn(
-          "flex items-baseline justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.08em]",
+          "flex items-baseline justify-between gap-2 text-[length:var(--dg-fs-micro)] font-bold uppercase tracking-[0.08em]",
           tone === "before" ? "text-text-muted" : "text-brand",
         )}
       >
