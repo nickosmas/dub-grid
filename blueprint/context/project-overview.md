@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 46 are
-shipped. Item 40 is in progress. Item 47 is planned.
+shipped. Item 40 is in progress. Item 47 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,7 +81,7 @@ shipped. Item 40 is in progress. Item 47 is planned.
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
-| 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
+| 47   | In progress | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
 
@@ -201,12 +201,13 @@ After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
 
-Item 47 is split; none has shipped:
+Item 47 is split; 47a has shipped:
 
-- **47a - Matrix and changes since publish:** planned; the panel, renamed
-  Coverage Check, shows each requirement's staffed and needed counts by day, short or over,
-  for the draft and the published schedule, with a detail per cell. No
-  migration.
+- **47a - Matrix and changes since publish:** shipped; Coverage Check
+  shows each requirement's staffed and needed counts by day, short or over,
+  for the draft and the published schedule, what the draft opens and closes,
+  and a detail per cell with Fill a spot and Show in grid. Mentored credit
+  sums without float noise everywhere coverage is counted. No migration.
 - **47b - What changed:** planned; each cell names the draft changes behind
   it.
 - **47c - Suggestion engine:** planned; a tested schedule-core function that

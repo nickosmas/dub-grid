@@ -88,10 +88,15 @@ import {
   iterateDateRange,
 } from "@/lib/utils";
 import {
+  buildCoverageMatrix,
+  computeCoverageCategorySnapshots,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
+  type CoverageCategorySnapshot,
+  type CoverageMatrixCell,
 } from "@dubgrid/schedule-core";
+import type { CoverageCellFill } from "@/components/coverage-check/CoverageCellDetail";
 import {
   filterAndSortEmployees,
   hasVisibleGridShiftEntry,
@@ -99,6 +104,8 @@ import {
   buildPublishedDateSet,
   computeCoverageGaps,
   createCoverageCreditResolver,
+  createPublishedAssignmentIdsResolver,
+  createPublishedCoverageCreditResolver,
   filterPublishedDates,
   timesOverlap,
   checkCrossDateOverlap,
@@ -3477,6 +3484,97 @@ function SchedulerContent({
     [allCoverageGaps, canEditShifts, getActionableCoverageGapAssignmentIds, publishedCoverageGaps],
   );
 
+  const publishedAssignmentIdsForKey = useMemo(
+    () => createPublishedAssignmentIdsResolver(shifts),
+    [shifts],
+  );
+
+  const publishedCoverageCreditForKey = useMemo(
+    () => createPublishedCoverageCreditResolver(shifts, org?.coverageRuleConfig),
+    [org?.coverageRuleConfig, shifts],
+  );
+
+  // Started means every shift that could fill the requirement has begun: the
+  // same rule that drops a gap from the toolbar count, so the two agree.
+  const isCoverageSnapshotStarted = useCallback(
+    (snapshot: CoverageCategorySnapshot): boolean =>
+      snapshot.eligibleAssignmentDefinitionIds.every((assignmentId) =>
+        hasDateAndTimeStarted(
+          formatDateKey(snapshot.date),
+          getOpenShiftTimeRanges([assignmentId], null, null),
+        ),
+      ),
+    [getOpenShiftTimeRanges, hasDateAndTimeStarted],
+  );
+
+  // Built only while Coverage Check is open, so the grid pays nothing for it.
+  const coverageMatrix = useMemo(() => {
+    if (!showCoveragePanel || !canViewCoveragePanel || spanWeeks === "month") return null;
+    const base = {
+      focusAreas,
+      shiftCategories,
+      assignments,
+      requirements: coverageRequirements,
+      employeesByFocusArea,
+      assignmentIdsByFocusArea,
+      assignmentLabelMap,
+      assignmentNameMap,
+    };
+    if (!canEditShifts) {
+      const published = computeCoverageCategorySnapshots({
+        ...base,
+        dates: publishedVisibleDates,
+        assignmentIdsForKey,
+        coverageCreditForKey,
+      });
+      return buildCoverageMatrix({
+        draft: published,
+        published,
+        dates: publishedVisibleDates,
+        publishedDateKeys: publishedDateSet,
+        isStarted: isCoverageSnapshotStarted,
+      });
+    }
+    return buildCoverageMatrix({
+      draft: computeCoverageCategorySnapshots({
+        ...base,
+        dates,
+        assignmentIdsForKey,
+        coverageCreditForKey,
+      }),
+      published: computeCoverageCategorySnapshots({
+        ...base,
+        dates: publishedVisibleDates,
+        assignmentIdsForKey: publishedAssignmentIdsForKey,
+        coverageCreditForKey: publishedCoverageCreditForKey,
+      }),
+      dates,
+      publishedDateKeys: publishedDateSet,
+      isStarted: isCoverageSnapshotStarted,
+    });
+  }, [
+    showCoveragePanel,
+    canViewCoveragePanel,
+    spanWeeks,
+    focusAreas,
+    shiftCategories,
+    assignments,
+    coverageRequirements,
+    employeesByFocusArea,
+    assignmentIdsByFocusArea,
+    assignmentLabelMap,
+    assignmentNameMap,
+    canEditShifts,
+    dates,
+    publishedVisibleDates,
+    assignmentIdsForKey,
+    coverageCreditForKey,
+    publishedAssignmentIdsForKey,
+    publishedCoverageCreditForKey,
+    publishedDateSet,
+    isCoverageSnapshotStarted,
+  ]);
+
   // ── Merge calloff open shifts + coverage-gap open shifts ──
   const openShifts = useMemo<GridOpenShift[]>(() => {
     const gapShifts = visibleCoverageGaps.reduce<GridOpenShift[]>((items, gap) => {
@@ -3647,12 +3745,6 @@ function SchedulerContent({
       return null;
     },
     [shifts, assignmentLabelMap, absenceTypeMap],
-  );
-
-  const publishedAssignmentIdsForKey = useCallback(
-    (empId: string, date: Date): number[] =>
-      shifts[`${empId}_${formatDateKey(date)}`]?.publishedAssignmentDefinitionIds ?? [],
-    [shifts],
   );
 
   /**
@@ -6329,6 +6421,103 @@ function SchedulerContent({
     [canEditShifts, canSeeAllOpenShifts, handleClaimOpenShift],
   );
 
+  const findCoverageGapForCell = useCallback(
+    (focusAreaId: number, cell: CoverageMatrixCell) =>
+      visibleCoverageGaps.find(
+        (gap) =>
+          gap.focusAreaId === focusAreaId &&
+          gap.requirementAssignmentDefinitionId === cell.preferredOpenAssignmentDefinitionId &&
+          formatDateKey(gap.date) === cell.dateKey,
+      ) ?? null,
+    [visibleCoverageGaps],
+  );
+
+  const findCoverageOpenShift = useCallback(
+    (focusAreaId: number, cell: CoverageMatrixCell) =>
+      openShifts.find(
+        (openShift) =>
+          openShift.id ===
+          `gap_${focusAreaId}_${cell.preferredOpenAssignmentDefinitionId}_${cell.dateKey}`,
+      ) ?? null,
+    [openShifts],
+  );
+
+  const getCoverageCellFill = useCallback(
+    (focusAreaId: number, cell: CoverageMatrixCell): CoverageCellFill => {
+      const gap = findCoverageGapForCell(focusAreaId, cell);
+      if (!gap) return { canFill: false, pendingPickups: 0 };
+      return {
+        canFill: findCoverageOpenShift(focusAreaId, cell) !== null,
+        pendingPickups: countPendingVolunteerRequestsForCoverageGap({
+          gap,
+          requests: shiftRequests.requests,
+          actionableAssignmentIds: getActionableCoverageGapAssignmentIds(gap),
+        }),
+      };
+    },
+    [
+      findCoverageGapForCell,
+      findCoverageOpenShift,
+      getActionableCoverageGapAssignmentIds,
+      shiftRequests.requests,
+    ],
+  );
+
+  const fillCoverageCell = useCallback(
+    (focusAreaId: number, cell: CoverageMatrixCell) => {
+      const openShift = findCoverageOpenShift(focusAreaId, cell);
+      if (openShift) handleOpenShiftClick(openShift);
+    },
+    [findCoverageOpenShift, handleOpenShiftClick],
+  );
+
+  const coverageFlashRef = useRef<{ cells: HTMLElement[]; timer: number } | null>(null);
+  useEffect(
+    () => () => {
+      if (coverageFlashRef.current) window.clearTimeout(coverageFlashRef.current.timer);
+    },
+    [],
+  );
+
+  const showCoverageInGrid = useCallback(
+    (focusAreaId: number, dateKey: string) => {
+      setShowCoveragePanel(false);
+      if (activeFocusArea !== null && activeFocusArea !== focusAreaId) {
+        setActiveFocusArea(focusAreaId);
+      }
+      const previous = coverageFlashRef.current;
+      if (previous) {
+        window.clearTimeout(previous.timer);
+        for (const cell of previous.cells) cell.removeAttribute("data-coverage-flash");
+      }
+      // Sections mount in idle time, so the cells can take a few frames to appear.
+      let framesLeft = 30;
+      const reveal = () => {
+        const cells = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            `[data-slot="cell"][data-section-id="${focusAreaId}"][data-date-key="${dateKey}"]`,
+          ),
+        );
+        if (cells.length === 0) {
+          if (framesLeft-- > 0) window.requestAnimationFrame(reveal);
+          else toast.info("No one in that focus area is on the grid to show.");
+          return;
+        }
+        cells[0].scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+        for (const cell of cells) cell.setAttribute("data-coverage-flash", "true");
+        coverageFlashRef.current = {
+          cells,
+          timer: window.setTimeout(() => {
+            for (const cell of cells) cell.removeAttribute("data-coverage-flash");
+            coverageFlashRef.current = null;
+          }, 2400),
+        };
+      };
+      window.requestAnimationFrame(reveal);
+    },
+    [activeFocusArea],
+  );
+
   const scheduleGridModel = useMemo(
     () =>
       buildScheduleGridModel({
@@ -8117,11 +8306,17 @@ function SchedulerContent({
           {/* ── Coverage Panel (slide-out) ── */}
           {showCoveragePanel && canViewCoveragePanel && (
             <CoveragePanel
-              gaps={visibleCoverageGaps}
+              matrix={coverageMatrix}
+              publishedDateKeys={publishedDateSet}
               focusAreas={focusAreas}
-              shiftCategories={shiftCategories}
               activeFocusArea={activeFocusArea}
-              publishedWindowState={publishedWindowState}
+              publishedWindowState={canEditShifts ? publishedWindowState : rawPublishedWindowState}
+              canEditShifts={canEditShifts}
+              hasRequirements={coverageRequirements.length > 0}
+              todayKey={todayKey}
+              getCellFill={getCoverageCellFill}
+              onFillSpot={fillCoverageCell}
+              onShowInGrid={showCoverageInGrid}
               onClose={() => setShowCoveragePanel(false)}
             />
           )}

@@ -49,6 +49,35 @@ export function createCoverageCreditResolver(
 }
 
 /**
+ * The published side of the same lookups, for coverage as staff see it now.
+ * A draft deletion leaves the published shift in place, so it is ignored here.
+ */
+export function createPublishedAssignmentIdsResolver(
+  shifts: ShiftMap,
+): (empId: string, date: Date) => number[] {
+  return (empId, date) =>
+    shifts[`${empId}_${formatDateKey(date)}`]?.publishedAssignmentDefinitionIds ?? [];
+}
+
+export function createPublishedCoverageCreditResolver(
+  shifts: ShiftMap,
+  config?: Partial<CoverageRuleConfig> | null,
+): (empId: string, date: Date, assignmentId: number) => number {
+  const normalized = normalizeCoverageRuleConfig(config);
+  const mentoredCredit = normalized.mentoredCoverageCreditPercent / 100;
+
+  return (empId, date, assignmentId) => {
+    const entry = shifts[`${empId}_${formatDateKey(date)}`];
+    if (!entry) return 0;
+    const segmentIndex = entry.publishedAssignmentDefinitionIds.findIndex(
+      (id) => id === assignmentId,
+    );
+    if (segmentIndex === -1) return 0;
+    return entry.publishedSegments?.[segmentIndex]?.isMentored ? mentoredCredit : 1;
+  };
+}
+
+/**
  * The platform adapter for web: reads an employee's resolved shift segments
  * for a date out of a `ShiftMap` entry, for use with
  * `@dubgrid/schedule-core`'s `assembleDashboardCoverage`.

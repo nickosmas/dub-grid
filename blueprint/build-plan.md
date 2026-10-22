@@ -941,7 +941,7 @@
       fix gaps in one click or explain why nothing can. Every insight is
       measured on the schedule and must be exact (owner, 2026-10-21).
       Design reference: the "Staffing check panel" canvas.
-  - [ ] 47a. **Matrix and changes since publish** - replaces the card list:
+  - [x] 47a. **Matrix and changes since publish** - replaces the card list:
         status per requirement including over, for the draft and the
         published schedule; Whole draft and Changes since publish views;
         cell detail with Before and After, still needed, Fill a spot (the

@@ -948,7 +948,7 @@ export default function Toolbar({
           {/* Coverage button */}
           {onCoverageToggle && (
             <Hint
-              content={hint("View real-time staffing gaps by shift and focus area")}
+              content={hint("Check staffing against coverage requirements, day by day")}
               side="bottom"
             >
               <Button
@@ -975,10 +975,10 @@ export default function Toolbar({
                 >
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
-                Coverage
+                Coverage Check
                 <NumericBadge
                   count={coverageGapCount}
-                  label={`${coverageGapCount} coverage gaps`}
+                  label={`${coverageGapCount} coverage ${coverageGapCount === 1 ? "gap" : "gaps"}`}
                   size="sm"
                   tone="danger"
                   style={FLOATING_BADGE_STYLE}

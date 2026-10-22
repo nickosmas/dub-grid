@@ -80,6 +80,14 @@ export interface CoverageGap {
 export interface CoverageCategorySnapshot {
   focusAreaId: number;
   focusAreaName: string;
+  /**
+   * The requirement this snapshot measures, stable across dates and across a
+   * draft and a published computation: `focusArea:category` for legacy
+   * requirements, `focusArea:job:shift` for current ones.
+   */
+  rowKey: string;
+  /** What the requirement covers, spelled out: the shift, plus the job when it names one. */
+  rowLabel: string;
   shiftCategoryId: number;
   shiftCategoryName: string;
   date: Date;
@@ -262,6 +270,9 @@ export function computeCoverageStatus(input: CoverageStatusInput): CoverageStatu
     }
   }
 
+  // Credits are whole percentages, so rounding drops only float noise:
+  // 0.7 + 0.7 + 0.6 must read as 2, not 1.9999999999999998 and short.
+  actual = Math.round(actual * 1e6) / 1e6;
   const hasRequirement = requirement.minStaff > 0;
   const isMet = actual >= requirement.minStaff;
 
@@ -465,11 +476,14 @@ export function computeCoverageCategorySnapshots(
           sortedRequirementAssignmentIds[0] ??
           eligibleAssignmentDefinitions[0].id;
 
+        const shiftCategoryName = categoryById.get(shiftCategoryId)?.name ?? "Uncategorized";
         snapshots.push({
           focusAreaId: focusArea.id,
           focusAreaName: focusArea.name,
+          rowKey: groupKey,
+          rowLabel: shiftCategoryName,
           shiftCategoryId,
-          shiftCategoryName: categoryById.get(shiftCategoryId)?.name ?? "Uncategorized",
+          shiftCategoryName,
           date,
           status,
           eligibleAssignmentDefinitionIds: eligibleAssignmentDefinitions.map(
@@ -518,6 +532,7 @@ export function computeCoverageCategorySnapshots(
     ).sort((left, right) => compareAssignmentDefinitions(left.assignment, right.assignment));
 
     for (const { assignment, jobId, preferredShiftId } of localRequirementGroups) {
+      const rowKey = getRequirementGroupKey(focusArea.id, jobId, preferredShiftId);
       for (const date of dates) {
         const resolvedRequirement = resolveRequirementByJobShift(
           requirements,
@@ -547,6 +562,8 @@ export function computeCoverageCategorySnapshots(
         snapshots.push({
           focusAreaId: focusArea.id,
           focusAreaName: focusArea.name,
+          rowKey,
+          rowLabel: displayFullName,
           shiftCategoryId: assignment.categoryId ?? assignment.shiftId ?? 0,
           shiftCategoryName:
             categoryById.get(assignment.categoryId ?? assignment.shiftId ?? -1)?.name ??

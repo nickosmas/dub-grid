@@ -1,0 +1,136 @@
+"use client";
+
+import type { CoverageMatrixCell, CoverageMatrixRow } from "@dubgrid/schedule-core";
+import { Button } from "@/components/Button";
+import {
+  describeCellState,
+  formatCellCount,
+  formatCoverageNumber,
+  formatShortDate,
+  pluralize,
+} from "./coverage-check-text";
+
+/** What the schedule page can do for a short cell right now. */
+export interface CoverageCellFill {
+  /** An open shift exists for this gap, so the staffing dialog can fill it. */
+  canFill: boolean;
+  /** Pickup requests waiting for approval on this gap. */
+  pendingPickups: number;
+}
+
+interface CoverageCellDetailProps {
+  row: CoverageMatrixRow;
+  cell: CoverageMatrixCell;
+  date: Date;
+  canEditShifts: boolean;
+  fill: CoverageCellFill;
+  onFillSpot: () => void;
+  onShowInGrid: () => void;
+}
+
+export function stillNeededText(cell: CoverageMatrixCell): string {
+  const details = cell.shortageDetails.filter((detail) => detail.shortage > 0);
+  if (details.length === 0) return `${pluralize(cell.shortage, "person", "people")} more`;
+  return details
+    .map((detail) => `${detail.assignmentFullName} (${formatCoverageNumber(detail.shortage)})`)
+    .join(", ");
+}
+
+export function pendingPickupText(count: number): string {
+  return count === 1
+    ? "1 pickup request is waiting for this shift."
+    : `${formatCoverageNumber(count)} pickup requests are waiting for this shift.`;
+}
+
+export function CoverageCellDetail({
+  row,
+  cell,
+  date,
+  canEditShifts,
+  fill,
+  onFillSpot,
+  onShowInGrid,
+}: CoverageCellDetailProps) {
+  const isActionable = canEditShifts && cell.kind === "short" && !cell.past;
+  const showFill = isActionable && fill.canFill;
+  const badgeClass =
+    cell.kind === "short"
+      ? "dg-cc-cell--short"
+      : cell.kind === "over"
+        ? "dg-cc-cell--over"
+        : "dg-cc-cell--closed";
+
+  return (
+    <section className="dg-cc-detail" aria-label="Selected day">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="dg-cc-detail-title">
+            {row.focusAreaName} · {row.rowLabel}
+          </h3>
+          <div className="dg-cc-detail-date dg-tabular-nums">
+            {formatShortDate(date)}
+            {cell.past ? " · already started" : ""}
+          </div>
+        </div>
+        <span className={`dg-cc-badge dg-tabular-nums ${badgeClass}`}>
+          {describeCellState(cell)}
+        </span>
+      </div>
+
+      {canEditShifts ? (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="dg-cc-side">
+            <div className="dg-cc-caption">Before</div>
+            <div className="dg-cc-side-value dg-tabular-nums">
+              {cell.published
+                ? formatCellCount(cell.published.actual, cell.published.required)
+                : "Not published yet"}
+            </div>
+            <div className="dg-cc-side-note">Published</div>
+          </div>
+          <div className="dg-cc-side">
+            <div className="dg-cc-caption">After</div>
+            <div className="dg-cc-side-value dg-tabular-nums">
+              {formatCellCount(cell.draft.actual, cell.draft.required)}
+            </div>
+            <div className="dg-cc-side-note">This draft</div>
+          </div>
+        </div>
+      ) : (
+        <div className="dg-cc-side">
+          <div className="dg-cc-caption">Staffed / needed</div>
+          <div className="dg-cc-side-value dg-tabular-nums">
+            {formatCellCount(cell.draft.actual, cell.draft.required)}
+          </div>
+          <div className="dg-cc-side-note">Published</div>
+        </div>
+      )}
+
+      {cell.kind === "short" && (
+        <p className="dg-cc-detail-line dg-tabular-nums">
+          <span className="font-semibold">Still needed:</span> {stillNeededText(cell)}
+        </p>
+      )}
+      {isActionable && fill.pendingPickups > 0 && (
+        <p className="dg-cc-detail-line dg-tabular-nums">
+          {pendingPickupText(fill.pendingPickups)}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {showFill && (
+          <Button type="button" className="dg-btn dg-btn-primary" onClick={onFillSpot}>
+            Fill a spot
+          </Button>
+        )}
+        <Button
+          type="button"
+          className={`dg-btn dg-btn-secondary${showFill ? "" : " col-span-2"}`}
+          onClick={onShowInGrid}
+        >
+          Show in grid
+        </Button>
+      </div>
+    </section>
+  );
+}

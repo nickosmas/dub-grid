@@ -1,45 +1,127 @@
 "use client";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, History } from "lucide-react";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  parseLocalDateKey,
+  summarizeCoverageMatrixRows,
+  type CoverageMatrix,
+  type CoverageMatrixCell,
+} from "@dubgrid/schedule-core";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import { Button } from "@/components/Button";
-import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
+import type { FocusArea } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
+import { SpanTabs } from "@/components/ui/span-tabs";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import {
+  CoverageMatrixGrid,
+  type CoverageCellRef,
+} from "@/components/coverage-check/CoverageMatrixGrid";
+import {
+  CoverageCellDetail,
+  type CoverageCellFill,
+} from "@/components/coverage-check/CoverageCellDetail";
+import {
+  comparisonSentence,
+  coverageCheckSubtitle,
+  type CoverageCheckView,
+} from "@/components/coverage-check/coverage-check-text";
 
 interface CoveragePanelProps {
-  gaps: CoverageGap[];
+  /** Null in Month view, which computes no coverage. */
+  matrix: CoverageMatrix | null;
+  publishedDateKeys: ReadonlySet<string>;
   focusAreas: FocusArea[];
-  shiftCategories: ShiftCategory[];
   activeFocusArea: number | null;
   publishedWindowState?: PublishedWindowState;
+  /** Editors see the draft beside the published schedule; everyone else sees published values. */
+  canEditShifts: boolean;
+  hasRequirements: boolean;
+  todayKey: string;
+  getCellFill: (focusAreaId: number, cell: CoverageMatrixCell) => CoverageCellFill;
+  onFillSpot: (focusAreaId: number, cell: CoverageMatrixCell) => void;
+  onShowInGrid: (focusAreaId: number, dateKey: string) => void;
   onClose: () => void;
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
+const VIEW_ITEMS: { value: CoverageCheckView; label: string }[] = [
+  { value: "all", label: "Whole draft" },
+  { value: "changes", label: "Changes since publish" },
+];
 
-function formatShortageDetails(gap: CoverageGap): string {
-  return gap.shortageDetails
-    .map(
-      (detail) => `${detail.assignmentFullName ?? detail.assignmentLabel} short ${detail.shortage}`,
-    )
-    .join(", ");
+function Legend({
+  view,
+  hasPast,
+  hasUnpublished,
+}: {
+  view: CoverageCheckView;
+  hasPast: boolean;
+  hasUnpublished: boolean;
+}) {
+  return (
+    <div className="dg-cc-legend" aria-label="Legend">
+      <span className="dg-cc-legend-item">
+        <span className="dg-cc-swatch dg-cc-cell--short" />
+        Short
+      </span>
+      <span className="dg-cc-legend-item">
+        <span className="dg-cc-swatch dg-cc-cell--over" />
+        Over
+      </span>
+      <span className="dg-cc-legend-item">
+        <span className="dg-cc-swatch dg-cc-swatch--staffed" />
+        Staffed
+      </span>
+      {view === "changes" && (
+        <>
+          <span className="dg-cc-legend-item">
+            <span className="dg-cc-swatch dg-cc-cell--opened" />
+            Opened by this draft
+          </span>
+          <span className="dg-cc-legend-item">
+            <span className="dg-cc-swatch dg-cc-cell--closed" />
+            Closed by this draft
+          </span>
+          <span className="dg-cc-legend-item">
+            <span className="dg-cc-swatch dg-cc-cell--changed" />
+            Other change
+          </span>
+        </>
+      )}
+      {hasPast && (
+        <span className="dg-cc-legend-item">
+          <span className="dg-cc-swatch dg-cc-swatch--past" />
+          Already started, not counted
+        </span>
+      )}
+      {hasUnpublished && (
+        <span className="dg-cc-legend-item">
+          <b className="dg-cc-legend-date dg-tabular-nums">12</b>
+          Dashed date: not published yet
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function CoveragePanel({
-  gaps,
+  matrix,
+  publishedDateKeys,
   focusAreas,
-  shiftCategories,
   activeFocusArea,
   publishedWindowState = "published",
+  canEditShifts,
+  hasRequirements,
+  todayKey,
+  getCellFill,
+  onFillSpot,
+  onShowInGrid,
   onClose,
 }: CoveragePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
@@ -52,45 +134,67 @@ export default function CoveragePanel({
     setPrevActiveFocusArea(activeFocusArea);
     setFilterFocusArea(activeFocusArea ?? "all");
   }
-  const [filterCategory, setFilterCategory] = useState<number | "all">("all");
+  const [view, setView] = useState<CoverageCheckView>("all");
+  const [selected, setSelected] = useState<CoverageCellRef | null>(null);
 
-  const filtered = useMemo(() => {
-    return gaps.filter((g) => {
-      if (filterFocusArea !== "all" && g.focusAreaId !== filterFocusArea) return false;
-      if (filterCategory !== "all" && g.shiftCategoryId !== filterCategory) return false;
-      return true;
-    });
-  }, [gaps, filterFocusArea, filterCategory]);
+  const dates = useMemo(() => matrix?.dateKeys.map(parseLocalDateKey) ?? [], [matrix]);
+  const rows = useMemo(
+    () =>
+      (matrix?.rows ?? []).filter(
+        (row) => filterFocusArea === "all" || row.focusAreaId === filterFocusArea,
+      ),
+    [matrix, filterFocusArea],
+  );
+  const totals = useMemo(
+    () => summarizeCoverageMatrixRows(rows, matrix?.dateKeys ?? []),
+    [rows, matrix],
+  );
+  const selection = useMemo(() => {
+    if (!selected || !matrix) return null;
+    const row = rows.find((candidate) => candidate.rowKey === selected.rowKey);
+    const index = matrix.dateKeys.indexOf(selected.dateKey);
+    const cell = row && index >= 0 ? row.cells[index] : null;
+    return row && cell ? { row, cell, date: dates[index] } : null;
+  }, [selected, matrix, rows, dates]);
+  const detailRef = useRef<HTMLDivElement>(null);
+  // Keyed on the pick, not the cell, so a live update never scrolls the panel.
+  useEffect(() => {
+    if (selected) detailRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [selected]);
+  const hasPast = rows.some((row) => row.cells.some((cell) => cell?.past));
+  const areaName =
+    filterFocusArea === "all"
+      ? null
+      : (focusAreas.find((area) => area.id === filterFocusArea)?.name ?? null);
 
-  // Group by focus area
-  const grouped = useMemo(() => {
-    const map = new Map<number, CoverageGap[]>();
-    for (const g of filtered) {
-      const arr = map.get(g.focusAreaId) ?? [];
-      arr.push(g);
-      map.set(g.focusAreaId, arr);
-    }
-    return map;
-  }, [filtered]);
+  // Staff who cannot edit only ever see published dates, so their window is
+  // never compared and an unpublished window has nothing to show them.
+  const hidesForViewer = !canEditShifts && isUnpublished;
+  const comparable = canEditShifts && !isUnpublished && matrix !== null;
+  const activeView: CoverageCheckView = comparable ? view : "all";
+  const showsMatrix = matrix !== null && hasRequirements && !hidesForViewer;
 
-  const subtitle = isUnpublished
-    ? "Not published yet"
-    : gaps.length === 0
-      ? isPartial
-        ? "No gaps on published dates"
-        : "All requirements met"
-      : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`;
+  const subtitle = !matrix
+    ? "Checked in 1 Week and 2 Weeks"
+    : !hasRequirements
+      ? "No coverage requirements"
+      : hidesForViewer
+        ? "Not published yet"
+        : coverageCheckSubtitle({
+            totals,
+            publishedOnly: !canEditShifts && isPartial,
+            areaName,
+          });
 
   return createPortal(
     <>
       <div className={`dg-panel-overlay${closing ? " closing" : ""}`} onClick={close} />
       <div
-        className={`dg-panel${closing ? " closing" : ""}`}
+        className={`dg-panel${showsMatrix ? " dg-panel--cols-2" : ""}${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Coverage overview"
+        aria-label="Coverage Check"
       >
-        {/* Header */}
         <div
           style={{
             padding: isMobile ? "12px 16px" : "16px 20px",
@@ -131,9 +235,10 @@ export default function CoveragePanel({
                 color: "var(--dg-color-text-secondary)",
               }}
             >
-              Coverage Overview
+              Coverage Check
             </div>
             <div
+              className="dg-tabular-nums"
               style={{
                 fontSize: "var(--dg-fs-caption)",
                 color: "var(--dg-color-text-subtle)",
@@ -143,53 +248,73 @@ export default function CoveragePanel({
               {subtitle}
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close coverage panel" />}
+          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close Coverage Check" />}
         </div>
 
-        {!isUnpublished && (
-          <div
-            style={{
-              padding: "10px 20px",
-              borderBottom: "1px solid var(--dg-color-border)",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              flexShrink: 0,
-            }}
-          >
-            <CustomSelect
-              style={{ flex: "1 1 auto" }}
-              value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
-              options={[
-                { value: "all", label: "All Focus Areas" },
-                ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
-              ]}
-              onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
-              fontSize="var(--dg-fs-caption)"
-            />
-            <CustomSelect
-              style={{ flex: "1 1 auto" }}
-              value={filterCategory === "all" ? "all" : String(filterCategory)}
-              options={[
-                { value: "all", label: "All Categories" },
-                ...shiftCategories.map((cat) => ({ value: String(cat.id), label: cat.name })),
-              ]}
-              onChange={(val) => setFilterCategory(val === "all" ? "all" : Number(val))}
-              fontSize="var(--dg-fs-caption)"
-            />
+        {showsMatrix && (
+          <div className="flex shrink-0 flex-col gap-2.5 border-b border-[var(--dg-color-border)] px-4 py-3 md:px-5">
+            {comparable && (
+              <div className="dg-cc-note dg-tabular-nums">
+                <History
+                  size={16}
+                  aria-hidden
+                  className="mt-px shrink-0 text-[var(--dg-color-brand)]"
+                />
+                <span>{comparisonSentence(totals, isPartial)}</span>
+              </div>
+            )}
+            {canEditShifts && isUnpublished && (
+              <div className="dg-cc-note">
+                Nothing in this period is published yet, so there is nothing to compare. The counts
+                are the draft&apos;s.
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {comparable && (
+                <SpanTabs
+                  aria-label="Coverage Check view"
+                  items={VIEW_ITEMS}
+                  value={activeView}
+                  onChange={setView}
+                />
+              )}
+              <CustomSelect
+                style={{ flex: "1 1 180px" }}
+                value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
+                options={[
+                  { value: "all", label: "All Focus Areas" },
+                  ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
+                ]}
+                onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
+                fontSize="var(--dg-fs-caption)"
+              />
+            </div>
           </div>
         )}
 
-        {/* Body */}
         <div
           style={{
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            padding: isMobile ? "16px" : "20px 24px",
+            padding: isMobile ? "16px" : "16px 20px",
           }}
         >
-          {isUnpublished ? (
+          {!matrix ? (
+            <EmptyState
+              size="compact"
+              style={{ minHeight: 260 }}
+              title="Switch to 1 Week or 2 Weeks"
+              description="Coverage is checked in 1 Week and 2 Weeks."
+            />
+          ) : !hasRequirements ? (
+            <EmptyState
+              size="compact"
+              style={{ minHeight: 260 }}
+              title="No coverage requirements"
+              description="Coverage Check compares the schedule with how many people each shift needs. Set those numbers in Settings > Coverage."
+            />
+          ) : hidesForViewer ? (
             <EmptyState
               size="compact"
               style={{ minHeight: 260 }}
@@ -197,153 +322,63 @@ export default function CoveragePanel({
               description="Coverage details will appear after this period is published for the first time."
             />
           ) : (
-            <>
-              {isPartial && (
-                <div
-                  style={{
-                    marginBottom: 12,
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-sm)",
-                    background: "var(--dg-color-bg)",
-                    border: "1px dashed var(--dg-color-border)",
-                    fontSize: "var(--dg-type-metadata-size)",
-                    color: "var(--dg-color-text-subtle)",
-                  }}
-                >
-                  Showing published dates only.
-                </div>
+            <div className="flex flex-col gap-3">
+              {!canEditShifts && isPartial && (
+                <div className="dg-cc-note">Showing published dates only.</div>
               )}
-              {filtered.length === 0 ? (
-                <div
-                  style={{
-                    padding: "40px 20px",
-                    textAlign: "center",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "50%",
-                      background: "var(--dg-color-success-bg)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      margin: "0 auto 12px",
-                    }}
-                  >
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--dg-color-success-text)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
-                  </div>
-                  <div style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600 }}>
-                    {isPartial ? "No gaps on published dates" : "All coverage requirements met"}
-                  </div>
-                  <div style={{ fontSize: "var(--dg-fs-caption)", marginTop: 4 }}>
-                    {gaps.length === 0
-                      ? isPartial
-                        ? "Coverage is only shown for dates that have been published."
-                        : "No gaps detected in the current schedule."
-                      : "No gaps match the current filters."}
-                  </div>
-                </div>
+              {rows.length === 0 ? (
+                <EmptyState
+                  size="compact"
+                  title="No coverage requirements here"
+                  description={
+                    areaName
+                      ? `${areaName} has no coverage requirements for these dates.`
+                      : "No requirement applies to these dates."
+                  }
+                />
               ) : (
-                Array.from(grouped.entries()).map(([focusAreaId, faGaps]) => {
-                  const fa = focusAreas.find((f) => f.id === focusAreaId);
-                  return (
-                    <div key={focusAreaId} style={{ marginBottom: 16 }}>
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "4px 10px",
-                          borderRadius: "var(--dg-radius-md)",
-                          background: "var(--dg-color-bg-secondary)",
-                          color: "var(--dg-color-text-muted)",
-                          fontSize: "var(--dg-fs-footnote)",
-                          fontWeight: 700,
-                          marginBottom: 8,
-                        }}
-                      >
-                        {fa?.name ?? `Area #${focusAreaId}`}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {faGaps.map((gap, gapIndex) => (
-                          <div
-                            key={`${focusAreaId}-${gap.date.toISOString()}-${gap.shiftCategoryId}-${gap.assignmentId}-${gapIndex}`}
-                            style={{
-                              padding: "10px 12px",
-                              borderRadius: "var(--dg-radius-lg)",
-                              border: "1px solid var(--dg-color-border)",
-                              background: "rgba(220, 38, 38, 0.03)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "var(--dg-fs-caption)",
-                                  fontWeight: 600,
-                                  color: "var(--dg-color-text-secondary)",
-                                }}
-                              >
-                                {gap.shiftCategoryName}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  color: "var(--dg-color-text-muted)",
-                                }}
-                              >
-                                {formatDate(gap.date)}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "var(--dg-fs-caption)",
-                                fontWeight: 700,
-                                color: "var(--dg-color-danger-dark)",
-                                marginTop: 4,
-                              }}
-                            >
-                              {gap.status.actual}/{gap.status.required} staff
-                            </div>
-                            {gap.shortageDetails.length > 0 && (
-                              <div
-                                style={{
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  color: "var(--dg-color-text-muted)",
-                                  marginTop: 4,
-                                }}
-                              >
-                                {formatShortageDetails(gap)}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                <>
+                  <CoverageMatrixGrid
+                    dates={dates}
+                    dateKeys={matrix.dateKeys}
+                    rows={rows}
+                    staffShortByDate={totals.staffShortByDate}
+                    publishedDateKeys={publishedDateKeys}
+                    showUnpublishedMarks={canEditShifts && isPartial}
+                    view={activeView}
+                    todayKey={todayKey}
+                    selected={selected}
+                    onSelect={(cell) =>
+                      setSelected((current) =>
+                        current?.rowKey === cell.rowKey && current.dateKey === cell.dateKey
+                          ? null
+                          : cell,
+                      )
+                    }
+                  />
+                  <Legend
+                    view={activeView}
+                    hasPast={hasPast}
+                    hasUnpublished={canEditShifts && isPartial}
+                  />
+                  {selection && (
+                    <div ref={detailRef}>
+                      <CoverageCellDetail
+                        row={selection.row}
+                        cell={selection.cell}
+                        date={selection.date}
+                        canEditShifts={canEditShifts}
+                        fill={getCellFill(selection.row.focusAreaId, selection.cell)}
+                        onFillSpot={() => onFillSpot(selection.row.focusAreaId, selection.cell)}
+                        onShowInGrid={() =>
+                          onShowInGrid(selection.row.focusAreaId, selection.cell.dateKey)
+                        }
+                      />
                     </div>
-                  );
-                })
+                  )}
+                </>
               )}
-            </>
+            </div>
           )}
         </div>
         <ScrollOverflowCue />
