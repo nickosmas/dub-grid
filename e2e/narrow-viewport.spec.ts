@@ -7,6 +7,7 @@ import {
   QA_REGULAR_EMAIL,
   QA_SUPER_ADMIN_EMAIL,
 } from "./helpers/auth";
+import { warmUpAndCaptureEmployeeHref } from "./helpers/role-variance";
 
 // 40e3: the matrix's narrow viewport. The narrow projects (390 by 844) run
 // only these @narrow tests; each role's main surfaces must fit the width and
@@ -33,9 +34,11 @@ async function answerCookieBanner(page: Page) {
 
 async function expectSignedInSurfaces(page: Page, email: string) {
   // The shared sign-in waits for the desktop navigation, so sign in wide and
-  // check the surfaces at the project's phone width.
+  // check the surfaces at the project's phone width. On a fresh database only
+  // a super admin's first sign-in opens the organization to everyone else.
   const narrow = page.viewportSize();
   await page.setViewportSize({ width: 1280, height: 800 });
+  await warmUpAndCaptureEmployeeHref(page);
   await answerCookieBanner(page);
   await loginAsQaAccount(page, email, QA_CALM_HAVEN_ORIGIN);
   if (narrow) await page.setViewportSize(narrow);

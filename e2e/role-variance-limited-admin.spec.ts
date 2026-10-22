@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { loginAsQaAccount, QA_ADMIN_EMAIL, QA_CALM_HAVEN_ORIGIN } from "./helpers/auth";
 import { setLocalAdminPermissions } from "./helpers/local-auth-state";
-import { collectUnexpectedRuntimeFailures, expectNav, walkRoutes } from "./helpers/role-variance";
+import {
+  collectUnexpectedRuntimeFailures,
+  expectNav,
+  walkRoutes,
+  warmUpAndCaptureEmployeeHref,
+} from "./helpers/role-variance";
 
 // 40e3: the matrix's limited admin. qa-admin is narrowed for this file to
 // viewing the schedule and staff and approving requests, the shape of an
@@ -50,6 +55,7 @@ test.afterAll(async () => {
 test.describe("role variance: limited admin route entry contract", () => {
   test("qa-admin narrowed to schedule, staff and approvals", async ({ page }) => {
     test.setTimeout(180_000);
+    await warmUpAndCaptureEmployeeHref(page);
     const failures = collectUnexpectedRuntimeFailures(page);
     await loginAsQaAccount(page, QA_ADMIN_EMAIL, QA_CALM_HAVEN_ORIGIN);
 
