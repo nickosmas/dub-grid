@@ -27,10 +27,11 @@ vi.mock("expo-status-bar", () => ({
   StatusBar: () => null,
 }));
 
-vi.mock("expo-splash-screen", () => ({
-  preventAutoHideAsync: () => Promise.resolve(),
-  hideAsync: () => Promise.resolve(),
+const splashScreen = vi.hoisted(() => ({
+  preventAutoHideAsync: vi.fn(() => Promise.resolve()),
+  hideAsync: vi.fn(() => Promise.resolve()),
 }));
+vi.mock("expo-splash-screen", () => splashScreen);
 
 vi.mock("@expo-google-fonts/inter", () => ({
   useFonts: (fonts: Record<string, unknown>) => {
@@ -192,6 +193,7 @@ describe("RootLayout", () => {
     navigationThemeValues.length = 0;
     fontState.loadedMaps.length = 0;
     fontState.result = [true, null];
+    splashScreen.hideAsync.mockClear();
   });
 
   // Reading the stored session overlaps font loading instead of following it.
@@ -218,6 +220,9 @@ describe("RootLayout", () => {
     expect(
       screen.getByText("This build is missing a reachable web connection."),
     ).toBeInTheDocument();
+    // StartupSplashGate never mounts on this path, so without its own hide the
+    // screen sits behind the launch image forever.
+    expect(splashScreen.hideAsync).toHaveBeenCalledTimes(1);
   });
 
   it("renders the app shell when env validation passes", async () => {
@@ -237,6 +242,7 @@ describe("RootLayout", () => {
     expect(screen.getByTestId("app-lock-provider")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
     expect(screen.getByTestId("stack")).toBeInTheDocument();
+    expect(splashScreen.hideAsync).toHaveBeenCalledTimes(1);
     // The light page is plain white; the navigation theme has to follow it or
     // the bar behind a screen transition flashes the old grey.
     expect(navigationThemeValues.at(-1)?.colors).toMatchObject({
