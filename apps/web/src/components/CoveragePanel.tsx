@@ -8,6 +8,7 @@ import {
   summarizeCoverageMatrixRows,
   type CoverageMatrix,
   type CoverageMatrixCell,
+  type CoverageMatrixRow,
 } from "@dubgrid/schedule-core";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -45,6 +46,8 @@ interface CoveragePanelProps {
   hasRequirements: boolean;
   todayKey: string;
   getCellFill: (focusAreaId: number, cell: CoverageMatrixCell) => CoverageCellFill;
+  /** Lines naming the draft changes behind a cell; only asked for when editing. */
+  describeCellChanges: (row: CoverageMatrixRow, cell: CoverageMatrixCell) => string[];
   onFillSpot: (focusAreaId: number, cell: CoverageMatrixCell) => void;
   onShowInGrid: (focusAreaId: number, dateKey: string) => void;
   onClose: () => void;
@@ -120,6 +123,7 @@ export default function CoveragePanel({
   hasRequirements,
   todayKey,
   getCellFill,
+  describeCellChanges,
   onFillSpot,
   onShowInGrid,
   onClose,
@@ -369,6 +373,9 @@ export default function CoveragePanel({
                         date={selection.date}
                         canEditShifts={canEditShifts}
                         fill={getCellFill(selection.row.focusAreaId, selection.cell)}
+                        changes={
+                          canEditShifts ? describeCellChanges(selection.row, selection.cell) : []
+                        }
                         onFillSpot={() => onFillSpot(selection.row.focusAreaId, selection.cell)}
                         onShowInGrid={() =>
                           onShowInGrid(selection.row.focusAreaId, selection.cell.dateKey)

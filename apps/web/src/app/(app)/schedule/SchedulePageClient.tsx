@@ -90,13 +90,17 @@ import {
 import {
   buildCoverageMatrix,
   computeCoverageCategorySnapshots,
+  describeCoverageCellChanges,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
   type CoverageCategorySnapshot,
+  type CoverageDaySide,
   type CoverageMatrixCell,
+  type CoverageMatrixRow,
 } from "@dubgrid/schedule-core";
 import type { CoverageCellFill } from "@/components/coverage-check/CoverageCellDetail";
+import { formatShortDate } from "@/components/coverage-check/coverage-check-text";
 import {
   filterAndSortEmployees,
   hasVisibleGridShiftEntry,
@@ -3541,12 +3545,14 @@ function SchedulerContent({
         dates,
         assignmentIdsForKey,
         coverageCreditForKey,
+        includeContributors: true,
       }),
       published: computeCoverageCategorySnapshots({
         ...base,
         dates: publishedVisibleDates,
         assignmentIdsForKey: publishedAssignmentIdsForKey,
         coverageCreditForKey: publishedCoverageCreditForKey,
+        includeContributors: true,
       }),
       dates,
       publishedDateKeys: publishedDateSet,
@@ -6463,6 +6469,57 @@ function SchedulerContent({
     ],
   );
 
+  // A deleted draft counts for nothing in coverage, so it reads as an empty day here too.
+  const describeCoverageCell = useCallback(
+    (row: CoverageMatrixRow, cell: CoverageMatrixCell): string[] => {
+      const employeeName = new Map(employees.map((employee) => [employee.id, employee]));
+      const focusAreaNames = new Map(focusAreas.map((area) => [area.id, area.name]));
+      const draftDay = (employeeId: string, dateKey: string): CoverageDaySide => {
+        const entry = shifts[`${employeeId}_${dateKey}`];
+        if (!entry || entry.isDelete) return { assignmentIds: [], absenceTypeId: null };
+        return { assignmentIds: entry.assignmentIds, absenceTypeId: entry.absenceTypeId ?? null };
+      };
+      const publishedDay = (employeeId: string, dateKey: string): CoverageDaySide => {
+        const entry = shifts[`${employeeId}_${dateKey}`];
+        return {
+          assignmentIds: entry?.publishedAssignmentDefinitionIds ?? [],
+          absenceTypeId: entry?.publishedAbsenceTypeId ?? null,
+        };
+      };
+      return describeCoverageCellChanges({
+        changes: cell.contributorChanges,
+        focusAreaId: row.focusAreaId,
+        dateKey: cell.dateKey,
+        dateKeys: availableSwapDates,
+        personName: (employeeId) => {
+          const employee = employeeName.get(employeeId);
+          return employee ? getEmployeeDisplayName(employee) : null;
+        },
+        assignmentName: (assignmentId) =>
+          assignmentNameMap.get(assignmentId) ??
+          assignmentById.get(assignmentId)?.name ??
+          "Unknown shift",
+        assignmentFocusAreaId: (assignmentId) =>
+          assignmentById.get(assignmentId)?.focusAreaId ?? null,
+        focusAreaName: (focusAreaId) => focusAreaNames.get(focusAreaId) ?? null,
+        absenceName: (absenceTypeId) =>
+          absenceTypeObjectMap.get(absenceTypeId)?.name ?? "Unknown absence",
+        draftDay,
+        publishedDay,
+        formatDate: (dateKey) => formatShortDate(parseLocalDateKey(dateKey)),
+      });
+    },
+    [
+      absenceTypeObjectMap,
+      assignmentById,
+      assignmentNameMap,
+      availableSwapDates,
+      employees,
+      focusAreas,
+      shifts,
+    ],
+  );
+
   const fillCoverageCell = useCallback(
     (focusAreaId: number, cell: CoverageMatrixCell) => {
       const openShift = findCoverageOpenShift(focusAreaId, cell);
@@ -8315,6 +8372,7 @@ function SchedulerContent({
               hasRequirements={coverageRequirements.length > 0}
               todayKey={todayKey}
               getCellFill={getCoverageCellFill}
+              describeCellChanges={describeCoverageCell}
               onFillSpot={fillCoverageCell}
               onShowInGrid={showCoverageInGrid}
               onClose={() => setShowCoveragePanel(false)}

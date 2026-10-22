@@ -77,6 +77,13 @@ export interface CoverageGap {
   shortageDetails: CoverageShortageDetail[];
 }
 
+/** One person counted toward a snapshot: the code that earned the credit, and the credit. */
+export interface CoverageContributor {
+  employeeId: string;
+  assignmentId: number;
+  credit: number;
+}
+
 export interface CoverageCategorySnapshot {
   focusAreaId: number;
   focusAreaName: string;
@@ -95,6 +102,8 @@ export interface CoverageCategorySnapshot {
   eligibleAssignmentDefinitionIds: number[];
   preferredOpenAssignmentDefinitionId: number;
   shortageDetails: CoverageShortageDetail[];
+  /** Who `status.actual` counts, present only when asked for with `includeContributors`. */
+  contributors?: CoverageContributor[];
 }
 
 // ── Coverage rule config ────────────────────────────────────────────────────
@@ -233,6 +242,8 @@ export interface CoverageStatusInput {
   eligibleAssignmentDefinitionIds: number[] | Set<number>;
   requirement: { minStaff: number };
   coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
+  /** When given, each counted person is appended here as they are counted. */
+  contributors?: CoverageContributor[];
 }
 
 /**
@@ -248,6 +259,7 @@ export function computeCoverageStatus(input: CoverageStatusInput): CoverageStatu
     eligibleAssignmentDefinitionIds,
     requirement,
     coverageCreditForKey,
+    contributors,
   } = input;
   const eligibleAssignmentDefinitionIdSet =
     eligibleAssignmentDefinitionIds instanceof Set
@@ -258,15 +270,24 @@ export function computeCoverageStatus(input: CoverageStatusInput): CoverageStatu
   for (const emp of employees) {
     const codeIds = assignmentIdsForKey(emp.id, date);
     let employeeCredit = 0;
+    let creditedCodeId: number | null = null;
     for (const codeId of codeIds) {
       if (!sectionCodeIds.has(codeId) || !eligibleAssignmentDefinitionIdSet.has(codeId)) {
         continue;
       }
-      const credit = coverageCreditForKey?.(emp.id, date, codeId) ?? 1;
-      employeeCredit = Math.max(employeeCredit, Math.min(1, Math.max(0, credit)));
+      const credit = Math.min(1, Math.max(0, coverageCreditForKey?.(emp.id, date, codeId) ?? 1));
+      if (credit > employeeCredit) {
+        employeeCredit = credit;
+        creditedCodeId = codeId;
+      }
     }
-    if (employeeCredit > 0) {
+    if (employeeCredit > 0 && creditedCodeId != null) {
       actual += employeeCredit;
+      contributors?.push({
+        employeeId: emp.id,
+        assignmentId: creditedCodeId,
+        credit: employeeCredit,
+      });
     }
   }
 
@@ -346,6 +367,8 @@ export interface CoverageComputationInput {
   /** Name-mode label map for `assignmentFullName`; falls back to `assignmentLabelMap` when omitted. */
   assignmentNameMap?: Map<number, string>;
   coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
+  /** Record who each snapshot counts, for explaining a change. Off by default. */
+  includeContributors?: boolean;
 }
 
 export function computeCoverageCategorySnapshots(
@@ -363,6 +386,7 @@ export function computeCoverageCategorySnapshots(
     assignmentLabelMap,
     assignmentNameMap,
     coverageCreditForKey,
+    includeContributors = false,
   } = input;
   const snapshots: CoverageCategorySnapshot[] = [];
   const categoryById = new Map(shiftCategories.map((category) => [category.id, category]));
@@ -460,6 +484,9 @@ export function computeCoverageCategorySnapshots(
 
         if (totalRequired <= 0) continue;
 
+        const contributors: CoverageContributor[] | undefined = includeContributors
+          ? []
+          : undefined;
         const status = computeCoverageStatus({
           employees,
           date,
@@ -470,6 +497,7 @@ export function computeCoverageCategorySnapshots(
           ),
           requirement: { minStaff: totalRequired },
           coverageCreditForKey,
+          contributors,
         });
         const preferredOpenAssignmentDefinitionId =
           shortageDetails[0]?.assignmentId ??
@@ -491,6 +519,7 @@ export function computeCoverageCategorySnapshots(
           ),
           preferredOpenAssignmentDefinitionId,
           shortageDetails,
+          ...(contributors ? { contributors } : {}),
         });
       }
     }
@@ -543,6 +572,9 @@ export function computeCoverageCategorySnapshots(
         );
         if (!resolvedRequirement || resolvedRequirement.minStaff <= 0) continue;
 
+        const contributors: CoverageContributor[] | undefined = includeContributors
+          ? []
+          : undefined;
         const status = computeCoverageStatus({
           employees,
           date,
@@ -551,6 +583,7 @@ export function computeCoverageCategorySnapshots(
           eligibleAssignmentDefinitionIds: [assignment.id],
           requirement: resolvedRequirement,
           coverageCreditForKey,
+          contributors,
         });
         const shortage = Math.max(resolvedRequirement.minStaff - status.actual, 0);
         const displayLabel = getAssignmentDisplayLabel(assignment, assignmentLabelMap);
@@ -585,6 +618,7 @@ export function computeCoverageCategorySnapshots(
                   },
                 ]
               : [],
+          ...(contributors ? { contributors } : {}),
         });
       }
     }

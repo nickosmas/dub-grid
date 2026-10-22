@@ -201,15 +201,18 @@ After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
 
-Item 47 is split; 47a has shipped:
+Item 47 is split; 47a and 47b have shipped:
 
 - **47a - Matrix and changes since publish:** shipped; Coverage Check
   shows each requirement's staffed and needed counts by day, short or over,
   for the draft and the published schedule, what the draft opens and closes,
   and a detail per cell with Fill a spot and Show in grid. Mentored credit
   sums without float noise everywhere coverage is counted. No migration.
-- **47b - What changed:** planned; each cell names the draft changes behind
-  it.
+- **47b - What changed:** shipped; a cell's detail lists each person whose
+  draft change moved its count (moved to or from a day, changed shift, given
+  an absence, taken off, scheduled, mentoring), from the same per-person
+  credit the coverage engine counts, so the lines always add up to Before
+  versus After.
 - **47c - Suggestion engine:** planned; a tested schedule-core function that
   proposes moves back, restores, assignments and waiting pickups, measures
   each on a copy of the schedule, and says why nobody fits when nothing does.

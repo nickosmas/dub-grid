@@ -1,6 +1,10 @@
 "use client";
 
-import type { CoverageMatrixCell, CoverageMatrixRow } from "@dubgrid/schedule-core";
+import {
+  coverageCellUnchangedText,
+  type CoverageMatrixCell,
+  type CoverageMatrixRow,
+} from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import {
   describeCellState,
@@ -24,6 +28,8 @@ interface CoverageCellDetailProps {
   date: Date;
   canEditShifts: boolean;
   fill: CoverageCellFill;
+  /** One line per draft change behind the cell; editors only. */
+  changes: string[];
   onFillSpot: () => void;
   onShowInGrid: () => void;
 }
@@ -48,6 +54,7 @@ export function CoverageCellDetail({
   date,
   canEditShifts,
   fill,
+  changes,
   onFillSpot,
   onShowInGrid,
 }: CoverageCellDetailProps) {
@@ -111,6 +118,23 @@ export function CoverageCellDetail({
           <span className="font-semibold">Still needed:</span> {stillNeededText(cell)}
         </p>
       )}
+      {canEditShifts &&
+        (changes.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <div className="dg-cc-caption">What changed</div>
+            <ul className="dg-cc-changes">
+              {changes.map((line) => (
+                <li key={line} className="dg-cc-change dg-cc-detail-line dg-tabular-nums">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="dg-cc-detail-line dg-cc-detail-line--muted">
+            {coverageCellUnchangedText(cell)}
+          </p>
+        ))}
       {isActionable && fill.pendingPickups > 0 && (
         <p className="dg-cc-detail-line dg-tabular-nums">
           {pendingPickupText(fill.pendingPickups)}

@@ -948,7 +948,7 @@
         existing staffing modal) and Show in grid. People without edit
         rights see published dates only and no suggestions. The button and
         panel are named "Coverage Check" (owner, 2026-10-21). No migration.
-  - [ ] 47b. **What changed** - each cell names the draft changes behind
+  - [x] 47b. **What changed** - each cell names the draft changes behind
         it (moved, removed, added, given an absence), from the draft versus
         published difference.
   - [ ] 47c. **Suggestion engine** - a tested schedule-core function:

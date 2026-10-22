@@ -32,6 +32,7 @@ export * from "./types";
 export * from "./coverage";
 export * from "./coverage-assembly";
 export * from "./coverage-matrix";
+export * from "./coverage-change-text";
 export * from "./requests-assembly";
 export * from "./hours-assembly";
 export * from "./pay-period";

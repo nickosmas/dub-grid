@@ -1011,6 +1011,20 @@
   line-height: 1.45;
   color: var(--dg-color-text-secondary);
 }
+.dg-cc-detail-line--muted {
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.dg-cc-change::marker {
+  color: var(--dg-color-text-subtle);
+}
 /* Show in grid outlines the cells it scrolled to, then lets them go. */
 [data-coverage-flash="true"] {
   outline: 2px solid var(--dg-color-brand);

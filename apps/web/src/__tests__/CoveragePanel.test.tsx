@@ -83,6 +83,7 @@ function renderPanel(props: Partial<Parameters<typeof CoveragePanel>[0]> = {}) {
       hasRequirements
       todayKey="2026-10-26"
       getCellFill={() => ({ canFill: true, pendingPickups: 0 })}
+      describeCellChanges={() => []}
       onFillSpot={() => {}}
       onShowInGrid={() => {}}
       onClose={() => {}}
@@ -308,6 +309,84 @@ describe("CoveragePanel", () => {
       expect(detail().queryByText("Before")).not.toBeInTheDocument();
       expect(detail().queryByRole("button", { name: "Fill a spot" })).not.toBeInTheDocument();
       expect(detail().getByRole("button", { name: "Show in grid" })).toBeInTheDocument();
+    });
+  });
+
+  describe("what changed", () => {
+    function detail() {
+      return within(screen.getByRole("region", { name: "Selected day" }));
+    }
+    const sameOnBothSides = (actual: number, required: number, published = ALL_PUBLISHED) =>
+      buildCoverageMatrix({
+        draft: [snapshot(MON, actual, required)],
+        published: [snapshot(MON, actual, required)],
+        dates: [MON],
+        publishedDateKeys: published,
+        isStarted: () => false,
+      });
+
+    it("lists the lines it is given, in order, under What changed", () => {
+      const describeCellChanges = vi.fn(() => [
+        "Ben Shepherd was taken off Day Shift · Med Aide",
+        "Ana Crawford was scheduled for Day Shift · Med Aide",
+      ]);
+      renderPanel({ describeCellChanges });
+
+      fireEvent.click(cell(/Wednesday, October 28/));
+
+      expect(detail().getByText("What changed")).toBeInTheDocument();
+      expect(
+        detail()
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([
+        "Ben Shepherd was taken off Day Shift · Med Aide",
+        "Ana Crawford was scheduled for Day Shift · Med Aide",
+      ]);
+      expect(describeCellChanges).toHaveBeenCalledWith(
+        expect.objectContaining({ rowKey: "1:5:1" }),
+        expect.objectContaining({ dateKey: "2026-10-28" }),
+      );
+    });
+
+    it("says a short cell nothing touched was already short", () => {
+      renderPanel({ matrix: sameOnBothSides(1, 3) });
+
+      fireEvent.click(cell(/Monday, October 26/));
+      expect(
+        detail().getByText("Already short when published. Nothing in this draft changed it."),
+      ).toBeInTheDocument();
+      expect(detail().queryByText("What changed")).not.toBeInTheDocument();
+    });
+
+    it("says nothing changed a staffed cell", () => {
+      renderPanel({ matrix: sameOnBothSides(3, 3) });
+
+      fireEvent.click(cell(/Monday, October 26/));
+      expect(detail().getByText("Nothing in this draft changed it.")).toBeInTheDocument();
+    });
+
+    it("says there is nothing to compare before a first publish", () => {
+      renderPanel({
+        matrix: sameOnBothSides(3, 3, new Set()),
+        publishedDateKeys: new Set(),
+        publishedWindowState: "unpublished",
+      });
+
+      fireEvent.click(cell(/Monday, October 26/));
+      expect(
+        detail().getByText("Not published yet, so there is nothing to compare."),
+      ).toBeInTheDocument();
+    });
+
+    it("shows someone who cannot edit shifts no draft changes", () => {
+      const describeCellChanges = vi.fn(() => ["Ana Crawford was scheduled for Day Shift"]);
+      renderPanel({ canEditShifts: false, describeCellChanges });
+
+      fireEvent.click(cell(/Wednesday, October 28/));
+      expect(detail().queryByText("What changed")).not.toBeInTheDocument();
+      expect(detail().queryByText(/Nothing in this draft/)).not.toBeInTheDocument();
+      expect(describeCellChanges).not.toHaveBeenCalled();
     });
   });
 });

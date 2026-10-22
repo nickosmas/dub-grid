@@ -1,4 +1,9 @@
-import type { CoverageCategorySnapshot, CoverageShortageDetail, CoverageStatus } from "./coverage";
+import type {
+  CoverageCategorySnapshot,
+  CoverageContributor,
+  CoverageShortageDetail,
+  CoverageStatus,
+} from "./coverage";
 import { formatLocalDateKey } from "./dates";
 
 export type CoverageCellKind = "short" | "over" | "staffed";
@@ -10,6 +15,18 @@ export type CoverageCellKind = "short" | "over" | "staffed";
  * is not published yet.
  */
 export type CoverageCellChange = "opened" | "closed" | "changed" | "none";
+
+/**
+ * One person whose credit toward a cell differs between published and draft.
+ * Across a cell these always sum to `draft.actual - published.actual`.
+ */
+export interface CoverageContributorChange {
+  employeeId: string;
+  publishedAssignmentId: number | null;
+  draftAssignmentId: number | null;
+  publishedCredit: number;
+  draftCredit: number;
+}
 
 export interface CoverageMatrixCell {
   dateKey: string;
@@ -24,6 +41,8 @@ export interface CoverageMatrixCell {
   shortage: number;
   shortageDetails: CoverageShortageDetail[];
   preferredOpenAssignmentDefinitionId: number;
+  /** Empty on a date never published, or when snapshots carry no contributors. */
+  contributorChanges: CoverageContributorChange[];
 }
 
 export interface CoverageMatrixRow {
@@ -86,6 +105,32 @@ function changeOf(draft: CoverageStatus, published: CoverageStatus | null): Cove
   return "none";
 }
 
+function contributorChangesOf(
+  draft: ReadonlyArray<CoverageContributor> | undefined,
+  published: ReadonlyArray<CoverageContributor> | undefined,
+): CoverageContributorChange[] {
+  if (!draft || !published) return [];
+  const draftById = new Map(draft.map((entry) => [entry.employeeId, entry]));
+  const publishedById = new Map(published.map((entry) => [entry.employeeId, entry]));
+  const employeeIds = [...new Set([...publishedById.keys(), ...draftById.keys()])].sort();
+  const changes: CoverageContributorChange[] = [];
+  for (const employeeId of employeeIds) {
+    const before = publishedById.get(employeeId);
+    const after = draftById.get(employeeId);
+    const publishedCredit = before?.credit ?? 0;
+    const draftCredit = after?.credit ?? 0;
+    if (Math.abs(draftCredit - publishedCredit) <= EPSILON) continue;
+    changes.push({
+      employeeId,
+      publishedAssignmentId: before?.assignmentId ?? null,
+      draftAssignmentId: after?.assignmentId ?? null,
+      publishedCredit,
+      draftCredit,
+    });
+  }
+  return changes;
+}
+
 /**
  * Lays draft coverage beside published coverage, one row per requirement and
  * one column per date. Both inputs come from `computeCoverageCategorySnapshots`
@@ -142,6 +187,9 @@ export function buildCoverageMatrix(input: BuildCoverageMatrixInput): CoverageMa
       shortage,
       shortageDetails: snapshot.shortageDetails,
       preferredOpenAssignmentDefinitionId: snapshot.preferredOpenAssignmentDefinitionId,
+      contributorChanges: publishedSnapshot
+        ? contributorChangesOf(snapshot.contributors, publishedSnapshot.contributors)
+        : [],
     };
   }
 
