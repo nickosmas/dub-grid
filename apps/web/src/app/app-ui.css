@@ -757,6 +757,390 @@
     width: min(1200px, calc(100vw - 24px));
   }
 }
+/* Coverage Check matrix: one row per requirement, one column per day. */
+.dg-cc-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: var(--dg-radius-sm);
+}
+.dg-cc-scroll:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-cc-matrix {
+  --dg-cc-label-w: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: calc(var(--dg-cc-label-w) + var(--dg-cc-days) * 38px);
+}
+.dg-cc-row {
+  display: grid;
+  grid-template-columns: var(--dg-cc-label-w) repeat(var(--dg-cc-days), minmax(34px, 1fr));
+  column-gap: 3px;
+  align-items: center;
+}
+.dg-cc-row--head {
+  align-items: end;
+  padding-bottom: 2px;
+}
+.dg-cc-week-start {
+  margin-left: 7px;
+}
+.dg-cc-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 8px;
+  background: var(--dg-color-surface);
+}
+.dg-cc-caption,
+.dg-cc-short-label {
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+  color: var(--dg-color-text-subtle);
+}
+.dg-cc-row-name {
+  font-size: var(--dg-fs-caption);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--dg-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.dg-cc-label--selected .dg-cc-row-name {
+  color: var(--dg-color-brand);
+  font-weight: 600;
+}
+.dg-cc-row-need {
+  margin-top: 2px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-subtle);
+}
+.dg-cc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 10px;
+}
+.dg-cc-group-name {
+  position: sticky;
+  left: 0;
+  width: fit-content;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 700;
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-day {
+  text-align: center;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--dg-color-text-subtle);
+}
+.dg-cc-day b {
+  display: block;
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-day--today,
+.dg-cc-day--today b {
+  color: var(--dg-color-brand);
+}
+.dg-cc-day--past {
+  opacity: 0.55;
+}
+.dg-cc-day--unpublished b {
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+.dg-cc-day--selected b {
+  text-decoration: underline solid 2px;
+  text-underline-offset: 3px;
+}
+.dg-cc-short {
+  text-align: center;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 700;
+  color: var(--dg-color-danger-text);
+}
+.dg-cc-cell {
+  height: 38px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dg-color-text-subtle);
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dg-cc-cell:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-cc-cell--none {
+  cursor: default;
+}
+.dg-cc-cell--short {
+  background: var(--dg-color-danger-bg);
+  color: var(--dg-color-danger-text);
+  font-weight: 700;
+}
+.dg-cc-cell--over {
+  box-shadow: inset 0 0 0 1.5px var(--dg-color-info);
+  color: var(--dg-color-info-text);
+}
+.dg-cc-cell--closed {
+  background: var(--dg-color-success-bg);
+  color: var(--dg-color-success-text);
+}
+.dg-cc-cell--opened {
+  box-shadow: inset 0 0 0 2px var(--dg-color-danger);
+}
+.dg-cc-cell--changed {
+  box-shadow: inset 0 0 0 2px var(--dg-color-text-secondary);
+}
+.dg-cc-cell--past {
+  opacity: 0.4;
+}
+.dg-cc-cell--selected {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 1px;
+}
+.dg-cc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dg-cc-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.dg-cc-legend-date {
+  font-weight: 600;
+  color: var(--dg-color-text-secondary);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+.dg-cc-swatch--staffed {
+  box-shadow: inset 0 0 0 1px var(--dg-color-border);
+}
+.dg-cc-swatch--past {
+  box-shadow: inset 0 0 0 1.5px var(--dg-color-text-subtle);
+  opacity: 0.4;
+}
+.dg-cc-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--dg-radius-sm);
+  background: var(--dg-color-bg);
+  border: 1px solid var(--dg-color-border);
+  font-size: var(--dg-fs-caption);
+  line-height: 1.4;
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-color-surface);
+  scroll-margin: 16px;
+}
+.dg-cc-detail-title {
+  margin: 0;
+  font-size: var(--dg-fs-body-sm);
+  font-weight: 700;
+  color: var(--dg-color-text-primary);
+}
+.dg-cc-detail-date {
+  margin-top: 2px;
+  font-size: var(--dg-fs-caption);
+  color: var(--dg-color-text-subtle);
+}
+.dg-cc-badge {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.dg-cc-side {
+  padding: 10px 12px;
+  border-radius: var(--dg-radius-sm);
+  background: var(--dg-color-bg);
+}
+.dg-cc-side-value {
+  margin-top: 4px;
+  font-size: var(--dg-fs-body);
+  font-weight: 700;
+  color: var(--dg-color-text-primary);
+}
+.dg-cc-side-note {
+  margin-top: 2px;
+  font-size: var(--dg-fs-footnote);
+  color: var(--dg-color-text-subtle);
+}
+.dg-cc-detail-line {
+  margin: 0;
+  font-size: var(--dg-fs-caption);
+  line-height: 1.45;
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-detail-line--muted {
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.dg-cc-change::marker {
+  color: var(--dg-color-text-subtle);
+}
+/* Show in grid outlines the cells it scrolled to, then lets them go. */
+[data-coverage-flash="true"] {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: -2px;
+  animation: dg-coverage-flash 2.4s ease-out forwards;
+}
+@keyframes dg-coverage-flash {
+  0%,
+  70% {
+    outline-color: var(--dg-color-brand);
+  }
+  100% {
+    outline-color: transparent;
+  }
+}
+.dg-cc-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dg-cc-sg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dg-cc-sg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-surface);
+}
+.dg-cc-sg-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: normal;
+}
+button.dg-cc-sg-main {
+  cursor: pointer;
+}
+.dg-cc-sg-main:focus-visible,
+.dg-cc-more:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-cc-sg-title {
+  overflow-wrap: anywhere;
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--dg-color-text-primary);
+}
+.dg-cc-sg-detail {
+  font-size: var(--dg-fs-footnote);
+  line-height: 1.4;
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-sg-effect {
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+  color: var(--dg-color-success-text);
+}
+.dg-cc-sg-action {
+  flex-shrink: 0;
+  min-width: 96px;
+  white-space: nowrap;
+}
+.dg-cc-more {
+  align-self: flex-start;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-brand);
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dg-cc-applied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dg-cc-applied .dg-cc-detail-line {
+  flex: 1;
+  min-width: 0;
+}
+.dg-cc-applied-icon {
+  flex-shrink: 0;
+  color: var(--dg-color-success-text);
+}
+.dg-cc-applied-final {
+  flex-shrink: 0;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+  color: var(--dg-color-text-subtle);
+}
+@media (max-width: 767px) {
+  .dg-cc-matrix {
+    --dg-cc-label-w: 112px;
+  }
+}
 .dg-page-enter {
   /* Route content needs one stable first paint. Applying a mount animation to
      both the page wrapper and its cards made every navigation briefly render

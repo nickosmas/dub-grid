@@ -23,10 +23,26 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
+  // The narrow projects run only @narrow tests at phone width (the 40e3
+  // matrix's narrow viewport); the desktop projects run everything else.
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "chromium", grepInvert: /@narrow/, use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox", grepInvert: /@narrow/, use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", grepInvert: /@narrow/, use: { ...devices["Desktop Safari"] } },
+    ...(["chromium", "firefox", "webkit"] as const).map((browser) => ({
+      name: `${browser}-narrow`,
+      grep: /@narrow/,
+      use: {
+        ...devices[
+          browser === "chromium"
+            ? "Desktop Chrome"
+            : browser === "firefox"
+              ? "Desktop Firefox"
+              : "Desktop Safari"
+        ],
+        viewport: { width: 390, height: 844 },
+      },
+    })),
   ],
   webServer: process.env.CI
     ? undefined

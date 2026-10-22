@@ -181,7 +181,8 @@ async function main() {
     await interrupts.waitFor(run("npm", ["--workspace", "@dubgrid/web", "run", "build"], env));
     server = startServer(config, env);
     await interrupts.waitFor(waitForServer(config.port));
-    await interrupts.waitFor(run("npx", ["playwright", "test"], env));
+    // Arguments after the script pass straight to Playwright, e.g. `--project=firefox`.
+    await interrupts.waitFor(run("npx", ["playwright", "test", ...process.argv.slice(2)], env));
   } finally {
     interrupts.dispose();
     if (activeChild) await stopProcess(activeChild);

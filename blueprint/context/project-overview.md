@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 46 are
-shipped. Item 40 is in progress. Item 47 is planned.
+Items appear in build-plan order. Items 1 through 39 and 41 through 47 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,7 +81,7 @@ shipped. Item 40 is in progress. Item 47 is planned.
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
-| 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
+| 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
 
@@ -99,9 +99,19 @@ Item 40 is split:
     `npm run db:migrations:rehearse` rehearses a ledger suffix on a throwaway
     local stack, and 001 to 079 is qualified as a clean install, an upgrade
     from 075, and a seeded upgrade with a signed-in smoke.
-  - **40e3 - Web browser role and state qualification:** planned.
-  - **40e4 - Native iOS and Android qualification:** planned; Android evidence
-    is mandatory.
+  - **40e3 - Web browser role and state qualification:** shipped;
+    Chromium, Firefox and WebKit at desktop and 390 by 844 pass every role
+    against a seeded throwaway stack and a production build, recorded under
+    `internal/operations/runtime-qualification/` and as `runtimeEvidence`
+    the docs check validates (`--require-runtime-evidence` for 40e).
+  - **40e4 - Native iOS and Android qualification:** in progress; Android
+    evidence is mandatory.
+    - **40e4a - Simulator and emulator qualification:** shipped; every
+      mobile role and state was observed on the iOS Simulator and an Android
+      emulator (offline on Android only), recorded as virtual-device evidence
+      that the 40e gate does not count.
+    - **40e4b - Physical-device pass:** planned; needs a physical iPhone and
+      Android phone, and is the only mobile evidence the gate accepts.
 
 Item 44 is split, and every part has shipped:
 
@@ -201,22 +211,30 @@ After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
 
-Item 47 is split; none has shipped:
+Item 47 is split, and every part has shipped:
 
-- **47a - Matrix and changes since publish:** planned; the panel, renamed
-  Coverage Check, shows each requirement's staffed and needed counts by day, short or over,
-  for the draft and the published schedule, with a detail per cell. No
-  migration.
-- **47b - What changed:** planned; each cell names the draft changes behind
-  it.
-- **47c - Suggestion engine:** planned; a tested schedule-core function that
+- **47a - Matrix and changes since publish:** shipped; Coverage Check
+  shows each requirement's staffed and needed counts by day, short or over,
+  for the draft and the published schedule, what the draft opens and closes,
+  and a detail per cell with Fill a spot and Show in grid. Mentored credit
+  sums without float noise everywhere coverage is counted. No migration.
+- **47b - What changed:** shipped; a cell's detail lists each person whose
+  draft change moved its count (moved to or from a day, changed shift, given
+  an absence, taken off, scheduled, mentoring), from the same per-person
+  credit the coverage engine counts, so the lines always add up to Before
+  versus After.
+- **47c - Suggestion engine:** shipped; a tested schedule-core function that
   proposes moves back, restores, assignments and waiting pickups, measures
-  each on a copy of the schedule, and says why nobody fits when nothing does.
+  each on a copy of the schedule with the coverage engine, keeps only those
+  that fix a gap without opening another, names repeating gaps, and says why
+  each other qualified person was not suggested. No UI yet.
   A person fits when qualified and free that day; there is no weekly hours
   limit or minimum rest rule (owner, 2026-10-21).
-- **47d - Suggestions in the panel:** planned; apply and undo through the
-  draft, approve behind a confirmation, and the opened and closed counts in
-  the Publish dialog. Approve needs the approval-replaces-draft fix first.
+- **47d - Suggestions in the panel:** shipped; the panel lists the engine's
+  suggestions (top 3, show all), each cell's detail shows Ways to fix and
+  Not suggested, Move back, Restore and Schedule apply through the normal
+  draft save with Undo, Approve asks first and publishes, and the Publish
+  dialog says how many gaps a publish opens and closes.
 
 Every staffing insight is measured on the schedule and must be exact; an
 approval publishes at once and replaces any earlier draft of the cells it
@@ -410,6 +428,6 @@ Main mobile surfaces:
 
 - Exact per-seat billing price points and tier breaks are unconfirmed.
 - Deployment domain details are unconfirmed.
-- Item 40e cannot complete until both iOS and Android runtime evidence is
-  recorded.
+- Item 40e cannot complete until iOS and Android runtime evidence from
+  physical devices is recorded (40e4b).
 - The Privacy Policy promises a self-serve data export that no screen offers.

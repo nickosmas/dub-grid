@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:54f0c5ae7f5c3fcd3964b574bcdf51dc762bf80935406b2aef274464773fdb0c"
+      "evidenceFingerprint": "sha256:112b444af0716725c4201304edf30eebc0ba2f6e0a8c91b77873e00bce9a537b"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3813a882a612b00959f30aa174d4e8c8c221de2be5172a033c9d5db0b54e9129"
+      "evidenceFingerprint": "sha256:9a0790b4d0a9b057735292daf256eb822580a917efe509445cf2ba1611b959e7"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:df69ec92978046df0a91ed8671f210b16dd416da17d8735df5507ef265d29620"
+      "evidenceFingerprint": "sha256:d8742ff3da04d420d6ef8a4b11f7f91c92b44fe9a07ac73310cba9b90434362f"
     },
     {
       "id": "onboarding",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1efa6d62da74ad01e46b659855abb2cdc01cfc3270d20c5de88d88e0c826a1c8"
+      "evidenceFingerprint": "sha256:838431f4fc94e30efc688cc93f5a5d77af3e48449d7f5836be2e645691973616"
     },
     {
       "id": "draft-publish",
@@ -441,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a1443bc8f22488021ecc34272e6d75a2b0bfa1f302342585cf130303f7e62bb7"
+      "evidenceFingerprint": "sha256:1ddf8a6b554eaca623b1b45e728d929e7fb31c22f670cf99b6394149739c43da"
     },
     {
       "id": "recurring-shifts",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:15452dd53ac069fb93c6ff2200d9fed16527d04803dd835879c53191ab9a0471"
+      "evidenceFingerprint": "sha256:e8b4df1e2369f6fdfeee93a0ee1cc9a974bdf915867ddc7558aa08eaaff60857"
     },
     {
       "id": "realtime",
@@ -542,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f42385724f124cfaf6bfb23188d03d4302d5ed58b0755ee449c4bb0ac198a9d7"
+      "evidenceFingerprint": "sha256:301a5ef65fb97a08a383e22ee6ed2c590c1f546464f242f5ebd74f9b680e5b62"
     },
     {
       "id": "shift-requests",
@@ -989,7 +989,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c0a639382d1c634a16919224a444f92a8c6d6d9ae03d70c174a0a183a9864542"
+      "evidenceFingerprint": "sha256:ee9f7b79db8fa86484367b11ec2bfc61c63eb4be64645b7e04c1190b3b991783"
     },
     {
       "id": "terminology",
@@ -1817,7 +1817,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0605a3b57e431c443ca4e1b41cfe7d40532026cc698570b3212cb891ccc96df4"
+      "evidenceFingerprint": "sha256:81dc86292173cef97fd46d5506b3e4d7a99437d7086c58eed9dfd93698fb91f7"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1926,7 +1926,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:18af609ee427ddd72df30110fd9b434c74d23f86f872934893e45b9098bda73e"
+      "evidenceFingerprint": "sha256:742c549cec429af57aa1fd35fc4d9b28a4389f30c2ccbca0e85af549ef3150dd"
     },
     {
       "id": "coverage-open-shifts",
@@ -1977,7 +1977,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:0efc796d20ad59de50efcc84eec30f78160cf3781bb1aa1b6b9ffa46e5b77549"
+      "evidenceFingerprint": "sha256:296bfb6fdd6891a124c0ced96d26470ade6fee70148a5866da72cb75237d5787"
     },
     {
       "id": "mobile-schedule",
@@ -2088,7 +2088,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:23acaedb8eae57f14ff8ee2c6d9f7d48f5feca2d737d2b525bf0c5d925a256ba"
+      "evidenceFingerprint": "sha256:4e50c30f27f0bf9ffdcf2c1958455ea23f670992af045a8e01d3a44fc81e3258"
     }
   ],
   "surfaceExclusions": [
@@ -2115,6 +2115,210 @@
       "sourceFiles": [
         "apps/mobile/app/+not-found.tsx"
       ]
+    }
+  ],
+  "runtimeEvidence": [
+    {
+      "id": "web-chromium-desktop-2026-10-22",
+      "platform": "web",
+      "target": "chromium",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 86,
+        "failed": 0,
+        "skipped": 1
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-chromium-narrow-2026-10-22",
+      "platform": "web",
+      "target": "chromium",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-firefox-narrow-2026-10-22",
+      "platform": "web",
+      "target": "firefox",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-webkit-narrow-2026-10-22",
+      "platform": "web",
+      "target": "webkit",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-firefox-desktop-2026-10-22",
+      "platform": "web",
+      "target": "firefox",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "945d7618eeaecb532348dcd76ac67f8317875e43",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 86,
+        "failed": 0,
+        "skipped": 1
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-webkit-desktop-2026-10-22",
+      "platform": "web",
+      "target": "webkit",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "945d7618eeaecb532348dcd76ac67f8317875e43",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 85,
+        "failed": 0,
+        "skipped": 2
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "ios-simulator-2026-10-22",
+      "platform": "ios",
+      "target": "iPhone 17 Pro Max simulator, iOS 26.2",
+      "viewport": null,
+      "device": "virtual",
+      "roles": [
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [
+        "loaded",
+        "loading",
+        "empty",
+        "error",
+        "retry",
+        "cold-start"
+      ],
+      "recordedAt": "2026-10-22",
+      "commit": "02fc63c200ea0cebbd7dc61722ca4a35c32a687d",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production web build as the mobile API, local Upstash emulator, Metro from the worktree on a Debug native build",
+      "result": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 1
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-ios-simulator.md"
+    },
+    {
+      "id": "android-emulator-2026-10-22",
+      "platform": "android",
+      "target": "Pixel 7 Pro emulator, Android 13 (API 33)",
+      "viewport": null,
+      "device": "virtual",
+      "roles": [
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [
+        "loaded",
+        "loading",
+        "empty",
+        "error",
+        "offline",
+        "retry",
+        "cold-start"
+      ],
+      "recordedAt": "2026-10-22",
+      "commit": "02fc63c200ea0cebbd7dc61722ca4a35c32a687d",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production web build as the mobile API, local Upstash emulator, Metro from the worktree on a Debug native build",
+      "result": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-android-emulator.md"
     }
   ]
 }

@@ -145,10 +145,68 @@ describe("computeCoverageStatus", () => {
     expect(result.actual).toBe(1.5);
     expect(result.isMet).toBe(false);
   });
+
+  it("sums fractional credit without float noise", () => {
+    const credits: Record<string, number> = { a: 0.7, b: 0.6, c: 0.7 };
+    const result = computeCoverageStatus({
+      employees: ["a", "b", "c"].map((id) => makeEmployee({ id })),
+      date,
+      assignmentIdsForKey: () => [10],
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: { minStaff: 2 },
+      coverageCreditForKey: (empId: string) => credits[empId],
+    });
+    expect(result.actual).toBe(2);
+    expect(result.isMet).toBe(true);
+  });
 });
 
 describe("computeCoverageGaps / computeCoverageCategorySnapshots", () => {
   const date = new Date(2024, 0, 15); // Monday
+
+  it("names each row by its requirement, stable across dates, for both requirement models", () => {
+    const fa = makeFocusArea({ id: 1, name: "ICU" });
+    const cat = makeShiftCategory({ id: 1, name: "Day" });
+    const legacyCode = makeAssignment({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const currentCode = makeAssignment({
+      id: 20,
+      label: "D-MA",
+      categoryId: 1,
+      shiftId: 1,
+      jobId: 5,
+      focusAreaId: 1,
+    });
+    const legacy = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, minStaff: 2 });
+    const current = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: null,
+      jobId: 5,
+      preferredShiftId: 1,
+      minStaff: 1,
+    });
+    const nextDay = new Date(2024, 0, 16);
+
+    const snapshots = computeCoverageCategorySnapshots({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [legacyCode, currentCode],
+      requirements: [legacy, current],
+      dates: [date, nextDay],
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10, 20])]]),
+      assignmentNameMap: new Map([[20, "Day Shift · Med Aide"]]),
+    });
+
+    const rows = snapshots.map((snapshot) => [snapshot.rowKey, snapshot.rowLabel]);
+    expect(rows).toEqual([
+      ["1:1", "Day"],
+      ["1:1", "Day"],
+      ["1:5:1", "Day Shift · Med Aide"],
+      ["1:5:1", "Day Shift · Med Aide"],
+    ]);
+  });
 
   it("returns a gap with real actual/required numbers when understaffed", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
@@ -211,7 +269,12 @@ describe("summarizeCoverageTotals", () => {
         focusAreaId: 1,
         focusAreaName: "ICU",
         shiftCategoryId: 1,
+
         shiftCategoryName: "Day",
+
+        rowKey: "1:1",
+
+        rowLabel: "Day",
         date: new Date(),
         status: { actual: 2, required: 3, isMet: false, hasRequirement: true },
         eligibleAssignmentDefinitionIds: [],
@@ -222,7 +285,12 @@ describe("summarizeCoverageTotals", () => {
         focusAreaId: 1,
         focusAreaName: "ICU",
         shiftCategoryId: 2,
+
         shiftCategoryName: "Night",
+
+        rowKey: "1:2",
+
+        rowLabel: "Night",
         date: new Date(),
         // over-staffed slot: actual must not inflate totalFilled beyond required
         status: { actual: 5, required: 2, isMet: true, hasRequirement: true },
@@ -260,7 +328,12 @@ describe("summarizeCoverageByFocusArea", () => {
         focusAreaId: 1,
         focusAreaName: "ICU",
         shiftCategoryId: 1,
+
         shiftCategoryName: "Day",
+
+        rowKey: "1:1",
+
+        rowLabel: "Day",
         date: new Date(),
         status: { actual: 1, required: 2, isMet: false, hasRequirement: true },
         eligibleAssignmentDefinitionIds: [],
@@ -271,7 +344,12 @@ describe("summarizeCoverageByFocusArea", () => {
         focusAreaId: 2,
         focusAreaName: "ER",
         shiftCategoryId: 1,
+
         shiftCategoryName: "Day",
+
+        rowKey: "1:1",
+
+        rowLabel: "Day",
         date: new Date(),
         status: { actual: 0, required: 0, isMet: true, hasRequirement: false },
         eligibleAssignmentDefinitionIds: [],
@@ -296,7 +374,12 @@ describe("summarizeCoverageDailyForFocusArea", () => {
       focusAreaId: 1,
       focusAreaName: "ICU",
       shiftCategoryId: 1,
+
       shiftCategoryName: "Day",
+
+      rowKey: "1:1",
+
+      rowLabel: "Day",
       eligibleAssignmentDefinitionIds: [],
       preferredOpenAssignmentDefinitionId: 1,
       shortageDetails: [],

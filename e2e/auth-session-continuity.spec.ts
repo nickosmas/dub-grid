@@ -29,8 +29,9 @@ function collectRuntimeFailures(page: Page, isSigningOut: () => boolean): Runtim
         message.text(),
       ) &&
       // The local realtime socket failing or closing before it connects, as
-      // sign-out tears it down: Chromium's wording, then Firefox's.
-      !/(?:WebSocket connection to '|can.t establish a connection to the server at )ws:\/\/127\.0\.0\.1:54321\/realtime\/v1\//.test(
+      // sign-out tears it down: Chromium's and WebKit's wording, then
+      // Firefox's. Any local port, since a throwaway stack is not on 54321.
+      !/(?:WebSocket connection to '|can.t establish a connection to the server at )ws:\/\/127\.0\.0\.1:\d+\/realtime\/v1\//.test(
         message.text(),
       ) &&
       !isKnownBenignConsoleNoise(message.text())

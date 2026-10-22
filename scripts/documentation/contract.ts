@@ -84,10 +84,37 @@ export interface SurfaceExclusion {
   sourceFiles: string[];
 }
 
+/** One dated, retained runtime run: a browser and viewport on web, or a mobile platform. */
+export interface RuntimeEvidenceEntry {
+  id: string;
+  platform: "web" | "ios" | "android";
+  /** The browser on web, the device or emulator on mobile. */
+  target: string;
+  /** Web only; null on mobile. */
+  viewport: string | null;
+  /** Mobile only: a simulator or emulator is virtual and never satisfies the requirement. */
+  device?: "physical" | "virtual";
+  roles: string[];
+  states: string[];
+  /** YYYY-MM-DD. */
+  recordedAt: string;
+  commit: string;
+  environment: string;
+  result: { passed: number; failed: number; skipped: number };
+  /** Repository path of the dated record. */
+  record: string;
+}
+
+export interface RuntimeProfiles {
+  web?: { browsers?: string[]; viewports?: string[]; roles?: string[] };
+  mobile?: { platforms?: string[]; roles?: string[]; states?: string[] };
+}
+
 export interface AccuracyManifest {
   schemaVersion: 1;
   frozenProductCandidate: string;
-  runtimeProfiles: Record<string, unknown>;
+  runtimeProfiles: RuntimeProfiles;
+  runtimeEvidence?: RuntimeEvidenceEntry[];
   pages: AccuracyManifestPage[];
   surfaceExclusions: SurfaceExclusion[];
 }
@@ -303,13 +330,129 @@ export function validateSchedulingCapabilityCoverage(
   return errors.sort();
 }
 
+function isCount(value: unknown): boolean {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Checks retained runtime evidence against the declared profiles. With
+ * `requireRuntimeEvidence`, every web browser and viewport and each mobile
+ * platform needs a passing run, on a physical device for mobile, and together
+ * they must cover every role.
+ */
+export function validateRuntimeEvidence(
+  repoRoot: string,
+  manifest: AccuracyManifest,
+  options: { requireRuntimeEvidence?: boolean } = {},
+): string[] {
+  const errors: string[] = [];
+  const entries = manifest.runtimeEvidence ?? [];
+  const web = manifest.runtimeProfiles.web ?? {};
+  const mobile = manifest.runtimeProfiles.mobile ?? {};
+  const where = (entry: RuntimeEvidenceEntry) =>
+    `accuracy-manifest.json: runtimeEvidence ${entry.id}`;
+
+  for (const duplicate of duplicateValues(entries.map((entry) => entry.id))) {
+    errors.push(`accuracy-manifest.json: duplicate runtimeEvidence id ${duplicate}`);
+  }
+  for (const entry of entries) {
+    const unknown = (label: string, values: string[], allowed: string[] = []) => {
+      for (const value of values) {
+        if (!allowed.includes(value)) errors.push(`${where(entry)}: unknown ${label} ${value}`);
+      }
+    };
+    if (entry.platform === "web") {
+      unknown("browser", [entry.target], web.browsers);
+      unknown("viewport", [entry.viewport ?? "none"], web.viewports);
+      unknown("role", entry.roles, web.roles);
+      if (entry.states.length > 0) errors.push(`${where(entry)}: web evidence lists no states`);
+      if (entry.device !== undefined) errors.push(`${where(entry)}: web evidence has no device`);
+    } else if (entry.platform === "ios" || entry.platform === "android") {
+      unknown("platform", [entry.platform], mobile.platforms);
+      unknown("role", entry.roles, mobile.roles);
+      unknown("state", entry.states, mobile.states);
+      if (entry.viewport !== null) errors.push(`${where(entry)}: mobile evidence has no viewport`);
+      if (!entry.target) errors.push(`${where(entry)}: mobile evidence names its device`);
+      if (entry.device !== "physical" && entry.device !== "virtual") {
+        errors.push(
+          `${where(entry)}: mobile evidence says whether its device is physical or virtual`,
+        );
+      }
+    } else {
+      errors.push(`${where(entry)}: unknown platform ${String(entry.platform)}`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.recordedAt)) {
+      errors.push(`${where(entry)}: recordedAt must be YYYY-MM-DD`);
+    }
+    if (!/^[0-9a-f]{40}$/.test(entry.commit)) {
+      errors.push(`${where(entry)}: commit must be a full Git commit hash`);
+    }
+    if (!entry.environment?.trim()) errors.push(`${where(entry)}: environment is required`);
+    const { passed, failed, skipped } = entry.result ?? {};
+    if (!isCount(passed) || !isCount(failed) || !isCount(skipped)) {
+      errors.push(`${where(entry)}: result counts must be whole numbers`);
+    }
+    if (
+      !entry.record ||
+      !isInsideRepository(repoRoot, entry.record) ||
+      !existsSync(path.join(repoRoot, entry.record))
+    ) {
+      errors.push(`${where(entry)}: record ${entry.record} does not exist`);
+    }
+  }
+
+  if (options.requireRuntimeEvidence) {
+    const passing = entries.filter(
+      (entry) => entry.result?.failed === 0 && (entry.result?.passed ?? 0) > 0,
+    );
+    for (const browser of web.browsers ?? []) {
+      for (const viewport of web.viewports ?? []) {
+        if (
+          !passing.some(
+            (entry) =>
+              entry.platform === "web" && entry.target === browser && entry.viewport === viewport,
+          )
+        ) {
+          errors.push(`accuracy-manifest.json: no passing web evidence for ${browser} ${viewport}`);
+        }
+      }
+    }
+    const webRoles = new Set(
+      passing.filter((entry) => entry.platform === "web").flatMap((entry) => entry.roles),
+    );
+    for (const role of (web.roles ?? []).filter((item) => !webRoles.has(item))) {
+      errors.push(`accuracy-manifest.json: no passing web evidence for role ${role}`);
+    }
+    for (const platform of mobile.platforms ?? []) {
+      const runs = passing.filter(
+        (entry) => entry.platform === platform && entry.device === "physical",
+      );
+      if (runs.length === 0) {
+        errors.push(`accuracy-manifest.json: no passing ${platform} evidence on a physical device`);
+        continue;
+      }
+      const roles = new Set(runs.flatMap((entry) => entry.roles));
+      for (const role of (mobile.roles ?? []).filter((item) => !roles.has(item))) {
+        errors.push(
+          `accuracy-manifest.json: no passing ${platform} evidence on a physical device for role ${role}`,
+        );
+      }
+    }
+  }
+  return errors;
+}
+
 export function validateAccuracyManifest(
   repoRoot: string,
   inventory: DocumentationSourceInventory,
   manifest: AccuracyManifest,
-  options: { requireClosed?: boolean } = {},
+  options: { requireClosed?: boolean; requireRuntimeEvidence?: boolean } = {},
 ): ContractReport {
-  const errors: string[] = [];
+  const errors: string[] = [
+    ...validateRuntimeEvidence(repoRoot, manifest, {
+      requireRuntimeEvidence: options.requireRuntimeEvidence,
+    }),
+  ];
   if (manifest.schemaVersion !== 1) errors.push("accuracy-manifest.json: schemaVersion must be 1");
   if (!/^[0-9a-f]{40}$/.test(manifest.frozenProductCandidate)) {
     errors.push("accuracy-manifest.json: frozenProductCandidate must be a full Git commit hash");

@@ -16,7 +16,11 @@ import {
   filterPublishedDates,
   getPublishedWindowState,
   filterAndSortEmployees,
+  createCoverageCreditResolver,
+  createPublishedAssignmentIdsResolver,
+  createPublishedCoverageCreditResolver,
 } from "@/lib/schedule-logic";
+import type { ShiftMap } from "@/types";
 import {
   makeEmployee,
   makeAssignmentDefinition as makeAssignmentDefinition,
@@ -1037,5 +1041,65 @@ describe("getPublishedWindowState", () => {
     expect(
       getPublishedWindowState(dates, new Set(["2026-03-01", "2026-03-02", "2026-03-03"])),
     ).toBe("published");
+  });
+});
+
+// ── Published coverage resolvers ─────────────────────────────────────────────
+
+describe("published coverage resolvers", () => {
+  const date = new Date(2026, 9, 27);
+  const key = (empId: string) => `${empId}_${formatDateKey(date)}`;
+  const segment = (shiftId: number, isMentored = false) => ({ shiftId, jobId: 1, isMentored });
+  // Cast: only the fields the resolvers read are filled in.
+  const shifts = {
+    // A shift removed in the draft: nothing in effect, still published.
+    [key("removed")]: {
+      assignmentIds: [],
+      segments: [],
+      isDelete: true,
+      publishedAssignmentDefinitionIds: [10],
+      publishedSegments: [segment(1)],
+    },
+    // A shift moved in the draft from assignment 10 to 11.
+    [key("moved")]: {
+      assignmentIds: [11],
+      segments: [segment(2)],
+      publishedAssignmentDefinitionIds: [10],
+      publishedSegments: [segment(1)],
+    },
+    // A mentored published segment, unmentored in the draft.
+    [key("mentored")]: {
+      assignmentIds: [10],
+      segments: [segment(1)],
+      publishedAssignmentDefinitionIds: [10],
+      publishedSegments: [segment(1, true)],
+    },
+  } as unknown as ShiftMap;
+  const config = { mentoredCoverageCreditPercent: 50 };
+  const draftCredit = createCoverageCreditResolver(shifts, config);
+  const publishedCredit = createPublishedCoverageCreditResolver(shifts, config);
+  const publishedIds = createPublishedAssignmentIdsResolver(shifts);
+
+  it("counts a shift removed in the draft as published", () => {
+    expect(draftCredit("removed", date, 10)).toBe(0);
+    expect(publishedCredit("removed", date, 10)).toBe(1);
+    expect(publishedIds("removed", date)).toEqual([10]);
+  });
+
+  it("counts a moved shift where each side has it", () => {
+    expect(draftCredit("moved", date, 11)).toBe(1);
+    expect(draftCredit("moved", date, 10)).toBe(0);
+    expect(publishedCredit("moved", date, 10)).toBe(1);
+    expect(publishedCredit("moved", date, 11)).toBe(0);
+  });
+
+  it("gives a published mentored segment the mentored credit", () => {
+    expect(draftCredit("mentored", date, 10)).toBe(1);
+    expect(publishedCredit("mentored", date, 10)).toBe(0.5);
+  });
+
+  it("finds nothing for a person with no cell", () => {
+    expect(publishedCredit("nobody", date, 10)).toBe(0);
+    expect(publishedIds("nobody", date)).toEqual([]);
   });
 });

@@ -813,12 +813,20 @@
           contiguous checksum-locked migration ledger against a local scratch
           database and record reproducible evidence without touching a remote
           project.
-    - [ ] 40e3. **Web browser role and state qualification** - execute and
+    - [x] 40e3. **Web browser role and state qualification** - execute and
           retain the documented Chromium, Firefox, and WebKit role/state
           matrix against the dedicated local E2E environment.
     - [ ] 40e4. **Native iOS and Android qualification** - record real-device
           evidence for the required mobile roles and states, including the
           mandatory Android pass; do not infer unavailable device evidence.
+      - [x] 40e4a. **Simulator and emulator qualification** - run the
+            native app on the iOS Simulator and an Android emulator against
+            the dedicated local environment for every mobile role and the
+            states each can reach, recorded as virtual-device evidence that
+            never satisfies the real-device requirement.
+      - [ ] 40e4b. **Physical-device pass** - repeat the qualification on a
+            physical iPhone and a physical Android phone; the 40e gate
+            accepts only this evidence for iOS and Android.
 - [x] 44. **Billing safety and Gridmaster billing controls** - fix the billing
       defects that can lock out or strand a customer, give Gridmasters safe,
       explained billing actions, show customers only the billing activity that
@@ -933,7 +941,7 @@
         log shows each schedule edit as Before and After with names. Its
         rows store only the new state, so the save must record the previous
         one: an extra read per save or a migration (owner decision).
-- [ ] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
+- [x] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
       check of the draft: a focus area by day matrix (staffed / needed,
       short, over, staff short per day), the draft compared with the
       published schedule (gaps opened and closed), a detail for each cell
@@ -941,24 +949,24 @@
       fix gaps in one click or explain why nothing can. Every insight is
       measured on the schedule and must be exact (owner, 2026-10-21).
       Design reference: the "Staffing check panel" canvas.
-  - [ ] 47a. **Matrix and changes since publish** - replaces the card list:
+  - [x] 47a. **Matrix and changes since publish** - replaces the card list:
         status per requirement including over, for the draft and the
         published schedule; Whole draft and Changes since publish views;
         cell detail with Before and After, still needed, Fill a spot (the
         existing staffing modal) and Show in grid. People without edit
         rights see published dates only and no suggestions. The button and
         panel are named "Coverage Check" (owner, 2026-10-21). No migration.
-  - [ ] 47b. **What changed** - each cell names the draft changes behind
+  - [x] 47b. **What changed** - each cell names the draft changes behind
         it (moved, removed, added, given an absence), from the draft versus
         published difference.
-  - [ ] 47c. **Suggestion engine** - a tested schedule-core function:
+  - [x] 47c. **Suggestion engine** - a tested schedule-core function:
         undo a move that opened a gap and made an over, restore a removed
         shift with no absence or request, assign qualified people who are
         free that day (no overlapping shift), waiting pickup requests, and
         repeating weekday gaps; impact measured by applying each to a copy;
         a reason for every qualified person when nothing fits. No weekly
         hours limit and no minimum rest rule (owner, 2026-10-21). No UI.
-  - [ ] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
+  - [x] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
         ways to fix per cell, apply and undo through the normal draft save,
         approve through the existing request approval behind a confirmation,
         and the opened and closed counts in the Publish dialog. Approve

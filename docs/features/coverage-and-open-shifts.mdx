@@ -7,9 +7,43 @@ Coverage compares the people scheduled for a shift and job with the minimum your
 
 ## Reading coverage
 
-On the web schedule, every focus-area section has count rows. They show how many people are scheduled against how many are needed. Select **Coverage** for the detailed list of gaps in the period you are viewing.
+On the web schedule, every focus-area section has count rows. They show how many people are scheduled against how many are needed.
 
-People who edit shifts see coverage from the working schedule, including drafts. Staff see only the published coverage they can act on. **All coverage requirements met** means there are no visible gaps for that period.
+## Coverage Check
+
+Select **Coverage Check** on the schedule toolbar to see every coverage requirement for the period at once. The button's number is how many shifts are short. Coverage Check is available in **1 Week** and **2 Weeks**, to people who can see dashboard analytics.
+
+Each row is one requirement, such as Day Shift for a job in a focus area, and each column is a day. A cell reads staffed / needed, for example **3/5**, and is marked:
+
+- **Short** when fewer people are scheduled than needed.
+- **Over** when more are scheduled than needed.
+- **Staffed** when the numbers match.
+
+A mentored person counts at your Organization's mentored credit, so a cell can read 2.5/3. The **Staff short** row adds up each day's shortfall. Shifts that have already started are faded and not counted. Filter by focus area to check one area at a time.
+
+People who edit shifts see the draft. A line at the top compares it with the published schedule: how many gaps the draft opens, how many it closes, and how many other cells change. **Changes since publish** marks those cells in the matrix. Dates that have never been published have nothing to compare. People who cannot edit shifts see published dates only.
+
+Select a cell to see it in detail:
+
+- **Before** is what staff see now, and **After** is the draft.
+- **Still needed** lists the jobs that are short.
+- **What changed** lists, for people who edit shifts, each person whose draft change moved the cell's count, for example a shift moved to another day, taken off, or replaced by an absence. The lines always add up to the difference between Before and After. A cell the draft did not touch says so.
+- **Fill a spot** opens the list of qualified people for that gap, the same as selecting the open shift. If pickup requests are already waiting for the shift, Coverage Check says how many.
+- **Show in grid** closes Coverage Check and outlines that day in the focus area's section.
+- **Ways to fix** lists the suggestions for that day, and **Not suggested** says why each other qualified person was left out, for example an absence or a shift that overlaps.
+
+### Suggestions
+
+People who edit shifts also see **Suggestions** above the matrix: ways to fix the gaps, best first. Select **Show all** for the rest. Each one says what it does, for example "Closes 1 gap", and is measured on a copy of the schedule first, so it never fixes one gap by opening another.
+
+- **Move back** returns a shift this draft moved to another day or changed to other work.
+- **Restore** puts back a shift this draft removed, when no absence or request explains the removal.
+- **Schedule** adds someone who is qualified for the shift and free that day: no absence, and no shift that overlaps it.
+- **Approve** approves a pickup request already waiting for the shift. Coverage Check asks first, because an approval takes effect for staff right away, without a publish, and replaces any draft change of yours for that person's day.
+
+Move back, Restore and Schedule change only the draft, the same way an edit in the grid does, and appear under **Applied** with **Undo**. When nothing can fix a requirement that is short on the same day every week, Coverage Check says so.
+
+**All requirements met** means no requirement is short or over for the period. If your Organization has not set any requirements, Coverage Check says so and points to [Coverage settings](/configuration/coverage-requirements).
 
 Your Super Admin controls the requirements in [Coverage settings](/configuration/coverage-requirements). They also choose whether staff see coverage shortages and call-off vacancies in [Schedule Rules](/configuration/schedule-rules-and-display).
 

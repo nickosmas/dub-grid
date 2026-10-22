@@ -19,9 +19,11 @@ import {
 import {
   REQUIRED_SCHEDULING_CAPABILITY_IDS,
   validateAccuracyManifest,
+  validateRuntimeEvidence,
   validateSchedulingCapabilityCoverage,
   type AccuracyManifest,
   type AccuracyManifestPage,
+  type RuntimeEvidenceEntry,
   type SchedulingCapability,
   type SchedulingCapabilityCoverage,
   type SurfaceExclusion,
@@ -477,5 +479,127 @@ describe("documentation contract", () => {
     const first = computePageFingerprint(root, page(), inventory());
     write(root, "source.ts", "export const value = 2;\n");
     expect(computePageFingerprint(root, page(), inventory())).not.toBe(first);
+  });
+});
+
+describe("runtime evidence", () => {
+  const COMMIT = "a".repeat(40);
+  const profiles: AccuracyManifest["runtimeProfiles"] = {
+    web: { browsers: ["chromium", "webkit"], viewports: ["desktop"], roles: ["user", "admin"] },
+    mobile: { platforms: ["android"], roles: ["user"], states: ["loaded", "offline"] },
+  };
+  const web = (overrides: Partial<RuntimeEvidenceEntry> = {}): RuntimeEvidenceEntry => ({
+    id: "web-chromium-desktop",
+    platform: "web",
+    target: "chromium",
+    viewport: "desktop",
+    roles: ["user", "admin"],
+    states: [],
+    recordedAt: "2026-10-22",
+    commit: COMMIT,
+    environment: "local seeded stack",
+    result: { passed: 10, failed: 0, skipped: 1 },
+    record: "evidence/web.md",
+    ...overrides,
+  });
+  const android = (overrides: Partial<RuntimeEvidenceEntry> = {}): RuntimeEvidenceEntry => ({
+    ...web(),
+    id: "android",
+    platform: "android",
+    target: "Pixel 7 Pro emulator",
+    viewport: null,
+    device: "physical",
+    roles: ["user"],
+    states: ["loaded", "offline"],
+    ...overrides,
+  });
+  function check(entries: RuntimeEvidenceEntry[], requireRuntimeEvidence = false): string[] {
+    const root = fixture();
+    write(root, "evidence/web.md", "# Evidence\n");
+    const manifest = { runtimeProfiles: profiles, runtimeEvidence: entries } as AccuracyManifest;
+    return validateRuntimeEvidence(root, manifest, { requireRuntimeEvidence });
+  }
+
+  it("accepts a well-formed entry", () => {
+    expect(check([web()])).toEqual([]);
+  });
+
+  it("rejects unknown browsers, roles, states and a mobile viewport", () => {
+    expect(
+      check([
+        web({ target: "edge", roles: ["guest"] }),
+        android({ id: "a2", states: ["frozen"], viewport: "desktop" }),
+      ]).sort(),
+    ).toEqual(
+      [
+        "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: unknown browser edge",
+        "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: unknown role guest",
+        "accuracy-manifest.json: runtimeEvidence a2: unknown state frozen",
+        "accuracy-manifest.json: runtimeEvidence a2: mobile evidence has no viewport",
+      ].sort(),
+    );
+  });
+
+  it("rejects a missing record, a bad date, a short commit and broken counts", () => {
+    expect(
+      check([
+        web({
+          record: "evidence/missing.md",
+          recordedAt: "Oct 22",
+          commit: "abc",
+          result: { passed: -1, failed: 0, skipped: 0 },
+        }),
+      ]),
+    ).toEqual([
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: recordedAt must be YYYY-MM-DD",
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: commit must be a full Git commit hash",
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: result counts must be whole numbers",
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: record evidence/missing.md does not exist",
+    ]);
+  });
+
+  it("requires a passing run for every browser, viewport, role and platform when asked", () => {
+    expect(
+      check(
+        [web(), web({ id: "w2", target: "webkit", result: { passed: 3, failed: 1, skipped: 0 } })],
+        true,
+      ),
+    ).toEqual([
+      "accuracy-manifest.json: no passing web evidence for webkit desktop",
+      "accuracy-manifest.json: no passing android evidence on a physical device",
+    ]);
+    expect(
+      check(
+        [web({ roles: ["user"] }), web({ id: "w2", target: "webkit", roles: ["user"] }), android()],
+        true,
+      ),
+    ).toEqual(["accuracy-manifest.json: no passing web evidence for role admin"]);
+    expect(check([web(), web({ id: "w2", target: "webkit" }), android()], true)).toEqual([]);
+  });
+
+  it("needs a device kind on mobile only, and counts only physical devices", () => {
+    expect(
+      check([
+        web({ device: "virtual" }),
+        android({ id: "a1", device: undefined }),
+        android({ id: "a2", device: "tablet" as "physical" }),
+      ]),
+    ).toEqual([
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: web evidence has no device",
+      "accuracy-manifest.json: runtimeEvidence a1: mobile evidence says whether its device is physical or virtual",
+      "accuracy-manifest.json: runtimeEvidence a2: mobile evidence says whether its device is physical or virtual",
+    ]);
+    const webRuns = [web(), web({ id: "w2", target: "webkit" })];
+    expect(check([...webRuns, android({ device: "virtual" })])).toEqual([]);
+    expect(check([...webRuns, android({ device: "virtual" })], true)).toEqual([
+      "accuracy-manifest.json: no passing android evidence on a physical device",
+    ]);
+    expect(
+      check([...webRuns, android({ device: "virtual" }), android({ id: "a2" })], true),
+    ).toEqual([]);
+  });
+
+  it("only checks the shape unless coverage is required", () => {
+    expect(check([])).toEqual([]);
   });
 });
