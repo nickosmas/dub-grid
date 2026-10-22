@@ -946,17 +946,18 @@
         published schedule; Whole draft and Changes since publish views;
         cell detail with Before and After, still needed, Fill a spot (the
         existing staffing modal) and Show in grid. People without edit
-        rights see published dates only and no suggestions. No migration.
+        rights see published dates only and no suggestions. The button and
+        panel are named "Coverage Check" (owner, 2026-10-21). No migration.
   - [ ] 47b. **What changed** - each cell names the draft changes behind
         it (moved, removed, added, given an absence), from the draft versus
         published difference.
   - [ ] 47c. **Suggestion engine** - a tested schedule-core function:
         undo a move that opened a gap and made an over, restore a removed
-        shift with no absence or request, assign qualified free people
-        within hours and rest limits, waiting pickup requests, and repeating
-        weekday gaps; impact measured by applying each to a copy; a reason
-        for every qualified person when nothing fits. No UI. Needs the
-        weekly hours and minimum rest decisions.
+        shift with no absence or request, assign qualified people who are
+        free that day (no overlapping shift), waiting pickup requests, and
+        repeating weekday gaps; impact measured by applying each to a copy;
+        a reason for every qualified person when nothing fits. No weekly
+        hours limit and no minimum rest rule (owner, 2026-10-21). No UI.
   - [ ] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
         ways to fix per cell, apply and undo through the normal draft save,
         approve through the existing request approval behind a confirmation,

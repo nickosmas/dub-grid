@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 02a4dab6705b284db8b939550b8a1131bb15852f5d63923103adcee33abd1bda -->
+<!-- blueprint:source-hash f419076bf16024a80d8060f9d3dbd33edec5f93ad7120e3e7f9cd030ca400ec7 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -203,8 +203,8 @@ assumed to have seen nothing in between publishes. Design reference: the
 
 Item 47 is split; none has shipped:
 
-- **47a - Matrix and changes since publish:** planned; the Coverage panel
-  shows each requirement's staffed and needed counts by day, short or over,
+- **47a - Matrix and changes since publish:** planned; the panel, renamed
+  Coverage Check, shows each requirement's staffed and needed counts by day, short or over,
   for the draft and the published schedule, with a detail per cell. No
   migration.
 - **47b - What changed:** planned; each cell names the draft changes behind
@@ -212,7 +212,8 @@ Item 47 is split; none has shipped:
 - **47c - Suggestion engine:** planned; a tested schedule-core function that
   proposes moves back, restores, assignments and waiting pickups, measures
   each on a copy of the schedule, and says why nobody fits when nothing does.
-  Needs the weekly hours and minimum rest decisions.
+  A person fits when qualified and free that day; there is no weekly hours
+  limit or minimum rest rule (owner, 2026-10-21).
 - **47d - Suggestions in the panel:** planned; apply and undo through the
   draft, approve behind a confirmation, and the opened and closed counts in
   the Publish dialog. Approve needs the approval-replaces-draft fix first.
