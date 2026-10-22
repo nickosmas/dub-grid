@@ -6,10 +6,10 @@ import { createReactNativeModule } from "../../../test/native";
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 let ShiftChangeCard: (typeof import("./ShiftChangeView"))["ShiftChangeCard"];
-let ShiftChangeLink: (typeof import("./ShiftChangeView"))["ShiftChangeLink"];
+let ShiftChangeButton: (typeof import("./ShiftChangeView"))["ShiftChangeButton"];
 
 beforeAll(async () => {
-  ({ ShiftChangeCard, ShiftChangeLink } = await import("./ShiftChangeView"));
+  ({ ShiftChangeCard, ShiftChangeButton } = await import("./ShiftChangeView"));
 });
 
 function shift(overrides: Partial<ShiftChangeShiftInput> = {}): ShiftChangeShiftInput {
@@ -57,14 +57,14 @@ describe("ShiftChangeCard (46d)", () => {
   });
 });
 
-describe("ShiftChangeLink (46d)", () => {
+describe("ShiftChangeButton (46d)", () => {
   it("offers What changed and opens the Before and After sheet", () => {
     const change = describeShiftChange(
       { items: [shift()] },
       { items: [shift({ focusAreaName: "Memory Care" })] },
       { date: "2026-10-22" },
     );
-    render(<ShiftChangeLink change={change} />);
+    render(<ShiftChangeButton change={change} />);
 
     expect(screen.queryByText("BEFORE")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "See what changed" }));

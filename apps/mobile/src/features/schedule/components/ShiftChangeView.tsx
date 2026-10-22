@@ -5,7 +5,7 @@ import type { z } from "zod";
 import type { shiftChangeSchema } from "@dubgrid/contracts";
 import { formatScheduleTimeValue, formatShiftChangeHours } from "@dubgrid/schedule-core";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
-import { Pressable } from "../../../shared/components/Pressable";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Text } from "../../../shared/components/Text";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -251,27 +251,28 @@ export function ShiftChangeSheet({
   );
 }
 
-/** A list row's "What changed" link, opening the same sheet as shift detail. */
-export function ShiftChangeLink({ change }: { change: ShiftChange }) {
+/**
+ * The "What changed" button that opens the sheet. Shift detail and Your Week
+ * share it, so the two read and behave the same.
+ */
+export function ShiftChangeButton({ change }: { change: ShiftChange }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [open, setOpen] = useState(false);
   if (change.kind === "none") return null;
   return (
     <>
-      <Pressable
+      <PressableRow
         accessibilityLabel="See what changed"
-        accessibilityRole="button"
-        hitSlop={mobileSpace.sm}
         onPress={() => setOpen(true)}
-        style={styles.link}
+        style={styles.button}
       >
-        <Ionicons color={mobileColors.brand} name="arrow-undo-outline" size={14} />
-        <Text fit="compact" style={styles.linkText}>
+        <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.buttonText}>
           What changed
         </Text>
-        <Ionicons color={mobileColors.brand} name="chevron-forward" size={14} />
-      </Pressable>
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
+      </PressableRow>
       <ShiftChangeSheet change={change} visible={open} onDismiss={() => setOpen(false)} />
     </>
   );
@@ -397,20 +398,23 @@ function createStyles(colors: MobileColors) {
       ...mobileTabularText,
       color: colors.textMuted,
     },
-    link: {
+    button: {
+      minHeight: 48,
       flexDirection: "row",
       alignItems: "center",
-      alignSelf: "flex-start",
-      gap: mobileSpace.xs,
-      marginTop: mobileSpace.sm,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: colors.brandSoft,
+      gap: mobileSpace.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      backgroundColor: "transparent",
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
     },
-    linkText: {
-      ...mobileText.label,
-      color: colors.brand,
+    buttonText: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.bodyStrong,
+      color: colors.textSecondary,
     },
   });
 }

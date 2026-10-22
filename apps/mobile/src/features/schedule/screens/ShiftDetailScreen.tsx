@@ -33,7 +33,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
-import { ShiftChangeSheet } from "../components/ShiftChangeView";
+import { ShiftChangeButton } from "../components/ShiftChangeView";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   createShiftRequest,
@@ -1850,26 +1850,7 @@ function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
   // The whole day Before and After (item 46d); older servers send only the
   // previous presentation, which keeps the sheet below.
   if (shiftChange && shiftChange.kind !== "none") {
-    return (
-      <>
-        <PressableRow
-          accessibilityLabel="See what changed"
-          onPress={() => setShowPreviousShift(true)}
-          style={styles.detailPreviousShiftFooter}
-        >
-          <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailPreviousShiftText}>
-            What changed
-          </Text>
-          <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
-        </PressableRow>
-        <ShiftChangeSheet
-          change={shiftChange}
-          visible={showPreviousShift}
-          onDismiss={() => setShowPreviousShift(false)}
-        />
-      </>
-    );
+    return <ShiftChangeButton change={shiftChange} />;
   }
 
   if (!previous) {

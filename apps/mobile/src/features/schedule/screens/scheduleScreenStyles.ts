@@ -476,6 +476,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
       paddingVertical: mobileSpace.lg,
     },
+    upcomingWhatChanged: {
+      alignSelf: "stretch",
+      marginTop: mobileSpace.sm,
+    },
     upcomingDeletedHistoryRow: {
       paddingVertical: mobileSpace.md,
     },
