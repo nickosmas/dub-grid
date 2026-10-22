@@ -1,4 +1,5 @@
 import type { ShiftChangeResolvers } from "@dubgrid/schedule-core";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DbAbsenceType,
   DbFocusArea,
@@ -14,13 +15,9 @@ import {
 } from "@/lib/db/mappers";
 import { ABSENCE_TYPE_COLS, FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS } from "@/lib/db/shared";
 import { buildShiftChangeResolvers } from "@/lib/shift-change-web";
-import type { getServiceClient } from "@/lib/supabase-service";
 
 /** An organization's focus areas, shifts, jobs and every assignment, archived included. */
-export async function fetchAssignmentContext(
-  serviceClient: ReturnType<typeof getServiceClient>,
-  orgId: string,
-) {
+export async function fetchAssignmentContext(serviceClient: SupabaseClient, orgId: string) {
   const [focusAreaResult, shiftCategoryResult, jobResult] = await Promise.all([
     serviceClient
       .from("focus_areas")
@@ -71,7 +68,7 @@ export async function fetchAssignmentContext(
 
 /** Name lookups for describing shift changes, archived definitions included. */
 export async function fetchShiftChangeResolvers(
-  serviceClient: ReturnType<typeof getServiceClient>,
+  serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<ShiftChangeResolvers> {
   const [context, absenceResult] = await Promise.all([
