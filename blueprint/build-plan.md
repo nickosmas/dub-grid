@@ -951,7 +951,7 @@
   - [x] 47b. **What changed** - each cell names the draft changes behind
         it (moved, removed, added, given an absence), from the draft versus
         published difference.
-  - [ ] 47c. **Suggestion engine** - a tested schedule-core function:
+  - [x] 47c. **Suggestion engine** - a tested schedule-core function:
         undo a move that opened a gap and made an over, restore a removed
         shift with no absence or request, assign qualified people who are
         free that day (no overlapping shift), waiting pickup requests, and

@@ -201,7 +201,7 @@ After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
 
-Item 47 is split; 47a and 47b have shipped:
+Item 47 is split; 47a, 47b and 47c have shipped:
 
 - **47a - Matrix and changes since publish:** shipped; Coverage Check
   shows each requirement's staffed and needed counts by day, short or over,
@@ -213,9 +213,11 @@ Item 47 is split; 47a and 47b have shipped:
   an absence, taken off, scheduled, mentoring), from the same per-person
   credit the coverage engine counts, so the lines always add up to Before
   versus After.
-- **47c - Suggestion engine:** planned; a tested schedule-core function that
+- **47c - Suggestion engine:** shipped; a tested schedule-core function that
   proposes moves back, restores, assignments and waiting pickups, measures
-  each on a copy of the schedule, and says why nobody fits when nothing does.
+  each on a copy of the schedule with the coverage engine, keeps only those
+  that fix a gap without opening another, names repeating gaps, and says why
+  each other qualified person was not suggested. No UI yet.
   A person fits when qualified and free that day; there is no weekly hours
   limit or minimum rest rule (owner, 2026-10-21).
 - **47d - Suggestions in the panel:** planned; apply and undo through the

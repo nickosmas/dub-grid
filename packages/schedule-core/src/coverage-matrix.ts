@@ -41,6 +41,8 @@ export interface CoverageMatrixCell {
   shortage: number;
   shortageDetails: CoverageShortageDetail[];
   preferredOpenAssignmentDefinitionId: number;
+  /** The assignments that count toward this cell. */
+  eligibleAssignmentDefinitionIds: number[];
   /** Empty on a date never published, or when snapshots carry no contributors. */
   contributorChanges: CoverageContributorChange[];
 }
@@ -187,6 +189,7 @@ export function buildCoverageMatrix(input: BuildCoverageMatrixInput): CoverageMa
       shortage,
       shortageDetails: snapshot.shortageDetails,
       preferredOpenAssignmentDefinitionId: snapshot.preferredOpenAssignmentDefinitionId,
+      eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
       contributorChanges: publishedSnapshot
         ? contributorChangesOf(snapshot.contributors, publishedSnapshot.contributors)
         : [],

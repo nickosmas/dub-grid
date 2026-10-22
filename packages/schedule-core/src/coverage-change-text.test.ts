@@ -288,6 +288,7 @@ describe("coverageCellUnchangedText", () => {
     shortage: 1,
     shortageDetails: [],
     preferredOpenAssignmentDefinitionId: 1,
+    eligibleAssignmentDefinitionIds: [1],
     contributorChanges: [],
     ...overrides,
   });
