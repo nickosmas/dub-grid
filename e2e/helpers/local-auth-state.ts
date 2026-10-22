@@ -116,3 +116,33 @@ export async function enrollLocalTotp(
 
   return { secret };
 }
+
+/**
+ * Replaces a member's admin permissions in an organization and returns the
+ * previous set, so a spec can narrow an account for its run and put it back.
+ */
+export async function setLocalAdminPermissions(
+  email: string,
+  slug: string,
+  permissions: Record<string, boolean>,
+): Promise<Record<string, boolean>> {
+  return withDatabase(async (database) => {
+    const current = await database.query<{ admin_permissions: Record<string, boolean> }>(
+      `SELECT m.admin_permissions
+         FROM public.organization_memberships m
+         JOIN auth.users u ON u.id = m.user_id
+         JOIN public.organizations o ON o.id = m.org_id
+        WHERE lower(u.email) = lower($1) AND o.slug = $2`,
+      [email, slug],
+    );
+    if (current.rowCount !== 1) throw new Error(`No ${email} membership in ${slug}`);
+    await database.query(
+      `UPDATE public.organization_memberships m
+          SET admin_permissions = $3::jsonb
+         FROM auth.users u, public.organizations o
+        WHERE u.id = m.user_id AND o.id = m.org_id AND lower(u.email) = lower($1) AND o.slug = $2`,
+      [email, slug, JSON.stringify(permissions)],
+    );
+    return current.rows[0].admin_permissions;
+  });
+}

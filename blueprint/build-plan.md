@@ -813,7 +813,7 @@
           contiguous checksum-locked migration ledger against a local scratch
           database and record reproducible evidence without touching a remote
           project.
-    - [ ] 40e3. **Web browser role and state qualification** - execute and
+    - [x] 40e3. **Web browser role and state qualification** - execute and
           retain the documented Chromium, Firefox, and WebKit role/state
           matrix against the dedicated local E2E environment.
     - [ ] 40e4. **Native iOS and Android qualification** - record real-device

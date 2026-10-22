@@ -2116,5 +2116,148 @@
         "apps/mobile/app/+not-found.tsx"
       ]
     }
+  ],
+  "runtimeEvidence": [
+    {
+      "id": "web-chromium-desktop-2026-10-22",
+      "platform": "web",
+      "target": "chromium",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 86,
+        "failed": 0,
+        "skipped": 1
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-chromium-narrow-2026-10-22",
+      "platform": "web",
+      "target": "chromium",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-firefox-narrow-2026-10-22",
+      "platform": "web",
+      "target": "firefox",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-webkit-narrow-2026-10-22",
+      "platform": "web",
+      "target": "webkit",
+      "viewport": "narrow",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "f1f669c5354d9f35d3dfcc2da26801b1da4b59ed",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-firefox-desktop-2026-10-22",
+      "platform": "web",
+      "target": "firefox",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "945d7618eeaecb532348dcd76ac67f8317875e43",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 86,
+        "failed": 0,
+        "skipped": 1
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    },
+    {
+      "id": "web-webkit-desktop-2026-10-22",
+      "platform": "web",
+      "target": "webkit",
+      "viewport": "desktop",
+      "roles": [
+        "signed-out",
+        "user",
+        "management-only-user",
+        "limited-admin",
+        "admin",
+        "super-admin"
+      ],
+      "states": [],
+      "recordedAt": "2026-10-22",
+      "commit": "945d7618eeaecb532348dcd76ac67f8317875e43",
+      "environment": "Local throwaway Supabase stack seeded by db:migrations:rehearse, production build through run-production-e2e, local Upstash emulator, CI's variables only",
+      "result": {
+        "passed": 85,
+        "failed": 0,
+        "skipped": 2
+      },
+      "record": "internal/operations/runtime-qualification/2026-10-22-web.md"
+    }
   ]
 }

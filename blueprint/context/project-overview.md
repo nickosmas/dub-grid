@@ -99,7 +99,11 @@ Item 40 is split:
     `npm run db:migrations:rehearse` rehearses a ledger suffix on a throwaway
     local stack, and 001 to 079 is qualified as a clean install, an upgrade
     from 075, and a seeded upgrade with a signed-in smoke.
-  - **40e3 - Web browser role and state qualification:** planned.
+  - **40e3 - Web browser role and state qualification:** shipped;
+    Chromium, Firefox and WebKit at desktop and 390 by 844 pass every role
+    against a seeded throwaway stack and a production build, recorded under
+    `internal/operations/runtime-qualification/` and as `runtimeEvidence`
+    the docs check validates (`--require-runtime-evidence` for 40e).
   - **40e4 - Native iOS and Android qualification:** planned; Android evidence
     is mandatory.
 

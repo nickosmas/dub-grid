@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:1f0bdafbbf45fb1e66b5fd78ba81730dcaf04e751e1185500f8ac9f1a6f05444",
+  "sourceDigest": "sha256:6f7ff0e91e0084b33514711d0e1fa5cc5ada8fcfbe556923bef4060308c41196",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5493,7 +5493,26 @@
       "declarations": [],
       "usages": [
         {
+          "path": "scripts/e2e/qualify-web-local.mjs"
+        },
+        {
           "path": "scripts/run-production-e2e.mjs"
+        }
+      ],
+      "exampleFiles": []
+    },
+    {
+      "id": "env:E2E_STACK_WORKDIR",
+      "name": "E2E_STACK_WORKDIR",
+      "scopes": [
+        "script"
+      ],
+      "declaration": "optional",
+      "exposure": "server-config",
+      "declarations": [],
+      "usages": [
+        {
+          "path": "scripts/e2e/qualify-web-local.mjs"
         }
       ],
       "exampleFiles": []

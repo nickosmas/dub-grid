@@ -413,7 +413,7 @@ export function checkSchedulingCapabilityTargets(
 
 export function checkDocumentationContract(
   repoRoot: string,
-  options: { requireClosed?: boolean } = {},
+  options: { requireClosed?: boolean; requireRuntimeEvidence?: boolean } = {},
 ): DocumentationCheckResult {
   const diagnostics: DocumentationDiagnostic[] = [];
   const generated = generatedInventory(repoRoot);
@@ -467,6 +467,7 @@ export function checkDocumentationContract(
 function main(): void {
   const result = checkDocumentationContract(process.cwd(), {
     requireClosed: process.argv.includes("--require-closed"),
+    requireRuntimeEvidence: process.argv.includes("--require-runtime-evidence"),
   });
   for (const item of result.diagnostics) {
     process.stderr.write(`${item.file} [${item.rule}] ${item.message}\n`);
