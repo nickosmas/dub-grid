@@ -219,6 +219,32 @@ beforeAll(async () => {
   TeamScheduleScreen = module.TeamScheduleScreen;
 });
 
+// A worked cell with an absence for the rest of the day (item 45), in the
+// payload's presentation shape, since that is where the absence travels.
+function withRestOfDaySick(entry: ReturnType<typeof createScheduleEntry>) {
+  return {
+    ...entry,
+    presentation: {
+      label: entry.shiftLabel,
+      shiftName: entry.shiftName,
+      focusAreaId: entry.focusAreaId,
+      focusAreaName: entry.focusAreaName,
+      displayFocusAreaName: entry.displayFocusAreaName,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      segments: entry.segments,
+      restOfDayAbsence: {
+        absenceTypeId: 8,
+        label: "S",
+        name: "Sick",
+        color: "#FEE2E2",
+        borderColor: "#FCA5A5",
+        textColor: "#991B1B",
+      },
+    },
+  };
+}
+
 describe("ScheduleScreen", () => {
   let mutationSpy: any;
   let invalidateQueriesSpy: any;
@@ -547,7 +573,7 @@ describe("ScheduleScreen", () => {
       openShiftCarouselText.indexOf("Nurse"),
     );
 
-    expect(screen.getByText("Your Week")).toBeInTheDocument();
+    expect(screen.getByText("Your week")).toBeInTheDocument();
     expect(screen.getByText("24h this week")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-date-dot-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
@@ -656,7 +682,7 @@ describe("ScheduleScreen", () => {
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
     expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
   });
 
@@ -684,7 +710,7 @@ describe("ScheduleScreen", () => {
     render(<HomeScheduleScreen />);
 
     expect(screen.getByTestId("me-empty-schedule-state")).toBeInTheDocument();
-    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
     expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Previous shift:/)).toBeNull();
   });
@@ -2371,27 +2397,26 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Job Lead")).toBeInTheDocument();
   });
 
-  it("keeps the open shifts section with an empty state when there are no open items", () => {
+  // Home is not the dashboard: a section with nothing to act on is left out
+  // rather than shown as an empty state.
+  it("leaves the open shifts section off Home when there are no open items", () => {
     shiftRequests = shiftRequests.filter((request) => request.type !== "pickup");
     openShifts = [];
 
     render(<HomeScheduleScreen />);
 
-    const section = screen.getByTestId("me-open-shifts-empty");
-    expect(within(section).getByText("Open shifts")).toBeInTheDocument();
-    expect(within(section).getByText("No open shifts")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Open shifts carousel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
+    expect(screen.queryByText("No open shifts")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
   });
 
-  it("keeps the cover requests section with an empty state when nothing needs a response", () => {
+  it("leaves the cover requests section off Home when nothing needs a response", () => {
     shiftRequests = [];
 
     render(<HomeScheduleScreen />);
 
-    const section = screen.getByTestId("me-cover-requests-empty");
-    expect(within(section).getByText("Needs your response")).toBeInTheDocument();
-    expect(within(section).getByText("All caught up")).toBeInTheDocument();
+    expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
+    expect(screen.queryByText("All caught up")).not.toBeInTheDocument();
   });
 
   it("accepts and declines shift cover requests from Home", async () => {
@@ -2432,6 +2457,31 @@ describe("ScheduleScreen", () => {
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
+  });
+
+  it("lists the absence for the rest of the day after the shift in Your Week and the hero", () => {
+    meScheduleEntries = [withRestOfDaySick(createScheduleEntry())];
+
+    render(<HomeScheduleScreen />);
+
+    const row = screen.getByTestId("upcoming-rest-of-day-row-2026-04-16");
+    expect(row).toHaveTextContent("Sick");
+    expect(row).toHaveTextContent("Rest of the day");
+    const hero = screen.getByTestId("me-hero-card");
+    expect(within(hero).getByText("Sick")).toBeInTheDocument();
+    expect(hero.textContent!.indexOf("Sick")).toBeGreaterThan(hero.textContent!.indexOf("Mentor"));
+  });
+
+  it("puts the absence for the rest of the day after the shift on a team row", () => {
+    teamScheduleEntries = teamScheduleEntries.map((entry, index) =>
+      index === 0 ? withRestOfDaySick(entry) : entry,
+    );
+
+    render(<TeamScheduleScreen />);
+
+    const sickPill = screen.getByLabelText("Absence Sick");
+    const row = sickPill.closest("[data-testid], div")!.parentElement!;
+    expect(row.textContent!.indexOf("Sick")).toBeGreaterThan(row.textContent!.indexOf("Mentor"));
   });
 
   it("shows job-focused team rows and opens shift detail from the Schedule tab", () => {

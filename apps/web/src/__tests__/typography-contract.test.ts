@@ -169,6 +169,7 @@ const documentedMicroTextCounts = {
   "app/globals.css": 1,
   "components/dashboard/DonutChart.tsx": 1,
   "components/schedule-grid/badges.tsx": 1,
+  "components/schedule-grid/noteDots.tsx": 1,
 };
 
 const documentedHeavyWeightCounts = {
@@ -203,7 +204,7 @@ const documentedUppercaseStyleCounts = {
 const documentedOpacityTextCounts = {
   "components/PublishHistoryPanel.tsx": 1,
   "components/RepeatForm.tsx": 1,
-  "components/ScheduleGrid.tsx": 7,
+  "components/ScheduleGrid.tsx": 8,
   "components/ShiftEditPanel.tsx": 4,
   "components/ShiftPicker.tsx": 1,
   "components/dashboard/MyScheduleRow.tsx": 1,

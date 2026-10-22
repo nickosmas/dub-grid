@@ -1,6 +1,7 @@
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
+  hiddenPublishDiffDescriptors,
   type ShiftDiffBadgeDescriptor,
   type ShiftDiffDescriptorResult,
 } from "@/lib/shift-diff-badges";
@@ -8,6 +9,7 @@ import type { DraftKind, PublishChange, ScheduleCellStateEntry, ShiftJobSegment 
 import { getGridDiffBadgeLabel, type GridDiffBadgeConfig } from "./badges";
 import {
   absenceTypeIdFromPublishState,
+  restOfDayAbsenceTypeIdFromPublishState,
   assignmentIdsFromPublishState,
   cellLevelDiffBadge,
   cellShowsDraftDiffBadge,
@@ -94,6 +96,7 @@ function buildDraftDiff(
     before: {
       assignmentIds: publishedIds,
       absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+      restOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
       isMentoredFlags: sortedSegments(entry.publishedSegments).map(
         (segment) => segment.isMentored ?? false,
       ),
@@ -106,6 +109,7 @@ function buildDraftDiff(
     after: {
       assignmentIds: currentIds,
       absenceTypeId: entry.absenceTypeId ?? null,
+      restOfDayAbsenceTypeId: entry.restOfDayAbsenceTypeId ?? null,
       isMentoredFlags: sortedSegments(entry.segments).map((segment) => segment.isMentored ?? false),
       timeRanges: expandDelimitedTimeRanges(
         entry.customStartTime,
@@ -124,6 +128,9 @@ function buildPublishDiff(
   change: PublishChange,
   input: ResolveCellChangeBadgesInput,
 ): ShiftDiffDescriptorResult {
+  if (change.detailsHidden && change.kind !== "deleted") {
+    return hiddenPublishDiffDescriptors(change.kind, input.pillCount);
+  }
   const from =
     change.from ??
     assignmentIdsFromPublishState(change.fromState, input.publishedAssignmentIdByPair);
@@ -133,6 +140,9 @@ function buildPublishDiff(
     before: {
       assignmentIds: from,
       absenceTypeId: change.fromAbsenceTypeId ?? absenceTypeIdFromPublishState(change.fromState),
+      restOfDayAbsenceTypeId:
+        change.fromRestOfDayAbsenceTypeId ??
+        restOfDayAbsenceTypeIdFromPublishState(change.fromState),
       timeRanges: timeRangesFromPublishState(
         change.fromState,
         change.fromCustomStart,
@@ -144,6 +154,8 @@ function buildPublishDiff(
     after: {
       assignmentIds: to,
       absenceTypeId: change.toAbsenceTypeId ?? absenceTypeIdFromPublishState(change.toState),
+      restOfDayAbsenceTypeId:
+        change.toRestOfDayAbsenceTypeId ?? restOfDayAbsenceTypeIdFromPublishState(change.toState),
       timeRanges: timeRangesFromPublishState(
         change.toState,
         change.toCustomStart,
@@ -209,16 +221,22 @@ export function resolveCellChangeBadges(input: ResolveCellChangeBadgesInput): Ce
   const draftCellBadge = draftCellDescriptor ? toBadge("draft", draftCellDescriptor) : null;
   const publishCellBadge = publishCellDescriptor ? toBadge("publish", publishCellDescriptor) : null;
 
+  // A worked cell's absence for the rest of the day is its last pill, and its
+  // change comes from the diff's own slot rather than a worked pill's.
+  const restOfDayIndex = entry?.restOfDayAbsenceTypeId != null ? input.pillCount - 1 : null;
+  const pillDiffAt = (diff: ShiftDiffDescriptorResult | null, index: number) =>
+    index === restOfDayIndex ? (diff?.restOfDayDiff ?? undefined) : diff?.pillDiffs[index];
+
   // A cell-level chip silences its own source's pill chips unless it is the
   // "Changed" summary, which still lets each pill say what happened to it.
   const pillBadges = perPill((index) => {
     const draftPill =
       showsDraftBadge && (draftCellBadge == null || draftCellBadge.text === "Changed")
-        ? pillBadgeFor("draft", draftDiff?.pillDiffs[index]?.badge)
+        ? pillBadgeFor("draft", pillDiffAt(draftDiff, index)?.badge)
         : null;
     const publishPill =
       publishCellBadge == null || publishCellBadge.text === "Changed"
-        ? pillBadgeFor("publish", publishDiff?.pillDiffs[index]?.badge)
+        ? pillBadgeFor("publish", pillDiffAt(publishDiff, index)?.badge)
         : null;
     // The draft is the newer state, so it outranks a published chip on the
     // same pill, cell-level or not.
@@ -232,7 +250,7 @@ export function resolveCellChangeBadges(input: ResolveCellChangeBadgesInput): Ce
   const fallbackBorder: DraftKind =
     draftKind === "new" || draftKind === "modified" ? draftKind : null;
   const pillBorderKinds = perPill((index): DraftKind => {
-    const pillDiff = draftDiff?.pillDiffs[index];
+    const pillDiff = pillDiffAt(draftDiff, index);
     if (!pillDiff) return fallbackBorder;
     return input.pillCount === 1 ? (pillDiff.borderKind ?? fallbackBorder) : pillDiff.borderKind;
   });

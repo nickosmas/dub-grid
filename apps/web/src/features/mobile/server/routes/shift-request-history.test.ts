@@ -6,9 +6,11 @@ const requireMobileAuth = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileShiftRequestHistory = vi.fn();
 
+const fetchMobileHiddenPeople = vi.fn(async (..._args: unknown[]) => [] as string[]);
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
+  fetchMobileHiddenPeople: (...args: unknown[]) => fetchMobileHiddenPeople(...args),
   fetchMobileShiftRequestHistory,
 }));
 
@@ -88,6 +90,7 @@ describe("mobile shift-request history route", () => {
           createdAt: "2026-04-01T10:00:00.000Z",
           id: "00000000-0000-4000-8000-000000000001",
         },
+        hiddenUserIds: [],
       },
     );
   });
@@ -107,6 +110,7 @@ describe("mobile shift-request history route", () => {
       {
         orgId: "org-1",
         limit: 25,
+        hiddenUserIds: [],
       },
     );
   });

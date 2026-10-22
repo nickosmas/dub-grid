@@ -381,6 +381,20 @@ describe("loadGridmasterOrgBilling", () => {
     expect(client.filters).toContainEqual(["organizations", "workspace_kind", "real"]);
   });
 
+  it("counts no seat for an internal account", async () => {
+    const client = singleOrgClient({
+      organizations: { data: organizationRow(), error: null },
+      subscriptions: { data: null, error: null },
+      employees: { data: [{ status: "active", archived_at: null, user_id: "u1" }], error: null },
+      organization_memberships: { data: [{ user_id: "u1" }, { user_id: "qa-1" }], error: null },
+      profiles: { data: [{ id: "qa-1" }], error: null },
+    });
+
+    const summary = await loadGridmasterOrgBilling(client, orgId);
+
+    expect(summary?.appUsers).toBe(1);
+  });
+
   it("returns nothing for an unknown or sandbox organization", async () => {
     const client = singleOrgClient({});
 

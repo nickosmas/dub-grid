@@ -13,7 +13,7 @@ import { fetchPublishHistory } from "@/features/schedule/client";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { formatRelativeTime } from "@/lib/utils";
+import { fmt12h, formatRelativeTime } from "@/lib/utils";
 import type {
   NotePublishChange,
   PublishHistoryEntryWithName,
@@ -28,6 +28,13 @@ import type {
 } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ChevronLeft, History, User } from "lucide-react";
+import type { ShiftChangeResolvers } from "@dubgrid/schedule-core";
+import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
+import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import {
@@ -47,6 +54,8 @@ interface PublishHistoryPanelProps {
   focusAreas: FocusArea[];
   employees: Employee[];
   absenceTypes: AbsenceType[];
+  /** Every definition, archived ones included, so old changes keep their names. */
+  allAssignmentDefinitions?: AssignmentDefinition[];
 }
 
 function formatDateRange(start: string, end: string): string {
@@ -160,7 +169,13 @@ function resolveLabel(
         assignmentIdByPair,
       );
       if (derivedIds.length > 0) {
-        return derivedIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/");
+        const shifts = derivedIds.map((id) => assignmentLabelMap.get(id) ?? "?");
+        // A worked cell's absence for the rest of the day reads last: D/E/Sick.
+        const restOfDay =
+          state.absenceTypeId != null
+            ? [absenceTypeMap.get(state.absenceTypeId) ?? `Absence #${state.absenceTypeId}`]
+            : [];
+        return [...shifts, ...restOfDay].join("/");
       }
     }
   }
@@ -173,15 +188,18 @@ function resolveLabel(
   return "";
 }
 
-/** Strip seconds from "HH:MM:SS" → "HH:MM" */
+/** "07:00" → "7:00 AM"; a multi-shift "07:00|15:00" reads each part. */
 function fmtTime(t: string): string {
-  const parts = t.split(":");
-  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : t;
+  return t
+    .split("|")
+    .filter(Boolean)
+    .map((part) => fmt12h(part))
+    .join(" / ");
 }
 
 /** Format a time range concisely */
 function fmtTimeRange(start?: string | null, end?: string | null): string {
-  if (start && end) return `${fmtTime(start)}–${fmtTime(end)}`;
+  if (start && end) return `${fmtTime(start)} - ${fmtTime(end)}`;
   if (start) return fmtTime(start);
   if (end) return fmtTime(end);
   return "";
@@ -233,11 +251,13 @@ function ChangeRow({
   assignmentIdByPair,
   assignmentLabelMap,
   absenceTypeMap,
+  shiftChangeResolvers,
 }: {
   change: PublishChange;
   assignmentIdByPair: Map<string, number>;
   assignmentLabelMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
+  shiftChangeResolvers?: ShiftChangeResolvers;
 }) {
   const dateObj = new Date(change.date + "T00:00:00");
   const dateStr = dateObj.toLocaleDateString("en-US", {
@@ -246,6 +266,20 @@ function ChangeRow({
     day: "numeric",
     year: "numeric",
   });
+  const shiftChange =
+    shiftChangeResolvers && publishChangeHasStates(change)
+      ? describeCellStateChange(change.fromState, change.toState, change.date, shiftChangeResolvers)
+      : null;
+  if (shiftChange && shiftChange.kind !== "none") {
+    return (
+      <div className="flex flex-col gap-1.5 py-1">
+        <span className="text-[12px] font-semibold text-text-secondary dg-tabular-nums">
+          {dateStr}
+        </span>
+        <ShiftChangeCard change={shiftChange} layout="stacked" />
+      </div>
+    );
+  }
   const fromLabel = resolveLabel(
     change.from,
     change.fromState,
@@ -418,6 +452,7 @@ export function ExpandedChangesGrouped({
   assignmentLabelMap,
   empNameMap,
   absenceTypeMap,
+  shiftChangeResolvers,
 }: {
   changes: PublishChange[];
   noteChanges?: NotePublishChange[];
@@ -425,6 +460,7 @@ export function ExpandedChangesGrouped({
   assignmentLabelMap: Map<number, string>;
   empNameMap: Map<string, string>;
   absenceTypeMap: Map<number, string>;
+  shiftChangeResolvers?: ShiftChangeResolvers;
 }) {
   if (changes.length === 0 && noteChanges.length === 0) return null;
 
@@ -490,6 +526,7 @@ export function ExpandedChangesGrouped({
                     assignmentIdByPair={assignmentIdByPair}
                     assignmentLabelMap={assignmentLabelMap}
                     absenceTypeMap={absenceTypeMap}
+                    shiftChangeResolvers={shiftChangeResolvers}
                   />
                 ),
               )}
@@ -512,6 +549,7 @@ export default function PublishHistoryPanel({
   focusAreas,
   employees,
   absenceTypes,
+  allAssignmentDefinitions,
 }: PublishHistoryPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const queryClient = useQueryClient();
@@ -545,6 +583,17 @@ export default function PublishHistoryPanel({
         shiftDisplayMode: "name",
       }),
     [assignments, focusAreas, jobs, shiftCategories],
+  );
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: allAssignmentDefinitions ?? assignments,
+        shiftCategories,
+        jobs,
+        absenceTypes,
+        focusAreas,
+      }),
+    [allAssignmentDefinitions, assignments, shiftCategories, jobs, absenceTypes, focusAreas],
   );
   const absenceTypeMap = useMemo(
     () =>
@@ -810,6 +859,7 @@ export default function PublishHistoryPanel({
                     assignmentLabelMap={assignmentLabelMap}
                     empNameMap={empNameMap}
                     absenceTypeMap={absenceTypeMap}
+                    shiftChangeResolvers={shiftChangeResolvers}
                   />
                 )}
               </div>

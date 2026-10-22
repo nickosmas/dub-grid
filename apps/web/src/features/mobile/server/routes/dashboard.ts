@@ -1,3 +1,4 @@
+import { scheduleViewerVisibility } from "@dubgrid/authz";
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileDashboardResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
@@ -11,9 +12,11 @@ import {
   fetchMobilePublishHistoryRows,
   fetchProfileNameRowsByIds,
   fetchMobileScheduleComparisonRows,
+  fetchHiddenEmployeeIds,
 } from "@dubgrid/data-access";
 import {
   fetchMobileCoverageSummary,
+  fetchMobileHiddenPeople,
   fetchMobileOpenShiftContext,
   fetchMobileShiftRequests,
   requireMobileAuth,
@@ -73,20 +76,59 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Looked up once, and only when a loader the viewer may run needs it.
+    let hiddenLookup: Promise<string[]> | undefined;
+    const hiddenUserIds = () => (hiddenLookup ??= fetchMobileHiddenPeople(auth));
     const payload = await loadMobileDashboardPayload(
       {
         currentOrg: { id: auth.currentOrg.id, timezone: auth.currentOrg.timezone },
         effectiveRole: getEffectiveMobileRole(auth.permissions.role),
         canEditSchedule: auth.permissions.canEditShifts,
+        canSeePublisher: scheduleViewerVisibility(
+          {
+            canEditShifts: auth.permissions.canEditShifts,
+            canPublishSchedule: auth.permissions.canPublishSchedule,
+            isSuperAdmin: auth.permissions.level >= 3,
+            isGridmaster: false,
+          },
+          auth.currentOrg,
+        ).showPublisher,
         serviceClient: auth.serviceClient,
       },
       range,
       {
-        fetchMobileCoverageSummary,
-        fetchMobileShiftRequests,
-        fetchMobileDashboardDraftComparisons: fetchMobileScheduleComparisonRows,
-        fetchMobileOpenShiftContext,
-        fetchMobilePublishHistoryRows,
+        fetchMobileCoverageSummary: async (serviceClient, input) =>
+          fetchMobileCoverageSummary(serviceClient, {
+            ...input,
+            hiddenUserIds: await hiddenUserIds(),
+          }),
+        fetchMobileShiftRequests: async (serviceClient, input) =>
+          fetchMobileShiftRequests(serviceClient, {
+            ...input,
+            hiddenUserIds: await hiddenUserIds(),
+          }),
+        fetchMobileDashboardDraftComparisons: async (serviceClient, input) =>
+          fetchMobileScheduleComparisonRows(serviceClient, {
+            ...input,
+            hiddenUserIds: await hiddenUserIds(),
+          }),
+        fetchMobileOpenShiftContext: async (serviceClient, orgId) =>
+          fetchMobileOpenShiftContext(serviceClient, orgId, await hiddenUserIds()),
+        fetchMobilePublishHistoryRows: async (serviceClient, orgId, input) => {
+          const [rows, hiddenStaffIds] = await Promise.all([
+            fetchMobilePublishHistoryRows(serviceClient, orgId, input),
+            hiddenUserIds().then(
+              async (ids) => new Set(await fetchHiddenEmployeeIds(serviceClient, orgId, ids)),
+            ),
+          ]);
+          return rows.map((row) => {
+            const changes = row.changes.filter((change) => !hiddenStaffIds.has(change.empId));
+            const removed = row.changes.length - changes.length;
+            return removed === 0
+              ? row
+              : { ...row, changes, change_count: row.change_count - removed };
+          });
+        },
         fetchMobileAcceptedInvitationRows,
         fetchProfileNameRowsByIds,
       },

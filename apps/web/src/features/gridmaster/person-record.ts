@@ -1,3 +1,4 @@
+import type { ShiftChange } from "@dubgrid/schedule-core";
 import type { AdminPermissions } from "@dubgrid/domain";
 import type { OrganizationTerminology } from "@/lib/db/mappers";
 import type { Employee, Invitation, OrganizationRole } from "@/types";
@@ -14,6 +15,8 @@ export interface GridmasterPersonProfile {
   firstName: string | null;
   lastName: string | null;
   platformRole: string;
+  /** Internal (QA) account, hidden from organization members who are not internal. */
+  isInternal: boolean;
   mfaEnabled: boolean;
   termsVersion: string | null;
   termsAcceptedAt: string | null;
@@ -226,6 +229,8 @@ export interface GridmasterPublishChange {
   kind: string;
   from: string | null;
   to: string | null;
+  /** The change as Before and After; null for a schedule note or an unreadable row. */
+  change: ShiftChange | null;
   publishedBy: string | null;
 }
 

@@ -258,6 +258,9 @@ function renderPanel(
     currentAssignmentIds?: number[];
     currentSegments?: ShiftJobSegment[];
     currentAbsenceTypeId?: number | null;
+    currentRestOfDayAbsenceTypeId?: number | null;
+    publishedRestOfDayAbsenceTypeId?: number | null;
+    onRepeatConfirm?: ReturnType<typeof vi.fn>;
     customStartTime?: string | null;
     customEndTime?: string | null;
     draftKind?: DraftKind;
@@ -309,6 +312,9 @@ function panelElement(
       currentAssignmentIds={overrides.currentAssignmentIds ?? []}
       currentSegments={overrides.currentSegments ?? []}
       currentAbsenceTypeId={overrides.currentAbsenceTypeId ?? null}
+      currentRestOfDayAbsenceTypeId={overrides.currentRestOfDayAbsenceTypeId ?? null}
+      publishedRestOfDayAbsenceTypeId={overrides.publishedRestOfDayAbsenceTypeId ?? null}
+      onRepeatConfirm={overrides.onRepeatConfirm}
       assignments={overrides.assignmentsOverride ?? assignments}
       shiftCategories={shiftCategories}
       jobs={overrides.jobsOverride ?? jobs}
@@ -1593,15 +1599,15 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText("Select an end date.")).toBeInTheDocument();
     });
 
-    it("shows the absence repeat flow for off days", async () => {
+    it("shows the repeat flow for absences", async () => {
       const user = userEvent.setup();
 
       render(<RepeatAbsenceFlowPanel />);
 
       await user.click(screen.getByRole("button", { name: "Make this repeating" }));
 
-      expect(screen.getByText("Repeating Off Day")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Create Repeating Off Day" })).toBeInTheDocument();
+      expect(screen.getByText("Repeating Absence")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create Repeating Absence" })).toBeInTheDocument();
     });
 
     it("renders the repeat preview badge with split grid labels in name mode", async () => {
@@ -1647,7 +1653,7 @@ describe("ShiftEditPanel", () => {
       const user = await submitRepeat(onRepeatConfirm);
 
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
-      expect(dialog).toHaveTextContent("2 of these days already have a shift or off day.");
+      expect(dialog).toHaveTextContent("2 of these days already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
 
       await user.click(within(dialog).getByRole("button", { name: choice }));
@@ -1662,7 +1668,7 @@ describe("ShiftEditPanel", () => {
       await submitRepeat(onRepeatConfirm);
 
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
-      expect(dialog).toHaveTextContent("Some of these days may already have a shift or off day.");
+      expect(dialog).toHaveTextContent("Some of these days may already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
     });
   });
@@ -1714,6 +1720,305 @@ describe("ShiftEditPanel", () => {
       );
 
       expect(onSelect).toHaveBeenLastCalledWith(null, "previous");
+    });
+  });
+
+  describe("Absence for the rest of the day", () => {
+    const sick: AbsenceType = {
+      id: 8,
+      orgId: "org-1",
+      label: "S",
+      name: "Sick",
+      color: "#FEE2E2",
+      border: "#FCA5A5",
+      text: "#991B1B",
+      sortOrder: 2,
+    };
+    const timedDay = { ...northShift, defaultStartTime: "07:00", defaultEndTime: "15:00" };
+    const timedEvening = { ...southShift, defaultStartTime: "15:00", defaultEndTime: "23:00" };
+    const daySegment: ShiftJobSegment = {
+      shiftId: 11,
+      jobId: 102,
+      position: 0,
+      label: "D",
+      isMentored: false,
+    };
+    const eveningSegment: ShiftJobSegment = {
+      ...daySegment,
+      shiftId: 12,
+      position: 1,
+      label: "E",
+    };
+
+    function renderDay(overrides: Parameters<typeof renderPanel>[0] = {}) {
+      return renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        currentSegments: [daySegment],
+        assignmentsOverride: [timedDay, timedEvening, generalShift],
+        absenceTypesOverride: [...absenceTypes, sick],
+        allowShiftEdits: true,
+        ...overrides,
+      });
+    }
+
+    it("adds an absence beside the shift and keeps the shift", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderDay();
+
+      await user.click(screen.getByRole("button", { name: "Add an absence" }));
+      expect(screen.queryByRole("button", { name: "Evening Shift - Supervisor" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "S - Sick" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [{ shiftId: 11, jobId: 102, position: 0, isMentored: false }],
+          absenceTypeId: 8,
+        }),
+        undefined,
+      );
+    });
+
+    it("draws the absence last, from where the shift ends, and offers no second absence", () => {
+      renderDay({ currentRestOfDayAbsenceTypeId: 8 });
+
+      const card = document.querySelector("[data-rest-of-day-absence-card]");
+      expect(card).toHaveTextContent("Sick");
+      expect(card).toHaveTextContent("Rest of the day, from 3:00 PM");
+      expect(card).not.toHaveTextContent("Mentored");
+      expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Add another shift" })).toBeInTheDocument();
+    });
+
+    it("hides Add another shift at two shifts but still offers an absence", () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+      });
+
+      expect(screen.queryByRole("button", { name: "Add another shift" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Add an absence" })).toBeInTheDocument();
+    });
+
+    it("adds a second shift beside the absence and keeps the absence", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderDay({ currentRestOfDayAbsenceTypeId: 8 });
+
+      await user.click(screen.getByRole("button", { name: "Add another shift" }));
+      expect(screen.queryByRole("button", { name: "S - Sick" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Evening Shift - Supervisor" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [
+            { shiftId: 11, jobId: 102, position: 0, isMentored: false },
+            { shiftId: 12, jobId: 102, position: 1, isMentored: false },
+          ],
+          absenceTypeId: 8,
+        }),
+        undefined,
+      );
+    });
+
+    it("removes only the absence and keeps the shifts", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remove Sick for the rest of the day" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent("The shifts stay.");
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [
+            { shiftId: 11, jobId: 102, position: 0, isMentored: false },
+            { shiftId: 12, jobId: 102, position: 1, isMentored: false },
+          ],
+          absenceTypeId: null,
+        }),
+        undefined,
+      );
+    });
+
+    it("keeps the absence when one of two shifts is removed", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      await user.click(screen.getByRole("button", { name: /^Remove Day Shift/ }));
+      await user.click(
+        within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }),
+      );
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          segments: [expect.objectContaining({ shiftId: 12, jobId: 102 })],
+          absenceTypeId: 8,
+        }),
+        undefined,
+      );
+    });
+
+    it("removes the shift and the absence together, naming both", async () => {
+      const user = userEvent.setup();
+      const { onSelect } = renderDay({ currentRestOfDayAbsenceTypeId: 8 });
+
+      await user.click(screen.getByRole("button", { name: "Remove shift and absence" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent("Remove Shift and Absence?");
+      expect(dialog).toHaveTextContent('the absence "Sick"');
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(null, undefined);
+    });
+
+    it("names two shifts and an absence on the whole-cell remove", async () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      expect(screen.getByRole("button", { name: "Remove shifts and absence" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove all shifts" })).toBeNull();
+    });
+
+    it("calls two shifts without an absence both shifts", async () => {
+      const user = userEvent.setup();
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Remove both shifts" }));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("Remove Both Shifts?");
+    });
+
+    it("spells out Remove on each shift and on the absence", () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+      });
+
+      const cards = document.querySelectorAll<HTMLElement>("[data-shift-edit-card]");
+      expect(cards).toHaveLength(2);
+      for (const card of cards) {
+        expect(within(card).getByRole("button", { name: /^Remove / })).toHaveTextContent(
+          /^Remove$/,
+        );
+      }
+      const absenceCard = document.querySelector<HTMLElement>("[data-rest-of-day-absence-card]");
+      expect(
+        within(absenceCard!).getByRole("button", { name: "Remove Sick for the rest of the day" }),
+      ).toHaveTextContent(/^Remove$/);
+    });
+
+    it("names the added absence in the summary and undoes it", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      const onClose = vi.fn();
+      const base = {
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        currentSegments: [daySegment],
+        assignmentsOverride: [timedDay, timedEvening, generalShift],
+        absenceTypesOverride: [...absenceTypes, sick],
+        allowShiftEdits: true,
+      };
+      const { rerender } = render(panelElement(base, onSelect, onClose));
+      rerender(panelElement({ ...base, currentRestOfDayAbsenceTypeId: 8 }, onSelect, onClose));
+
+      expect(screen.getByText("Before")).toBeInTheDocument();
+      expect(screen.getByText("After")).toBeInTheDocument();
+      expect(screen.getByText("Sick (rest of day)")).toBeInTheDocument();
+      expect(screen.getByText("Added")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Undo" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [{ shiftId: 11, jobId: 102, position: 0, isMentored: false }],
+          absenceTypeId: null,
+        }),
+      );
+    });
+
+    it("sets only the last shift's end with Worked until, for one shift", async () => {
+      const user = userEvent.setup();
+      const onCustomTimeChange = vi.fn();
+      renderDay({ currentRestOfDayAbsenceTypeId: 8, onCustomTimeChange });
+
+      expect(
+        screen.getByText("Hours count to 3:00 PM. The absence covers the rest."),
+      ).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Worked until hour" }));
+      await user.click(screen.getByRole("option", { name: "1" }));
+
+      expect(onCustomTimeChange).toHaveBeenLastCalledWith("07:00", "13:00");
+    });
+
+    it("sets only the last shift's end with Worked until, for two shifts", async () => {
+      const user = userEvent.setup();
+      const onCustomTimeChange = vi.fn();
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        currentRestOfDayAbsenceTypeId: 8,
+        customStartTime: "06:30|",
+        customEndTime: "14:30|",
+        onCustomTimeChange,
+      });
+
+      expect(screen.getAllByRole("group", { name: "Worked until" })).toHaveLength(1);
+      expect(
+        document.querySelector('[data-shift-edit-card="1"] [data-worked-until]'),
+      ).not.toBeNull();
+      await user.click(screen.getByRole("button", { name: "Worked until hour" }));
+      await user.click(screen.getByRole("option", { name: "7" }));
+
+      expect(onCustomTimeChange).toHaveBeenLastCalledWith("06:30|15:00", "14:30|19:00");
+    });
+
+    it("shows no Worked until without an absence", () => {
+      renderDay({ onCustomTimeChange: vi.fn() });
+      expect(screen.queryByRole("group", { name: "Worked until" })).toBeNull();
+    });
+
+    it("makes Repeat unavailable on a shift with an absence, and says why", () => {
+      renderDay({ currentRestOfDayAbsenceTypeId: 8, onRepeatConfirm: vi.fn() });
+
+      expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeDisabled();
+      expect(
+        screen.getByText(/A shift with an absence for the rest of the day can.t repeat/),
+      ).toBeInTheDocument();
+    });
+
+    it("offers an absence on a repeating shift only for this date", async () => {
+      const user = userEvent.setup();
+      renderDay({ seriesId: "series-1" });
+
+      expect(screen.getByRole("button", { name: "Add an absence" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "This and later" }));
+      expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
     });
   });
 

@@ -83,11 +83,15 @@ export function toManagementUsers(rows: MobileManagementRosterRows): MobileManag
   );
 }
 
+/** Pass `hiddenUserIds` when listing for a viewer; uniqueness checks need everyone. */
 export async function loadManagementUsers(
   serviceClient: SupabaseClient,
   orgId: string,
+  hiddenUserIds: readonly string[] = [],
 ): Promise<MobileManagementUser[]> {
-  return toManagementUsers(await fetchMobileManagementRosterRows(serviceClient, orgId));
+  const users = toManagementUsers(await fetchMobileManagementRosterRows(serviceClient, orgId));
+  const hidden = new Set(hiddenUserIds);
+  return users.filter((user) => !user.userId || !hidden.has(user.userId));
 }
 
 export async function findManagementUser(

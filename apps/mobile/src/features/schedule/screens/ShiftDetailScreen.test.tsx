@@ -1740,6 +1740,72 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Swap")).toBeInTheDocument();
   });
 
+  it("names the absence for the rest of the day after the shift and keeps its actions", () => {
+    const shift = {
+      employeeId: "emp-1",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      assignmentIds: [1],
+      shiftLabel: "D",
+      assignmentLabel: "D",
+      shiftName: "Day Shift",
+      absenceTypeId: null,
+      focusAreaId: 2,
+      focusAreaName: "ICU",
+      displayFocusAreaName: "ICU",
+      startTime: "07:00:00",
+      endTime: "15:00:00",
+      customStartTime: null,
+      customEndTime: null,
+      publishedAt: null,
+      publishedByName: null,
+    };
+    useQuery.mockImplementation(() => ({
+      data: {
+        entries: [
+          {
+            ...shift,
+            presentation: {
+              label: "D",
+              shiftName: "Day Shift",
+              focusAreaId: 2,
+              focusAreaName: "ICU",
+              displayFocusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              segments: [],
+              restOfDayAbsence: {
+                absenceTypeId: 8,
+                label: "S",
+                name: "Sick",
+                color: "#FEE2E2",
+                borderColor: "#FCA5A5",
+                textColor: "#991B1B",
+              },
+            },
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.getByLabelText("Rest of the day Sick")).toBeInTheDocument();
+    expect(screen.getByLabelText("Absence Sick")).toHaveTextContent("Sick");
+    expect(screen.getByText("Drop shift")).toBeInTheDocument();
+    expect(screen.getByText("Swap")).toBeInTheDocument();
+  });
+
   it("shows deleted history without operational shift actions", () => {
     useQuery.mockImplementation(() => ({
       data: {

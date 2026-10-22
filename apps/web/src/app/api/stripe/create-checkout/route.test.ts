@@ -150,6 +150,10 @@ describe("POST /api/stripe/create-checkout", () => {
           select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: subscriptionMaybeSingle })) })),
         };
       }
+      if (table === "profiles") {
+        // The internal-account lookup behind the seat count.
+        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
     requireOrgPermissions.mockResolvedValue({

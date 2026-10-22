@@ -132,7 +132,7 @@ function buildDaySegmentPills(
   const segments: Array<Partial<ResolvedSchedulePresentationSegment>> =
     entry.presentation.segments.length > 0 ? entry.presentation.segments : [{}];
 
-  return segments.map((segment, index) => {
+  const pills = segments.map((segment, index): DaySegmentPill => {
     const label =
       readOptionalText(segment.shiftName) ??
       readOptionalText(segment.label) ??
@@ -178,6 +178,31 @@ function buildDaySegmentPills(
         .length,
     };
   });
+
+  // A worked cell's absence for the rest of the day (item 45) follows its
+  // shifts, with no time, in the absence's own colours.
+  const restOfDay = entry.state.kind === "worked" ? entry.presentation.restOfDayAbsence : null;
+  if (restOfDay) {
+    const color = readOptionalText(restOfDay.color);
+    pills.push({
+      key: `${entry.date}-rest-of-day`,
+      label: restOfDay.name || restOfDay.label,
+      jobName: null,
+      timeRangeLabel: null,
+      pill: color
+        ? resolveShiftPillColors(
+            {
+              color,
+              text: readOptionalText(restOfDay.textColor) ?? mobileColors.textPrimary,
+              border: readOptionalText(restOfDay.borderColor) ?? color,
+            },
+            isDarkTheme,
+          )
+        : null,
+      noteCount: 0,
+    });
+  }
+  return pills;
 }
 
 // One column per day in the period, matching web's MyScheduleRow.tsx DayBox
@@ -250,16 +275,22 @@ export function MyScheduleCard({
             // as an empty day and opens like one.
             const openableEntry = segmentPills.length > 0 && entry ? entry : null;
             const notes = openableEntry ? scheduleNotesForRow(openableEntry.indicators) : [];
+            const restOfDay =
+              openableEntry?.state.kind === "worked"
+                ? openableEntry.presentation.restOfDayAbsence
+                : null;
+            const spokenParts = [
+              spokenDate,
+              restOfDay ? `${restOfDay.name || restOfDay.label} for the rest of the day` : null,
+              notes.length > 0 ? scheduleNotesSpokenLabel(notes) : null,
+            ].filter(Boolean);
 
             return (
               <Pressable
                 key={dateIso}
-                // The day's label replaces everything inside it, so it carries the notes.
-                accessibilityLabel={
-                  notes.length > 0
-                    ? `${spokenDate}. ${scheduleNotesSpokenLabel(notes)}`
-                    : spokenDate
-                }
+                // The day's label replaces everything inside it, so it carries
+                // the absence and the notes.
+                accessibilityLabel={spokenParts.join(". ")}
                 accessibilityRole="button"
                 disabled={!onOpenDay}
                 onPress={() => onOpenDay?.({ date: dateIso, entry: openableEntry })}

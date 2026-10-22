@@ -7,9 +7,11 @@ import {
   normalizeMobileScheduleRange,
   type MobileScheduleEntry,
 } from "@dubgrid/contracts";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import { timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
 import {
   fetchLinkedEmployeeForUser,
+  fetchMobileHiddenPeople,
   fetchMobileScheduleEntries,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -146,16 +148,21 @@ export function getSwapOptions(input: {
   });
 }
 
-async function fetchActiveEmployeeIds(
+/** The swap-partner pool: active staff, without the people this viewer must not see. */
+export async function fetchActiveEmployeeIds(
   serviceClient: SupabaseClient,
   orgId: string,
+  hiddenUserIds: readonly string[],
 ): Promise<Set<string>> {
-  const { data, error } = await serviceClient
-    .from("employees")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("status", "active")
-    .is("archived_at", null);
+  const { data, error } = await withoutHiddenStaff(
+    serviceClient
+      .from("employees")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .is("archived_at", null),
+    hiddenUserIds,
+  );
   if (error) throw error;
   return new Set((data ?? []).map((row: { id: string }) => row.id));
 }
@@ -201,7 +208,9 @@ export async function GET(req: NextRequest) {
       orgId: auth.currentOrg.id,
       ...range,
     }),
-    fetchActiveEmployeeIds(auth.serviceClient, auth.currentOrg.id),
+    fetchMobileHiddenPeople(auth).then((hiddenUserIds) =>
+      fetchActiveEmployeeIds(auth.serviceClient, auth.currentOrg.id, hiddenUserIds),
+    ),
   ]);
   const requesterEntry =
     entries.find(

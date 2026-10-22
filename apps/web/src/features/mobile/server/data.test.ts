@@ -145,6 +145,8 @@ function createServiceClientForSchedule(
   employeeRelation: unknown,
   options?: {
     absenceTypeId?: number | null;
+    /** A worked cell's absence for the rest of the day (item 45). */
+    restOfDayAbsenceTypeId?: number | null;
     customEndTime?: string | null;
     customStartTime?: string | null;
     jobIds?: number[];
@@ -309,7 +311,7 @@ function createServiceClientForSchedule(
             org_id: "org-1",
             snapshot_kind: "published",
             state_kind: options?.absenceTypeId != null ? "absence" : "worked",
-            absence_type_id: options?.absenceTypeId ?? null,
+            absence_type_id: options?.absenceTypeId ?? options?.restOfDayAbsenceTypeId ?? null,
             custom_start_time: options?.customStartTime ?? null,
             custom_end_time: options?.customEndTime ?? null,
             segments:
@@ -790,6 +792,48 @@ describe("fetchMobilePeople", () => {
 });
 
 describe("fetchMobileScheduleEntries", () => {
+  it("names a worked cell's absence for the rest of the day without making it a segment", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+    };
+    const fetch = (restOfDayAbsenceTypeId: number | null) =>
+      fetchMobileScheduleEntries(
+        createServiceClientForSchedule(employee, {
+          shiftIds: [101],
+          restOfDayAbsenceTypeId,
+        }) as never,
+        {
+          orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+          startDate: "2026-04-18",
+          endDate: "2026-04-24",
+          employeeId: employee.id,
+        },
+      );
+
+    const [mixed] = await fetch(56);
+    const [plain] = await fetch(null);
+
+    expect(mixed.state).toMatchObject({ kind: "worked", absenceTypeId: 56 });
+    expect(mixed.presentation.restOfDayAbsence).toEqual({
+      absenceTypeId: 56,
+      label: "X",
+      name: "Off",
+      color: "#fef3c7",
+      borderColor: "#f59e0b",
+      textColor: "#92400e",
+    });
+    expect(mixed.presentation.segments).toEqual(plain.presentation.segments);
+    expect(mixed.presentation).toMatchObject({
+      label: "D",
+      startTime: plain.presentation.startTime,
+      endTime: plain.presentation.endTime,
+    });
+    expect(plain.presentation.restOfDayAbsence).toBeNull();
+  });
+
   it.each([
     {
       name: "object relations returned by many-to-one embeds",
@@ -1098,6 +1142,15 @@ describe("fetchMobileScheduleEntries", () => {
         previousPresentation: { shiftName: "Day Shift", startTime: "07:00" },
       },
     });
+
+    // 46d: the whole day Before and After, nothing for a first publication.
+    const sideText = (date: string, side: "before" | "after") =>
+      byDate.get(date)?.change?.shiftChange?.[side].items.map((item) => item.plain);
+    expect(byDate.get("2026-04-19")?.change?.shiftChange).toBeNull();
+    expect(byDate.get("2026-04-20")?.change?.shiftChange?.kind).toBe("single");
+    expect(sideText("2026-04-20", "before")).toEqual([expect.stringMatching(/^Day Shift/)]);
+    expect(sideText("2026-04-20", "after")).toEqual([expect.stringMatching(/^Evening Shift/)]);
+    expect(sideText("2026-04-21", "after")).toEqual([]);
   });
 
   it("returns deleted regular and absence entries when their schedule cells no longer exist", async () => {
@@ -1190,6 +1243,56 @@ describe("fetchMobileScheduleEntries", () => {
       },
     ]);
     expect(serviceClient.from).toHaveBeenCalledWith("employees");
+  });
+
+  it("does not rebuild a deleted shift for a person the viewer must not see", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "QA",
+      last_name: "Admin",
+      org_id: "org-1",
+      user_id: "qa-person",
+    };
+    const serviceClient = createServiceClientForSchedule(employee, {
+      assignmentFocusAreaId: 12,
+      scheduleCells: [],
+      shiftIds: [101],
+      publishHistory: [
+        {
+          published_by: "user-1",
+          start_date: "2026-04-22",
+          end_date: "2026-04-22",
+          published_at: "2026-04-21T18:30:00.000Z",
+          change_count: 1,
+          schedule_publish_changes: [
+            {
+              emp_id: employee.id,
+              date: "2026-04-22",
+              kind: "deleted",
+              from_state: {
+                kind: "worked",
+                segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+                absenceTypeId: null,
+                customStartTime: null,
+                customEndTime: null,
+                seriesId: null,
+                fromRecurring: false,
+              },
+              to_state: null,
+            },
+          ],
+        },
+      ],
+    });
+    const range = { orgId: "org-1", startDate: "2026-04-22", endDate: "2026-04-22" };
+
+    expect(await fetchMobileScheduleEntries(serviceClient as never, range)).toHaveLength(1);
+    expect(
+      await fetchMobileScheduleEntries(serviceClient as never, {
+        ...range,
+        hiddenUserIds: ["qa-person"],
+      }),
+    ).toEqual([]);
   });
 
   it("keeps focus areas off absences and general segments while retaining them on regular segments", async () => {
@@ -1702,6 +1805,28 @@ describe("fetchMobileScheduleEntries", () => {
 });
 
 describe("fetchMobileShiftRequests", () => {
+  it("leaves out a request whose target the viewer must not see", async () => {
+    const base = createServiceClientForShiftRequests();
+    // The hidden person's staff record is the request's target.
+    const staffLookup = createThenableQuery({
+      data: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => (table === "employees" ? staffLookup : base.from(table))),
+    };
+    const input = { orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90" };
+
+    expect(await fetchMobileShiftRequests(serviceClient as never, input)).toHaveLength(1);
+    expect(
+      await fetchMobileShiftRequests(serviceClient as never, {
+        ...input,
+        hiddenUserIds: ["qa-person"],
+      }),
+    ).toEqual([]);
+    expect(staffLookup.in).toHaveBeenCalledWith("user_id", ["qa-person"]);
+  });
+
   it("returns mobile request segments with job names and focus area labels", async () => {
     const serviceClient = createServiceClientForShiftRequests();
 
@@ -1842,6 +1967,80 @@ describe("fetchMobileOpenShifts", () => {
       expect(openShifts[0]).toMatchObject({
         id: expect.stringMatching(/^coverage_gap_12_.+_2026-04-16$/),
         needed: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("marks an open shift unavailable to someone absent for the rest of that day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const employeeId = "196d610f-2283-486c-a9e0-197852969a31";
+      const serviceClient = createServiceClientForOpenShifts({
+        minStaff: 2,
+        scheduleCells: [
+          {
+            id: "cell-1",
+            emp_id: employeeId,
+            date: "2026-04-16",
+            org_id: "org-1",
+            focus_area_id: 12,
+            version: 1,
+            series_id: null,
+            from_recurring: false,
+            created_by: null,
+            updated_by: null,
+            created_at: null,
+            updated_at: null,
+            snapshots: [
+              {
+                id: "published-snapshot",
+                cell_id: "cell-1",
+                org_id: "org-1",
+                snapshot_kind: "published",
+                state_kind: "worked",
+                absence_type_id: 5,
+                custom_start_time: null,
+                custom_end_time: null,
+                segments: [
+                  {
+                    id: "segment-0",
+                    snapshot_id: "published-snapshot",
+                    org_id: "org-1",
+                    position: 0,
+                    shift_id: 101,
+                    job_id: 91,
+                    is_mentored: false,
+                  },
+                ],
+              },
+            ],
+            employees: { id: employeeId, first_name: "Nic", last_name: "Kosmas", org_id: "org-1" },
+          },
+        ],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: employeeId,
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toHaveLength(1);
+      expect(openShifts[0]).toMatchObject({
+        canVolunteer: false,
+        volunteerBlockReason: "You are absent for the rest of this day.",
       });
     } finally {
       vi.useRealTimers();

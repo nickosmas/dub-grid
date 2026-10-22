@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useTheme } from "next-themes";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
 import {
@@ -73,12 +75,12 @@ interface RepeatFormProps {
     previewTotal: number,
     keepExisting: boolean,
   ) => void;
-  /** When set, the form is creating a repeating off day instead of a shift. */
+  /** When set, the form is creating a repeating absence instead of a shift. */
   absenceType?: AbsenceType;
 }
 
 export interface RepeatFormHandle {
-  submit: () => void;
+  submit: () => Promise<void>;
 }
 
 type EndType = "never" | "on_date" | "after_n";
@@ -327,6 +329,10 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   ref,
 ) {
   const isAbsence = absenceType != null || selectionInput?.kind === "absence";
+  const { resolvedTheme } = useTheme();
+  const absenceFill = absenceType
+    ? absenceStripeFill(absenceType.color, resolvedTheme === "dark")
+    : null;
   const [frequency, setFrequency] = useState<SeriesFrequency>("weekly");
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
   const todayStr = formatLocalDate(new Date());
@@ -377,9 +383,9 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     };
   }, [absenceType, shiftCategory, assignment, shiftJob, shiftLabel]);
   const previewBackground =
-    absenceType?.color ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
-  const previewText = absenceType?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
-  const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--dg-color-border)";
+    absenceFill?.background ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
+  const previewText = absenceFill?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
+  const previewBorder = absenceFill?.border ?? assignment?.border ?? "var(--dg-color-border)";
 
   function toggleDay(day: number) {
     setDaysOfWeek((prev) =>
@@ -475,7 +481,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   useImperativeHandle(
     ref,
     () => ({
-      submit: () => void handleConfirm(),
+      submit: () => handleConfirm(),
     }),
     [handleConfirm],
   );
@@ -486,7 +492,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     <div style={formLayoutStyle}>
       {/* Badge */}
       <div style={badgeRowStyle}>
-        <span style={badgeLabelStyle}>{isAbsence ? "Repeating Off Day" : "Repeating Shift"}</span>
+        <span style={badgeLabelStyle}>{isAbsence ? "Repeating Absence" : "Repeating Shift"}</span>
         {(isAbsence ? absenceType : assignment || shiftLabel) && (
           <span
             data-repeat-shift-preview="true"
@@ -737,7 +743,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           }}
         >
           <div style={{ fontWeight: 600 }}>
-            {preview.total} {isAbsence ? "off day" : "shift"}
+            {preview.total} {isAbsence ? "absence" : "shift"}
             {preview.total === 1 ? "" : "s"} will be created
             {endType === "never" && (
               <span style={{ fontWeight: 400, color: "var(--dg-color-text-subtle)" }}>
@@ -779,17 +785,17 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
 
 function overwriteCountText(count: number): string {
   return count === 1
-    ? "1 of these days already has a shift or off day."
-    : `${count} of these days already have a shift or off day.`;
+    ? "1 of these days already has a shift or absence."
+    : `${count} of these days already have a shift or absence.`;
 }
 
 function overwritePromptMessage(count: number | null, isAbsence: boolean): string {
   const days =
     count == null
-      ? "Some of these days may already have a shift or off day."
+      ? "Some of these days may already have a shift or absence."
       : overwriteCountText(count);
   const them = count === 1 ? "it" : "them";
-  return `${days} Replace ${them} with the repeating ${isAbsence ? "off day" : "shift"}, or keep ${them} and skip ${count === 1 ? "that day" : "those days"}?`;
+  return `${days} Replace ${them} with the repeating ${isAbsence ? "absence" : "shift"}, or keep ${them} and skip ${count === 1 ? "that day" : "those days"}?`;
 }
 
 const formLayoutStyle: React.CSSProperties = {

@@ -59,6 +59,7 @@ import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/Schedule
 import { ScheduleDateTile } from "../components/ScheduleDateTile";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
+import { ShiftChangeButton } from "../components/ShiftChangeView";
 import {
   getMySchedule,
   getOrgSchedule,
@@ -177,6 +178,7 @@ import {
   getMeHeroShiftmates,
   getMeHeroSupplementalSplitSegments,
   getRequestDateLabel,
+  buildRestOfDayAbsenceChip,
   getScheduleEntrySegmentChange,
   summariseScheduleSegment,
   type MobileScheduleSegmentChange,
@@ -2375,6 +2377,34 @@ function getPreviousShiftSummary(
   return parts.length > 0 ? { prefix: "Was", text: parts.join(" · ") } : null;
 }
 
+/**
+ * The day's "What changed" button, the one shift detail shows, when
+ * the server sent the whole day's change (item 46d), once per day;
+ * otherwise the older one-line summary.
+ */
+function PreviousChange({
+  entry,
+  change,
+  firstOfDay,
+}: {
+  entry: MobileScheduleEntry;
+  change: MobileScheduleSegmentChange | null | undefined;
+  firstOfDay: boolean;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const shiftChange = entry.change?.shiftChange ?? null;
+  if (shiftChange && shiftChange.kind !== "none") {
+    return firstOfDay ? (
+      <View style={styles.upcomingWhatChanged}>
+        <ShiftChangeButton change={shiftChange} />
+      </View>
+    ) : null;
+  }
+  return <PreviousShiftRow change={change} />;
+}
+
 function PreviousShiftRow({
   change,
   inverse = false,
@@ -2580,6 +2610,10 @@ export function MeHeroCard({
   // and pill that restated it as three lines.
   const isAbsenceHero = visibleTypeChip?.kind === "absence";
   const typeChip = isAbsenceHero ? null : visibleTypeChip;
+  // A featured shift's absence for the rest of the day sits beside its pill.
+  const heroRestOfDayChip = isAbsenceHero
+    ? null
+    : buildRestOfDayAbsenceChip(mobileColors, isDark, featuredItem.entry);
   const heroTitle = isAbsenceHero ? visibleTypeChip.label : shiftName;
   const shouldShowShiftName = isAbsenceHero || shouldShowMePrimaryTitle(shiftName, typeChip);
   const timeRange = getScheduleItemTimeRange(featuredItem);
@@ -2642,7 +2676,7 @@ export function MeHeroCard({
                 ) : null}
               </View>
             ) : null}
-            {typeChip ? (
+            {typeChip || heroRestOfDayChip ? (
               <View style={styles.meHeroRoleRow}>
                 <MeTypePill
                   chip={typeChip}
@@ -2651,6 +2685,9 @@ export function MeHeroCard({
                   isMentored={featuredItem.segment.isMentored === true}
                   titleScale="hero"
                 />
+                {heroRestOfDayChip ? (
+                  <MeTypePill chip={heroRestOfDayChip} compact inverseLabel titleScale="hero" />
+                ) : null}
               </View>
             ) : featuredItem.segment.isMentored ? (
               <MentoredPill />
@@ -2858,7 +2895,7 @@ function UpcomingShiftsSection({
   return (
     <View style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>Your Week</Text>
+        <Text style={styles.upcomingSectionTitle}>Your week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
             <Text fit="compact" style={styles.upcomingHoursBadgeText}>
@@ -2907,9 +2944,11 @@ function UpcomingShiftsSection({
                       Unscheduled
                     </Text>
                     {group.deletedEntries.map((entry) => (
-                      <PreviousShiftRow
+                      <PreviousChange
                         key={`${entry.employeeId}:${entry.date}`}
+                        entry={entry}
                         change={entry.change}
+                        firstOfDay
                       />
                     ))}
                   </View>
@@ -2995,17 +3034,52 @@ function UpcomingShiftsSection({
                               <ScheduleNoteLabels
                                 notes={getSegmentScheduleNotes(item.entry, item.segment)}
                               />
-                              <PreviousShiftRow change={change} />
+                              <PreviousChange
+                                entry={item.entry}
+                                change={change}
+                                firstOfDay={
+                                  group.items.findIndex(
+                                    (candidate) => candidate.entry === item.entry,
+                                  ) === itemIndex
+                                }
+                              />
                             </View>
                           </PressableRow>
                         </Fragment>
                       );
                     })}
+                    {[...new Set(group.items.map((item) => item.entry))].map((entry) => {
+                      // A worked cell's absence for the rest of the day (item
+                      // 45) is its own row after the cell's shifts.
+                      const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
+                      return restOfDayChip ? (
+                        <Fragment key={`${entry.employeeId}:${entry.date}:rest-of-day`}>
+                          <UpcomingShiftDashedDivider />
+                          <PressableRow
+                            onPress={() => onPressEntry(entry)}
+                            style={styles.upcomingShiftRow}
+                          >
+                            <View
+                              style={styles.upcomingShiftCopy}
+                              testID={`upcoming-rest-of-day-row-${group.date}`}
+                            >
+                              <MeTypePill chip={restOfDayChip} compact />
+                              <Text
+                                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                style={styles.upcomingShiftArea}
+                              >
+                                Rest of the day
+                              </Text>
+                            </View>
+                          </PressableRow>
+                        </Fragment>
+                      ) : null;
+                    })}
                     {group.deletedEntries.map((entry) => (
                       <Fragment key={`${entry.employeeId}:${entry.date}`}>
                         <UpcomingShiftDashedDivider />
                         <View style={styles.upcomingDeletedHistoryRow}>
-                          <PreviousShiftRow change={entry.change} />
+                          <PreviousChange entry={entry} change={entry.change} firstOfDay />
                         </View>
                       </Fragment>
                     ))}
@@ -3247,9 +3321,6 @@ function OpenShiftsSection({
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
             label="Claim"
-            leadingAccessory={
-              <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
-            }
             loading={isVolunteerLoading}
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
@@ -3335,14 +3406,8 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
+          icon={isPendingVolunteerRequest ? "hourglass-outline" : undefined}
           label={isPendingVolunteerRequest ? "Pending approval" : "Claim"}
-          leadingAccessory={
-            <Ionicons
-              color={mobileColors.brand}
-              name={isPendingVolunteerRequest ? "hourglass-outline" : "add-circle-outline"}
-              size={18}
-            />
-          }
           loading={isClaimLoading}
           onPress={() => runAction(() => onClaim(item.request.id))}
           tone="secondary"
@@ -3351,26 +3416,11 @@ function OpenShiftsSection({
     );
   };
 
-  if (requestsError) {
+  // Home shows a section only when it has something to act on; an empty
+  // "No open shifts" card there is noise. The admin dashboard is different
+  // and keeps its empty sections, and the Requests tab lists everything.
+  if (requestsError || availableOpenShiftFeed.totalCount === 0) {
     return null;
-  }
-
-  // An empty section still holds its place, as on web: the reader learns the
-  // page looked and found nothing, rather than wondering where the section went.
-  if (availableOpenShiftFeed.totalCount === 0) {
-    return (
-      <View style={styles.meSectionBlock} testID="me-open-shifts-empty">
-        <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open shifts" />
-        <View style={styles.requestCard}>
-          <EmptyStateCard
-            compact
-            iconName="calendar-outline"
-            title="No open shifts"
-            body="Available pickups and coverage gaps will appear here."
-          />
-        </View>
-      </View>
-    );
   }
 
   return (
@@ -3517,24 +3567,9 @@ function ShiftCoverRequestsSection({
     }
   }, [requestsError, pushToast]);
 
-  if (requestsError) {
+  // Only when something actually needs an answer; see OpenShiftsSection.
+  if (requestsError || requests.length === 0) {
     return null;
-  }
-
-  if (requests.length === 0) {
-    return (
-      <View style={styles.meSectionBlock} testID="me-cover-requests-empty">
-        <MeSectionHeader title="Needs your response" />
-        <View style={styles.requestCard}>
-          <EmptyStateCard
-            compact
-            iconName="checkmark-circle"
-            title="All caught up"
-            body="Requests for your shifts will appear here."
-          />
-        </View>
-      </View>
-    );
   }
 
   return (
@@ -3684,10 +3719,15 @@ function TeamShiftMemberRow({
     : isSplitEntry
       ? getSegmentScheduleNotes(entry, segment)
       : scheduleNotesForRow(entry.indicators, tabFocusAreaId);
+  // A worked cell's absence for the rest of the day follows the shift's pill.
+  const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
   const rolePill =
-    roleChip || isMentored ? (
+    roleChip || isMentored || restOfDayChip ? (
       <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
-        <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
+        {roleChip || isMentored ? (
+          <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
+        ) : null}
+        {restOfDayChip ? <JobPill chip={restOfDayChip} compact eyebrowDisplay="outside" /> : null}
       </View>
     ) : null;
 

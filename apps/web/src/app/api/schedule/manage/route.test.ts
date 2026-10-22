@@ -88,8 +88,11 @@ function captureNoteClearing() {
   return { deleted, softDeleted };
 }
 
+const fetchHiddenStaffIds = vi.fn(async (..._args: unknown[]) => new Set<string>());
+
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  fetchHiddenStaffIds: (...args: unknown[]) => fetchHiddenStaffIds(...args),
   // The sandbox redirect resolves the effective org before permission checks;
   // defaults to a pass-through (see beforeEach) so most tests can use the
   // body orgId unchanged. Tests exercising the sandbox redirect itself
@@ -345,6 +348,169 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
+  it("records the cell as it stood before an edit, for the activity log (46h)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+    serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "get_schedule_cell_snapshot_payload" || args.p_snapshot_kind !== "published") {
+        return { data: [], error: null };
+      }
+      return {
+        data: [
+          {
+            version: 4,
+            focus_area_id: null,
+            series_id: null,
+            from_recurring: false,
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: "08:00",
+            custom_end_time: null,
+            shift_ids: [3],
+            job_ids: [30],
+            is_mentored_flags: [false],
+          },
+        ],
+        error: null,
+      };
+    });
+    const auditInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const previousFrom = serviceFrom.getMockImplementation();
+    serviceFrom.mockImplementation((table: string) =>
+      table === "audit_log" ? { insert: auditInsert } : previousFrom?.(table),
+    );
+    const input = { kind: "absence", segments: [], absenceTypeId: 7 };
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        expectedVersion: 4,
+        input,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "shift.updated",
+        details: {
+          input: expect.objectContaining({ kind: "absence", absenceTypeId: 7 }),
+          before: {
+            kind: "worked",
+            segments: [{ shiftId: 3, jobId: 30, position: 0, isMentored: false }],
+            focusAreaId: null,
+            absenceTypeId: null,
+            customStartTime: "08:00",
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        },
+      }),
+    );
+  });
+
+  it("keeps a rest-of-day absence when only the times change (item 45)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+    serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "get_schedule_cell_snapshot_payload" || args.p_snapshot_kind !== "draft") {
+        return { data: [], error: null };
+      }
+      return {
+        data: [
+          {
+            version: 2,
+            focus_area_id: null,
+            series_id: null,
+            from_recurring: false,
+            state_kind: "worked",
+            absence_type_id: 7,
+            shift_ids: [3],
+            job_ids: [30],
+            is_mentored_flags: [false],
+          },
+        ],
+        error: null,
+      };
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShiftTimes",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        customStartTime: "07:00",
+        customEndTime: "11:00",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({ p_state_kind: "worked", p_absence_type_id: 7 }),
+    );
+  });
+
+  it("saves a worked shift with an absence for the rest of the day (item 45)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+          absenceTypeId: 7,
+          customStartTime: "07:00",
+          customEndTime: "11:00",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({
+        p_state_kind: "worked",
+        p_shift_ids: [3],
+        p_job_ids: [30],
+        p_absence_type_id: 7,
+        p_custom_start_time: "07:00",
+        p_custom_end_time: "11:00",
+      }),
+    );
+  });
+
+  it.each(["createShiftSeries", "updateSeriesAllShifts"])(
+    "refuses an absence on a repeating shift (%s) before writing",
+    async (action) => {
+      const response = await POST(
+        makeRequest({
+          ...seriesRequest,
+          action,
+          seriesId: "33333333-3333-4333-8333-333333333333",
+          input: {
+            kind: "worked",
+            segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+            absenceTypeId: 7,
+          },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error: expect.stringMatching(/absence for the rest of the day/),
+      });
+      expect(userRpc).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects a mismatched org id when the caller has no sandbox and requireOrgPermissions denies it", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const employeeId = "22222222-2222-4222-8222-222222222222";
@@ -432,13 +598,69 @@ describe("POST /api/schedule/manage", () => {
   // object itself is thenable, matching the real Supabase query builder.
   function chainableQuery(result: { data: unknown; error: unknown }) {
     const query: Record<string, ReturnType<typeof vi.fn>> = {};
-    for (const method of ["select", "eq", "gte", "lte", "is", "or", "in", "order", "range"]) {
+    for (const method of [
+      "select",
+      "eq",
+      "gte",
+      "lte",
+      "is",
+      "or",
+      "in",
+      "not",
+      "order",
+      "range",
+    ]) {
       query[method] = vi.fn(() => query);
     }
     (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
       resolve(result);
     return query;
   }
+
+  it("leaves a hidden staff member's call-off out of the open shifts", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const calloff = (id: string, empId: string) => ({
+      id,
+      org_id: orgId,
+      type: "pickup",
+      status: "open",
+      requester_emp_id: empId,
+      requester_shift_date: "2026-08-03",
+      requester_state: {
+        kind: "absence",
+        segments: [],
+        absenceTypeId: 1,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      target_emp_id: null,
+      parent_request_id: "parent-1",
+      created_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:00:00.000Z",
+      expires_at: "2026-08-10T00:00:00.000Z",
+      requester: { first_name: "A", last_name: "B", focus_area_ids: [4] },
+    });
+    serviceFrom.mockReturnValue(
+      chainableQuery({ data: [calloff("r-1", "emp-1"), calloff("r-2", "emp-qa")], error: null }),
+    );
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set(["emp-qa"]));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchCalloffOpenShifts",
+        orgId,
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+        assignmentLabels: [],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const { openShifts } = (await response.json()) as { openShifts: Array<{ id: string }> };
+    expect(openShifts.map((shift) => shift.id)).toEqual(["r-1"]);
+  });
 
   it("paginates fetchShifts through the service client and maps a short page into shifts", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
@@ -497,6 +719,55 @@ describe("POST /api/schedule/manage", () => {
     expect(query.order).toHaveBeenCalledWith("date", { ascending: true });
     expect(query.range).toHaveBeenCalledWith(0, 499);
     expect(body.shifts[`${empId}_2026-08-02`]).toBeDefined();
+  });
+
+  it("leaves a hidden staff member's cells out of fetchShifts", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const shown = "22222222-2222-4222-8222-222222222222";
+    const hidden = "33333333-3333-4333-8333-333333333333";
+    const cell = (empId: string) => ({
+      id: `cell-${empId}`,
+      emp_id: empId,
+      date: "2026-08-02",
+      org_id: orgId,
+      version: 0,
+      series_id: null,
+      from_recurring: false,
+      created_by: null,
+      updated_by: null,
+      created_at: "2026-08-01T00:00:00.000Z",
+      updated_at: "2026-08-01T00:00:00.000Z",
+      snapshots: [
+        {
+          id: `snap-${empId}`,
+          cell_id: `cell-${empId}`,
+          org_id: orgId,
+          snapshot_kind: "published",
+          state_kind: "absence",
+          absence_type_id: 5,
+          custom_start_time: null,
+          custom_end_time: null,
+          segments: [],
+        },
+      ],
+    });
+    serviceFrom.mockReturnValue(chainableQuery({ data: [cell(shown), cell(hidden)], error: null }));
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set([hidden]));
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchShifts",
+        orgId,
+        isScheduler: true,
+        assignmentLabels: [],
+        absenceTypeLabels: [[5, "Vacation"]],
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+      }),
+    );
+
+    const body = await response.json();
+    expect(Object.keys(body.shifts)).toEqual([`${shown}_2026-08-02`]);
   });
 
   function draftedCellQuery(orgId: string, empId: string) {

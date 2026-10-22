@@ -2,7 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbRecurringShift, DbScheduleCell } from "@/lib/db/types";
 import { scheduleStateLabel } from "@/lib/db/mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
-import { fetchAssignmentLabelMap, fetchSegmentResolutionMaps } from "@/app/api/shared/schedule";
+import {
+  fetchAssignmentLabelMap,
+  fetchSegmentResolutionMaps,
+  fetchShiftChangeResolvers,
+} from "@/app/api/shared/schedule";
+import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
+import {
+  cellStateToChangeDay,
+  describeShiftChange,
+  type ShiftChange,
+} from "@dubgrid/schedule-core";
 import type { ScheduleCellInput } from "@/types";
 import type {
   GridmasterPersonSchedule,
@@ -36,15 +46,16 @@ function rowsOrThrow<T>(result: { data: unknown; error: unknown }): T[] {
 }
 
 async function loadLabelMaps(client: SupabaseClient, orgId: string) {
-  const [codeMap, resolution, absenceResult] = await Promise.all([
+  const [codeMap, resolution, absenceResult, shiftChangeResolvers] = await Promise.all([
     fetchAssignmentLabelMap(client, orgId),
     fetchSegmentResolutionMaps(client, orgId),
     client.from("absence_types").select("id, name").eq("org_id", orgId),
+    fetchShiftChangeResolvers(client, orgId),
   ]);
   const absenceTypeMap = new Map(
     rowsOrThrow<{ id: number; name: string }>(absenceResult).map((row) => [row.id, row.name]),
   );
-  return { codeMap, absenceTypeMap, ...resolution };
+  return { codeMap, absenceTypeMap, shiftChangeResolvers, ...resolution };
 }
 
 type LabelMaps = Awaited<ReturnType<typeof loadLabelMaps>>;
@@ -67,6 +78,29 @@ function stateLabel(state: unknown, maps: LabelMaps): string | null {
   } catch {
     return "Unknown";
   }
+}
+
+function readCellState(state: unknown): { ok: boolean; cell: ScheduleCellState | null } {
+  if (state == null) return { ok: true, cell: null };
+  const parsed = scheduleCellStateSchema.safeParse(state);
+  return parsed.success ? { ok: true, cell: parsed.data } : { ok: false, cell: null };
+}
+
+/** Before and After for a cell change; null for a schedule note or a row either side cannot read. */
+function cellChange(
+  fromState: unknown,
+  toState: unknown,
+  date: string,
+  maps: LabelMaps,
+): ShiftChange | null {
+  const from = readCellState(fromState);
+  const to = readCellState(toState);
+  if (!from.ok || !to.ok) return null;
+  return describeShiftChange(
+    cellStateToChangeDay(from.cell, maps.shiftChangeResolvers),
+    cellStateToChangeDay(to.cell, maps.shiftChangeResolvers),
+    { date },
+  );
 }
 
 function employeeName(row: { first_name?: string | null; last_name?: string | null } | null) {
@@ -127,6 +161,7 @@ async function loadRequestsAndChanges(
         kind: row.kind as string,
         from: stateLabel(row.from_state, maps),
         to: stateLabel(row.to_state, maps),
+        change: cellChange(row.from_state, row.to_state, row.date as string, maps),
         publishedBy: publish.published_by ?? null,
       };
     })

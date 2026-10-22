@@ -21,6 +21,7 @@ import {
   getInvitationEmailConfig,
   sendInvitationEmail,
 } from "@/features/mobile/server/invitation-email";
+import { fetchMobileHiddenPeople } from "@/features/mobile/server";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
   const managementUsers = await loadManagementUsers(
     gated.auth.serviceClient,
     gated.auth.currentOrg.id,
+    await fetchMobileHiddenPeople(gated.auth),
   );
 
   return NextResponse.json(mobileManagementUsersResponseSchema.parse({ managementUsers }));

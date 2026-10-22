@@ -59,7 +59,10 @@ export {
   toDarkPillColors,
   resolveShiftPillColors,
   visiblePillBorder,
+  resolveAbsenceStripes,
+  absenceStripeCss,
   type ShiftPillColors,
+  type AbsenceStripeColors,
 } from "./pill-colors";
 
 export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";

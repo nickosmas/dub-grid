@@ -92,6 +92,35 @@ describe("countShiftsAddedToPublishedCell", () => {
   });
 });
 
+describe("countShiftsAddedToPublishedEntry with a rest-of-day absence (item 45)", () => {
+  const entry = (overrides: Partial<ShiftMap[string]>): ShiftMap[string] => ({
+    label: "D/E",
+    assignmentIds: [1, 2],
+    segments: [
+      { ...day, position: 0, label: "D" },
+      { ...evening, position: 1, label: "E" },
+    ],
+    isDraft: true,
+    draftKind: "modified",
+    publishedAssignmentDefinitionIds: [1],
+    publishedSegments: [{ ...day, position: 0, label: "D" }],
+    publishedLabel: "D",
+    ...overrides,
+  });
+
+  it("keeps an added shift new when the absence did not change", () => {
+    expect(
+      countShiftsAddedToPublishedEntry(
+        entry({ restOfDayAbsenceTypeId: 9, publishedRestOfDayAbsenceTypeId: 9 }),
+      ),
+    ).toBe(1);
+  });
+
+  it("makes it an edit when the absence was added at the same time", () => {
+    expect(countShiftsAddedToPublishedEntry(entry({ restOfDayAbsenceTypeId: 9 }))).toBe(0);
+  });
+});
+
 describe("computeDraftBreakdown", () => {
   const baseEntry: ShiftMap[string] = {
     label: "D/E",

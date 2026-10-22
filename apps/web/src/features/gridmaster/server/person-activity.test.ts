@@ -6,6 +6,11 @@ vi.mock("@/app/api/shared/schedule", () => ({
     assignmentIdByPair: new Map(),
     segmentCompatibility: null,
   })),
+  fetchShiftChangeResolvers: vi.fn(async () => ({
+    segment: () => null,
+    absenceType: (id: number) => (id === 5 ? { name: "Vacation" } : null),
+    focusArea: () => null,
+  })),
 }));
 
 import { loadPersonSchedule } from "./person-activity";
@@ -398,6 +403,13 @@ describe("loadPersonSchedule", () => {
           kind: "deleted",
           from: "Vacation",
           to: null,
+          change: expect.objectContaining({
+            kind: "single",
+            before: expect.objectContaining({
+              items: [expect.objectContaining({ plain: "Vacation (all day)", status: "removed" })],
+            }),
+            after: expect.objectContaining({ items: [] }),
+          }),
           publishedBy: "admin-2",
         },
         {
@@ -406,6 +418,7 @@ describe("loadPersonSchedule", () => {
           kind: "new",
           from: null,
           to: "Vacation",
+          change: expect.objectContaining({ kind: "single" }),
           publishedBy: "admin-2",
         },
       ]);

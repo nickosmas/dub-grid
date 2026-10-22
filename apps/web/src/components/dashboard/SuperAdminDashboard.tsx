@@ -51,6 +51,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
+        focusAreas={focusAreas}
         periodDates={periodDates}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

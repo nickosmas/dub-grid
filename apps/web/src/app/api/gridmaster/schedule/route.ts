@@ -362,8 +362,11 @@ export async function GET(req: NextRequest) {
           assignments: assignmentDetails.map((assignment) => assignment.label),
           assignmentDetails,
           requestIndicators: requestsByEmployeeDate.get(`${row.emp_id}:${row.date}`) ?? [],
-          absenceLabel:
-            entry.absenceTypeId != null ? (absenceTypeMap.get(entry.absenceTypeId) ?? null) : null,
+          // A whole-day absence, or a worked cell's absence for the rest of the day.
+          absenceLabel: (() => {
+            const absenceTypeId = entry.absenceTypeId ?? entry.restOfDayAbsenceTypeId ?? null;
+            return absenceTypeId != null ? (absenceTypeMap.get(absenceTypeId) ?? null) : null;
+          })(),
           focusAreaName: typeof focusArea?.name === "string" ? focusArea.name : null,
           isDraft: entry.draftKind != null,
           draftKind: entry.draftKind,

@@ -248,7 +248,8 @@ describe("loadMobilePeoplePayload", () => {
   });
 });
 
-describe("schedule payloads and the publisher's name", () => {
+describe("schedule payloads and what staff may see (46f)", () => {
+  const previousPresentation = { label: "D", name: "Day Shift" };
   const entry = (publishedByName: string | null) =>
     ({
       employeeId: "employee-1",
@@ -256,7 +257,7 @@ describe("schedule payloads and the publisher's name", () => {
       date: "2026-09-21",
       state: null,
       presentation: null,
-      change: null,
+      change: { kind: "modified", isNewAddition: false, previousPresentation },
       publishedAt: "2026-09-18T03:31:00Z",
       publishedByName,
     }) as never;
@@ -271,48 +272,76 @@ describe("schedule payloads and the publisher's name", () => {
     focusAreaIds: [],
     departmentIds: [],
   }));
-
-  it("withholds who published from a viewer who cannot publish, keeping the time", async () => {
-    const payload = await loadMobileMeSchedulePayload(
+  const staffPermissions = { canPublishSchedule: false, canEditShifts: false, level: 0 };
+  const loadForStaff = (currentOrg: Record<string, unknown>) =>
+    loadMobileMeSchedulePayload(
       {
-        currentOrg: { id: ORG_ID },
+        currentOrg: { id: ORG_ID, ...currentOrg },
         serviceClient: {},
         user: { id: USER_ID },
-        permissions: { canPublishSchedule: false, level: 0 },
+        permissions: staffPermissions,
       } as never,
       range,
       { fetchLinkedEmployeeForUser, fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
     );
-    expect(payload.entries.map((item) => item.publishedByName)).toEqual([null, null]);
-    expect(payload.entries[0]!.publishedAt).toBe("2026-09-18T03:31:00Z");
+
+  it("shows staff the publisher and the earlier shift by default", async () => {
+    const payload = await loadForStaff({});
+    expect(payload.entries[0]!.publishedByName).toBe("Nic Kosmas");
+    expect(payload.entries[0]!.change?.previousPresentation).toEqual(previousPresentation);
   });
 
-  it("keeps the publisher for a publisher and for a super admin", async () => {
-    const publisher = await loadMobileOrgSchedulePayload(
+  it("withholds each one from staff when the organization hides it, keeping the time and mark", async () => {
+    const payload = await loadForStaff({ staffSeePublisher: false, staffSeeShiftChanges: false });
+    expect(payload.entries.map((item) => item.publishedByName)).toEqual([null, null]);
+    expect(payload.entries[0]!.publishedAt).toBe("2026-09-18T03:31:00Z");
+    expect(payload.entries[0]!.change).toEqual({
+      kind: "modified",
+      isNewAddition: false,
+      previousPresentation: null,
+      shiftChange: null,
+    });
+  });
+
+  it("leaves out a removed shift's entry when what changed is hidden, since it is the removed shift", async () => {
+    const removed = {
+      ...(entry(null) as object),
+      change: { kind: "deleted", previousPresentation },
+    } as never;
+    fetchMobileScheduleEntries.mockResolvedValueOnce([entry(null), removed]);
+    const payload = await loadForStaff({ staffSeeShiftChanges: false });
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0]!.change?.kind).toBe("modified");
+  });
+
+  it("keeps both for an editor and for a super admin whatever the organization chose", async () => {
+    const hidden = { id: ORG_ID, staffSeePublisher: false, staffSeeShiftChanges: false };
+    const editor = await loadMobileOrgSchedulePayload(
       {
-        currentOrg: { id: ORG_ID },
+        currentOrg: hidden,
         serviceClient: {},
         permissions: {
           canViewSchedule: true,
           canEditShifts: true,
           canApproveShiftRequests: false,
           canManageEmployees: false,
-          canPublishSchedule: true,
+          canPublishSchedule: false,
           level: 2,
         },
       } as never,
       range,
       { fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
     );
-    expect(publisher.entries[0]!.publishedByName).toBe("Nic Kosmas");
+    expect(editor.entries[0]!.publishedByName).toBe("Nic Kosmas");
+    expect(editor.entries[0]!.change?.previousPresentation).toEqual(previousPresentation);
 
     const superAdmin = await loadMobileOrgSchedulePayload(
       {
-        currentOrg: { id: ORG_ID },
+        currentOrg: hidden,
         serviceClient: {},
         permissions: {
           canViewSchedule: true,
-          canEditShifts: true,
+          canEditShifts: false,
           canApproveShiftRequests: true,
           canManageEmployees: true,
           canPublishSchedule: false,

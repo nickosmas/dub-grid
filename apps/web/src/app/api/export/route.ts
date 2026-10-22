@@ -3,11 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
   fetchPublishedShiftRows,
+  publishedCellText,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -37,14 +39,21 @@ function buildCsv(headers: string[], rows: (string | number | null | undefined)[
   return [headerLine, ...dataLines].join("\n");
 }
 
-async function exportStaff(supabase: SupabaseClient, orgId: string) {
-  const { data: employees, error } = await supabase
-    .from("employees")
-    .select(
-      "id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at",
-    )
-    .eq("org_id", orgId)
-    .is("archived_at", null)
+async function exportStaff(
+  supabase: SupabaseClient,
+  orgId: string,
+  hiddenUserIds: readonly string[],
+) {
+  const { data: employees, error } = await withoutHiddenStaff(
+    supabase
+      .from("employees")
+      .select(
+        "id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at",
+      )
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    hiddenUserIds,
+  )
     .order("seniority", { ascending: true })
     .limit(10000);
 
@@ -102,6 +111,7 @@ async function exportStaff(supabase: SupabaseClient, orgId: string) {
 async function exportSchedule(
   supabase: SupabaseClient,
   orgId: string,
+  hiddenUserIds: readonly string[],
   startDate?: string,
   endDate?: string,
 ) {
@@ -121,12 +131,15 @@ async function exportSchedule(
   }
 
   // Fetch employees
-  const { data: employees, error: empErr } = await supabase
-    .from("employees")
-    .select("id, first_name, last_name")
-    .eq("org_id", orgId)
-    .is("archived_at", null)
-    .order("seniority", { ascending: true });
+  // Rows come from this list, so a hidden person's shifts are left out too.
+  const { data: employees, error: empErr } = await withoutHiddenStaff(
+    supabase
+      .from("employees")
+      .select("id, first_name, last_name")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    hiddenUserIds,
+  ).order("seniority", { ascending: true });
   if (empErr) throw empErr;
 
   // Fetch shifts in date range
@@ -163,7 +176,7 @@ async function exportSchedule(
   for (const row of shifts as PublishedShiftRow[]) {
     const entry = resolvePublishedScheduleEntry(row, new Map(), absenceTypeById);
     if (!entry) continue;
-    shiftIndex.set(`${entry.empId}:${entry.date}`, entry.label);
+    shiftIndex.set(`${entry.empId}:${entry.date}`, publishedCellText(entry, absenceTypeById));
   }
 
   const headers = [
@@ -253,14 +266,15 @@ export async function GET(req: NextRequest) {
     // authorizing one Organization and exporting another is a tenant leak.
     const effectiveOrgId = orgAuth.orgId;
 
+    const hiddenUserIds = await fetchHiddenPeople(orgAuth);
     let csv: string;
     let filename: string;
 
     if (type === "staff") {
-      csv = await exportStaff(serviceClient, effectiveOrgId);
+      csv = await exportStaff(serviceClient, effectiveOrgId, hiddenUserIds);
       filename = `staff-export-${new Date().toISOString().split("T")[0]}.csv`;
     } else {
-      csv = await exportSchedule(serviceClient, effectiveOrgId, startDate, endDate);
+      csv = await exportSchedule(serviceClient, effectiveOrgId, hiddenUserIds, startDate, endDate);
       filename = `schedule-export-${startDate ?? "current"}-${endDate ?? "week"}.csv`;
     }
 

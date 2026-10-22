@@ -26,6 +26,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { tintStripeCss } from "@/lib/absence-stripes";
 
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
@@ -64,6 +65,25 @@ function getAssignmentStyle(
 function formatRequestIndicator(request: ShiftRow["requestIndicators"][number]) {
   const relation = request.relation === "target" ? "target person" : "requester";
   return `${formatShiftRequestTypeLabel(request.type)} request - ${formatShiftRequestStatusLabel(request.status).toLowerCase()} (${relation})`;
+}
+
+/** An absence: the whole day's, or a worked cell's for the rest of the day after its shifts. */
+function AbsenceChip({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "1px 6px",
+        borderRadius: "var(--dg-radius-xs)",
+        fontSize: "var(--dg-fs-caption)",
+        fontWeight: 700,
+        background: tintStripeCss("var(--dg-color-warning-bg)", "var(--dg-color-warning)"),
+        color: "var(--dg-color-warning)",
+      }}
+    >
+      {label}
+    </span>
+  );
 }
 
 export default function ReadOnlyScheduleView({
@@ -238,21 +258,10 @@ export default function ReadOnlyScheduleView({
                                 </span>
                               </MaybeHint>
                             ))}
+                            {r.absenceLabel && <AbsenceChip label={r.absenceLabel} />}
                           </span>
                         ) : r.absenceLabel ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "1px 6px",
-                              borderRadius: "var(--dg-radius-xs)",
-                              fontSize: "var(--dg-fs-caption)",
-                              fontWeight: 700,
-                              background: "var(--dg-color-warning-bg)",
-                              color: "var(--dg-color-warning)",
-                            }}
-                          >
-                            {r.absenceLabel}
-                          </span>
+                          <AbsenceChip label={r.absenceLabel} />
                         ) : (
                           <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
                         )}

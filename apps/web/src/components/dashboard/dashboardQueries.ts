@@ -17,6 +17,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { getScheduleStartForSpan } from "@/lib/schedule-view";
 import { addDays, formatDateKey } from "@/lib/utils";
 import type { PublishChange, PublishHistoryEntryWithName, ShiftMap } from "@/types";
+import { mergeCellPublishChanges } from "@/lib/shift-change-web";
 
 import { dashboardScheduleWindow } from "./dashboardScheduleNotes";
 import { dashboardInvitationsQueryOptions } from "./useDashboardInvitations";
@@ -147,7 +148,10 @@ export function dashboardPublishHistoryQueryOptions(orgId: string, window: DateW
   });
 }
 
-/** The latest published change per cell, newest publish winning. */
+/**
+ * One published change per cell, compared with the cell before its first
+ * publish in the window: staff are assumed to have seen nothing in between.
+ */
 export function dashboardRecentChangesQueryOptions(
   orgId: string,
   window: DateWindow,
@@ -166,11 +170,19 @@ export function dashboardRecentChangesQueryOptions(
         startDate: window.start,
         endDate: window.end,
       }).catch(() => []);
-      const changes = new Map<string, PublishChange>();
+      const byCell = new Map<string, PublishChange[]>();
       for (let entryIndex = entries.length - 1; entryIndex >= 0; entryIndex -= 1) {
         for (const change of entries[entryIndex].changes) {
-          changes.set(`${change.empId}_${change.date}`, change);
+          const key = `${change.empId}_${change.date}`;
+          const list = byCell.get(key);
+          if (list) list.push(change);
+          else byCell.set(key, [change]);
         }
+      }
+      const changes = new Map<string, PublishChange>();
+      for (const [key, cellChanges] of byCell) {
+        const merged = mergeCellPublishChanges(cellChanges);
+        if (merged) changes.set(key, merged);
       }
       return changes;
     },

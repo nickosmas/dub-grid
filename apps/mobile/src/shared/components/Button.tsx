@@ -304,8 +304,9 @@ const TONE_STYLE = {
 
 function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string {
   switch (tone) {
+    // The main action is a soft blue fill rather than a solid one; `secondary`
+    // shares it, and a pair that needs a step down beside it takes `neutral`.
     case "primary":
-      return mobileColors.onBrandText;
     case "secondary":
       // Paired with the darker secondary fill; the standard brand blue on that
       // fill measures 4.03:1 and fails AA.
@@ -336,7 +337,7 @@ function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string
 }
 
 function resolveRippleColor(tone: ButtonTone, mobileColors: MobileColors): string {
-  if (tone === "primary" || tone === "danger" || tone === "success" || tone === "warning") {
+  if (tone === "danger" || tone === "success" || tone === "warning") {
     return mobileColors.ripplePrimary;
   }
   return mobileColors.rippleNeutral;
@@ -370,11 +371,8 @@ const createStyles = (mobileColors: MobileColors) =>
       // need to fade further before they read as unavailable.
       opacity: 0.4,
     },
-    // The four solid tones take the `button*Bg` ramp rather than the shared
-    // semantic tokens: those are tuned for icons and banners, where the colour
-    // sits beside text, and they fail AA under this button's white label.
     tonePrimary: {
-      backgroundColor: mobileColors.buttonPrimaryBg,
+      backgroundColor: mobileColors.controlSecondaryBg,
     },
     toneSecondary: {
       backgroundColor: mobileColors.controlSecondaryBg,
@@ -382,6 +380,9 @@ const createStyles = (mobileColors: MobileColors) =>
     toneNeutral: {
       backgroundColor: mobileColors.controlNeutralBg,
     },
+    // The three solid tones take the `button*Bg` ramp rather than the shared
+    // semantic tokens: those are tuned for icons and banners, where the colour
+    // sits beside text, and they fail AA under this button's white label.
     toneDanger: {
       backgroundColor: mobileColors.buttonDangerBg,
     },

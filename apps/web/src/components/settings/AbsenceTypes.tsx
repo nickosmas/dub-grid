@@ -26,12 +26,8 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
-import {
-  PREDEFINED_COLORS,
-  TRANSPARENT_BORDER,
-  borderColor,
-  resolveShiftPillColors,
-} from "@/lib/colors";
+import { PREDEFINED_COLORS, TRANSPARENT_BORDER } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type AbsenceTypeFormState = {
@@ -271,10 +267,7 @@ function AbsenceTypeRow({
         onClick={toggleExpanded}
       >
         {(() => {
-          const badge = resolveShiftPillColors(
-            { color: form.color, text: form.text, border: form.border },
-            isDarkTheme,
-          );
+          const badge = absenceStripeFill(form.color, isDarkTheme);
           const previewLabel = isNameMode ? form.name : form.label;
           return (
             <span
@@ -286,8 +279,8 @@ function AbsenceTypeRow({
                 marginRight: isNameMode ? "auto" : undefined,
                 overflow: "hidden",
                 padding: "3px 8px",
-                background: badge.color,
-                border: `1px solid ${borderColor(badge.text)}`,
+                background: badge.background,
+                border: `1px solid ${badge.border}`,
                 color: badge.text,
                 borderRadius: "var(--dg-radius-md)",
                 fontSize: "var(--dg-fs-caption)",
@@ -629,7 +622,7 @@ export default function AbsenceTypesSettings({
           <EmptyState
             size="compact"
             title="No absence types yet"
-            description="Create the off-day and calloff labels your schedulers use."
+            description="Create the absence and call-off labels your schedulers use."
             action={
               canManageScheduleDefinitions ? (
                 <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">

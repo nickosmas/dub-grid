@@ -24,15 +24,18 @@ function TimeDropdown({
   onChange,
   width,
   placeholder,
+  ariaLabel,
 }: {
   value: string;
   options: { value: string; label: string }[];
   onChange: (val: string) => void;
   width: number;
   placeholder?: string;
+  ariaLabel?: string;
 }) {
   return (
     <CustomSelect
+      ariaLabel={ariaLabel}
       value={value}
       options={options}
       onChange={onChange}
@@ -511,3 +514,93 @@ export function PillTimeEditor({
   );
 }
 // ────────────────────────────────────────────────────────────────────────────
+
+/** When the last shift actually ended, beside an absence for the rest of the day (item 45). */
+export function WorkedUntilField({
+  start,
+  end,
+  onChange,
+}: {
+  /** The shift's effective start, so the end can't equal it. */
+  start: string | null;
+  /** The shift's effective end: its custom end, else its default end. */
+  end: string | null;
+  onChange: (end: string) => void;
+}) {
+  const e = parseTo12h(end);
+  function update(hour: string, minute: string, period: "AM" | "PM") {
+    const next = to24h(hour, minute, period);
+    if (!next || (start && !isValidTimeOrder(start, next))) return;
+    onChange(next);
+  }
+  return (
+    <div
+      data-worked-until
+      style={{
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: "1px solid var(--dg-color-border-light)",
+      }}
+    >
+      <div
+        role="group"
+        aria-label="Worked until"
+        style={{ display: "flex", alignItems: "center", gap: 4 }}
+      >
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            fontWeight: 700,
+            color: "var(--dg-color-text-secondary)",
+            marginRight: "auto",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Worked until
+        </span>
+        <TimeDropdown
+          value={e.hour}
+          options={hourOptions}
+          onChange={(v) => update(v, e.minute, e.period)}
+          width={60}
+          ariaLabel="Worked until hour"
+        />
+        <span
+          style={{
+            fontWeight: 700,
+            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-caption)",
+          }}
+        >
+          :
+        </span>
+        <TimeDropdown
+          value={e.minute}
+          options={minuteOptions}
+          onChange={(v) => update(e.hour, v, e.period)}
+          width={60}
+          ariaLabel="Worked until minute"
+        />
+        <TimeDropdown
+          value={e.period}
+          options={periodOptions}
+          onChange={(v) => update(e.hour, e.minute, v as "AM" | "PM")}
+          width={64}
+          ariaLabel="Worked until AM or PM"
+        />
+      </div>
+      {end && (
+        <div
+          className="dg-tabular-nums"
+          style={{
+            marginTop: 6,
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--dg-color-text-muted)",
+          }}
+        >
+          Hours count to {fmt12h(end)}. The absence covers the rest.
+        </div>
+      )}
+    </div>
+  );
+}

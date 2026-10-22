@@ -866,3 +866,100 @@
   - [x] 44g. **Seat and revenue history** - append-only seat and invoice
         history and a report that states its own start date. Needs a
         migration.
+- [x] 45. **A worked shift plus an absence in one cell** - someone who works
+      part of a day, including part of a double shift, can have an absence
+      (an absence type) for the rest of it, shown and saved as one cell such
+      as D/Bereavement or D/E/Sick. The absence always comes last, and the
+      last worked shift can record when it actually ended. Worked parts keep
+      their times, hours and coverage; the absence counts in reports with no
+      hours. A cell with three items gets a taller row on screen and in
+      print. Owner decisions, 2026-10-19: at most two worked shifts plus one
+      absence; asking for time off from part of a shift in the app is out of
+      scope. Always called an absence (owner, 2026-10-20).
+  - [x] 45a. **Data model** - a worked cell may carry one absence: contract,
+        a migration relaxing the snapshot check and keeping the absence in
+        the save, state, sync, import and publish functions, and the shared
+        accessors and mappers. A mixed cell round-trips through draft,
+        publish and publish history. Needs a migration.
+  - [x] 45b. **Web editor and grid** - the panel adds an absence beside one
+        or two shifts and can record when the last shift ended; grid pills,
+        labels, publish-diff badges, copy, paste and drag keep every part;
+        the overlap check covers worked parts only; a three-item cell gets a
+        taller row. Needs an approved mockup first.
+  - [x] 45c. **Other web surfaces** - Month view, the phone Day view, print
+        (a taller row for a three-item cell), dashboard, person page,
+        coverage tallies, reports, CSV export and calendar feed.
+  - [x] 45d. **Mobile app** - schedule, shift detail and dashboard show
+        every part of a mixed cell.
+  - [x] 45e. **Shift requests** - time off on half a double shift keeps the
+        absence; swap, pickup and open-shift staffing respect a mixed cell
+        instead of discarding it. Someone absent for the rest of a day takes
+        no more work that day (owner, 2026-10-21).
+- [x] 46. **Clear shift-change descriptions** - every shift change reads the
+      same detailed way on web, mobile, alerts and records: Before and After
+      headings, every field that tells the shifts apart (shift, job spelled
+      out, 12-hour times with hours, focus area, absence), compared against
+      the original published shift, whole-day blocks with Shift 1 / Shift 2 /
+      Absence labels for multi-item days, and break lines for split doubles.
+      An organization can hide change details and the publisher's name from
+      staff. Design reference: the "Shift change display" canvas (owner
+      decisions, 2026-10-20 and 2026-10-21).
+  - [x] 46a. **Shared change model and formatter** - one schedule-core
+        function turns a cell's original and current state into Before and
+        After sides (fields, highlights, hours, totals, labels, breaks,
+        Added/Removed, archived names, overnight weekdays), with the
+        original taken from the earliest in-window publish. Tested; no UI.
+  - [x] 46b. **Web schedule surfaces** - grid chip tooltips, hover card with
+        the day bar, deleted pill, the edit panel's unsaved-changes summary
+        (paired by identity, not position), and Publish History (every
+        segment's times, archived shifts by name).
+  - [x] 46c. **Web dashboards and records** - the staff dashboard "Was"
+        block (fixing the production path that drops time and focus area),
+        the admin "My schedule" tooltip, and the Gridmaster person record.
+  - [x] 46d. **Mobile** - Your week "Was" blocks and the "What changed"
+        sheet with the day bar, including job and rest-of-day absence.
+        After 45d.
+  - [x] 46e. **Schedule-change alerts** - one alert per person per publish
+        listing every changed day, a compact push, and an email with Before
+        and After. Needs a migration (the alert is written in the publish
+        function).
+  - [x] 46f. **Staff visibility setting** - two organization settings: show
+        staff what changed, and show who published. Hidden on the server as
+        well as on screen. Needs a migration and the hidden-state decisions
+        (no mark or a plain "Changed" mark; summary alert or none).
+  - [x] 46g. **12-hour sweep** - any remaining 24-hour time shown to people
+        (settings, reports, import) uses the shared 12-hour format.
+  - [x] 46h. **Activity log Before and After** - the organization activity
+        log shows each schedule edit as Before and After with names. Its
+        rows store only the new state, so the save must record the previous
+        one: an extra read per save or a migration (owner decision).
+- [ ] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
+      check of the draft: a focus area by day matrix (staffed / needed,
+      short, over, staff short per day), the draft compared with the
+      published schedule (gaps opened and closed), a detail for each cell
+      with Before and After and what changed, and ranked suggestions that
+      fix gaps in one click or explain why nothing can. Every insight is
+      measured on the schedule and must be exact (owner, 2026-10-21).
+      Design reference: the "Staffing check panel" canvas.
+  - [ ] 47a. **Matrix and changes since publish** - replaces the card list:
+        status per requirement including over, for the draft and the
+        published schedule; Whole draft and Changes since publish views;
+        cell detail with Before and After, still needed, Fill a spot (the
+        existing staffing modal) and Show in grid. People without edit
+        rights see published dates only and no suggestions. The button and
+        panel are named "Coverage Check" (owner, 2026-10-21). No migration.
+  - [ ] 47b. **What changed** - each cell names the draft changes behind
+        it (moved, removed, added, given an absence), from the draft versus
+        published difference.
+  - [ ] 47c. **Suggestion engine** - a tested schedule-core function:
+        undo a move that opened a gap and made an over, restore a removed
+        shift with no absence or request, assign qualified people who are
+        free that day (no overlapping shift), waiting pickup requests, and
+        repeating weekday gaps; impact measured by applying each to a copy;
+        a reason for every qualified person when nothing fits. No weekly
+        hours limit and no minimum rest rule (owner, 2026-10-21). No UI.
+  - [ ] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
+        ways to fix per cell, apply and undo through the normal draft save,
+        approve through the existing request approval behind a confirmation,
+        and the opened and closed counts in the Publish dialog. Approve
+        needs the approval-replaces-draft fix first.

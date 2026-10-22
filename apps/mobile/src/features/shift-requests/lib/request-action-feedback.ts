@@ -1,7 +1,9 @@
 import {
+  describeApprovalDraftWarning,
   describeCancelAwaitingRecipientCaution,
   describeShiftRequestSubmitted,
   isAwaitingRecipient,
+  type ShiftRequestDraftCell,
 } from "@dubgrid/domain";
 
 export type MobileRequestActionBody = {
@@ -16,6 +18,10 @@ export type MobileRequestActionSubject = {
   status: "open" | "pending_approval" | "approved" | "rejected" | "cancelled" | "expired";
   targetEmpId: string | null;
   targetName: string | null;
+  requesterEmpId?: string;
+  requesterName?: string;
+  /** Absent when not checked; null when the check failed. */
+  draftCells?: ShiftRequestDraftCell[] | null;
 };
 
 export type MobileRequestActionFeedback = {
@@ -24,7 +30,22 @@ export type MobileRequestActionFeedback = {
   key: string;
   message: string;
   title: string;
+  /** What approving would replace: shown before an approval, never after. */
+  warning?: string[];
 };
+
+function approvalWarning(request: MobileRequestActionSubject | undefined): string[] {
+  if (!request || request.draftCells === undefined || !request.requesterEmpId) return [];
+  return describeApprovalDraftWarning(
+    {
+      requesterEmpId: request.requesterEmpId,
+      requesterName: request.requesterName ?? "",
+      targetEmpId: request.targetEmpId,
+      targetName: request.targetName,
+    },
+    request.draftCells,
+  );
+}
 
 export type MobileRequestActionSuccessToast = {
   message: string;
@@ -105,6 +126,7 @@ export function getMobileRequestActionFeedback({
         key,
         message: "Approve this request? This will finalize the staffing change.",
         title: "Approve request?",
+        warning: approvalWarning(request),
       };
     case "reject":
       return {

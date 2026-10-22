@@ -13,6 +13,7 @@ import { createMobileShiftRequest, loadMobileShiftRequestsPayload } from "@dubgr
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import {
   fetchLinkedEmployeeForUser,
+  fetchMobileHiddenPeople,
   fetchMobileOpenShifts,
   fetchMobileScheduleEntries,
   fetchMobileShiftRequests,
@@ -49,11 +50,20 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
+  // Looked up once, and only when a loader the viewer may run needs it.
+  let hiddenLookup: Promise<string[]> | undefined;
+  const hiddenUserIds = () => (hiddenLookup ??= fetchMobileHiddenPeople(auth));
   const payload = await loadMobileShiftRequestsPayload(auth, range, {
     fetchLinkedEmployeeForUser,
-    fetchMobileOpenShifts,
-    fetchMobileScheduleEntries,
-    fetchMobileShiftRequests,
+    fetchMobileOpenShifts: async (serviceClient, input) =>
+      fetchMobileOpenShifts(serviceClient, { ...input, hiddenUserIds: await hiddenUserIds() }),
+    fetchMobileScheduleEntries: async (serviceClient, input) =>
+      fetchMobileScheduleEntries(serviceClient, {
+        ...input,
+        hiddenUserIds: await hiddenUserIds(),
+      }),
+    fetchMobileShiftRequests: async (serviceClient, input) =>
+      fetchMobileShiftRequests(serviceClient, { ...input, hiddenUserIds: await hiddenUserIds() }),
   });
 
   return NextResponse.json(mobileShiftRequestsResponseSchema.parse(payload));

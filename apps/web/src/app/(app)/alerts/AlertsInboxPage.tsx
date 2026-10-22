@@ -40,7 +40,11 @@ import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions, type Permissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
@@ -957,19 +961,13 @@ function Toolbar({
           type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={clearSearchOnEscape(onClearSearch)}
           placeholder="Search title or message…"
           aria-label="Search alerts"
           className="dg-input"
-          style={{ paddingLeft: 32, paddingRight: search ? 32 : 12 }}
+          style={{ paddingLeft: 32, paddingRight: search ? SEARCH_CLEAR_PADDING : 12 }}
         />
-        {search && (
-          <CloseButton
-            size="sm"
-            onClick={onClearSearch}
-            aria-label="Clear search"
-            style={{ position: "absolute", top: "50%", right: 6, transform: "translateY(-50%)" }}
-          />
-        )}
+        {search && <SearchClearButton onClear={onClearSearch} />}
       </div>
 
       <CustomSelect

@@ -1,4 +1,8 @@
-import { alignSegmentsToBefore, unclaimedBeforeIndices } from "@dubgrid/schedule-core";
+import {
+  alignSegmentsToBefore,
+  formatScheduleTimeValue,
+  unclaimedBeforeIndices,
+} from "@dubgrid/schedule-core";
 
 export type ShiftDiffBorderKind = "new" | "modified" | null;
 
@@ -12,6 +16,8 @@ export type ShiftDiffTimeRange = {
 export type ShiftDiffState = {
   assignmentIds?: number[] | null;
   absenceTypeId?: number | null;
+  /** A worked cell's absence for the rest of the day (item 45), its last pill. */
+  restOfDayAbsenceTypeId?: number | null;
   timeRanges?: ShiftDiffTimeRange[] | null;
   isMentoredFlags?: boolean[] | null;
 };
@@ -30,6 +36,8 @@ export type ShiftPillDiffDescriptor = {
 export type ShiftDiffDescriptorResult = {
   pillDiffs: ShiftPillDiffDescriptor[];
   cellBadge: ShiftDiffBadgeDescriptor | null;
+  /** The rest-of-day absence pill's own diff (item 45); null when it did not change. */
+  restOfDayDiff?: ShiftPillDiffDescriptor | null;
 };
 
 type BuildShiftDiffDescriptorsInput = {
@@ -76,8 +84,9 @@ function hasTimeRange(range: ShiftDiffTimeRange | undefined): boolean {
 function formatTimeRange(range: ShiftDiffTimeRange | undefined): string {
   const start = normalizeTimeValue(range?.start);
   const end = normalizeTimeValue(range?.end);
-  if (start && end) return `${start}-${end}`;
-  return start ?? end ?? "";
+  if (start && end) return `${formatScheduleTimeValue(start)} - ${formatScheduleTimeValue(end)}`;
+  const one = start ?? end;
+  return one ? formatScheduleTimeValue(one) : "";
 }
 
 function normalizeShiftLabelValue(value: string | null | undefined): string | null {
@@ -253,6 +262,47 @@ export function expandDelimitedTimeRanges(
 }
 
 export function buildShiftDiffDescriptors(
+  input: BuildShiftDiffDescriptorsInput,
+): ShiftDiffDescriptorResult {
+  const result = buildShiftOnlyDiffDescriptors(input);
+  const before = input.before.restOfDayAbsenceTypeId ?? null;
+  const after = input.after.restOfDayAbsenceTypeId ?? null;
+  if (before === after) return { ...result, restOfDayDiff: null };
+
+  const label = (id: number) => input.resolveAbsenceLabel?.(id) ?? "an absence";
+  if (after == null) {
+    // No pill is left to carry the change, so the cell says what went, as
+    // "Changed" like a removed segment, which keeps the marker on the cell
+    // while its shifts survive.
+    const detail = `Removed ${label(before!)} for the rest of the day.`;
+    return {
+      ...result,
+      restOfDayDiff: null,
+      cellBadge: result.cellBadge
+        ? { ...result.cellBadge, detail: `${result.cellBadge.detail} ${detail}` }
+        : { kind: "modified", text: "Changed", detail },
+    };
+  }
+  return {
+    ...result,
+    restOfDayDiff:
+      before == null
+        ? {
+            borderKind: "new",
+            badge: {
+              kind: "new",
+              text: "New",
+              detail: `Added ${label(after)} for the rest of the day.`,
+            },
+          }
+        : {
+            borderKind: "modified",
+            badge: { kind: "modified", text: "Edited", detail: `Was ${label(before)}.` },
+          },
+  };
+}
+
+function buildShiftOnlyDiffDescriptors(
   input: BuildShiftDiffDescriptorsInput,
 ): ShiftDiffDescriptorResult {
   const beforeAssignmentDefinitionIds = [...(input.before.assignmentIds ?? [])];
@@ -512,5 +562,31 @@ export function buildShiftDiffDescriptors(
       text: "Changed",
       detail: [...visibleActions.map((action) => action.detail), ...removedDetails].join(" "),
     },
+  };
+}
+
+/**
+ * The mark a published change carries when the organization hides what
+ * changed from this viewer (item 46f): New or Changed, saying nothing about
+ * the earlier shift. A removal is the deleted pill's own mark.
+ */
+export function hiddenPublishDiffDescriptors(
+  kind: "new" | "modified",
+  pillCount: number,
+): ShiftDiffDescriptorResult {
+  if (kind === "new") {
+    const badge: ShiftDiffBadgeDescriptor = {
+      kind: "new",
+      text: "New",
+      detail: "Added since the last publish.",
+    };
+    return {
+      pillDiffs: Array.from({ length: pillCount }, () => ({ borderKind: "new" as const, badge })),
+      cellBadge: badge,
+    };
+  }
+  return {
+    pillDiffs: [],
+    cellBadge: { kind: "modified", text: "Changed", detail: "Changed since the last publish." },
   };
 }

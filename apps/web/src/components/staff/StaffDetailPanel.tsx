@@ -52,7 +52,8 @@ interface StaffDetailPanelProps {
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
   onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
-  onActivate: (empId: string) => void;
+  onActivate: (empId: string) => void | Promise<unknown>;
+  statusStepUpOpen?: boolean;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
   /** Org access tier, matching the directory table's Access column. */
@@ -87,6 +88,7 @@ export function StaffDetailPanel({
   onRemove,
   onDeactivate,
   onActivate,
+  statusStepUpOpen = false,
   onClose,
   onInvite,
   orgRole,
@@ -439,6 +441,7 @@ export function StaffDetailPanel({
                           onDeactivate={onDeactivate}
                           onActivate={onActivate}
                           onRemove={onRemove}
+                          stepUpOpen={statusStepUpOpen}
                           variant="page"
                           fillWidth
                         />

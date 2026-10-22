@@ -8,6 +8,7 @@ import {
 import { API_ERRORS } from "@dubgrid/client-errors";
 import type { Organization } from "@dubgrid/domain";
 import {
+  fetchHiddenInternalUserIds,
   fetchMobileOrganizationMembershipRows,
   fetchMobileOrganizationRowById,
   fetchMobileProfilePlatformRole,
@@ -134,4 +135,12 @@ export async function requireMobileSensitiveActionAuth(
   }
 
   return auth;
+}
+
+/** The user ids this mobile viewer must not be shown: internal (QA) accounts, unless they may see them. */
+export function fetchMobileHiddenPeople(auth: MobileAuthContext): Promise<string[]> {
+  return fetchHiddenInternalUserIds(auth.serviceClient, {
+    userId: auth.user.id,
+    isGridmaster: auth.permissions.isGridmaster,
+  });
 }

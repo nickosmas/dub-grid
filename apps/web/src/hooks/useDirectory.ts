@@ -25,6 +25,9 @@ export function useDirectory(orgId: string | null): DirectoryData {
   // that key and expect an array, including many optimistic updates in
   // MembersSection.tsx.
   const [hasMore, setHasMore] = useState(false);
+  // The server's offset, not the cached length: it can leave hidden people
+  // out of a page, and optimistic edits change the cached list.
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const query = useQuery({
@@ -32,6 +35,7 @@ export function useDirectory(orgId: string | null): DirectoryData {
     queryFn: async () => {
       const result = await fetchOrganizationDirectory(orgId!, { limit: PAGE_SIZE, offset: 0 });
       setHasMore(result.hasMore);
+      setNextOffset(result.nextOffset);
       return result.directory;
     },
     enabled: !!orgId,
@@ -43,22 +47,20 @@ export function useDirectory(orgId: string | null): DirectoryData {
   // back to the first page — same tradeoff AlertsInboxPage's manual-cursor
   // pagination makes. Acceptable: it's a resync to fresh data, not data loss.
   const loadMore = useCallback(() => {
-    if (!orgId || loadingMore || !hasMore) return;
+    if (!orgId || loadingMore || !hasMore || nextOffset == null) return;
     setLoadingMore(true);
     void (async () => {
       try {
-        const currentLength = (
-          queryClient.getQueryData<DirectoryPerson[]>(queryKeys.org.directory(orgId)) ?? []
-        ).length;
         const result = await fetchOrganizationDirectory(orgId, {
           limit: PAGE_SIZE,
-          offset: currentLength,
+          offset: nextOffset,
         });
         queryClient.setQueryData<DirectoryPerson[]>(queryKeys.org.directory(orgId), (prev) => [
           ...(prev ?? []),
           ...result.directory,
         ]);
         setHasMore(result.hasMore);
+        setNextOffset(result.nextOffset);
       } catch {
         // Leave hasMore as-is so the "Load more" control stays visible and
         // the user can retry, rather than silently losing the ability to
@@ -67,7 +69,7 @@ export function useDirectory(orgId: string | null): DirectoryData {
         setLoadingMore(false);
       }
     })();
-  }, [orgId, loadingMore, hasMore, queryClient]);
+  }, [orgId, loadingMore, hasMore, nextOffset, queryClient]);
 
   return {
     directory: query.data ?? [],

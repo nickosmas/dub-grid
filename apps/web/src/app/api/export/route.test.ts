@@ -9,7 +9,8 @@ const isFeatureEnabled = vi.fn();
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -20,6 +21,11 @@ vi.mock("@/lib/feature-flags", () => ({
   isFeatureEnabled: (...args: unknown[]) => isFeatureEnabled(...args),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
+const fetchPublishedShiftRows = vi.fn();
+vi.mock("@/lib/published-shifts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/published-shifts")>()),
+  fetchPublishedShiftRows: (...args: unknown[]) => fetchPublishedShiftRows(...args),
+}));
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn() } }));
 
 const REQUESTED_ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -32,7 +38,13 @@ function makeRequest(orgId: string) {
   return new NextRequest(url);
 }
 
-function createServiceClientMock() {
+function createServiceClientMock(
+  tables: {
+    employees?: Array<Record<string, unknown>>;
+    internalIds?: string[];
+    absenceTypes?: Array<Record<string, unknown>>;
+  } = {},
+) {
   const orgIdFilters: string[] = [];
   const auditInsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -42,8 +54,23 @@ function createServiceClientMock() {
         return { insert: auditInsert };
       }
 
+      let rows: Array<Record<string, unknown>> =
+        table === "employees"
+          ? (tables.employees ?? [])
+          : table === "profiles"
+            ? (tables.internalIds ?? []).map((id) => ({ id }))
+            : table === "absence_types"
+              ? (tables.absenceTypes ?? [])
+              : [];
       const query = {
         select() {
+          return query;
+        },
+        or(filter: string) {
+          const dropped = filter.match(/not\.in\.\((.*)\)$/)?.[1]?.split(",") ?? [];
+          rows = rows.filter(
+            (row) => row.user_id == null || !dropped.includes(String(row.user_id)),
+          );
           return query;
         },
         eq(column: string, value: string) {
@@ -63,7 +90,7 @@ function createServiceClientMock() {
           onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
         ) {
-          return Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected);
+          return Promise.resolve({ data: rows, error: null }).then(onfulfilled, onrejected);
         },
       };
       return query;
@@ -85,7 +112,12 @@ describe("GET /api/export", () => {
 
   it("exports and audits the effective sandbox Organization, never the raw query id", async () => {
     const { serviceClient, orgIdFilters, auditInsert } = createServiceClientMock();
-    requireOrgPermissions.mockResolvedValue({ orgId: SANDBOX_ORG_ID, serviceClient });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: SANDBOX_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
 
     const { GET } = await import("./route");
     const response = await GET(makeRequest(REQUESTED_ORG_ID));
@@ -94,6 +126,31 @@ describe("GET /api/export", () => {
     expect(orgIdFilters).toContain(SANDBOX_ORG_ID);
     expect(orgIdFilters).not.toContain(REQUESTED_ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
+  });
+
+  it("leaves internal accounts out of a client's staff export, not a Gridmaster's", async () => {
+    const employees = [
+      { id: "e1", first_name: "Rosa", last_name: "Member", user_id: "member-1" },
+      { id: "e2", first_name: "QA", last_name: "Admin", user_id: "qa-person" },
+      { id: "e3", first_name: "Ida", last_name: "NoAccount", user_id: null },
+    ];
+    const { GET } = await import("./route");
+    async function exportFor(isGridmaster: boolean) {
+      const { serviceClient } = createServiceClientMock({ employees, internalIds: ["qa-person"] });
+      requireOrgPermissions.mockResolvedValue({
+        orgId: REQUESTED_ORG_ID,
+        serviceClient,
+        actor: { id: "user-1" },
+        permissions: { isGridmaster },
+      });
+      return (await GET(makeRequest(REQUESTED_ORG_ID))).text();
+    }
+
+    const forClient = await exportFor(false);
+    expect(forClient).toContain("Rosa");
+    expect(forClient).toContain("Ida");
+    expect(forClient).not.toContain("QA");
+    expect(await exportFor(true)).toContain("QA");
   });
 
   it("gates staff export on employee details and schedule export on shift editing", async () => {
@@ -127,6 +184,52 @@ describe("GET /api/export", () => {
         canViewSchedule: true,
       }),
     ).toBe(false);
+  });
+
+  it("writes a shift with an absence for the rest of the day as one cell, absence last", async () => {
+    const { serviceClient } = createServiceClientMock({
+      employees: [{ id: "e1", first_name: "Rosa", last_name: "Member", user_id: null }],
+      absenceTypes: [{ id: 4, label: "Sick" }],
+    });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
+    fetchPublishedShiftRows.mockResolvedValue([
+      {
+        emp_id: "e1",
+        date: "2026-05-04",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [
+          { shiftId: 1, jobId: 2, label: "D", startTime: "07:00", endTime: "15:00" },
+        ],
+        published_absence_type_id: null,
+        published_rest_of_day_absence_type_id: 4,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+      {
+        emp_id: "e1",
+        date: "2026-05-05",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [],
+        published_absence_type_id: 4,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+    ]);
+    const url = new URL("http://localhost/api/export");
+    url.searchParams.set("type", "schedule");
+    url.searchParams.set("orgId", REQUESTED_ORG_ID);
+    url.searchParams.set("startDate", "2026-05-04");
+    url.searchParams.set("endDate", "2026-05-05");
+    const { GET } = await import("./route");
+
+    const csv = await (await GET(new NextRequest(url))).text();
+
+    expect(csv).toContain("Rosa Member,D / Sick,Sick");
   });
 
   it("refuses a schedule range that is not a calendar date", async () => {

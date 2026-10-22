@@ -17,6 +17,15 @@ import { MaybeHint } from "@/components/ui/hint";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
+import {
+  attachedPillSeams,
+  gapBefore,
+  seamBorders,
+  seamRadius,
+  timesMeet,
+  type PillSeam,
+} from "@/lib/attached-pill";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type {
@@ -31,6 +40,13 @@ import type {
   ShiftMap,
   ScheduleNoteShift,
 } from "@/types";
+import type { ShiftChangeResolvers } from "@dubgrid/schedule-core";
+import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Every day cell shares one width, never below this: the longest time range
@@ -56,6 +72,7 @@ const APPROX_NAME_CHAR_WIDTH = 6.6;
 // in a week-sized cell; the cell links through to the schedule for the full value.
 const MAX_SHIFT_TEXT_LENGTH = 64;
 
+const NO_FOCUS_AREAS: NonNullable<MyScheduleRowProps["focusAreas"]> = [];
 const NO_NOTES: DashboardContentProps["scheduleNotes"] = [];
 const NO_INDICATOR_TYPES: DashboardContentProps["indicatorTypes"] = [];
 
@@ -71,6 +88,7 @@ type MyScheduleRowProps = Pick<
   jobs?: DashboardContentProps["jobs"];
   publishedAssignmentIdByPair?: DashboardContentProps["publishedAssignmentIdByPair"];
   shiftCategories?: DashboardContentProps["shiftCategories"];
+  focusAreas?: DashboardContentProps["focusAreas"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
@@ -94,6 +112,10 @@ type MyScheduleShift = {
   focusAreaId: number | null;
   noteShift: ScheduleNoteShift | null;
   noteMarks: ScheduleNoteMark[];
+  startTime: string | null;
+  endTime: string | null;
+  /** Edges where this pill touches its neighbour (connected in time). */
+  seams: PillSeam[];
 };
 
 function capShiftText(value: string): string {
@@ -161,12 +183,10 @@ function getDelimitedValue(
   count: number,
 ): string | null {
   if (!value) return null;
-  const parts = value
-    .split("|")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length > 1) return parts[index] ?? null;
-  return count <= 1 ? (parts[0] ?? null) : null;
+  // An unset part is stored empty ("|00:00"), so keep the positions.
+  const parts = value.split("|").map((part) => part.trim());
+  if (parts.length > 1) return parts[index] || null;
+  return count <= 1 ? parts[0] || null : null;
 }
 
 function buildWorkedShifts(input: {
@@ -234,6 +254,9 @@ function buildWorkedShifts(input: {
       // A cell stored before segments names its shift through the assignment.
       noteShift: noteShiftOf(segment.jobId != null ? segment : assignment),
       noteMarks: [],
+      startTime,
+      endTime,
+      seams: [],
     });
   });
 
@@ -248,6 +271,8 @@ function attachChangeBadges(
     assignmentById: Map<number, AssignmentDefinition>;
     absenceTypeById: Map<number, AbsenceType>;
     publishedAssignmentIdByPair: Map<string, number>;
+    /** The published change as "Was ..." text, which replaces the older detail. */
+    publishChangeText: string | null;
   },
 ): MyScheduleShift[] {
   const badges = resolveCellChangeBadges({
@@ -264,11 +289,17 @@ function attachChangeBadges(
       return absence ? absence.name || absence.label : "?";
     },
   });
-  return shifts.map((shift, index) => ({
-    ...shift,
-    badge: badges.pillBadges[index] ?? null,
-    borderKind: badges.pillBorderKinds[index] ?? null,
-  }));
+  return shifts.map((shift, index) => {
+    const badge = badges.pillBadges[index] ?? null;
+    return {
+      ...shift,
+      badge:
+        badge && badge.source === "publish" && input.publishChangeText
+          ? { ...badge, detail: input.publishChangeText }
+          : badge,
+      borderKind: badges.pillBorderKinds[index] ?? null,
+    };
+  });
 }
 
 function buildMyScheduleDay(input: {
@@ -284,6 +315,7 @@ function buildMyScheduleDay(input: {
   publishedAssignmentIdByPair: Map<string, number>;
   scheduleNotes: DashboardContentProps["scheduleNotes"];
   isScheduleEditor: boolean;
+  shiftChangeResolvers: ShiftChangeResolvers;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
@@ -302,6 +334,7 @@ function buildMyScheduleDay(input: {
           ...entry,
           assignmentIds: entry.publishedAssignmentDefinitionIds,
           absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+          restOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
           customStartTime: entry.publishedCustomStartTime ?? null,
           customEndTime: entry.publishedCustomEndTime ?? null,
           label: entry.publishedLabel,
@@ -314,48 +347,59 @@ function buildMyScheduleDay(input: {
           draftKind: null,
           segments: publishedChange?.fromSegments ?? [],
           absenceTypeId: publishedChange?.fromAbsenceTypeId ?? null,
+          restOfDayAbsenceTypeId: publishedChange?.fromRestOfDayAbsenceTypeId ?? null,
           customStartTime: publishedChange?.fromCustomStart ?? null,
           customEndTime: publishedChange?.fromCustomEnd ?? null,
           publishedAssignmentDefinitionIds: [],
           publishedLabel: "",
         });
 
+  const publishChangeView =
+    publishedChange && !publishedChange.detailsHidden && publishChangeHasStates(publishedChange)
+      ? describeCellStateChange(
+          publishedChange.fromState,
+          publishedChange.toState,
+          dateKey,
+          input.shiftChangeResolvers,
+        )
+      : null;
   const badgeInput = {
     entry,
     publishedChange,
     assignmentById: input.assignmentById,
     absenceTypeById: input.absenceTypeById,
     publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
+    publishChangeText: publishChangeView ? formatShiftChangeWasText(publishChangeView) : null,
+  };
+
+  const absenceShift = (absenceTypeId: number, fallbackLabel: string): MyScheduleShift => {
+    const absence = input.absenceTypeById.get(absenceTypeId) ?? null;
+    const resolved = absence ? absenceStripeFill(absence.color, input.isDarkTheme) : null;
+    return {
+      label: absence?.name ?? fallbackLabel,
+      jobName: null,
+      timeRange: null,
+      background: resolved?.background ?? "var(--dg-color-bg-secondary)",
+      border: resolved?.border ?? "var(--dg-color-border)",
+      textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
+      badge: null,
+      borderKind: null,
+      focusAreaId: null,
+      noteShift: null,
+      noteMarks: [],
+      startTime: null,
+      endTime: null,
+      seams: [],
+    };
   };
 
   if (displayEntry.absenceTypeId != null) {
-    const absence = input.absenceTypeById.get(displayEntry.absenceTypeId) ?? null;
-    const resolved = absence
-      ? resolveShiftPillColors(
-          { color: absence.color, text: absence.text, border: absence.border },
-          input.isDarkTheme,
-        )
-      : null;
     return {
       key: dateKey,
       dateKey,
       date: input.date,
       shifts: attachChangeBadges(
-        [
-          {
-            label: absence?.name ?? displayEntry.label ?? "Away",
-            jobName: null,
-            timeRange: null,
-            background: resolved?.color ?? "var(--dg-color-bg-secondary)",
-            border: resolved?.border ?? "var(--dg-color-border)",
-            textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
-            badge: null,
-            borderKind: null,
-            focusAreaId: null,
-            noteShift: null,
-            noteMarks: [],
-          },
-        ],
+        [absenceShift(displayEntry.absenceTypeId, displayEntry.label || "Away")],
         badgeInput,
       ),
     };
@@ -382,11 +426,28 @@ function buildMyScheduleDay(input: {
     });
   }
 
+  // The absence for the rest of the day comes after the shifts (item 45).
+  const restOfDayAbsenceTypeId = displayEntry.restOfDayAbsenceTypeId ?? null;
+  const hasRestOfDay = restOfDayAbsenceTypeId != null && workedShifts.length > 0;
+  const shifts = hasRestOfDay
+    ? [...workedShifts, absenceShift(restOfDayAbsenceTypeId, "Absence")]
+    : workedShifts;
+  // Pills touch only when connected in time; the absence starts as the last shift ends.
+  const seams = attachedPillSeams("stacked", [
+    ...workedShifts
+      .slice(1)
+      .map((shift, index) => timesMeet(workedShifts[index].endTime, shift.startTime)),
+    ...(hasRestOfDay ? [true] : []),
+  ]);
+  shifts.forEach((shift, index) => {
+    shift.seams = seams[index];
+  });
+
   return {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: attachChangeBadges(workedShifts, badgeInput),
+    shifts: attachChangeBadges(shifts, badgeInput),
   };
 }
 
@@ -403,6 +464,7 @@ function buildMyScheduleDays(input: {
   publishedAssignmentIdByPair: Map<string, number>;
   scheduleNotes: DashboardContentProps["scheduleNotes"];
   isScheduleEditor: boolean;
+  shiftChangeResolvers: ShiftChangeResolvers;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
@@ -418,6 +480,7 @@ function buildMyScheduleDays(input: {
       publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
       scheduleNotes: input.scheduleNotes,
       isScheduleEditor: input.isScheduleEditor,
+      shiftChangeResolvers: input.shiftChangeResolvers,
     }),
   );
 }
@@ -548,11 +611,13 @@ function isCrowdedByPill(shift: MyScheduleShift, cellWidth: number): boolean {
 
 function ShiftPill({
   shift,
+  index,
   alignLeft,
   indicatorTypes,
   height,
 }: {
   shift: MyScheduleShift;
+  index: number;
   alignLeft: boolean;
   indicatorTypes: DashboardContentProps["indicatorTypes"];
   height: number;
@@ -571,10 +636,14 @@ function ShiftPill({
         justifyContent: "center",
         textAlign: alignLeft ? "left" : undefined,
         padding: "8px",
-        borderRadius: "var(--dg-radius-sm, 6px)",
-        border: shift.borderKind
-          ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
-          : `1px solid ${shift.border}`,
+        borderRadius: seamRadius("var(--dg-radius-sm, 6px)", shift.seams),
+        ...seamBorders(
+          shift.borderKind
+            ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
+            : `1px solid ${shift.border}`,
+          shift.seams,
+        ),
+        ...gapBefore(index, shift.seams, "stacked", 4),
         background: shift.background,
         color: shift.textColor,
         boxSizing: "border-box",
@@ -754,7 +823,6 @@ function DayBox({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 4,
             marginTop: 4,
             justifyContent: "flex-start",
             flex: 1,
@@ -766,6 +834,7 @@ function DayBox({
             day.shifts.map((shift, index) => (
               <ShiftPill
                 key={index}
+                index={index}
                 shift={shift}
                 alignLeft={alignLeft}
                 indicatorTypes={indicatorTypes}
@@ -786,6 +855,7 @@ export default function MyScheduleRow({
   absenceTypeById,
   jobs = [],
   shiftCategories = [],
+  focusAreas = NO_FOCUS_AREAS,
   periodDates,
   periodLabel,
   isManagementOnly = false,
@@ -810,6 +880,17 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: [...assignmentById.values()],
+        shiftCategories,
+        jobs,
+        absenceTypes: [...absenceTypeById.values()],
+        focusAreas,
+      }),
+    [assignmentById, shiftCategories, jobs, absenceTypeById, focusAreas],
+  );
   const days = useMemo(
     () =>
       currentEmpId
@@ -826,6 +907,7 @@ export default function MyScheduleRow({
             publishedAssignmentIdByPair: assignmentIdByPair,
             scheduleNotes,
             isScheduleEditor,
+            shiftChangeResolvers,
           })
         : [],
     [
@@ -841,6 +923,7 @@ export default function MyScheduleRow({
       assignmentIdByPair,
       scheduleNotes,
       isScheduleEditor,
+      shiftChangeResolvers,
     ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);

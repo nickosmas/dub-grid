@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -151,7 +152,16 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
         {schedule.publishChanges.map((change, index) => (
           <Row
             key={`${change.publishedAt}-${change.date}-${index}`}
-            primary={`${formatDay(change.date)}: ${change.from ?? "Nothing"} to ${change.to ?? "nothing"}`}
+            primary={
+              change.change && change.change.kind !== "none" ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="font-semibold">{formatDay(change.date)}</span>
+                  <ShiftChangeCard change={change.change} layout="stacked" />
+                </div>
+              ) : (
+                `${formatDay(change.date)}: ${change.from ?? "Nothing"} to ${change.to ?? "nothing"}`
+              )
+            }
             secondary={[
               `Published ${formatMoment(change.publishedAt)}`,
               actor(schedule, change.publishedBy)

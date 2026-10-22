@@ -85,6 +85,9 @@ import {
 export * from "./team-schedule";
 export * from "./open-shifts";
 export * from "./segment-alignment";
+export * from "./shift-change";
+export * from "./shift-change-input";
+export * from "./shift-change-text";
 import { getRequestSortTime } from "./open-shifts";
 
 export function isDeletedScheduleHistory(entry: Pick<ScheduleEntryLike, "change">): boolean {

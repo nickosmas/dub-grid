@@ -51,11 +51,13 @@ export default function AdminDashboard(props: DashboardContentProps) {
         openShifts,
         draftTotal,
         currentEmpId,
+        orgId: props.org.id,
         onResolve: permissions.canApproveShiftRequests ? shiftRequests.resolve : undefined,
         assignmentNameMap,
       }),
     [
       currentEmpId,
+      props.org.id,
       draftTotal,
       openShifts,
       permissions.canApproveShiftRequests,
@@ -102,6 +104,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
         absenceTypeById={absenceTypeById}
         jobs={jobs}
         shiftCategories={shiftCategories}
+        focusAreas={focusAreas}
         periodDates={periodDates}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

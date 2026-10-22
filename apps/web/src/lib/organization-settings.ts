@@ -20,6 +20,8 @@ export type OrganizationSettingsKey =
   | "shiftDisplayMode"
   | "showShiftDetailHoverCards"
   | "useCompactRoleCertificationLabels"
+  | "staffSeeShiftChanges"
+  | "staffSeePublisher"
   | "enforceConflictPrevention"
   | "defaultShiftEnabled"
   | "coverageRuleConfig"
@@ -105,6 +107,16 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     sensitive: false,
     format: (value) => (value ? "Enabled" : "Disabled"),
   },
+  staffSeeShiftChanges: {
+    label: "Staff See What Changed",
+    sensitive: false,
+    format: (value) => (value ? "Shown" : "Hidden"),
+  },
+  staffSeePublisher: {
+    label: "Staff See Who Published",
+    sensitive: false,
+    format: (value) => (value ? "Shown" : "Hidden"),
+  },
   payPeriodStartDate: {
     label: "Pay Period Start Date",
     sensitive: true,
@@ -167,6 +179,8 @@ export function pickOrganizationSettings(organization: Organization): Organizati
     shiftDisplayMode: organization.shiftDisplayMode,
     showShiftDetailHoverCards: organization.showShiftDetailHoverCards ?? true,
     useCompactRoleCertificationLabels: organization.useCompactRoleCertificationLabels ?? false,
+    staffSeeShiftChanges: organization.staffSeeShiftChanges ?? true,
+    staffSeePublisher: organization.staffSeePublisher ?? true,
     enforceConflictPrevention: organization.enforceConflictPrevention,
     defaultShiftEnabled: organization.defaultShiftEnabled,
     coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },

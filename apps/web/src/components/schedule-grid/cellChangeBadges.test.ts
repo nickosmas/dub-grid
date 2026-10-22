@@ -404,3 +404,109 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBorderKinds).toEqual(["modified"]);
   });
 });
+
+describe("resolveCellChangeBadges: absence for the rest of the day", () => {
+  const SICK = 8;
+  const BEREAVEMENT = 9;
+
+  it("dashes a draft absence added beside a published shift, and only that pill", () => {
+    const result = resolve({
+      entry: {
+        assignmentIds: [DAY],
+        label: "D",
+        isDraft: true,
+        draftKind: "modified",
+        restOfDayAbsenceTypeId: SICK,
+        publishedAssignmentDefinitionIds: [DAY],
+        publishedLabel: "D",
+      },
+      pillCount: 2,
+    });
+    expect(result.pillBadges).toEqual([null, null]);
+    expect(result.pillBorderKinds).toEqual([null, "new"]);
+  });
+
+  it("marks a draft change of absence on the absence pill", () => {
+    const result = resolve({
+      entry: {
+        assignmentIds: [DAY],
+        label: "D",
+        isDraft: true,
+        draftKind: "modified",
+        restOfDayAbsenceTypeId: BEREAVEMENT,
+        publishedAssignmentDefinitionIds: [DAY],
+        publishedLabel: "D",
+        publishedRestOfDayAbsenceTypeId: SICK,
+      },
+      pillCount: 2,
+    });
+    expect(result.pillBadges[0]).toBeNull();
+    expect(result.pillBadges[1]).toMatchObject({ source: "draft", label: "Edited" });
+    expect(result.pillBorderKinds).toEqual([null, "modified"]);
+  });
+
+  it("chips a published absence as New on its own pill", () => {
+    const result = resolve({
+      entry: {
+        assignmentIds: [DAY],
+        label: "D",
+        restOfDayAbsenceTypeId: SICK,
+        publishedAssignmentDefinitionIds: [DAY],
+        publishedRestOfDayAbsenceTypeId: SICK,
+      },
+      publishChange: { from: [DAY], to: [DAY], toRestOfDayAbsenceTypeId: SICK },
+      pillCount: 2,
+    });
+    expect(result.pillBadges[0]).toBeNull();
+    expect(result.pillBadges[1]).toMatchObject({ source: "publish", kind: "new", label: "New" });
+  });
+
+  it("says on the cell that a published absence was removed", () => {
+    const result = resolve({
+      entry: { assignmentIds: [DAY], label: "D", publishedAssignmentDefinitionIds: [DAY] },
+      publishChange: { from: [DAY], to: [DAY], fromRestOfDayAbsenceTypeId: SICK },
+      pillCount: 1,
+    });
+    expect(result.pillBadges[0]).toMatchObject({ source: "publish", label: "Edited" });
+    expect(result.pillBadges[0]?.detail).toContain("rest of the day");
+  });
+});
+
+describe("resolveCellChangeBadges: details the organization hides (46f)", () => {
+  const published = { assignmentIds: [DAY], publishedAssignmentDefinitionIds: [DAY] };
+
+  it("marks a hidden edit as changed without naming the earlier shift", () => {
+    const { pillBadges } = resolve({
+      entry: published,
+      publishChange: {
+        kind: "modified",
+        detailsHidden: true,
+        fromState: null,
+        toState: workedState([segment(10, 0)]),
+      },
+      pillCount: 1,
+    });
+
+    expect(pillBadges[0]).toMatchObject({
+      kind: "modified",
+      text: "Changed",
+      detail: "Changed since the last publish.",
+    });
+    expect(pillBadges[0]?.detail).not.toMatch(/Night|Day/);
+  });
+
+  it("marks a hidden addition as new on every pill", () => {
+    const { pillBadges } = resolve({
+      entry: { assignmentIds: [DAY, NIGHT], publishedAssignmentDefinitionIds: [DAY, NIGHT] },
+      publishChange: {
+        kind: "new",
+        isNewAddition: true,
+        detailsHidden: true,
+        toState: workedState([segment(10, 0), segment(20, 1)]),
+      },
+      pillCount: 2,
+    });
+
+    expect(pillBadges.map((badge) => badge?.text)).toEqual(["New", "New"]);
+  });
+});

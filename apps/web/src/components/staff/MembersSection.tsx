@@ -56,7 +56,11 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
-import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { NumericBadge } from "@/components/ui/numeric-badge";
@@ -129,7 +133,7 @@ export interface MembersSectionProps {
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
   onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
   statusStepUpOpen?: boolean;
-  onActivate: (empId: string) => void;
+  onActivate: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -389,6 +393,7 @@ export function MembersSection({
     isDirty,
     enterReorder: handleEnterReorder,
     saveOrder: handleSaveOrder,
+    discardReorder: handleDiscardReorder,
     cancelReorder: handleCancelReorder,
     moveEmployee,
     displayList,
@@ -1322,6 +1327,7 @@ export function MembersSection({
                   className="dg-input w-full"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
                   placeholder={
                     regularUserMode
                       ? "Search by name or qualification..."
@@ -1329,22 +1335,10 @@ export function MembersSection({
                   }
                   style={{
                     paddingLeft: 32,
-                    paddingRight: searchQuery ? 30 : 12,
+                    paddingRight: searchQuery ? SEARCH_CLEAR_PADDING : 12,
                   }}
                 />
-                {searchQuery && (
-                  <CloseButton
-                    size="sm"
-                    onClick={() => setSearchQuery("")}
-                    aria-label="Clear search"
-                    style={{
-                      position: "absolute",
-                      right: 4,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                    }}
-                  />
-                )}
+                {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
               </div>
             </div>
 
@@ -1523,6 +1517,7 @@ export function MembersSection({
               isReordering={isReordering}
               isDirty={isDirty}
               onSaveOrder={handleSaveOrder}
+              onDiscardReorder={handleDiscardReorder}
               onCancelReorder={handleCancelReorder}
             />
           )}
@@ -2154,6 +2149,7 @@ export function MembersSection({
           onRemove={onRemove}
           onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
           onActivate={(employeeId) => onActivate(employeeId)}
+          statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
           onInvite={
             canManageManagementAccess ? (employee) => setInviteEmployee(employee) : undefined

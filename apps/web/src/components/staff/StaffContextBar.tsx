@@ -1,9 +1,10 @@
 "use client";
 
+import { GripVertical } from "lucide-react";
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useIsInSandbox } from "@/hooks";
 import type {
   AccountLinkFilter,
@@ -58,9 +59,15 @@ interface StaffContextBarProps {
   // Reorder
   isReordering: boolean;
   isDirty: boolean;
-  onSaveOrder: () => void;
+  onSaveOrder: () => Promise<void>;
+  /** Puts the rows back in their saved order and stays in reorder mode. */
+  onDiscardReorder: () => void;
   onCancelReorder: () => void;
 }
+
+const MODE_BAR_CLASS =
+  "flex items-center flex-wrap gap-x-3 gap-y-2 px-4 py-2.5 rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-control-active-bg)]";
+const MODE_BAR_TITLE_CLASS = "text-[13px] font-semibold text-[var(--dg-color-control-active-text)]";
 
 export function StaffContextBar({
   filterEmploymentType,
@@ -105,6 +112,7 @@ export function StaffContextBar({
   isReordering,
   isDirty,
   onSaveOrder,
+  onDiscardReorder,
   onCancelReorder,
 }: StaffContextBarProps) {
   const isInSandbox = useIsInSandbox();
@@ -229,140 +237,85 @@ export function StaffContextBar({
 
       {/* Bulk action bar */}
       {showBulk && (
-        <div className="flex items-center gap-4 px-5 py-3 rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-control-active-bg)]">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
-              style={{ background: "var(--dg-color-control-primary)" }}
-            >
-              <span className="text-[12px] font-bold text-white">{selectionCount}</span>
-            </div>
-            <span className="text-[13px] font-semibold text-[var(--dg-color-control-active-text)]">
-              {selectionCount} selected
-            </span>
+        <div className={MODE_BAR_CLASS}>
+          <span className={`${MODE_BAR_TITLE_CLASS} dg-tabular-nums`}>
+            {selectionCount} selected
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {invitableEmployees.length > 0 && canManageManagementAccess && (
+              <Button
+                onClick={() => onBulkInvite(invitableEmployees)}
+                disabled={isInSandbox}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                title={
+                  isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
+                }
+              >
+                Invite ({invitableEmployees.length})
+              </Button>
+            )}
+            {activatableIds.length > 0 && (
+              <Button
+                onClick={() => onBulkActivate(activatableIds)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                Activate
+                {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
+              </Button>
+            )}
+            {deactivatableIds.length > 0 && (
+              <Button
+                onClick={() => onBulkDeactivate(deactivatableIds)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                Deactivate
+                {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
+              </Button>
+            )}
+            {removableIds.length > 0 && (
+              <Button
+                onClick={() => onBulkRemove(removableIds)}
+                className="dg-btn dg-btn-danger dg-btn-sm"
+              >
+                Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
+              </Button>
+            )}
+            <Button onClick={onClearSelection} className="dg-btn dg-btn-ghost dg-btn-sm">
+              Clear selection
+            </Button>
           </div>
-          <div className="flex-1" />
-          {invitableEmployees.length > 0 && canManageManagementAccess && (
-            <Button
-              onClick={() => onBulkInvite(invitableEmployees)}
-              disabled={isInSandbox}
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              title={
-                isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
-              }
-            >
-              Invite ({invitableEmployees.length})
-            </Button>
-          )}
-          {activatableIds.length > 0 && (
-            <Button
-              onClick={() => onBulkActivate(activatableIds)}
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-            >
-              Activate
-              {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
-            </Button>
-          )}
-          {deactivatableIds.length > 0 && (
-            <Button
-              onClick={() => onBulkDeactivate(deactivatableIds)}
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-            >
-              Deactivate
-              {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
-            </Button>
-          )}
-          {removableIds.length > 0 && (
-            <Button
-              onClick={() => onBulkRemove(removableIds)}
-              className="dg-btn dg-btn-danger dg-btn-sm"
-            >
-              Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
-            </Button>
-          )}
-          <Button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
-            Cancel
-          </Button>
         </div>
       )}
 
       {/* Reorder bar */}
       {showReorder && (
-        <div className="flex items-center gap-4 px-5 py-3 rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-control-active-bg)]">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
-              style={{ background: "white" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 14 14">
-                <rect
-                  x="3"
-                  y="1"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-                <rect
-                  x="8.5"
-                  y="1"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-                <rect
-                  x="3"
-                  y="5.75"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-                <rect
-                  x="8.5"
-                  y="5.75"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-                <rect
-                  x="3"
-                  y="10.5"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-                <rect
-                  x="8.5"
-                  y="10.5"
-                  width="2.5"
-                  height="2.5"
-                  rx="1.25"
-                  fill="var(--dg-color-control-primary)"
-                />
-              </svg>
-            </div>
-            <div>
-              <span className="text-[13px] font-semibold text-[var(--dg-color-control-active-text)]">
-                Reorder Mode
-              </span>
-              <p className="mt-0.5 text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
-                Drag rows to change seniority order
-              </p>
-            </div>
+        <div className={MODE_BAR_CLASS}>
+          <GripVertical
+            size={16}
+            aria-hidden
+            className="shrink-0 text-[var(--dg-color-text-muted)]"
+          />
+          <div className="min-w-0">
+            <p className={MODE_BAR_TITLE_CLASS}>Reorder by seniority</p>
+            <p className="mt-0.5 text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-muted)]">
+              Drag rows into order, then save.
+            </p>
           </div>
-          <div className="flex-1" />
-          <Button onClick={onCancelReorder} className="dg-btn dg-btn-secondary dg-btn-sm">
-            {EDITOR_ACTION_LABELS.close}
-          </Button>
-          {isDirty && (
-            <Button onClick={onSaveOrder} className="dg-btn dg-btn-primary dg-btn-sm">
-              Save Order
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              onClick={isDirty ? onDiscardReorder : onCancelReorder}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
             </Button>
-          )}
+            <Button
+              onClick={onSaveOrder}
+              disabled={!isDirty}
+              className="dg-btn dg-btn-primary dg-btn-sm"
+            >
+              Save order
+            </Button>
+          </div>
         </div>
       )}
     </div>

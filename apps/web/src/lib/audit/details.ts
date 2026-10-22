@@ -61,7 +61,7 @@ export function formatShortDate(value: string): string {
 export function formatDateTime(value: string | Date): string | null {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", hour12: true });
 }
 
 /**

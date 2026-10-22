@@ -18,9 +18,17 @@ const fetchMobileShiftRequests = vi.fn();
 const fetchMobileOpenShifts = vi.fn();
 const fetchMobileScheduleEntries = vi.fn();
 
-vi.mock("@/features/mobile/server", () => ({
+vi.mock("@/features/mobile/server", async () => ({
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
+  // The real lookup where a test gives the client tables; none hidden otherwise.
+  fetchMobileHiddenPeople: async (auth: { serviceClient: { from?: unknown } }) => {
+    if (typeof auth.serviceClient.from !== "function") return [];
+    const { fetchMobileHiddenPeople } = await vi.importActual<
+      typeof import("@/features/mobile/server/auth")
+    >("@/features/mobile/server/auth");
+    return fetchMobileHiddenPeople(auth as never);
+  },
   fetchMobileOpenShifts,
   fetchMobileScheduleEntries,
   fetchMobileShiftRequests,
@@ -33,13 +41,29 @@ const ACTIVE_STAFF = [
 ];
 
 /** A service client whose only table is the organization's active staff list. */
-function activeStaffClient(ids: string[]) {
-  const query = {
-    select: () => query,
-    eq: () => query,
-    is: async () => ({ data: ids.map((id) => ({ id })), error: null }),
+/** Active staff whose account ids equal their staff ids; `internalIds` are internal accounts. */
+function activeStaffClient(ids: string[], internalIds: string[] = []) {
+  return {
+    from: (table: string) => {
+      let rows =
+        table === "profiles"
+          ? internalIds.map((id) => ({ id }))
+          : ids.map((id) => ({ id, user_id: id }));
+      const query = {
+        select: () => query,
+        eq: () => query,
+        is: () => query,
+        or: (filter: string) => {
+          const dropped = filter.match(/not\.in\.\((.*)\)$/)?.[1]?.split(",") ?? [];
+          rows = rows.filter((row) => !dropped.includes(row.id));
+          return query;
+        },
+        then: (resolve: (value: unknown) => unknown) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve),
+      };
+      return query;
+    },
   };
-  return { from: () => query };
 }
 
 describe("mobile shift-requests route", () => {
@@ -163,6 +187,7 @@ describe("mobile shift-requests route", () => {
         includeOpenPickupRequests: true,
         startDate: "2026-04-18",
         endDate: "2026-05-01",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileOpenShifts).toHaveBeenCalledWith(
@@ -174,6 +199,7 @@ describe("mobile shift-requests route", () => {
         endDate: "2026-05-01",
         showAll: false,
         timeZone: "America/Los_Angeles",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
@@ -183,6 +209,7 @@ describe("mobile shift-requests route", () => {
         employeeId: "emp-1",
         startDate: expect.any(String),
         endDate: expect.any(String),
+        hiddenUserIds: [],
       },
     );
   });
@@ -224,6 +251,7 @@ describe("mobile shift-requests route", () => {
         includeOpenPickupRequests: true,
         startDate: "2026-04-19",
         endDate: "2026-04-25",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileOpenShifts).toHaveBeenCalledWith(
@@ -235,6 +263,7 @@ describe("mobile shift-requests route", () => {
         endDate: "2026-04-25",
         showAll: false,
         timeZone: "America/Los_Angeles",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
@@ -244,6 +273,7 @@ describe("mobile shift-requests route", () => {
         employeeId: "emp-1",
         startDate: "2026-04-19",
         endDate: "2026-04-25",
+        hiddenUserIds: [],
       },
     );
   });
@@ -643,6 +673,7 @@ describe("mobile shift-requests route", () => {
         includeOpenPickupRequests: false,
         startDate: "2026-04-18",
         endDate: "2026-05-01",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileOpenShifts).toHaveBeenCalledWith(
@@ -653,6 +684,7 @@ describe("mobile shift-requests route", () => {
         endDate: "2026-05-01",
         showAll: true,
         timeZone: "America/Los_Angeles",
+        hiddenUserIds: [],
       },
     );
     expect(fetchMobileScheduleEntries).not.toHaveBeenCalled();
@@ -710,13 +742,25 @@ describe("mobile shift-requests route", () => {
   });
 
   it.each([
-    ["returns eligible swap options for a regular linked employee", ACTIVE_STAFF, ["Jordan Lee"]],
+    [
+      "returns eligible swap options for a regular linked employee",
+      ACTIVE_STAFF,
+      [],
+      ["Jordan Lee"],
+    ],
     [
       "leaves out a teammate who is no longer active",
       ACTIVE_STAFF.filter((id) => id !== "22222222-2222-4222-8222-222222222222"),
       [],
+      [],
     ],
-  ])("%s", async (_name, activeStaff, expectedNames) => {
+    [
+      "never offers a client an internal account as a partner",
+      ACTIVE_STAFF,
+      ["22222222-2222-4222-8222-222222222222"],
+      [],
+    ],
+  ])("%s", async (_name, activeStaff, internalIds, expectedNames) => {
     requireMobileAuth.mockResolvedValue({
       currentOrg: {
         id: "org-1",
@@ -727,7 +771,7 @@ describe("mobile shift-requests route", () => {
         canManageEmployees: false,
         canApproveShiftRequests: false,
       },
-      serviceClient: activeStaffClient(activeStaff),
+      serviceClient: activeStaffClient(activeStaff, internalIds),
       user: {
         id: "user-1",
       },

@@ -184,8 +184,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meHeroBadgeDotScheduled: {
       backgroundColor: "#BFDBFE",
     },
+    // A light neutral like its green and blue siblings: the hero is the same
+    // deep blue in every status, where `textMuted` grey all but disappeared.
     meHeroBadgeDotMuted: {
-      backgroundColor: mobileColors.textMuted,
+      backgroundColor: "#CBD5E1",
     },
     meHeroBadgeText: {
       ...mobileText.label,
@@ -460,19 +462,30 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // Rows and card surfaces that navigate take the same rounded highlight
     // as every other pressable row: it bleeds past the content by the inset
     // and gives it back as padding, so the text stays where it was.
+    // The tap area is inset the same 8 from the dividers, the date tile and
+    // the card's edge (the card pads 20, the tile's gap is 16), and pads its
+    // content the same 12 on every side, so its press highlight sits evenly.
     upcomingShiftRow: {
-      minHeight: 132,
+      minHeight: 116,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.lg,
-      paddingVertical: mobileSpace.lg,
-      ...pressableBleed,
+      marginVertical: mobileSpace.sm,
+      marginLeft: -mobileSpace.sm,
+      marginRight: -mobileSpace.md,
+      padding: mobileSpace.md,
+      borderRadius: mobileRadii.control,
+      overflow: "hidden",
     },
     upcomingUnscheduledRow: {
       minHeight: 132,
       justifyContent: "center",
       gap: 4,
       paddingVertical: mobileSpace.lg,
+    },
+    upcomingWhatChanged: {
+      alignSelf: "stretch",
+      marginTop: mobileSpace.sm,
     },
     upcomingDeletedHistoryRow: {
       paddingVertical: mobileSpace.md,
@@ -531,8 +544,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textPrimary,
     },
+    // Regular weight so the focus area reads as detail under the bold shift
+    // name rather than as a second heading, as it does on the Requests card.
     upcomingShiftArea: {
-      ...mobileText.rowTitle,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     upcomingShiftTime: {
@@ -582,7 +597,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     scheduleRowMeta: {
-      ...mobileText.rowTitle,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     scheduleRowContext: {
@@ -600,7 +615,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 8,
     },
     scheduleRowTimeText: {
-      ...mobileTextWeighted("rowTitle", "medium"),
+      ...mobileText.body,
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },

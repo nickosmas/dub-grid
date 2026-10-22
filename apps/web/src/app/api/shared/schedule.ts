@@ -1,64 +1,10 @@
-import type { DbFocusArea, DbJobDefinition, DbShiftCategory } from "@dubgrid/db-types";
-import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
-import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
-import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS } from "@/lib/db/shared";
+import { fetchAssignmentContext } from "@/lib/server/schedule-context";
 import {
   createAssignmentDefinitionIdByPairMap,
   createShiftJobCompatibilityMaps,
   type SegmentCompatibilityMaps,
 } from "@/lib/shift-job-segments";
 import type { getServiceClient } from "@/lib/supabase-service";
-
-async function fetchAssignmentContext(
-  serviceClient: ReturnType<typeof getServiceClient>,
-  orgId: string,
-) {
-  const [focusAreaResult, shiftCategoryResult, jobResult] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select(FOCUS_AREA_COLS)
-      .eq("org_id", orgId)
-      .order("sort_order", { ascending: true }),
-    serviceClient
-      .from("shift_categories")
-      .select(SHIFT_CATEGORY_COLS)
-      .eq("org_id", orgId)
-      .order("sort_order", { ascending: true }),
-    serviceClient
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId)
-      .order("sort_order", { ascending: true }),
-  ]);
-
-  if (focusAreaResult.error) {
-    throw focusAreaResult.error;
-  }
-  if (shiftCategoryResult.error) {
-    throw shiftCategoryResult.error;
-  }
-  if (jobResult.error) {
-    throw jobResult.error;
-  }
-
-  const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(rowToFocusArea);
-  const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(
-    rowToShiftCategory,
-  );
-  const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(rowToJobDefinition);
-
-  return {
-    assignments: buildScheduleAssignmentOptions({
-      orgId,
-      focusAreas,
-      shiftCategories,
-      jobs,
-      includeArchived: true,
-    }),
-    shiftCategories,
-    jobs,
-  };
-}
 
 export async function fetchAssignmentIdByPairMap(
   serviceClient: ReturnType<typeof getServiceClient>,
@@ -105,3 +51,5 @@ export async function fetchSegmentResolutionMaps(
     }),
   };
 }
+
+export { fetchShiftChangeResolvers } from "@/lib/server/schedule-context";

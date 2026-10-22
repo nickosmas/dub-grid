@@ -1,8 +1,15 @@
 import type { CSSProperties } from "react";
 import { MaybeHint } from "@/components/ui/hint";
 import type { IndicatorType } from "@/types";
-import { NOTE_ICON_SIZE, NOTE_STACK_SIZE } from "./badges";
+import {
+  MAX_VISIBLE_NOTE_DOTS,
+  NOTE_DOT_GAP,
+  NOTE_DOT_SIZE,
+  NOTE_LANE_HEIGHT,
+  NOTE_LANE_INSET,
+} from "./badges";
 import { ScheduleNoteIcon } from "./noteIcon";
+import { getPublishDiffTone } from "./publishDiffPill";
 
 /**
  * What a cell's note mark is saying about itself.
@@ -18,10 +25,13 @@ export interface ScheduleNoteMark {
   state: ScheduleNoteMarkState;
 }
 
-// lucide's StickyNote, drawn by hand so two can be layered into one stack.
-const NOTE_BODY =
-  "M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z";
-const NOTE_FOLD = "M15 3v5a1 1 0 0 0 1 1h5";
+/** The marks a pill draws as dots, and how many more its count stands for. */
+export function splitNoteMarks(
+  marks: ScheduleNoteMark[],
+  max: number = MAX_VISIBLE_NOTE_DOTS,
+): { shown: ScheduleNoteMark[]; hidden: number } {
+  return { shown: marks.slice(0, max), hidden: Math.max(0, marks.length - max) };
+}
 
 /** Mixes a hex colour toward white; anything else passes through. */
 function lighten(color: string, amount: number): string {
@@ -34,98 +44,41 @@ function lighten(color: string, amount: number): string {
   return `#${channels.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 }
 
-interface GlyphColors {
-  /** The pill's text colour: readable on the pill, so it outlines any note colour. */
-  rim: string;
-  isDark: boolean;
-}
-
 /**
- * One sticky note. A published note, the last publish's additions included, is
- * filled with the note's colour and outlined in the pill's text colour, so a
- * note matching its shift's colour still shows. A draft is hollow in its own
- * colour, lightened on dark pills.
+ * One note's dot. Every ring is inset, so all three states are the same size.
+ * A published dot is rimmed in the pill's text colour, so a note matching its
+ * shift's colour still shows; a draft is hollow in its own colour, lightened on
+ * dark pills; the last publish's additions take the publish "new" green.
  */
-function NoteGlyph({
-  state,
-  color,
-  colors,
-  strokeWidth,
-}: {
-  state: ScheduleNoteMarkState;
-  color: string;
-  colors: GlyphColors;
-  strokeWidth: number;
-}) {
+function noteDotStyle(
+  state: ScheduleNoteMarkState,
+  color: string,
+  rim: string,
+  isDark: boolean,
+): CSSProperties {
+  const ring = (width: number, ringColor: string) => `inset 0 0 0 ${width}px ${ringColor}`;
+  const base: CSSProperties = {
+    display: "block",
+    width: NOTE_DOT_SIZE,
+    height: NOTE_DOT_SIZE,
+    borderRadius: "50%",
+    flexShrink: 0,
+  };
   if (state === "draft_added") {
-    const line = colors.isDark ? lighten(color, 0.4) : color;
-    return (
-      <>
-        <path d={NOTE_BODY} fill="none" stroke={line} strokeWidth={strokeWidth * 1.3} />
-        <path d={NOTE_FOLD} fill="none" stroke={line} strokeWidth={strokeWidth} />
-      </>
-    );
+    return {
+      ...base,
+      background: "transparent",
+      boxShadow: ring(1.75, isDark ? lighten(color, 0.4) : color),
+    };
   }
-  return (
-    <>
-      <path d={NOTE_BODY} fill={color} stroke={colors.rim} strokeWidth={strokeWidth} />
-      <path d={NOTE_FOLD} fill="none" stroke={colors.rim} strokeWidth={strokeWidth} />
-    </>
-  );
-}
-
-function CornerMark({
-  marks,
-  colorOf,
-  colors,
-  surface,
-  label,
-}: {
-  marks: ScheduleNoteMark[];
-  colorOf: (mark: ScheduleNoteMark) => string;
-  colors: GlyphColors;
-  surface: string;
-  label: string;
-}) {
-  const [front, back] = marks;
-  if (!back) {
-    return (
-      <svg
-        data-note-mark={front.state}
-        role="img"
-        aria-label={label}
-        width={NOTE_ICON_SIZE}
-        height={NOTE_ICON_SIZE}
-        viewBox="0 0 24 24"
-        strokeLinejoin="round"
-        style={{ display: "block", flexShrink: 0 }}
-      >
-        <NoteGlyph state={front.state} color={colorOf(front)} colors={colors} strokeWidth={2.6} />
-      </svg>
-    );
+  if (state === "published_added") {
+    return {
+      ...base,
+      background: color,
+      boxShadow: ring(1.75, getPublishDiffTone("new").background),
+    };
   }
-  // The first note in front, the second behind it; a halo in the pill's own
-  // colour keeps the two apart where they overlap.
-  return (
-    <svg
-      data-note-mark="stack"
-      role="img"
-      aria-label={label}
-      width={NOTE_STACK_SIZE}
-      height={NOTE_STACK_SIZE}
-      viewBox="0 0 24 24"
-      strokeLinejoin="round"
-      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
-    >
-      <g data-note-layer={back.state} transform="translate(6.5 -0.5) scale(0.74)">
-        <NoteGlyph state={back.state} color={colorOf(back)} colors={colors} strokeWidth={3.2} />
-      </g>
-      <g data-note-layer={front.state} transform="translate(-0.5 6.5) scale(0.74)">
-        <path d={NOTE_BODY} fill={surface} stroke={surface} strokeWidth={7.7} />
-        <NoteGlyph state={front.state} color={colorOf(front)} colors={colors} strokeWidth={3.2} />
-      </g>
-    </svg>
-  );
+  return { ...base, background: color, boxShadow: ring(1, rim) };
 }
 
 const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
@@ -135,9 +88,9 @@ const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
 };
 
 /**
- * The note marks for one shift: one coloured sticky note in a grid corner (a
- * stacked one for several notes), or a text-coloured icon per note inline
- * where there is room.
+ * The note marks for one shift: a coloured dot per note on a grid pill, up to
+ * two and then a count, or a text-coloured icon per note inline where there is
+ * room.
  *
  * One component for every place they appear. The four branches of the grid
  * cell each carried their own copy, which is how two of them ended up with
@@ -146,25 +99,30 @@ const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
 export function NoteDots({
   marks,
   indicatorTypes,
-  placement = "corner",
+  placement = "lane",
   rimColor = "var(--dg-color-text)",
-  surfaceColor = "var(--dg-color-surface)",
   isDark = false,
+  corner = false,
   style,
 }: {
   marks: ScheduleNoteMark[];
   indicatorTypes: IndicatorType[];
   /**
-   * `corner` pins one mark inside a positioned cell, as the grid does; `inline`
-   * lets an icon per note flow with a row's content where nothing is positioned.
+   * Where a pill's dots go: `lane` is a row of their own along the bottom of a
+   * flex-column pill, in flow so the words leave room for it, the dots
+   * right-aligned in it; `inline` lists an icon per note beside a name,
+   * outside the grid.
    */
-  placement?: "corner" | "inline";
-  /** The pill's text colour, which outlines a corner mark. */
+  placement?: "lane" | "inline";
+  /** The pill's text colour, which rims a published dot and colours the count. */
   rimColor?: string;
-  /** The pill's fill, which separates a stack's two notes. */
-  surfaceColor?: string;
   isDark?: boolean;
-  /** Placement within the cell; each corner call site anchors its own corner. */
+  /**
+   * A grid pill's strip: the strip stays in flow as the room the words leave,
+   * and the dots sit NOTE_LANE_INSET inside the pill's bottom-right corner, as
+   * the mentored M sits in its top-right. The pill must be positioned.
+   */
+  corner?: boolean;
   style?: CSSProperties;
 }) {
   if (marks.length === 0) return null;
@@ -174,18 +132,66 @@ export function NoteDots({
   const labelOf = (mark: ScheduleNoteMark) =>
     `${typeOf(mark)?.name ?? "Note"}${STATE_SUFFIX[mark.state]}`;
 
-  if (placement === "corner") {
+  if (placement !== "inline") {
     const label = marks.map(labelOf).join(", ");
+    const { shown, hidden } = splitNoteMarks(marks);
     return (
-      <div data-note-dots="true" style={{ position: "absolute", display: "flex", ...style }}>
+      <div
+        data-note-dots={placement}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexShrink: 0,
+          alignSelf: "stretch",
+          height: NOTE_LANE_HEIGHT,
+          justifyContent: "flex-end",
+          ...style,
+        }}
+      >
         <MaybeHint content={label} side="top">
-          <CornerMark
-            marks={marks}
-            colorOf={(mark) => typeOf(mark)?.color ?? "var(--dg-color-text-muted)"}
-            colors={{ rim: rimColor, isDark }}
-            surface={surfaceColor}
-            label={marks.length > 1 ? `${marks.length} notes: ${label}` : label}
-          />
+          <span
+            role="img"
+            aria-label={marks.length > 1 ? `${marks.length} notes: ${label}` : label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: NOTE_DOT_GAP,
+              ...(corner
+                ? { position: "absolute", right: NOTE_LANE_INSET, bottom: NOTE_LANE_INSET }
+                : null),
+            }}
+          >
+            {shown.map((mark) => (
+              <span
+                key={`${mark.indicatorTypeId}_${mark.state}`}
+                data-note-mark={mark.state}
+                aria-hidden="true"
+                style={noteDotStyle(
+                  mark.state,
+                  typeOf(mark)?.color ?? "var(--dg-color-text-muted)",
+                  rimColor,
+                  isDark,
+                )}
+              />
+            ))}
+            {hidden > 0 && (
+              <span
+                data-note-more={hidden}
+                aria-hidden="true"
+                className="dg-tabular-nums"
+                style={{
+                  color: rimColor,
+                  // Sized to the 9px dot row it ends, like the mentored M's label;
+                  // the smallest type token (12px) would outgrow a double shift's pill.
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: `${NOTE_DOT_SIZE}px`,
+                }}
+              >
+                +{hidden}
+              </span>
+            )}
+          </span>
         </MaybeHint>
       </div>
     );

@@ -169,7 +169,8 @@ describe.runIf(reachable)("Gridmaster direct writes (054, live DB)", () => {
       )
       SELECT g.relname AS table_name,
              COALESCE(array_agg(p.polname::text ORDER BY p.polname)
-               FILTER (WHERE NOT p.polpermissive), '{}'::text[]) AS fresh
+               FILTER (WHERE NOT p.polpermissive AND p.polname LIKE 'gridmaster_fresh_%'),
+               '{}'::text[]) AS fresh
       FROM gridmaster_writes g
       LEFT JOIN pg_policy p ON p.polrelid = g.oid
       GROUP BY g.relname

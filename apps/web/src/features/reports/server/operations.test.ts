@@ -316,6 +316,71 @@ describe("operations reports", () => {
     );
   });
 
+  describe("absence for the rest of the day", () => {
+    function sourceWithRestOfDaySick() {
+      const source = buildSource();
+      return buildSource({
+        jobs: [...source.jobs, { id: 71, name: "Med Tech" }],
+        publishedRows: [
+          { ...source.publishedRows[0], published_rest_of_day_absence_type_id: 50 },
+          source.publishedRows[1],
+        ],
+      });
+    }
+
+    it("counts it as an absence with no hours", () => {
+      const payload = buildOperationsReportPayload(sourceWithRestOfDaySick(), {
+        startDate: "2026-05-03",
+        endDate: "2026-05-04",
+      });
+
+      expect(payload.reports.staffHours[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        scheduledHours: 8,
+        shiftCount: 1,
+        absenceCount: 1,
+      });
+      expect(payload.reports.staffActivity.summaries[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        publishedAbsenceDays: 1,
+        absenceBreakdown: expect.stringContaining("Sick"),
+      });
+      expect(payload.reports.absencesCalloffs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "absence",
+            employeeName: "Avery Ng",
+            date: "2026-05-03",
+            absenceType: "Sick",
+          }),
+        ]),
+      );
+      expect(payload.reports.shiftPeriodSummary).toMatchObject({
+        totalAbsences: 2,
+        totalShifts: 1,
+        totalScheduledHours: 8,
+      });
+      expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe(
+        "DAY Caregiver / Sick / Late / Training",
+      );
+    });
+
+    it("keeps it when a job filter leaves the shift out, as for a whole-day absence", () => {
+      const payload = buildOperationsReportPayload(
+        sourceWithRestOfDaySick(),
+        { startDate: "2026-05-03", endDate: "2026-05-04" },
+        { jobIds: [71] },
+      );
+
+      expect(payload.filters.jobIds).toEqual([71]);
+      expect(payload.reports.staffHours[0]).toMatchObject({
+        employeeName: "Avery Ng",
+        scheduledHours: 0,
+        absenceCount: 1,
+      });
+    });
+  });
+
   it("attributes removed employees in historical schedule reports without restoring them to the current roster", () => {
     const removedEmployee = {
       ...buildSource().employees[0],
@@ -1122,7 +1187,7 @@ describe("operations reports", () => {
           "Shift breakdown",
           "Job breakdown",
           "Schedule notes",
-          "Published off days",
+          "Published absences",
           "Unscheduled days",
           "Approved impact",
           "All request activity",
@@ -1160,7 +1225,7 @@ describe("operations reports", () => {
           "End time",
           "Mentoring hours",
         ],
-        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "07:00", "15:00", 8],
+        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "7:00 AM", "3:00 PM", 8],
       },
       {
         report: "coverage",
@@ -1596,6 +1661,7 @@ describe("report reads page past the API row cap", () => {
     const { filterOptions } = await loadOperationsReportFilterOptions(client, {
       orgId: "11111111-1111-4111-8111-111111111111",
       range: { startDate: "2026-09-01", endDate: "2026-09-07" },
+      hiddenUserIds: [],
     });
 
     // The employee list is longer than one page, so every row survived.

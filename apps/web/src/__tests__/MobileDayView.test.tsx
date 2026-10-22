@@ -1,8 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
 import MobileDayView from "@/components/MobileDayView";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
-import type { AssignmentDefinition, Employee, FocusArea, IndicatorType } from "@/types";
+import type {
+  AbsenceType,
+  AssignmentDefinition,
+  Employee,
+  FocusArea,
+  IndicatorType,
+} from "@/types";
 import { formatDateKey } from "@/lib/utils";
 
 const focusAreas: FocusArea[] = [
@@ -105,5 +112,67 @@ describe("MobileDayView indicators", () => {
     const { container } = renderView(() => []);
 
     expect(container.querySelector("[data-note-mark]")).toBeNull();
+  });
+});
+
+describe("MobileDayView absence for the rest of the day", () => {
+  const sick: AbsenceType = {
+    id: 9,
+    orgId: "org-1",
+    label: "S",
+    name: "Sick",
+    color: "#FEE2E2",
+    border: "#FCA5A5",
+    text: "#991B1B",
+    sortOrder: 1,
+  };
+
+  function renderMixed() {
+    return render(
+      <MobileDayView
+        filteredEmployees={[employee]}
+        allEmployees={[employee]}
+        dates={dates}
+        shiftForKey={(_, date) => (formatDateKey(date) === shiftDay ? "D" : null)}
+        assignmentIdsForKey={(_, date) => (formatDateKey(date) === shiftDay ? [1] : [])}
+        restOfDayAbsenceTypeIdForKey={(_, date) =>
+          formatDateKey(date) === shiftDay ? sick.id : null
+        }
+        absenceTypeMap={new Map([[sick.id, sick]])}
+        getShiftStyle={() => assignments[0]}
+        handleCellClick={vi.fn()}
+        todayKey="2026-01-01"
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={[{ id: 1, orgId: "org-1", name: "Day", abbr: "D", sortOrder: 0 }]}
+        indicatorTypes={indicatorTypes}
+        isCellInteractive
+        noteMarksForKey={() => []}
+      />,
+    );
+  }
+
+  it("draws the absence after the shift, striped in its own colour and joined to it", () => {
+    renderMixed();
+
+    const day = screen.getByText("D").closest("button")!;
+    const pills = Array.from(day.querySelectorAll("span")).filter(
+      (span) =>
+        span.children.length === 0 && (span.textContent === "D" || span.textContent === "S"),
+    );
+    expect(pills.map((pill) => pill.textContent)).toEqual(["D", "S"]);
+    const [shiftPill, absencePill] = pills.map((pill) => pill.closest<HTMLElement>("button > *")!);
+    const stripes = resolveAbsenceStripes(sick.color, false);
+    expect(absencePill).toHaveStyle({ color: stripes.text });
+    expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
+    expect(shiftPill.style.borderBottomStyle).toBe("none");
+    expect(absencePill.style.borderTopStyle).toBe("none");
+  });
+
+  it("counts only the shift in the tally", () => {
+    renderMixed();
+
+    expect(screen.getByText("D: 1")).toBeInTheDocument();
+    expect(screen.queryByText(/^S: /)).toBeNull();
   });
 });

@@ -42,6 +42,8 @@ const SUCCESS_MESSAGES: Record<GridmasterSubscriptionInput["action"], string> = 
 export interface GridmasterBillingActions {
   /** The organization an action is running for, if any. */
   busyOrgId: string | null;
+  /** The action running once its confirmation has stepped aside, if any. */
+  busyAction: GridmasterSubscriptionInput["action"] | null;
   confirm: (action: BillingConfirmAction) => void;
   changeTrial: (org: GridmasterBillingOrgSummary) => void;
   /** Ends the trial, with the grace period or by locking now, as the dialog asks. */
@@ -61,6 +63,7 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
   const queryClient = useQueryClient();
   const stepUp = useStepUpAction();
   const [busyOrgId, setBusyOrgId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<GridmasterSubscriptionInput["action"] | null>(null);
   const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
   const [trialOrg, setTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
   const [trialDays, setTrialDays] = useState<number | null>(DEFAULT_TRIAL_DAYS);
@@ -100,6 +103,7 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
 
   async function runSubscription(input: GridmasterSubscriptionInput) {
     setBusyOrgId(input.orgId);
+    setBusyAction(input.action);
     // The confirmation steps aside so the identity check is the only dialog.
     setConfirmAction(null);
     setTrialOrg(null);
@@ -117,6 +121,7 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
       toast.error(formatClientErrorMessage(error, "Billing action failed"));
     } finally {
       setBusyOrgId(null);
+      setBusyAction(null);
     }
   }
 
@@ -177,6 +182,7 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
 
   return {
     busyOrgId,
+    busyAction,
     confirm: (action) => {
       setOverrideReason("");
       setConfirmAction(action);

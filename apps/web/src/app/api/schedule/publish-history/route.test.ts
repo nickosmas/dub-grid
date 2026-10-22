@@ -8,8 +8,10 @@ const publishHistoryOrder = vi.fn();
 const publishHistoryEq = vi.fn();
 const profilesIn = vi.fn();
 
+const fetchHiddenStaffIds = vi.fn(async (..._args: unknown[]) => new Set<string>());
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  fetchHiddenStaffIds: (...args: unknown[]) => fetchHiddenStaffIds(...args),
 }));
 
 import { GET } from "./route";
@@ -99,6 +101,53 @@ describe("GET /api/schedule/publish-history", () => {
     });
   });
 
+  it("leaves a hidden staff member's changes out of the list and its count", async () => {
+    const change = (empId: string) => ({
+      emp_id: empId,
+      date: "2026-05-04",
+      kind: "new",
+      from_state: null,
+      to_state: null,
+      from_absence_type_id: null,
+      to_absence_type_id: null,
+      updated_by: null,
+      from_custom_start: null,
+      from_custom_end: null,
+      to_custom_start: null,
+      to_custom_end: null,
+    });
+    publishHistoryRange.mockResolvedValueOnce({
+      data: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          published_by: "22222222-2222-4222-8222-222222222222",
+          start_date: "2026-05-04",
+          end_date: "2026-05-10",
+          change_count: 2,
+          schedule_publish_changes: [change("emp-1"), change("emp-qa")],
+          published_at: "2026-05-06T17:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    fetchHiddenStaffIds.mockResolvedValueOnce(new Set(["emp-qa"]));
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient: createServiceClient(),
+      orgId: ORG_ID,
+      actor: { id: "user-1" },
+      permissions: { canViewSchedule: true },
+      userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
+    });
+
+    const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
+
+    expect(body.entries[0].changeCount).toBe(1);
+    expect(body.entries[0].changes.map((entry: { empId: string }) => entry.empId)).toEqual([
+      "emp-1",
+    ]);
+  });
+
   it("loads authorized publish history through org-scoped service queries", async () => {
     const serviceClient = createServiceClient();
     requireOrgPermissions.mockResolvedValue({
@@ -107,6 +156,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, limit: "5", offset: "10" }));
@@ -139,6 +189,8 @@ describe("GET /api/schedule/publish-history", () => {
             toState: null,
             fromAbsenceTypeId: null,
             toAbsenceTypeId: null,
+            fromRestOfDayAbsenceTypeId: null,
+            toRestOfDayAbsenceTypeId: null,
             updatedBy: null,
             fromCustomStart: null,
             fromCustomEnd: null,
@@ -195,6 +247,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));
@@ -214,6 +267,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));
@@ -231,6 +285,7 @@ describe("GET /api/schedule/publish-history", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
 
     await GET(makeRequest({ orgId: ORG_ID }));

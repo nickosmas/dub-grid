@@ -1146,7 +1146,7 @@ function AddPersonButton({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
     rippleBorderless: true,
-    rippleColor: mobileColors.ripplePrimary,
+    rippleColor: mobileColors.rippleNeutral,
     scale: mobileMotion.press.iconOnlyScale,
   });
 
@@ -1159,7 +1159,7 @@ function AddPersonButton({
       {...pressHandlers}
       style={[styles.addPersonButton, animatedStyle]}
     >
-      <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
+      <Ionicons color={mobileColors.controlSecondaryFg} name="person-add-outline" size={18} />
     </AnimatedPressable>
   );
 }
@@ -1283,7 +1283,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     addPersonButton: {
       alignItems: "center",
-      backgroundColor: mobileColors.brand,
+      backgroundColor: mobileColors.controlSecondaryBg,
       // Circular: 46 square at the pill radius, matching the search field's
       // height and the filter pill beside it.
       borderRadius: mobileRadii.pill,

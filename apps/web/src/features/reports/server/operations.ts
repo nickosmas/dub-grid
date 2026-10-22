@@ -2,9 +2,10 @@ import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ScheduleCellState } from "@dubgrid/contracts";
-import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
+import { formatScheduleTimeRange, formatScheduleTimeValue } from "@dubgrid/schedule-core";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
@@ -857,7 +858,34 @@ export function buildOperationsReportPayload(
     );
   });
   const shiftEntries = entries.filter((item) => item.entry.kind === "shift");
-  const absenceEntries = entries.filter((item) => item.entry.kind === "absence");
+  // A worked cell's absence for the rest of the day (item 45) counts as an
+  // absence at no hours. Like a whole-day absence it ignores the shift
+  // filters, so it is read from every report entry, not the filtered ones.
+  const restOfDayAbsenceEntries: ResolvedEntry[] = allReportEntries.flatMap((item) => {
+    const absenceTypeId = item.entry.kind === "shift" ? item.entry.restOfDayAbsenceTypeId : null;
+    if (absenceTypeId == null) return [];
+    return [
+      {
+        source: item.source,
+        entry: {
+          ...item.entry,
+          kind: "absence" as const,
+          label: absenceTypeById.get(absenceTypeId) ?? "",
+          assignmentIds: [],
+          absenceTypeId,
+          restOfDayAbsenceTypeId: null,
+          startTime: null,
+          endTime: null,
+          durationHours: 0,
+          segments: [],
+        },
+      },
+    ];
+  });
+  const absenceEntries = [
+    ...entries.filter((item) => item.entry.kind === "absence"),
+    ...restOfDayAbsenceEntries,
+  ];
   const activeEmployees = reportEmployees.filter((employee) => employee.status === "active");
   const overtimeThresholdHours = 40 * Math.ceil(Math.max(1, reportDates.length) / 7);
   const pendingInvitationByEmployeeId = new Map(
@@ -942,7 +970,7 @@ export function buildOperationsReportPayload(
   const staffHours = reportEmployees.map((employee) => {
     const employeeEntries = entries.filter((item) => item.entry.empId === employee.id);
     const workedEntries = employeeEntries.filter((item) => item.entry.kind === "shift");
-    const absenceCount = employeeEntries.filter((item) => item.entry.kind === "absence").length;
+    const absenceCount = absenceEntries.filter((item) => item.entry.empId === employee.id).length;
     const scheduledHours = roundHours(
       workedEntries.reduce(
         (sum, item) =>
@@ -1028,8 +1056,8 @@ export function buildOperationsReportPayload(
                 ? "No shift"
                 : (shiftNameById.get(segment.shiftId) ?? "Unknown shift"),
             job: jobById.get(segment.jobId) ?? "Unknown job",
-            startTime: segment.startTime ?? "",
-            endTime: segment.endTime ?? "",
+            startTime: segment.startTime ? formatScheduleTimeValue(segment.startTime) : "",
+            endTime: segment.endTime ? formatScheduleTimeValue(segment.endTime) : "",
             mentoringHours: roundHours(getSegmentDurationHours(segment)),
           },
         ];
@@ -1471,7 +1499,7 @@ export function buildOperationsReportPayload(
     rows: reportEmployees.map((employee) => {
       const cells: Record<string, string> = {};
       for (const date of reportDates) {
-        const labels = entries
+        const labels = [...entries, ...restOfDayAbsenceEntries]
           .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
           .map((item) => item.entry.label);
         // Shift labels lead so a cell stays readable when it carries no notes.
@@ -2208,14 +2236,21 @@ const EMPLOYEE_REPORT_COLUMNS =
  * the full report load and the options-only load, so the dropdowns can never
  * be built from a different query than the report itself.
  */
-function fetchFilterOptionSource(serviceClient: SupabaseClient, orgId: string) {
+function fetchFilterOptionSource(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  hiddenUserIds: readonly string[],
+) {
   return {
     employees: fetchTableRows<EmployeeReportRow>((from, to) =>
-      serviceClient
-        .from("employees")
-        .select(EMPLOYEE_REPORT_COLUMNS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
+      withoutHiddenStaff(
+        serviceClient
+          .from("employees")
+          .select(EMPLOYEE_REPORT_COLUMNS)
+          .eq("org_id", orgId)
+          .is("archived_at", null),
+        hiddenUserIds,
+      )
         .order("seniority", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),
@@ -2268,9 +2303,9 @@ function fetchFilterOptionSource(serviceClient: SupabaseClient, orgId: string) {
  */
 export async function loadOperationsReportFilterOptions(
   serviceClient: SupabaseClient,
-  input: { orgId: string; range: OperationsReportRange },
+  input: { orgId: string; range: OperationsReportRange; hiddenUserIds: readonly string[] },
 ): Promise<OperationsReportFilterOptionsPayload> {
-  const queries = fetchFilterOptionSource(serviceClient, input.orgId);
+  const queries = fetchFilterOptionSource(serviceClient, input.orgId, input.hiddenUserIds);
   const [employees, focusAreas, shiftCategories, jobs, indicatorTypes] = await Promise.all([
     queries.employees,
     queries.focusAreas,
@@ -2292,10 +2327,12 @@ export async function loadOperationsReport(
     orgId: string;
     range: OperationsReportRange;
     filters?: OperationsReportFilters;
+    /** People the viewer must not be shown (internal accounts). */
+    hiddenUserIds: readonly string[];
   },
 ): Promise<OperationsReportPayload> {
   const now = new Date().toISOString();
-  const optionSource = fetchFilterOptionSource(serviceClient, input.orgId);
+  const optionSource = fetchFilterOptionSource(serviceClient, input.orgId, input.hiddenUserIds);
   const [
     orgRows,
     employees,
@@ -2325,11 +2362,14 @@ export async function loadOperationsReport(
     ),
     optionSource.employees,
     fetchTableRows<EmployeeReportRow>((from, to) =>
-      serviceClient
-        .from("employees")
-        .select(EMPLOYEE_REPORT_COLUMNS)
-        .eq("org_id", input.orgId)
-        .not("archived_at", "is", null)
+      withoutHiddenStaff(
+        serviceClient
+          .from("employees")
+          .select(EMPLOYEE_REPORT_COLUMNS)
+          .eq("org_id", input.orgId)
+          .not("archived_at", "is", null),
+        input.hiddenUserIds,
+      )
         .order("seniority", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),

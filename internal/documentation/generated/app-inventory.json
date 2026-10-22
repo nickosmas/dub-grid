@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b06719f1b1413968c2a8b5f7f274ab153b37483dc8436f7739df56a2206175f1",
+  "sourceDigest": "sha256:1f0bdafbbf45fb1e66b5fd78ba81730dcaf04e751e1185500f8ac9f1a6f05444",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2544,6 +2544,15 @@
       }
     },
     {
+      "id": "http:POST:/api/gridmaster/users/[userId]/internal",
+      "method": "POST",
+      "path": "/api/gridmaster/users/[userId]/internal",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/users/[userId]/internal/route.ts"
+      }
+    },
+    {
       "id": "http:POST:/api/gridmaster/users/[userId]/reinstate",
       "method": "POST",
       "path": "/api/gridmaster/users/[userId]/reinstate",
@@ -4576,6 +4585,86 @@
       "sha256": "98bb75a24df116b40f35c666961dfe8e31601a0d446662660e5d4c043d64e6b5",
       "source": {
         "path": "supabase/migrations/080_shift_series_scope.sql"
+      }
+    },
+    {
+      "id": "migration:081_internal_accounts.sql",
+      "version": "081",
+      "name": "internal_accounts",
+      "file": "081_internal_accounts.sql",
+      "sha256": "33b7bb979fb888edb9126e4b531772a003e70ff3afced18ef197c49b7df8825e",
+      "source": {
+        "path": "supabase/migrations/081_internal_accounts.sql"
+      }
+    },
+    {
+      "id": "migration:082_worked_cell_off_day.sql",
+      "version": "082",
+      "name": "worked_cell_off_day",
+      "file": "082_worked_cell_off_day.sql",
+      "sha256": "8c963fd5a0a44ce223c833c7411649cea74abc67e22ac4c42deb91bef02595a1",
+      "source": {
+        "path": "supabase/migrations/082_worked_cell_off_day.sql"
+      }
+    },
+    {
+      "id": "migration:083_move_shift_keeps_absence.sql",
+      "version": "083",
+      "name": "move_shift_keeps_absence",
+      "file": "083_move_shift_keeps_absence.sql",
+      "sha256": "addab503b90a59a17b5ec68b75fe0890373f0791cc4abf4e410e191de0b6ed5c",
+      "source": {
+        "path": "supabase/migrations/083_move_shift_keeps_absence.sql"
+      }
+    },
+    {
+      "id": "migration:084_staff_schedule_visibility.sql",
+      "version": "084",
+      "name": "staff_schedule_visibility",
+      "file": "084_staff_schedule_visibility.sql",
+      "sha256": "32dc0a5eccfb61ead760090df401529b826b4b99f0342e025fee9a0712a888ce",
+      "source": {
+        "path": "supabase/migrations/084_staff_schedule_visibility.sql"
+      }
+    },
+    {
+      "id": "migration:085_requests_keep_rest_of_day_absence.sql",
+      "version": "085",
+      "name": "requests_keep_rest_of_day_absence",
+      "file": "085_requests_keep_rest_of_day_absence.sql",
+      "sha256": "9fcc666f0f4aa63026c75b12e78780c4b1bb6e5cf3737ca1e04eac14f8001430",
+      "source": {
+        "path": "supabase/migrations/085_requests_keep_rest_of_day_absence.sql"
+      }
+    },
+    {
+      "id": "migration:086_approval_replaces_draft.sql",
+      "version": "086",
+      "name": "approval_replaces_draft",
+      "file": "086_approval_replaces_draft.sql",
+      "sha256": "eadb679d72fad68141d6b2f87271a0b143934acef9b5a8b0cf5de93ae9973b37",
+      "source": {
+        "path": "supabase/migrations/086_approval_replaces_draft.sql"
+      }
+    },
+    {
+      "id": "migration:087_publish_alerts_leave_the_database.sql",
+      "version": "087",
+      "name": "publish_alerts_leave_the_database",
+      "file": "087_publish_alerts_leave_the_database.sql",
+      "sha256": "9f4e4544168b5c43241a00d76f225c32ec98338540a1d1f5df9cbe555d3745aa",
+      "source": {
+        "path": "supabase/migrations/087_publish_alerts_leave_the_database.sql"
+      }
+    },
+    {
+      "id": "migration:088_open_pickup_claims.sql",
+      "version": "088",
+      "name": "open_pickup_claims",
+      "file": "088_open_pickup_claims.sql",
+      "sha256": "7d0a0e68ecea5ed56cc9fa36ac32dcc4b51a2a9b06d214eca76887a122e98fc9",
+      "source": {
+        "path": "supabase/migrations/088_open_pickup_claims.sql"
       }
     }
   ],

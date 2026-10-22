@@ -4,6 +4,7 @@ import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
 import { MaybeHint } from "@/components/ui/hint";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 interface PersonRecordCardProps {
   employee: Employee;
@@ -70,7 +71,7 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
           <RecordField
             label="Last active"
             value={formatRelativeTime(lastSignInAt)}
-            hint={new Date(lastSignInAt).toLocaleString()}
+            hint={formatDateTimeLabel(lastSignInAt)}
             tabular
           />
         ) : null}

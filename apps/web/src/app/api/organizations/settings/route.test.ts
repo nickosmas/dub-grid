@@ -445,6 +445,34 @@ describe("PUT /api/organizations/settings", () => {
     );
   });
 
+  it("persists what staff see after a publish", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", {
+      staff_see_shift_changes: true,
+      staff_see_publisher: true,
+    });
+    const updatedRow = makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+      staff_see_shift_changes: false,
+      staff_see_publisher: false,
+    });
+
+    organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+    organizationUpdateMaybeSingle.mockResolvedValueOnce({ data: updatedRow, error: null });
+
+    const response = await PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        staffSeeShiftChanges: false,
+        staffSeePublisher: false,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ staff_see_shift_changes: false, staff_see_publisher: false }),
+    );
+  });
+
   it("rejects invalid organization phone numbers with field errors", async () => {
     const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
 

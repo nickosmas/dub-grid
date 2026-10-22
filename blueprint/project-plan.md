@@ -146,6 +146,13 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   fact about a person they may see, and a Gridmaster has one page with
   everything about a person, including recovery from a two-factor lockout,
   without ever showing secrets.
+- Clear shift-change descriptions: a shift change reads the same detailed way
+  everywhere (Before and After, every distinguishing field, compared with the
+  original), and an organization can hide change details and the publisher's
+  name from staff.
+- Staffing check: the Schedule page's Coverage panel checks the draft against
+  the coverage requirements and the published schedule, and offers exact,
+  one-click suggestions that fix gaps or explains why nobody can fill them.
 - Documentation truth and drift prevention: public documentation and the
   living engineering references describe the current `dev` through
   source-derived inventories and a machine-checked accuracy manifest, with
@@ -162,7 +169,8 @@ runtime evidence.
 
 ## 4. Data - What are we storing?
 
-- Organizations (tenants), subdomains, org settings/terminology overrides
+- Organizations (tenants), subdomains, org settings/terminology overrides,
+  including what staff see after a publish (change details, publisher name)
 - Users / profiles, with `platform_role` and per-org `org_role`
   (Gridmaster/Super Admin/Admin/User) plus per-user `admin_permissions`
   (25-key JSONB)
@@ -171,9 +179,11 @@ runtime evidence.
 - Employees / staff records, focus areas, certifications, employment
   status
 - Schedules: recurring shifts, published schedule entries, draft state,
-  shift snapshots for audit history
+  shift snapshots for audit history. A cell holds worked shifts, an
+  absence, or up to two worked shifts plus an absence for the rest of the
+  day
 - Shift requests (pickup/swap/call-off) and their approval/status events
-- Absences / off-day types (`absence_types`)
+- Absence types (`absence_types`)
 - Coverage and reporting aggregates
 - Notifications
 - Billing/subscription state (Stripe customer, subscription, trial status)
@@ -241,6 +251,9 @@ before conversion is required.
   native Inter 400/500/600/700 faces. Preserve the existing semantic size
   hierarchy and use tabular numerals for schedules, dates, times, durations,
   and totals.
+- Times shown to people are 12-hour (`7:00 AM - 3:00 PM`); a shift crossing
+  midnight names both days. A shift change shows Before and After with every
+  field that tells them apart; the arrow is only for compact spaces.
 - Neutral grays carry a deliberate tint: light-mode grays are slate
   (blue-tinted), dark-mode grays are zinc; any new gray must match
 - Terminology is customizable per organization (e.g. "Wings" can be

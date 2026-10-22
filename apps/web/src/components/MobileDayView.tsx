@@ -18,6 +18,8 @@ import {
 } from "@/types";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
+import { attachedPillSeams, gapBefore, seamBorders, seamRadius } from "@/lib/attached-pill";
 import { useTheme } from "next-themes";
 import { MaybeHint } from "@/components/ui/hint";
 import { CalendarOff } from "lucide-react";
@@ -55,6 +57,8 @@ interface MobileDayViewProps {
   useCompactRoleCertificationLabels?: boolean;
   /** Returns the absence type ID for a given cell, or null if not an absence. */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** A worked cell's absence for the rest of the day (item 45), drawn after its shifts. */
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Map from absence type ID to AbsenceType for color/label resolution. */
   absenceTypeMap?: Map<number, AbsenceType>;
 }
@@ -87,6 +91,7 @@ export default function MobileDayView({
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
   absenceTypeIdForKey,
+  restOfDayAbsenceTypeIdForKey,
   absenceTypeMap,
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
@@ -436,37 +441,34 @@ export default function MobileDayView({
                     // general key for a section without one.
                     const noteMarks = noteMarksForKey?.(emp.id, date, sectionId ?? undefined) ?? [];
 
-                    // Check for absence (off-day) entry first
+                    // Check for an absence entry first
                     const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                     const absenceType =
                       absenceTypeId != null ? (absenceTypeMap?.get(absenceTypeId) ?? null) : null;
+                    const restOfDayAbsenceTypeId = absenceType
+                      ? null
+                      : (restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null);
+                    const restOfDayAbsenceType =
+                      restOfDayAbsenceTypeId != null
+                        ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null)
+                        : null;
+                    const absencePill = (absence: AbsenceType) => {
+                      const resolved = absenceStripeFill(absence.color, isDarkTheme);
+                      return {
+                        label: isNameMode ? absence.name || absence.label : absence.label,
+                        bg: resolved.background,
+                        text: resolved.text,
+                        border: resolved.border,
+                        foreignInitials: null,
+                        foreignBg: null,
+                        foreignText: null,
+                      };
+                    };
 
                     // Build pills for all codes (supports split shifts)
                     // For absence cells, synthesize a single pill from the absence type
                     const pills = absenceType
-                      ? [
-                          (() => {
-                            const resolved = resolveShiftPillColors(
-                              {
-                                color: absenceType.color,
-                                text: absenceType.text,
-                                border: absenceType.border,
-                              },
-                              isDarkTheme,
-                            );
-                            return {
-                              label: isNameMode
-                                ? absenceType.name || absenceType.label
-                                : absenceType.label,
-                              bg: resolved.color,
-                              text: resolved.text,
-                              border: resolved.border,
-                              foreignInitials: null,
-                              foreignBg: null,
-                              foreignText: null,
-                            };
-                          })(),
-                        ]
+                      ? [absencePill(absenceType)]
                       : codeIds.map((id, idx) => {
                           const sc = assignmentById.get(id);
                           if (!sc) {
@@ -529,6 +531,17 @@ export default function MobileDayView({
                             foreignText,
                           };
                         });
+                    // The absence for the rest of the day comes after the shifts and
+                    // starts where the last one ends, so it joins that shift. This view
+                    // has no shift times, so two shifts are never joined here.
+                    const shiftPillCount = pills.length;
+                    if (restOfDayAbsenceType) pills.push(absencePill(restOfDayAbsenceType));
+                    const pillSeams = attachedPillSeams(
+                      "stacked",
+                      pills
+                        .slice(1)
+                        .map((_, i) => restOfDayAbsenceType != null && i + 1 === shiftPillCount),
+                    );
 
                     return (
                       <Button
@@ -548,12 +561,15 @@ export default function MobileDayView({
                           cursor: isCellInteractive ? "pointer" : "default",
                           padding: "2px 1px",
                           fontFamily: "inherit",
-                          gap: 1,
+                          gap: 0,
                         }}
                       >
                         {pills.length > 0 ? (
                           pills.map((pill, pillIdx) => {
                             const fs = pills.length > 1 ? 8 : 10;
+                            const seams = pillSeams[pillIdx];
+                            const pillBorder =
+                              getDraftBorderStyle(draftKind) ?? "1px solid var(--dg-color-border)";
                             const codePill = (
                               <span
                                 key={`pill-${pill.label}-${pillIdx}`}
@@ -564,16 +580,19 @@ export default function MobileDayView({
                                     ? "var(--dg-color-surface)"
                                     : pill.bg,
                                   color: pill.text,
-                                  borderRadius: pill.foreignInitials ? "0 0 2px 2px" : 3,
+                                  borderRadius: pill.foreignInitials
+                                    ? seamRadius(2, [...seams, "top"])
+                                    : seamRadius(3, seams),
                                   padding: pills.length > 1 ? "2px 4px" : "2px 4px",
                                   width: pill.foreignInitials ? "100%" : "calc(100% - 2px)",
                                   textAlign: "center",
                                   lineHeight: 1.2,
-                                  border: pill.foreignInitials
-                                    ? "none"
-                                    : draftKind
-                                      ? getDraftBorderStyle(draftKind)
-                                      : "1px solid var(--dg-color-border)",
+                                  ...(pill.foreignInitials
+                                    ? { border: "none" }
+                                    : {
+                                        ...seamBorders(pillBorder, seams),
+                                        ...gapBefore(pillIdx, seams, "stacked", 1),
+                                      }),
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   display: "block",
@@ -600,11 +619,10 @@ export default function MobileDayView({
                                   key={`foreign-${pill.label}-${pillIdx}`}
                                   style={{
                                     width: "calc(100% - 2px)",
-                                    borderRadius: 3,
+                                    borderRadius: seamRadius(3, seams),
                                     overflow: "hidden",
-                                    border: draftKind
-                                      ? getDraftBorderStyle(draftKind)
-                                      : "1px solid var(--dg-color-border)",
+                                    ...seamBorders(pillBorder, seams),
+                                    ...gapBefore(pillIdx, seams, "stacked", 1),
                                     display: "flex",
                                     flexDirection: "column",
                                   }}

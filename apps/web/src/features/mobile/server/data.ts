@@ -39,6 +39,8 @@ import {
   fetchMobileShiftRequestRows as fetchMobileShiftRequestRowsData,
   fetchMobileUnreadNotificationCount as fetchMobileUnreadNotificationCountData,
   fetchProfileNameRowsByIds as fetchProfileNameRowsByIdsData,
+  fetchHiddenEmployeeIds,
+  withoutHiddenRequests,
 } from "@dubgrid/data-access";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import {
@@ -98,7 +100,13 @@ import {
   type CoverageGap,
   type CoverageTotals,
   type SegmentsForEmployeeDate,
+  cellStateToChangeDay,
+  describeShiftChange,
+  selectOriginalCellChange,
+  type ShiftChange,
+  type ShiftChangeResolvers,
 } from "@dubgrid/schedule-core";
+import { fetchShiftChangeResolvers } from "@/lib/server/schedule-context";
 import { normalizeCoverageRuleConfig, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 
 type EmbeddedEmployee = {
@@ -839,6 +847,38 @@ function findPublishedChangeForCell(
   return null;
 }
 
+/**
+ * A cell's whole day Before and After (item 46d): its earliest in-window
+ * "from" against its newest "to", since staff are assumed to have seen
+ * nothing in between, as on the web. Null for a first publication and for a
+ * cell that ended where it started.
+ */
+function describeCellPublishChange(
+  history: MobilePublishHistoryEntry[],
+  employeeId: string,
+  date: string,
+  resolvers: ShiftChangeResolvers,
+): ShiftChange | null {
+  const changes = history
+    .flatMap((entry) =>
+      entry.changes.filter((change) => change.empId === employeeId && change.date === date),
+    )
+    .reverse();
+  const original = selectOriginalCellChange(
+    changes.map((change) => ({
+      fromState: change.fromState ?? null,
+      toState: change.toState ?? null,
+    })),
+  );
+  if (!original) return null;
+  const change = describeShiftChange(
+    cellStateToChangeDay(original.fromState, resolvers),
+    cellStateToChangeDay(original.toState, resolvers),
+    { date },
+  );
+  return change.kind === "none" ? null : change;
+}
+
 function getMissingDeletedPublishedChanges(
   history: MobilePublishHistoryEntry[],
   rows: MobileScheduleComparisonRow[],
@@ -895,19 +935,28 @@ export async function fetchMobileScheduleEntries(
     startDate: string;
     endDate: string;
     employeeId?: string;
+    /** People whose shifts the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
 ): Promise<MobileScheduleEntry[]> {
-  const [assignmentDetailsByPair, absenceMap, focusAreaNameMap, jobNameMap, publishHistory] =
-    await Promise.all([
-      fetchAssignmentDetailsMap(serviceClient, input.orgId),
-      fetchAbsenceLabelMap(serviceClient, input.orgId),
-      fetchFocusAreaNameMap(serviceClient, input.orgId),
-      fetchJobNameMap(serviceClient, input.orgId),
-      fetchMobilePublishHistory(serviceClient, input.orgId, {
-        startDate: input.startDate,
-        endDate: input.endDate,
-      }),
-    ]);
+  const [
+    assignmentDetailsByPair,
+    absenceMap,
+    focusAreaNameMap,
+    jobNameMap,
+    publishHistory,
+    shiftChangeResolvers,
+  ] = await Promise.all([
+    fetchAssignmentDetailsMap(serviceClient, input.orgId),
+    fetchAbsenceLabelMap(serviceClient, input.orgId),
+    fetchFocusAreaNameMap(serviceClient, input.orgId),
+    fetchJobNameMap(serviceClient, input.orgId),
+    fetchMobilePublishHistory(serviceClient, input.orgId, {
+      startDate: input.startDate,
+      endDate: input.endDate,
+    }),
+    fetchShiftChangeResolvers(serviceClient, input.orgId),
+  ]);
   const data = await fetchMobileScheduleComparisonRowsData(serviceClient, input);
   const missingDeletedChanges = getMissingDeletedPublishedChanges(publishHistory, data, input);
   const missingDeletedEmployees = await fetchMobileEmployeeRowsByIds(
@@ -915,8 +964,11 @@ export async function fetchMobileScheduleEntries(
     input.orgId,
     missingDeletedChanges.map((change) => change.empId),
   );
+  const hidden = new Set(input.hiddenUserIds ?? []);
   const missingDeletedEmployeesById = new Map(
-    missingDeletedEmployees.map((employee) => [employee.id, employee]),
+    missingDeletedEmployees
+      .filter((employee) => !employee.user_id || !hidden.has(employee.user_id))
+      .map((employee) => [employee.id, employee]),
   );
   const missingDeletedRows = missingDeletedChanges.map((change) => {
     const employee = missingDeletedEmployeesById.get(change.empId);
@@ -968,6 +1020,10 @@ export async function fetchMobileScheduleEntries(
           : [];
       const absenceTypeId = candidateState.kind === "absence" ? candidateState.absenceTypeId : null;
       const absence = absenceTypeId != null ? (absenceMap.get(absenceTypeId) ?? null) : null;
+      const restOfDayAbsenceTypeId =
+        candidateState.kind === "worked" ? (candidateState.absenceTypeId ?? null) : null;
+      const restOfDay =
+        restOfDayAbsenceTypeId != null ? (absenceMap.get(restOfDayAbsenceTypeId) ?? null) : null;
       const primaryAssignmentDetails =
         jobIds.length > 0
           ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
@@ -1046,6 +1102,17 @@ export async function fetchMobileScheduleEntries(
           null,
         shiftTextColor: absence?.textColor ?? primaryAssignmentDetails?.textColor ?? null,
         segments,
+        restOfDayAbsence:
+          restOfDayAbsenceTypeId != null && restOfDay
+            ? {
+                absenceTypeId: restOfDayAbsenceTypeId,
+                label: restOfDay.label,
+                name: restOfDay.name ?? restOfDay.label,
+                color: restOfDay.color ?? null,
+                borderColor: restOfDay.borderColor ?? restOfDay.color ?? null,
+                textColor: restOfDay.textColor ?? null,
+              }
+            : null,
       };
     };
 
@@ -1076,6 +1143,15 @@ export async function fetchMobileScheduleEntries(
             kind: publishedChange.kind,
             isNewAddition: publishedChange.isNewAddition,
             previousPresentation,
+            shiftChange:
+              publishedChange.kind === "new" && !publishedChange.isNewAddition
+                ? null
+                : describeCellPublishChange(
+                    publishHistory,
+                    row.employees.id,
+                    row.date as string,
+                    shiftChangeResolvers,
+                  ),
           }
         : null,
       publishedAt: publishEntry?.publishedAt ?? null,
@@ -1140,8 +1216,16 @@ function getPublishedMobileDates(
   });
 }
 
-export async function fetchMobileOpenShiftContext(serviceClient: SupabaseClient, orgId: string) {
-  const contextRows = await fetchMobileOpenShiftContextRowsData(serviceClient, orgId);
+export async function fetchMobileOpenShiftContext(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  hiddenUserIds: readonly string[] = [],
+) {
+  const contextRows = await fetchMobileOpenShiftContextRowsData(
+    serviceClient,
+    orgId,
+    hiddenUserIds,
+  );
   const focusAreas = contextRows.focusAreaRows.map(rowToFocusArea);
   const shiftCategories = contextRows.shiftCategoryRows.map(rowToShiftCategory);
   const jobs = contextRows.jobRows.map(rowToJobDefinition);
@@ -1195,6 +1279,8 @@ type MobileOpenShiftInput = {
   endDate?: string;
   showAll?: boolean;
   timeZone?: string | null;
+  /** People whose shifts the viewer must not be shown; coverage counts only the rest. */
+  hiddenUserIds?: readonly string[];
 };
 
 /**
@@ -1226,7 +1312,7 @@ async function buildMobileCoverageEngineInputs(
       startDate: range.startDate,
       endDate: range.endDate,
     }),
-    fetchMobileOpenShiftContext(serviceClient, input.orgId),
+    fetchMobileOpenShiftContext(serviceClient, input.orgId, input.hiddenUserIds),
     // Draft-preferred ("effective") rows, not published-only — matches web's
     // scheduler view (apps/web/src/lib/schedule-cells.ts's
     // `isScheduler ? (draft ?? published) : published`), so an admin's
@@ -1237,12 +1323,15 @@ async function buildMobileCoverageEngineInputs(
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,
+      hiddenUserIds: input.hiddenUserIds,
     }),
     fetchMobileShiftRequestRowsData(serviceClient, {
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,
-    }),
+    }).then((rows) =>
+      withoutHiddenRequestRows(serviceClient, input.orgId, rows, input.hiddenUserIds),
+    ),
   ]);
 
   const rangeDates = getMobileDatesBetween(range.startDate, range.endDate);
@@ -1462,6 +1551,16 @@ function buildMobileOpenShiftsFromGaps(
       const employeeScheduleRow = rowByEmployeeDate.get(
         `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
       );
+      if (
+        employeeScheduleRow?.state.kind === "worked" &&
+        employeeScheduleRow.state.absenceTypeId != null
+      ) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason: "You are absent for the rest of this day.",
+        };
+      }
+
       const employeeTimeRanges = employeeScheduleRow
         ? getScheduleRowTimeRanges({
             row: employeeScheduleRow,
@@ -1827,6 +1926,18 @@ async function loadMobileShiftRequestMappingContext(serviceClient: SupabaseClien
   return { assignmentDetailsByPair, focusAreaNameMap, jobNameMap };
 }
 
+/** Drops requests made by, or aimed at, a person the viewer must not see. */
+async function withoutHiddenRequestRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  rows: MobileShiftRequestQueryRow[],
+  hiddenUserIds: readonly string[] = [],
+): Promise<MobileShiftRequestQueryRow[]> {
+  if (hiddenUserIds.length === 0) return rows;
+  const hiddenStaffIds = new Set(await fetchHiddenEmployeeIds(serviceClient, orgId, hiddenUserIds));
+  return withoutHiddenRequests(rows, hiddenStaffIds);
+}
+
 export async function fetchMobileShiftRequests(
   serviceClient: SupabaseClient,
   input: {
@@ -1835,11 +1946,15 @@ export async function fetchMobileShiftRequests(
     includeOpenPickupRequests?: boolean;
     startDate?: string;
     endDate?: string;
+    /** People whose requests the viewer must not be shown. */
+    hiddenUserIds?: readonly string[];
   },
 ): Promise<MobileShiftRequest[]> {
   const [mappingContext, rows] = await Promise.all([
     loadMobileShiftRequestMappingContext(serviceClient, input.orgId),
-    fetchMobileShiftRequestRowsData(serviceClient, input),
+    fetchMobileShiftRequestRowsData(serviceClient, input).then((found) =>
+      withoutHiddenRequestRows(serviceClient, input.orgId, found, input.hiddenUserIds),
+    ),
   ]);
 
   return mapMobileShiftRequestRows(rows, mappingContext);
@@ -1847,15 +1962,24 @@ export async function fetchMobileShiftRequests(
 
 export async function fetchMobileShiftRequestHistory(
   serviceClient: SupabaseClient,
-  input: Parameters<typeof fetchMobileShiftRequestHistoryRowsData>[1],
+  input: Parameters<typeof fetchMobileShiftRequestHistoryRowsData>[1] & {
+    hiddenUserIds?: readonly string[];
+  },
 ) {
   const [mappingContext, page] = await Promise.all([
     loadMobileShiftRequestMappingContext(serviceClient, input.orgId),
     fetchMobileShiftRequestHistoryRowsData(serviceClient, input),
   ]);
+  // The cursor still comes from the full page, so a hidden row never skips the next one.
+  const rows = await withoutHiddenRequestRows(
+    serviceClient,
+    input.orgId,
+    page.rows,
+    input.hiddenUserIds,
+  );
 
   return {
-    requests: mapMobileShiftRequestRows(page.rows, mappingContext),
+    requests: mapMobileShiftRequestRows(rows, mappingContext),
     nextCursor: page.nextCursor,
   };
 }

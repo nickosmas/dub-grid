@@ -1987,7 +1987,7 @@ function JobRow({
                     label: shiftLabelById.get(shift.id) ?? shift.name,
                     description:
                       shift.startTime && shift.endTime
-                        ? `${shift.startTime.slice(0, 5)}-${shift.endTime.slice(0, 5)}`
+                        ? `${fmt12h(shift.startTime)} - ${fmt12h(shift.endTime)}`
                         : undefined,
                   }))}
                   selectedIds={form.applicableShiftIds}
@@ -2146,7 +2146,7 @@ function JobRow({
                               }}
                             >
                               {shift.startTime && shift.endTime
-                                ? `Inherits ${shift.startTime.slice(0, 5)}-${shift.endTime.slice(0, 5)} when time override is off`
+                                ? `Inherits ${fmt12h(shift.startTime)} - ${fmt12h(shift.endTime)} when time override is off`
                                 : "No shift time configured yet"}
                             </div>
                           </div>
@@ -2309,8 +2309,10 @@ function JobRow({
                                   color: "var(--dg-color-text-muted)",
                                 }}
                               >
-                                Using {resolvedTimes.startTime?.slice(0, 5) ?? "—"}-
-                                {resolvedTimes.endTime?.slice(0, 5) ?? "—"} from the shift.
+                                Using{" "}
+                                {resolvedTimes.startTime ? fmt12h(resolvedTimes.startTime) : "—"} -{" "}
+                                {resolvedTimes.endTime ? fmt12h(resolvedTimes.endTime) : "—"} from
+                                the shift.
                               </div>
                             )}
                           </div>

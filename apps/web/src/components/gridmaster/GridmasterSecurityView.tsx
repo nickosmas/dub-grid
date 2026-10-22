@@ -11,6 +11,11 @@ import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsVi
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
@@ -23,6 +28,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 function SecurityCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
@@ -76,7 +82,7 @@ function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString();
+  return formatDateTimeLabel(date);
 }
 
 function formatRelative(value: string | null | undefined): string {
@@ -590,27 +596,16 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               className="dg-input"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={clearSearchOnEscape(() => setSearch(""))}
               placeholder="Search sessions..."
               aria-label="Search sessions"
               style={{
                 width: "100%",
-                paddingRight: search ? 30 : undefined,
+                paddingRight: search ? SEARCH_CLEAR_PADDING : undefined,
                 fontSize: "var(--dg-fs-caption)",
               }}
             />
-            {search && (
-              <CloseButton
-                size="sm"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                style={{
-                  position: "absolute",
-                  right: 4,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
-              />
-            )}
+            {search && <SearchClearButton onClear={() => setSearch("")} />}
           </div>
         </div>
 
@@ -812,10 +807,8 @@ export default function GridmasterSecurityView({
                             {entry.targetUserId}
                           </td>
                           <td style={gmTdStyle}>{entry.justification || "—"}</td>
-                          <td style={gmTdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
-                          <td style={gmTdStyle}>
-                            {entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}
-                          </td>
+                          <td style={gmTdStyle}>{formatDateTime(entry.createdAt)}</td>
+                          <td style={gmTdStyle}>{formatDateTime(entry.endedAt)}</td>
                         </tr>
                       );
                     })}

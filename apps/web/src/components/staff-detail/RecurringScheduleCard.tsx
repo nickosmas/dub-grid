@@ -6,6 +6,7 @@ import { CalendarClock } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { DAY_LABELS } from "@/lib/constants";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import {
@@ -58,18 +59,13 @@ function buildDayPills(
   const { assignmentByPair, absenceTypeById, shiftById, jobById } = lookups;
   if (recurringShift.absenceTypeId != null) {
     const absence = absenceTypeById.get(recurringShift.absenceTypeId) ?? null;
-    const resolved = absence
-      ? resolveShiftPillColors(
-          { color: absence.color, text: absence.text, border: absence.border },
-          isDarkTheme,
-        )
-      : null;
+    const resolved = absence ? absenceStripeFill(absence.color, isDarkTheme) : null;
     return [
       {
         key: `${recurringShift.id}-absence`,
         name: absence?.name || absence?.label || recurringShift.shiftLabel,
         jobName: null,
-        background: resolved?.color ?? NEUTRAL_PILL.background,
+        background: resolved?.background ?? NEUTRAL_PILL.background,
         border: resolved?.border ?? NEUTRAL_PILL.border,
         textColor: resolved?.text ?? NEUTRAL_PILL.textColor,
       },

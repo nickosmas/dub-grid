@@ -5,7 +5,13 @@ import type { DbEmployee, DbInvitation, DbScheduleCell } from "@dubgrid/db-types
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { Employee } from "@/types";
-import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import {
+  fetchHiddenPeople,
+  fetchHiddenStaffIds,
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import {
   forbidIfSandboxCookie,
   requireAuthenticatedUser,
@@ -532,6 +538,7 @@ export async function POST(req: NextRequest) {
 
         const isManager = isEmployeeDetailViewer(auth.permissions);
         const includesTerminated = data.statuses?.includes("removed");
+        const hiddenUserIds = await fetchHiddenPeople(auth);
 
         // A single unpaged query here would silently truncate at PostgREST's
         // max_rows cap (200 OK, rows just missing) once an org has more
@@ -556,7 +563,7 @@ export async function POST(req: NextRequest) {
           if (!isManager) {
             query = query.eq("status", "active");
           }
-          return query.order("seniority").range(from, to);
+          return withoutHiddenStaff(query, hiddenUserIds).order("seniority").range(from, to);
         };
 
         const rows = await fetchAllRows<DbEmployee>(buildPage);
@@ -1016,6 +1023,10 @@ export async function POST(req: NextRequest) {
         }
 
         assertDateRange(data.startDate, data.endDate);
+        // Someone the viewer is not shown has no shifts as far as they can tell.
+        if ((await fetchHiddenStaffIds(auth)).has(data.employeeId)) {
+          return NextResponse.json({ shifts: {} });
+        }
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
         const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
         const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);

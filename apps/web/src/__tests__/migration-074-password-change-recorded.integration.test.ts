@@ -47,8 +47,11 @@ async function passwordRows() {
     resource_id: string;
     details: Record<string, string>;
   }>(
+    // Only this case's rows: each runs in its own transaction, where now() is
+    // its start, so a real password change in the shared local database (a QA
+    // account signing in and changing it) never counts.
     `SELECT actor_id, org_id, resource_type, resource_id, details FROM public.audit_log
-      WHERE action = 'security.auth.password' AND resource_id = $1`,
+      WHERE action = 'security.auth.password' AND resource_id = $1 AND created_at >= now()`,
     [userId],
   );
   return rows;

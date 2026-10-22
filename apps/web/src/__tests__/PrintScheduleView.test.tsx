@@ -129,7 +129,8 @@ describe("PrintScheduleView", () => {
     expect(pills.length).toBe(7);
     for (const pill of pills) {
       const surface = pill.closest("div[style*='border-radius']") as HTMLElement | null;
-      expect(surface?.style.background).toBe("rgb(253, 230, 138)");
+      expect(surface?.style.background).toContain("repeating-linear-gradient(135deg");
+      expect(surface?.style.borderStyle).toBe("dashed");
     }
   });
 
@@ -293,6 +294,94 @@ describe("PrintScheduleView", () => {
 
       expect(container.innerHTML).not.toMatch(/ellipsis|line-clamp/);
       expect(container.querySelectorAll("[data-print-fit]").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("absence for the rest of the day", () => {
+    const sick: AbsenceType = {
+      id: 9,
+      orgId: "org-1",
+      label: "S",
+      name: "Sick",
+      color: "#FEE2E2",
+      border: "#FCA5A5",
+      text: "#991B1B",
+      sortOrder: 2,
+    };
+    const evening: AssignmentDefinition = { ...assignments[0], id: 3, label: "E", name: "Evening" };
+    const firstDay = formatDateKey(new Date(2024, 0, 7));
+    const secondDay = formatDateKey(new Date(2024, 0, 8));
+
+    function renderMixed() {
+      return render(
+        <PrintScheduleView
+          weekStart={new Date(2024, 0, 7)}
+          config={{ fontSize: 12, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+          employees={employees}
+          allEmployees={employees}
+          focusAreas={focusAreas}
+          assignments={[assignments[0], evening]}
+          shiftCategories={shiftCategories}
+          jobs={[]}
+          certifications={[]}
+          orgRoles={[]}
+          shiftForKey={(_, date) => {
+            const key = formatDateKey(date);
+            return key === firstDay ? "D" : key === secondDay ? "D/E" : null;
+          }}
+          assignmentIdsForKey={(_, date) => {
+            const key = formatDateKey(date);
+            return key === firstDay ? [1] : key === secondDay ? [1, 3] : [];
+          }}
+          restOfDayAbsenceTypeIdForKey={(_, date) =>
+            [firstDay, secondDay].includes(formatDateKey(date)) ? sick.id : null
+          }
+          absenceTypeMap={new Map([[sick.id, sick]])}
+          getCustomShiftTimes={(_, date) =>
+            formatDateKey(date) === firstDay ? { start: "07:00", end: "11:00" } : null
+          }
+          getShiftStyle={(label) => (label === "E" ? evening : assignments[0])}
+          onClose={() => {}}
+        />,
+      );
+    }
+
+    function cellPills(cell: Element) {
+      return Array.from(cell.querySelectorAll<HTMLElement>("[data-print-pill]"));
+    }
+
+    it("prints the absence after the shifts, without a time", () => {
+      const { container } = renderMixed();
+      const cells = Array.from(container.querySelectorAll("td")).filter(
+        (cell) => cellPills(cell).length > 0,
+      );
+
+      const [mixed, triple] = cells;
+      expect(cellPills(mixed).map((pill) => pill.textContent)).toEqual([
+        expect.stringContaining("D"),
+        "S",
+      ]);
+      expect(cellPills(mixed)[0].textContent).toContain("7");
+      expect(cellPills(mixed)[1].style.background).toContain("repeating-linear-gradient(135deg");
+      // The absence starts where the shift ends, so the two touch.
+      expect(cellPills(mixed)[0].style.borderRightStyle).toBe("none");
+      expect(cellPills(mixed)[1].style.borderLeftStyle).toBe("none");
+      expect(cellPills(triple)).toHaveLength(3);
+      expect(cellPills(triple)[2].textContent).toBe("S");
+    });
+
+    it("stacks a three-item cell in a taller row and keeps two items side by side", () => {
+      const { container } = renderMixed();
+      const layouts = Array.from(container.querySelectorAll<HTMLElement>("td > div")).filter(
+        (cell) => cellPills(cell).length > 0,
+      );
+
+      const [two, three] = layouts;
+      expect(two.dataset.printCellLayout).toBeUndefined();
+      expect(two.style.flexDirection).toBe("row");
+      expect(three.dataset.printCellLayout).toBe("stacked");
+      expect(three.style.flexDirection).toBe("column");
+      expect(parseFloat(three.style.minHeight)).toBeGreaterThan(parseFloat(two.style.minHeight));
     });
   });
 

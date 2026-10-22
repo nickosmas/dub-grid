@@ -14,7 +14,8 @@ import type {
   ShiftCategory,
 } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -560,6 +561,7 @@ async function authorize(req: NextRequest, orgId: string, permission: SettingsPe
     actor: auth.actor,
     serviceClient: auth.serviceClient,
     orgId: auth.orgId,
+    loadHiddenPeople: () => fetchHiddenPeople(auth),
   } as const;
 }
 
@@ -1089,15 +1091,22 @@ async function indicatorTypeHasAnyReferencesForOrg(
   return (noteRes.count ?? 0) > 0;
 }
 
-async function checkRoleDependenciesForOrg(roleId: number, orgId: string): Promise<DependencyInfo> {
+async function checkRoleDependenciesForOrg(
+  roleId: number,
+  orgId: string,
+  hiddenUserIds: readonly string[],
+): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
   const [employeeRes, jobRes, hasAny] = await Promise.all([
-    serviceClient
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .contains("role_ids", [roleId]),
+    withoutHiddenStaff(
+      serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .contains("role_ids", [roleId]),
+      hiddenUserIds,
+    ),
     serviceClient
       .from("jobs")
       .select("id", { count: "exact", head: true })
@@ -1119,15 +1128,19 @@ async function checkRoleDependenciesForOrg(roleId: number, orgId: string): Promi
 async function checkCertificationDependenciesForOrg(
   certId: number,
   orgId: string,
+  hiddenUserIds: readonly string[],
 ): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
   const [employeeRes, assignments, jobRes, hasAny] = await Promise.all([
-    serviceClient
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .eq("certification_id", certId),
+    withoutHiddenStaff(
+      serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .eq("certification_id", certId),
+      hiddenUserIds,
+    ),
     fetchAssignmentDefinitionsForOrg(orgId, true),
     serviceClient
       .from("jobs")
@@ -1158,6 +1171,7 @@ async function checkCertificationDependenciesForOrg(
 async function checkDepartmentDependenciesForOrg(
   deptId: number,
   orgId: string,
+  hiddenUserIds: readonly string[],
 ): Promise<DependencyInfo> {
   // Focus areas are intentionally omitted from the active-deps summary:
   // every scheduled department has at least one structural focus area, so
@@ -1165,12 +1179,15 @@ async function checkDepartmentDependenciesForOrg(
   // surfaces through employees/roles/jobs (and via FA children separately).
   const serviceClient = getServiceClient();
   const [employeeRes, roleRes, jobRes, refCheck] = await Promise.all([
-    serviceClient
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .contains("department_ids", [deptId]),
+    withoutHiddenStaff(
+      serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .contains("department_ids", [deptId]),
+      hiddenUserIds,
+    ),
     serviceClient
       .from("organization_roles")
       .select("id", { count: "exact", head: true })
@@ -1199,15 +1216,19 @@ async function checkDepartmentDependenciesForOrg(
 async function checkFocusAreaDependenciesForOrg(
   focusAreaId: number,
   orgId: string,
+  hiddenUserIds: readonly string[],
 ): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
   const [employeeRes, shiftCatRes, coverageRes, hasAny] = await Promise.all([
-    serviceClient
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .contains("focus_area_ids", [focusAreaId]),
+    withoutHiddenStaff(
+      serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .contains("focus_area_ids", [focusAreaId]),
+      hiddenUserIds,
+    ),
     serviceClient
       .from("shift_categories")
       .select("id", { count: "exact", head: true })
@@ -1399,21 +1420,35 @@ export async function GET(req: NextRequest) {
         });
       case "checkCertificationDependencies":
         return NextResponse.json(
-          await checkCertificationDependenciesForOrg(Number(itemId), effectiveOrgId),
+          await checkCertificationDependenciesForOrg(
+            Number(itemId),
+            effectiveOrgId,
+            await authorized.loadHiddenPeople(),
+          ),
         );
       case "fetchOrganizationRoles":
         return NextResponse.json({
           items: await fetchOrganizationRolesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkRoleDependencies":
-        return NextResponse.json(await checkRoleDependenciesForOrg(Number(itemId), effectiveOrgId));
+        return NextResponse.json(
+          await checkRoleDependenciesForOrg(
+            Number(itemId),
+            effectiveOrgId,
+            await authorized.loadHiddenPeople(),
+          ),
+        );
       case "fetchDepartments":
         return NextResponse.json({
           items: await fetchDepartmentsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkDepartmentDependencies":
         return NextResponse.json(
-          await checkDepartmentDependenciesForOrg(Number(itemId), effectiveOrgId),
+          await checkDepartmentDependenciesForOrg(
+            Number(itemId),
+            effectiveOrgId,
+            await authorized.loadHiddenPeople(),
+          ),
         );
       case "fetchFocusAreas":
         return NextResponse.json({
@@ -1421,7 +1456,11 @@ export async function GET(req: NextRequest) {
         });
       case "checkFocusAreaDependencies":
         return NextResponse.json(
-          await checkFocusAreaDependenciesForOrg(Number(itemId), effectiveOrgId),
+          await checkFocusAreaDependenciesForOrg(
+            Number(itemId),
+            effectiveOrgId,
+            await authorized.loadHiddenPeople(),
+          ),
         );
       case "fetchShiftCategories":
         return NextResponse.json({

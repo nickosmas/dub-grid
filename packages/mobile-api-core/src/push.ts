@@ -31,6 +31,8 @@ export class MobilePushDeliveryError extends Error {
 const PUSH_ELIGIBLE_TYPES = new Set([
   // existing
   "schedule_published",
+  // one alert per person per publish, every changed day (item 46e)
+  "shift_change",
   "shift_request_new",
   "shift_request_approved",
   "shift_request_rejected",

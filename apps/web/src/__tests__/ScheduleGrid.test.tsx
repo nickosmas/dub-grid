@@ -7,8 +7,13 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import { getReadableTextOnSurface } from "@/lib/colors";
-import { REQUEST_FOLD_CLEARANCE, REQUEST_FOLD_SIZE } from "@/components/schedule-grid/badges";
-import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
+import {
+  MENTORED_CORNER_CLEARANCE,
+  REQUEST_FOLD_CLEARANCE,
+  REQUEST_FOLD_SIZE,
+} from "@/components/schedule-grid/badges";
+import { formatPublishedMetadata, GRID_CELL_HEIGHT } from "@/components/schedule-grid/gridHelpers";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { formatDateKey } from "@/lib/utils";
 import type {
@@ -261,6 +266,8 @@ interface RenderGridOptions {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,
     date: Date,
@@ -326,6 +333,47 @@ function getGridBody(name: string): HTMLElement {
   return body;
 }
 
+// A fit line's size: its token at the line's fit scale (gridFit.ts).
+const fitSize = (token: string) => `calc(${token} * var(--dg-grid-fit-scale, 1))`;
+const FIT_TITLE = fitSize("var(--dg-fs-title)");
+const FIT_FOOTNOTE = fitSize("var(--dg-fs-footnote)");
+const FIT_MICRO = fitSize("var(--dg-fs-micro)");
+
+// Marks on a pill that are not its text.
+const PILL_MARKS =
+  "[data-mentored-badge], [data-draft-badge], [data-publish-badge], [data-note-dots], [data-request-fold]";
+
+// Every word on a pill sits in a fit line, so it shrinks rather than being cut.
+function expectPillTextToFit(cell: HTMLElement) {
+  const pills = Array.from(cell.querySelectorAll<HTMLElement>("[data-shift-pill]"));
+  expect(pills.length).toBeGreaterThan(0);
+  for (const pill of pills) {
+    const walker = document.createTreeWalker(pill, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const host = node.parentElement as HTMLElement;
+      // The focus-area wing's initials run vertically beside the words.
+      if (!node.textContent?.trim() || host.closest(PILL_MARKS) || host.style.writingMode) {
+        continue;
+      }
+      expect(host.closest("[data-pill-fit]"), node.textContent).not.toBeNull();
+    }
+    for (const el of Array.from(pill.querySelectorAll<HTMLElement>("*"))) {
+      if (el.closest(PILL_MARKS)) continue;
+      expect(el.style.textOverflow).not.toBe("ellipsis");
+      expect(el.getAttribute("style") ?? "").not.toContain("line-clamp");
+    }
+  }
+}
+
+// Note dots sit in the pill's flow, so text has to make room for them.
+function expectNoteDotsInFlow(cell: HTMLElement) {
+  for (const dots of cell.querySelectorAll<HTMLElement>("[data-note-dots]")) {
+    expect(dots.style.position).toBe("");
+    // A row of their own, never the end of a line of text.
+    expect(dots.dataset.noteDots).toBe("lane");
+  }
+}
+
 function renderGrid(options: RenderGridOptions = {}) {
   const resolvedAssignmentDefinitions = options.assignments ?? assignments;
   const model = buildScheduleGridModel({
@@ -382,6 +430,8 @@ function renderGrid(options: RenderGridOptions = {}) {
       publishedLabelForKey: options.publishedLabelForKey,
       publishedAssignmentIdsForKey: options.publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey: options.publishedAbsenceTypeIdForKey,
+      restOfDayAbsenceTypeIdForKey: options.restOfDayAbsenceTypeIdForKey,
+      publishedRestOfDayAbsenceTypeIdForKey: options.publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffForKey: options.publishDiffForKey as any,
       publishedMetadataForKey: options.publishedMetadataForKey,
       createdByNameForKey: options.createdByNameForKey,
@@ -534,12 +584,17 @@ describe("ScheduleGrid", () => {
     expect(badges).toHaveLength(1);
     expect(pills[0].querySelector('[data-mentored-badge="true"]')).toBeNull();
     expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
-    expect((badges[0] as HTMLElement).style.width).toBe("15px");
-    expect((badges[0] as HTMLElement).style.height).toBe("15px");
+    // Each pill of a double shift is drawn like a single shift's, full-size M included.
+    expect((badges[0] as HTMLElement).style.width).toBe("16px");
+    expect((badges[0] as HTMLElement).style.height).toBe("16px");
     expect((badges[0] as HTMLElement).style.borderRadius).toBe("999px");
     expect((badges[0] as HTMLElement).style.top).toBe("0.5px");
     expect((badges[0] as HTMLElement).style.right).toBe("0.5px");
     expect(pills[1].style.paddingLeft).toBe(pills[1].style.paddingRight);
+    // The first line keeps the M's room on both sides, so it stays centred and clear of it.
+    const firstLine = pills[1].querySelector<HTMLElement>(":scope > div");
+    expect(firstLine?.style.paddingRight).toBe(`${MENTORED_CORNER_CLEARANCE - 3}px`);
+    expect(firstLine?.style.paddingLeft).toBe(firstLine?.style.paddingRight);
   });
 
   it("keeps all staff rows visible and visibly highlights matches when a staff search highlight set is active", async () => {
@@ -741,11 +796,12 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.left).toBe("4px");
     expect(badge?.style.zIndex).toBe("10");
 
-    expect(badge?.getAttribute("aria-label")).toContain("Was Night Shift.");
+    expect(badge?.getAttribute("aria-label")).toContain("Was Night Shift · North");
 
     fireEvent.mouseEnter(pill!);
     await waitFor(() => {
-      expect(screen.getByText(/Was Night Shift\./)).toBeInTheDocument();
+      expect(screen.getByText("Was")).toBeInTheDocument();
+      expect(screen.getByText("Night Shift")).toBeInTheDocument();
       expect(screen.getByText(/Published .*by Mina\./)).toBeInTheDocument();
     });
   });
@@ -1035,7 +1091,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.textContent).toBe("Edited");
 
     expect(badge?.getAttribute("aria-label")).toContain(
-      "Changed custom time 07:00-15:00 to 08:00-16:00.",
+      "Changed custom time 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
     );
   });
 
@@ -1078,7 +1134,7 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
     expect(badge?.textContent).toBe("Edited");
     expect(badge).toHaveStyle({
@@ -1241,7 +1297,7 @@ describe("ScheduleGrid", () => {
     expect(pills[1]?.style.borderColor).toBe("rgb(217, 119, 6)");
     expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
     const splitPillContainer = pills[0]?.parentElement?.parentElement as HTMLElement | null;
-    expect(splitPillContainer?.style.top).toBe("3px");
+    expect(splitPillContainer?.style.top).toBe("4px");
     expect(
       Number.parseFloat(splitPillContainer?.style.top ?? "0") +
         Number.parseFloat(badge?.style.top ?? "0"),
@@ -1355,7 +1411,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.borderRadius).toBe("3px");
     expect(badge?.style.top).toBe("0px");
     expect(badge?.style.transform).toBe("translateY(-50%)");
-    expect(badge?.style.left).toBe("4px");
+    expect(badge?.style.left).toBe("2px");
   });
 
   it("rings a reordered pair without claiming either pill was something else", () => {
@@ -1409,12 +1465,17 @@ describe("ScheduleGrid", () => {
     const archivedEvening = {
       ...twoPillAssignmentDefinitions[2],
       name: "Evening Shift · Supervisor",
+      categoryId: 2,
       jobId: 103,
       archivedAt: "2024-01-08T00:00:00.000Z",
     };
     renderGrid({
       assignments: [currentDay],
       historicalAssignments: [archivedEvening],
+      shiftCategories: [
+        ...shiftCategories,
+        { id: 2, orgId: "org-1", name: "Evening Shift", sortOrder: 2 },
+      ],
       jobs: [{ id: 103, name: "Supervisor" } as JobDefinition],
       shiftForKey: () => "D",
       assignmentIdsForKey: () => [1],
@@ -1427,7 +1488,7 @@ describe("ScheduleGrid", () => {
           kind: "worked",
           segments: [
             { shiftId: 1, jobId: 101, position: 0 },
-            { shiftId: 1, jobId: 103, position: 1 },
+            { shiftId: 2, jobId: 103, position: 1 },
           ],
           absenceTypeId: null,
           customStartTime: null,
@@ -1453,7 +1514,9 @@ describe("ScheduleGrid", () => {
       .getAllByRole("gridcell")[0]
       .querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.getAttribute("aria-label")).toContain("Was Evening Shift · Supervisor.");
+    expect(badge?.getAttribute("aria-label")).toContain(
+      "Shift 2: Evening Shift (archived) · Supervisor · North (removed)",
+    );
     expect(badge?.getAttribute("aria-label")).not.toContain("Supervisor · Supervisor");
   });
 
@@ -1547,12 +1610,12 @@ describe("ScheduleGrid", () => {
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
     const crossPill = initialsBadge.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
-    expect(crossPill?.style.borderRadius).toBe("6px");
-    expect(crossPill?.style.paddingLeft).toBe("16px");
+    expect(crossPill?.style.borderRadius).toBe("8px");
+    expect(crossPill?.style.paddingLeft).toBe("18px");
     expect(initialsBadge.style.position).toBe("absolute");
     expect(initialsBadge.style.writingMode).toBe("vertical-rl");
     expect(initialsBadge.style.left).toBe("0px");
-    expect(initialsBadge.style.borderRadius).toBe("5px 0 0 5px");
+    expect(initialsBadge.style.borderRadius).toBe("7px 0 0 7px");
     expect(initialsBadge).toHaveStyle({
       background: "#DBEAFE",
       color: "#1E3A8A",
@@ -2002,7 +2065,7 @@ describe("ScheduleGrid", () => {
     const dots = firstCell.querySelector('[data-mentored-badge="true"]')?.parentElement;
 
     expect(badge?.textContent).toBe("Edited");
-    expect(badge?.style.left).toBe("4px");
+    expect(badge?.style.left).toBe("2px");
     expect(dots).not.toBeNull();
   });
 
@@ -2020,8 +2083,11 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
 
-    expect(firstCell.querySelector('[data-shift-pill="deleted"]')).not.toBeNull();
+    const deletedPill = firstCell.querySelector('[data-shift-pill="deleted"]') as HTMLElement;
+    expect(deletedPill).not.toBeNull();
     expect(firstCell.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expect(deletedPill.querySelector('[data-note-dots="lane"] [data-note-mark]')).not.toBeNull();
+    expectNoteDotsInFlow(firstCell);
   });
 
   it("draws a note added but not yet published hollow in its own colour", () => {
@@ -2033,15 +2099,14 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const added = firstCell.querySelector('[data-note-mark="draft_added"]') as SVGElement;
+    const added = firstCell.querySelector('[data-note-mark="draft_added"]') as HTMLElement;
 
-    expect(added?.getAttribute("aria-label")).toBe("Flag · Added, not published");
-    const body = added?.querySelector("path");
-    expect(body?.getAttribute("fill")).toBe("none");
-    expect(body?.getAttribute("stroke")).toBe("#ff0000");
+    expect(within(firstCell).getByLabelText("Flag · Added, not published")).toBeInTheDocument();
+    expect(added.style.background).toBe("transparent");
+    expect(added.style.boxShadow).toBe("inset 0 0 0 1.75px #ff0000");
   });
 
-  it("stacks several notes on a shift into one mark", () => {
+  it("draws two notes as dots and counts a third", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -2059,9 +2124,468 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const marks = firstCell.querySelectorAll("[data-note-mark]");
 
-    expect(marks).toHaveLength(1);
-    expect(marks[0].getAttribute("data-note-mark")).toBe("stack");
-    expect(marks[0].getAttribute("aria-label")).toBe("3 notes: Note 1, Note 2, Note 3");
+    expect(marks).toHaveLength(2);
+    expect(firstCell.querySelector("[data-note-more]")?.textContent).toBe("+1");
+    expect(within(firstCell).getByLabelText("3 notes: Note 1, Note 2, Note 3")).toBeInTheDocument();
+    expectNoteDotsInFlow(firstCell);
+  });
+
+  it("keeps a one-line pill's notes in a strip along its bottom", () => {
+    observedWidth = 1600;
+
+    renderGrid({ noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }] });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const lane = pill.querySelector<HTMLElement>('[data-note-dots="lane"]');
+
+    expect(lane?.parentElement).toBe(pill);
+    expect(lane?.style.height).toBe("13px");
+    expect(lane?.style.justifyContent).toBe("flex-end");
+    // The strip keeps the words' room; the dots sit in the pill's bottom-right
+    // corner, as the M sits in its top-right.
+    const dots = lane?.querySelector<HTMLElement>('[role="img"]');
+    expect(dots?.style.position).toBe("absolute");
+    expect(dots?.style.right).toBe("2px");
+    expect(dots?.style.bottom).toBe("2px");
+    expect(lane?.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    // A one-line pill with notes still fits the normal cell.
+    expect(
+      (firstCell.closest('[role="row"]') as HTMLElement).style.getPropertyValue(
+        "--dg-grid-row-cell-height",
+      ),
+    ).toBe("");
+    expectNoteDotsInFlow(firstCell);
+  });
+
+  it("puts a timed pill's notes on a row of their own and grows the row to fit", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      getCustomShiftTimes: () => ({ start: "08:00", end: "16:00" }),
+      noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const row = firstCell.closest('[role="row"]') as HTMLElement;
+    const content = firstCell.querySelector<HTMLElement>(".dg-grid-cell__content");
+
+    // The time keeps its line; the dots take the strip below it.
+    expect(pill.querySelector('[data-note-dots="lane"]')?.parentElement).toBe(pill);
+    expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(
+      "1px + var(--dg-fs-footnote) + 14px",
+    );
+    // This cell grows with the row rather than holding the normal height.
+    expect(content?.style.height).toBe("");
+    expectNoteDotsInFlow(firstCell);
+    expectPillTextToFit(firstCell);
+  });
+
+  it("shows two dots and a count on a double shift's pill with more than two notes", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      indicatorTypes: [1, 2, 3].map((id) => ({
+        id,
+        orgId: "org-1",
+        name: `Note ${id}`,
+        color: "#ff0000",
+        sortOrder: id,
+      })),
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      noteMarksForKey: () =>
+        [1, 2, 3].map((indicatorTypeId) => ({ indicatorTypeId, state: "published" as const })),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelectorAll('[data-shift-pill="multi"]')[0] as HTMLElement;
+
+    expect(pill.querySelectorAll("[data-note-mark]")).toHaveLength(2);
+    expect(pill.querySelector("[data-note-more]")?.textContent).toBe("+1");
+    expect(within(pill).getByLabelText("3 notes: Note 1, Note 2, Note 3")).toBeInTheDocument();
+  });
+
+  it("stacks a double shift in a taller row when its pills would be too narrow side by side", () => {
+    observedWidth = 1440;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    const row = firstCell.closest('[role="row"]') as HTMLElement;
+
+    expect(pills[0].parentElement?.dataset.shiftLayout).toBe("stacked");
+    expect(pills[0].parentElement?.style.gridTemplateRows).toBe(
+      "minmax(min-content, 1fr) minmax(min-content, 1fr)",
+    );
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toMatch(
+      /^max\(var\(--dg-grid-cell-height\), calc\(/,
+    );
+  });
+
+  it("keeps a single shift at its normal height in a row grown for a double shift", () => {
+    observedWidth = 1440;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: (_empId, date) => (date.getDay() === 1 ? "D/N" : "D"),
+      assignmentIdsForKey: (_empId, date) => (date.getDay() === 1 ? [1, 2] : [1]),
+    });
+
+    const cells = screen.getAllByRole("gridcell") as HTMLElement[];
+    const content = (cell: HTMLElement) =>
+      cell.querySelector<HTMLElement>(".dg-grid-cell__content");
+    const doubleCell = cells.find((cell) => cell.querySelector('[data-shift-pill="multi"]'))!;
+    const singleCell = cells.find((cell) => cell.querySelector('[data-shift-pill="single"]'))!;
+
+    expect(doubleCell.closest('[role="row"]')).toBe(singleCell.closest('[role="row"]'));
+    expect(content(doubleCell)?.style.height).toBe("");
+    expect(content(singleCell)?.style.height).toBe("var(--dg-grid-cell-height)");
+  });
+
+  it("keeps a double shift side by side at the normal height when the column is wide", () => {
+    observedWidth = 1440;
+
+    renderGrid({
+      spanWeeks: 1,
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    const row = firstCell.closest('[role="row"]') as HTMLElement;
+
+    expect(pills[0].parentElement?.dataset.shiftLayout).toBe("side-by-side");
+    expect(pills[0].parentElement?.style.gridTemplateColumns).toBe("repeat(2, minmax(0, 1fr))");
+    // One pill tall, so the row keeps the grid's height unless a pill's lines need more.
+    expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 1 * (");
+  });
+
+  describe("a rest-of-day absence (item 45)", () => {
+    const sick: AbsenceType = {
+      id: 9,
+      orgId: "org-1",
+      label: "SICK",
+      name: "Sick",
+      color: "#FFE4E6",
+      border: "#FDA4AF",
+      text: "#9F1239",
+      sortOrder: 1,
+    };
+    const absenceTypeMap = new Map([[sick.id, sick]]);
+
+    it("sits side by side after a single shift in a wide column, with when it starts", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        getCustomShiftTimes: () => ({ start: "07:00", end: "11:00" }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+      const pills = Array.from(absencePill.parentElement!.children) as HTMLElement[];
+
+      expect(absencePill.parentElement?.dataset.shiftLayout).toBe("side-by-side");
+      expect(absencePill.parentElement?.style.gridTemplateColumns).toBe(
+        "repeat(2, minmax(0, 1fr))",
+      );
+      expect(pills[pills.length - 1]).toBe(absencePill);
+      expect(absencePill).toHaveTextContent("SICK");
+      expect(absencePill).toHaveTextContent("from 11");
+      expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
+      // Attached: they touch, with no border or rounding where they meet.
+      const shiftPill = pills[pills.length - 2];
+      expect(shiftPill.style.borderRightStyle).toBe("none");
+      expect(shiftPill.style.borderRadius).toBe("8px 0 0 8px");
+      expect(absencePill.style.borderLeftStyle).toBe("none");
+      expect(absencePill.style.borderRadius).toBe("0 8px 8px 0");
+      expect(absencePill.style.marginLeft).toBe("");
+      expect(absencePill.parentElement!.style.gap).toBe("0");
+      expectPillTextToFit(firstCell);
+    });
+
+    it("stacks after two shifts and grows only its row", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const layout = firstCell.querySelector<HTMLElement>("[data-shift-layout]")!;
+      const row = firstCell.closest('[role="row"]') as HTMLElement;
+
+      expect(layout.dataset.shiftLayout).toBe("stacked");
+      // One line each, so the three share the height equally.
+      expect(layout.style.gridTemplateRows).toBe(
+        "minmax(min-content, 1fr) minmax(min-content, 1fr) minmax(min-content, 1fr)",
+      );
+      expect(layout.lastElementChild?.getAttribute("data-shift-pill")).toBe("rest-of-day-absence");
+      expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 3 * (");
+      // These shifts have no times, so they never meet and keep their gap;
+      // the absence starts where the last shift ends, so it joins that one.
+      const [first, second, absence] = Array.from(layout.children) as HTMLElement[];
+      expect(first.style.border).toContain("solid");
+      expect(first.style.borderRadius).toBe("8px");
+      expect(second.style.marginTop).toBe("4px");
+      expect(second.style.borderTopStyle).not.toBe("none");
+      expect(second.style.borderBottomStyle).toBe("none");
+      expect(second.style.borderRadius).toBe("8px 8px 0 0");
+      expect(absence.style.borderTopStyle).toBe("none");
+      expect(absence.style.borderRadius).toBe("0 0 8px 8px");
+      expect(absence.style.marginTop).toBe("");
+    });
+
+    it.each([
+      ["joins", "15:00", true],
+      ["keeps apart", "16:00", false],
+    ])("%s a double shift whose second part starts at %s", (_, secondStart, joined) => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        getCustomShiftTimes: () => ({
+          start: "07:00",
+          end: "23:00",
+          perPill: [
+            { start: "07:00", end: "15:00" },
+            { start: secondStart, end: "23:00" },
+          ],
+        }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const [first, second] = Array.from(
+        firstCell.querySelectorAll<HTMLElement>('[data-shift-pill="multi"]'),
+      );
+      const seam = first.parentElement!.dataset.shiftLayout === "stacked" ? "Bottom" : "Right";
+      expect(first.style.getPropertyValue(`border-${seam.toLowerCase()}-style`) === "none").toBe(
+        joined,
+      );
+      expect(second.style.marginTop === "" && second.style.marginLeft === "").toBe(joined);
+    });
+
+    it("joins a shift with no custom time to the next through its default end", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions.map((assignment) =>
+          assignment.id === 3
+            ? { ...assignment, defaultStartTime: "15:30", defaultEndTime: "00:00" }
+            : assignment,
+        ),
+        shiftForKey: () => "E/N",
+        assignmentIdsForKey: () => [3, 2],
+        // An unset custom time is stored empty, not null.
+        getCustomShiftTimes: () => ({
+          start: "|00:00",
+          end: "|09:00",
+          perPill: [
+            { start: "", end: "" },
+            { start: "00:00", end: "09:00" },
+          ],
+        }),
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const [evening, night] = Array.from(
+        firstCell.querySelectorAll<HTMLElement>('[data-shift-pill="multi"]'),
+      );
+      const stacked = evening.parentElement!.dataset.shiftLayout === "stacked";
+      expect(
+        evening.style.getPropertyValue(stacked ? "border-bottom-style" : "border-right-style"),
+      ).toBe("none");
+      expect(night.style.getPropertyValue(stacked ? "border-top-style" : "border-left-style")).toBe(
+        "none",
+      );
+    });
+
+    it("gives a stacked one-line shift less height than a pill with a time", () => {
+      observedWidth = 640;
+
+      renderGrid({
+        spanWeeks: 2,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "E/N",
+        assignmentIdsForKey: () => [3, 2],
+        getCustomShiftTimes: () => ({
+          start: "|00:00",
+          end: "|09:00",
+          perPill: [
+            { start: "", end: "" },
+            { start: "00:00", end: "09:00" },
+          ],
+        }),
+      });
+
+      const layout = screen
+        .getAllByRole("gridcell")[0]
+        .querySelector<HTMLElement>('[data-shift-layout="stacked"]')!;
+      expect(layout.style.gridTemplateRows).toBe(
+        "minmax(min-content, 1fr) minmax(min-content, 2fr)",
+      );
+    });
+
+    it("badges the absence pill, not the shift, when only the absence is new", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        publishedRestOfDayAbsenceTypeIdForKey: () => null,
+        draftKindForKey: () => "modified",
+        publishedAssignmentIdsForKey: () => [1],
+        publishedLabelForKey: () => "D",
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+      const shiftPill = firstCell.querySelector<HTMLElement>('[data-shift-pill="multi"]')!;
+
+      // A draft "New" is the dashed border, on the absence pill alone.
+      expect(absencePill.style.borderRight).toContain("dashed");
+      expect(shiftPill.style.borderLeft).not.toContain("dashed");
+      expect(shiftPill.querySelector("[data-draft-badge]")).toBeNull();
+    });
+
+    it("badges the absence pill new when a publish added only the absence", () => {
+      observedWidth = 1440;
+      const worked = (absenceTypeId: number | null) => ({
+        kind: "worked" as const,
+        segments: [{ shiftId: 10, jobId: 101, position: 0 }],
+        absenceTypeId,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      });
+
+      renderGrid({
+        spanWeeks: 1,
+        showPublishDiffOverlay: true,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        publishedRestOfDayAbsenceTypeIdForKey: () => 9,
+        publishDiffForKey: () => ({
+          empId: "emp-1",
+          date: "2024-01-07",
+          kind: "modified",
+          fromState: worked(null),
+          toState: worked(9),
+          toRestOfDayAbsenceTypeId: 9,
+          publishedAt: "2024-01-07T12:00:00.000Z",
+          publishedBy: "user-1",
+        }),
+        resolvePublisherName: () => "Mina",
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const absencePill = firstCell.querySelector<HTMLElement>(
+        '[data-shift-pill="rest-of-day-absence"]',
+      )!;
+
+      expect(absencePill.querySelector('[data-publish-badge="new"]')?.textContent).toBe("New");
+    });
+
+    it("names the absence in the cell's accessible label", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D/N",
+        assignmentIdsForKey: () => [1, 2],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+      });
+
+      expect(screen.getAllByRole("gridcell")[0]).toHaveAccessibleName(
+        expect.stringMatching(/D\/N, then Sick for the rest of the day$/),
+      );
+    });
+
+    it("leaves a cell without one as it was", () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        restOfDayAbsenceTypeIdForKey: () => null,
+      });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      expect(firstCell.querySelector('[data-shift-pill="single"]')).not.toBeNull();
+      expect(firstCell.querySelector('[data-shift-pill="rest-of-day-absence"]')).toBeNull();
+    });
+  });
+
+  it("gives a double shift's cell notes to its last pill when segments do not line up", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
+      noteMarksForKey: () => [{ indicatorTypeId: 1, state: "published" }],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+
+    expect(pills).toHaveLength(2);
+    expect(pills[0].querySelector("[data-note-mark]")).toBeNull();
+    expect(pills[1].querySelectorAll("[data-note-mark]")).toHaveLength(1);
+    expectNoteDotsInFlow(firstCell);
   });
 
   it("draws each pill of a double shift with its own shift's notes, in its own focus area only", () => {
@@ -2255,6 +2779,102 @@ describe("ScheduleGrid", () => {
     expect(mentored?.style.right).toBe("0.5px");
   });
 
+  it("keeps the mentored circle at the top while a draft chip marks the pill", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(pill.querySelector("[data-draft-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
+  it("keeps the mentored circle at the top while a publish chip marks the pill", () => {
+    observedWidth = 1600;
+    const workedState = (jobId: number) => ({
+      kind: "worked" as const,
+      segments: [{ shiftId: 1, jobId, position: 0 }],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    });
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      assignments: [
+        { ...assignments[0], jobId: 101 },
+        {
+          id: 2,
+          orgId: "org-1",
+          label: "N",
+          name: "Night Shift",
+          color: "#E0F2FE",
+          border: "#0284C7",
+          text: "#0C4A6E",
+          categoryId: 1,
+          focusAreaId: 1,
+          jobId: 102,
+          sortOrder: 2,
+        },
+      ],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        fromState: workedState(102),
+        toState: workedState(101),
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(firstCell.querySelector("[data-publish-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
+  it("keeps a double shift's mentored circle at the top while a draft chip marks its pill", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: true },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [3, 4],
+      publishedLabelForKey: () => "E/S",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const mentored = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+    const mentoredPill = mentored?.closest('[data-shift-pill="multi"]') as HTMLElement | null;
+
+    expect(mentoredPill?.querySelector("[data-draft-badge]")).not.toBeNull();
+    expect(mentored?.style.top).toBe("0.5px");
+  });
+
   it("keeps mentored and cross-focus context on a draft-deleted shift", () => {
     observedWidth = 1600;
 
@@ -2276,12 +2896,18 @@ describe("ScheduleGrid", () => {
     const deletedPill = firstCell.querySelector('[data-shift-pill="deleted"]') as HTMLElement;
 
     expect(deletedPill).not.toBeNull();
-    expect(deletedPill.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    const mentored = deletedPill.querySelector(
+      '[data-mentored-badge="true"]',
+    ) as HTMLElement | null;
+    expect(mentored).not.toBeNull();
+    // The "Deleted" chip straddles the top-left edge, so the circle keeps its corner.
+    expect(mentored?.style.top).toBe("0.5px");
     const wing = within(deletedPill).getByText("SW") as HTMLElement;
     expect(wing).toHaveStyle({
       top: "0px",
       borderRadius: "6px 0 0 6px",
     });
+    expectPillTextToFit(firstCell);
   });
 
   it("keeps the cross-focus wing curved beneath a left-anchored badge", () => {
@@ -2785,7 +3411,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
 
-  it("borders absence pills in light mode even when the stored border is transparent", () => {
+  it("stripes an absence pill in its own color and borders it even when the stored border is transparent", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -2813,8 +3439,10 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
 
+    const stripes = resolveAbsenceStripes("#FDE68A", false);
     expect(pill?.textContent).toContain("VAC");
-    expect(pill?.style.borderColor).toBe("rgba(146, 64, 14, 0.35)");
+    expect(pill?.style.background).toContain("repeating-linear-gradient(135deg");
+    expect(pill?.style.borderColor).toBe(stripes.border.replace(/,/g, ", "));
   });
 
   it("keeps draft time-only changes compact and shows the time badge in-cell", () => {
@@ -2833,7 +3461,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(badge?.textContent).toBe("Edited");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
@@ -2841,7 +3469,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.top).toBe("0px");
     expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
-    expect(badge?.getAttribute("aria-label")).toContain("Added custom time 08:00-16:00.");
+    expect(badge?.getAttribute("aria-label")).toContain("Added custom time 8:00 AM - 4:00 PM.");
   });
 
   it("shows the meaningful edit badge when a draft adds a second shift alongside other edits", () => {
@@ -2888,7 +3516,7 @@ describe("ScheduleGrid", () => {
 
     expect(badge?.textContent).toBe("Edited");
     expect(badge?.getAttribute("aria-label")).toContain(
-      "Changed custom time for D 07:00-15:00 to 08:00-16:00.",
+      "Changed custom time for D 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
     );
   });
 
@@ -2963,8 +3591,40 @@ describe("ScheduleGrid", () => {
       Number.parseFloat(deletedPill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
 
-    expect(deletedPill?.getAttribute("aria-label")).toContain("Deleted N.");
-    expect(badge?.getAttribute("aria-label")).toContain("Deleted N.");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Removed: Night Shift · North");
+    expect(badge?.getAttribute("aria-label")).toContain("Removed: Night Shift · North");
+  });
+
+  it("marks a hidden removal without naming the shift, with the publisher it was sent (46f)", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "deleted",
+        detailsHidden: true,
+        fromState: null,
+        toState: null,
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const deletedPill = firstCell.querySelector(
+      '[data-shift-pill="deleted"]',
+    ) as HTMLElement | null;
+
+    expect(deletedPill).not.toBeNull();
+    expect(deletedPill?.textContent).toContain("Removed");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Removed since the last publish.");
+    expect(deletedPill?.getAttribute("aria-label")).toContain("Mina");
+    expect(deletedPill?.getAttribute("aria-label")).not.toMatch(/Day Shift|Night Shift/);
   });
 
   it("keeps author labels visible for publish diffs when authors are enabled", () => {
@@ -3002,7 +3662,7 @@ describe("ScheduleGrid", () => {
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(authorPill?.style.justifyContent).toBe("flex-start");
@@ -3038,7 +3698,7 @@ describe("ScheduleGrid", () => {
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("84px");
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
   });
 
   it("wraps open shift chips vertically inside narrow day cells", () => {
@@ -3935,7 +4595,7 @@ describe("ScheduleGrid", () => {
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(secondAuthorPill?.style.left).toBe("6px");
@@ -3967,7 +4627,7 @@ describe("ScheduleGrid", () => {
     const authorBody = authorText.parentElement as HTMLElement | null;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(authorPillIcon?.querySelector("svg")).not.toBeNull();
@@ -4014,7 +4674,7 @@ describe("ScheduleGrid", () => {
     const authorPill = authorPills[0] as HTMLElement | undefined;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(multiPills).toHaveLength(2);
     expect(authorPills).toHaveLength(1);
     expect(authorPill?.style.left).toBe("4px");
@@ -4081,20 +4741,24 @@ describe("ScheduleGrid", () => {
     const nightLabel = within(firstCell).getByText(longNightName) as HTMLElement;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
+    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
     expect(multiPills).toHaveLength(2);
     expect(authorPill).not.toBeNull();
     expect(dayLabel.closest('[data-shift-pill="multi"]')).not.toBeNull();
     expect(nightLabel.closest('[data-shift-pill="multi"]')).not.toBeNull();
-    expect(dayLabel.style.display).toBe("-webkit-box");
+    // A long name is a fit line: it shrinks to its pill, and is never
+    // clamped or broken inside a word.
+    expect(dayLabel.hasAttribute("data-pill-fit")).toBe(true);
+    expect(dayLabel.style.display).toBe("block");
     expect(dayLabel.style.textAlign).toBe("center");
-    expect(dayLabel.style.maxWidth).toBe("100%");
-    expect(dayLabel.style.overflowWrap).toBe("break-word");
+    expect(dayLabel.style.width).toBe("100%");
+    expect(dayLabel.style.overflowWrap).toBe("normal");
     expect(dayLabel.style.overflow).toBe("hidden");
     expect(dayLabel.style.lineHeight).toBe("1.2");
-    expect(dayLabel.getAttribute("style")).toContain("-webkit-line-clamp: 1");
-    expect(nightLabel.style.display).toBe("-webkit-box");
-    expect(nightLabel.style.overflowWrap).toBe("break-word");
+    expect(dayLabel.getAttribute("style")).not.toContain("line-clamp");
+    expect(nightLabel.hasAttribute("data-pill-fit")).toBe(true);
+    expect(nightLabel.style.overflowWrap).toBe("normal");
+    expectPillTextToFit(firstCell);
   });
 
   // A pill carrying shift, job and a custom time is three lines of type in a
@@ -4162,20 +4826,51 @@ describe("ScheduleGrid", () => {
     const job = Array.from(pill.querySelectorAll("span")).find(
       (span) => span.textContent === "S",
     ) as HTMLElement;
-    const shift = Array.from(pill.querySelectorAll("span")).find(
-      (span) => span.textContent === "D",
-    ) as HTMLElement;
+    const line = job.closest("[data-pill-fit]") as HTMLElement;
 
     expect(time).toBeTruthy();
     // Code mode: one- or two-character labels share a line, separated by a
-    // middot, so the time gets a line of its own without a row each.
-    expect(shift.parentElement).toBe(job.parentElement);
-    expect(shift.parentElement).toHaveStyle({ flexDirection: "row" });
-    expect(shift.parentElement?.textContent).toBe("D·S");
-    // The smaller job code sits on the shift code's baseline, not its centre.
-    expect(shift.parentElement).toHaveStyle({ alignItems: "baseline" });
+    // middot, so the time gets a line of its own without a row each. The
+    // line shrinks as one, the job code inline on the shift code's baseline.
+    expect(job.parentElement).toBe(line);
+    expect(line.textContent).toBe("D·S");
+    expect(line.style.fontSize).toBe(FIT_TITLE);
+    expect(job.style.fontSize).toBe(FIT_FOOTNOTE);
+    expect(job.style.display).toBe("");
+    expect(time.closest("[data-pill-fit]")).not.toBe(line);
     expect(time.parentElement).toBe(pill);
-    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+    expectPillTextToFit(firstCell);
+  });
+
+  it("shrinks an over-wide time line to its pill instead of cutting it", () => {
+    observedWidth = 1600;
+    // jsdom has no layout: the time line is 100px at full size in 60px of room.
+    const fitScaleOf = (el: Element) =>
+      Number((el as HTMLElement).style.getPropertyValue("--dg-grid-fit-scale") || 1);
+    const natural = vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (
+      this: Element,
+    ) {
+      const isTime = this.hasAttribute("data-pill-fit") && this.textContent?.includes("–");
+      return isTime ? 100 * fitScaleOf(this) : 0;
+    });
+    const room = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(60);
+    try {
+      renderGrid({ getCustomShiftTimes: () => ({ start: "07:30", end: "15:30" }) });
+
+      const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+      const lines = Array.from(firstCell.querySelectorAll<HTMLElement>("[data-pill-fit]"));
+      const time = lines.find((line) => line.textContent?.includes("–")) as HTMLElement;
+
+      expect(fitScaleOf(time)).toBeCloseTo(0.6);
+      expect(time.style.textOverflow).toBe("");
+      expect(time).toHaveTextContent("7:30–3:30");
+      expect(lines.filter((line) => line !== time).every((line) => fitScaleOf(line) === 1)).toBe(
+        true,
+      );
+    } finally {
+      natural.mockRestore();
+      room.mockRestore();
+    }
   });
 
   it("gives shift, job and custom time a row each in name mode", () => {
@@ -4245,9 +4940,11 @@ describe("ScheduleGrid", () => {
     expect(shift.parentElement).toBe(job.parentElement);
     expect(shift.parentElement).toHaveStyle({ flexDirection: "column" });
     expect(shift.parentElement?.textContent).toBe("DaySupervisor");
-    // Stepped down a size so three rows fit the 52px cell instead of clipping.
-    expect(job).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
-    expect(time).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
+    // Stepped down a size so three rows fit the 52px cell, and each a fit line.
+    expect(job.style.fontSize).toBe(FIT_MICRO);
+    expect(time.style.fontSize).toBe(FIT_MICRO);
+    expect([shift, job, time].every((span) => span.hasAttribute("data-pill-fit"))).toBe(true);
+    expectPillTextToFit(firstCell);
   });
 
   it("keeps shift and job on separate rows in name mode without a custom time", () => {
@@ -4376,13 +5073,10 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement;
 
     // Code mode shares the line whether or not a time follows.
-    expect(job.parentElement).toHaveStyle({ flexDirection: "row" });
-    expect(job.parentElement?.textContent).toBe("D·S");
-    expect(job.parentElement).toHaveStyle({ alignItems: "baseline" });
-    const shift = Array.from(pill.querySelectorAll("span")).find(
-      (span) => span.textContent === "D",
-    ) as HTMLElement;
-    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+    const line = job.parentElement as HTMLElement;
+    expect(line.hasAttribute("data-pill-fit")).toBe(true);
+    expect(line.textContent).toBe("D·S");
+    expect(line.style.fontSize).toBe(FIT_TITLE);
   });
 
   describe("pinned date row", () => {

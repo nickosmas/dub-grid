@@ -170,6 +170,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bresetPersonTwoFactor\s*\(/,
     ],
   },
+  "apps/web/src/app/api/gridmaster/users/[userId]/internal/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\(/,
+      /const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.update\(\{ is_internal:/,
+    ],
+  },
   "apps/web/src/app/api/gridmaster/users/[userId]/force-logout/route.ts": {
     policy: "sensitive",
     assertions: [

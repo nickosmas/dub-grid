@@ -259,6 +259,26 @@ describe("audit copy never leaks implementation detail", () => {
     expect(rows).toEqual([{ label: "Keep", value: "Visible" }]);
   });
 
+  it("says a worked shift has an absence for the rest of the day, and only then", () => {
+    const shift = (absenceTypeId: number | null) =>
+      formatDetails({
+        action: "shift.updated",
+        details: {
+          input: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 2, position: 0 }],
+            absenceTypeId,
+            customStartTime: null,
+            customEndTime: null,
+          },
+        },
+      });
+    expect(shift(4)).toEqual([
+      { label: "Shift", value: "Working, then an absence for the rest of the day" },
+    ]);
+    expect(shift(null)).toEqual([{ label: "Shift", value: "Working" }]);
+  });
+
   it("renders a change list as before/after rows using its own labels", () => {
     const rows = formatDetails({
       action: "org.updated",

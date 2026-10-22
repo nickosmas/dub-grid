@@ -1,5 +1,6 @@
 import { isNotePublishChangeState, type NotePublishChangeState } from "@dubgrid/contracts";
 import type { NotePublishChange, PublishChange, ShiftJobSegment } from "@/types";
+import { mergeCellPublishChanges } from "@/lib/shift-change-web";
 
 export interface ScheduleChangeRow {
   emp_id: string;
@@ -45,7 +46,23 @@ function stateIdentityKey(state: PublishChange["fromState"]): string {
     .sort((left, right) => left.position - right.position)
     .map(segmentIdentityKey)
     .join("|");
-  return `worked:${segments}:${state.customStartTime ?? ""}:${state.customEndTime ?? ""}`;
+  // A worked cell's absenceTypeId is its rest-of-day absence (item 45).
+  return `worked:${segments}:${state.customStartTime ?? ""}:${state.customEndTime ?? ""}:${state.absenceTypeId ?? ""}`;
+}
+
+/**
+ * Splits a change row's absence id by the state it belongs to. Since 082 the
+ * row also records a worked cell's rest-of-day absence there, so only an
+ * absence state makes it a whole-day absence. Rows without state predate both.
+ */
+function splitAbsenceTypeId(
+  state: PublishChange["fromState"],
+  absenceTypeId: number | null,
+): { wholeDay: number | null; restOfDay: number | null } {
+  if (!state) return { wholeDay: absenceTypeId, restOfDay: null };
+  if (state.kind === "absence") return { wholeDay: absenceTypeId, restOfDay: null };
+  if (state.kind === "worked") return { wholeDay: null, restOfDay: absenceTypeId };
+  return { wholeDay: null, restOfDay: null };
 }
 
 /**
@@ -76,6 +93,8 @@ export function toPublishChanges(rows: ScheduleChangeRow[] | null | undefined): 
     .map((row) => {
       const fromState = row.from_state as PublishChange["fromState"];
       const toState = row.to_state as PublishChange["toState"];
+      const fromAbsence = splitAbsenceTypeId(fromState, row.from_absence_type_id);
+      const toAbsence = splitAbsenceTypeId(toState, row.to_absence_type_id);
       return {
         empId: row.emp_id,
         date: row.date,
@@ -84,8 +103,10 @@ export function toPublishChanges(rows: ScheduleChangeRow[] | null | undefined): 
         toState,
         fromSegments: fromState?.segments as ShiftJobSegment[] | undefined,
         toSegments: toState?.segments as ShiftJobSegment[] | undefined,
-        fromAbsenceTypeId: row.from_absence_type_id,
-        toAbsenceTypeId: row.to_absence_type_id,
+        fromAbsenceTypeId: fromAbsence.wholeDay,
+        toAbsenceTypeId: toAbsence.wholeDay,
+        fromRestOfDayAbsenceTypeId: fromAbsence.restOfDay,
+        toRestOfDayAbsenceTypeId: toAbsence.restOfDay,
         updatedBy: row.updated_by,
         fromCustomStart: row.from_custom_start,
         fromCustomEnd: row.from_custom_end,
@@ -117,4 +138,58 @@ export function toNotePublishChanges(
     });
   }
   return changes;
+}
+
+interface ChangeEntry<TChange extends PublishChange> {
+  publishedAt: string;
+  changes: TChange[];
+}
+
+/**
+ * Withholds what each shift changed from (item 46f). A cell's changes are
+ * folded across the entries first, oldest to newest, the way the screens fold
+ * them: a cell that ended where it started drops out, and every row keeps the
+ * folded kind, so a viewer still sees a plain New, Changed or Removed mark but
+ * nothing of the earlier shift or who edited it.
+ */
+export function withoutChangeDetails<
+  TChange extends PublishChange,
+  TEntry extends ChangeEntry<TChange>,
+>(entries: TEntry[]): TEntry[] {
+  const byCell = new Map<string, TChange[]>();
+  const oldestFirst = [...entries].sort((left, right) =>
+    left.publishedAt.localeCompare(right.publishedAt),
+  );
+  for (const entry of oldestFirst) {
+    for (const change of entry.changes) {
+      const key = `${change.empId}:${change.date}`;
+      byCell.set(key, [...(byCell.get(key) ?? []), change]);
+    }
+  }
+  const folded = new Map<string, TChange | null>();
+  for (const [key, changes] of byCell) folded.set(key, mergeCellPublishChanges(changes));
+
+  return entries.map((entry) => ({
+    ...entry,
+    changes: entry.changes.flatMap((change) => {
+      const merged = folded.get(`${change.empId}:${change.date}`);
+      if (!merged) return [];
+      return [
+        {
+          ...change,
+          kind: merged.kind,
+          isNewAddition: merged.isNewAddition,
+          detailsHidden: true,
+          from: undefined,
+          fromState: null,
+          fromSegments: undefined,
+          fromAbsenceTypeId: null,
+          fromRestOfDayAbsenceTypeId: null,
+          fromCustomStart: null,
+          fromCustomEnd: null,
+          updatedBy: null,
+        },
+      ];
+    }),
+  }));
 }

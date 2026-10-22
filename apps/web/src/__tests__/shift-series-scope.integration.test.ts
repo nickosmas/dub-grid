@@ -98,7 +98,7 @@ async function createDailySeries(
   return seriesId;
 }
 
-/** Puts an existing off day on `date` the way an earlier edit would have. */
+/** Puts an existing absence on `date` the way an earlier edit would have. */
 async function writeCell(fixture: Fixture, date: string, absenceId: number) {
   // The internal writer is not granted to callers, so step out of the role.
   await db.query("SET LOCAL ROLE postgres");

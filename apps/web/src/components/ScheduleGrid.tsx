@@ -26,6 +26,15 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import type { ShiftChange } from "@dubgrid/schedule-core";
+import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
+import {
+  buildShiftChangeResolvers,
+  cellStateFromParts,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 import { formatDateKey } from "@/lib/utils";
 import {
   computeDailyTallies,
@@ -85,7 +94,6 @@ import {
   getReadableTextOnSurface,
   resolveShiftPillColors,
   toDarkPillColors,
-  visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
 import {
@@ -93,8 +101,18 @@ import {
   lightColorTokens,
   darkColorTokens,
   getAvatarTone,
+  absenceStripeCss,
+  resolveAbsenceStripes,
 } from "@dubgrid/design-tokens";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import {
+  attachedPillSeams,
+  seamBorders,
+  gapBefore,
+  seamRadius,
+  timesMeet,
+} from "@/lib/attached-pill";
+import { tintStripeCss } from "@/lib/absence-stripes";
 import {
   buildShiftJobPairKey,
   createAssignmentDefinitionIdByPairMap,
@@ -108,12 +126,15 @@ import {
   GridDiffBadge,
   MentoredShiftBadge,
   LOCK_CORNER_CLEARANCE,
+  MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
   noteMarksWidth,
+  NOTE_LANE_INSET,
   AuthorBadge,
   type GridDiffBadgeConfig,
 } from "./schedule-grid/badges";
 import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
+import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import {
   initialGridMount,
   nextGridMount,
@@ -139,12 +160,21 @@ import {
   splitShiftLabelParts,
   assignmentIdsFromPublishState,
   absenceTypeIdFromPublishState,
+  restOfDayAbsenceTypeIdFromPublishState,
+  joinedCustomTimes,
   mentoredFlagsFromPublishState,
   timeRangesFromPublishState,
   SINGLE_SHIFT_PILL_RADIUS,
-  MULTI_SHIFT_PILL_RADIUS,
   SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
-  MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
+  GRID_CELL_HEIGHT,
+  ROW_CELL_HEIGHT_VAR,
+  SIDE_BY_SIDE_SHIFT_GAP,
+  STACKED_SHIFT_CHIP_GAP,
+  STACKED_SHIFT_GAP,
+  shiftCellHeight,
+  singleShiftNeedsRoom,
+  RAISED_CHIP_RESERVE,
+  stacksShifts,
 } from "./schedule-grid/gridHelpers";
 
 import type { ShiftDragData } from "./DraggableShift";
@@ -155,6 +185,7 @@ import { isDeepEqual } from "@/lib/deep-equal";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
+  hiddenPublishDiffDescriptors,
   type ShiftDiffBadgeDescriptor,
   type ShiftDiffBorderKind,
   type ShiftDiffTimeRange,
@@ -224,6 +255,9 @@ interface LegacyScheduleGridProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Returns true if the cell's custom times differ from published times. */
   publishDiffForKey?: (
     empId: string,
@@ -302,6 +336,8 @@ interface SectionBlockProps {
   ) => void;
   nameColWidth: number;
   colWidth: number;
+  /** A day column's laid-out width: `colWidth` is its minimum, and columns share any spare room. */
+  dayColumnWidth: number;
   fitToContainer?: boolean;
   highlightEmpIds?: Set<string>;
   focusAreas: FocusArea[];
@@ -339,6 +375,9 @@ interface SectionBlockProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
+  restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,
     date: Date,
@@ -651,6 +690,7 @@ function ShiftDetailHoverCard({
   requestLabel,
   status,
   changeDetails,
+  changes = [],
   publicationLabel,
   children,
 }: {
@@ -663,6 +703,8 @@ function ShiftDetailHoverCard({
   status: string | null;
   /** Per-cell change explanations, already scoped to the affected segment(s). */
   changeDetails: string[];
+  /** The cell's changes as Before and After; replaces `changeDetails` when present. */
+  changes?: Array<{ view: ShiftChange; draft: boolean }>;
   publicationLabel: string | null;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
@@ -672,6 +714,9 @@ function ShiftDetailHoverCard({
   const triggerRef = useRef<HTMLDivElement | null>(null);
 
   if (!enabled) return children;
+  const shownChanges = changes.filter((change) => change.view.kind !== "none");
+  const hasRichChanges = shownChanges.length > 0;
+  const hasMultiChange = shownChanges.some((change) => change.view.kind === "multi");
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -700,7 +745,7 @@ function ShiftDetailHoverCard({
           showArrow
           style={{
             display: "block",
-            width: 300,
+            width: hasMultiChange ? 340 : 300,
             maxWidth: "calc(100vw - 32px)",
             padding: 0,
             border: "1px solid var(--dg-color-border)",
@@ -796,41 +841,94 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
-              {(indicators.length > 0 ||
-                requestLabel ||
-                status ||
-                changeDetails.length > 0 ||
-                publicationLabel) && (
+              {hasRichChanges ? (
                 <div
                   style={{
                     paddingTop: 10,
                     borderTop: "1px solid var(--dg-color-border-light)",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 3,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-text-muted)",
+                    gap: 8,
                   }}
                 >
-                  {/* An indicator describes the shift, not the change, so it stays
-                      beside a change's details rather than giving way to them. */}
                   {indicators.length > 0 ? (
-                    <div>Schedule notes: {indicators.join(", ")}</div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      Schedule notes: {indicators.join(", ")}
+                    </div>
                   ) : null}
-                  {changeDetails.length === 0 && requestLabel ? (
-                    <div>Request: {requestLabel}</div>
-                  ) : null}
-                  {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
-                  {changeDetails.map((detail) => (
-                    <div key={detail} style={{ whiteSpace: "pre-line" }}>
-                      {detail}
+                  {shownChanges.map(({ view, draft }, index) => (
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {draft ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                          }}
+                        >
+                          Not published yet. Staff still see the published shift.
+                        </div>
+                      ) : null}
+                      {view.kind === "multi" ? (
+                        <ShiftChangeCard change={view} layout="stacked" showDayBar />
+                      ) : (
+                        <ShiftChangeWas change={view} />
+                      )}
                     </div>
                   ))}
-                  {changeDetails.length === 0 && publicationLabel ? (
-                    <div>{publicationLabel}</div>
+                  {publicationLabel ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                        whiteSpace: "pre-line",
+                      }}
+                    >
+                      {publicationLabel}
+                    </div>
                   ) : null}
                 </div>
-              )}
+              ) : null}
+              {!hasRichChanges &&
+                (indicators.length > 0 ||
+                  requestLabel ||
+                  status ||
+                  changeDetails.length > 0 ||
+                  publicationLabel) && (
+                  <div
+                    style={{
+                      paddingTop: 10,
+                      borderTop: "1px solid var(--dg-color-border-light)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
+                  >
+                    {/* An indicator describes the shift, not the change, so it stays
+                      beside a change's details rather than giving way to them. */}
+                    {indicators.length > 0 ? (
+                      <div>Schedule notes: {indicators.join(", ")}</div>
+                    ) : null}
+                    {changeDetails.length === 0 && requestLabel ? (
+                      <div>Request: {requestLabel}</div>
+                    ) : null}
+                    {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
+                    {changeDetails.map((detail) => (
+                      <div key={detail} style={{ whiteSpace: "pre-line" }}>
+                        {detail}
+                      </div>
+                    ))}
+                    {changeDetails.length === 0 && publicationLabel ? (
+                      <div>{publicationLabel}</div>
+                    ) : null}
+                  </div>
+                )}
             </div>
           </div>
         </PopoverContent>
@@ -854,6 +952,8 @@ const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
   "publishedLabelForKey",
   "publishedAssignmentIdsForKey",
   "publishedAbsenceTypeIdForKey",
+  "restOfDayAbsenceTypeIdForKey",
+  "publishedRestOfDayAbsenceTypeIdForKey",
   "publishDiffForKey",
   "publishedMetadataForKey",
   "createdByNameForKey",
@@ -902,6 +1002,8 @@ function readSectionCell(props: SectionBlockProps, empId: string, date: Date): u
     props.publishedLabelForKey?.(empId, date),
     props.publishedAssignmentIdsForKey?.(empId, date),
     props.publishedAbsenceTypeIdForKey?.(empId, date),
+    props.restOfDayAbsenceTypeIdForKey?.(empId, date),
+    props.publishedRestOfDayAbsenceTypeIdForKey?.(empId, date),
     publishDiff,
     publishedMetadata,
     publisherName(publishDiff?.publishedBy),
@@ -967,6 +1069,7 @@ const SectionBlock = memo(function SectionBlock({
   handleCellClick,
   nameColWidth,
   colWidth,
+  dayColumnWidth,
   fitToContainer = false,
   highlightEmpIds,
   focusAreas,
@@ -985,6 +1088,8 @@ const SectionBlock = memo(function SectionBlock({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  restOfDayAbsenceTypeIdForKey,
+  publishedRestOfDayAbsenceTypeIdForKey,
   publishDiffForKey,
   publishedMetadataForKey,
   certifications,
@@ -1076,6 +1181,22 @@ const SectionBlock = memo(function SectionBlock({
       body.removeEventListener("scroll", sync);
     };
   }, [fitToContainer, weekDates.length]);
+
+  // Pill text shrinks to fit its pill rather than being cut. Every render
+  // refits, so newly mounted rows, a resized day column and new data are
+  // covered; the fonts arriving late is the one change no render follows.
+  useLayoutEffect(() => {
+    if (gridRef.current) fitGridText(gridRef.current);
+  });
+  useEffect(() => {
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled && gridRef.current) fitGridText(gridRef.current);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Everything the sticky group needs beyond CSS is discrete state measured when
   // layout changes, never per scroll frame: the header grid's width, the early
@@ -1226,6 +1347,17 @@ const SectionBlock = memo(function SectionBlock({
     for (const job of jobs) map.set(job.id, job);
     return map;
   }, [jobs]);
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: [...historicalAssignments, ...assignments],
+        shiftCategories,
+        jobs,
+        absenceTypes: absenceTypeMap ? [...absenceTypeMap.values()] : [],
+        focusAreas,
+      }),
+    [historicalAssignments, assignments, shiftCategories, jobs, absenceTypeMap, focusAreas],
+  );
 
   const getStyleByIdOrLabel = useMemo(
     () =>
@@ -1958,6 +2090,60 @@ const SectionBlock = memo(function SectionBlock({
               const roleAbbrs = getRoleAbbrs(emp.roleIds, orgRoles, true);
               const roleNames = getRoleAbbrs(emp.roleIds, orgRoles, false);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
+              // An absence is one pill even when its name holds a "/".
+              // A cell whose content needs more than the normal height (a double
+              // shift, or a pill whose notes' row sits below a second line) makes
+              // the row as tall as its fullest cell needs. Read once here; the
+              // cells below reuse them by index.
+              const rowShiftLabels = weekDates.map((date) => shiftForKey(emp.id, date));
+              const rowAbsenceTypeIds = weekDates.map(
+                (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
+              );
+              const grownCellHeights = new Set<string>();
+              const rowCellGrows = weekDates.map(() => false);
+              for (const [index, date] of weekDates.entries()) {
+                if (rowAbsenceTypeIds[index] != null) continue;
+                const labels = rowShiftLabels[index]?.split("/") ?? [];
+                // A rest-of-day absence (item 45) is one more pill, after the shifts.
+                const pillCount =
+                  labels.length + (restOfDayAbsenceTypeIdForKey?.(emp.id, date) != null ? 1 : 0);
+                if (pillCount < 1) continue;
+                const hasTime = !!getCustomShiftTimes?.(emp.id, date);
+                // Most cells hold one shift on one line, which never outgrows the
+                // cell; skip the rest of the lookups for them on every render.
+                if (pillCount === 1 && !hasTime && !isNameMode) continue;
+                const ids = assignmentIdsForKey?.(emp.id, date) ?? [];
+                const content = {
+                  isNameMode,
+                  hasSecondary: labels.some(
+                    (label, i) => !!getDisplayPartsByIdOrLabel(label, ids[i]).secondaryLabel,
+                  ),
+                  hasTime,
+                  hasNotes:
+                    (noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? []).length > 0,
+                };
+                if (pillCount > 1) {
+                  grownCellHeights.add(
+                    shiftCellHeight({
+                      ...content,
+                      pillsDown: stacksShifts(dayColumnWidth, pillCount, isNameMode)
+                        ? pillCount
+                        : 1,
+                      hasChip:
+                        draftKindForKey?.(emp.id, date) != null ||
+                        (!!showPublishDiffOverlay && publishDiffForKey?.(emp.id, date) != null),
+                    }),
+                  );
+                } else if (singleShiftNeedsRoom(content)) {
+                  // A single pill's chip rides over its edge, so it reserves no room.
+                  grownCellHeights.add(
+                    shiftCellHeight({ ...content, pillsDown: 1, hasChip: false }),
+                  );
+                } else {
+                  continue;
+                }
+                rowCellGrows[index] = true;
+              }
 
               return (
                 <div
@@ -1980,6 +2166,11 @@ const SectionBlock = memo(function SectionBlock({
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
+                    ...(grownCellHeights.size > 0
+                      ? {
+                          [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...grownCellHeights].join(", ")})`,
+                        }
+                      : null),
                   }}
                 >
                   {/* Name cell */}
@@ -2089,7 +2280,21 @@ const SectionBlock = memo(function SectionBlock({
                       const dateKey = formatDateKey(date);
                       const cellKey = `${emp.id}_${dateKey}`;
                       const isToday = dateKey === todayKey;
-                      const shiftLabel = shiftForKey(emp.id, date);
+                      const shiftLabel = rowShiftLabels[index];
+                      // A worked cell's absence for the rest of the day (item 45): one more
+                      // pill, always after the shifts.
+                      const restOfDayAbsenceTypeId =
+                        rowAbsenceTypeIds[index] == null
+                          ? (restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null)
+                          : null;
+                      const restOfDayAbsenceType =
+                        restOfDayAbsenceTypeId != null
+                          ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null)
+                          : null;
+                      const restOfDayAbsenceName =
+                        restOfDayAbsenceTypeId != null
+                          ? restOfDayAbsenceType?.name || restOfDayAbsenceType?.label || "Absence"
+                          : null;
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
@@ -2126,9 +2331,55 @@ const SectionBlock = memo(function SectionBlock({
                       const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                       const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
                       const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
-                      const currentAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const currentAbsenceTypeId = rowAbsenceTypeIds[index];
                       const publishedAbsenceTypeId =
                         publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const publishedRestOfDayAbsenceTypeId =
+                        publishedRestOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const publishChangeView =
+                        showsPublishDiff && publishDiff && publishChangeHasStates(publishDiff)
+                          ? describeCellStateChange(
+                              publishDiff.fromState,
+                              publishDiff.toState,
+                              dateKey,
+                              shiftChangeResolvers,
+                            )
+                          : null;
+                      // A changed or deleted draft needs its published cell to compare
+                      // with; without it, the older badge text stands.
+                      const hasPublishedCell =
+                        publishedSegments.length > 0 || publishedAbsenceTypeId != null;
+                      const draftChangeView =
+                        draftKind && (draftKind === "new" || hasPublishedCell)
+                          ? describeCellStateChange(
+                              cellStateFromParts({
+                                segments: publishedSegments,
+                                absenceTypeId: publishedAbsenceTypeId,
+                                restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                customTimes: publishedCustomTimes,
+                              }),
+                              draftKind === "deleted"
+                                ? null
+                                : cellStateFromParts({
+                                    segments: cellSegments,
+                                    absenceTypeId: currentAbsenceTypeId,
+                                    restOfDayAbsenceTypeId,
+                                    customTimes,
+                                  }),
+                              dateKey,
+                              shiftChangeResolvers,
+                            )
+                          : null;
+                      const publishChangeText = publishChangeView
+                        ? formatShiftChangeWasText(publishChangeView)
+                        : null;
+                      const draftChangeText = draftChangeView
+                        ? formatShiftChangeWasText(draftChangeView)
+                        : null;
+                      const hoverChanges = [
+                        ...(draftChangeView ? [{ view: draftChangeView, draft: true }] : []),
+                        ...(publishChangeView ? [{ view: publishChangeView, draft: false }] : []),
+                      ];
                       const cellAbsenceType =
                         currentAbsenceTypeId != null
                           ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
@@ -2137,7 +2388,19 @@ const SectionBlock = memo(function SectionBlock({
                       const activeRequestLabel = activeRequest
                         ? formatActiveRequestLabel(activeRequest)
                         : null;
-                      const hoverDetailEntries: ShiftDetailEntry[] = cellAbsenceType
+                      const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
+                        ? [
+                            {
+                              label: restOfDayAbsenceName,
+                              jobName: null,
+                              focusAreaName: null,
+                              timeLabel: "Rest of the day",
+                              isCustomTime: false,
+                              isMentored: false,
+                            },
+                          ]
+                        : [];
+                      const shiftHoverEntries: ShiftDetailEntry[] = cellAbsenceType
                         ? [
                             {
                               label: cellAbsenceType.name || cellAbsenceType.label,
@@ -2201,6 +2464,7 @@ const SectionBlock = memo(function SectionBlock({
                               isMentored: cellSegments[entryIndex]?.isMentored ?? false,
                             };
                           });
+                      const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
                       const hoverIndicatorNames = indicatorTypes
                         .filter((indicator) =>
                           noteMarks.some((mark) => mark.indicatorTypeId === indicator.id),
@@ -2242,6 +2506,9 @@ const SectionBlock = memo(function SectionBlock({
                       const firstStyle = hasDraggableEntry
                         ? getStyleByIdOrLabel(shiftLabel.split("/")[0], cellCodeIds[0])
                         : null;
+                      const dragAbsenceStripes = cellAbsenceType
+                        ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
+                        : null;
                       const leadingDividerInset = index === 0 ? 0 : 1;
                       // Only the cell's own top divider eats into its box. The
                       // header/open-shifts stroke above row 0 lives in that
@@ -2265,7 +2532,7 @@ const SectionBlock = memo(function SectionBlock({
                           role="gridcell"
                           aria-label={
                             shiftLabel && shiftLabel !== "OFF"
-                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}${isBulkSelected ? ", selected for removal" : ""}`
+                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}${restOfDayAbsenceName ? `, then ${restOfDayAbsenceName} for the rest of the day` : ""}${isBulkSelected ? ", selected for removal" : ""}`
                               : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                           }
                           aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
@@ -2287,7 +2554,7 @@ const SectionBlock = memo(function SectionBlock({
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
                           style={{
-                            height: "var(--dg-grid-cell-height)",
+                            height: GRID_CELL_HEIGHT,
                             background: isBulkSelected
                               ? "var(--dg-color-brand-bg)"
                               : showDiffCellTint
@@ -2316,6 +2583,11 @@ const SectionBlock = memo(function SectionBlock({
                             style={{
                               zIndex: showDiffCellTint ? 4 : undefined,
                               overflow: "visible",
+                              // In a row grown for one cell's content, every
+                              // other cell keeps the normal height, centred.
+                              ...(rowCellGrows[index]
+                                ? null
+                                : { height: "var(--dg-grid-cell-height)" }),
                             }}
                           >
                             {isBulkSelected && (
@@ -2389,18 +2661,20 @@ const SectionBlock = memo(function SectionBlock({
                                                 isMentored: boolean;
                                               } => segment != null,
                                             ),
-                                    absenceTypeId: currentAbsenceTypeId,
-                                    customStartTime: customTimes?.start ?? null,
-                                    customEndTime: customTimes?.end ?? null,
+                                    // A worked cell carries its rest-of-day absence (item 45).
+                                    absenceTypeId: currentAbsenceTypeId ?? restOfDayAbsenceTypeId,
+                                    ...joinedCustomTimes(customTimes),
                                     seriesId: null,
                                     fromRecurring: false,
                                   },
-                                  pillColor:
-                                    cellAbsenceType?.color ??
-                                    firstStyle?.color ??
-                                    "var(--dg-color-bg)",
+                                  pillColor: dragAbsenceStripes
+                                    ? absenceStripeCss(
+                                        dragAbsenceStripes.stripeA,
+                                        dragAbsenceStripes.stripeB,
+                                      )
+                                    : (firstStyle?.color ?? "var(--dg-color-bg)"),
                                   pillText:
-                                    cellAbsenceType?.text ??
+                                    dragAbsenceStripes?.text ??
                                     firstStyle?.text ??
                                     "var(--dg-color-text-muted)",
                                 }}
@@ -2494,6 +2768,7 @@ const SectionBlock = memo(function SectionBlock({
                                         before: {
                                           assignmentIds: publishedCodeIds,
                                           absenceTypeId: publishedAbsenceTypeId,
+                                          restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
                                           isMentoredFlags: publishedSegments.map(
                                             (segment) => segment.isMentored ?? false,
                                           ),
@@ -2505,6 +2780,7 @@ const SectionBlock = memo(function SectionBlock({
                                         after: {
                                           assignmentIds: cellCodeIds,
                                           absenceTypeId: currentAbsenceTypeId,
+                                          restOfDayAbsenceTypeId,
                                           isMentoredFlags: cellSegments.map(
                                             (segment) => segment.isMentored ?? false,
                                           ),
@@ -2525,66 +2801,81 @@ const SectionBlock = memo(function SectionBlock({
                                   // derive both id lists and both history
                                   // label lists on every render for nothing.
                                   const publishDiffSummary = isPubDiff
-                                    ? (() => {
-                                        const publishFrom =
-                                          isPubDiff.from ??
-                                          assignmentIdsFromPublishState(
-                                            isPubDiff.fromState,
-                                            publishedAssignmentIdByPair,
-                                          );
-                                        const publishTo =
-                                          isPubDiff.to ??
-                                          assignmentIdsFromPublishState(
-                                            isPubDiff.toState,
-                                            publishedAssignmentIdByPair,
-                                          );
-                                        return buildShiftDiffDescriptors({
-                                          before: {
-                                            assignmentIds: publishFrom,
-                                            absenceTypeId:
-                                              isPubDiff.fromAbsenceTypeId ??
-                                              absenceTypeIdFromPublishState(isPubDiff.fromState),
-                                            timeRanges: timeRangesFromPublishState(
+                                    ? isPubDiff.detailsHidden && isPubDiff.kind !== "deleted"
+                                      ? hiddenPublishDiffDescriptors(isPubDiff.kind, labels.length)
+                                      : (() => {
+                                          const publishFrom =
+                                            isPubDiff.from ??
+                                            assignmentIdsFromPublishState(
                                               isPubDiff.fromState,
-                                              isPubDiff.fromCustomStart,
-                                              isPubDiff.fromCustomEnd,
-                                              publishFrom.length,
-                                            ),
-                                            isMentoredFlags: mentoredFlagsFromPublishState(
-                                              isPubDiff.fromState,
-                                            ),
-                                          },
-                                          after: {
-                                            assignmentIds: publishTo,
-                                            absenceTypeId:
-                                              isPubDiff.toAbsenceTypeId ??
-                                              absenceTypeIdFromPublishState(isPubDiff.toState),
-                                            timeRanges: timeRangesFromPublishState(
+                                              publishedAssignmentIdByPair,
+                                            );
+                                          const publishTo =
+                                            isPubDiff.to ??
+                                            assignmentIdsFromPublishState(
                                               isPubDiff.toState,
-                                              isPubDiff.toCustomStart,
-                                              isPubDiff.toCustomEnd,
-                                              publishTo.length,
-                                            ),
-                                            isMentoredFlags: mentoredFlagsFromPublishState(
-                                              isPubDiff.toState,
-                                            ),
-                                          },
-                                          beforeShiftLabels:
-                                            snapshotLabels(isPubDiff.fromSegments) ??
-                                            publishFrom.map(resolveHistoryShiftLabel),
-                                          afterShiftLabels:
-                                            snapshotLabels(isPubDiff.toSegments) ??
-                                            cellCodeIds.map(resolveHistoryShiftLabel),
-                                          resolveAssignmentDefinitionLabel:
-                                            resolveHistoryShiftLabel,
-                                          resolveAbsenceLabel: (absenceTypeId) =>
-                                            absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
-                                        });
-                                      })()
+                                              publishedAssignmentIdByPair,
+                                            );
+                                          return buildShiftDiffDescriptors({
+                                            before: {
+                                              assignmentIds: publishFrom,
+                                              absenceTypeId:
+                                                isPubDiff.fromAbsenceTypeId ??
+                                                absenceTypeIdFromPublishState(isPubDiff.fromState),
+                                              restOfDayAbsenceTypeId:
+                                                isPubDiff.fromRestOfDayAbsenceTypeId ??
+                                                restOfDayAbsenceTypeIdFromPublishState(
+                                                  isPubDiff.fromState,
+                                                ),
+                                              timeRanges: timeRangesFromPublishState(
+                                                isPubDiff.fromState,
+                                                isPubDiff.fromCustomStart,
+                                                isPubDiff.fromCustomEnd,
+                                                publishFrom.length,
+                                              ),
+                                              isMentoredFlags: mentoredFlagsFromPublishState(
+                                                isPubDiff.fromState,
+                                              ),
+                                            },
+                                            after: {
+                                              assignmentIds: publishTo,
+                                              absenceTypeId:
+                                                isPubDiff.toAbsenceTypeId ??
+                                                absenceTypeIdFromPublishState(isPubDiff.toState),
+                                              restOfDayAbsenceTypeId:
+                                                isPubDiff.toRestOfDayAbsenceTypeId ??
+                                                restOfDayAbsenceTypeIdFromPublishState(
+                                                  isPubDiff.toState,
+                                                ),
+                                              timeRanges: timeRangesFromPublishState(
+                                                isPubDiff.toState,
+                                                isPubDiff.toCustomStart,
+                                                isPubDiff.toCustomEnd,
+                                                publishTo.length,
+                                              ),
+                                              isMentoredFlags: mentoredFlagsFromPublishState(
+                                                isPubDiff.toState,
+                                              ),
+                                            },
+                                            beforeShiftLabels:
+                                              snapshotLabels(isPubDiff.fromSegments) ??
+                                              publishFrom.map(resolveHistoryShiftLabel),
+                                            afterShiftLabels:
+                                              snapshotLabels(isPubDiff.toSegments) ??
+                                              cellCodeIds.map(resolveHistoryShiftLabel),
+                                            resolveAssignmentDefinitionLabel:
+                                              resolveHistoryShiftLabel,
+                                            resolveAbsenceLabel: (absenceTypeId) =>
+                                              absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
+                                          });
+                                        })()
                                     : null;
 
                                   const publishCellBadge = isPubDiff
-                                    ? publishCellLevelBadge(publishDiffSummary, labels.length)
+                                    ? publishCellLevelBadge(
+                                        publishDiffSummary,
+                                        labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0),
+                                      )
                                     : null;
                                   const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
                                     ? {
@@ -2594,7 +2885,7 @@ const SectionBlock = memo(function SectionBlock({
                                         tooltip: buildPublishTooltip({
                                           publishDiff: publishDiff!,
                                           resolvePublisherName,
-                                          detail: publishCellBadge.detail,
+                                          detail: publishChangeText ?? publishCellBadge.detail,
                                           timeZone: publicationTimeZone,
                                         }),
                                       }
@@ -2626,7 +2917,7 @@ const SectionBlock = memo(function SectionBlock({
                                         source: "draft",
                                         kind: draftCellBadge.kind,
                                         text: draftCellBadge.text,
-                                        tooltip: draftCellBadge.detail,
+                                        tooltip: draftChangeText ?? draftCellBadge.detail,
                                       }
                                     : null;
 
@@ -2652,14 +2943,16 @@ const SectionBlock = memo(function SectionBlock({
                                           ? buildPublishTooltip({
                                               publishDiff,
                                               resolvePublisherName,
-                                              detail: descriptor.detail,
+                                              detail: publishChangeText ?? descriptor.detail,
                                               timeZone: publicationTimeZone,
                                             })
-                                          : descriptor.detail,
+                                          : source === "draft"
+                                            ? (draftChangeText ?? descriptor.detail)
+                                            : descriptor.detail,
                                     };
                                   };
 
-                                  if (labels.length === 1) {
+                                  if (labels.length === 1 && restOfDayAbsenceTypeId == null) {
                                     const label = labels[0];
                                     const isAbsence = cellAbsenceType != null;
                                     const style = isAbsence
@@ -2669,11 +2962,17 @@ const SectionBlock = memo(function SectionBlock({
                                           text: cellAbsenceType!.text,
                                         }
                                       : getStyleByIdOrLabel(label, cellCodeIds[0]);
-                                    const darkPillStyle = isDarkTheme
-                                      ? toDarkPillColors(style.color)
+                                    const absenceStripes = isAbsence
+                                      ? resolveAbsenceStripes(style.color, isDarkTheme)
                                       : null;
-                                    const effectiveColor = darkPillStyle?.bg ?? style.color;
-                                    const effectiveText = darkPillStyle?.text ?? style.text;
+                                    const darkPillStyle =
+                                      isDarkTheme && !absenceStripes
+                                        ? toDarkPillColors(style.color)
+                                        : null;
+                                    const effectiveColor =
+                                      absenceStripes?.stripeA ?? darkPillStyle?.bg ?? style.color;
+                                    const effectiveText =
+                                      absenceStripes?.text ?? darkPillStyle?.text ?? style.text;
                                     const codeEntry0 =
                                       cellCodeIds[0] != null
                                         ? assignmentById.get(cellCodeIds[0])
@@ -2730,11 +3029,8 @@ const SectionBlock = memo(function SectionBlock({
                                           themeSurface,
                                         );
                                     // Compute effective border: draft indicators use dashed border.
-                                    // Absence pills derive theirs from the resolved text like every
-                                    // other pill — their stored border is the "transparent"
-                                    // sentinel, which would render as no border at all in light mode.
-                                    const absenceBorder = isAbsence
-                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : visiblePillBorder(cellAbsenceType!.border, singleForegroundColor)}`
+                                    const absenceBorder = absenceStripes
+                                      ? `1px solid ${absenceStripes.border}`
                                       : `1px solid ${borderColor(singleForegroundColor)}`;
                                     const effectiveBorder = singleDraftBorderKind
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)
@@ -2803,6 +3099,9 @@ const SectionBlock = memo(function SectionBlock({
                                     const singleDisplayLabel = displayParts.primaryLabel;
                                     const singleIsMentored =
                                       !isAbsence && (cellSegments[0]?.isMentored ?? false);
+                                    // Notes always take a row of their own, below every line of text.
+                                    const singleHasNotes = noteMarks.length > 0;
+                                    const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
                                     return (
                                       <>
                                         {isBulkSelected && (
@@ -2830,6 +3129,7 @@ const SectionBlock = memo(function SectionBlock({
                                           requestLabel={activeRequestLabel}
                                           status={hoverStatus}
                                           changeDetails={singleHoverChangeDetails}
+                                          changes={hoverChanges}
                                           publicationLabel={publicationLabel}
                                         >
                                           <div
@@ -2840,9 +3140,14 @@ const SectionBlock = memo(function SectionBlock({
                                               right: `${singleSideInset}px`,
                                               bottom: `${singleBottomInset}px`,
                                               left: insetFromVisibleCellLeft(singleSideInset),
-                                              background: singleUsesShiftColor
-                                                ? effectiveColor
-                                                : "var(--dg-color-surface)",
+                                              background: !singleUsesShiftColor
+                                                ? "var(--dg-color-surface)"
+                                                : absenceStripes
+                                                  ? absenceStripeCss(
+                                                      absenceStripes.stripeA,
+                                                      absenceStripes.stripeB,
+                                                    )
+                                                  : effectiveColor,
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
                                               border: effectiveBorder,
                                               borderRadius: SINGLE_SHIFT_PILL_RADIUS,
@@ -2933,63 +3238,43 @@ const SectionBlock = memo(function SectionBlock({
                                             {singleIsMentored && (
                                               <MentoredShiftBadge
                                                 rightInset={cornerLockClearance || undefined}
-                                                topInset={singlePillBadge ? 19 : undefined}
                                               />
                                             )}
                                             <div
                                               style={{
                                                 display: "flex",
-                                                flexDirection: singleInlinesSecondary
-                                                  ? "row"
-                                                  : "column",
-                                                // Inline, the job code sits on the shift code's
-                                                // baseline rather than floating at its optical
-                                                // centre, which reads as one label instead of two.
-                                                alignItems: singleInlinesSecondary
-                                                  ? "baseline"
-                                                  : "center",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                alignSelf: "stretch",
                                                 justifyContent: "center",
-                                                flexWrap: "nowrap",
-                                                gap: singleInlinesSecondary
-                                                  ? 2
-                                                  : showSingleSecondaryLine
+                                                gap:
+                                                  showSingleSecondaryLine && !singleInlinesSecondary
                                                     ? 1
                                                     : 0,
-                                                maxWidth: "100%",
                                                 minWidth: 0,
                                                 overflow: "hidden",
                                               }}
                                             >
                                               <span
-                                                style={
-                                                  isNameMode
-                                                    ? {
-                                                        fontSize: "var(--dg-fs-caption)",
-                                                        fontWeight: 600,
-                                                        lineHeight: singleIsThreeRow ? 1.15 : 1.2,
-                                                        textAlign: "center" as const,
-                                                        maxWidth: "100%",
-                                                        overflowWrap: "break-word" as const,
-                                                        display: "-webkit-box",
-                                                        WebkitBoxOrient: "vertical" as const,
-                                                        WebkitLineClamp: showSingleSecondaryLine
-                                                          ? 1
-                                                          : customTimes
-                                                            ? 1
-                                                            : 2,
-                                                        overflow: "hidden",
-                                                      }
-                                                    : {
-                                                        fontSize: "var(--dg-fs-title)",
-                                                        fontWeight: 600,
-                                                        lineHeight: 1.2,
-                                                        whiteSpace: "nowrap",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%",
-                                                        minWidth: 0,
-                                                      }
-                                                }
+                                                data-pill-fit=""
+                                                style={{
+                                                  ...gridFitLine(
+                                                    isNameMode
+                                                      ? "var(--dg-fs-caption)"
+                                                      : "var(--dg-fs-title)",
+                                                    // A name alone in its pill may take two lines.
+                                                    {
+                                                      wrap:
+                                                        isNameMode &&
+                                                        !showSingleSecondaryLine &&
+                                                        !customTimes &&
+                                                        !singleHasNotes,
+                                                    },
+                                                  ),
+                                                  fontWeight: 600,
+                                                  lineHeight:
+                                                    isNameMode && singleIsThreeRow ? 1.15 : 1.2,
+                                                }}
                                               >
                                                 {singleDisplayLabel}
                                                 {!customTimes && isOvernight && (
@@ -3004,35 +3289,47 @@ const SectionBlock = memo(function SectionBlock({
                                                     +1
                                                   </sup>
                                                 )}
+                                                {singleInlinesSecondary && (
+                                                  <>
+                                                    <span
+                                                      aria-hidden="true"
+                                                      style={{
+                                                        fontSize:
+                                                          gridFitSize("var(--dg-fs-footnote)"),
+                                                        fontWeight: 700,
+                                                        opacity: 0.5,
+                                                        margin: "0 2px",
+                                                      }}
+                                                    >
+                                                      ·
+                                                    </span>
+                                                    <span
+                                                      style={{
+                                                        fontSize:
+                                                          gridFitSize("var(--dg-fs-footnote)"),
+                                                        fontWeight: 700,
+                                                        color:
+                                                          "color-mix(in srgb, currentColor 78%, transparent)",
+                                                      }}
+                                                    >
+                                                      {displayParts.secondaryLabel}
+                                                    </span>
+                                                  </>
+                                                )}
                                               </span>
-                                              {singleInlinesSecondary && (
+                                              {showSingleSecondaryLine &&
+                                              !singleInlinesSecondary ? (
                                                 <span
-                                                  aria-hidden="true"
+                                                  data-pill-fit=""
                                                   style={{
-                                                    fontSize: "var(--dg-fs-footnote)",
-                                                    fontWeight: 700,
-                                                    lineHeight: 1.3,
-                                                    opacity: 0.5,
-                                                    flexShrink: 0,
-                                                  }}
-                                                >
-                                                  ·
-                                                </span>
-                                              )}
-                                              {showSingleSecondaryLine ? (
-                                                <span
-                                                  style={{
-                                                    fontSize: singleIsThreeRow
-                                                      ? "var(--dg-fs-micro)"
-                                                      : "var(--dg-fs-footnote)",
+                                                    ...gridFitLine(
+                                                      singleIsThreeRow
+                                                        ? "var(--dg-fs-micro)"
+                                                        : "var(--dg-fs-footnote)",
+                                                    ),
                                                     fontWeight: 700,
                                                     lineHeight: singleIsThreeRow ? 1.2 : 1.3,
                                                     opacity: 0.78,
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    maxWidth: "100%",
-                                                    minWidth: 0,
                                                   }}
                                                 >
                                                   {displayParts.secondaryLabel}
@@ -3041,13 +3338,16 @@ const SectionBlock = memo(function SectionBlock({
                                             </div>
                                             {customTimes && (
                                               <span
+                                                data-pill-fit=""
                                                 style={{
-                                                  fontSize: singleIsThreeRow
-                                                    ? "var(--dg-fs-micro)"
-                                                    : "var(--dg-fs-footnote)",
+                                                  ...gridFitLine(
+                                                    singleIsThreeRow
+                                                      ? "var(--dg-fs-micro)"
+                                                      : "var(--dg-fs-footnote)",
+                                                  ),
                                                   fontWeight: 500,
                                                   lineHeight: 1,
-                                                  marginTop: singleIsThreeRow ? 2 : 4,
+                                                  marginTop: singleTimeMarginTop,
                                                   opacity: 0.7,
                                                   letterSpacing: "0.02em",
                                                 }}
@@ -3072,16 +3372,8 @@ const SectionBlock = memo(function SectionBlock({
                                               marks={noteMarks}
                                               indicatorTypes={indicatorTypes}
                                               rimColor={singleForegroundColor}
-                                              surfaceColor={
-                                                singleUsesShiftColor
-                                                  ? effectiveColor
-                                                  : "var(--dg-color-surface)"
-                                              }
                                               isDark={isDarkTheme}
-                                              style={{
-                                                bottom: shouldShowAuthorName ? 18 : 4,
-                                                right: 5,
-                                              }}
+                                              corner
                                             />
                                             {(draftBadge || publishBadge) && (
                                               <GridDiffBadge
@@ -3100,9 +3392,15 @@ const SectionBlock = memo(function SectionBlock({
                                           <AuthorBadge
                                             name={auditName}
                                             leftInset={singleAuthorLeftInset}
+                                            // The name shares the pill's bottom row with a
+                                            // note strip, so it stops short of the dots.
                                             rightInset={
-                                              noteMarks.length > 0
-                                                ? 5 + noteMarksWidth(noteMarks.length) + 3
+                                              singleHasNotes
+                                                ? singleSideInset +
+                                                  1 +
+                                                  NOTE_LANE_INSET +
+                                                  noteMarksWidth(noteMarks.length) +
+                                                  3
                                                 : 5
                                             }
                                             bottomInset={singleAuthorBottomInset}
@@ -3112,10 +3410,10 @@ const SectionBlock = memo(function SectionBlock({
                                     );
                                   }
 
-                                  // Multi-pill: render each shift as a separate vertical pill.
-                                  // Every raised badge needs real room above the pills. Letting it
-                                  // hang from the standard 3px inset pushed its top 5px outside
-                                  // the cell, where neighbouring rows could cover it.
+                                  // Multi-pill: each shift is its own pill, drawn like a single
+                                  // shift's. They sit side by side while the column leaves each
+                                  // one a single pill's width, and stack in a taller row when it
+                                  // does not; halves about 30px wide had marks over their words.
                                   const multiPillBadges = labels.map(
                                     (_, labelIndex) =>
                                       (showsDraftBadge &&
@@ -3133,13 +3431,100 @@ const SectionBlock = memo(function SectionBlock({
                                           })
                                         : null),
                                   );
-                                  const multiTopInset = 3;
-                                  const multiSideInset = 3;
-                                  const multiBottomInset = 3;
+                                  // The rest-of-day absence pill's own change (item 45).
+                                  const restOfDayDraftDiff = draftDiff?.restOfDayDiff ?? null;
+                                  const restOfDayPublishDiff =
+                                    publishDiffSummary?.restOfDayDiff ?? null;
+                                  const restOfDayPillBadge =
+                                    (showsDraftBadge
+                                      ? buildPillBadge({
+                                          source: "draft",
+                                          descriptor: restOfDayDraftDiff?.badge,
+                                        })
+                                      : null) ??
+                                    buildPillBadge({
+                                      source: "publish",
+                                      descriptor: restOfDayPublishDiff?.badge,
+                                    });
+                                  // The rest-of-day absence is the last pill (item 45).
+                                  const pillCount =
+                                    labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0);
+                                  const stackShifts = stacksShifts(
+                                    dayColumnWidth,
+                                    pillCount,
+                                    isNameMode,
+                                  );
+                                  const multiPillGap = stackShifts
+                                    ? multiPillBadges.slice(1).some(Boolean) || !!restOfDayPillBadge
+                                      ? STACKED_SHIFT_CHIP_GAP
+                                      : STACKED_SHIFT_GAP
+                                    : SIDE_BY_SIDE_SHIFT_GAP;
+                                  // Neighbouring pills touch when one runs straight into
+                                  // the next; the rest-of-day absence always starts where
+                                  // the last shift ends.
+                                  const pillSpans = labels.map((_, li) => {
+                                    const code =
+                                      cellCodeIds[li] != null
+                                        ? assignmentById.get(cellCodeIds[li])
+                                        : undefined;
+                                    const category =
+                                      code?.categoryId != null
+                                        ? categoryById.get(code.categoryId)
+                                        : undefined;
+                                    const own =
+                                      customTimes?.perPill?.[li] ??
+                                      (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                    // An unset custom time is stored as "", not null.
+                                    return {
+                                      start:
+                                        own?.start || code?.defaultStartTime || category?.startTime,
+                                      end: own?.end || code?.defaultEndTime || category?.endTime,
+                                    };
+                                  });
+                                  const pillJoins = [
+                                    ...pillSpans
+                                      .slice(1)
+                                      .map((span, li) => timesMeet(pillSpans[li].end, span.start)),
+                                    ...(restOfDayAbsenceTypeId != null ? [true] : []),
+                                  ];
+                                  // Stacked, each pill's share of spare height follows its
+                                  // line count, so a one-line shift stays short beside a
+                                  // pill carrying a time or a job.
+                                  const pillLines = [
+                                    ...labels.map((label, li) => {
+                                      const own =
+                                        customTimes?.perPill?.[li] ??
+                                        (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                      const secondary = !!getDisplayPartsByIdOrLabel(
+                                        label,
+                                        cellCodeIds[li],
+                                      ).secondaryLabel;
+                                      return (
+                                        1 +
+                                        (own?.start || own?.end ? 1 : 0) +
+                                        (secondary && isNameMode ? 1 : 0)
+                                      );
+                                    }),
+                                    ...(restOfDayAbsenceTypeId != null
+                                      ? [
+                                          1 +
+                                            ((
+                                              customTimes?.perPill?.[labels.length - 1] ??
+                                              (labels.length === 1 && !customTimes?.perPill
+                                                ? customTimes
+                                                : null)
+                                            )?.end
+                                              ? 1
+                                              : 0),
+                                        ]
+                                      : []),
+                                  ];
+                                  const pillAxis = stackShifts ? "stacked" : "side-by-side";
+                                  const pillSeams = attachedPillSeams(pillAxis, pillJoins);
+                                  const multiTopInset = 4;
+                                  const multiSideInset = 4;
+                                  const multiBottomInset = 4;
                                   const multiAuthorLeftInset = 4 + leadingDividerInset;
-                                  // Status chips own the top-right corner. Keep
-                                  // note dots on the bottom edge instead.
-                                  const multiNotesRightOffset = 2;
                                   // Each pill draws its own shift's notes when the
                                   // cell's segments line up with its pills.
                                   const notesPerPill =
@@ -3150,6 +3535,7 @@ const SectionBlock = memo(function SectionBlock({
                                         draftBadge?.tooltip,
                                         publishBadge?.tooltip,
                                         ...multiPillBadges.map((badge) => badge?.tooltip),
+                                        restOfDayPillBadge?.tooltip,
                                       ].filter((detail): detail is string => !!detail),
                                     ),
                                   );
@@ -3167,7 +3553,7 @@ const SectionBlock = memo(function SectionBlock({
                                             leftInset: multiSideInset,
                                             topDividerInset,
                                             leadingDividerInset,
-                                            pillRadius: MULTI_SHIFT_PILL_RADIUS,
+                                            pillRadius: SINGLE_SHIFT_PILL_RADIUS,
                                           })}
                                         />
                                       )}
@@ -3180,6 +3566,7 @@ const SectionBlock = memo(function SectionBlock({
                                         requestLabel={activeRequestLabel}
                                         status={hoverStatus}
                                         changeDetails={multiHoverChangeDetails}
+                                        changes={hoverChanges}
                                         publicationLabel={publicationLabel}
                                       >
                                         <div
@@ -3203,16 +3590,30 @@ const SectionBlock = memo(function SectionBlock({
                                             />
                                           )}
                                           <div
+                                            data-shift-layout={
+                                              stackShifts ? "stacked" : "side-by-side"
+                                            }
                                             style={{
-                                              display: "flex",
-                                              flexDirection: "row",
-                                              // Two hairlines butted together read
-                                              // as one thick rule; 2px keeps the
-                                              // pills legibly separate.
-                                              gap: 2,
+                                              // A grid, so a pill padded clear of its M
+                                              // stays the same size as its neighbour.
+                                              display: "grid",
+                                              // Stacked, each pill is at least as tall as
+                                              // its own lines and they share any spare room.
+                                              ...(stackShifts
+                                                ? {
+                                                    gridTemplateRows: pillLines
+                                                      .map(
+                                                        (lines) =>
+                                                          `minmax(min-content, ${lines}fr)`,
+                                                      )
+                                                      .join(" "),
+                                                  }
+                                                : {
+                                                    gridTemplateColumns: `repeat(${pillCount}, minmax(0, 1fr))`,
+                                                  }),
+                                              gap: 0,
                                               flex: 1,
                                               minHeight: 0,
-                                              alignItems: "stretch",
                                             }}
                                           >
                                             {labels.map((label, li) => {
@@ -3270,6 +3671,11 @@ const SectionBlock = memo(function SectionBlock({
                                                     themeSurface,
                                                   );
                                               const pillBadge = multiPillBadges[li];
+                                              // The cell's own chip rides on the first pill.
+                                              const pillHasChip =
+                                                !!pillBadge ||
+                                                (li === 0 && !!(draftBadge || publishBadge));
+                                              const pillSeam = pillSeams[li];
                                               const pillBorder = draftPillBorderKind
                                                 ? getDraftBorder(
                                                     draftPillBorderKind,
@@ -3298,7 +3704,7 @@ const SectionBlock = memo(function SectionBlock({
                                               const multiCrossFocusPill =
                                                 isCross && crossHomeFaLi ? crossHomeFaLi : null;
                                               const multiCrossFocusWingRadius =
-                                                MULTI_SHIFT_PILL_RADIUS -
+                                                SINGLE_SHIFT_PILL_RADIUS -
                                                 (draftPillBorderKind ? 2 : 1);
                                               const multiCrossFocusPalette =
                                                 getCrossFocusBadgePalette({
@@ -3316,6 +3722,10 @@ const SectionBlock = memo(function SectionBlock({
                                               const multiDisplayLabel = displayParts.primaryLabel;
                                               const isMentoredPill =
                                                 cellSegments[li]?.isMentored ?? false;
+                                              const multiSidePadding = isNameMode ? 6 : 3;
+                                              const multiPaddingLeft = multiCrossFocusPill
+                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                : multiSidePadding;
                                               const pillSegment = notesPerPill
                                                 ? cellSegments[li]
                                                 : undefined;
@@ -3332,7 +3742,13 @@ const SectionBlock = memo(function SectionBlock({
                                                       jobId: pillSegment.jobId,
                                                     },
                                                   ) ?? [])
-                                                : [];
+                                                : // Segments that do not line up with the
+                                                  // pills leave the notes with the cell, so
+                                                  // the last pill carries them.
+                                                  li === labels.length - 1
+                                                  ? noteMarks
+                                                  : [];
+                                              const pillHasNotes = pillNoteMarks.length > 0;
 
                                               return (
                                                 <div
@@ -3343,8 +3759,17 @@ const SectionBlock = memo(function SectionBlock({
                                                     background: multiUsesShiftColor
                                                       ? effectiveColorLi
                                                       : "var(--dg-color-surface)",
-                                                    border: pillBorder,
-                                                    borderRadius: MULTI_SHIFT_PILL_RADIUS,
+                                                    ...seamBorders(pillBorder, pillSeam),
+                                                    ...gapBefore(
+                                                      li,
+                                                      pillSeam,
+                                                      pillAxis,
+                                                      multiPillGap,
+                                                    ),
+                                                    borderRadius: seamRadius(
+                                                      SINGLE_SHIFT_PILL_RADIUS,
+                                                      pillSeam,
+                                                    ),
                                                     color: multiForegroundColor,
                                                     boxShadow:
                                                       publishRingStatus === "new" ||
@@ -3360,12 +3785,12 @@ const SectionBlock = memo(function SectionBlock({
                                                     justifyContent: "center",
                                                     gap: 1,
                                                     fontSize: isNameMode
-                                                      ? "var(--dg-fs-micro)"
-                                                      : "var(--dg-fs-caption)",
+                                                      ? "var(--dg-fs-caption)"
+                                                      : "var(--dg-fs-title)",
                                                     fontWeight: 600,
                                                     position: "relative",
-                                                    // A sibling pill otherwise paints over the
-                                                    // raised chip at their shared edge.
+                                                    // The pill above otherwise paints over the
+                                                    // raised chip in the gap between them.
                                                     zIndex: pillBadge ? 2 : 1,
                                                     cursor: "pointer",
                                                     textDecoration:
@@ -3375,14 +3800,13 @@ const SectionBlock = memo(function SectionBlock({
                                                     lineHeight: 1.2,
                                                     overflow: pillBadge ? "visible" : "hidden",
                                                     minWidth: 0,
-                                                    padding: isNameMode ? "2px 4px" : "2px 3px",
-                                                    paddingTop: 2,
-                                                    paddingLeft: multiCrossFocusPill
-                                                      ? MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                                      : isNameMode
-                                                        ? 4
-                                                        : 3,
-                                                    paddingRight: isNameMode ? 4 : 3,
+                                                    padding: isNameMode ? "2px 6px" : "2px 3px",
+                                                    // Words start below a raised chip's lower half.
+                                                    paddingTop: pillHasChip
+                                                      ? RAISED_CHIP_RESERVE
+                                                      : 2,
+                                                    paddingLeft: multiPaddingLeft,
+                                                    paddingRight: multiSidePadding,
                                                   }}
                                                 >
                                                   {pillBadge && (
@@ -3390,7 +3814,8 @@ const SectionBlock = memo(function SectionBlock({
                                                       badge={{
                                                         ...pillBadge,
                                                         topOffset: 0,
-                                                        leftOffset: 4,
+                                                        // Clears the mentored M on a single pill's width.
+                                                        leftOffset: 2,
                                                         overlapPillEdge: true,
                                                         showChangeTooltip:
                                                           !showShiftDetailHoverCards,
@@ -3410,14 +3835,17 @@ const SectionBlock = memo(function SectionBlock({
                                                         whiteSpace: "nowrap",
                                                         alignItems: "center",
                                                         justifyContent: "center",
-                                                        fontSize: "var(--dg-fs-micro)",
+                                                        fontSize: "var(--dg-fs-footnote)",
                                                         fontWeight: 600,
                                                         lineHeight: 1,
                                                         background:
                                                           multiCrossFocusPalette.background,
                                                         color: multiCrossFocusPalette.color,
-                                                        borderRadius: `${multiCrossFocusWingRadius}px 0 0 ${multiCrossFocusWingRadius}px`,
-                                                        padding: "0 1px",
+                                                        borderRadius: seamRadius(
+                                                          multiCrossFocusWingRadius,
+                                                          [...pillSeam, "right"],
+                                                        ),
+                                                        padding: "0 2px",
                                                         letterSpacing: "-0.2em",
                                                         pointerEvents: "none",
                                                       }}
@@ -3429,65 +3857,65 @@ const SectionBlock = memo(function SectionBlock({
                                                   )}
                                                   {isMentoredPill && (
                                                     <MentoredShiftBadge
-                                                      compact
                                                       rightInset={
-                                                        // Only the last pill shares
-                                                        // the cell's corner with
-                                                        // the lock avatar.
-                                                        li === labels.length - 1
+                                                        // Only the pill in the cell's
+                                                        // top-right corner shares it
+                                                        // with the lock avatar.
+                                                        li === (stackShifts ? 0 : pillCount - 1)
                                                           ? cornerLockClearance || undefined
                                                           : undefined
                                                       }
-                                                      topInset={pillBadge ? 19 : undefined}
                                                     />
                                                   )}
                                                   <div
                                                     style={{
                                                       display: "flex",
-                                                      flexDirection: multiInlinesSecondary
-                                                        ? "row"
-                                                        : "column",
-                                                      alignItems: multiInlinesSecondary
-                                                        ? "baseline"
-                                                        : "center",
+                                                      flexDirection: "column",
+                                                      alignItems: "center",
+                                                      alignSelf: "stretch",
                                                       justifyContent: "center",
-                                                      flexWrap: "nowrap",
-                                                      gap: multiInlinesSecondary
-                                                        ? 2
-                                                        : showMultiSecondaryLine
+                                                      gap:
+                                                        showMultiSecondaryLine &&
+                                                        !multiInlinesSecondary
                                                           ? 1
                                                           : 0,
-                                                      maxWidth: "100%",
+                                                      // The first line shares the corner's height,
+                                                      // so it alone keeps the M's room on both
+                                                      // sides: clear of it and still centred.
+                                                      ...(isMentoredPill
+                                                        ? {
+                                                            paddingLeft: Math.max(
+                                                              0,
+                                                              MENTORED_CORNER_CLEARANCE -
+                                                                multiPaddingLeft,
+                                                            ),
+                                                            paddingRight:
+                                                              MENTORED_CORNER_CLEARANCE -
+                                                              multiSidePadding,
+                                                          }
+                                                        : null),
                                                       minWidth: 0,
                                                       overflow: "hidden",
                                                     }}
                                                   >
                                                     <span
-                                                      style={
-                                                        isNameMode
-                                                          ? {
-                                                              textAlign: "center" as const,
-                                                              maxWidth: "100%",
-                                                              overflowWrap: "break-word" as const,
-                                                              display: "-webkit-box",
-                                                              WebkitBoxOrient: "vertical" as const,
-                                                              WebkitLineClamp:
-                                                                showMultiSecondaryLine
-                                                                  ? 1
-                                                                  : hasTime
-                                                                    ? 1
-                                                                    : 2,
-                                                              overflow: "hidden",
-                                                              lineHeight: 1.2,
-                                                            }
-                                                          : {
-                                                              whiteSpace: "nowrap",
-                                                              overflow: "hidden",
-                                                              textOverflow: "ellipsis",
-                                                              maxWidth: "100%",
-                                                              minWidth: 0,
-                                                            }
-                                                      }
+                                                      data-pill-fit=""
+                                                      style={{
+                                                        ...gridFitLine(
+                                                          isNameMode
+                                                            ? "var(--dg-fs-caption)"
+                                                            : "var(--dg-fs-title)",
+                                                          // A name alone in its pill may take two lines.
+                                                          {
+                                                            wrap:
+                                                              isNameMode &&
+                                                              !showMultiSecondaryLine &&
+                                                              !hasTime &&
+                                                              !pillHasNotes,
+                                                          },
+                                                        ),
+                                                        lineHeight: 1.2,
+                                                      }}
                                                     >
                                                       {multiDisplayLabel}
                                                       {!hasTime && isPillOvernight && (
@@ -3502,35 +3930,54 @@ const SectionBlock = memo(function SectionBlock({
                                                           +1
                                                         </sup>
                                                       )}
+                                                      {multiInlinesSecondary && (
+                                                        <>
+                                                          <span
+                                                            aria-hidden="true"
+                                                            style={{
+                                                              fontSize:
+                                                                gridFitSize(
+                                                                  "var(--dg-fs-footnote)",
+                                                                ),
+                                                              fontWeight: 700,
+                                                              opacity: 0.5,
+                                                              margin: "0 2px",
+                                                            }}
+                                                          >
+                                                            ·
+                                                          </span>
+                                                          <span
+                                                            style={{
+                                                              fontSize:
+                                                                gridFitSize(
+                                                                  "var(--dg-fs-footnote)",
+                                                                ),
+                                                              fontWeight: 700,
+                                                              color:
+                                                                "color-mix(in srgb, currentColor 78%, transparent)",
+                                                            }}
+                                                          >
+                                                            {displayParts.secondaryLabel}
+                                                          </span>
+                                                        </>
+                                                      )}
                                                     </span>
-                                                    {multiInlinesSecondary && (
+                                                    {showMultiSecondaryLine &&
+                                                    !multiInlinesSecondary ? (
                                                       <span
-                                                        aria-hidden="true"
+                                                        data-pill-fit=""
                                                         style={{
-                                                          fontSize: "var(--dg-fs-micro)",
-                                                          fontWeight: 700,
-                                                          opacity: 0.5,
-                                                          lineHeight: 1.3,
-                                                          flexShrink: 0,
-                                                        }}
-                                                      >
-                                                        ·
-                                                      </span>
-                                                    )}
-                                                    {showMultiSecondaryLine ? (
-                                                      <span
-                                                        style={{
-                                                          fontSize: "var(--dg-fs-micro)",
+                                                          ...gridFitLine(
+                                                            multiIsThreeRow
+                                                              ? "var(--dg-fs-micro)"
+                                                              : "var(--dg-fs-footnote)",
+                                                          ),
                                                           fontWeight: 700,
                                                           opacity: 0.78,
                                                           // A split shift is half the width but the
                                                           // full cell height, so three rows fit on
                                                           // the same budget as the single pill.
                                                           lineHeight: multiIsThreeRow ? 1.2 : 1.3,
-                                                          whiteSpace: "nowrap",
-                                                          overflow: "hidden",
-                                                          textOverflow: "ellipsis",
-                                                          maxWidth: "100%",
                                                         }}
                                                       >
                                                         {displayParts.secondaryLabel}
@@ -3539,15 +3986,16 @@ const SectionBlock = memo(function SectionBlock({
                                                   </div>
                                                   {hasTime && (
                                                     <span
+                                                      data-pill-fit=""
                                                       style={{
-                                                        fontSize: "var(--dg-fs-micro)",
+                                                        ...gridFitLine(
+                                                          multiIsThreeRow
+                                                            ? "var(--dg-fs-micro)"
+                                                            : "var(--dg-fs-footnote)",
+                                                        ),
                                                         fontWeight: 500,
                                                         opacity: 0.7,
                                                         lineHeight: 1,
-                                                        whiteSpace: "nowrap",
-                                                        overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%",
                                                       }}
                                                     >
                                                       {fmt12hShort(pillTime!.start)}–
@@ -3570,36 +4018,147 @@ const SectionBlock = memo(function SectionBlock({
                                                     marks={pillNoteMarks}
                                                     indicatorTypes={indicatorTypes}
                                                     rimColor={multiForegroundColor}
-                                                    surfaceColor={
-                                                      multiUsesShiftColor
-                                                        ? effectiveColorLi
-                                                        : "var(--dg-color-surface)"
-                                                    }
                                                     isDark={isDarkTheme}
-                                                    style={{ bottom: 2, right: 2 }}
+                                                    corner
                                                   />
                                                 </div>
                                               );
                                             })}
+                                            {restOfDayAbsenceTypeId != null &&
+                                              (() => {
+                                                // The absence for the rest of the day, after the
+                                                // shifts; from when the last shift ended, if known.
+                                                const stripes = restOfDayAbsenceType
+                                                  ? resolveAbsenceStripes(
+                                                      restOfDayAbsenceType.color,
+                                                      isDarkTheme,
+                                                    )
+                                                  : null;
+                                                const absenceBg = stripes
+                                                  ? absenceStripeCss(
+                                                      stripes.stripeA,
+                                                      stripes.stripeB,
+                                                    )
+                                                  : "var(--dg-color-bg)";
+                                                const absenceFg =
+                                                  stripes?.text ?? "var(--dg-color-text-primary)";
+                                                const absenceBorder =
+                                                  stripes?.border ?? borderColor(absenceFg);
+                                                const absenceSeam = pillSeams[labels.length];
+                                                const lastShiftTime =
+                                                  customTimes?.perPill?.[labels.length - 1] ??
+                                                  (labels.length === 1 && !customTimes?.perPill
+                                                    ? customTimes
+                                                    : null);
+                                                const absenceLabel = isNameMode
+                                                  ? restOfDayAbsenceName
+                                                  : restOfDayAbsenceType?.label ||
+                                                    restOfDayAbsenceName;
+                                                return (
+                                                  <div
+                                                    key="rest-of-day-absence"
+                                                    data-shift-pill="rest-of-day-absence"
+                                                    style={{
+                                                      flex: 1,
+                                                      background: absenceBg,
+                                                      ...seamBorders(
+                                                        restOfDayDraftDiff?.borderKind
+                                                          ? getDraftBorder(
+                                                              restOfDayDraftDiff.borderKind,
+                                                              `1px solid ${absenceBorder}`,
+                                                            )
+                                                          : `1px solid ${absenceBorder}`,
+                                                        absenceSeam,
+                                                      ),
+                                                      ...gapBefore(
+                                                        labels.length,
+                                                        absenceSeam,
+                                                        pillAxis,
+                                                        multiPillGap,
+                                                      ),
+                                                      boxShadow: restOfDayPublishDiff?.borderKind
+                                                        ? getPublishDiffRing(
+                                                            restOfDayPublishDiff.borderKind,
+                                                            borderColor(absenceFg),
+                                                          )
+                                                        : "none",
+                                                      borderRadius: seamRadius(
+                                                        SINGLE_SHIFT_PILL_RADIUS,
+                                                        absenceSeam,
+                                                      ),
+                                                      color: absenceFg,
+                                                      display: "flex",
+                                                      flexDirection: "column",
+                                                      alignItems: "center",
+                                                      justifyContent: "center",
+                                                      gap: 1,
+                                                      fontSize: isNameMode
+                                                        ? "var(--dg-fs-caption)"
+                                                        : "var(--dg-fs-title)",
+                                                      fontWeight: 600,
+                                                      position: "relative",
+                                                      zIndex: restOfDayPillBadge ? 2 : 1,
+                                                      cursor: "pointer",
+                                                      textDecoration:
+                                                        draftKind === "deleted"
+                                                          ? "line-through"
+                                                          : "none",
+                                                      lineHeight: 1.2,
+                                                      overflow: restOfDayPillBadge
+                                                        ? "visible"
+                                                        : "hidden",
+                                                      minWidth: 0,
+                                                      padding: isNameMode ? "2px 6px" : "2px 3px",
+                                                      paddingTop: restOfDayPillBadge
+                                                        ? RAISED_CHIP_RESERVE
+                                                        : 2,
+                                                    }}
+                                                  >
+                                                    {restOfDayPillBadge && (
+                                                      <GridDiffBadge
+                                                        badge={{
+                                                          ...restOfDayPillBadge,
+                                                          topOffset: 0,
+                                                          leftOffset: 2,
+                                                          overlapPillEdge: true,
+                                                          showChangeTooltip:
+                                                            !showShiftDetailHoverCards,
+                                                        }}
+                                                      />
+                                                    )}
+                                                    <span
+                                                      data-pill-fit=""
+                                                      style={gridFitLine(
+                                                        isNameMode
+                                                          ? "var(--dg-fs-caption)"
+                                                          : "var(--dg-fs-title)",
+                                                      )}
+                                                    >
+                                                      {absenceLabel}
+                                                    </span>
+                                                    {lastShiftTime?.end && (
+                                                      <span
+                                                        data-pill-fit=""
+                                                        style={{
+                                                          ...gridFitLine("var(--dg-fs-footnote)"),
+                                                          fontWeight: 500,
+                                                          opacity: 0.7,
+                                                          lineHeight: 1,
+                                                        }}
+                                                      >
+                                                        from {fmt12hShort(lastShiftTime.end)}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })()}
                                           </div>
-                                          {!notesPerPill && (
-                                            <NoteDots
-                                              marks={noteMarks}
-                                              indicatorTypes={indicatorTypes}
-                                              isDark={isDarkTheme}
-                                              style={{
-                                                bottom: 2,
-                                                right: multiNotesRightOffset,
-                                                zIndex: 1,
-                                              }}
-                                            />
-                                          )}
                                           {(draftBadge || publishBadge) && (
                                             <GridDiffBadge
                                               badge={{
                                                 ...(draftBadge ?? publishBadge!),
                                                 topOffset: 0,
-                                                leftOffset: 4,
+                                                leftOffset: 2,
                                                 overlapPillEdge: true,
                                                 showChangeTooltip: !showShiftDetailHoverCards,
                                               }}
@@ -3622,7 +4181,8 @@ const SectionBlock = memo(function SectionBlock({
                             ) : (draftKind === "deleted" && publishedLabel) ||
                               (showsPublishDiff &&
                                 publishDiff?.kind === "deleted" &&
-                                ((publishDiff.from ?? []).length > 0 ||
+                                (publishDiff.detailsHidden ||
+                                  (publishDiff.from ?? []).length > 0 ||
                                   publishDiff.fromAbsenceTypeId != null ||
                                   publishDiff.fromState?.kind === "worked" ||
                                   publishDiff.fromState?.kind === "absence")) ? (
@@ -3637,31 +4197,40 @@ const SectionBlock = memo(function SectionBlock({
                                 const publishDeletedAbsenceTypeId =
                                   publishDiff?.fromAbsenceTypeId ??
                                   absenceTypeIdFromPublishState(publishDiff?.fromState);
+                                // The organization may hide what was removed
+                                // from staff (item 46f); the pill still says
+                                // that something was.
                                 const deletedLabel = isDraftDelete
                                   ? publishedLabel!
-                                  : publishDeletedAbsenceTypeId != null
-                                    ? (() => {
-                                        const at = absenceTypeMap?.get(
-                                          Number(publishDeletedAbsenceTypeId),
-                                        );
-                                        return at ? (isNameMode ? at.name : at.label) : "?";
-                                      })()
-                                    : publishDeletedFromIds
-                                        .map((id) => {
-                                          const sc = assignmentById.get(id);
-                                          return sc
-                                            ? isNameMode
-                                              ? sc.name || sc.label
-                                              : sc.label
-                                            : "?";
-                                        })
-                                        .join("/");
+                                  : publishDiff?.detailsHidden
+                                    ? "Removed"
+                                    : publishDeletedAbsenceTypeId != null
+                                      ? (() => {
+                                          const at = absenceTypeMap?.get(
+                                            Number(publishDeletedAbsenceTypeId),
+                                          );
+                                          return at ? (isNameMode ? at.name : at.label) : "?";
+                                        })()
+                                      : publishDeletedFromIds
+                                          .map((id) => {
+                                            const sc = assignmentById.get(id);
+                                            return sc
+                                              ? isNameMode
+                                                ? sc.name || sc.label
+                                                : sc.label
+                                              : "?";
+                                          })
+                                          .join("/");
                                 const deletedTooltip =
                                   !isDraftDelete && publishDiff
                                     ? buildPublishTooltip({
                                         publishDiff,
                                         resolvePublisherName,
-                                        detail: `Deleted ${deletedLabel}.`,
+                                        detail:
+                                          publishChangeText ??
+                                          (publishDiff.detailsHidden
+                                            ? "Removed since the last publish."
+                                            : `Deleted ${deletedLabel}.`),
                                         timeZone: publicationTimeZone,
                                       })
                                     : undefined;
@@ -3710,7 +4279,13 @@ const SectionBlock = memo(function SectionBlock({
                                       right: "4px",
                                       bottom: "4px",
                                       left: insetFromVisibleCellLeft(4),
-                                      background: "var(--dg-color-danger-bg)",
+                                      background:
+                                        publishDeletedAbsenceTypeId != null
+                                          ? tintStripeCss(
+                                              "var(--dg-color-danger-bg)",
+                                              "var(--dg-color-danger-dark)",
+                                            )
+                                          : "var(--dg-color-danger-bg)",
                                       border: isDraftDelete
                                         ? "2px dashed var(--dg-color-danger-dark)"
                                         : "1px solid var(--dg-color-danger-border)",
@@ -3773,18 +4348,31 @@ const SectionBlock = memo(function SectionBlock({
                                     {deletedWasMentored && (
                                       <MentoredShiftBadge
                                         rightInset={cornerLockClearance || undefined}
-                                        topInset={19}
                                       />
                                     )}
                                     <span
+                                      data-pill-fit=""
                                       style={{
-                                        fontSize: "var(--dg-fs-title)",
+                                        ...gridFitLine("var(--dg-fs-title)"),
                                         fontWeight: 600,
                                         lineHeight: 1,
                                       }}
                                     >
                                       {deletedLabel}
                                     </span>
+                                    {/* Deleting the shift does not delete the
+                                        cell's notes — they outlive the draft and
+                                        come back the moment it publishes. This
+                                        branch used to drop them, so a note went
+                                        invisible for exactly as long as the
+                                        delete sat unpublished. */}
+                                    <NoteDots
+                                      marks={noteMarks}
+                                      indicatorTypes={indicatorTypes}
+                                      rimColor="var(--dg-color-danger-dark)"
+                                      isDark={isDarkTheme}
+                                      corner
+                                    />
                                   </div>
                                 );
                                 const deletedHoverEntries: ShiftDetailEntry[] = [
@@ -3807,6 +4395,7 @@ const SectionBlock = memo(function SectionBlock({
                                     requestLabel={null}
                                     status="Deleted"
                                     changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                    changes={hoverChanges}
                                     publicationLabel={publicationLabel}
                                   >
                                     {deletedPill}
@@ -3815,23 +4404,19 @@ const SectionBlock = memo(function SectionBlock({
                                 return (
                                   <>
                                     {deletedShiftContent}
-                                    {/* Deleting the shift does not delete the
-                                        cell's notes — they outlive the draft and
-                                        come back the moment it publishes. This
-                                        branch used to drop them, so a note went
-                                        invisible for exactly as long as the
-                                        delete sat unpublished. */}
-                                    <NoteDots
-                                      marks={noteMarks}
-                                      indicatorTypes={indicatorTypes}
-                                      isDark={isDarkTheme}
-                                      style={{ top: 5, right: 5, zIndex: 7 }}
-                                    />
                                     {shouldShowAuthorName && auditName && (
                                       <AuthorBadge
                                         name={auditName}
                                         leftInset={5 + leadingDividerInset}
-                                        rightInset={5}
+                                        rightInset={
+                                          noteMarks.length > 0
+                                            ? 4 +
+                                              1 +
+                                              NOTE_LANE_INSET +
+                                              noteMarksWidth(noteMarks.length) +
+                                              3
+                                            : 5
+                                        }
                                         bottomInset={5}
                                       />
                                     )}
@@ -3839,7 +4424,14 @@ const SectionBlock = memo(function SectionBlock({
                                 );
                               })()
                             ) : (
-                              <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: 2,
+                                }}
+                              >
                                 {shiftLabel === "OFF" && (
                                   <span
                                     style={{
@@ -3857,9 +4449,9 @@ const SectionBlock = memo(function SectionBlock({
                                   marks={noteMarks}
                                   indicatorTypes={indicatorTypes}
                                   isDark={isDarkTheme}
-                                  style={{ top: 5, right: 5 }}
+                                  style={{ alignSelf: "stretch", justifyContent: "center" }}
                                 />
-                              </>
+                              </div>
                             )}
                             {cellEditor && (
                               <MaybeHint
@@ -4083,6 +4675,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  restOfDayAbsenceTypeIdForKey,
+  publishedRestOfDayAbsenceTypeIdForKey,
   publishDiffForKey,
   publishedMetadataForKey,
   cellEditors,
@@ -4344,6 +4938,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     hasStackedCellContent: false,
   });
   const { nameColWidth, colWidth, fitToContainer } = gridLayout;
+  const dayColumnWidth = Math.max(
+    colWidth,
+    Math.floor(((containerWidth ?? 0) - nameColWidth) / (spanWeeks * 7)),
+  );
   const hasAnySections = renderedDepartmentSections.length > 0;
   const hasHighlightedSearch = (highlightEmpIds?.size ?? 0) > 0;
 
@@ -4497,6 +5095,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     handleCellClick={handleCellClick}
                     nameColWidth={nameColWidth}
                     colWidth={colWidth}
+                    dayColumnWidth={dayColumnWidth}
                     fitToContainer={fitToContainer}
                     highlightEmpIds={highlightEmpIds}
                     focusAreas={focusAreas}
@@ -4515,6 +5114,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
+                    restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+                    publishedRestOfDayAbsenceTypeIdForKey={publishedRestOfDayAbsenceTypeIdForKey}
                     publishDiffForKey={publishDiffForKey}
                     publishedMetadataForKey={publishedMetadataForKey}
                     certifications={certifications}
@@ -4753,6 +5354,10 @@ const ScheduleGrid = memo(function ScheduleGrid({
           publishedLabelForKey={model.accessors.publishedLabelForKey}
           publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
           publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
+          restOfDayAbsenceTypeIdForKey={model.accessors.restOfDayAbsenceTypeIdForKey}
+          publishedRestOfDayAbsenceTypeIdForKey={
+            model.accessors.publishedRestOfDayAbsenceTypeIdForKey
+          }
           publishDiffForKey={model.accessors.publishDiffForKey}
           publishedMetadataForKey={model.accessors.publishedMetadataForKey}
           cellEditors={model.cellEditors}

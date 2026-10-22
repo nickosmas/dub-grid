@@ -5,7 +5,8 @@ const requireOrgPermissions = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const getServiceClient = vi.fn();
 
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 vi.mock("@/lib/csrf", () => ({
@@ -152,5 +153,57 @@ describe("delete dependency checks", () => {
       p_absence_type_id: null,
     });
     expect(tables).not.toContain("schedule_cells");
+  });
+
+  it("leaves internal accounts out of a client's count but still blocks the delete", async () => {
+    // Two staff hold the role; one is an internal account.
+    const client = {
+      from: (table: string) => {
+        let count = table === "employees" ? 2 : 0;
+        const chain: Record<string, unknown> = {};
+        const passthrough = () => chain;
+        chain.select = passthrough;
+        chain.is = passthrough;
+        chain.eq = passthrough;
+        chain.contains = passthrough;
+        chain.or = () => {
+          count = 1;
+          return chain;
+        };
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(
+            table === "profiles"
+              ? { data: [{ id: "qa-person" }], error: null }
+              : { data: [], count, error: null },
+          );
+        return chain;
+      },
+    };
+    getServiceClient.mockReturnValue(client);
+    const { GET } = await import("./route");
+
+    async function roleCheckFor(isGridmaster: boolean) {
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: "actor-1" },
+        permissions: { isGridmaster },
+        serviceClient: client,
+        orgId: REAL_ORG,
+      });
+      const res = await GET(
+        new NextRequest(
+          `https://app.test/api/settings/config?action=checkRoleDependencies&orgId=${REAL_ORG}&itemId=7`,
+        ),
+      );
+      return res?.json();
+    }
+
+    expect(await roleCheckFor(false)).toMatchObject({
+      summary: "Used by 1 employee",
+      hasAnyReferences: true,
+    });
+    expect(await roleCheckFor(true)).toMatchObject({
+      summary: "Used by 2 employees",
+      hasAnyReferences: true,
+    });
   });
 });

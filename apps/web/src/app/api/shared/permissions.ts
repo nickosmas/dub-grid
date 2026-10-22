@@ -1,6 +1,11 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { buildPermissionContext } from "@dubgrid/authz";
+import {
+  buildPermissionContext,
+  scheduleViewerVisibility,
+  type ScheduleVisibility,
+} from "@dubgrid/authz";
+import { fetchHiddenEmployeeIds, fetchHiddenInternalUserIds } from "@dubgrid/data-access";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
@@ -29,19 +34,6 @@ export async function isCallerInactive(
 }
 
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
-
-/**
- * Who published a schedule is process detail for the people who publish it.
- * The publish history page and its panel already sit behind this gate; the
- * reads every schedule viewer can make (recent changes, published ranges)
- * withhold the publisher's id under the same rule, so the grid cannot name a
- * publisher to a viewer who could never open the history.
- */
-export function canSeeSchedulePublisher(
-  permissions: Pick<PermissionContext, "canPublishSchedule" | "isSuperAdmin" | "isGridmaster">,
-): boolean {
-  return permissions.canPublishSchedule || permissions.isSuperAdmin || permissions.isGridmaster;
-}
 
 interface OrgPermissionOptions {
   allowLockedOrganization?: boolean;
@@ -113,6 +105,8 @@ export interface AuthorizedOrgRequest {
    * to prevent.
    */
   orgId: string;
+  /** What this viewer may see about a publish (item 46f). */
+  scheduleVisibility: ScheduleVisibility;
 }
 
 function forbiddenResponse(message: string = API_ERRORS.FORBIDDEN) {
@@ -479,7 +473,7 @@ export async function requireOrgPermissions(
       serviceClient
         .from("organizations")
         .select(
-          `archived_at, suspended_at, subscription_status, trial_ends_at, ${BILLING_ACCESS_SELECT}`,
+          `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .maybeSingle(),
@@ -571,5 +565,23 @@ export async function requireOrgPermissions(
     serviceClient,
     userClient,
     orgId,
+    scheduleVisibility: scheduleViewerVisibility(permissions, {
+      staffSeeShiftChanges: organization?.staff_see_shift_changes as boolean | null | undefined,
+      staffSeePublisher: organization?.staff_see_publisher as boolean | null | undefined,
+    }),
   };
+}
+
+/** The user ids this request's viewer must not be shown: internal (QA) accounts, unless they may see them. */
+export function fetchHiddenPeople(auth: AuthorizedOrgRequest): Promise<string[]> {
+  return fetchHiddenInternalUserIds(auth.serviceClient, {
+    userId: auth.actor.id,
+    isGridmaster: auth.permissions.isGridmaster,
+  });
+}
+
+/** The staff ids, in this request's organization, whose shifts its viewer must not be shown. */
+export async function fetchHiddenStaffIds(auth: AuthorizedOrgRequest): Promise<Set<string>> {
+  const hiddenUserIds = await fetchHiddenPeople(auth);
+  return new Set(await fetchHiddenEmployeeIds(auth.serviceClient, auth.orgId, hiddenUserIds));
 }

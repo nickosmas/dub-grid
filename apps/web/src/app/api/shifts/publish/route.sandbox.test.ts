@@ -7,6 +7,16 @@ const fetchScheduleDraftBreakdown = vi.fn();
 const publishScheduleDirect = vi.fn();
 const fetchPendingNotePublishChanges = vi.fn();
 const recordNotePublishChanges = vi.fn();
+const notifyPublishedShiftChanges = vi.fn();
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (callback: () => unknown) => callback(),
+}));
+
+vi.mock("@/features/notifications/server/publish-alerts", () => ({
+  notifyPublishedShiftChanges: (...args: unknown[]) => notifyPublishedShiftChanges(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
@@ -74,6 +84,7 @@ describe("POST /api/shifts/publish inside a Test Sandbox", () => {
       fetchScheduleDraftBreakdown,
       fetchPendingNotePublishChanges,
       publishScheduleDirect,
+      notifyPublishedShiftChanges,
     ]) {
       expect(call).toHaveBeenCalledWith(expect.objectContaining({ orgId: SANDBOX_ORG_ID }));
       expect(call).not.toHaveBeenCalledWith(expect.objectContaining({ orgId: REQUESTED_ORG_ID }));

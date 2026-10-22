@@ -2,8 +2,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import type { ShiftRequestDraftCell } from "@dubgrid/domain";
 import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import type { ShiftRequest } from "@/types";
+
+const fetchShiftRequestDraftCells = vi.fn(
+  async (..._args: unknown[]): Promise<ShiftRequestDraftCell[] | null> => [],
+);
+vi.mock("@/features/schedule/client/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/schedule/client/api")>()),
+  fetchShiftRequestDraftCells: (...args: unknown[]) => fetchShiftRequestDraftCells(...args),
+}));
 
 function makeRequest(overrides: Partial<ShiftRequest> = {}): ShiftRequest {
   return {
@@ -258,6 +267,65 @@ describe("ShiftRequestBoard", () => {
 
     expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true, "Thanks for asking");
     expect(onResolve).toHaveBeenNthCalledWith(2, "approve-1", false, "Need more coverage");
+  });
+
+  describe("approving over unpublished changes", () => {
+    const pending = makeRequest({ id: "approve-2", type: "pickup", status: "pending_approval" });
+
+    async function openApprove() {
+      const user = userEvent.setup();
+      const handlers = renderBoard({
+        pendingApproval: [pending],
+        canApprove: true,
+        currentEmpId: "manager-1",
+      });
+      await user.click(screen.getByRole("button", { name: /approval queue/i }));
+      await user.click(screen.getByRole("button", { name: "Approve" }));
+      return { user, ...handlers };
+    }
+
+    it("names each changed day before approving, and approves only on confirm", async () => {
+      fetchShiftRequestDraftCells.mockResolvedValueOnce([{ empId: "emp-1", date: "2026-04-16" }]);
+      const { user, onResolve } = await openApprove();
+
+      expect(fetchShiftRequestDraftCells).toHaveBeenCalledWith("approve-2", "org-1");
+      const note = screen.getByRole("note");
+      expect(note).toHaveTextContent("Alice Smith has unpublished changes on Thu, Apr 16.");
+      expect(note).toHaveTextContent(
+        "Approving publishes this request now and replaces those changes.",
+      );
+      expect(onResolve).not.toHaveBeenCalled();
+
+      await confirmDialogAction(user, "Approve");
+      expect(onResolve).toHaveBeenCalledWith("approve-2", true, undefined);
+    });
+
+    it("still warns when the check failed", async () => {
+      fetchShiftRequestDraftCells.mockResolvedValueOnce(null);
+      await openApprove();
+
+      expect(screen.getByRole("note")).toHaveTextContent(
+        "These days couldn't be checked for unpublished changes.",
+      );
+    });
+
+    it("shows no warning when approving replaces nothing", async () => {
+      fetchShiftRequestDraftCells.mockResolvedValueOnce([]);
+      await openApprove();
+
+      expect(screen.getByText(/This will finalize the staffing change/)).toBeInTheDocument();
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("changes nothing when cancelled", async () => {
+      fetchShiftRequestDraftCells.mockResolvedValueOnce([{ empId: "emp-1", date: "2026-04-16" }]);
+      const { user, onResolve } = await openApprove();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(onResolve).not.toHaveBeenCalled();
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
   });
 
   it("shows open requests in the approval queue for approvers", async () => {

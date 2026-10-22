@@ -373,6 +373,15 @@ describe("buildActivityFeed", () => {
     expect(result[0]?.description).toContain("Someone published");
   });
 
+  it("names nobody when the organization hides who published", () => {
+    const nameByProfileId = new Map([["profile-1", "Jordan Lee"]]);
+    const result = buildActivityFeed([makeRow()], [], [], nameByProfileId, 100, false);
+
+    expect(result[0]?.description).toBe(
+      "Schedule published for May 11 to May 17 · No shift changes",
+    );
+  });
+
   it("folds a publish's changes into its description and emits no shift_change items", () => {
     const changes = Array.from({ length: 14 }, (_, i) => ({
       empId: `emp-${i}`,

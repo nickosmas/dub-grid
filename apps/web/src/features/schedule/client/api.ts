@@ -16,6 +16,7 @@ import type {
   ShiftRequestType,
   SeriesFrequency,
 } from "@/types";
+import type { ShiftRequestDraftCell } from "@dubgrid/domain";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -237,6 +238,23 @@ export function resolveShiftRequest(
     approved,
     note,
   }).then(() => undefined);
+}
+
+/**
+ * The days approving this request would publish whose draft differs from what
+ * is published. `null` when the check fails, which the warning still reports.
+ */
+export function fetchShiftRequestDraftCells(
+  requestId: string,
+  orgId: string,
+): Promise<ShiftRequestDraftCell[] | null> {
+  return requestScheduleAction<{ success: true; draftCells: ShiftRequestDraftCell[] }>({
+    action: "fetchShiftRequestDraftCells",
+    orgId,
+    requestId,
+  })
+    .then((data) => data.draftCells)
+    .catch(() => null);
 }
 
 export function cancelShiftRequest(

@@ -24,8 +24,17 @@ import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
+import type { ShiftChange, ShiftChangeResolvers } from "@dubgrid/schedule-core";
+import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
+import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+  publishChangeHasStates,
+} from "@/lib/shift-change-web";
 import {
   getCurrentTimeValueInTimeZone,
   getIsoDateInTimeZone,
@@ -97,7 +106,14 @@ type DashboardScheduleItem = {
   /** The change chip this pill carries, resolved the way the grid resolves it. */
   changeBadge: CellChangeBadge | null;
   isDeletedHistory: boolean;
+  /** A removal the organization hides the details of (item 46f): "Shift removed" only. */
+  removalHidden?: boolean;
+  /** The older summary, for changes stored without their cell states. */
   previousLabel: string | null;
+  /** The cell's change against its original, for the Was card. */
+  previousChange: ShiftChange | null;
+  /** The same change as one block of text, starting "Was", for one-line places. */
+  previousText: string | null;
   /** This pill's schedule notes, by the one-half rule. */
   noteMarks: ScheduleNoteMark[];
   /** Every schedule note of the person's day, for the hero. */
@@ -237,6 +253,17 @@ export default function UserDashboard(props: DashboardContentProps) {
       }),
     [assignmentById, publishedAssignmentIdByPair],
   );
+  const shiftChangeResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: [...assignmentById.values()],
+        shiftCategories,
+        jobs,
+        absenceTypes: [...absenceTypeById.values()],
+        focusAreas,
+      }),
+    [assignmentById, shiftCategories, jobs, absenceTypeById, focusAreas],
+  );
   const allScheduleItems = useMemo(
     () =>
       buildScheduleItemsFromShiftMap({
@@ -252,6 +279,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         isDarkTheme,
         scheduleNotes,
         isScheduleEditor,
+        shiftChangeResolvers,
       }),
     [
       absenceTypeById,
@@ -266,6 +294,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       isDarkTheme,
       scheduleNotes,
       isScheduleEditor,
+      shiftChangeResolvers,
     ],
   );
   const myScheduleItems = useMemo(
@@ -291,6 +320,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         isDarkTheme,
         scheduleNotes,
         isScheduleEditor,
+        shiftChangeResolvers,
       }).filter((item) => item.dateKey >= todayKey && !item.isDeletedHistory),
     [
       absenceTypeById,
@@ -306,6 +336,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       isDarkTheme,
       scheduleNotes,
       isScheduleEditor,
+      shiftChangeResolvers,
     ],
   );
   const heroItems = useMemo(
@@ -676,6 +707,7 @@ function buildScheduleItemsFromShiftMap(input: {
   recentPublishedChanges: Map<string, PublishChange>;
   scheduleNotes: DashboardContentProps["scheduleNotes"];
   isScheduleEditor: boolean;
+  shiftChangeResolvers: ShiftChangeResolvers;
 }): DashboardScheduleItem[] {
   const items: DashboardScheduleItem[] = [];
 
@@ -683,8 +715,13 @@ function buildScheduleItemsFromShiftMap(input: {
   // Cells a publication removed have no shift-map row, so their last
   // published presentation is rebuilt here for the history line.
   const historyKeys = new Set<string>();
+  const hiddenRemovals: string[] = [];
   for (const [key, change] of input.recentPublishedChanges) {
     if (change.kind !== "deleted" || entries.has(key)) continue;
+    if (change.detailsHidden) {
+      hiddenRemovals.push(key);
+      continue;
+    }
     historyKeys.add(key);
     entries.set(key, {
       label: "",
@@ -693,8 +730,14 @@ function buildScheduleItemsFromShiftMap(input: {
       draftKind: null,
       publishedAssignmentDefinitionIds: [],
       publishedLabel: "",
-      segments: change.fromSegments ?? [],
-      absenceTypeId: change.fromAbsenceTypeId ?? null,
+      segments:
+        change.fromSegments ??
+        (change.fromState?.kind === "worked"
+          ? (change.fromState.segments as ShiftJobSegment[])
+          : []),
+      absenceTypeId:
+        change.fromAbsenceTypeId ??
+        (change.fromState?.kind === "absence" ? change.fromState.absenceTypeId : null),
       customStartTime: change.fromCustomStart ?? null,
       customEndTime: change.fromCustomEnd ?? null,
     });
@@ -717,20 +760,41 @@ function buildScheduleItemsFromShiftMap(input: {
     const absenceTypeId = entry.absenceTypeId ?? null;
     const publishedChange = input.recentPublishedChanges.get(key) ?? null;
     const isDeletedHistory = historyKeys.has(key);
-    const previousLabel = getPreviousChangeSummary({
-      absenceTypeById: input.absenceTypeById,
-      assignmentById: input.assignmentById,
-      change: publishedChange,
-      focusAreaById: input.focusAreaById,
-      jobById: input.jobById,
-      shiftById: input.shiftById,
-    });
+    const previousChange =
+      publishedChange && !publishedChange.detailsHidden && publishChangeHasStates(publishedChange)
+        ? describeCellStateChange(
+            publishedChange.fromState,
+            publishedChange.toState,
+            parsedKey.dateKey,
+            input.shiftChangeResolvers,
+          )
+        : null;
+    const legacySummary =
+      previousChange || publishedChange?.detailsHidden
+        ? null
+        : getPreviousChangeSummary({
+            absenceTypeById: input.absenceTypeById,
+            assignmentById: input.assignmentById,
+            change: publishedChange,
+            focusAreaById: input.focusAreaById,
+            jobById: input.jobById,
+            shiftById: input.shiftById,
+          });
+    const previousLabel = legacySummary;
+    const previousText = previousChange ? formatShiftChangeWasText(previousChange) : null;
 
     const rawSegments = absenceTypeId != null ? [] : getWorkedSegments(entry);
+    // A worked cell's absence for the rest of the day (item 45), its last item.
+    // A removed cell's history line already names it in "Was ...".
+    const restOfDayAbsenceTypeId =
+      absenceTypeId == null && rawSegments.length > 0 && !isDeletedHistory
+        ? (entry.restOfDayAbsenceTypeId ?? null)
+        : null;
     const badges = resolveCellChangeBadges({
       entry: isDeletedHistory ? null : entry,
       publishChange: publishedChange,
-      pillCount: absenceTypeId != null ? 1 : rawSegments.length,
+      pillCount:
+        absenceTypeId != null ? 1 : rawSegments.length + (restOfDayAbsenceTypeId != null ? 1 : 0),
       publishedAssignmentIdByPair: input.assignmentIdByPair,
       resolveAssignmentLabel: (assignmentId) => {
         const assignment = input.assignmentById.get(assignmentId);
@@ -755,6 +819,8 @@ function buildScheduleItemsFromShiftMap(input: {
         changeBadge: badgeForPill(0),
         isDeletedHistory,
         previousLabel,
+        previousChange,
+        previousText,
         noteMarks: [],
         dayNoteMarks: [],
       });
@@ -804,10 +870,82 @@ function buildScheduleItemsFromShiftMap(input: {
         changeBadge: badgeForPill(segmentIndex),
         isDeletedHistory,
         previousLabel,
+        previousChange,
+        previousText,
         noteMarks: marksBySegment[segmentIndex] ?? [],
         dayNoteMarks,
       });
     });
+
+    if (restOfDayAbsenceTypeId != null) {
+      const absence = input.absenceTypeById.get(restOfDayAbsenceTypeId) ?? null;
+      items.push({
+        avatarSeed,
+        date,
+        dateKey: parsedKey.dateKey,
+        employeeId: parsedKey.employeeId,
+        employeeName,
+        entry,
+        key: `${key}:rest-of-day-absence`,
+        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
+        segmentIndex: rawSegments.length,
+        changeBadge: badgeForPill(rawSegments.length),
+        isDeletedHistory,
+        previousLabel,
+        previousChange,
+        previousText,
+        noteMarks: [],
+        dayNoteMarks,
+      });
+    }
+  }
+
+  for (const key of hiddenRemovals) {
+    const parsedKey = parseShiftMapKey(key);
+    if (!parsedKey) continue;
+    const employee = input.employeeById.get(parsedKey.employeeId);
+    const entry: ScheduleCellStateEntry = {
+      label: "",
+      assignmentIds: [],
+      isDraft: false,
+      draftKind: null,
+      publishedAssignmentDefinitionIds: [],
+      publishedLabel: "",
+    };
+    items.push({
+      avatarSeed: employee ? resolveAvatarSeed(employee) : parsedKey.employeeId,
+      date: new Date(`${parsedKey.dateKey}T00:00:00`),
+      dateKey: parsedKey.dateKey,
+      employeeId: parsedKey.employeeId,
+      employeeName: employee ? formatEmployeeName(employee) : "Staff",
+      entry,
+      key: `${key}:removed`,
+      segment: buildAbsenceSegment(entry, null, parsedKey.dateKey, input.isDarkTheme),
+      segmentIndex: 0,
+      changeBadge: null,
+      isDeletedHistory: true,
+      removalHidden: true,
+      previousLabel: null,
+      previousChange: null,
+      previousText: null,
+      noteMarks: [],
+      dayNoteMarks: [],
+    });
+  }
+
+  // A day's change is told once, on its first changed item, rather than
+  // repeated beside every shift of a double or its absence.
+  const toldCells = new Set<string>();
+  for (const item of items) {
+    if (!item.previousChange || item.isDeletedHistory) continue;
+    const cellKey = `${item.employeeId}_${item.dateKey}`;
+    if (!showsPreviousLabel(item)) continue;
+    if (toldCells.has(cellKey)) {
+      item.previousChange = null;
+      item.previousText = null;
+    } else {
+      toldCells.add(cellKey);
+    }
   }
 
   return items.sort(compareScheduleItems);
@@ -850,7 +988,15 @@ function getPreviousChangeSummary(input: {
       return parts.filter((part): part is string => Boolean(part)).join(" · ");
     });
 
-  if (summaries.length > 0) return summaries.join("; ");
+  // A worked cell's absence for the rest of the day (item 45) ends the summary.
+  const restOfDay =
+    change.fromRestOfDayAbsenceTypeId != null
+      ? `${input.absenceTypeById.get(change.fromRestOfDayAbsenceTypeId)?.name ?? "Absence"} for the rest of the day`
+      : null;
+  const withRestOfDay = (parts: string[]) =>
+    [...parts, ...(restOfDay ? [restOfDay] : [])].join("; ");
+
+  if (summaries.length > 0) return withRestOfDay(summaries);
 
   const previousSegments = change.fromState?.segments ?? [];
   const stateSummaries = previousSegments.map((segment) => {
@@ -858,7 +1004,7 @@ function getPreviousChangeSummary(input: {
     const job = segment.jobId != null ? (input.jobById.get(segment.jobId) ?? null) : null;
     return shift?.name ?? job?.name ?? "Shift";
   });
-  return stateSummaries.length > 0 ? stateSummaries.join("; ") : null;
+  return stateSummaries.length > 0 ? withRestOfDay(stateSummaries) : null;
 }
 
 function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJobSegment>> {
@@ -896,7 +1042,9 @@ function ChangeBadgePill({ badge }: { badge: CellChangeBadge }) {
 
 // "Was …" explains a chip; a pill the change left alone has nothing to explain.
 function showsPreviousLabel(item: DashboardScheduleItem): boolean {
-  return !!item.previousLabel && !!item.changeBadge && item.changeBadge.kind !== "new";
+  if (item.previousChange?.kind === "none") return false;
+  const hasPrevious = item.previousChange ? !!item.previousText : !!item.previousLabel;
+  return hasPrevious && !!item.changeBadge && item.changeBadge.kind !== "new";
 }
 
 function buildAbsenceSegment(
@@ -906,15 +1054,10 @@ function buildAbsenceSegment(
   isDarkTheme: boolean,
 ): DashboardScheduleSegment {
   const label = absence?.name ?? absence?.label ?? entry.label ?? "Away";
-  const resolved = absence
-    ? resolveShiftPillColors(
-        { color: absence.color, text: absence.text, border: absence.border },
-        isDarkTheme,
-      )
-    : null;
+  const resolved = absence ? absenceStripeFill(absence.color, isDarkTheme) : null;
   return {
     assignment: null,
-    backgroundColor: resolved?.color ?? "var(--dg-color-bg-secondary)",
+    backgroundColor: resolved?.background ?? "var(--dg-color-bg-secondary)",
     borderColor: resolved?.border ?? "var(--dg-color-border)",
     chipLabel: label,
     dateKey,
@@ -1892,10 +2035,14 @@ function MeHeroCard({
         />
         {showsPreviousLabel(item) ? (
           <div
-            aria-label={`Previous shift: ${item.previousLabel}`}
-            style={{ color: "rgba(255,255,255,0.82)", fontSize: "var(--dg-type-metadata-size)" }}
+            aria-label={`Previous shift: ${item.previousText ?? item.previousLabel}`}
+            style={{
+              color: "rgba(255,255,255,0.82)",
+              fontSize: "var(--dg-type-metadata-size)",
+              whiteSpace: "pre-line",
+            }}
           >
-            Was {item.previousLabel}
+            {item.previousText ?? `Was ${item.previousLabel}`}
           </div>
         ) : null}
         {formatSegmentTimeRange(item.segment) ? (
@@ -2688,7 +2835,7 @@ function MyWeekSection({
     <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">{isTwoWeekView ? "Your Schedule" : "Your Week"}</div>
+          <div className="dg-card-title">{isTwoWeekView ? "Your schedule" : "Your week"}</div>
           <div className="dg-card-subtitle">
             {hoursLabel ? (
               <span className="dg-tabular-nums">{hoursLabel}</span>
@@ -2743,19 +2890,40 @@ function MyWeekSection({
                     />
                   </div>
                 ))}
-                {deletedItems.map((item) => (
-                  <div
-                    key={item.key}
-                    aria-label={`Previous shift: ${item.previousLabel ?? item.segment.title}`}
-                    style={{
-                      color: "var(--dg-color-text-muted)",
-                      fontSize: 12,
-                      marginTop: activeItems.length > 0 ? 8 : 4,
-                    }}
-                  >
-                    Was {item.previousLabel ?? item.segment.title}
-                  </div>
-                ))}
+                {deletedItems
+                  .filter((item, index) => !item.previousChange || index === 0)
+                  .map((item) =>
+                    item.removalHidden ? (
+                      <div
+                        key={item.key}
+                        style={{
+                          color: "var(--dg-color-text-muted)",
+                          fontSize: 12,
+                          marginTop: activeItems.length > 0 ? 8 : 4,
+                        }}
+                      >
+                        Shift removed
+                      </div>
+                    ) : item.previousChange && item.previousChange.kind !== "none" ? (
+                      <ShiftChangeWas
+                        key={item.key}
+                        change={item.previousChange}
+                        className={activeItems.length > 0 ? "mt-2" : "mt-1"}
+                      />
+                    ) : (
+                      <div
+                        key={item.key}
+                        aria-label={`Previous shift: ${item.previousLabel ?? item.segment.title}`}
+                        style={{
+                          color: "var(--dg-color-text-muted)",
+                          fontSize: 12,
+                          marginTop: activeItems.length > 0 ? 8 : 4,
+                        }}
+                      >
+                        Was {item.previousLabel ?? item.segment.title}
+                      </div>
+                    ),
+                  )}
               </div>
             </div>
           );
@@ -3127,12 +3295,16 @@ function WeekShiftRow({
           testId="user-dashboard-week-notes"
         />
         {showsPreviousLabel(item) ? (
-          <div
-            aria-label={`Previous shift: ${item.previousLabel}`}
-            style={{ color: "var(--dg-color-text-muted)", fontSize: 12, marginTop: 4 }}
-          >
-            Was {item.previousLabel}
-          </div>
+          item.previousChange ? (
+            <ShiftChangeWas change={item.previousChange} className="mt-1" />
+          ) : (
+            <div
+              aria-label={`Previous shift: ${item.previousLabel}`}
+              style={{ color: "var(--dg-color-text-muted)", fontSize: 12, marginTop: 4 }}
+            >
+              Was {item.previousLabel}
+            </div>
+          )
         ) : null}
       </div>
     </div>

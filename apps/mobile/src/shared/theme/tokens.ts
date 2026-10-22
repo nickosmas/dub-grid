@@ -76,7 +76,11 @@ import { isLoaded as isFontLoaded } from "expo-font";
  * against the label it actually renders — which is white for all but that one.
  */
 const BUTTON_SOLID_FILLS = {
-  /** blue-600. Matches light `brand`; dark's brighter #2075FF measured 4.16:1. */
+  /**
+   * blue-600. Matches light `brand`; dark's brighter #2075FF measured 4.16:1.
+   * Now the `brand` count badge's fill only: `<Button tone="primary">` takes
+   * the soft `controlSecondaryBg` pair instead.
+   */
   buttonPrimaryBg: "#2563EB",
   /** red-600, one step down from the shared red-500 `danger`. */
   buttonDangerBg: "#DC2626",

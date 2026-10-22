@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
-import { canSeeSchedulePublisher, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const querySchema = z.object({
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    const showPublisher = canSeeSchedulePublisher(auth.permissions);
+    const { showPublisher } = auth.scheduleVisibility;
     return NextResponse.json({
       ranges: (data ?? []).map((row: Record<string, unknown>) => ({
         startDate: row.start_date as string,

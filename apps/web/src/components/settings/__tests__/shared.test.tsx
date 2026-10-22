@@ -44,19 +44,19 @@ describe("PresetColorPicker", () => {
     });
   });
 
-  it("renders circular swatches and exposes names on hover", async () => {
+  it("renders circular swatches named once, by the hint rather than a native tooltip", async () => {
     const user = userEvent.setup();
 
     render(<PresetColorPicker valueBg="#DBEAFE" onChange={vi.fn()} />);
 
-    const trigger = screen.getByRole("button", { name: /color preset:/i });
-    expect(trigger).toHaveAttribute("title", "Powder");
+    const trigger = screen.getByRole("button", { name: "Color preset: Powder" });
+    expect(trigger).not.toHaveAttribute("title");
     expect(trigger).toHaveStyle({ borderRadius: "9999px" });
 
     await user.click(trigger);
 
     const lilac = await screen.findByRole("button", { name: "Lilac" });
-    expect(lilac).toHaveAttribute("title", "Lilac");
+    expect(lilac).not.toHaveAttribute("title");
     expect(lilac).toHaveStyle({ borderRadius: "9999px" });
   });
 });

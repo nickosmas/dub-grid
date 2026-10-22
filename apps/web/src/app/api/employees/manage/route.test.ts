@@ -21,7 +21,8 @@ vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
   resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
 }));
@@ -45,7 +46,8 @@ vi.mock("@/app/api/shared/schedule", () => ({
   fetchAssignmentIdByPairMap: vi.fn(),
 }));
 
-vi.mock("@dubgrid/data-access", () => ({
+vi.mock("@dubgrid/data-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
   fetchMobileManagementMembershipRowsByUserIds: (...args: unknown[]) =>
     fetchMobileManagementMembershipRowsByUserIds(...args),
   fetchMobilePendingInvitationRowByEmployeeId: (...args: unknown[]) =>
@@ -721,14 +723,29 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
     { user_id: OTHER_USER_ID, joined_at: "2026-01-01T00:00:00.000Z" },
   ];
 
+  let internalIds: string[] = [];
+
   function makeListClient() {
     return {
       from: vi.fn((table: string) => {
-        const rows = table === "organization_memberships" ? membershipRows : employeeRows;
+        let rows: Array<{ user_id: string | null }> =
+          table === "organization_memberships" ? membershipRows : employeeRows;
         const chain: Record<string, unknown> = {};
         for (const method of ["select", "is", "in", "order"]) {
           chain[method] = vi.fn(() => chain);
         }
+        if (table === "profiles") {
+          chain.eq = vi.fn(() => chain);
+          chain.then = (resolve: (value: unknown) => unknown) =>
+            Promise.resolve({ data: internalIds.map((id) => ({ id })), error: null }).then(resolve);
+          return chain;
+        }
+        // The one `or` the route sends: keep unlinked staff, drop the listed accounts.
+        chain.or = vi.fn((filter: string) => {
+          const dropped = filter.match(/not\.in\.\((.*)\)$/)?.[1]?.split(",") ?? [];
+          rows = rows.filter((row) => row.user_id === null || !dropped.includes(row.user_id));
+          return chain;
+        });
         chain.eq = vi.fn((column: string, value: unknown) => {
           if (table === "organization_memberships") membershipFilters.push([column, value]);
           return chain;
@@ -770,6 +787,7 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     membershipFilters.length = 0;
+    internalIds = [];
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
@@ -793,10 +811,86 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
     expect(membershipFilters).toEqual([["org_id", ORG_ID]]);
   });
 
+  it("leaves internal accounts out for a client and keeps them for a Gridmaster", async () => {
+    internalIds = [PERSON_USER_ID];
+    const forClient = await listAs({ canManageEmployees: true });
+    expect([...forClient.keys()]).toEqual(["emp-self", "emp-unlinked"]);
+
+    const forGridmaster = await listAs({ isGridmaster: true });
+    expect([...forGridmaster.keys()]).toEqual(["emp-joined", "emp-self", "emp-unlinked"]);
+  });
+
+  it("keeps internal accounts for a viewer who is one", async () => {
+    internalIds = [PERSON_USER_ID, VIEWER_USER_ID];
+    const joined = await listAs({ canManageEmployees: true });
+    expect([...joined.keys()]).toEqual(["emp-joined", "emp-self", "emp-unlinked"]);
+  });
+
   it("withholds a coworker's joined date from a view-only caller, but not their own", async () => {
     const joined = await listAs({});
 
     expect(joined.get("emp-joined")).toBeNull();
     expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
+  });
+});
+
+describe("POST /api/employees/manage fetchEmployeeShifts", () => {
+  const HIDDEN_EMPLOYEE_ID = "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a";
+
+  function hiddenStaffClient() {
+    const tables: string[] = [];
+    const resolved = (data: unknown[]) => {
+      const query: Record<string, unknown> = {};
+      for (const method of ["select", "eq", "in", "order", "gte", "lte"]) {
+        query[method] = () => query;
+      }
+      query.then = (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data, error: null }).then(resolve);
+      return query;
+    };
+    return {
+      tables,
+      client: {
+        from: (table: string) => {
+          tables.push(table);
+          if (table === "profiles") return resolved([{ id: PERSON_USER_ID }]);
+          if (table === "employees") return resolved([{ id: HIDDEN_EMPLOYEE_ID }]);
+          return resolved([]);
+        },
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateCsrfOrigin.mockReturnValue(null);
+    requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
+    resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+  });
+
+  it("gives a client no shifts for a staff member they are not shown", async () => {
+    const { client, tables } = hiddenStaffClient();
+    requireOrgPermissions.mockResolvedValue({
+      permissions: { isGridmaster: false, isSuperAdmin: true },
+      serviceClient: client,
+      actor: { id: VIEWER_USER_ID },
+      orgId: ORG_ID,
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/employees/manage", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "fetchEmployeeShifts",
+          orgId: ORG_ID,
+          employeeId: HIDDEN_EMPLOYEE_ID,
+          assignmentLabels: [],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ shifts: {} });
+    expect(tables).not.toContain("schedule_cells");
   });
 });

@@ -570,12 +570,47 @@ export const mobileScheduleEntrySegmentSchema = resolvedSchedulePresentationSegm
 
 export const mobileScheduleEntryChangeKindSchema = z.enum(["new", "modified", "deleted"]);
 
+const shiftChangeTextPartSchema = z.object({
+  text: z.string(),
+  changed: z.boolean().optional(),
+});
+
+const shiftChangeItemSchema = z.object({
+  kind: z.enum(["shift", "absence"]),
+  label: z.enum(["shift1", "shift2", "absence"]).nullable(),
+  status: z.enum(["same", "changed", "added", "removed"]),
+  title: z.array(shiftChangeTextPartSchema),
+  detail: z.array(shiftChangeTextPartSchema),
+  plain: z.string(),
+  minutes: z.number().nullable(),
+  breakBefore: z.object({ minutes: z.number(), start: z.string(), end: z.string() }).nullable(),
+  bar: z.object({ from: z.number(), to: z.number() }).nullable(),
+});
+
+const shiftChangeSideSchema = z.object({
+  items: z.array(shiftChangeItemSchema),
+  totalMinutes: z.number().nullable(),
+});
+
+/** The shared Before and After of a day (`ShiftChange` in @dubgrid/schedule-core). */
+export const shiftChangeSchema = z.object({
+  kind: z.enum(["none", "single", "multi"]),
+  date: z.string(),
+  before: shiftChangeSideSchema,
+  after: shiftChangeSideSchema,
+  barScale: z.object({ start: z.string(), end: z.string(), minutes: z.number() }).nullable(),
+});
+
 export const mobileScheduleEntryChangeSchema = z.object({
   kind: mobileScheduleEntryChangeKindSchema,
   // A raw `new` record is only user-facing when it was added after the date
   // had already been published. Initial period publication stays quiet.
   isNewAddition: z.boolean().optional(),
   previousPresentation: resolvedSchedulePresentationSchema.nullable(),
+  // The whole day Before and After, against the earliest publish in the
+  // window (item 46d). Absent from an older server; null when the
+  // organization hides what changed from this viewer (item 46f).
+  shiftChange: shiftChangeSchema.nullable().optional(),
 });
 
 /**
@@ -669,6 +704,16 @@ export const mobileShiftRequestSchema = z.object({
   resolvedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /**
+   * For an approver, on a request awaiting approval: the days it would
+   * publish whose draft differs from what is published. Absent when not
+   * checked (not an approver, or not awaiting approval); null when the check
+   * failed, which must still warn.
+   */
+  draftCells: z
+    .array(z.object({ empId: z.string().uuid(), date: z.string().date() }))
+    .nullable()
+    .optional(),
 });
 
 // Same thresholds as web's computeOpenShifts (apps/web/src/lib/

@@ -50,6 +50,8 @@ export type MobileDashboardContext = {
   currentOrg: { id: string; timezone?: string | null };
   effectiveRole: string;
   canEditSchedule?: boolean;
+  /** False when the organization hides who published from this viewer (item 46f). */
+  canSeePublisher?: boolean;
   serviceClient: SupabaseClient;
 };
 
@@ -527,6 +529,7 @@ export function buildActivityFeed(
   acceptedInvitations: DashboardAcceptedInvitationRow[],
   nameByProfileId: Map<string, string>,
   maxItems = MAX_ACTIVITY_ITEMS,
+  showPublisher = true,
 ): MobileDashboardResponse["activity"] {
   const items: MobileDashboardResponse["activity"] = [];
 
@@ -538,7 +541,7 @@ export function buildActivityFeed(
     items.push({
       id: `pub_${row.published_at}`,
       type: "publish",
-      description: `${publisherName} published the schedule for ${range} · ${summarizePublishChanges(row.changes, row.change_count)}`,
+      description: `${showPublisher ? `${publisherName} published the schedule` : "Schedule published"} for ${range} · ${summarizePublishChanges(row.changes, row.change_count)}`,
       timestamp: row.published_at,
     });
   }
@@ -662,11 +665,16 @@ export async function loadMobileDashboardPayload(
     (legacyOpenShiftContext.assignments ?? []).map((row) => [row.id, row]),
   );
 
-  const publisherIds = Array.from(
-    new Set(
-      publishHistoryRows.map((row) => row.published_by).filter((id): id is string => Boolean(id)),
-    ),
-  );
+  const showPublisher = auth.canSeePublisher !== false;
+  const publisherIds = showPublisher
+    ? Array.from(
+        new Set(
+          publishHistoryRows
+            .map((row) => row.published_by)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      )
+    : [];
   const profileNameRows =
     publisherIds.length > 0
       ? await deps.fetchProfileNameRowsByIds(auth.serviceClient, publisherIds)
@@ -734,6 +742,8 @@ export async function loadMobileDashboardPayload(
       shiftRequests,
       acceptedInvitations,
       nameByProfileId,
+      MAX_ACTIVITY_ITEMS,
+      showPublisher,
     ),
     staffHours: computeStaffHoursForPeriod(
       scheduleRows,

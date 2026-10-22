@@ -7,7 +7,12 @@ import {
   settleShiftRequestAfterTransition,
   type ShiftRequestSettlement,
 } from "@dubgrid/data-access";
-import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import {
+  fetchHiddenStaffIds,
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { withoutHiddenRequests } from "@dubgrid/data-access";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchSegmentResolutionMaps } from "@/app/api/shared/schedule";
@@ -83,6 +88,11 @@ const requestSchema = z
       requestId: z.string().uuid(),
       approved: z.boolean(),
       note: z.string().trim().max(1000).optional(),
+    }),
+    z.object({
+      action: z.literal("fetchShiftRequestDraftCells"),
+      orgId: z.string().uuid(),
+      requestId: z.string().uuid(),
     }),
     z.object({
       action: z.literal("cancelShiftRequest"),
@@ -371,13 +381,19 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const { assignmentIdByPair, segmentCompatibility } = await fetchSegmentResolutionMaps(
-          auth.serviceClient,
-          data.orgId,
+        const [{ assignmentIdByPair, segmentCompatibility }, hiddenStaffIds] = await Promise.all([
+          fetchSegmentResolutionMaps(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
+        const visibleRows = withoutHiddenRequests(
+          (rows ?? []) as Array<
+            Record<string, unknown> & { requester_emp_id: string; target_emp_id: string | null }
+          >,
+          hiddenStaffIds,
         );
 
         return NextResponse.json({
-          requests: ((rows ?? []) as Record<string, unknown>[]).map((row) => {
+          requests: visibleRows.map((row) => {
             const requester = row.requester as {
               first_name: string;
               last_name: string;
@@ -598,6 +614,33 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true });
+      }
+
+      case "fetchShiftRequestDraftCells": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canApproveShiftRequests,
+          { gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: rows, error } = await auth.userClient.rpc("shift_request_draft_cells", {
+          p_request_id: data.requestId,
+        });
+        if (error) {
+          throw error;
+        }
+
+        const draftCells = ((rows ?? []) as { emp_id: string; shift_date: string }[]).map(
+          (row) => ({ empId: row.emp_id, date: row.shift_date }),
+        );
+        return NextResponse.json({ success: true, draftCells });
       }
 
       case "cancelShiftRequest": {

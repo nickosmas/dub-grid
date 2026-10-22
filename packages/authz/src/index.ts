@@ -2,6 +2,7 @@ import type { AdminPermissions } from "@dubgrid/domain";
 import type { Session } from "@supabase/supabase-js";
 
 export * from "./assurance";
+export * from "./schedule-visibility";
 
 export const ROLE_LEVEL: Record<string, number> = {
   gridmaster: 4,

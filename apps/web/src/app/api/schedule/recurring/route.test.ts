@@ -90,4 +90,45 @@ describe("POST /api/schedule/recurring", () => {
       expect.objectContaining({ org_id: ORG_ID, saved_by: ACTOR_ID, draft_data: draftData }),
     );
   });
+
+  it.each([
+    {
+      action: "upsertRecurringShift",
+      employeeId: EMPLOYEE_ID,
+      dayOfWeek: 1,
+      effectiveFrom: "2026-09-21",
+    },
+    {
+      action: "saveRecurringShifts",
+      effectiveFrom: "2026-09-21",
+    },
+  ])("refuses an absence on a recurring shift ($action) before writing (item 45)", async (body) => {
+    const rpc = vi.fn();
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: ACTOR_ID, email: null },
+      userClient: { rpc },
+    });
+    const input = {
+      kind: "worked",
+      segments: [{ shiftId: 4, jobId: 9, position: 0 }],
+      absenceTypeId: 7,
+    };
+    const payload =
+      body.action === "saveRecurringShifts"
+        ? { ...body, orgId: ORG_ID, changes: [{ employeeId: EMPLOYEE_ID, dayOfWeek: 1, input }] }
+        : { ...body, orgId: ORG_ID, input };
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/schedule/recurring", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/absence for the rest of the day/),
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });

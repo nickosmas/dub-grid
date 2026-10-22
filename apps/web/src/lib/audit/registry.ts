@@ -157,6 +157,9 @@ function describeScheduleCell(d: AuditDetails): string | null {
     segments.length > 1 ? `Working, ${pluralize(segments.length, "assignment")}` : "Working",
   );
   if (start && end) parts.push(`${formatClockTime(start)} – ${formatClockTime(end)}`);
+  // A worked cell's absence type is its absence for the rest of the day (item 45).
+  if (typeof input.absenceTypeId === "number")
+    parts.push("then an absence for the rest of the day");
   return parts.join(", ");
 }
 
@@ -521,6 +524,9 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "schedule",
     severity: "delete",
     headline: (_d, ctx) => `Removed a shift${onDate(ctx)}`,
+    // The removed shift is the recorded earlier state, which the log draws as
+    // Before and After rather than as raw fields.
+    details: () => [],
   },
   "shift.moved": {
     category: "schedule",
@@ -738,6 +744,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "access",
     severity: "warning",
     headline: (d, ctx) => `Reset two-factor for ${who(d, ctx, "a team member")}`,
+  },
+  "user.marked_internal": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Marked ${who(d, ctx, "an account")} as internal`,
+  },
+  "user.marked_client": {
+    category: "access",
+    severity: "warning",
+    headline: (d, ctx) => `Made ${who(d, ctx, "an account")} a client account again`,
   },
   "user.password_reset_sent": {
     category: "access",

@@ -76,6 +76,10 @@ export interface Organization {
   useCompactRoleCertificationLabels?: boolean;
   /** Whether schedule shift pills reveal their full detail card on hover. */
   showShiftDetailHoverCards?: boolean;
+  /** Staff see what each published shift changed from (item 46f). */
+  staffSeeShiftChanges?: boolean;
+  /** Staff see who published and who edited each cell (item 46f). */
+  staffSeePublisher?: boolean;
   timezone: string | null;
   payPeriodStartDate: string | null;
   archivedAt?: string | null;

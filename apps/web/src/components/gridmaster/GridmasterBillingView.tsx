@@ -274,7 +274,7 @@ function BillingRowActions({
         aria-label={`Billing actions for ${org.orgName}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={busy}
+        loading={busy}
         onClick={() => setOpen((value) => !value)}
       >
         Actions

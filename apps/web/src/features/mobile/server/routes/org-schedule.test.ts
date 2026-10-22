@@ -5,8 +5,10 @@ const fetchMobileScheduleEntries = vi.fn();
 const fetchMobileScheduleNotes = vi.fn(async () => []);
 const resolveMobileDateRange = vi.fn();
 
+const fetchMobileHiddenPeople = vi.fn(async (..._args: unknown[]) => [] as string[]);
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
+  fetchMobileHiddenPeople: (...args: unknown[]) => fetchMobileHiddenPeople(...args),
   fetchMobileScheduleEntries,
   fetchMobileScheduleNotes,
   resolveMobileDateRange,
@@ -45,6 +47,31 @@ describe("mobile org-schedule route", () => {
     expect(await response.json()).toEqual({
       error: "You don't have permission to view the organization schedule.",
     });
+    expect(fetchMobileHiddenPeople).not.toHaveBeenCalled();
+  });
+
+  it("reads the schedule without the shifts of people the viewer must not see", async () => {
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "org-1" },
+      permissions: {
+        level: 0,
+        canViewSchedule: true,
+        canEditShifts: false,
+        canApproveShiftRequests: false,
+        canManageEmployees: false,
+      },
+      serviceClient: {},
+    });
+    fetchMobileHiddenPeople.mockResolvedValueOnce(["qa-person"]);
+    fetchMobileScheduleEntries.mockResolvedValue([]);
+
+    const { GET } = await import("./org-schedule");
+    await GET({ nextUrl: new URL("http://localhost/api/mobile/v1/org/schedule") } as never);
+
+    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ hiddenUserIds: ["qa-person"] }),
+    );
   });
 
   it("returns published entries for users with schedule view access", async () => {
@@ -102,6 +129,7 @@ describe("mobile org-schedule route", () => {
         orgId: "org-1",
         startDate: "2026-04-16",
         endDate: "2026-04-22",
+        hiddenUserIds: [],
       },
     );
     // 42b: the notes are read for the same organization and range.
@@ -148,6 +176,7 @@ describe("mobile org-schedule route", () => {
         orgId: "org-1",
         startDate: "2026-04-16",
         endDate: "2026-04-22",
+        hiddenUserIds: [],
       },
     );
   });

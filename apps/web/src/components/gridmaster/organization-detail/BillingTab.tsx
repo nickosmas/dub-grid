@@ -114,6 +114,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
   });
   const billingOrg = billingQuery.data?.organization ?? null;
   const busy = actions.busyOrgId !== null;
+  const running = (...kinds: NonNullable<typeof actions.busyAction>[]) =>
+    actions.busyAction !== null && kinds.includes(actions.busyAction);
 
   // Start the override select on the current status, never on a default that
   // one click would apply.
@@ -417,6 +419,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={busy || !stripeActions.trueUp.enabled}
+              loading={running("sync_seats")}
               onClick={() => actions.confirm({ kind: "sync_seats", org: billingOrg })}
             >
               True up seats
@@ -425,6 +428,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={busy || !stripeActions.cancelAtPeriodEnd.enabled}
+              loading={running("cancel_at_period_end")}
               onClick={() => actions.confirm({ kind: "cancel_at_period_end", org: billingOrg })}
             >
               Cancel at period end
@@ -433,6 +437,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               type="button"
               className="dg-btn dg-btn-danger dg-btn-sm"
               disabled={busy || !stripeActions.cancel.enabled}
+              loading={running("cancel")}
               onClick={() => actions.confirm({ kind: "cancel", org: billingOrg })}
             >
               Cancel
@@ -454,6 +459,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 type="button"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 disabled={busy || !trial.change}
+                loading={running("set_trial_days")}
                 onClick={() => actions.changeTrial(billingOrg)}
               >
                 Change trial
@@ -462,6 +468,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 type="button"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 disabled={busy || Boolean(trialReasons.end)}
+                loading={running("end_trial", "expire_trial")}
                 onClick={() => actions.endTrial(billingOrg)}
               >
                 End trial…
@@ -481,6 +488,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   type="button"
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                   disabled={busy}
+                  loading={running("resume_billing")}
                   onClick={() => actions.confirm({ kind: "resume_billing", org: billingOrg })}
                 >
                   Resume billing
@@ -490,6 +498,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   type="button"
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                   disabled={busy || !holdControls.pause.allowed}
+                  loading={running("pause_billing")}
                   onClick={() => actions.pauseBilling(billingOrg)}
                 >
                   Pause billing…
@@ -499,6 +508,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 type="button"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 disabled={busy || !holdControls.extendGrace.allowed}
+                loading={running("extend_grace")}
                 onClick={() => actions.extendGrace(billingOrg)}
               >
                 Extend grace…
@@ -529,6 +539,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               type="button"
               className="dg-btn dg-btn-primary dg-btn-sm"
               disabled={busy || !status || status === billingOrg.status}
+              loading={running("override_status")}
               onClick={() => actions.confirm({ kind: "override_status", org: billingOrg, status })}
             >
               Override status

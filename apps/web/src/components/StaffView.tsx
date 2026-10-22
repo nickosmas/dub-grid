@@ -113,7 +113,7 @@ interface StaffViewProps {
   onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
   /** A status change is waiting on the step-up prompt, so bulk confirmations stay hidden. */
   statusStepUpOpen?: boolean;
-  onActivate: (empId: string) => void;
+  onActivate: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];

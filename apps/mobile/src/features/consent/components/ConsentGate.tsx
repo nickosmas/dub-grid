@@ -133,7 +133,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
               disabled={saving}
               label="Essential only"
               onPress={() => choose(false)}
-              tone="secondary"
+              tone="neutral"
             />
           </SheetActions>
         }

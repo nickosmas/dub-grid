@@ -382,9 +382,36 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
             scheduleEntries: availabilityEntries,
             timeZone: auth.currentOrg.timezone ?? null,
           })
-        : requests,
+        : await withApprovalDraftCells(auth, requests),
     openShifts,
   };
+}
+
+/**
+ * Approving publishes at once and replaces the earlier drafts of the days it
+ * publishes, so an approver is warned about them first. Only an approver can
+ * ask, and only a request awaiting approval has anything to approve.
+ */
+async function withApprovalDraftCells(
+  auth: MobileShiftRequestsContext,
+  requests: MobileShiftRequest[],
+): Promise<MobileShiftRequest[]> {
+  if (!auth.permissions.canApproveShiftRequests) return requests;
+  return Promise.all(
+    requests.map(async (request) => {
+      if (request.status !== "pending_approval") return request;
+      const { data, error } = await auth.userClient.rpc("shift_request_draft_cells", {
+        p_request_id: request.id,
+      });
+      const draftCells = error
+        ? null
+        : ((data ?? []) as { emp_id: string; shift_date: string }[]).map((row) => ({
+            empId: row.emp_id,
+            date: row.shift_date,
+          }));
+      return { ...request, draftCells };
+    }),
+  );
 }
 
 export async function loadMobileShiftRequestHistoryPayload<

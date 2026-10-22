@@ -36,7 +36,7 @@ const snapshot = (snapshot_kind: string, state_kind: string) => ({ snapshot_kind
 describe("POST /api/shifts/repeat-overwrites", () => {
   beforeEach(() => cells.mockReset());
 
-  it("counts only the asked-for days an editor sees a shift or off day on", async () => {
+  it("counts only the asked-for days an editor sees a shift or absence on", async () => {
     cells.mockReturnValue([
       { date: "2026-08-03", snapshots: [snapshot("draft", "worked")] },
       { date: "2026-08-04", snapshots: [snapshot("published", "absence")] },

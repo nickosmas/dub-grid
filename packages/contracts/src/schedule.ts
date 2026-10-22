@@ -29,13 +29,8 @@ export const scheduleCellStateSchema = z
           path: ["segments"],
         });
       }
-      if (state.absenceTypeId != null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Worked schedule cells cannot include an absence type",
-          path: ["absenceTypeId"],
-        });
-      }
+      // A worked cell's absenceTypeId is its absence for the rest of the day,
+      // such as the Bereavement in D/Bereavement (item 45).
       return;
     }
 
@@ -138,6 +133,19 @@ export const resolvedSchedulePresentationSegmentSchema = z.object({
   isMentored: z.boolean().optional(),
 });
 
+/**
+ * A worked cell's absence for the rest of the day (item 45), shown after its
+ * shifts. It has no times and never adds hours, so it is not a segment.
+ */
+export const resolvedRestOfDayAbsenceSchema = z.object({
+  absenceTypeId: z.number().int(),
+  label: z.string(),
+  name: z.string(),
+  color: z.string().nullable(),
+  borderColor: z.string().nullable(),
+  textColor: z.string().nullable(),
+});
+
 export const resolvedSchedulePresentationSchema = z.object({
   label: z.string(),
   shiftName: z.string().nullable().optional(),
@@ -150,6 +158,8 @@ export const resolvedSchedulePresentationSchema = z.object({
   shiftBorderColor: z.string().nullable().optional(),
   shiftTextColor: z.string().nullable().optional(),
   segments: z.array(resolvedSchedulePresentationSegmentSchema).default([]),
+  // Optional, so an app or server from before item 45 still parses the other's payload.
+  restOfDayAbsence: resolvedRestOfDayAbsenceSchema.nullable().optional(),
 });
 
 export type ScheduleCellKind = z.infer<typeof scheduleCellKindSchema>;

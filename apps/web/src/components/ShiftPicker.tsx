@@ -16,6 +16,7 @@ import {
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
 import { borderColor, toDarkPillColors } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { MaybeHint } from "@/components/ui/hint";
@@ -524,20 +525,19 @@ export default function ShiftPicker({
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              Off Days
+              Absences
               <span style={countPill}>{absenceTypes.length}</span>
               <div style={headingLine} />
             </div>
             <div
               role="group"
-              aria-label="Off day options"
+              aria-label="Absence options"
               style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}
             >
               {absenceTypes.map((at) => {
                 const isActive = currentAbsenceTypeId === at.id;
-                const darkAt = isDarkTheme ? toDarkPillColors(at.color) : null;
-                const atColor = darkAt?.bg ?? at.color;
-                const atText = darkAt?.text ?? at.text;
+                const atFill = absenceStripeFill(at.color, isDarkTheme);
+                const atText = atFill.text;
                 return (
                   <Button
                     key={at.id}
@@ -547,7 +547,7 @@ export default function ShiftPicker({
                     }}
                     aria-pressed={isActive}
                     aria-label={`${at.label} - ${at.name}`}
-                    style={getOptionButtonStyle(atColor, atText, at.border, isActive)}
+                    style={getOptionButtonStyle(atFill.background, atText, atFill.border, isActive)}
                     onMouseEnter={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";

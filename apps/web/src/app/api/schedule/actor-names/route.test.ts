@@ -79,6 +79,7 @@ describe("POST /api/schedule/actor-names", () => {
       actor: { id: VIEWER_ID, email: "viewer@example.com" },
       orgId: ORG_ID,
       serviceClient: { from: serviceFrom },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
   });
 
@@ -143,12 +144,28 @@ describe("POST /api/schedule/actor-names", () => {
     expect(serviceFrom).not.toHaveBeenCalledWith("profiles");
   });
 
+  it("names nobody for a viewer the organization hides authors from", async () => {
+    requireOrgPermissions.mockResolvedValueOnce({
+      actor: { id: VIEWER_ID, email: "viewer@example.com" },
+      orgId: ORG_ID,
+      serviceClient: { from: serviceFrom },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: false },
+    });
+
+    const response = await POST(makeRequest([SAME_ORG_USER_ID]));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ names: {} });
+    expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
   it("uses the Test Sandbox id returned by the shared guard for every org-scoped read", async () => {
     const SANDBOX_ORG_ID = "55555555-5555-4555-8555-555555555555";
     requireOrgPermissions.mockResolvedValueOnce({
       actor: { id: VIEWER_ID, email: "viewer@example.com" },
       orgId: SANDBOX_ORG_ID,
       serviceClient: { from: serviceFrom },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
     });
     enqueue("organization_memberships", { data: [] });
     enqueue("employees", { data: [] });

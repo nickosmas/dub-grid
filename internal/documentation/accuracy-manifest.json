@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a03763b0294667aa820246ca777955ebaab267d768aa7f60acfb347b48ea208b"
+      "evidenceFingerprint": "sha256:54f0c5ae7f5c3fcd3964b574bcdf51dc762bf80935406b2aef274464773fdb0c"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d9097f17cf23951664df735b3a4b524f0c54cef640641fb5de352d35a2bd8342"
+      "evidenceFingerprint": "sha256:3813a882a612b00959f30aa174d4e8c8c221de2be5172a033c9d5db0b54e9129"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4d075a3b23c4addc64ad15583d430d743a2afb7831e945c68add5efa9128acb1"
+      "evidenceFingerprint": "sha256:df69ec92978046df0a91ed8671f210b16dd416da17d8735df5507ef265d29620"
     },
     {
       "id": "onboarding",
@@ -340,6 +340,7 @@
             "toolbar views, navigation, pay-period alignment, focus tabs, sort, search highlights, coverage",
             "Month is read-only; phones show one day",
             "panel Confirm and Undo, remove actions, right-click and keyboard copy and paste",
+            "absence for the rest of the day: Add an absence, up to two shifts plus one absence, absence last, Worked until, no repeating",
             "drag moves, Shift-drag copies, qualification check",
             "open shift staffing and claims",
             "Tools menu items; print options and legends; print may be unavailable",
@@ -383,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9ce4ba75200c30a9f32bcb1e29c65bb66e14d058dfc27a2a8225ea0b510ec511"
+      "evidenceFingerprint": "sha256:1efa6d62da74ad01e46b659855abb2cdc01cfc3270d20c5de88d88e0c826a1c8"
     },
     {
       "id": "draft-publish",
@@ -440,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4d4904e0a94a2d1cc4111a7589d99eaf1b86c119e78edde17a3dceced95ef8b0"
+      "evidenceFingerprint": "sha256:a1443bc8f22488021ecc34272e6d75a2b0bfa1f302342585cf130303f7e62bb7"
     },
     {
       "id": "recurring-shifts",
@@ -494,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c5a02b7e384862574d1a2747c26573f54438b401bdcbe43b84c360f7a4fb2033"
+      "evidenceFingerprint": "sha256:15452dd53ac069fb93c6ff2200d9fed16527d04803dd835879c53191ab9a0471"
     },
     {
       "id": "realtime",
@@ -541,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2870fedb53b582b8ea12a851ed83382f5c1f480587d323188657a4fae787243c"
+      "evidenceFingerprint": "sha256:f42385724f124cfaf6bfb23188d03d4302d5ed58b0755ee449c4bb0ac198a9d7"
     },
     {
       "id": "shift-requests",
@@ -569,9 +570,10 @@
           "claims": [
             "pickup, swap and time off; pickup offers your own shift",
             "web Drop shift and Swap; app shift detail; requester cancels while open or awaiting approval",
+            "a day with an absence for the rest of the day keeps it through requests; nobody absent for the rest of a day takes another shift that day",
             "statuses and their meanings; 72-hour expiry, may be unavailable",
             "teammate accepts first for swaps and named pickups; approval publishes directly; party approver auto-approves",
-            "approved time off leaves the shift open; a published fill settles it",
+            "approved time off leaves the shift open; a teammate can claim it, or a published fill settles it",
             "request board tabs and history filters; app Requests tabs and visibility",
             "alerts on new, approved, rejected, expired",
             "approval needs permission; Super Admin always"
@@ -592,7 +594,9 @@
             "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
             "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
-            "apps/web/src/components/dashboard/UserDashboard.tsx"
+            "apps/web/src/components/dashboard/UserDashboard.tsx",
+            "supabase/migrations/085_requests_keep_rest_of_day_absence.sql",
+            "supabase/migrations/088_open_pickup_claims.sql"
           ],
           "testFiles": [
             "apps/web/src/__tests__/ShiftRequestBoard.test.tsx",
@@ -600,13 +604,15 @@
             "apps/web/src/__tests__/finalize-scheduler-staffed-calloffs.integration.test.ts",
             "packages/domain/src/shift-request-copy.test.ts",
             "apps/web/src/app/api/cron/expire-requests/route.test.ts",
-            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx"
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.test.tsx",
+            "apps/web/src/__tests__/shift-requests-rest-of-day-absence.integration.test.ts",
+            "apps/web/src/__tests__/open-pickup-claims.integration.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:608f7fdc549a0285fb85ba3ab626e854b4d9ef5604c325004cbb02e539dbf854"
+      "evidenceFingerprint": "sha256:3804dc07b9253f4e61c852097083e82478adda89154cac7072b6af942eb085cd"
     },
     {
       "id": "dashboard",
@@ -677,7 +683,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5e61a43efc6d96e12f329f59f7447c3b51b0ac16a8b66df03fe96d543a1e47f0"
+      "evidenceFingerprint": "sha256:0040659d2eda81a0329114974c4c868945314d4a59e11596a8e5e35339d9b5c4"
     },
     {
       "id": "roster",
@@ -749,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1a2773aedb00f8d723c7550a344c305478c12b08e05965d348cf7cc7cf404f1b"
+      "evidenceFingerprint": "sha256:776caecbcd2cc05810b4c26202e5a457823bcbd9626790ac3a484ee643712835"
     },
     {
       "id": "person-detail",
@@ -813,7 +819,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:89d03eb9457ecf58892f02cf36c75eff3f040a00cdd531c8966b1c5064fdb3bd"
+      "evidenceFingerprint": "sha256:1e09d5c8c8a16e6f213147cbbf05764e60a98df4c924129fb1fec81a5ceb78f4"
     },
     {
       "id": "invitations",
@@ -876,7 +882,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3b863755e8a0639462419cf265b96dbc76d475c4fe20dfd128f0a160d97e9026"
+      "evidenceFingerprint": "sha256:f1e6725e6d738408b799caf20ff84cd6cf3f1d9cfa168203b944ddb7fa8cdeff"
     },
     {
       "id": "organization",
@@ -931,7 +937,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:90eeef70e71f5c2d5d38ad3dc45a99315794e6a3f2fb478cc58269974f0d110a"
+      "evidenceFingerprint": "sha256:26a61dc72cf1cab9e5fe4c11d9b5a5015c938b48979841dd88d876030afc71d5"
     },
     {
       "id": "coverage",
@@ -983,7 +989,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9cae4b0a7f2268e25743c34b83f11d255cfa19d5d4fc75b9e8168967a4df4bd3"
+      "evidenceFingerprint": "sha256:c0a639382d1c634a16919224a444f92a8c6d6d9ae03d70c174a0a183a9864542"
     },
     {
       "id": "terminology",
@@ -1032,7 +1038,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0d1c716884c1148a83eff8780d4a8c7987fd1a87bcdce9ea2980c3abefaece75"
+      "evidenceFingerprint": "sha256:b3c83762d2e9162893596ef9e8dcc9c1982d2ebaf42937b0925b69fd13a1107c"
     },
     {
       "id": "roles",
@@ -1085,7 +1091,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d7966d36f52c3a738b1f42f4dd172e5ed16ccf4d21709f7d691c9127180eadc9"
+      "evidenceFingerprint": "sha256:8278c08dd8529e4d57e8a4b29e493715cc7dc0caffcab87a32b248499bb09464"
     },
     {
       "id": "admin-permissions",
@@ -1128,7 +1134,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:130f0a1c7ed371c05f14c2112c003decdff873be0d070a0511c29cb640d71297"
+      "evidenceFingerprint": "sha256:44d9205e7b71349d83c8131929ffc649566c45bf9b4d15d226db7771dd184e6d"
     },
     {
       "id": "billing",
@@ -1187,7 +1193,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:18be51bd34f2d342ba556ca2074e5baec411b24cba3777e63fcb01a531d98ab9"
+      "evidenceFingerprint": "sha256:02e511adbad41b0ae895c72052b0cb340e7356ed82a990891cab682af131b11c"
     },
     {
       "id": "mobile-navigation",
@@ -1271,7 +1277,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f72f2e14752202b432a46c56087fc2764f08d8f74731b4d98e68ba49669792d0"
+      "evidenceFingerprint": "sha256:386b5f7eea5fab2bfcc617d75344943df5c348877d1bdcc8f246f9e11344fbd1"
     },
     {
       "id": "alerts",
@@ -1333,7 +1339,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:2f5b229c1bc0869b1cab84bce27c0714db68acb4dbaa1f1994698467f4cf6ac6"
+      "evidenceFingerprint": "sha256:4ec36b6087603d852f9a3571809a28d42564367736807316eb1efd3d28ab319f"
     },
     {
       "id": "reports",
@@ -1360,7 +1366,8 @@
             "who can run reports; Admin default; may be unavailable; web only",
             "report, range, filters, generate and refresh; pay period requirement; roster reports take no range",
             "the fourteen reports; staff hours and staff activity columns; empty published message",
-            "PDF and CSV export once rows exist"
+            "PDF and CSV export once rows exist",
+            "a shift with an absence for the rest of the day: shift hours, one absence at no hours, listed in absences and the matrix"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/reports/ReportsPageContent.tsx",
@@ -1383,7 +1390,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f72686fda9a9b65c9e6726d3dbd34b806e9100d3ba4ac5acaa2b9c3bd570ce64"
+      "evidenceFingerprint": "sha256:a01950bbbe802b10d603a847621f67544b453f3e1a1c18d9422f001692fa7e89"
     },
     {
       "id": "profile",
@@ -1533,7 +1540,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5399164eadb7572574848d136df56c2b63da7541731cfba3e7615773dd7bdf72"
+      "evidenceFingerprint": "sha256:ae05ed749f82dc3b9802d381d762c1465b0555c63f585c926ceba551f41f4357"
     },
     {
       "id": "privacy-controls",
@@ -1596,7 +1603,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:fa8c794d4b416a713e5d9757e91788b63dbfc87d83a76d8e944e7e13efc9e182"
+      "evidenceFingerprint": "sha256:c600adbd7c5e733d036b77dd170ebb7a75f3d254f86974ee2c8d7d1d53d42636"
     },
     {
       "id": "schedule-rules-display",
@@ -1649,7 +1656,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c0c7b8f0fc13bb415820388204b42ea565360a2f25af67bd0090d5a017c25aa7"
+      "evidenceFingerprint": "sha256:8fc7fea80ce28ff18d30a3f66371420ae15b9f014ea517fe23e691c4b739d2fe"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1702,7 +1709,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9c02a54b096cc14d7eee3dcca03044853d72eb62d612bb73d29526fd1aea287e"
+      "evidenceFingerprint": "sha256:58f0249c773eec64ecec75ecd92a60c2eab8821a95df3dbf399334f4bbe74aba"
     },
     {
       "id": "organization-activity-controls",
@@ -1758,7 +1765,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cd391bd03d8bfc1d2923645cfa1a18faa2b751ae41d8b5d406944c513081baae"
+      "evidenceFingerprint": "sha256:ef7b745daa5898ae3b3c2340d480c379912a8c68ed1435136ef5123713280bc9"
     },
     {
       "id": "departments-focus-areas",
@@ -1810,7 +1817,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6e8badc4c9321d8d1ecffc1075587b5fdae52062ae10f2d871940bc5869e7434"
+      "evidenceFingerprint": "sha256:0605a3b57e431c443ca4e1b41cfe7d40532026cc698570b3212cb891ccc96df4"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1867,7 +1874,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:623c93113fc5a3f193000e4d6f2ce494cf64dba8a3589ed091019d65fe86752d"
+      "evidenceFingerprint": "sha256:857f0e6d3a1f83404b7eaf043d8aded21b6e500e701bc77f43c24ffb304a41d7"
     },
     {
       "id": "schedule-tools",
@@ -1919,7 +1926,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:deb8c6120bcafc3ad286ad8dd1cd425de8ef49704203927ad12b4297ded9d5f3"
+      "evidenceFingerprint": "sha256:18af609ee427ddd72df30110fd9b434c74d23f86f872934893e45b9098bda73e"
     },
     {
       "id": "coverage-open-shifts",
@@ -1970,7 +1977,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:de007f3e27896e0168560269015b53b9a1162fc790f48d698b6cb83985c8f434"
+      "evidenceFingerprint": "sha256:0efc796d20ad59de50efcc84eec30f78160cf3781bb1aa1b6b9ffa46e5b77549"
     },
     {
       "id": "mobile-schedule",
@@ -1996,7 +2003,8 @@
             "week and month navigation with focus-area filtering",
             "shift detail shows schedule facts and supports drop, pickup, call-off, and swap requests",
             "mobile schedule surfaces explain loading, unavailable, unlinked, error, and retry states",
-            "schedule authoring and publication remain web-only"
+            "schedule authoring and publication remain web-only",
+            "a shift with an absence for the rest of the day: the absence after the shifts in Your Week, the team schedule and shift details, no hours"
           ],
           "sourceFiles": [
             "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
@@ -2022,7 +2030,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:a6efbdb5cab98be51c3539b37a9e1e0669a98500e3b7b08a995c01660fa63d55"
+      "evidenceFingerprint": "sha256:ff65a598b9cab67f71024018c63004408ff645f998232e5c19dcd2c295847536"
     },
     {
       "id": "integrations-exports",
@@ -2049,7 +2057,8 @@
             "no public API",
             "personal calendar subscription on web and app: contents, window, create, replace, disable, eligibility",
             "print options and browser PDF; may be unavailable",
-            "schedule, staff and report exports, where and who; may be unavailable"
+            "schedule, staff and report exports, where and who; may be unavailable",
+            "a shift with an absence for the rest of the day: one calendar event at the shift's times naming the absence; schedule export reads shift then absence"
           ],
           "sourceFiles": [
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
@@ -2079,7 +2088,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:e6efc65a516bab0c2dfb7f41d9f531d10a884258c6eb96105cb6ed6187aa05d3"
+      "evidenceFingerprint": "sha256:23acaedb8eae57f14ff8ee2c6d9f7d48f5feca2d737d2b525bf0c5d925a256ba"
     }
   ],
   "surfaceExclusions": [

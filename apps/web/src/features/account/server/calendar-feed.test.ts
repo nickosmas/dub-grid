@@ -132,4 +132,39 @@ describe("renderPublishedEmployeeCalendar", () => {
     expect(result).toContain("DTEND;TZID=America/Los_Angeles:20260905T060000");
     expect(result).not.toContain("20260905T030000Z");
   });
+  it("adds the absence for the rest of the day to the shift's own event", async () => {
+    fetchPublishedShiftRows.mockResolvedValue([
+      {
+        emp_id: "employee-1",
+        date: "2026-09-03",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [
+          { shiftId: 1, jobId: 2, label: "D", startTime: "07:00", endTime: "11:00" },
+        ],
+        published_absence_type_id: null,
+        published_rest_of_day_absence_type_id: 4,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+    ]);
+
+    const result = await renderPublishedEmployeeCalendar(
+      makeClient([{ id: 4, label: "Sick" }]) as never,
+      {
+        id: "employee-1",
+        orgId: "org-1",
+        userId: "user-1",
+        firstName: "Avery",
+        lastName: "Stone",
+        timeZone: "America/Los_Angeles",
+      },
+      12,
+      new Date("2026-09-01T12:00:00.000Z"),
+    );
+
+    expect(result).toContain("SUMMARY:D / Sick (DubGrid)");
+    expect(result).toContain("DTSTART;TZID=America/Los_Angeles:20260903T070000");
+    expect(result).toContain("DTEND;TZID=America/Los_Angeles:20260903T110000");
+    expect(result).not.toContain("DTSTART;VALUE=DATE:20260903");
+  });
 });

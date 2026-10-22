@@ -2644,7 +2644,7 @@ describe("settings dirty save controls", () => {
       shifts: [/^Day Shift/i],
     });
 
-    expect(screen.getByText(/using 07:00-15:00 from the shift/i)).toBeInTheDocument();
+    expect(screen.getByText(/using 7:00 AM - 3:00 PM from the shift/i)).toBeInTheDocument();
 
     await user.click(screen.getByLabelText(/override time/i));
 

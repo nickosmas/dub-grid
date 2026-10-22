@@ -170,6 +170,10 @@ describe("POST /api/gridmaster/subscription", () => {
       if (table === "audit_log") {
         return { insert: auditInsert };
       }
+      if (table === "profiles") {
+        // The internal-account lookup behind the seat count.
+        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+      }
       throw new Error(`Unexpected table: ${table}`);
     });
   });

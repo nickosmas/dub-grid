@@ -2906,6 +2906,8 @@ async function main() {
     preferred_org: "sunrise-senior" | "calmhaven" | "ardenwood";
     management_access: boolean;
     employee_status: "active" | "inactive";
+    /** Internal (QA or demo) accounts are hidden from client organizations (migration 081). */
+    internal: boolean;
   }> = [
     {
       email: "nicokosmas.dev@gmail.com",
@@ -2917,6 +2919,7 @@ async function main() {
       preferred_org: "sunrise-senior",
       management_access: false,
       employee_status: "active",
+      internal: false,
     },
     {
       email: "nicokosmas@outlook.com",
@@ -2928,6 +2931,7 @@ async function main() {
       preferred_org: "ardenwood",
       management_access: true,
       employee_status: "active",
+      internal: false,
     },
     {
       email: "nicodamusalois@gmail.com",
@@ -2939,6 +2943,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: false,
     },
     {
       // Dedicated to automated integration tests (see LOCAL_SUPABASE_SUPER_ADMIN_EMAIL
@@ -2953,6 +2958,7 @@ async function main() {
       preferred_org: "ardenwood",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-regular@dubgrid.test",
@@ -2964,6 +2970,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: false,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-management@dubgrid.test",
@@ -2975,6 +2982,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-inactive@dubgrid.test",
@@ -2986,6 +2994,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: false,
       employee_status: "inactive",
+      internal: true,
     },
     {
       email: "qa-admin@dubgrid.test",
@@ -2997,6 +3006,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       // Platform-level QA identity so automated runs never sign in as the
@@ -3010,6 +3020,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: false,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-mfa-chromium@dubgrid.test",
@@ -3021,6 +3032,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-mfa-firefox@dubgrid.test",
@@ -3032,6 +3044,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       email: "qa-mfa-webkit@dubgrid.test",
@@ -3043,6 +3056,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
     {
       // Marketing captures (landing page, store listings, onboarding). A
@@ -3056,6 +3070,7 @@ async function main() {
       preferred_org: "calmhaven",
       management_access: true,
       employee_status: "active",
+      internal: true,
     },
   ];
 
@@ -3165,13 +3180,14 @@ async function main() {
           WHERE id = uid;
         END IF;
 
-        INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
-        VALUES (uid, ${orgIdSql}, '${user.platform_role}', '${user.first_name}', '${user.last_name}')
+        INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name, is_internal)
+        VALUES (uid, ${orgIdSql}, '${user.platform_role}', '${user.first_name}', '${user.last_name}', ${user.internal})
         ON CONFLICT (id) DO UPDATE
           SET org_id        = EXCLUDED.org_id,
               platform_role = EXCLUDED.platform_role,
               first_name    = EXCLUDED.first_name,
               last_name     = EXCLUDED.last_name,
+              is_internal   = EXCLUDED.is_internal,
               updated_at    = NOW();
       END $$;
     `);

@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireOrgPermissions = vi.fn();
 const rpc = vi.fn();
 
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
 import { GET } from "./route";
+import { INTERNAL_IDS, VIEWERS, internalProfilesFrom } from "@/__tests__/helpers/internal-people";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -54,8 +56,43 @@ describe("GET /api/organization/directory", () => {
     vi.clearAllMocks();
     requireOrgPermissions.mockResolvedValue({
       orgId: ORG_ID,
-      serviceClient: { rpc },
+      actor: VIEWERS.client.actor,
+      serviceClient: { rpc, from: internalProfilesFrom([]) },
       permissions: { isGridmaster: false, isSuperAdmin: true, canManageEmployees: true },
+    });
+  });
+
+  describe("internal accounts", () => {
+    const rows = [makeRow("member-1"), makeRow("qa-person"), makeRow("qa-viewer")];
+
+    async function directoryFor(viewer: (typeof VIEWERS)[keyof typeof VIEWERS]) {
+      requireOrgPermissions.mockResolvedValue({
+        orgId: ORG_ID,
+        actor: viewer.actor,
+        serviceClient: { rpc, from: internalProfilesFrom(INTERNAL_IDS) },
+        permissions: { isGridmaster: viewer.isGridmaster, isSuperAdmin: true },
+      });
+      rpc.mockResolvedValue({ data: rows, error: null });
+      const body = await (await GET(makeRequest({ orgId: ORG_ID, limit: "3" }))).json();
+      return body as { directory: Array<{ userId: string }>; hasMore: boolean; nextOffset: number };
+    }
+
+    it("leaves them out for a client, paging by the function's rows", async () => {
+      const body = await directoryFor(VIEWERS.client);
+      expect(body.directory.map((person) => person.userId)).toEqual(["member-1"]);
+      expect(body.hasMore).toBe(true);
+      expect(body.nextOffset).toBe(3);
+    });
+
+    it("keeps them for an internal viewer and a Gridmaster", async () => {
+      for (const viewer of [VIEWERS.internal, VIEWERS.gridmaster]) {
+        const body = await directoryFor(viewer);
+        expect(body.directory.map((person) => person.userId)).toEqual([
+          "member-1",
+          "qa-person",
+          "qa-viewer",
+        ]);
+      }
     });
   });
 

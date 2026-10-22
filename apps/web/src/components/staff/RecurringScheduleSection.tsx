@@ -8,6 +8,11 @@ import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { CloseButton } from "@/components/ui/CloseButton";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -22,8 +27,8 @@ import {
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   toDarkPillColors,
-  visiblePillBorder,
 } from "@/lib/colors";
+import { absenceStripeFill } from "@/lib/absence-stripes";
 import {
   deleteRecurringDraft,
   fetchRecurringShifts,
@@ -53,6 +58,7 @@ import type {
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { formatDateTimeLabel } from "@/lib/client-facing";
 
 type ShiftCellPopoverProps = {
   anchorRef: HTMLElement | null;
@@ -383,19 +389,14 @@ function RecurringShiftPill({
   }
 
   const isNameMode = shiftDisplayMode === "name";
+  const absenceFill =
+    !assignment && absenceType ? absenceStripeFill(absenceType.color, isDarkTheme) : null;
   const rawPillBackground = assignment?.color ?? absenceType!.color;
   const rawPillText = assignment?.text ?? absenceType!.text;
-  const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
-  const pillBackground = darkPill?.bg ?? rawPillBackground;
-  const pillText = darkPill?.text ?? rawPillText;
-  // absence_types.border_color defaults to 'transparent', so a stored border is
-  // not necessarily a visible one — derive from the text colour when it isn't,
-  // the way every other pill surface does via resolveShiftPillColors.
-  const fallbackBorder = `1px solid ${
-    !darkPill && absenceType
-      ? visiblePillBorder(absenceType.border, pillText)
-      : borderColor(pillText)
-  }`;
+  const darkPill = isDarkTheme && !absenceFill ? toDarkPillColors(rawPillBackground) : null;
+  const pillBackground = absenceFill?.background ?? darkPill?.bg ?? rawPillBackground;
+  const pillText = absenceFill?.text ?? darkPill?.text ?? rawPillText;
+  const fallbackBorder = `1px solid ${absenceFill?.border ?? borderColor(pillText)}`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
@@ -951,7 +952,7 @@ export function RecurringScheduleSection({
                     opacity: 0.75,
                   }}
                 >
-                  Draft saved {new Date(savedDraftTimestamp).toLocaleString()}
+                  Draft saved {formatDateTimeLabel(savedDraftTimestamp)}
                 </span>
               )}
             </div>
@@ -1047,8 +1048,10 @@ export function RecurringScheduleSection({
             placeholder="Search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
+            aria-label="Search people"
             style={{
-              padding: `7px ${searchQuery ? 30 : 10}px 7px 32px`,
+              padding: `7px ${searchQuery ? SEARCH_CLEAR_PADDING : 10}px 7px 32px`,
               border: "1px solid var(--dg-color-border)",
               borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
@@ -1065,14 +1068,7 @@ export function RecurringScheduleSection({
               event.currentTarget.style.borderColor = "var(--dg-color-border)";
             }}
           />
-          {searchQuery && (
-            <CloseButton
-              size="sm"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
-              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
-            />
-          )}
+          {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
         </div>
       </div>
 

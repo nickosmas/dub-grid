@@ -18,6 +18,7 @@ import type {
   ShiftRequestType,
   ResolvedBillingPolicy,
 } from "@dubgrid/domain";
+import type { ShiftChange } from "@dubgrid/schedule-core";
 export type {
   AdminPermissions,
   AssignableOrganizationRole,
@@ -100,7 +101,7 @@ export interface ShiftCategory {
   /** Preset color inherited by scheduled jobs unless they override this shift. */
   color?: string | null;
   sortOrder: number;
-  /** FK to focus_areas.id. NULL = global category (for general/off-day codes). */
+  /** FK to focus_areas.id. NULL = global category (for general and absence codes). */
   focusAreaId?: number | null;
   /** Break duration in minutes. Overrides focus area default. NULL = inherit from focus area. */
   breakMinutes?: number | null;
@@ -288,12 +289,18 @@ export interface ScheduleCellSnapshot extends ScheduleCellInput {
    */
   assignmentIds: number[];
   segments: ScheduleCellSegmentSnapshot[];
+  /**
+   * The absence a worked cell carries for the rest of the day (item 45).
+   * `absenceTypeId` stays a whole-day absence only, so readers that test it
+   * without the kind never mistake D/Bereavement for a whole-day absence.
+   */
+  restOfDayAbsenceTypeId?: number | null;
 }
 
 export type RecurringScheduleDraft = Record<string, Record<number, ScheduleCellInput | null>>;
 
 /**
- * An absence type: off-day definitions (Off, Sick, Vacation, etc.).
+ * An absence type: Off, Sick, Vacation and the like.
  * Separate from worked assignments — an absence is the absence of a shift, not a type of shift.
  */
 export interface AbsenceType {
@@ -316,14 +323,24 @@ export interface PublishChange {
   kind: "new" | "modified" | "deleted";
   /** True when this `new` change was added after an earlier publication covered its date. */
   isNewAddition?: boolean;
+  /**
+   * The organization hides what changed from this viewer (item 46f): every
+   * "from" field is null and the kind is already folded across the window,
+   * so show a plain mark and nothing about the earlier shift.
+   */
+  detailsHidden?: boolean;
   from?: number[];
   to?: number[];
   fromState?: ScheduleCellState | null;
   toState?: ScheduleCellState | null;
   fromSegments?: ShiftJobSegment[];
   toSegments?: ShiftJobSegment[];
+  /** A whole-day absence only; a worked cell's absence is in the rest-of-day fields. */
   fromAbsenceTypeId?: number | null;
   toAbsenceTypeId?: number | null;
+  /** The absence a worked cell carries for the rest of the day (item 45). */
+  fromRestOfDayAbsenceTypeId?: number | null;
+  toRestOfDayAbsenceTypeId?: number | null;
   updatedBy?: string | null;
   fromCustomStart?: string | null;
   fromCustomEnd?: string | null;
@@ -351,7 +368,7 @@ export interface NotePublishChange {
 
 export interface PublishHistoryEntry {
   id: string;
-  /** Null for a viewer who cannot open the publish history; see `canSeeSchedulePublisher`. */
+  /** Null for a viewer the organization hides the publisher from; see `scheduleViewerVisibility`. */
   publishedBy: string | null;
   startDate: string;
   endDate: string;
@@ -362,7 +379,8 @@ export interface PublishHistoryEntry {
 }
 
 export interface PublishHistoryEntryWithName extends PublishHistoryEntry {
-  publishedByName: string;
+  /** Null when the organization hides who published from this viewer (item 46f). */
+  publishedByName: string | null;
 }
 
 export interface ScheduleCellStateEntry {
@@ -395,6 +413,13 @@ export interface ScheduleCellStateEntry {
   absenceTypeId?: number | null;
   /** Published absence type ID. */
   publishedAbsenceTypeId?: number | null;
+  /**
+   * The absence a worked cell carries for the rest of the day (item 45), such
+   * as the Sick in D/E/Sick. Separate from `absenceTypeId`, which is whole-day.
+   */
+  restOfDayAbsenceTypeId?: number | null;
+  /** Published rest-of-day absence type ID. */
+  publishedRestOfDayAbsenceTypeId?: number | null;
   /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
   version?: number;
   /** UUID of the user who created this shift. */
@@ -1186,6 +1211,8 @@ export interface FullAuditLogEntry {
   targetEmail: string | null;
   details: Record<string, unknown>;
   createdAt: string;
+  /** A schedule edit's Before and After, when the edit recorded them (item 46h). */
+  shiftChange?: ShiftChange | null;
 }
 
 /**

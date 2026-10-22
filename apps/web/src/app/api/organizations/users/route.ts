@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import { mapInBatches } from "@/lib/async-batch";
@@ -15,7 +15,10 @@ const searchSchema = z.object({
 
 const AUTH_LOOKUP_BATCH_SIZE = 25;
 
-async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUser[]> {
+async function fetchOrganizationUserRows(
+  orgId: string,
+  hiddenUserIds: readonly string[],
+): Promise<OrganizationUser[]> {
   const serviceClient = getServiceClient();
   const { data: memberships, error } = await serviceClient
     .from("organization_memberships")
@@ -51,8 +54,11 @@ async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUse
       },
     ]),
   );
+  const hidden = new Set(hiddenUserIds);
   const visibleMemberships = membershipRows.filter(
-    (membership) => (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster",
+    (membership) =>
+      (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster" &&
+      !hidden.has(membership.user_id),
   );
 
   // Only visible memberships reach the response, so gridmaster rows filtered out
@@ -107,7 +113,7 @@ export async function GET(req: NextRequest) {
 
     // Use the auth-effective orgId so sandbox callers see their
     // sandbox's users, not the real organization's users.
-    const users = await fetchOrganizationUserRows(orgAuth.orgId);
+    const users = await fetchOrganizationUserRows(orgAuth.orgId, await fetchHiddenPeople(orgAuth));
     return NextResponse.json({ users });
   } catch (error) {
     logger.error({ error }, "organization users GET failed");

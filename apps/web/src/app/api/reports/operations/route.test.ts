@@ -8,7 +8,8 @@ const buildOperationsReportCsv = vi.fn();
 const buildOperationsReportPdf = vi.fn();
 const auditInsert = vi.fn();
 
-vi.mock("@/app/api/shared/permissions", () => ({
+vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/shared/permissions")>()),
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
@@ -40,6 +41,7 @@ vi.mock("@/features/reports/server/operations", async () => {
 
 import { GET as GET_REPORT } from "./route";
 import { GET as GET_EXPORT } from "./export/route";
+import { internalProfilesFrom } from "@/__tests__/helpers/internal-people";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -66,7 +68,7 @@ describe("reports operations API", () => {
       orgId: ORG_ID,
       permissions: { role: "admin", isSuperAdmin: false },
       serviceClient: {
-        from: vi.fn((table: string) => {
+        from: internalProfilesFrom(["qa-person"], (table) => {
           if (table === "audit_log") {
             return { insert: auditInsert };
           }
@@ -190,6 +192,7 @@ describe("reports operations API", () => {
         indicatorTypeIds: [],
         shiftCategoryIds: [],
       },
+      hiddenUserIds: ["qa-person"],
     });
   });
 
@@ -224,6 +227,7 @@ describe("reports operations API", () => {
     expect(loadOperationsReportFilterOptions).toHaveBeenCalledWith(expect.any(Object), {
       orgId: ORG_ID,
       range: { startDate: "2026-05-03", endDate: "2026-05-09" },
+      hiddenUserIds: ["qa-person"],
     });
     expect(loadOperationsReport).not.toHaveBeenCalled();
   });
@@ -247,6 +251,7 @@ describe("reports operations API", () => {
         indicatorTypeIds: [],
         shiftCategoryIds: [],
       },
+      hiddenUserIds: ["qa-person"],
     });
   });
 
@@ -284,6 +289,23 @@ describe("reports operations API", () => {
         filters: expect.objectContaining({ indicatorTypeIds: [80, 81] }),
       }),
     );
+  });
+
+  it("hides internal accounts from a client's report and its export", async () => {
+    await GET_REPORT(makeReportRequest());
+    await GET_EXPORT(makeExportRequest());
+    await GET_REPORT(
+      makeReportRequest(`${makeReportRequest().nextUrl.search.slice(1)}&optionsOnly=1`),
+    );
+
+    for (const call of [
+      ...loadOperationsReport.mock.calls,
+      ...loadOperationsReportFilterOptions.mock.calls,
+    ]) {
+      expect(call[1]).toEqual(expect.objectContaining({ hiddenUserIds: ["qa-person"] }));
+    }
+    expect(loadOperationsReport).toHaveBeenCalledTimes(2);
+    expect(loadOperationsReportFilterOptions).toHaveBeenCalledTimes(1);
   });
 
   it("passes through unauthenticated or forbidden permission responses", async () => {

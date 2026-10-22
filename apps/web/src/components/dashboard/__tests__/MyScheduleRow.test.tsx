@@ -6,6 +6,7 @@ import type {
   AssignmentDefinition,
   IndicatorType,
   JobDefinition,
+  PublishChange,
   ScheduleNote,
   ShiftCategory,
   ShiftMap,
@@ -1309,5 +1310,95 @@ describe("MyScheduleRow", () => {
       expect(screen.getByText("Vacation")).toBeInTheDocument();
       expect(screen.queryByTestId("my-schedule-notes")).toBeNull();
     });
+  });
+});
+
+describe("MyScheduleRow absence for the rest of the day", () => {
+  const dayCell = {
+    label: "D",
+    assignmentIds: [101],
+    segments: [{ shiftId: 10, jobId: 7, position: 0, assignmentId: 101, label: "D" }],
+    isDraft: false,
+    draftKind: null,
+    publishedAssignmentDefinitionIds: [101],
+    publishedLabel: "D",
+  };
+
+  function renderRow(
+    currentPeriodShifts: ShiftMap,
+    recentPublishedChanges?: Map<string, PublishChange>,
+  ) {
+    return render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        recentPublishedChanges={recentPublishedChanges}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+  }
+
+  it("lists the shift, then the absence", () => {
+    const { container } = renderRow({
+      "emp-1_2026-05-11": {
+        ...dayCell,
+        restOfDayAbsenceTypeId: absenceType.id,
+        publishedRestOfDayAbsenceTypeId: absenceType.id,
+      },
+    });
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Day shift")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Vacation")).toBeGreaterThan(text.indexOf("Day shift"));
+  });
+
+  it("keeps a deleted draft's published absence on show", () => {
+    renderRow({
+      "emp-1_2026-05-11": {
+        ...dayCell,
+        assignmentIds: [],
+        segments: [],
+        isDelete: true,
+        isDraft: true,
+        draftKind: "deleted",
+        publishedSegments: dayCell.segments,
+        publishedRestOfDayAbsenceTypeId: absenceType.id,
+      },
+    });
+
+    expect(screen.getByText("Vacation")).toBeInTheDocument();
+  });
+
+  it("chips a published absence as new on its own card", () => {
+    const { container } = renderRow(
+      {
+        "emp-1_2026-05-11": {
+          ...dayCell,
+          restOfDayAbsenceTypeId: absenceType.id,
+          publishedRestOfDayAbsenceTypeId: absenceType.id,
+        },
+      },
+      new Map([
+        [
+          "emp-1_2026-05-11",
+          {
+            empId: "emp-1",
+            date: "2026-05-11",
+            kind: "modified" as const,
+            from: [101],
+            to: [101],
+            toRestOfDayAbsenceTypeId: absenceType.id,
+          },
+        ],
+      ]),
+    );
+
+    const badges = container.querySelectorAll("[data-publish-badge]");
+    expect(Array.from(badges).map((badge) => badge.getAttribute("data-publish-badge"))).toEqual([
+      "new",
+    ]);
   });
 });

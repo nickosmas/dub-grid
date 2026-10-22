@@ -35,14 +35,20 @@ export function shouldUseShiftColorForDiffState(args: { isCross: boolean }): boo
   return !args.isCross;
 }
 
-/** A shift's note mark: one sticky note, or a stacked one for several notes. */
-export const NOTE_ICON_SIZE = 11;
-export const NOTE_STACK_SIZE = 13;
+/** A shift's notes on a grid pill: one dot per note, up to two, then a `+n` count. */
+export const NOTE_DOT_SIZE = 9;
+export const NOTE_DOT_GAP = 3;
+export const MAX_VISIBLE_NOTE_DOTS = 2;
+/** The strip a pill with notes keeps along its bottom for them. */
+export const NOTE_LANE_HEIGHT = 13;
+/** How far inside a pill's bottom-right corner its note dots sit, as the mentored M sits in the top-right. */
+export const NOTE_LANE_INSET = 2;
 
-/** Horizontal run a shift's note mark claims for `count` notes. */
+/** Horizontal run a shift's note dots claim for `count` notes; a count takes about a dot's room. */
 export function noteMarksWidth(count: number): number {
   if (count <= 0) return 0;
-  return count === 1 ? NOTE_ICON_SIZE : NOTE_STACK_SIZE;
+  const slots = Math.min(count, MAX_VISIBLE_NOTE_DOTS) + (count > MAX_VISIBLE_NOTE_DOTS ? 1 : 0);
+  return slots * NOTE_DOT_SIZE + (slots - 1) * NOTE_DOT_GAP;
 }
 
 /**
@@ -188,13 +194,10 @@ function ChangeHoverCard({
 export function MentoredShiftBadge({
   compact = false,
   rightInset = 0.5,
-  topInset = 0.5,
 }: {
   compact?: boolean;
   /** Pushed inward when something outranks it in the corner — see LOCK_CORNER_CLEARANCE. */
   rightInset?: number;
-  /** Moved below a top-right change chip when both are present. */
-  topInset?: number;
 }) {
   const size = compact ? 15 : 16;
   const badge = (
@@ -203,7 +206,8 @@ export function MentoredShiftBadge({
       aria-label="Mentored assignment"
       style={{
         position: "absolute",
-        top: topInset,
+        // Change chips straddle the top-left edge, so no chip shares this corner.
+        top: 0.5,
         right: rightInset,
         width: size,
         height: size,

@@ -17,7 +17,7 @@ import type {
 
 // Explicit lists: a `*` would carry any token column a later migration adds.
 const PROFILE_COLUMNS =
-  "platform_role, first_name, last_name, mfa_enabled, mfa_reenroll_required_at, terms_version, terms_accepted_at, scheduled_deletion_at, deactivation_warned_at, deactivated_at, deactivated_by, terminated_at, terminated_by, terminated_reason, created_at, updated_at";
+  "platform_role, first_name, last_name, is_internal, mfa_enabled, mfa_reenroll_required_at, terms_version, terms_accepted_at, scheduled_deletion_at, deactivation_warned_at, deactivated_at, deactivated_by, terminated_at, terminated_by, terminated_reason, created_at, updated_at";
 const MEMBERSHIP_COLUMNS =
   "id, org_id, org_role, admin_permissions, joined_at, schedule_last_viewed_at, archived_at, archived_by, department_ids, dept_admin_ids, phone, onboarding_completed_at, tooltip_tours_completed, updated_at";
 const EMPLOYEE_COLUMNS =
@@ -53,6 +53,7 @@ function mapProfile(row: Row): GridmasterPersonProfile {
     firstName: (row.first_name as string | null) ?? null,
     lastName: (row.last_name as string | null) ?? null,
     platformRole: row.platform_role as string,
+    isInternal: Boolean(row.is_internal),
     mfaEnabled: Boolean(row.mfa_enabled),
     termsVersion: (row.terms_version as string | null) ?? null,
     termsAcceptedAt: (row.terms_accepted_at as string | null) ?? null,

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 1c82ee55025d1acc1690d565ff715e564129dc7591c004fe577c72d5cb0b2bf7 -->
+<!-- blueprint:source-hash f419076bf16024a80d8060f9d3dbd33edec5f93ad7120e3e7f9cd030ca400ec7 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 44 are
-shipped. Item 40 is in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 46 are
+shipped. Item 40 is in progress. Item 47 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,6 +79,9 @@ shipped. Item 40 is in progress.
 | 43   | Shipped     | Complete person records for managers and one Gridmaster person page with two-factor lockout recovery.                           |
 | 40   | In progress | Public and internal documentation accurate for `dev`, with permanent drift gates.                                               |
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
+| 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
+| 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
+| 47   | Planned     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
 
@@ -129,6 +132,97 @@ Item 44 is split, and every part has shipped:
   history and a Gridmaster revenue and seats report that states when its
   history starts (migration 079).
 
+Item 45 is split, and every part has shipped:
+
+- **45a - Data model:** shipped; a worked cell may carry one absence,
+  through draft, publish, publish history and import (migration 082).
+- **45b - Web editor and grid:** shipped; the panel adds an absence beside
+  one or two shifts and records when the last shift ended ("Worked until"),
+  and the Week and 2 Weeks grid draws it last, stacking a three-item cell in
+  a taller row. Drafts, publish, copy and drag keep every part (migration
+  083).
+- **45c - Other web surfaces:** shipped; the phone-width schedule, print
+  (a taller row for a three-item cell), both dashboards, reports, both CSV
+  exports, the calendar feed and the activity log show the absence after
+  the shifts, at no hours. Coverage, hours, Month and the person page
+  already handled it.
+- **45d - Mobile app:** shipped; Your Week, the team list, shift detail
+  and the admin Home card show the absence after the shifts, from an
+  optional `restOfDayAbsence` the server adds to each entry; hours are
+  unchanged.
+- **45e - Shift requests:** shipped; a mixed cell can be offered, swapped
+  or called off, and an approval keeps the absence on the shifts left
+  behind (or for the whole day when none are). Someone absent for the rest
+  of a day is not offered and cannot claim, volunteer for or swap into
+  another shift that day (migration 085).
+
+The absence always comes last and carries no hours; at most two worked
+shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
+
+Item 46 is split, and every part has shipped:
+
+- **46a - Shared change model and formatter:** shipped; one schedule-core
+  function turns a cell's original and current state into Before and After sides,
+  with the original taken from the earliest in-window publish. Tested; no
+  UI.
+- **46b - Web schedule surfaces:** shipped; grid chip tooltips, the hover card with
+  the day bar, the deleted pill, the edit panel's unsaved-changes summary
+  (paired by identity), and Publish History (every segment's times, archived
+  shifts by name).
+- **46c - Web dashboards and records:** shipped; the staff dashboard "Was" block
+  (fixing the production path that drops time and focus area), the admin
+  "My schedule" tooltip and the Gridmaster person record.
+- **46d - Mobile:** shipped; Your Week shows a "Was" block once per changed
+  day and shift detail opens "What changed" with Before and After and the
+  day bar, from a whole-day change the server computes with the shared
+  model. With what changed hidden, a removed shift's entry is left out.
+- **46e - Schedule-change alerts:** shipped; each person whose shifts a
+  publish changed (except the publisher) gets one alert listing every
+  changed day against what was published before, as a compact push and,
+  under their schedule email preference, an email with Before and After.
+  It never names the publisher, names the days only when the organization
+  hides what changed, and replaces "Schedule updated" (migration 087).
+- **46f - Staff visibility setting:** shipped; Settings > Display decides
+  whether staff see what each changed shift was and who published (both on
+  by default). Hidden, staff keep a plain New, Changed or Removed mark and
+  "Published <time>"; the server folds and strips the data, and staff can no
+  longer read publishers or change rows directly (migration 084). Anyone who
+  edits or publishes the schedule always sees both.
+- **46g - 12-hour sweep:** shipped; any remaining 24-hour time shown to people uses
+  the shared 12-hour format.
+- **46h - Activity log Before and After:** shipped; each single-cell save
+  records the cell as it stood before (one extra read, no migration), and
+  the organization activity log names the person and shows Before and
+  After. Rows saved earlier show the new shift only.
+
+A shift change shows every field that tells the two sides apart (shift, job
+spelled out, 12-hour times with hours, focus area, absence), under Before and
+After headings; the arrow is only for compact spaces such as push. Staff are
+assumed to have seen nothing in between publishes. Design reference: the
+"Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
+
+Item 47 is split; none has shipped:
+
+- **47a - Matrix and changes since publish:** planned; the panel, renamed
+  Coverage Check, shows each requirement's staffed and needed counts by day, short or over,
+  for the draft and the published schedule, with a detail per cell. No
+  migration.
+- **47b - What changed:** planned; each cell names the draft changes behind
+  it.
+- **47c - Suggestion engine:** planned; a tested schedule-core function that
+  proposes moves back, restores, assignments and waiting pickups, measures
+  each on a copy of the schedule, and says why nobody fits when nothing does.
+  A person fits when qualified and free that day; there is no weekly hours
+  limit or minimum rest rule (owner, 2026-10-21).
+- **47d - Suggestions in the panel:** planned; apply and undo through the
+  draft, approve behind a confirmation, and the opened and closed counts in
+  the Publish dialog. Approve needs the approval-replaces-draft fix first.
+
+Every staffing insight is measured on the schedule and must be exact; an
+approval publishes at once and replaces any earlier draft of the cells it
+writes, with a warning first (owner decisions, 2026-10-21). Design
+reference: the "Staffing check panel" canvas.
+
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
 endpoints remain internal.
@@ -141,7 +235,8 @@ endpoints remain internal.
 - `subdomain` (text) - organization routing boundary
 - `name` (text) - customer-facing organization name
 - terminology and configuration fields - organization-specific labels and
-  settings
+  settings, including what staff see after a publish (change details,
+  publisher name; item 46f)
 - `workspace_kind` - the only approved use of the word "workspace" in product
   data
 - has many memberships, employees, schedule records, requests, notifications,
@@ -177,6 +272,8 @@ endpoints remain internal.
 
 - organization, employee or open-shift identity, date, shift, job, and absence
   facts
+- a cell holds worked shifts, an absence, or (item 45) up to two worked
+  shifts plus an absence for the rest of the day
 - draft and published state with optimistic versioning
 - snapshot fields are the source of truth for schedule-cell audit history
 - recurring shifts generate bounded series through the normal draft workflow
@@ -262,6 +359,8 @@ billing policy with per-organization overrides.
   `organization`; "workspace" is reserved for the literal `workspace_kind`
   field. Customers say "schedule notes"; code keeps `indicator`.
 - Schedule data uses tabular numerals.
+- Times shown to people are 12-hour (`7:00 AM - 3:00 PM`); a shift crossing
+  midnight names both days (`Wed 11:00 PM - Thu 7:00 AM`).
 - Mobile has native primitives and motion while preserving the same product
   hierarchy and accessibility contract as web.
 
@@ -291,7 +390,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `079`.
+  checksum-locked through `088`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

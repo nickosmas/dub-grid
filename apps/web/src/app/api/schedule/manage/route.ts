@@ -9,9 +9,14 @@ import type {
 } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
-import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
 import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
-import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import {
+  fetchHiddenStaffIds,
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { withoutHiddenRequests } from "@dubgrid/data-access";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -375,12 +380,21 @@ function normalizeScheduleInput(
       position: index,
       isMentored: segment.isMentored ?? false,
     })),
-    absenceTypeId: null,
+    // The absence for the rest of the day, such as D/Bereavement (item 45).
+    absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
     seriesId,
     fromRecurring,
   };
+}
+
+const SERIES_REST_OF_DAY_ABSENCE_ERROR =
+  "A repeating shift can't include an absence for the rest of the day.";
+
+/** Repeating shifts don't take a worked shift plus an absence yet (item 45a). */
+function seriesHasRestOfDayAbsence(input: ScheduleCellInput): boolean {
+  return input.kind === "worked" && input.absenceTypeId != null;
 }
 
 function getScheduleCellStorage(input: ScheduleCellInput) {
@@ -411,7 +425,7 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
     shiftIds: orderedSegments.map((segment) => segment.shiftId),
     jobIds: orderedSegments.map((segment) => segment.jobId),
     isMentoredFlags: orderedSegments.map((segment) => segment.isMentored ?? false),
-    absenceTypeId: null,
+    absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
   };
@@ -638,11 +652,61 @@ async function fetchScheduleCellSnapshotPayload(
     series_id: string | null;
     from_recurring: boolean;
     state_kind: "worked" | "absence" | "deleted";
+    absence_type_id: number | null;
     shift_ids: Array<number | null>;
     job_ids: number[];
     is_mentored_flags: boolean[];
+    custom_start_time: string | null;
+    custom_end_time: string | null;
   }>;
   return rows[0] ?? null;
+}
+
+type SnapshotPayload = NonNullable<Awaited<ReturnType<typeof fetchScheduleCellSnapshotPayload>>>;
+
+/** A stored snapshot as the shared cell state; null for an empty or deleted cell. */
+function cellStateFromSnapshotPayload(payload: SnapshotPayload | null): ScheduleCellState | null {
+  if (!payload || payload.state_kind === "deleted") return null;
+  return {
+    kind: payload.state_kind,
+    segments: (payload.shift_ids ?? []).map((shiftId, position) => ({
+      shiftId,
+      jobId: payload.job_ids[position]!,
+      position,
+      isMentored: payload.is_mentored_flags?.[position] ?? false,
+    })),
+    focusAreaId: payload.focus_area_id,
+    absenceTypeId: payload.absence_type_id,
+    customStartTime: payload.custom_start_time ?? null,
+    customEndTime: payload.custom_end_time ?? null,
+    seriesId: payload.series_id,
+    fromRecurring: payload.from_recurring,
+  };
+}
+
+/**
+ * The cell as it stood before this save, its draft when it has one, else what
+ * is published, so the activity log can show Before and After (item 46h). The
+ * save's version check means a save that succeeds replaced exactly this.
+ * Undefined when the read fails: the log then records the new state alone,
+ * and the save goes ahead.
+ */
+async function readCellStateForAudit(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+): Promise<ScheduleCellState | null | undefined> {
+  try {
+    const [draft, published] = await Promise.all([
+      fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "draft"),
+      fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "published"),
+    ]);
+    return cellStateFromSnapshotPayload(draft ?? published);
+  } catch (error) {
+    logger.error({ error, orgId }, "Schedule audit before-state read failed");
+    return undefined;
+  }
 }
 
 /**
@@ -792,7 +856,10 @@ export async function POST(req: NextRequest) {
         const isScheduler = auth.permissions.canEditShifts;
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
         const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
+        const [assignmentIdByPair, hiddenStaffIds] = await Promise.all([
+          fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
 
         const buildPage = (from: number, to: number) => {
           let query = auth.serviceClient
@@ -819,6 +886,7 @@ export async function POST(req: NextRequest) {
 
         const shifts: Record<string, unknown> = {};
         for (const row of rows) {
+          if (hiddenStaffIds.has(row.emp_id)) continue;
           const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
             isScheduler,
             assignmentLabelMap,
@@ -918,9 +986,17 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
+        const [assignmentIdByPair, hiddenStaffIds] = await Promise.all([
+          fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
+          fetchHiddenStaffIds(auth),
+        ]);
 
-        const openShifts = ((rows ?? []) as Record<string, unknown>[])
+        const openShifts = withoutHiddenRequests(
+          (rows ?? []) as Array<
+            Record<string, unknown> & { requester_emp_id: string; target_emp_id: string | null }
+          >,
+          hiddenStaffIds,
+        )
           .map((row): GridOpenShift | null => {
             const requester = row.requester as {
               first_name: string;
@@ -1038,6 +1114,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const before = await readCellStateForAudit(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+        );
         await writeShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
@@ -1057,7 +1139,7 @@ export async function POST(req: NextRequest) {
           action: data.expectedVersion !== undefined ? "shift.updated" : "shift.created",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: { input: data.input },
+          details: { input: data.input, before },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1125,6 +1207,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const before = await readCellStateForAudit(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+        );
         await deleteShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
@@ -1141,7 +1229,7 @@ export async function POST(req: NextRequest) {
           action: "shift.deleted",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: {},
+          details: { before },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1176,6 +1264,12 @@ export async function POST(req: NextRequest) {
         // sees an optimistic-conflict error and refetches.
         await Promise.all(
           data.shifts.map(async (shift) => {
+            const before = await readCellStateForAudit(
+              auth.serviceClient,
+              data.orgId,
+              shift.employeeId,
+              shift.date,
+            );
             await deleteShiftSnapshot(auth.userClient, {
               orgId: data.orgId,
               employeeId: shift.employeeId,
@@ -1192,7 +1286,7 @@ export async function POST(req: NextRequest) {
               action: "shift.deleted",
               resourceType: "shift",
               resourceId: `${shift.employeeId}:${shift.date}`,
-              details: {},
+              details: { before },
             });
           }),
         );
@@ -1236,6 +1330,7 @@ export async function POST(req: NextRequest) {
             : publishedPayload?.state_kind === "worked"
               ? publishedPayload
               : null;
+        const timesBefore = cellStateFromSnapshotPayload(draftPayload ?? publishedPayload);
         if (!sourcePayload) {
           return NextResponse.json(
             { error: "Cannot set custom times without a worked schedule cell" },
@@ -1252,7 +1347,8 @@ export async function POST(req: NextRequest) {
           p_shift_ids: sourcePayload.shift_ids ?? [],
           p_job_ids: sourcePayload.job_ids ?? [],
           p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
-          p_absence_type_id: null,
+          // A worked cell's rest-of-day absence (item 45) survives a time edit.
+          p_absence_type_id: sourcePayload.absence_type_id ?? null,
           p_custom_start_time: data.customStartTime,
           p_custom_end_time: data.customEndTime,
           p_series_id: sourcePayload.series_id ?? null,
@@ -1280,7 +1376,18 @@ export async function POST(req: NextRequest) {
           action: "shift.updated",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: { customStartTime: data.customStartTime, customEndTime: data.customEndTime },
+          details: {
+            customStartTime: data.customStartTime,
+            customEndTime: data.customEndTime,
+            before: timesBefore,
+            input: timesBefore
+              ? {
+                  ...timesBefore,
+                  customStartTime: data.customStartTime,
+                  customEndTime: data.customEndTime,
+                }
+              : null,
+          },
         });
         return writeResponse(
           auth.serviceClient,
@@ -1305,6 +1412,10 @@ export async function POST(req: NextRequest) {
         const state = normalizeScheduleInput(data.input);
         const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
           getScheduleCellStorage(state);
+        const [before, targetBefore] = await Promise.all([
+          readCellStateForAudit(auth.serviceClient, data.orgId, data.sourceEmpId, data.sourceDate),
+          readCellStateForAudit(auth.serviceClient, data.orgId, data.targetEmpId, data.targetDate),
+        ]);
         const { error } = await auth.userClient.rpc("move_shift", {
           p_org_id: data.orgId,
           p_source_emp_id: data.sourceEmpId,
@@ -1358,6 +1469,9 @@ export async function POST(req: NextRequest) {
             targetEmpId: data.targetEmpId,
             targetDate: data.targetDate,
             dragMode: data.dragMode ?? "move",
+            before,
+            targetBefore,
+            input: state,
           },
         });
         return NextResponse.json({ success: true });
@@ -1395,6 +1509,9 @@ export async function POST(req: NextRequest) {
             { error: "Shift series requires at least one worked segment" },
             { status: 400 },
           );
+        }
+        if (seriesHasRestOfDayAbsence(normalizedInput)) {
+          return NextResponse.json({ error: SERIES_REST_OF_DAY_ABSENCE_ERROR }, { status: 400 });
         }
 
         const { data: createdSeriesId, error } = await auth.userClient.rpc("create_shift_series", {
@@ -1481,6 +1598,9 @@ export async function POST(req: NextRequest) {
             { error: "Series updates require at least one worked segment" },
             { status: 400 },
           );
+        }
+        if (seriesHasRestOfDayAbsence(normalizedInput)) {
+          return NextResponse.json({ error: SERIES_REST_OF_DAY_ABSENCE_ERROR }, { status: 400 });
         }
 
         const { error } = await auth.userClient.rpc("update_series_all_shifts", {

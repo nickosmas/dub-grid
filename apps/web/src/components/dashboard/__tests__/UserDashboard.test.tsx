@@ -462,7 +462,7 @@ describe("UserDashboard", () => {
         name: "Claim",
       }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Your Week")).toBeInTheDocument();
+    expect(screen.getByText("Your week")).toBeInTheDocument();
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     const todayDateTile = screen.getByTestId("user-dashboard-date-tile-today");
     const weekPills = within(myWeek).getAllByTestId("user-dashboard-week-pills");
@@ -601,6 +601,100 @@ describe("UserDashboard", () => {
         "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
       ),
     ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
+  });
+
+  it("marks a hidden edit without saying what the shift was (46f)", () => {
+    const todayKey = formatDateKey(new Date());
+    render(
+      <UserDashboard
+        {...makeProps({
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${todayKey}`,
+              {
+                empId: "emp-1",
+                date: todayKey,
+                kind: "modified" as const,
+                detailsHidden: true,
+                fromState: null,
+              },
+            ],
+          ]),
+        })}
+      />,
+    );
+
+    const hero = screen.getByTestId("user-dashboard-hero");
+    expect(within(hero).getByLabelText("Edited shift")).toHaveTextContent("Edited");
+    expect(within(hero).queryByText(/^Was/)).not.toBeInTheDocument();
+    expect(within(hero).queryByLabelText(/Previous shift/)).not.toBeInTheDocument();
+  });
+
+  it("says only that a shift was removed when the details are hidden (46f)", () => {
+    const props = makeProps();
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                detailsHidden: true,
+                fromState: null,
+                toState: null,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getByText("Shift removed")).toBeInTheDocument();
+    expect(within(myWeek).queryByText(/^Was/)).not.toBeInTheDocument();
+  });
+
+  it("shows a removed shift's Was card from its stored state, once", () => {
+    const props = makeProps();
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                fromState: {
+                  kind: "worked" as const,
+                  segments: [{ shiftId: 10, jobId: 7, position: 0 }],
+                  absenceTypeId: null,
+                  customStartTime: null,
+                  customEndTime: "12:00",
+                  seriesId: null,
+                  fromRecurring: false,
+                },
+                toState: null,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(within(myWeek).getAllByText("Was")).toHaveLength(1);
+    expect(within(myWeek).getByText("Removed")).toBeInTheDocument();
+    expect(within(myWeek).getByText("Day shift Care")).toBeInTheDocument();
+    expect(within(myWeek).getByText(/12:00 AM - 12:00 PM \(12 hrs\)/)).toBeInTheDocument();
   });
 
   it("flows Working with and split follow-up shifts naturally instead of pinning to the hero bottom", () => {
@@ -1505,6 +1599,94 @@ describe("UserDashboard", () => {
     expect(within(myWeek).getByText("Absence")).toBeInTheDocument();
     expect(within(myWeek).getAllByText("Off")).toHaveLength(1);
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
+  });
+
+  it("lists the absence for the rest of the day after the shift and keeps the shift in the hero", () => {
+    const sick = {
+      id: 5,
+      orgId: "org-1",
+      label: "S",
+      name: "Sick",
+      color: "#fee2e2",
+      border: "#fca5a5",
+      text: "#991b1b",
+      sortOrder: 1,
+      archivedAt: null,
+    };
+    const todayKey = formatDateKey(new Date());
+    const shiftMap = makeShiftMap(todayKey);
+    shiftMap[`emp-1_${todayKey}`] = {
+      ...shiftMap[`emp-1_${todayKey}`]!,
+      restOfDayAbsenceTypeId: sick.id,
+      publishedRestOfDayAbsenceTypeId: sick.id,
+    };
+
+    render(
+      <UserDashboard
+        {...makeProps({
+          absenceTypeById: new Map([[sick.id, sick]]),
+          allShifts: shiftMap,
+          currentPeriodShifts: shiftMap,
+        })}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    const weekText = myWeek.textContent ?? "";
+    expect(weekText.indexOf("Sick")).toBeGreaterThan(weekText.indexOf("Day shift"));
+    expect(within(myWeek).getAllByText("Sick")).toHaveLength(1);
+    const hero = screen.getByTestId("user-dashboard-hero");
+    expect(within(hero).getByText("Day shift")).toBeInTheDocument();
+    expect(within(hero).queryByText("Sick")).not.toBeInTheDocument();
+  });
+
+  it("names a removed shift's absence in its Your Week history line", () => {
+    const props = makeProps({
+      absenceTypeById: new Map([
+        [
+          5,
+          {
+            id: 5,
+            orgId: "org-1",
+            label: "S",
+            name: "Sick",
+            color: "#fee2e2",
+            border: "#fca5a5",
+            text: "#991b1b",
+            sortOrder: 1,
+            archivedAt: null,
+          },
+        ],
+      ]),
+    });
+    const deletedDate = formatDateKey(props.periodDates[1]!);
+    render(
+      <UserDashboard
+        {...{
+          ...props,
+          recentPublishedChanges: new Map([
+            [
+              `emp-1_${deletedDate}`,
+              {
+                empId: "emp-1",
+                date: deletedDate,
+                kind: "deleted" as const,
+                from: [101],
+                fromRestOfDayAbsenceTypeId: 5,
+              },
+            ],
+          ]),
+        }}
+      />,
+    );
+
+    const myWeek = screen.getByTestId("user-dashboard-my-week");
+    expect(
+      within(myWeek).getByLabelText(
+        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care; Sick for the rest of the day",
+      ),
+    ).toBeInTheDocument();
+    expect(within(myWeek).queryByText("Sick")).not.toBeInTheDocument();
   });
 
   it("shows only the empty state in a brand-new published week", () => {

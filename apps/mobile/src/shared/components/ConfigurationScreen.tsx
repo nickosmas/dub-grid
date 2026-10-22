@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect, useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -55,6 +56,13 @@ export function ConfigurationScreen({
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
+
+  // Rendered in place of StartupSplashGate, which owns the hide on every
+  // other launch, so the native splash held by the root layout stays up over
+  // this screen unless it comes down here.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>

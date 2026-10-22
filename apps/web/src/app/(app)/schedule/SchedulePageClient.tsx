@@ -113,6 +113,7 @@ import {
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
 } from "@/lib/assignable-shifts";
 import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import { mergeCellPublishChanges } from "@/lib/shift-change-web";
 import { seriesScopeRange } from "@/lib/series-dates";
 import {
   buildScheduleCellEntryFromInput,
@@ -155,8 +156,7 @@ import {
   computeOutOfWindowDraftGroups,
   countShiftsAddedToPublishedCell,
 } from "@/lib/draft-utils";
-import { exportScheduleCSV } from "@/lib/export-csv";
-import { queueNotification } from "@/lib/notify";
+import { exportScheduleCSV, withRestOfDayAbsence } from "@/lib/export-csv";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
 import {
   getScheduleStartForSpan,
@@ -444,6 +444,11 @@ function SchedulerContent({
     () => [...employees, ...inactiveEmployees, ...removedEmployees],
     [employees, inactiveEmployees, removedEmployees],
   );
+  // Who a peer's draft broadcast may touch on this grid; see readDraftChangedBroadcast.
+  const visibleEmployeeIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
+  visibleEmployeeIdsRef.current = empLoading
+    ? undefined
+    : new Set(employeeDirectory.map((employee) => employee.id));
   const employeeNameById = useMemo(
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
@@ -1808,24 +1813,27 @@ function SchedulerContent({
       outOfWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
     );
 
-  // Build a lookup map from in-window publish history changes for O(1) access.
-  // Iterate oldest→newest so the most recent publish wins per cell key.
+  // One change per cell, compared with the cell before its first in-window
+  // publish: staff are assumed to have seen none of the versions in between.
   const publishChangesMap = useMemo(() => {
     if (inWindowPublishHistory.length === 0) return null;
-    const map = new Map<
-      string,
-      PublishChange & { publishedAt: string; publishedBy: string | null }
-    >();
-    // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
+    type DatedChange = PublishChange & { publishedAt: string; publishedBy: string | null };
+    const byCell = new Map<string, DatedChange[]>();
+    // inWindowPublishHistory is newest-first; collect each cell's changes oldest first.
     for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
       const entry = inWindowPublishHistory[i];
       for (const change of entry.changes) {
-        map.set(`${change.empId}_${change.date}`, {
-          ...change,
-          publishedAt: entry.publishedAt,
-          publishedBy: entry.publishedBy,
-        });
+        const key = `${change.empId}_${change.date}`;
+        const dated = { ...change, publishedAt: entry.publishedAt, publishedBy: entry.publishedBy };
+        const list = byCell.get(key);
+        if (list) list.push(dated);
+        else byCell.set(key, [dated]);
       }
+    }
+    const map = new Map<string, DatedChange>();
+    for (const [key, changes] of byCell) {
+      const merged = mergeCellPublishChanges(changes);
+      if (merged) map.set(key, merged);
     }
     return map;
   }, [inWindowPublishHistory]);
@@ -2337,6 +2345,7 @@ function SchedulerContent({
               editorSessionId: editorSessionIdRef.current,
               canEditShifts: canEditShiftsRef.current,
               currentShifts: shiftsRef.current,
+              visibleEmployeeIds: visibleEmployeeIdsRef.current,
             });
             if (!actions) return;
 
@@ -2962,6 +2971,25 @@ function SchedulerContent({
     [absenceTypeMap, assignmentLabelMap, assignments, jobs, shiftCategories, shifts],
   );
 
+  // The CSV cell adds a worked cell's absence for the rest of the day (item
+  // 45), from the same published-or-current side shiftNameForKey reads.
+  const scheduleCsvTextForKey = useCallback(
+    (empId: string, date: Date): string | null => {
+      const text = shiftNameForKey(empId, date);
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!text || !entry) return text;
+      const restOfDayAbsenceTypeId =
+        (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0
+          ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
+          : (entry.restOfDayAbsenceTypeId ?? null);
+      return withRestOfDayAbsence(
+        text,
+        restOfDayAbsenceTypeId != null ? absenceTypeMap.get(restOfDayAbsenceTypeId) : undefined,
+      );
+    },
+    [absenceTypeMap, shiftNameForKey, shifts],
+  );
+
   const getAbsenceTypeIdForKey = useCallback(
     (empId: string, date: Date): number | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
@@ -3042,6 +3070,19 @@ function SchedulerContent({
       if (!entry) return null;
       return entry.publishedAbsenceTypeId ?? null;
     },
+    [shifts],
+  );
+
+  // A worked cell's absence for the rest of the day (item 45), drawn as its last pill.
+  const restOfDayAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.restOfDayAbsenceTypeId ?? null,
+    [shifts],
+  );
+
+  const publishedRestOfDayAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.publishedRestOfDayAbsenceTypeId ?? null,
     [shifts],
   );
 
@@ -3875,7 +3916,7 @@ function SchedulerContent({
     [getPublishedRequestShift, getPublishedShiftTimeRanges, hasDateAndTimeStarted],
   );
 
-  /** True if the published shift has at least one categorized, non-off-day shift code. */
+  /** True if the published shift has at least one categorized shift code that is not an absence. */
   const isPublishedRequestableShift = useCallback(
     (empId: string, date: Date): boolean => {
       const publishedShift = getPublishedRequestShift(empId, date);
@@ -4349,11 +4390,8 @@ function SchedulerContent({
           toast.warning("Removed assignments that are no longer available.");
           return false;
         }
-        if (
-          entry.kind === "absence" &&
-          entry.absenceTypeId != null &&
-          !absenceTypeMapRef.current.has(entry.absenceTypeId)
-        ) {
+        // A whole-day absence, or a worked cell's absence for the rest of the day.
+        if (entry.absenceTypeId != null && !absenceTypeMapRef.current.has(entry.absenceTypeId)) {
           toast.error("That absence type is no longer available.");
           return false;
         }
@@ -4585,11 +4623,7 @@ function SchedulerContent({
         }
       }
 
-      if (
-        input.kind === "absence" &&
-        input.absenceTypeId != null &&
-        !absenceTypeMapRef.current.has(input.absenceTypeId)
-      ) {
+      if (input.absenceTypeId != null && !absenceTypeMapRef.current.has(input.absenceTypeId)) {
         toast.error("That absence type is no longer available.");
         return currentShift;
       }
@@ -5016,7 +5050,7 @@ function SchedulerContent({
       startScheduleOperation({
         kind: "repeat_series",
         title:
-          absenceTypeId != null ? "Creating repeating off day..." : "Creating repeating shift...",
+          absenceTypeId != null ? "Creating repeating absence..." : "Creating repeating shift...",
         detail:
           previewTotal > 0
             ? `Creating ${previewTotal} scheduled occurrence${previewTotal === 1 ? "" : "s"} for ${currentLabel}.`
@@ -5033,7 +5067,7 @@ function SchedulerContent({
         if (pendingNeedsPersist) {
           updateScheduleOperation("repeat_series", {
             progress: 12,
-            detail: `Saving the current ${absenceTypeId != null ? "off day" : "shift"} before creating the repeating pattern...`,
+            detail: `Saving the current ${absenceTypeId != null ? "absence" : "shift"} before creating the repeating pattern...`,
           });
           await upsertShift(
             editPanel.empId,
@@ -5825,14 +5859,6 @@ function SchedulerContent({
       closeEditPanel();
       toast.success("Schedule published");
 
-      // Notify affected employees about the published schedule
-      queueNotification({
-        action: "schedule_published",
-        orgId: org.id,
-        startDate: formatDateKey(startDate),
-        endDate: formatDateKey(endDate),
-      });
-
       // Tell other tabs/users to refetch before we refetch ourselves, so a
       // slow local refresh can't leave them stale.
       clearPendingDraftBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
@@ -6069,13 +6095,15 @@ function SchedulerContent({
       employeeId: string,
       targetDateKey: string,
     ): StaffingScheduleState | null => {
-      const effective = shifts[`${employeeId}_${targetDateKey}`]?.effective ?? null;
+      const entry = shifts[`${employeeId}_${targetDateKey}`];
+      const effective = entry?.effective ?? null;
       return effective
         ? {
             kind: effective.kind,
             segments: effective.segments,
             assignmentIds: effective.assignmentIds,
             absenceTypeId: effective.absenceTypeId ?? null,
+            restOfDayAbsenceTypeId: entry?.restOfDayAbsenceTypeId ?? null,
             customStartTime: effective.customStartTime ?? null,
             customEndTime: effective.customEndTime ?? null,
             seriesId: effective.seriesId ?? null,
@@ -6323,12 +6351,9 @@ function SchedulerContent({
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
         cellEditors: editingCells,
-        // Who published is process detail for the people who publish, the same
-        // viewers who can open the publish history; everyone else reads the
-        // time alone, as on mobile.
-        resolvePublisherName: canNavigatePublishHistory
-          ? (userId: string) => auditNames.get(userId) ?? null
-          : undefined,
+        // The server sends a publisher only to a viewer the organization lets
+        // see it (item 46f); everyone else reads the time alone.
+        resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
         openShifts,
         activeFocusArea,
         highlightEmpIds: searchMatchedEmployeeIds,
@@ -6352,6 +6377,8 @@ function SchedulerContent({
           publishedLabelForKey,
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
+          restOfDayAbsenceTypeIdForKey,
+          publishedRestOfDayAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
           publishedMetadataForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
@@ -6401,6 +6428,8 @@ function SchedulerContent({
       publishedLabelForKey,
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
+      restOfDayAbsenceTypeIdForKey,
+      publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffKindForKey,
       publishedMetadataForKey,
       canRenderAuthorNames,
@@ -7298,7 +7327,7 @@ function SchedulerContent({
                   // export; this client-side one was handing the same roster to
                   // anyone with the page open.
                   canEditShifts && dates.length > 0 && filteredEmployees.length > 0
-                    ? () => exportScheduleCSV(filteredEmployees, dates, shiftNameForKey)
+                    ? () => exportScheduleCSV(filteredEmployees, dates, scheduleCsvTextForKey)
                     : undefined
                 }
                 presenceSlot={
@@ -7405,6 +7434,7 @@ function SchedulerContent({
                 draftKindForKey={draftKindForKey}
                 shiftDisplayMode={org?.shiftDisplayMode}
                 absenceTypeIdForKey={absenceTypeIdForKey}
+                restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
                 absenceTypeMap={absenceTypeObjectMap}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
@@ -7912,6 +7942,12 @@ function SchedulerContent({
                   ?.publishedAbsenceTypeId ??
                 null
               }
+              publishedRestOfDayAbsenceTypeId={
+                panelShiftEntry?.publishedRestOfDayAbsenceTypeId ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedRestOfDayAbsenceTypeId ??
+                null
+              }
               publishedCustomStartTime={
                 panelShiftEntry?.publishedCustomStartTime ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
@@ -8004,6 +8040,7 @@ function SchedulerContent({
               shiftDisplayMode={org?.shiftDisplayMode}
               absenceTypes={absenceTypes}
               currentAbsenceTypeId={panelCurrentAbsenceTypeId}
+              currentRestOfDayAbsenceTypeId={panelShiftEntry?.restOfDayAbsenceTypeId ?? null}
             />
           )}
 
@@ -8125,6 +8162,7 @@ function SchedulerContent({
               shiftForKey={shiftForKey}
               assignmentIdsForKey={assignmentIdsForKey}
               absenceTypeIdForKey={absenceTypeIdForKey}
+              restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
               absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}
@@ -8308,6 +8346,7 @@ function SchedulerContent({
               focusAreas={focusAreas}
               employees={employeeDirectory}
               absenceTypes={allAbsenceTypes}
+              allAssignmentDefinitions={allAssignmentDefinitions}
             />
           )}
           {activeOperation && (

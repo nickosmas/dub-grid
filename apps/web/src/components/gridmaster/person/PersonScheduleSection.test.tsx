@@ -64,6 +64,7 @@ const FULL: GridmasterPersonSchedule = {
       kind: "modified",
       from: "D",
       to: "N",
+      change: null,
       publishedBy: "admin-1",
     },
   ],

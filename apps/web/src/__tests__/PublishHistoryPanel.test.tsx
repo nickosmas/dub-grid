@@ -56,4 +56,43 @@ describe("ExpandedChangesGrouped", () => {
     expect(screen.getByText(/Added note: Float/)).toBeInTheDocument();
     expect(screen.getByText(/Removed note: Training/)).toBeInTheDocument();
   });
+
+  it("names a worked cell's rest-of-day absence after its shift (item 45)", () => {
+    render(
+      <ExpandedChangesGrouped
+        changes={[
+          {
+            empId: "emp-1",
+            date: "2026-08-24",
+            kind: "modified",
+            fromState: {
+              kind: "worked",
+              segments: [{ shiftId: 1, jobId: 2, position: 0 }],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
+            toState: {
+              kind: "worked",
+              segments: [{ shiftId: 1, jobId: 2, position: 0 }],
+              absenceTypeId: 9,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
+            toRestOfDayAbsenceTypeId: 9,
+          },
+        ]}
+        assignmentIdByPair={new Map([["1:2", 5]])}
+        assignmentLabelMap={new Map([[5, "D"]])}
+        empNameMap={new Map([["emp-1", "Maria Garcia"]])}
+        absenceTypeMap={new Map([[9, "Sick"]])}
+      />,
+    );
+
+    expect(screen.getByText(/D\/Sick/)).toBeInTheDocument();
+  });
 });

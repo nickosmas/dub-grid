@@ -3,6 +3,11 @@ import { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import {
+  SEARCH_CLEAR_PADDING,
+  SearchClearButton,
+  clearSearchOnEscape,
+} from "@/components/ui/search-clear";
 
 export interface StaffOption {
   id: string;
@@ -115,15 +120,20 @@ export default function StaffMultiSelect({
               overflow: "hidden",
             }}
           >
-            <input
-              aria-label={`Search ${ariaLabel.toLowerCase()}`}
-              autoFocus
-              className="dg-input"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search"
-              type="search"
-              value={query}
-            />
+            <div className="relative">
+              <input
+                aria-label={`Search ${ariaLabel.toLowerCase()}`}
+                autoFocus
+                className="dg-input"
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={clearSearchOnEscape(() => setQuery(""))}
+                placeholder="Search"
+                type="search"
+                value={query}
+                style={{ paddingRight: query ? SEARCH_CLEAR_PADDING : undefined }}
+              />
+              {query && <SearchClearButton onClear={() => setQuery("")} />}
+            </div>
             <div role="listbox" aria-multiselectable style={{ overflowY: "auto", minHeight: 0 }}>
               {visible.length === 0 ? (
                 <div

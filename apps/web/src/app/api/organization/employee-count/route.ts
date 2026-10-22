@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
 
@@ -29,12 +30,14 @@ export async function GET(req: NextRequest) {
       return orgAuth.response;
     }
 
-    const serviceClient = orgAuth.serviceClient;
-    const { count, error } = await serviceClient
-      .from("employees")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgAuth.orgId)
-      .is("archived_at", null);
+    const { count, error } = await withoutHiddenStaff(
+      orgAuth.serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgAuth.orgId)
+        .is("archived_at", null),
+      await fetchHiddenPeople(orgAuth),
+    );
 
     if (error) throw error;
 
