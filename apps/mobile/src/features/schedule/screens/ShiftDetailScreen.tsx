@@ -33,7 +33,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
-import { ShiftChangeCard } from "../components/ShiftChangeView";
+import { ShiftChangeSheet } from "../components/ShiftChangeView";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   createShiftRequest,
@@ -1863,15 +1863,11 @@ function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
           </Text>
           <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
         </PressableRow>
-        <BottomSheetModal
-          accessibilityLabel="Dismiss what changed"
-          debugName="What changed"
-          header={<SheetHeader title="What changed" />}
+        <ShiftChangeSheet
+          change={shiftChange}
           visible={showPreviousShift}
           onDismiss={() => setShowPreviousShift(false)}
-        >
-          <ShiftChangeCard change={shiftChange} showDayBar />
-        </BottomSheetModal>
+        />
       </>
     );
   }

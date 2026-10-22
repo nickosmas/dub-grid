@@ -59,7 +59,7 @@ import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/Schedule
 import { ScheduleDateTile } from "../components/ScheduleDateTile";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
-import { ShiftChangeWas } from "../components/ShiftChangeView";
+import { ShiftChangeLink } from "../components/ShiftChangeView";
 import {
   getMySchedule,
   getOrgSchedule,
@@ -2378,8 +2378,9 @@ function getPreviousShiftSummary(
 }
 
 /**
- * The day's "Was" block when the server sent the whole day's change (item
- * 46d), told once per day; otherwise the older one-line summary.
+ * The day's "What changed" link, opening the Before and After sheet, when
+ * the server sent the whole day's change (item 46d), once per day;
+ * otherwise the older one-line summary.
  */
 function PreviousChange({
   entry,
@@ -2392,7 +2393,7 @@ function PreviousChange({
 }) {
   const shiftChange = entry.change?.shiftChange ?? null;
   if (shiftChange && shiftChange.kind !== "none") {
-    return firstOfDay ? <ShiftChangeWas change={shiftChange} /> : null;
+    return firstOfDay ? <ShiftChangeLink change={shiftChange} /> : null;
   }
   return <PreviousShiftRow change={change} />;
 }

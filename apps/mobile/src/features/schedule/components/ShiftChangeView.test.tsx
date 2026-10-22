@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { describeShiftChange, type ShiftChangeShiftInput } from "@dubgrid/schedule-core";
 import { createReactNativeModule } from "../../../test/native";
@@ -6,10 +6,10 @@ import { createReactNativeModule } from "../../../test/native";
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 let ShiftChangeCard: (typeof import("./ShiftChangeView"))["ShiftChangeCard"];
-let ShiftChangeWas: (typeof import("./ShiftChangeView"))["ShiftChangeWas"];
+let ShiftChangeLink: (typeof import("./ShiftChangeView"))["ShiftChangeLink"];
 
 beforeAll(async () => {
-  ({ ShiftChangeCard, ShiftChangeWas } = await import("./ShiftChangeView"));
+  ({ ShiftChangeCard, ShiftChangeLink } = await import("./ShiftChangeView"));
 });
 
 function shift(overrides: Partial<ShiftChangeShiftInput> = {}): ShiftChangeShiftInput {
@@ -57,17 +57,18 @@ describe("ShiftChangeCard (46d)", () => {
   });
 });
 
-describe("ShiftChangeWas (46d)", () => {
-  it("shows the earlier side under a WAS heading", () => {
+describe("ShiftChangeLink (46d)", () => {
+  it("offers What changed and opens the Before and After sheet", () => {
     const change = describeShiftChange(
       { items: [shift()] },
       { items: [shift({ focusAreaName: "Memory Care" })] },
       { date: "2026-10-22" },
     );
-    render(<ShiftChangeWas change={change} />);
+    render(<ShiftChangeLink change={change} />);
 
-    expect(screen.getByText("WAS")).toBeInTheDocument();
-    expect(screen.getByText(/Skilled Nursing/)).toBeInTheDocument();
-    expect(screen.queryByText(/Memory Care/)).not.toBeInTheDocument();
+    expect(screen.queryByText("BEFORE")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "See what changed" }));
+    expect(screen.getByText("BEFORE")).toBeInTheDocument();
+    expect(screen.getByText("AFTER")).toBeInTheDocument();
   });
 });

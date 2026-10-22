@@ -1,18 +1,19 @@
-import { useMemo } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { z } from "zod";
 import type { shiftChangeSchema } from "@dubgrid/contracts";
 import { formatScheduleTimeValue, formatShiftChangeHours } from "@dubgrid/schedule-core";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
+import { Pressable } from "../../../shared/components/Pressable";
 import { Text } from "../../../shared/components/Text";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
   mobileRadii,
-  mobileRadius,
   mobileSpace,
   mobileTabularText,
   mobileText,
-  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -71,12 +72,10 @@ function ItemLines({
   item,
   styles,
   highlight,
-  compact = false,
 }: {
   item: ShiftChangeItem;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
-  compact?: boolean;
 }) {
   const changedStyle = highlight ? styles.changed : styles.unchanged;
   return (
@@ -103,18 +102,9 @@ function ItemLines({
           </View>
         ) : null}
       </View>
-      <Parts
-        parts={item.title}
-        style={compact ? styles.compactTitle : styles.itemTitle}
-        changedStyle={changedStyle}
-      />
+      <Parts parts={item.title} style={styles.itemTitle} changedStyle={changedStyle} />
       {detailLines(item.detail).map((line, index) => (
-        <Parts
-          key={index}
-          parts={line}
-          style={compact ? styles.compactDetail : styles.itemDetail}
-          changedStyle={changedStyle}
-        />
+        <Parts key={index} parts={line} style={styles.itemDetail} changedStyle={changedStyle} />
       ))}
     </View>
   );
@@ -124,12 +114,10 @@ function SideItems({
   side,
   styles,
   highlight,
-  compact = false,
 }: {
   side: ShiftChangeSide;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
-  compact?: boolean;
 }) {
   if (side.items.length === 0) {
     return (
@@ -141,13 +129,7 @@ function SideItems({
   return (
     <View style={styles.items}>
       {side.items.map((item, index) => (
-        <ItemLines
-          key={index}
-          item={item}
-          styles={styles}
-          highlight={highlight}
-          compact={compact}
-        />
+        <ItemLines key={index} item={item} styles={styles} highlight={highlight} />
       ))}
     </View>
   );
@@ -246,28 +228,52 @@ export function ShiftChangeCard({
   );
 }
 
-/** "Was" beside a shift already on screen: the earlier side only, in the same heading style. */
-export function ShiftChangeWas({ change }: { change: ShiftChange }) {
+/** The "What changed" sheet: the whole day Before and After, with the day bar. */
+export function ShiftChangeSheet({
+  change,
+  visible,
+  onDismiss,
+}: {
+  change: ShiftChange;
+  visible: boolean;
+  onDismiss: () => void;
+}) {
+  return (
+    <BottomSheetModal
+      accessibilityLabel="Dismiss what changed"
+      debugName="What changed"
+      header={<SheetHeader title="What changed" />}
+      visible={visible}
+      onDismiss={onDismiss}
+    >
+      <ShiftChangeCard change={change} showDayBar />
+    </BottomSheetModal>
+  );
+}
+
+/** A list row's "What changed" link, opening the same sheet as shift detail. */
+export function ShiftChangeLink({ change }: { change: ShiftChange }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const [open, setOpen] = useState(false);
   if (change.kind === "none") return null;
   return (
-    <View
-      accessibilityLabel={`Was: ${change.before.items.length === 0 ? "No shift" : change.before.items.map((item) => item.plain).join("; ")}`}
-      style={styles.was}
-    >
-      <View style={styles.wasHeader}>
-        <Text fit="fixed" style={styles.heading}>
-          WAS
+    <>
+      <Pressable
+        accessibilityLabel="See what changed"
+        accessibilityRole="button"
+        hitSlop={mobileSpace.sm}
+        onPress={() => setOpen(true)}
+        style={styles.link}
+      >
+        <Ionicons color={mobileColors.brand} name="arrow-undo-outline" size={14} />
+        <Text fit="compact" style={styles.linkText}>
+          What changed
         </Text>
-        {change.before.totalMinutes != null ? (
-          <Text fit="fixed" style={styles.wasTotal}>
-            {hoursText(change.before.totalMinutes)}
-          </Text>
-        ) : null}
-      </View>
-      <SideItems side={change.before} styles={styles} highlight={false} compact />
-    </View>
+        <Ionicons color={mobileColors.brand} name="chevron-forward" size={14} />
+      </Pressable>
+      <ShiftChangeSheet change={change} visible={open} onDismiss={() => setOpen(false)} />
+    </>
   );
 }
 
@@ -391,35 +397,20 @@ function createStyles(colors: MobileColors) {
       ...mobileTabularText,
       color: colors.textMuted,
     },
-    was: {
+    link: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
       gap: mobileSpace.xs,
       marginTop: mobileSpace.sm,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-      borderRadius: mobileRadius.md,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderSubtle,
-      backgroundColor: colors.surfaceSecondary,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: colors.brandSoft,
     },
-    wasHeader: {
-      flexDirection: "row",
-      alignItems: "baseline",
-      justifyContent: "space-between",
-      gap: mobileSpace.sm,
-    },
-    wasTotal: {
-      ...mobileText.caption,
-      ...mobileTabularText,
-      color: colors.textSecondary,
-    },
-    compactTitle: {
-      ...mobileTextWeighted("meta", "semibold"),
-      color: colors.textPrimary,
-    },
-    compactDetail: {
-      ...mobileText.meta,
-      ...mobileTabularText,
-      color: colors.textSecondary,
+    linkText: {
+      ...mobileText.label,
+      color: colors.brand,
     },
   });
 }
