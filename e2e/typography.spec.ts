@@ -395,7 +395,7 @@ test("productive typography keeps its hierarchy across routes, themes, widths, a
         page.locator("h1").filter({ hasNotText: AUTH_TRANSITION_TITLES }).first(),
       ).toBeVisible({ timeout: 15_000 });
     } else {
-      await expect(page.getByRole("textbox", { name: "Search staff…" })).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Search staff", exact: true })).toBeVisible();
     }
 
     for (const theme of themes) {
@@ -467,7 +467,7 @@ test("productive typography keeps its hierarchy across routes, themes, widths, a
               expect(hierarchy.titleColor).not.toBe(hierarchy.descriptionColor);
             } else {
               const controlFontSize = await page
-                .getByRole("textbox", { name: "Search staff…" })
+                .getByRole("textbox", { name: "Search staff", exact: true })
                 .evaluate((control) => getComputedStyle(control).fontSize);
               expect(controlFontSize).toBe("14px");
             }

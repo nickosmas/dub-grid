@@ -85,6 +85,8 @@ async function loadFixture(): Promise<Fixture> {
   const peer = await loadMember(orgId, "qa-management@dubgrid.test");
 
   // A double shift needs two shifts of one focus area whose times never meet.
+  // The seed copies qa-admin's focus areas from a co-worker, which may hold
+  // one shift each, so fall back to any Calm Haven focus area with a pair.
   const { rows: pairs } = await db.query<{
     focus_area_id: number;
     day_id: number;
@@ -94,7 +96,7 @@ async function loadFixture(): Promise<Fixture> {
     `SELECT a.focus_area_id, a.id AS day_id, b.id AS evening_id, j.id AS job_id
        FROM public.employees e
        JOIN public.shift_categories a
-         ON a.org_id = e.org_id AND a.archived_at IS NULL AND a.focus_area_id = ANY(e.focus_area_ids)
+         ON a.org_id = e.org_id AND a.archived_at IS NULL AND a.focus_area_id IS NOT NULL
        JOIN public.shift_categories b
          ON b.org_id = e.org_id AND b.archived_at IS NULL AND b.focus_area_id = a.focus_area_id
         AND b.id > a.id
@@ -102,17 +104,17 @@ async function loadFixture(): Promise<Fixture> {
       WHERE e.id = $1
         AND NOT public.work_assignment_times_overlap(
           ARRAY[a.id], ARRAY[j.id], NULL, NULL, ARRAY[b.id], ARRAY[j.id], NULL, NULL)
-      ORDER BY a.focus_area_id, a.id, b.id, j.id
+      ORDER BY a.focus_area_id = ANY(e.focus_area_ids) DESC, a.focus_area_id, a.id, b.id, j.id
       LIMIT 1`,
     [approver.empId],
   );
-  if (pairs.length === 0) throw new Error("No two separate shifts in the approver's focus area");
+  if (pairs.length === 0) throw new Error("No Calm Haven focus area has two separate shifts");
 
   await db.query(
     `UPDATE public.employees
         SET focus_area_ids = array_append(array_remove(focus_area_ids, $2::bigint), $2::bigint)
-      WHERE id = $1`,
-    [peer.empId, pairs[0].focus_area_id],
+      WHERE id = ANY($1::uuid[])`,
+    [[approver.empId, peer.empId], pairs[0].focus_area_id],
   );
 
   const { rows: absences } = await db.query<{ id: number }>(
