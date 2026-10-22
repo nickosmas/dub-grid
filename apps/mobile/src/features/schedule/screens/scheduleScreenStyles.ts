@@ -462,13 +462,20 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // Rows and card surfaces that navigate take the same rounded highlight
     // as every other pressable row: it bleeds past the content by the inset
     // and gives it back as padding, so the text stays where it was.
+    // The tap area is inset the same 8 from the dividers, the date tile and
+    // the card's edge (the card pads 20, the tile's gap is 16), and pads its
+    // content the same 12 on every side, so its press highlight sits evenly.
     upcomingShiftRow: {
-      minHeight: 132,
+      minHeight: 116,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.lg,
-      paddingVertical: mobileSpace.lg,
-      ...pressableBleed,
+      marginVertical: mobileSpace.sm,
+      marginLeft: -mobileSpace.sm,
+      marginRight: -mobileSpace.md,
+      padding: mobileSpace.md,
+      borderRadius: mobileRadii.control,
+      overflow: "hidden",
     },
     upcomingUnscheduledRow: {
       minHeight: 132,
