@@ -933,7 +933,7 @@
         log shows each schedule edit as Before and After with names. Its
         rows store only the new state, so the save must record the previous
         one: an extra read per save or a migration (owner decision).
-- [ ] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
+- [x] 47. **Staffing check** - the Schedule page's Coverage panel becomes a
       check of the draft: a focus area by day matrix (staffed / needed,
       short, over, staff short per day), the draft compared with the
       published schedule (gaps opened and closed), a detail for each cell
@@ -958,7 +958,7 @@
         repeating weekday gaps; impact measured by applying each to a copy;
         a reason for every qualified person when nothing fits. No weekly
         hours limit and no minimum rest rule (owner, 2026-10-21). No UI.
-  - [ ] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
+  - [x] 47d. **Suggestions in the panel** - ranked list (top 3, show all),
         ways to fix per cell, apply and undo through the normal draft save,
         approve through the existing request approval behind a confirmation,
         and the opened and closed counts in the Publish dialog. Approve

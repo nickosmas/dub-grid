@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { UNATTRIBUTED_EDITOR_ID } from "@/lib/publish-attribution";
 import {
   PublishChangeSummary,
+  publishCoverageChangeText,
   type PublishActiveEditor,
   type PublishEditorRow,
 } from "./PublishChangeSummary";
@@ -170,5 +171,44 @@ describe("PublishChangeSummary", () => {
     renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0);
 
     expect(screen.queryByText(/coverage gap/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("publishCoverageChangeText", () => {
+  it.each([
+    [{ opened: 2, closed: 0, partial: false }, "This publish opens 2 gaps and closes none."],
+    [{ opened: 0, closed: 1, partial: false }, "This publish opens no gaps and closes 1."],
+    [{ opened: 1, closed: 3, partial: false }, "This publish opens 1 gap and closes 3."],
+    [{ opened: 0, closed: 0, partial: false }, "This publish doesn't open or close any gap."],
+    [
+      { opened: 1, closed: 0, partial: true },
+      "This publish opens 1 gap and closes none on dates already published.",
+    ],
+  ])("words %o", (change, line) => {
+    expect(publishCoverageChangeText(change)).toBe(line);
+  });
+
+  it("shows the line in the dialog, and nothing without coverage requirements", () => {
+    const { rerender } = render(
+      <PublishChangeSummary
+        editorRows={[row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })]}
+        windowLabel="Mar 1 - Mar 7, 2026"
+        totalChanges={1}
+        coverageGapCount={0}
+        coverageChange={{ opened: 1, closed: 2, partial: false }}
+      />,
+    );
+    expect(screen.getByText("This publish opens 1 gap and closes 2.")).toBeInTheDocument();
+
+    rerender(
+      <PublishChangeSummary
+        editorRows={[row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })]}
+        windowLabel="Mar 1 - Mar 7, 2026"
+        totalChanges={1}
+        coverageGapCount={0}
+        coverageChange={null}
+      />,
+    );
+    expect(screen.queryByText(/This publish/)).not.toBeInTheDocument();
   });
 });

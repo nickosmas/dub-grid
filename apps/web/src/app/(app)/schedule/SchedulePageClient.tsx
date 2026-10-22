@@ -47,6 +47,7 @@ import {
 } from "./_lib/open-shifts";
 import {
   buildOpenShiftStaffingCandidates,
+  staffingStateFromEntry,
   buildStaffedOpenShiftInput,
   isCalloffOpenShiftStaffedByDraft,
   resolveOpenShiftClickAction,
@@ -91,6 +92,10 @@ import {
   buildCoverageMatrix,
   computeCoverageCategorySnapshots,
   describeCoverageCellChanges,
+  describeCoverageRuledOut,
+  describeCoverageSuggestion,
+  normalizeCoverageRuleConfig,
+  suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
@@ -98,7 +103,13 @@ import {
   type CoverageDaySide,
   type CoverageMatrixCell,
   type CoverageMatrixRow,
+  type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
+import { buildCoverageSuggestionInput, planSuggestionWrites } from "./_lib/coverage-suggestions";
+import {
+  appliedSuggestionText,
+  type AppliedCoverageSuggestion,
+} from "@/components/coverage-check/CoverageSuggestions";
 import type { CoverageCellFill } from "@/components/coverage-check/CoverageCellDetail";
 import { formatShortDate } from "@/components/coverage-check/coverage-check-text";
 import {
@@ -255,6 +266,7 @@ import {
 } from "./_lib/operations";
 import {
   PublishChangeSummary,
+  type PublishCoverageChange,
   type PublishActiveEditor,
   type PublishEditorRow,
 } from "./_components/PublishChangeSummary";
@@ -3511,10 +3523,8 @@ function SchedulerContent({
     [getOpenShiftTimeRanges, hasDateAndTimeStarted],
   );
 
-  // Built only while Coverage Check is open, so the grid pays nothing for it.
-  const coverageMatrix = useMemo(() => {
-    if (!showCoveragePanel || !canViewCoveragePanel || spanWeeks === "month") return null;
-    const base = {
+  const coverageBase = useMemo(
+    () => ({
       focusAreas,
       shiftCategories,
       assignments,
@@ -3523,7 +3533,23 @@ function SchedulerContent({
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       assignmentNameMap,
-    };
+    }),
+    [
+      focusAreas,
+      shiftCategories,
+      assignments,
+      coverageRequirements,
+      employeesByFocusArea,
+      assignmentIdsByFocusArea,
+      assignmentLabelMap,
+      assignmentNameMap,
+    ],
+  );
+
+  // Built only while Coverage Check is open, so the grid pays nothing for it.
+  const coverageMatrix = useMemo(() => {
+    if (!showCoveragePanel || !canViewCoveragePanel || spanWeeks === "month") return null;
+    const base = coverageBase;
     if (!canEditShifts) {
       const published = computeCoverageCategorySnapshots({
         ...base,
@@ -3562,14 +3588,7 @@ function SchedulerContent({
     showCoveragePanel,
     canViewCoveragePanel,
     spanWeeks,
-    focusAreas,
-    shiftCategories,
-    assignments,
-    coverageRequirements,
-    employeesByFocusArea,
-    assignmentIdsByFocusArea,
-    assignmentLabelMap,
-    assignmentNameMap,
+    coverageBase,
     canEditShifts,
     dates,
     publishedVisibleDates,
@@ -6192,23 +6211,8 @@ function SchedulerContent({
     const staffingStateFor = (
       employeeId: string,
       targetDateKey: string,
-    ): StaffingScheduleState | null => {
-      const entry = shifts[`${employeeId}_${targetDateKey}`];
-      const effective = entry?.effective ?? null;
-      return effective
-        ? {
-            kind: effective.kind,
-            segments: effective.segments,
-            assignmentIds: effective.assignmentIds,
-            absenceTypeId: effective.absenceTypeId ?? null,
-            restOfDayAbsenceTypeId: entry?.restOfDayAbsenceTypeId ?? null,
-            customStartTime: effective.customStartTime ?? null,
-            customEndTime: effective.customEndTime ?? null,
-            seriesId: effective.seriesId ?? null,
-            fromRecurring: effective.fromRecurring ?? false,
-          }
-        : null;
-    };
+    ): StaffingScheduleState | null =>
+      staffingStateFromEntry(shifts[`${employeeId}_${targetDateKey}`]);
     const previousDateKey = formatDateKey(addDays(date, -1));
     const nextDateKey = formatDateKey(addDays(date, 1));
     for (const employee of employees) {
@@ -6519,6 +6523,259 @@ function SchedulerContent({
       shifts,
     ],
   );
+
+  // Counted only while the Publish dialog is open, over the window it publishes.
+  const publishCoverageChange = useMemo((): PublishCoverageChange | null => {
+    if (!showPublishConfirm || !canEditShifts || coverageRequirements.length === 0) return null;
+    const windowDates = Array.from(
+      iterateDateRange(currentPublishWindow.startDate, currentPublishWindow.endDate),
+      ({ dateKey }) => parseLocalDateKey(dateKey),
+    );
+    const publishedDates = windowDates.filter((date) => publishedDateSet.has(formatDateKey(date)));
+    const matrix = buildCoverageMatrix({
+      draft: computeCoverageCategorySnapshots({
+        ...coverageBase,
+        dates: windowDates,
+        assignmentIdsForKey,
+        coverageCreditForKey,
+      }),
+      published: computeCoverageCategorySnapshots({
+        ...coverageBase,
+        dates: publishedDates,
+        assignmentIdsForKey: publishedAssignmentIdsForKey,
+        coverageCreditForKey: publishedCoverageCreditForKey,
+      }),
+      dates: windowDates,
+      publishedDateKeys: publishedDateSet,
+      isStarted: isCoverageSnapshotStarted,
+    });
+    return {
+      opened: matrix.totals.opened,
+      closed: matrix.totals.closed,
+      partial: publishedDates.length < windowDates.length,
+    };
+  }, [
+    assignmentIdsForKey,
+    canEditShifts,
+    coverageBase,
+    coverageCreditForKey,
+    coverageRequirements.length,
+    currentPublishWindow.endDate,
+    currentPublishWindow.startDate,
+    isCoverageSnapshotStarted,
+    publishedAssignmentIdsForKey,
+    publishedCoverageCreditForKey,
+    publishedDateSet,
+    showPublishConfirm,
+  ]);
+
+  // Editors only, while the panel is open: every suggestion is measured on a
+  // copy of the schedule by the engine, so this reruns as the draft changes.
+  const coverageSuggestions = useMemo(() => {
+    if (!coverageMatrix || !canEditShifts) return null;
+    const { engine, text } = buildCoverageSuggestionInput({
+      matrix: coverageMatrix,
+      coverage: coverageBase,
+      mentoredCredit:
+        normalizeCoverageRuleConfig(org?.coverageRuleConfig).mentoredCoverageCreditPercent / 100,
+      shifts,
+      employees,
+      assignments: Array.from(assignmentById.values()),
+      shiftCategories,
+      jobs,
+      orgRoles,
+      requests: shiftRequests.requests,
+      focusAreaNames: new Map(focusAreas.map((area) => [area.id, area.name])),
+      assignmentNames: assignmentNameMap,
+      absenceNames: new Map(allAbsenceTypes.map((type) => [type.id, type.name])),
+      loadedDateKeys: availableSwapDates,
+    });
+    const result = suggestCoverageFixes(engine);
+    const notSuggestedByCell = new Map<string, string[]>();
+    for (const entry of result.ruledOut) {
+      const key = `${entry.rowKey}|${entry.dateKey}`;
+      notSuggestedByCell.set(key, [
+        ...(notSuggestedByCell.get(key) ?? []),
+        describeCoverageRuledOut(entry, text),
+      ]);
+    }
+    return {
+      items: result.suggestions.map((suggestion) => ({
+        suggestion,
+        text: describeCoverageSuggestion(suggestion, text),
+      })),
+      notSuggestedByCell,
+      text,
+    };
+  }, [
+    allAbsenceTypes,
+    assignmentById,
+    assignmentNameMap,
+    availableSwapDates,
+    canEditShifts,
+    coverageBase,
+    coverageMatrix,
+    employees,
+    focusAreas,
+    jobs,
+    org?.coverageRuleConfig,
+    orgRoles,
+    shiftCategories,
+    shiftRequests.requests,
+    shifts,
+  ]);
+
+  const [appliedSuggestions, setAppliedSuggestions] = useState<
+    Array<
+      AppliedCoverageSuggestion & {
+        before: { employeeId: string; dateKey: string; input: ScheduleCellInput | null }[];
+      }
+    >
+  >([]);
+  const [busySuggestionId, setBusySuggestionId] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<{
+    suggestion: CoverageSuggestion;
+    title: string;
+    message: string;
+  } | null>(null);
+
+  // Fill a spot's own builder, so a suggestion never writes what the dialog could not.
+  const buildSuggestedAssignInput = useCallback(
+    (suggestion: CoverageSuggestion): ScheduleCellInput | null => {
+      const employee = employees.find((candidate) => candidate.id === suggestion.employeeId);
+      if (!employee) return null;
+      const { dateKey, focusAreaId, assignmentId } = suggestion.subject;
+      const date = parseLocalDateKey(dateKey);
+      const previousKey = formatDateKey(addDays(date, -1));
+      const nextKey = formatDateKey(addDays(date, 1));
+      const stateFor = (key: string) => staffingStateFromEntry(shifts[`${employee.id}_${key}`]);
+      const isLoaded = (key: string) =>
+        key >= loadedShiftWindow.start && key <= loadedShiftWindow.end;
+      const [candidate] = buildOpenShiftStaffingCandidates({
+        openShift: {
+          id: `suggestion_${suggestion.id}`,
+          source: "coverage_gap",
+          date: dateKey,
+          focusAreaId,
+          assignmentIds: [assignmentId],
+          eligibleAssignmentDefinitionIds: [assignmentId],
+          assignmentLabel: "",
+          customStartTime: null,
+          customEndTime: null,
+        },
+        employees: [employee],
+        scheduleByEmployeeId: new Map([[employee.id, stateFor(dateKey)]]),
+        adjacentScheduleByEmployeeId: new Map([
+          [employee.id, { previous: stateFor(previousKey), next: stateFor(nextKey) }],
+        ]),
+        adjacentDaysLoaded: { previous: isLoaded(previousKey), next: isLoaded(nextKey) },
+        assignments,
+        shiftCategories,
+        jobs,
+        orgRoles,
+      });
+      const option = candidate?.options.find((item) => item.assignmentIds[0] === assignmentId);
+      if (!candidate || !option) return null;
+      return buildStaffedOpenShiftInput({
+        existingState: candidate.existingState,
+        option,
+        assignments,
+        shiftCategories,
+        jobs,
+        orgRoles,
+      });
+    },
+    [assignments, employees, jobs, loadedShiftWindow, orgRoles, shiftCategories, shifts],
+  );
+
+  const applyCoverageSuggestion = useCallback(
+    (suggestion: CoverageSuggestion) => {
+      const view = coverageSuggestions?.items.find((item) => item.suggestion.id === suggestion.id);
+      if (!view || suggestion.kind === "pattern") return;
+      const lookups = coverageSuggestions!.text;
+      if (suggestion.kind === "approvePickup") {
+        const name = lookups.personName(suggestion.employeeId ?? "") ?? "Someone";
+        const entry = shifts[`${suggestion.employeeId}_${suggestion.subject.dateKey}`];
+        setPendingApproval({
+          suggestion,
+          title: `Approve ${name}'s pickup request?`,
+          message: `${name} gets the ${lookups.assignmentName(suggestion.subject.assignmentId)} on ${lookups.formatDate(
+            suggestion.subject.dateKey,
+          )} right away. Staff see it without a publish, and it can't be undone here.${
+            entry?.draftKind ? " Their draft change for that day is replaced." : ""
+          }`,
+        });
+        return;
+      }
+
+      const plan = planSuggestionWrites(suggestion, shiftsRef.current, buildSuggestedAssignInput);
+      if (!plan) {
+        toast.error("That person is no longer free for this shift.");
+        return;
+      }
+      const { writes, before } = plan;
+      setBusySuggestionId(suggestion.id);
+      const done: typeof before = [];
+      for (const [index, write] of writes.entries()) {
+        if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
+          // Put back what was already written so the draft is never left half applied.
+          for (const undo of done)
+            setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
+          setBusySuggestionId(null);
+          toast.error("That change couldn't be saved. Nothing was changed.");
+          return;
+        }
+        done.push(before[index]);
+      }
+      setBusySuggestionId(null);
+      const text = appliedSuggestionText(view.text.title);
+      setAppliedSuggestions((current) => [
+        ...current,
+        { id: `${suggestion.id}@${Date.now()}`, text, final: false, before },
+      ]);
+      toast.success(text);
+    },
+    [buildSuggestedAssignInput, coverageSuggestions, setShift, shifts],
+  );
+
+  const undoCoverageSuggestion = useCallback(
+    (appliedId: string) => {
+      const entry = appliedSuggestions.find((item) => item.id === appliedId);
+      if (!entry || entry.final) return;
+      for (const write of entry.before) {
+        setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+      }
+      setAppliedSuggestions((current) => current.filter((item) => item.id !== appliedId));
+      toast.success(`Undone: ${entry.text}`);
+    },
+    [appliedSuggestions, setShift],
+  );
+
+  const confirmSuggestedApproval = useCallback(async () => {
+    if (!pendingApproval?.suggestion.requestId) return;
+    const { suggestion } = pendingApproval;
+    setBusySuggestionId(suggestion.id);
+    const approved = await shiftRequests.resolve(suggestion.requestId!, true);
+    // An approval publishes on the server; reload so the grid and the panel
+    // show it at once instead of waiting for a realtime message.
+    if (approved) {
+      try {
+        await refetchScheduleDataRef.current();
+      } catch (err) {
+        Sentry.captureException(err);
+      }
+    }
+    setBusySuggestionId(null);
+    setPendingApproval(null);
+    if (!approved) return;
+    const view = coverageSuggestions?.items.find((item) => item.suggestion.id === suggestion.id);
+    const text = appliedSuggestionText(view?.text.title ?? "Approved the pickup request");
+    setAppliedSuggestions((current) => [
+      ...current,
+      { id: `${suggestion.id}@${Date.now()}`, text, final: true, before: [] },
+    ]);
+    toast.success(text);
+  }, [coverageSuggestions, pendingApproval, shiftRequests]);
 
   const fillCoverageCell = useCallback(
     (focusAreaId: number, cell: CoverageMatrixCell) => {
@@ -7770,6 +8027,18 @@ function SchedulerContent({
               );
             })()}
 
+            {pendingApproval && (
+              <ConfirmDialog
+                title={pendingApproval.title}
+                message={pendingApproval.message}
+                confirmLabel="Approve"
+                variant="info"
+                isLoading={busySuggestionId === pendingApproval.suggestion.id}
+                onConfirm={() => confirmSuggestedApproval()}
+                onCancel={() => setPendingApproval(null)}
+              />
+            )}
+
             {/* Confirm dialog for context-menu shift removal */}
             {pendingClearShift && (
               <ConfirmDialog
@@ -8373,6 +8642,11 @@ function SchedulerContent({
               todayKey={todayKey}
               getCellFill={getCoverageCellFill}
               describeCellChanges={describeCoverageCell}
+              suggestions={coverageSuggestions}
+              appliedSuggestions={appliedSuggestions}
+              busySuggestionId={busySuggestionId}
+              onApplySuggestion={applyCoverageSuggestion}
+              onUndoSuggestion={undoCoverageSuggestion}
               onFillSpot={fillCoverageCell}
               onShowInGrid={showCoverageInGrid}
               onClose={() => setShowCoveragePanel(false)}
@@ -8508,6 +8782,7 @@ function SchedulerContent({
                   windowLabel={currentPublishWindow.label}
                   totalChanges={draftBreakdown.totalChanges}
                   coverageGapCount={allCoverageGaps.length}
+                  coverageChange={publishCoverageChange}
                 />
               }
               maxWidth={560}

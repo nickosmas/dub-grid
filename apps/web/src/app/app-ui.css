@@ -1040,6 +1040,102 @@
     outline-color: transparent;
   }
 }
+.dg-cc-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dg-cc-sg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dg-cc-sg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-surface);
+}
+.dg-cc-sg-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: normal;
+}
+button.dg-cc-sg-main {
+  cursor: pointer;
+}
+.dg-cc-sg-main:focus-visible,
+.dg-cc-more:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-cc-sg-title {
+  overflow-wrap: anywhere;
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--dg-color-text-primary);
+}
+.dg-cc-sg-detail {
+  font-size: var(--dg-fs-footnote);
+  line-height: 1.4;
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-sg-effect {
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+  color: var(--dg-color-success-text);
+}
+.dg-cc-sg-action {
+  flex-shrink: 0;
+  min-width: 96px;
+  white-space: nowrap;
+}
+.dg-cc-more {
+  align-self: flex-start;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-brand);
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dg-cc-applied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dg-cc-applied .dg-cc-detail-line {
+  flex: 1;
+  min-width: 0;
+}
+.dg-cc-applied-icon {
+  flex-shrink: 0;
+  color: var(--dg-color-success-text);
+}
+.dg-cc-applied-final {
+  flex-shrink: 0;
+  font-size: var(--dg-fs-footnote);
+  font-weight: 600;
+  color: var(--dg-color-text-subtle);
+}
 @media (max-width: 767px) {
   .dg-cc-matrix {
     --dg-cc-label-w: 112px;

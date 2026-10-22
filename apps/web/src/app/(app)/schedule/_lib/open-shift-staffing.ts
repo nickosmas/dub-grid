@@ -25,6 +25,26 @@ export interface StaffingScheduleState {
   fromRecurring?: boolean;
 }
 
+/** A cell as the staffing checks see it: the editor's draft, else what is published. */
+export function staffingStateFromEntry(
+  entry: ScheduleCellStateEntry | undefined,
+): StaffingScheduleState | null {
+  const effective = entry?.effective ?? null;
+  return effective
+    ? {
+        kind: effective.kind,
+        segments: effective.segments,
+        assignmentIds: effective.assignmentIds,
+        absenceTypeId: effective.absenceTypeId ?? null,
+        restOfDayAbsenceTypeId: entry?.restOfDayAbsenceTypeId ?? null,
+        customStartTime: effective.customStartTime ?? null,
+        customEndTime: effective.customEndTime ?? null,
+        seriesId: effective.seriesId ?? null,
+        fromRecurring: effective.fromRecurring ?? false,
+      }
+    : null;
+}
+
 export interface OpenShiftStaffingOption {
   assignmentIds: number[];
   /** Resolved per segment (custom or default): what the conflict checks see. */
@@ -106,7 +126,7 @@ function joinAlignedTimes(values: Array<string | null>): string | null {
   return values.some(Boolean) ? values.map((value) => value ?? "").join("|") : null;
 }
 
-function assignmentTimeRange(
+export function assignmentTimeRange(
   assignment: AssignmentDefinition,
   shiftCategories: ShiftCategory[],
 ): TimeRange | null {
@@ -119,7 +139,7 @@ function assignmentTimeRange(
   return shift?.startTime && shift.endTime ? { start: shift.startTime, end: shift.endTime } : null;
 }
 
-function getStaffingStateAlignedTimeRanges(
+export function getStaffingStateAlignedTimeRanges(
   state: StaffingScheduleState | null,
   context: Pick<StaffingContext, "assignments" | "shiftCategories">,
 ): Array<TimeRange | null> {

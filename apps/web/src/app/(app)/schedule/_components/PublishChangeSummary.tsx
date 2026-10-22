@@ -36,12 +36,34 @@ function joinNames(names: string[]): string {
  * It mirrors the discard dialog's card layout, and reuses the same summary
  * component, so the two schedule-wide decisions read the same way.
  */
+/** What publishing does to coverage, counted on cells that have not started. */
+export interface PublishCoverageChange {
+  opened: number;
+  closed: number;
+  /** Some dates in the window were never published, so only the rest are compared. */
+  partial: boolean;
+}
+
+export function publishCoverageChangeText(change: PublishCoverageChange): string {
+  const where = change.partial ? " on dates already published" : "";
+  if (change.opened === 0 && change.closed === 0) {
+    return `This publish doesn't open or close any gap${where}.`;
+  }
+  const opens =
+    change.opened === 0
+      ? "opens no gaps"
+      : `opens ${change.opened} ${change.opened === 1 ? "gap" : "gaps"}`;
+  const closes = change.closed === 0 ? "closes none" : `closes ${change.closed}`;
+  return `This publish ${opens} and ${closes}${where}.`;
+}
+
 export function PublishChangeSummary({
   editorRows,
   activeEditors = [],
   windowLabel,
   totalChanges,
   coverageGapCount,
+  coverageChange = null,
 }: {
   editorRows: PublishEditorRow[];
   /** Other people on the schedule right now, drafts or not. */
@@ -49,6 +71,8 @@ export function PublishChangeSummary({
   windowLabel: string;
   totalChanges: number;
   coverageGapCount: number;
+  /** Null when the organization has no coverage requirements. */
+  coverageChange?: PublishCoverageChange | null;
 }) {
   const otherEditors = editorRows.filter((row) => !row.isCurrentUser);
 
@@ -104,6 +128,20 @@ export function PublishChangeSummary({
           {joinNames(activeEditors.map((editor) => editor.name))}{" "}
           {activeEditors.length === 1 ? "is" : "are"} on the schedule right now. Anything they have
           not saved yet will not be published.
+        </p>
+      )}
+
+      {coverageChange && (
+        <p
+          className="dg-tabular-nums"
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-footnote)",
+            lineHeight: 1.5,
+            color: "var(--dg-color-text-secondary)",
+          }}
+        >
+          {publishCoverageChangeText(coverageChange)}
         </p>
       )}
 

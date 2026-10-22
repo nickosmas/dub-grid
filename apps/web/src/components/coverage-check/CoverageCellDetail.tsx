@@ -6,6 +6,7 @@ import {
   type CoverageMatrixRow,
 } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
+import { CoverageSuggestionRow, type CoverageSuggestionView } from "./CoverageSuggestions";
 import {
   describeCellState,
   formatCellCount,
@@ -30,6 +31,12 @@ interface CoverageCellDetailProps {
   fill: CoverageCellFill;
   /** One line per draft change behind the cell; editors only. */
   changes: string[];
+  /** Suggestions that fix this cell; editors only. */
+  ways: CoverageSuggestionView[];
+  /** Why each other qualified person was not suggested; editors only. */
+  notSuggested: string[];
+  busy: boolean;
+  onApply: (suggestion: CoverageSuggestionView["suggestion"]) => void;
   onFillSpot: () => void;
   onShowInGrid: () => void;
 }
@@ -55,6 +62,10 @@ export function CoverageCellDetail({
   canEditShifts,
   fill,
   changes,
+  ways,
+  notSuggested,
+  busy,
+  onApply,
   onFillSpot,
   onShowInGrid,
 }: CoverageCellDetailProps) {
@@ -135,6 +146,34 @@ export function CoverageCellDetail({
             {coverageCellUnchangedText(cell)}
           </p>
         ))}
+      {canEditShifts && ways.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <div className="dg-cc-caption">Ways to fix</div>
+          <ul className="dg-cc-sg-list">
+            {ways.map((view) => (
+              <CoverageSuggestionRow
+                key={view.suggestion.id}
+                view={view}
+                busy={busy}
+                onApply={onApply}
+                showDetail
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+      {canEditShifts && notSuggested.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <div className="dg-cc-caption">Not suggested</div>
+          <ul className="dg-cc-changes">
+            {notSuggested.map((line) => (
+              <li key={line} className="dg-cc-change dg-cc-detail-line dg-cc-detail-line--muted">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {isActionable && fill.pendingPickups > 0 && (
         <p className="dg-cc-detail-line dg-tabular-nums">
           {pendingPickupText(fill.pendingPickups)}

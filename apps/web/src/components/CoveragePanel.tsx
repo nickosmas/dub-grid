@@ -9,6 +9,7 @@ import {
   type CoverageMatrix,
   type CoverageMatrixCell,
   type CoverageMatrixRow,
+  type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -24,6 +25,11 @@ import {
   CoverageMatrixGrid,
   type CoverageCellRef,
 } from "@/components/coverage-check/CoverageMatrixGrid";
+import {
+  CoverageSuggestions,
+  type AppliedCoverageSuggestion,
+  type CoverageSuggestionView,
+} from "@/components/coverage-check/CoverageSuggestions";
 import {
   CoverageCellDetail,
   type CoverageCellFill,
@@ -50,6 +56,15 @@ interface CoveragePanelProps {
   describeCellChanges: (row: CoverageMatrixRow, cell: CoverageMatrixCell) => string[];
   onFillSpot: (focusAreaId: number, cell: CoverageMatrixCell) => void;
   onShowInGrid: (focusAreaId: number, dateKey: string) => void;
+  /** Editors only: the engine's suggestions and, per cell (`rowKey|dateKey`), why others were not. */
+  suggestions?: {
+    items: CoverageSuggestionView[];
+    notSuggestedByCell: ReadonlyMap<string, string[]>;
+  } | null;
+  appliedSuggestions?: AppliedCoverageSuggestion[];
+  busySuggestionId?: string | null;
+  onApplySuggestion?: (suggestion: CoverageSuggestion) => void;
+  onUndoSuggestion?: (appliedId: string) => void;
   onClose: () => void;
 }
 
@@ -126,6 +141,11 @@ export default function CoveragePanel({
   describeCellChanges,
   onFillSpot,
   onShowInGrid,
+  suggestions = null,
+  appliedSuggestions = [],
+  busySuggestionId = null,
+  onApplySuggestion = () => {},
+  onUndoSuggestion = () => {},
   onClose,
 }: CoveragePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
@@ -165,6 +185,13 @@ export default function CoveragePanel({
   useEffect(() => {
     if (selected) detailRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [selected]);
+  const suggestionItems = useMemo(() => {
+    if (!suggestions) return [];
+    const rowKeys = new Set(rows.map((row) => row.rowKey));
+    return suggestions.items.filter((view) =>
+      view.suggestion.targets.some((target) => rowKeys.has(target.rowKey)),
+    );
+  }, [suggestions, rows]);
   const hasPast = rows.some((row) => row.cells.some((cell) => cell?.past));
   const areaName =
     filterFocusArea === "all"
@@ -342,6 +369,17 @@ export default function CoveragePanel({
                 />
               ) : (
                 <>
+                  {canEditShifts && suggestions && (
+                    <CoverageSuggestions
+                      items={suggestionItems}
+                      applied={appliedSuggestions}
+                      hasGaps={totals.short > 0}
+                      busyId={busySuggestionId}
+                      onSelect={(target) => setSelected(target)}
+                      onApply={onApplySuggestion}
+                      onUndo={onUndoSuggestion}
+                    />
+                  )}
                   <CoverageMatrixGrid
                     dates={dates}
                     dateKeys={matrix.dateKeys}
@@ -376,6 +414,20 @@ export default function CoveragePanel({
                         changes={
                           canEditShifts ? describeCellChanges(selection.row, selection.cell) : []
                         }
+                        ways={suggestionItems.filter((view) =>
+                          view.suggestion.targets.some(
+                            (target) =>
+                              target.rowKey === selection.row.rowKey &&
+                              target.dateKey === selection.cell.dateKey,
+                          ),
+                        )}
+                        notSuggested={
+                          suggestions?.notSuggestedByCell.get(
+                            `${selection.row.rowKey}|${selection.cell.dateKey}`,
+                          ) ?? []
+                        }
+                        busy={busySuggestionId != null}
+                        onApply={onApplySuggestion}
                         onFillSpot={() => onFillSpot(selection.row.focusAreaId, selection.cell)}
                         onShowInGrid={() =>
                           onShowInGrid(selection.row.focusAreaId, selection.cell.dateKey)

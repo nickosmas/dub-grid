@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 46 are
-shipped. Item 40 is in progress. Item 47 is in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 47 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,7 +81,7 @@ shipped. Item 40 is in progress. Item 47 is in progress.
 | 44   | Shipped     | Safe billing actions, Gridmaster billing controls and policy, and billing history.                                              |
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
-| 47   | In progress | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
+| 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 
 Item 40 is split:
 
@@ -201,7 +201,7 @@ After headings; the arrow is only for compact spaces such as push. Staff are
 assumed to have seen nothing in between publishes. Design reference: the
 "Shift change display" canvas (owner decisions, 2026-10-20 and 2026-10-21).
 
-Item 47 is split; 47a, 47b and 47c have shipped:
+Item 47 is split, and every part has shipped:
 
 - **47a - Matrix and changes since publish:** shipped; Coverage Check
   shows each requirement's staffed and needed counts by day, short or over,
@@ -220,9 +220,11 @@ Item 47 is split; 47a, 47b and 47c have shipped:
   each other qualified person was not suggested. No UI yet.
   A person fits when qualified and free that day; there is no weekly hours
   limit or minimum rest rule (owner, 2026-10-21).
-- **47d - Suggestions in the panel:** planned; apply and undo through the
-  draft, approve behind a confirmation, and the opened and closed counts in
-  the Publish dialog. Approve needs the approval-replaces-draft fix first.
+- **47d - Suggestions in the panel:** shipped; the panel lists the engine's
+  suggestions (top 3, show all), each cell's detail shows Ways to fix and
+  Not suggested, Move back, Restore and Schedule apply through the normal
+  draft save with Undo, Approve asks first and publishes, and the Publish
+  dialog says how many gaps a publish opens and closes.
 
 Every staffing insight is measured on the schedule and must be exact; an
 approval publishes at once and replaces any earlier draft of the cells it

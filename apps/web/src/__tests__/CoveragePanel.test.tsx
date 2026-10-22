@@ -4,7 +4,9 @@ import {
   buildCoverageMatrix,
   type CoverageCategorySnapshot,
   type CoverageMatrix,
+  type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
+import { appliedSuggestionText } from "@/components/coverage-check/CoverageSuggestions";
 
 import CoveragePanel from "@/components/CoveragePanel";
 import type { FocusArea } from "@/types";
@@ -387,6 +389,155 @@ describe("CoveragePanel", () => {
       expect(detail().queryByText("What changed")).not.toBeInTheDocument();
       expect(detail().queryByText(/Nothing in this draft/)).not.toBeInTheDocument();
       expect(describeCellChanges).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("suggestions", () => {
+    const suggestion = (
+      id: string,
+      kind: CoverageSuggestion["kind"],
+      dateKey = "2026-10-28",
+    ): CoverageSuggestion => ({
+      id,
+      kind,
+      employeeId: kind === "pattern" ? null : "ana",
+      requestId: kind === "approvePickup" ? "r1" : null,
+      final: kind === "approvePickup",
+      subject: {
+        rowKey: "1:5:1",
+        focusAreaId: 1,
+        assignmentId: 20,
+        dateKey,
+        otherDateKey: null,
+        otherAssignmentIds: [],
+      },
+      targets: [{ rowKey: "1:5:1", dateKey }],
+      overrides: [],
+      effects: [],
+      closes: 1,
+      filled: 1,
+      clearsOver: 0,
+    });
+    const view = (id: string, kind: CoverageSuggestion["kind"], title = `Do ${id}`) => ({
+      suggestion: suggestion(id, kind),
+      text: { title, detail: `Detail ${id}`, effect: kind === "pattern" ? null : "Closes 1 gap" },
+    });
+    const items = [
+      view("a", "moveBack", "Move Ana Crawford's Day Shift back to Wed, Oct 28"),
+      view("b", "restore"),
+      view("c", "assign"),
+      view("d", "approvePickup"),
+      view("e", "pattern"),
+    ];
+    const withSuggestions = (overrides = {}) =>
+      renderPanel({
+        suggestions: {
+          items,
+          notSuggestedByCell: new Map([
+            [
+              "1:5:1|2026-10-28",
+              [
+                "Ben Shepherd: Sick that day",
+                "Cat Morrison: works Evening Shift that day, which overlaps",
+              ],
+            ],
+          ]),
+        },
+        ...overrides,
+      });
+    const list = () => within(screen.getByRole("region", { name: "Suggestions" }));
+
+    it("shows the top three, then all of them", () => {
+      withSuggestions();
+
+      expect(list().getAllByRole("listitem")).toHaveLength(3);
+      fireEvent.click(list().getByRole("button", { name: "Show all 5" }));
+      expect(list().getAllByRole("listitem")).toHaveLength(5);
+    });
+
+    it("labels each action and gives a repeating gap none", () => {
+      withSuggestions();
+      fireEvent.click(list().getByRole("button", { name: "Show all 5" }));
+
+      for (const label of ["Move back", "Restore", "Schedule", "Approve"]) {
+        expect(list().getByRole("button", { name: new RegExp(`^${label}:`) })).toBeInTheDocument();
+      }
+      expect(list().getByText("Detail e")).toBeInTheDocument();
+      expect(
+        list().getAllByRole("button", { name: /^(Move back|Restore|Schedule|Approve):/ }),
+      ).toHaveLength(4);
+    });
+
+    it("applies a suggestion and selects its cell when its text is chosen", () => {
+      const onApplySuggestion = vi.fn();
+      withSuggestions({ onApplySuggestion });
+
+      fireEvent.click(list().getByRole("button", { name: /^Move back:/ }));
+      expect(onApplySuggestion).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+      fireEvent.click(list().getByRole("button", { name: /^Show in Coverage Check: Move Ana/ }));
+      expect(screen.getByRole("region", { name: "Selected day" })).toBeInTheDocument();
+    });
+
+    it("lists applied changes with Undo, and an approval as published", () => {
+      const onUndoSuggestion = vi.fn();
+      withSuggestions({
+        onUndoSuggestion,
+        appliedSuggestions: [
+          {
+            id: "x",
+            text: appliedSuggestionText("Restore Ben Shepherd's Day Shift"),
+            final: false,
+          },
+          {
+            id: "y",
+            text: appliedSuggestionText("Approve Ana Crawford's pickup request"),
+            final: true,
+          },
+        ],
+      });
+
+      fireEvent.click(
+        list().getByRole("button", { name: "Undo: Restored Ben Shepherd's Day Shift" }),
+      );
+      expect(onUndoSuggestion).toHaveBeenCalledWith("x");
+      expect(list().getByText("Approved Ana Crawford's pickup request")).toBeInTheDocument();
+      expect(list().getByText("Published")).toBeInTheDocument();
+    });
+
+    it("says so when there are gaps and no fixes", () => {
+      renderPanel({ suggestions: { items: [], notSuggestedByCell: new Map() } });
+      expect(
+        list().getByText("No fixes found. Each short day's detail says why."),
+      ).toBeInTheDocument();
+    });
+
+    it("shows nothing to someone who cannot edit shifts", () => {
+      withSuggestions({ canEditShifts: false });
+      expect(screen.queryByRole("region", { name: "Suggestions" })).not.toBeInTheDocument();
+    });
+
+    it("shows Ways to fix and Not suggested for a short cell, and neither for a staffed one", () => {
+      withSuggestions();
+
+      fireEvent.click(cell(/Wednesday, October 28/));
+      const detail = within(screen.getByRole("region", { name: "Selected day" }));
+      expect(detail.getByText("Ways to fix")).toBeInTheDocument();
+      expect(detail.getByText("Detail a")).toBeInTheDocument();
+      expect(detail.getByText("Not suggested")).toBeInTheDocument();
+      expect(
+        detail
+          .getAllByRole("listitem")
+          .map((item) => item.textContent)
+          .slice(-2),
+      ).toEqual([
+        "Ben Shepherd: Sick that day",
+        "Cat Morrison: works Evening Shift that day, which overlaps",
+      ]);
+
+      fireEvent.click(cell(/Tuesday, October 27/));
+      const staffed = within(screen.getByRole("region", { name: "Selected day" }));
+      expect(staffed.queryByText("Ways to fix")).not.toBeInTheDocument();
+      expect(staffed.queryByText("Not suggested")).not.toBeInTheDocument();
     });
   });
 });
