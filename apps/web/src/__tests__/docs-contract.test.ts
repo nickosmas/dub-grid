@@ -508,6 +508,7 @@ describe("runtime evidence", () => {
     platform: "android",
     target: "Pixel 7 Pro emulator",
     viewport: null,
+    device: "physical",
     roles: ["user"],
     states: ["loaded", "offline"],
     ...overrides,
@@ -565,7 +566,7 @@ describe("runtime evidence", () => {
       ),
     ).toEqual([
       "accuracy-manifest.json: no passing web evidence for webkit desktop",
-      "accuracy-manifest.json: no passing android evidence",
+      "accuracy-manifest.json: no passing android evidence on a physical device",
     ]);
     expect(
       check(
@@ -574,6 +575,28 @@ describe("runtime evidence", () => {
       ),
     ).toEqual(["accuracy-manifest.json: no passing web evidence for role admin"]);
     expect(check([web(), web({ id: "w2", target: "webkit" }), android()], true)).toEqual([]);
+  });
+
+  it("needs a device kind on mobile only, and counts only physical devices", () => {
+    expect(
+      check([
+        web({ device: "virtual" }),
+        android({ id: "a1", device: undefined }),
+        android({ id: "a2", device: "tablet" as "physical" }),
+      ]),
+    ).toEqual([
+      "accuracy-manifest.json: runtimeEvidence web-chromium-desktop: web evidence has no device",
+      "accuracy-manifest.json: runtimeEvidence a1: mobile evidence says whether its device is physical or virtual",
+      "accuracy-manifest.json: runtimeEvidence a2: mobile evidence says whether its device is physical or virtual",
+    ]);
+    const webRuns = [web(), web({ id: "w2", target: "webkit" })];
+    expect(check([...webRuns, android({ device: "virtual" })])).toEqual([]);
+    expect(check([...webRuns, android({ device: "virtual" })], true)).toEqual([
+      "accuracy-manifest.json: no passing android evidence on a physical device",
+    ]);
+    expect(
+      check([...webRuns, android({ device: "virtual" }), android({ id: "a2" })], true),
+    ).toEqual([]);
   });
 
   it("only checks the shape unless coverage is required", () => {

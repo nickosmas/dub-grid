@@ -819,6 +819,14 @@
     - [ ] 40e4. **Native iOS and Android qualification** - record real-device
           evidence for the required mobile roles and states, including the
           mandatory Android pass; do not infer unavailable device evidence.
+      - [x] 40e4a. **Simulator and emulator qualification** - run the
+            native app on the iOS Simulator and an Android emulator against
+            the dedicated local environment for every mobile role and the
+            states each can reach, recorded as virtual-device evidence that
+            never satisfies the real-device requirement.
+      - [ ] 40e4b. **Physical-device pass** - repeat the qualification on a
+            physical iPhone and a physical Android phone; the 40e gate
+            accepts only this evidence for iOS and Android.
 - [x] 44. **Billing safety and Gridmaster billing controls** - fix the billing
       defects that can lock out or strand a customer, give Gridmasters safe,
       explained billing actions, show customers only the billing activity that

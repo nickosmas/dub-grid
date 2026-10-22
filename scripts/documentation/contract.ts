@@ -92,6 +92,8 @@ export interface RuntimeEvidenceEntry {
   target: string;
   /** Web only; null on mobile. */
   viewport: string | null;
+  /** Mobile only: a simulator or emulator is virtual and never satisfies the requirement. */
+  device?: "physical" | "virtual";
   roles: string[];
   states: string[];
   /** YYYY-MM-DD. */
@@ -335,7 +337,8 @@ function isCount(value: unknown): boolean {
 /**
  * Checks retained runtime evidence against the declared profiles. With
  * `requireRuntimeEvidence`, every web browser and viewport and each mobile
- * platform needs a passing run, and together they must cover every role.
+ * platform needs a passing run, on a physical device for mobile, and together
+ * they must cover every role.
  */
 export function validateRuntimeEvidence(
   repoRoot: string,
@@ -363,12 +366,18 @@ export function validateRuntimeEvidence(
       unknown("viewport", [entry.viewport ?? "none"], web.viewports);
       unknown("role", entry.roles, web.roles);
       if (entry.states.length > 0) errors.push(`${where(entry)}: web evidence lists no states`);
+      if (entry.device !== undefined) errors.push(`${where(entry)}: web evidence has no device`);
     } else if (entry.platform === "ios" || entry.platform === "android") {
       unknown("platform", [entry.platform], mobile.platforms);
       unknown("role", entry.roles, mobile.roles);
       unknown("state", entry.states, mobile.states);
       if (entry.viewport !== null) errors.push(`${where(entry)}: mobile evidence has no viewport`);
       if (!entry.target) errors.push(`${where(entry)}: mobile evidence names its device`);
+      if (entry.device !== "physical" && entry.device !== "virtual") {
+        errors.push(
+          `${where(entry)}: mobile evidence says whether its device is physical or virtual`,
+        );
+      }
     } else {
       errors.push(`${where(entry)}: unknown platform ${String(entry.platform)}`);
     }
@@ -415,14 +424,18 @@ export function validateRuntimeEvidence(
       errors.push(`accuracy-manifest.json: no passing web evidence for role ${role}`);
     }
     for (const platform of mobile.platforms ?? []) {
-      const runs = passing.filter((entry) => entry.platform === platform);
+      const runs = passing.filter(
+        (entry) => entry.platform === platform && entry.device === "physical",
+      );
       if (runs.length === 0) {
-        errors.push(`accuracy-manifest.json: no passing ${platform} evidence`);
+        errors.push(`accuracy-manifest.json: no passing ${platform} evidence on a physical device`);
         continue;
       }
       const roles = new Set(runs.flatMap((entry) => entry.roles));
       for (const role of (mobile.roles ?? []).filter((item) => !roles.has(item))) {
-        errors.push(`accuracy-manifest.json: no passing ${platform} evidence for role ${role}`);
+        errors.push(
+          `accuracy-manifest.json: no passing ${platform} evidence on a physical device for role ${role}`,
+        );
       }
     }
   }

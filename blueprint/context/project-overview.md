@@ -104,8 +104,14 @@ Item 40 is split:
     against a seeded throwaway stack and a production build, recorded under
     `internal/operations/runtime-qualification/` and as `runtimeEvidence`
     the docs check validates (`--require-runtime-evidence` for 40e).
-  - **40e4 - Native iOS and Android qualification:** planned; Android evidence
-    is mandatory.
+  - **40e4 - Native iOS and Android qualification:** in progress; Android
+    evidence is mandatory.
+    - **40e4a - Simulator and emulator qualification:** shipped; every
+      mobile role and state was observed on the iOS Simulator and an Android
+      emulator (offline on Android only), recorded as virtual-device evidence
+      that the 40e gate does not count.
+    - **40e4b - Physical-device pass:** planned; needs a physical iPhone and
+      Android phone, and is the only mobile evidence the gate accepts.
 
 Item 44 is split, and every part has shipped:
 
@@ -422,6 +428,6 @@ Main mobile surfaces:
 
 - Exact per-seat billing price points and tier breaks are unconfirmed.
 - Deployment domain details are unconfirmed.
-- Item 40e cannot complete until both iOS and Android runtime evidence is
-  recorded.
+- Item 40e cannot complete until iOS and Android runtime evidence from
+  physical devices is recorded (40e4b).
 - The Privacy Policy promises a self-serve data export that no screen offers.
