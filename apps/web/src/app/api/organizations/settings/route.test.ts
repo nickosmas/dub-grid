@@ -11,6 +11,8 @@ const profileMaybeSingle = vi.fn();
 const organizationBillingMaybeSingle = vi.fn();
 const organizationSingle = vi.fn();
 const organizationUpdateMaybeSingle = vi.fn();
+const absenceTypeMaybeSingle = vi.fn();
+const absenceTypeFilters: unknown[][] = [];
 const auditInsert = vi.fn();
 const organizationUpdate = vi.fn();
 
@@ -107,6 +109,21 @@ vi.mock("@/lib/supabase-service", () => ({
           })),
           update: organizationUpdate,
         };
+      }
+
+      if (table === "absence_types") {
+        const chain = {
+          eq: vi.fn((...args: unknown[]) => {
+            absenceTypeFilters.push(["eq", ...args]);
+            return chain;
+          }),
+          is: vi.fn((...args: unknown[]) => {
+            absenceTypeFilters.push(["is", ...args]);
+            return chain;
+          }),
+          maybeSingle: absenceTypeMaybeSingle,
+        };
+        return { select: vi.fn(() => chain) };
       }
 
       if (table === "audit_log") {
@@ -471,6 +488,79 @@ describe("PUT /api/organizations/settings", () => {
     expect(organizationUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ staff_see_shift_changes: false, staff_see_publisher: false }),
     );
+  });
+
+  describe("the day off absence", () => {
+    const save = (coverageRuleConfig: Record<string, unknown>, current = {}) => {
+      const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", {
+        coverage_rule_config: { mentoredCoverageCreditPercent: 50, ...current },
+      });
+      organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+      organizationUpdateMaybeSingle.mockResolvedValueOnce({
+        data: makeOrganizationRow("2026-04-15T18:10:00.000000+00:00"),
+        error: null,
+      });
+      return PUT(
+        makeRequest({
+          orgId: currentRow.id,
+          expectedUpdatedAt: currentRow.updated_at,
+          coverageRuleConfig,
+        }),
+      );
+    };
+
+    it("saves one of the organization's own absence types", async () => {
+      absenceTypeFilters.length = 0;
+      absenceTypeMaybeSingle.mockResolvedValueOnce({ data: { id: 133 }, error: null });
+      const response = await save({ mentoredCoverageCreditPercent: 50, dayOffAbsenceTypeId: 133 });
+
+      expect(response.status).toBe(200);
+      expect(absenceTypeFilters).toEqual([
+        ["eq", "id", 133],
+        ["eq", "org_id", "11111111-1111-4111-8111-111111111111"],
+        ["is", "archived_at", null],
+      ]);
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          coverage_rule_config: { mentoredCoverageCreditPercent: 50, dayOffAbsenceTypeId: 133 },
+        }),
+      );
+    });
+
+    it("refuses an absence type from another organization or archived", async () => {
+      absenceTypeMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      const response = await save({ mentoredCoverageCreditPercent: 50, dayOffAbsenceTypeId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+    });
+
+    it("saves none without a lookup", async () => {
+      absenceTypeMaybeSingle.mockClear();
+      const response = await save({ mentoredCoverageCreditPercent: 50, dayOffAbsenceTypeId: null });
+
+      expect(response.status).toBe(200);
+      expect(absenceTypeMaybeSingle).not.toHaveBeenCalled();
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          coverage_rule_config: { mentoredCoverageCreditPercent: 50, dayOffAbsenceTypeId: null },
+        }),
+      );
+    });
+
+    it("keeps the saved day off absence when a save leaves it out", async () => {
+      const response = await save(
+        { mentoredCoverageCreditPercent: 100 },
+        { dayOffAbsenceTypeId: 133 },
+      );
+
+      expect(response.status).toBe(200);
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          coverage_rule_config: { mentoredCoverageCreditPercent: 100, dayOffAbsenceTypeId: 133 },
+        }),
+      );
+    });
   });
 
   it("rejects invalid organization phone numbers with field errors", async () => {

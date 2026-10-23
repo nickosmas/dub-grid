@@ -599,18 +599,21 @@ function ChecklistPanel({
 function EligibilityModeToggle({
   value,
   disabled,
-  dimmed,
+  inactive,
   onChange,
 }: {
   value: JobEligibilityMode;
   disabled?: boolean;
-  dimmed?: boolean;
+  /** The rule has no effect until both lists have a selection, so nothing reads as chosen. */
+  inactive?: boolean;
   onChange: (value: JobEligibilityMode) => void;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ ...labelStyle, marginBottom: 0 }}>Matching rule</div>
+        <div id="job-matching-rule-label" style={{ ...labelStyle, marginBottom: 0 }}>
+          Matching rule
+        </div>
         <div
           style={{
             fontSize: "var(--dg-fs-caption)",
@@ -622,14 +625,9 @@ function EligibilityModeToggle({
         </div>
       </div>
       <div
-        style={{
-          display: "inline-flex",
-          borderRadius: "var(--dg-btn-radius)",
-          border: "1px solid var(--dg-color-border)",
-          overflow: "hidden",
-          alignSelf: "flex-start",
-          opacity: dimmed ? 0.65 : 1,
-        }}
+        className="dg-segment dg-segment-grid"
+        role="group"
+        aria-labelledby="job-matching-rule-label"
       >
         {(
           [
@@ -637,23 +635,16 @@ function EligibilityModeToggle({
             ["or", "Allow either"],
           ] as const
         ).map(([mode, label]) => {
-          const active = value === mode;
+          const active = !inactive && value === mode;
           return (
             <Button
               key={mode}
               type="button"
               onClick={() => onChange(mode)}
-              disabled={disabled}
-              style={{
-                height: 34,
-                padding: "0 12px",
-                border: "none",
-                background: active ? "var(--dg-color-bg-secondary)" : "var(--dg-color-surface)",
-                color: active ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: active ? 700 : 600,
-                cursor: disabled ? "not-allowed" : "pointer",
-              }}
+              disabled={disabled || inactive}
+              aria-pressed={active}
+              className={`dg-segment-btn${active ? " active" : ""}`}
+              style={{ padding: "0 8px" }}
             >
               {label}
             </Button>
@@ -1322,13 +1313,16 @@ function JobRow({
   const eligibleRoleSummary =
     form.eligibleRoleIds.length === 0
       ? `Any schedule-eligible ${roleLabel.toLowerCase()}`
-      : `${formatCount(form.eligibleRoleIds.length, roleLabel.toLowerCase())} selected`;
+      : `${form.eligibleRoleIds.length} of ${scheduleRoles.length} ${roleLabel.toLowerCase()} selected`;
   const certificationSummary =
     form.requiredCertificationIds.length === 0
       ? `Any ${certificationLabel.toLowerCase()}`
-      : `${formatCount(form.requiredCertificationIds.length, certificationLabel.toLowerCase())} selected`;
-  const eligibilityModeDimmed =
-    form.eligibleRoleIds.length === 0 || form.requiredCertificationIds.length === 0;
+      : `${form.requiredCertificationIds.length} of ${certifications.length} ${certificationLabel.toLowerCase()} selected`;
+  const eligibilityModeMissing = [
+    form.eligibleRoleIds.length === 0 ? roleLabel.toLowerCase() : null,
+    form.requiredCertificationIds.length === 0 ? certificationLabel.toLowerCase() : null,
+  ].filter((part): part is string => part !== null);
+  const eligibilityModeInactive = eligibilityModeMissing.length > 0;
   const overrideCount =
     Object.keys(form.shiftColorOverrides).length + Object.keys(form.shiftTimeOverrides).length;
   const perShiftSettingsSummary =
@@ -2381,9 +2375,10 @@ function JobRow({
                   value={form.eligibilityMode}
                   onChange={(value) => setForm((prev) => ({ ...prev, eligibilityMode: value }))}
                   disabled={!canManageScheduleDefinitions}
-                  dimmed={eligibilityModeDimmed}
+                  inactive={eligibilityModeInactive}
                 />
                 <div
+                  aria-live="polite"
                   style={{
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--dg-color-text-muted)",
@@ -2391,8 +2386,8 @@ function JobRow({
                     minHeight: "calc(var(--dg-fs-caption) * 1.45 * 2)",
                   }}
                 >
-                  {eligibilityModeDimmed
-                    ? "Activates once both lists have selections."
+                  {eligibilityModeInactive
+                    ? `Select ${eligibilityModeMissing.join(" and ")} to use this rule.`
                     : form.eligibilityMode === "and"
                       ? "Staff need a match in both lists."
                       : "Staff need a match in at least one list."}

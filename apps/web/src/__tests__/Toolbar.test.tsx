@@ -41,6 +41,16 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("Toolbar — Schedule Builder button", () => {
+  it("is a plain button with a calendar icon and no count", () => {
+    render(<Toolbar {...defaultProps} onCoverageToggle={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "Schedule Builder" });
+    expect(button).toHaveTextContent(/^Schedule Builder$/);
+    expect(button.querySelector("svg.lucide-calendar-check")).not.toBeNull();
+    expect(button.style.color).toBe("");
+  });
+});
+
 describe("Toolbar — schedule mode rendering", () => {
   it("renders previous period button", () => {
     render(<Toolbar {...defaultProps} />);

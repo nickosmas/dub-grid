@@ -131,4 +131,162 @@ describe("POST /api/schedule/recurring", () => {
     });
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  describe("shift preferences", () => {
+    type Result = { data: unknown; error: null };
+    // A chainable query that answers with what each table is given.
+    function client(tables: Record<string, Result>) {
+      const calls: { table: string; method: string; args: unknown[] }[] = [];
+      const from = (table: string) => {
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "in", "delete"]) {
+          chain[method] = (...args: unknown[]) => {
+            calls.push({ table, method, args });
+            return chain;
+          };
+        }
+        chain.maybeSingle = () => Promise.resolve(tables[table]);
+        chain.upsert = (...args: unknown[]) => {
+          calls.push({ table, method: "upsert", args });
+          return Promise.resolve({ error: null });
+        };
+        chain.insert = () => ({ then: () => undefined });
+        chain.then = (resolve: (value: Result) => unknown) =>
+          Promise.resolve(tables[table] ?? { data: null, error: null }).then(resolve);
+        return chain;
+      };
+      return { calls, from };
+    }
+    const post = (body: Record<string, unknown>) =>
+      POST(
+        new NextRequest("http://localhost/api/schedule/recurring", {
+          method: "POST",
+          body: JSON.stringify({ orgId: ORG_ID, ...body }),
+        }),
+      );
+
+    it("reads the organization's preferences", async () => {
+      const db = client({
+        employee_shift_preferences: {
+          data: [{ employee_id: EMPLOYEE_ID, mode: "only", shift_ids: ["80", "82"] }],
+          error: null,
+        },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: db,
+      });
+
+      const response = await post({ action: "fetchShiftPreferences" });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        preferences: [{ employeeId: EMPLOYEE_ID, mode: "only", shiftIds: [80, 82] }],
+      });
+      expect(db.calls).toContainEqual({
+        table: "employee_shift_preferences",
+        method: "eq",
+        args: ["org_id", ORG_ID],
+      });
+    });
+
+    it("saves a preference for the organization's own person and shifts", async () => {
+      const db = client({
+        employees: { data: { id: EMPLOYEE_ID }, error: null },
+        shift_categories: { data: [{ id: 80 }, { id: 82 }], error: null },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: db,
+      });
+
+      const response = await post({
+        action: "saveShiftPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: { mode: "prefers", shiftIds: [80, 82, 80] },
+      });
+
+      expect(response.status).toBe(200);
+      expect(db.calls).toContainEqual({
+        table: "employees",
+        method: "eq",
+        args: ["org_id", ORG_ID],
+      });
+      expect(db.calls).toContainEqual({
+        table: "employee_shift_preferences",
+        method: "upsert",
+        args: [
+          expect.objectContaining({
+            employee_id: EMPLOYEE_ID,
+            org_id: ORG_ID,
+            mode: "prefers",
+            shift_ids: [80, 82],
+            updated_by: ACTOR_ID,
+          }),
+          { onConflict: "employee_id" },
+        ],
+      });
+      // Only someone who manages recurring shifts may save.
+      const allowed = requireOrgPermissions.mock.calls[0][2] as (
+        p: Record<string, boolean>,
+      ) => boolean;
+      expect(allowed({ canViewRecurringShifts: true })).toBeFalsy();
+      expect(allowed({ canManageRecurringShifts: true })).toBeTruthy();
+    });
+
+    it("refuses a person or a shift from another organization", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: client({ employees: { data: null, error: null } }),
+      });
+      const foreignPerson = await post({
+        action: "saveShiftPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: { mode: "only", shiftIds: [80] },
+      });
+      expect(foreignPerson.status).toBe(400);
+
+      const db = client({
+        employees: { data: { id: EMPLOYEE_ID }, error: null },
+        shift_categories: { data: [{ id: 80 }], error: null },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: db,
+      });
+      const foreignShift = await post({
+        action: "saveShiftPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: { mode: "only", shiftIds: [80, 999] },
+      });
+      expect(foreignShift.status).toBe(400);
+      expect(db.calls.some((call) => call.method === "upsert")).toBe(false);
+    });
+
+    it("clears a preference", async () => {
+      const db = client({ employees: { data: { id: EMPLOYEE_ID }, error: null } });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: db,
+      });
+
+      const response = await post({
+        action: "saveShiftPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: null,
+      });
+
+      expect(response.status).toBe(200);
+      expect(db.calls).toContainEqual({
+        table: "employee_shift_preferences",
+        method: "delete",
+        args: [],
+      });
+      expect(db.calls).toContainEqual({
+        table: "employee_shift_preferences",
+        method: "eq",
+        args: ["employee_id", EMPLOYEE_ID],
+      });
+    });
+  });
 });

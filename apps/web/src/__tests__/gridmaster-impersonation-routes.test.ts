@@ -20,6 +20,7 @@ const READS = new Set([
   "updateScheduleLastViewed",
   "fetchRecurringShifts",
   "getRecurringDraft",
+  "fetchShiftPreferences",
   "fetchShiftRequests",
 ]);
 

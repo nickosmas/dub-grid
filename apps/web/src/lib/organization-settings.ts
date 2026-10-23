@@ -35,7 +35,7 @@ type OrganizationSettingsValue =
   | number
   | boolean
   | null
-  | { mentoredCoverageCreditPercent: number }
+  | { mentoredCoverageCreditPercent: number; dayOffAbsenceTypeId?: number | null }
   | OpenShiftVisibility
   | Record<string, boolean | number | string>;
 
@@ -139,7 +139,16 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
       typeof value === "object" &&
       !Array.isArray(value) &&
       "mentoredCoverageCreditPercent" in value
-        ? `Mentored coverage: ${Number(value.mentoredCoverageCreditPercent ?? 100)}%`
+        ? [
+            `Mentored coverage: ${Number(value.mentoredCoverageCreditPercent ?? 100)}%`,
+            !("dayOffAbsenceTypeId" in value)
+              ? null
+              : value.dayOffAbsenceTypeId == null
+                ? "No day off absence"
+                : "Day off absence chosen",
+          ]
+            .filter(Boolean)
+            .join(", ")
         : DEFAULT_EMPTY,
   },
   openShiftVisibility: {

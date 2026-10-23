@@ -17,6 +17,7 @@ import type {
   SeriesFrequency,
 } from "@/types";
 import type { ShiftRequestDraftCell } from "@dubgrid/domain";
+import type { CoverageShiftPreference } from "@dubgrid/schedule-core";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -345,6 +346,35 @@ export function fetchRecurringShifts(
     absenceTypeLabels: absenceTypeMap ? [...absenceTypeMap.entries()] : undefined,
     includeArchived,
   }).then((data) => data.rows);
+}
+
+export interface EmployeeShiftPreference extends CoverageShiftPreference {
+  employeeId: string;
+}
+
+export function fetchShiftPreferences(
+  orgId: string,
+  employeeId?: string,
+): Promise<EmployeeShiftPreference[]> {
+  return requestRecurringAction<{ preferences: EmployeeShiftPreference[] }>({
+    action: "fetchShiftPreferences",
+    orgId,
+    employeeId,
+  }).then((data) => data.preferences);
+}
+
+/** Saves one person's preference; null clears it. */
+export function saveShiftPreference(
+  orgId: string,
+  employeeId: string,
+  preference: CoverageShiftPreference | null,
+): Promise<void> {
+  return requestRecurringAction<{ success: true }>({
+    action: "saveShiftPreference",
+    orgId,
+    employeeId,
+    preference,
+  }).then(() => undefined);
 }
 
 export function getRecurringDraft(

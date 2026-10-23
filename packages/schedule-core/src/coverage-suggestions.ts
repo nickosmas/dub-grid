@@ -200,7 +200,18 @@ export type CoverageAvailability =
   | { kind: "overlap"; dateKey: string; assignmentId: number }
   | { kind: "unverified"; dateKey: string }
   /** A pickup, swap or call-off waits on this person that day. */
-  | { kind: "request"; dateKey: string };
+  | { kind: "request"; dateKey: string }
+  /** Working this day would make `days` in a row, over the limit. */
+  | { kind: "workRun"; days: number }
+  /** The person works only the shifts they chose, and this is not one. */
+  | { kind: "onlyShifts" };
+
+/** A person's shift preference: flexible ("prefers") or strict ("only"). */
+export interface CoverageShiftPreference {
+  mode: "prefers" | "only";
+  /** Shift category ids. */
+  shiftIds: number[];
+}
 
 export interface CoveragePickupRequest {
   requestId: string;
@@ -739,6 +750,10 @@ export interface CoverageOverThreshold {
 
 /** A person's standing for one shift; lower is fairer to give them. */
 export interface CoverageFairnessStanding {
+  /** Whether this shift would leave the person a single day off between work days. */
+  splitsDaysOff?: boolean;
+  /** Their preference against this shift: one they prefer, none, or other shifts. */
+  preference?: "match" | "none" | "other";
   /** Weekend shifts recently and this period, or null when the shift is not on a weekend. */
   weekends: number | null;
   /** Night shifts recently and this period, or null when the shift is not a night. */
@@ -761,7 +776,7 @@ export interface CoverageFairChoice {
   suggestionId: string;
   employeeId: string;
   dateKey: string;
-  reason: "only" | "weekends" | "nights" | "hours" | "tie";
+  reason: "only" | "daysOff" | "preference" | "weekends" | "nights" | "hours" | "tie";
   /** The chosen person's count for that reason (hours for a tie). */
   count: number;
   /** How many others could have filled it the same way. */
@@ -796,12 +811,31 @@ export interface PlanCoverageFixesOptions {
    * the one with the fewest weekends, nights or hours, and say why.
    */
   fairness?: CoverageFairnessRule;
+  /** Recurring fills the caller left out, such as a sixth day in a row; reported with the preview. */
+  skippedRecurring?: ReadonlyArray<CoverageSkippedRecurring>;
 }
 
-const FAIRNESS_REASONS = ["weekends", "nights", "hours"] as const;
+/** A recurring schedule fill left out because it would make too many days in a row. */
+export interface CoverageSkippedRecurring {
+  employeeId: string;
+  dateKey: string;
+  /** Days in a row it would have made. */
+  days: number;
+}
 
+const FAIRNESS_REASONS = ["daysOff", "preference", "weekends", "nights", "hours"] as const;
+
+const PREFERENCE_RANK = { match: 0, none: 1, other: 2 } as const;
+
+// Days off stay in pairs first: a split is taken only when everyone else splits too.
 function standingKey(standing: CoverageFairnessStanding): number[] {
-  return [standing.weekends ?? 0, standing.nights ?? 0, standing.hours];
+  return [
+    standing.splitsDaysOff ? 1 : 0,
+    PREFERENCE_RANK[standing.preference ?? "none"],
+    standing.weekends ?? 0,
+    standing.nights ?? 0,
+    standing.hours,
+  ];
 }
 
 /** Same shift, same cell, same effect: only who fills it differs. */
@@ -838,11 +872,32 @@ interface PlanWithLeftovers {
   choices: CoverageFairChoice[];
 }
 
-/** The plan, plus who the last pass ruled out and the schedule it ended on. */
+/** Runs the planner's steps to the end at once. */
 function planWithLeftovers(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions,
 ): PlanWithLeftovers {
+  const steps = planSteps(input, options);
+  for (let step = steps.next(); ; step = steps.next()) {
+    if (step.done) return step.value;
+  }
+}
+
+/** How far a build has got: fixes placed, and staff filled out of those needed at the start. */
+export interface CoverageBuildProgress {
+  placed: number;
+  filled: number;
+  needed: number;
+}
+
+/**
+ * The plan one fix at a time, yielding its progress after each, then the
+ * plan, who the last pass ruled out and the schedule it ended on.
+ */
+function* planSteps(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+): Generator<CoverageBuildProgress, PlanWithLeftovers> {
   const plan: CoverageSuggestion[] = [];
   const overtime = options.overtime;
   const taken: Omit<CoverageOverThreshold, "hours">[] = [];
@@ -879,7 +934,7 @@ function planWithLeftovers(
       employeeId: best.candidate.employeeId!,
       dateKey: best.candidate.subject.dateKey,
       reason: !runnerUp ? "only" : decided >= 0 ? FAIRNESS_REASONS[decided] : "tie",
-      count: best.key[decided >= 0 ? decided : 2],
+      count: best.key[decided >= 0 ? decided : FAIRNESS_REASONS.indexOf("hours")],
       others: ranked.length - 1,
     });
     return best.candidate;
@@ -925,6 +980,8 @@ function planWithLeftovers(
     choices,
   });
   let current = overrides.length > 0 ? withPlanned() : input;
+  const needed = countOpen(current.matrix, options.rowKeys).staffShort;
+  let filled = 0;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
   for (let step = 0; step < 500; step += 1) {
     const pass = suggestCoverageFixes(current);
@@ -952,6 +1009,8 @@ function planWithLeftovers(
     plan.push(next);
     overrides.push(...next.overrides);
     current = withPlanned();
+    filled += next.filled;
+    yield { placed: plan.length, filled: Math.min(filled, needed), needed };
   }
   return finish(current);
 }
@@ -983,6 +1042,12 @@ export interface CoverageBuildPreview {
   recurringPeople: { employeeId: string; shifts: number; absences: number }[];
   /** Shifts still short after the build that have not started, by date then row. */
   shortCells: { rowKey: string; dateKey: string; staffShort: number }[];
+  /** Recurring fills left out for the days-in-a-row limit. */
+  recurringSkipped: CoverageSkippedRecurring[];
+  /** Empty days the build marks with the day off absence; added by the caller. */
+  daysOff: { employeeId: string; dateKey: string }[];
+  /** Days the build gives someone a sixth day in a row, when allowed; added by the caller. */
+  sixthDays: { employeeId: string; dateKey: string }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1009,7 +1074,34 @@ export function previewCoverageBuild(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
-  const { fixes, ruledOut, final, overThreshold, choices } = planWithLeftovers(input, options);
+  return summarizeBuild(input, options, planWithLeftovers(input, options));
+}
+
+export interface CoverageBuildPacing {
+  /** Awaited after each fix is placed, so the caller can let the page draw. */
+  pause: () => Promise<void>;
+  onProgress?: (progress: CoverageBuildProgress) => void;
+}
+
+/** {@link previewCoverageBuild}, handing control back between fixes. */
+export async function previewCoverageBuildAsync(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+  pacing: CoverageBuildPacing,
+): Promise<CoverageBuildPreview> {
+  const steps = planSteps(input, options);
+  for (let step = steps.next(); ; step = steps.next()) {
+    if (step.done) return summarizeBuild(input, options, step.value);
+    pacing.onProgress?.(step.value);
+    await pacing.pause();
+  }
+}
+
+function summarizeBuild(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+  { fixes, ruledOut, final, overThreshold, choices }: PlanWithLeftovers,
+): CoverageBuildPreview {
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const stillShort = new Set<string>();
@@ -1062,6 +1154,9 @@ export function previewCoverageBuild(
     skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
     overThreshold,
     choices,
+    recurringSkipped: [...(options.skippedRecurring ?? [])],
+    daysOff: [],
+    sixthDays: [],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

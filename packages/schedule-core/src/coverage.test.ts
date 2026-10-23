@@ -6,6 +6,8 @@ import {
   computeCoverageGaps,
   computeCoverageStatus,
   hasEffectiveCoverageRequirements,
+  normalizeCoverageRuleConfig,
+  resolveDayOffAbsenceType,
   resolveRequirementByAssignment,
   summarizeCoverageByFocusArea,
   summarizeCoverageDailyForFocusArea,
@@ -489,5 +491,44 @@ describe("cross-platform parity", () => {
     const webByFocusArea = summarizeCoverageByFocusArea(webSnapshots, [fa]);
     const mobileByFocusArea = summarizeCoverageByFocusArea(mobileSnapshots, [fa]);
     expect(mobileByFocusArea).toEqual(webByFocusArea);
+  });
+});
+
+describe("the day off absence", () => {
+  const types = [
+    { id: 1, name: "Paid Time Off", label: "PTO" },
+    { id: 2, name: "Sick", label: "S" },
+    { id: 3, name: "Off", label: "X" },
+    { id: 4, name: "Vacation", label: "V", archivedAt: "2026-01-01" },
+  ];
+
+  it("keeps a saved choice, a saved none, and leaves it out when nothing was saved", () => {
+    expect(normalizeCoverageRuleConfig({ dayOffAbsenceTypeId: 3 }).dayOffAbsenceTypeId).toBe(3);
+    expect(
+      normalizeCoverageRuleConfig({ dayOffAbsenceTypeId: null }).dayOffAbsenceTypeId,
+    ).toBeNull();
+    expect("dayOffAbsenceTypeId" in normalizeCoverageRuleConfig({})).toBe(false);
+    expect("dayOffAbsenceTypeId" in normalizeCoverageRuleConfig({ dayOffAbsenceTypeId: "3" })).toBe(
+      false,
+    );
+  });
+
+  it("detects it by name, never by a name that only contains off", () => {
+    expect(resolveDayOffAbsenceType({}, types)).toEqual({ absenceType: types[2], detected: true });
+    expect(resolveDayOffAbsenceType({}, types.slice(0, 2))).toBeNull();
+  });
+
+  it("detects it by code when no name matches", () => {
+    const coded = [{ id: 9, name: "Weekly rest", label: "RDO" }];
+    expect(resolveDayOffAbsenceType(undefined, coded)?.absenceType.id).toBe(9);
+  });
+
+  it("uses a saved choice, ignores an archived one, and honours none", () => {
+    expect(resolveDayOffAbsenceType({ dayOffAbsenceTypeId: 2 }, types)).toEqual({
+      absenceType: types[1],
+      detected: false,
+    });
+    expect(resolveDayOffAbsenceType({ dayOffAbsenceTypeId: 4 }, types)).toBeNull();
+    expect(resolveDayOffAbsenceType({ dayOffAbsenceTypeId: null }, types)).toBeNull();
   });
 });

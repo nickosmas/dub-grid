@@ -319,4 +319,20 @@ describe("describeCoverageRuledOutReason", () => {
       "Ana Crawford: has a request waiting that day",
     );
   });
+
+  it("says how many days in a row a shift would make", () => {
+    const entry: CoverageRuledOut = {
+      rowKey: ROW_MA,
+      dateKey: MON,
+      employeeId: "ana",
+      requestId: null,
+      reason: { kind: "workRun", days: 6 },
+    };
+    expect(describeCoverageRuledOut(entry, LOOKUPS)).toBe(
+      "Ana Crawford: would work 6 days in a row",
+    );
+    expect(describeCoverageRuledOut({ ...entry, reason: { kind: "onlyShifts" } }, LOOKUPS)).toBe(
+      "Ana Crawford: works only their chosen shifts",
+    );
+  });
 });

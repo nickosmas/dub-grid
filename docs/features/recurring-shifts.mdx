@@ -26,7 +26,17 @@ It only fills empty slots: it never overwrites a shift already on the schedule. 
 
 It leaves a cell empty when it already has a visible entry, the recurring pattern is outside its effective date range, or it refers to an archived shift, job, or absence type. Review the resulting coverage gaps instead of assuming every recurring pattern was applied.
 
-The [Schedule Builder](/features/coverage-and-open-shifts#building-the-draft) starts every build the same way, filling empty cells from recurring schedules by the same rules, before it fills the shifts still short.
+The [Schedule Builder](/features/coverage-and-open-shifts#auto-build) starts every build the same way, filling empty cells from recurring schedules by the same rules, before it fills the shifts still short.
+
+## Shift preferences
+
+On **People > Recurring Shifts**, the preference button beside a person's name sets which shifts they want:
+
+- **No preference**: Auto-build can give them any shift they are qualified for.
+- **Prefers these shifts**: Auto-build gives them these shifts first, and others when it needs to.
+- **Only these shifts**: Auto-build and its suggestions never give them any other shift.
+
+The preference shows under their name, such as "Only: Evening Shift". It saves straight away and does not change their recurring schedule, which recurring fills still follow.
 
 ## Repeating shifts
 

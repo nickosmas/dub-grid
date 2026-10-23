@@ -127,12 +127,57 @@ export function clampMentoredCreditPercent(percent: unknown): number {
  * into a complete, validated `CoverageRuleConfig`.
  */
 export function normalizeCoverageRuleConfig(config?: unknown): CoverageRuleConfig {
-  const rawPercent =
+  const raw =
     config && typeof config === "object"
-      ? (config as { mentoredCoverageCreditPercent?: unknown }).mentoredCoverageCreditPercent
-      : undefined;
+      ? (config as { mentoredCoverageCreditPercent?: unknown; dayOffAbsenceTypeId?: unknown })
+      : {};
+  const dayOff = raw.dayOffAbsenceTypeId;
 
-  return { mentoredCoverageCreditPercent: clampMentoredCreditPercent(rawPercent) };
+  return {
+    mentoredCoverageCreditPercent: clampMentoredCreditPercent(raw.mentoredCoverageCreditPercent),
+    ...(dayOff === null
+      ? { dayOffAbsenceTypeId: null }
+      : typeof dayOff === "number" && Number.isInteger(dayOff) && dayOff > 0
+        ? { dayOffAbsenceTypeId: dayOff }
+        : {}),
+  };
+}
+
+/** Names and codes that mean a regular day off, compared without case. */
+const DAY_OFF_NAMES = new Set([
+  "off",
+  "day off",
+  "days off",
+  "off day",
+  "rest",
+  "rest day",
+  "regular day off",
+  "scheduled off",
+]);
+const DAY_OFF_CODES = new Set(["x", "off", "rdo", "do", "ro"]);
+
+export interface DayOffAbsenceTypeLike {
+  id: number;
+  name: string;
+  label: string;
+  archivedAt?: string | null;
+}
+
+/** The organization's day off absence: its saved choice, or one detected by name or code. */
+export function resolveDayOffAbsenceType<T extends DayOffAbsenceTypeLike>(
+  config: Pick<CoverageRuleConfig, "dayOffAbsenceTypeId"> | undefined,
+  absenceTypes: ReadonlyArray<T>,
+): { absenceType: T; detected: boolean } | null {
+  const active = absenceTypes.filter((type) => !type.archivedAt);
+  if (config?.dayOffAbsenceTypeId === null) return null;
+  if (config?.dayOffAbsenceTypeId != null) {
+    const chosen = active.find((type) => type.id === config.dayOffAbsenceTypeId);
+    return chosen ? { absenceType: chosen, detected: false } : null;
+  }
+  const byName = active.find((type) => DAY_OFF_NAMES.has(type.name.trim().toLowerCase()));
+  const byCode = active.find((type) => DAY_OFF_CODES.has(type.label.trim().toLowerCase()));
+  const detected = byName ?? byCode;
+  return detected ? { absenceType: detected, detected: true } : null;
 }
 
 // ── Coverage intelligence ───────────────────────────────────────────────────

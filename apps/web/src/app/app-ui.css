@@ -440,6 +440,16 @@
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: -2px;
 }
+.dg-segment-btn:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: not-allowed;
+}
+.dg-segment-btn:disabled:hover {
+  background: transparent;
+}
+.dg-segment-grid .dg-segment-btn:disabled:hover {
+  background: var(--dg-color-surface);
+}
 
 /* ── Segment Control ────────────────────────────────────── */
 .dg-segment-btn.active {
@@ -1150,6 +1160,29 @@ button.dg-cc-sg-main {
 .dg-cc-show-all:focus-visible {
   outline: 2px solid var(--dg-color-brand);
   outline-offset: 2px;
+}
+.dg-cc-build-warning {
+  color: var(--dg-color-warning);
+}
+.dg-cc-build-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--dg-fs-caption);
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-progress-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dg-color-border-light);
+  overflow: hidden;
+}
+.dg-cc-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dg-color-brand);
+  transition: width 160ms ease-out;
 }
 .dg-cc-build-counts {
   display: flex;

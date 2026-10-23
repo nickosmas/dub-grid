@@ -157,6 +157,9 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   draft for a period from recurring schedules, absences, qualifications,
   coverage requirements, an overtime threshold and fair rotation, previews
   and explains the result, and applies it as one undoable draft change.
+  Auto-build never schedules anyone six days in a row, keeps days off in
+  pairs and writes the organization's day off absence, and follows each
+  person's shift preferences (flexible or strict).
 - Documentation truth and drift prevention: public documentation and the
   living engineering references describe the current `dev` through
   source-derived inventories and a machine-checked accuracy manifest, with

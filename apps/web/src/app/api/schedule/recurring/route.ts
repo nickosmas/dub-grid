@@ -114,7 +114,30 @@ const requestSchema = z.discriminatedUnion("action", [
       .min(1)
       .max(500),
   }),
+  z.object({
+    action: z.literal("fetchShiftPreferences"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid().optional(),
+  }),
+  z.object({
+    action: z.literal("saveShiftPreference"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    // null = no preference
+    preference: z
+      .object({
+        mode: z.enum(["prefers", "only"]),
+        shiftIds: z.array(z.number().int().positive()).min(1).max(50),
+      })
+      .nullable(),
+  }),
 ]);
+
+interface ShiftPreferenceRow {
+  employee_id: string;
+  mode: "prefers" | "only";
+  shift_ids: number[];
+}
 
 function canReadRecurring(
   permissions: ReturnType<typeof import("@dubgrid/authz").buildPermissionContext>,
@@ -459,6 +482,109 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true, count: data.changes.length });
+      }
+
+      case "fetchShiftPreferences": {
+        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring, { actor });
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        let query = auth.serviceClient
+          .from("employee_shift_preferences")
+          .select("employee_id, mode, shift_ids")
+          .eq("org_id", data.orgId);
+        if (data.employeeId) {
+          query = query.eq("employee_id", data.employeeId);
+        }
+        const { data: rows, error } = await query;
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({
+          preferences: ((rows ?? []) as ShiftPreferenceRow[]).map((row) => ({
+            employeeId: row.employee_id,
+            mode: row.mode,
+            shiftIds: row.shift_ids.map(Number),
+          })),
+        });
+      }
+
+      case "saveShiftPreference": {
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
+          actor,
+          gridmasterNeedsImpersonation: true,
+        });
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        // The person and every shift must belong to this organization.
+        const { data: employee, error: employeeError } = await auth.serviceClient
+          .from("employees")
+          .select("id")
+          .eq("id", data.employeeId)
+          .eq("org_id", data.orgId)
+          .maybeSingle();
+        if (employeeError) {
+          throw employeeError;
+        }
+        if (!employee) {
+          return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
+        }
+
+        if (!data.preference) {
+          const { error } = await auth.serviceClient
+            .from("employee_shift_preferences")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("employee_id", data.employeeId);
+          if (error) {
+            throw error;
+          }
+        } else {
+          const shiftIds = [...new Set(data.preference.shiftIds)];
+          const { data: shifts, error: shiftsError } = await auth.serviceClient
+            .from("shift_categories")
+            .select("id")
+            .eq("org_id", data.orgId)
+            .in("id", shiftIds);
+          if (shiftsError) {
+            throw shiftsError;
+          }
+          if ((shifts ?? []).length !== shiftIds.length) {
+            return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
+          }
+          const { error } = await auth.serviceClient.from("employee_shift_preferences").upsert(
+            {
+              employee_id: data.employeeId,
+              org_id: data.orgId,
+              mode: data.preference.mode,
+              shift_ids: shiftIds,
+              updated_by: auth.actor.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "employee_id" },
+          );
+          if (error) {
+            throw error;
+          }
+        }
+
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift_preference.saved",
+          resourceType: "employee",
+          resourceId: data.employeeId,
+          details: data.preference
+            ? { mode: data.preference.mode, shifts: data.preference.shiftIds.length }
+            : { cleared: true },
+        });
+
+        return NextResponse.json({ success: true });
       }
     }
   } catch (error) {

@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect, Fragment } from "react";
 import {
   ArrowUpDown,
+  CalendarCheck,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -92,8 +93,6 @@ interface ToolbarProps {
   requestsBadgeCount?: number;
   /** Toggle the shift requests board panel. */
   onRequestsToggle?: () => void;
-  /** Badge count for coverage gaps. */
-  coverageGapCount?: number;
   /** Toggle the coverage panel. */
   onCoverageToggle?: () => void;
   /** Hide the 2-week option (auto-downgraded on narrow screens). */
@@ -478,7 +477,6 @@ export default function Toolbar({
   onAuditToggle,
   requestsBadgeCount = 0,
   onRequestsToggle,
-  coverageGapCount = 0,
   onCoverageToggle,
   hideTwoWeek,
   onPublishHistory,
@@ -951,7 +949,9 @@ export default function Toolbar({
           {/* Coverage button */}
           {onCoverageToggle && (
             <Hint
-              content={hint("Build the draft and check staffing against coverage requirements")}
+              content={hint(
+                "Auto-build the draft and check staffing against coverage requirements",
+              )}
               side="bottom"
             >
               <Button
@@ -963,29 +963,10 @@ export default function Toolbar({
                   height: "var(--dg-toolbar-h)",
                   padding: "0 12px",
                   position: "relative",
-                  color: coverageGapCount > 0 ? "var(--dg-color-danger)" : undefined,
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+                <CalendarCheck aria-hidden size={14} strokeWidth={2.25} />
                 Schedule Builder
-                <NumericBadge
-                  count={coverageGapCount}
-                  label={`${coverageGapCount} coverage ${coverageGapCount === 1 ? "gap" : "gaps"}`}
-                  size="sm"
-                  tone="danger"
-                  style={FLOATING_BADGE_STYLE}
-                />
               </Button>
             </Hint>
           )}
