@@ -238,6 +238,9 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     hasRequest: (employeeId, dateKey) => hasOpenRequest(input.requests, employeeId, dateKey),
     pendingPickups: pendingPickupsFromRequests(input.requests),
   };
+  const rowLabels = new Map(
+    input.matrix.rows.map((row) => [row.rowKey, `${row.focusAreaName} · ${row.rowLabel}`]),
+  );
   const text: CoverageSuggestionTextLookups = {
     personName: (employeeId) => {
       const employee = employeeById.get(employeeId);
@@ -250,6 +253,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     assignmentFocusAreaId: (assignmentId) => assignmentById.get(assignmentId)?.focusAreaId ?? null,
     focusAreaName: (focusAreaId) => input.focusAreaNames.get(focusAreaId) ?? null,
     absenceName: (absenceTypeId) => input.absenceNames.get(absenceTypeId) ?? "Unknown absence",
+    rowLabel: (rowKey) => rowLabels.get(rowKey) ?? null,
     formatDate: (dateKey) => formatShortDate(parseLocalDateKey(dateKey)),
   };
   return { engine, text };

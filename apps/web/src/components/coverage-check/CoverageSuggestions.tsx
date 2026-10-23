@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Check } from "lucide-react";
 import type {
   CoverageSuggestion,
@@ -8,7 +7,7 @@ import type {
   CoverageSuggestionText,
 } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
-import type { CoverageCellRef } from "./CoverageMatrixGrid";
+import { formatCoverageNumber, formatLongDate } from "./coverage-check-text";
 
 export interface CoverageSuggestionView {
   suggestion: CoverageSuggestion;
@@ -33,6 +32,7 @@ const ACTION_LABELS: Record<CoverageSuggestionKind, string | null> = {
 
 const PAST_TENSE: Record<string, string> = {
   Move: "Moved",
+  Change: "Changed",
   Restore: "Restored",
   Schedule: "Scheduled",
   Approve: "Approved",
@@ -51,43 +51,29 @@ export function suggestionActionLabel(kind: CoverageSuggestionKind): string | nu
 interface SuggestionRowProps {
   view: CoverageSuggestionView;
   busy: boolean;
-  onSelect?: (target: CoverageCellRef) => void;
   onApply: (suggestion: CoverageSuggestion) => void;
-  /** Ways to fix shows the detail; the main list keeps to title and effect. */
-  showDetail?: boolean;
 }
 
-export function CoverageSuggestionRow({
-  view,
-  busy,
-  onSelect,
-  onApply,
-  showDetail = false,
-}: SuggestionRowProps) {
+export function CoverageSuggestionRow({ view, busy, onApply }: SuggestionRowProps) {
   const { suggestion, text } = view;
   const action = suggestionActionLabel(suggestion.kind);
-  const target = suggestion.targets[0];
-  const body = (
-    <>
-      <span className="dg-cc-sg-title">{text.title}</span>
-      {(showDetail || !text.effect) && <span className="dg-cc-sg-detail">{text.detail}</span>}
-      {text.effect && <span className="dg-cc-sg-effect dg-tabular-nums">{text.effect}</span>}
-    </>
-  );
   return (
     <li className="dg-cc-sg">
-      {onSelect && target ? (
-        <button
-          type="button"
-          className="dg-cc-sg-main"
-          onClick={() => onSelect(target)}
-          aria-label={`Show in Coverage Check: ${text.title}`}
-        >
-          {body}
-        </button>
-      ) : (
-        <div className="dg-cc-sg-main">{body}</div>
-      )}
+      <div className="dg-cc-sg-main">
+        <span className="dg-cc-sg-title">{text.title}</span>
+        <span className="dg-cc-sg-detail">{text.detail}</span>
+        {text.effect && <span className="dg-cc-sg-effect dg-tabular-nums">{text.effect}</span>}
+        {text.changes.length > 0 && (
+          <ul className="dg-cc-sg-changes" aria-label="What it changes">
+            {text.changes.map((line) => (
+              <li key={line} className="dg-tabular-nums">
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
+        {text.outcome && <span className="dg-cc-sg-outcome">{text.outcome}</span>}
+      </div>
       {action && (
         <Button
           type="button"
@@ -103,88 +89,92 @@ export function CoverageSuggestionRow({
   );
 }
 
-interface CoverageSuggestionsProps {
-  items: CoverageSuggestionView[];
+interface CoverageAppliedListProps {
   applied: AppliedCoverageSuggestion[];
-  hasGaps: boolean;
-  busyId: string | null;
-  onSelect: (target: CoverageCellRef) => void;
-  onApply: (suggestion: CoverageSuggestion) => void;
+  busy: boolean;
   onUndo: (appliedId: string) => void;
 }
 
-const TOP = 3;
-
-export function CoverageSuggestions({
-  items,
-  applied,
-  hasGaps,
-  busyId,
-  onSelect,
-  onApply,
-  onUndo,
-}: CoverageSuggestionsProps) {
-  const [showAll, setShowAll] = useState(false);
-  if (!hasGaps && items.length === 0 && applied.length === 0) return null;
-  const visible = showAll ? items : items.slice(0, TOP);
-
+/** What was applied in this visit, kept in view so Undo is always reachable. */
+export function CoverageAppliedList({ applied, busy, onUndo }: CoverageAppliedListProps) {
+  if (applied.length === 0) return null;
   return (
-    <section className="dg-cc-suggestions" aria-label="Suggestions">
-      <div className="dg-cc-caption">Suggestions</div>
-      {items.length === 0 ? (
-        hasGaps && (
-          <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-            No fixes found. Each short day&apos;s detail says why.
-          </p>
-        )
-      ) : (
-        <ul className="dg-cc-sg-list">
-          {visible.map((view) => (
-            <CoverageSuggestionRow
-              key={view.suggestion.id}
-              view={view}
-              busy={busyId != null}
-              onSelect={onSelect}
-              onApply={onApply}
-            />
-          ))}
-        </ul>
-      )}
-      {items.length > TOP && (
-        <button
-          type="button"
-          className="dg-cc-more"
-          aria-expanded={showAll}
-          onClick={() => setShowAll((current) => !current)}
-        >
-          {showAll ? "Show fewer" : `Show all ${items.length}`}
-        </button>
-      )}
-      {applied.length > 0 && (
+    <section className="dg-cc-suggestions" aria-label="Applied">
+      <div className="dg-cc-caption">Applied</div>
+      <ul className="dg-cc-sg-list">
+        {applied.map((entry) => (
+          <li key={entry.id} className="dg-cc-applied">
+            <Check size={16} aria-hidden className="dg-cc-applied-icon" />
+            <span className="dg-cc-detail-line">{entry.text}</span>
+            {entry.final ? (
+              <span className="dg-cc-applied-final">Published</span>
+            ) : (
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={() => onUndo(entry.id)}
+                disabled={busy}
+                aria-label={`Undo: ${entry.text}`}
+              >
+                Undo
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface CoverageDayDetailProps {
+  date: Date;
+  staffShort: number;
+  items: CoverageSuggestionView[];
+  busy: boolean;
+  onApply: (suggestion: CoverageSuggestion) => void;
+}
+
+/** One selected date: how short it is and every suggestion for it. */
+export function CoverageDayDetail({
+  date,
+  staffShort,
+  items,
+  busy,
+  onApply,
+}: CoverageDayDetailProps) {
+  const label = formatLongDate(date);
+  return (
+    <section className="dg-cc-detail" aria-label={`Suggestions for ${label}`}>
+      <div className="min-w-0">
+        <h3 className="dg-cc-detail-title">{label}</h3>
+        <div className="dg-cc-detail-date dg-tabular-nums">
+          {staffShort > 0
+            ? `${formatCoverageNumber(staffShort)} staff short`
+            : "Every requirement is staffed"}
+        </div>
+      </div>
+      {items.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <div className="dg-cc-caption">Applied</div>
+          <div className="dg-cc-caption">
+            {items.length === 1 ? "1 suggestion" : `${items.length} suggestions`}
+          </div>
           <ul className="dg-cc-sg-list">
-            {applied.map((entry) => (
-              <li key={entry.id} className="dg-cc-applied">
-                <Check size={16} aria-hidden className="dg-cc-applied-icon" />
-                <span className="dg-cc-detail-line">{entry.text}</span>
-                {entry.final ? (
-                  <span className="dg-cc-applied-final">Published</span>
-                ) : (
-                  <Button
-                    type="button"
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                    onClick={() => onUndo(entry.id)}
-                    disabled={busyId != null}
-                    aria-label={`Undo: ${entry.text}`}
-                  >
-                    Undo
-                  </Button>
-                )}
-              </li>
+            {items.map((view) => (
+              <CoverageSuggestionRow
+                key={view.suggestion.id}
+                view={view}
+                busy={busy}
+                onApply={onApply}
+              />
             ))}
           </ul>
         </div>
+      ) : (
+        <p className="dg-cc-detail-line dg-cc-detail-line--muted">
+          {staffShort > 0
+            ? "No fixes found for this day. Select a short cell to see why each qualified person isn't suggested."
+            : "Nothing to fix on this day."}
+        </p>
       )}
     </section>
   );

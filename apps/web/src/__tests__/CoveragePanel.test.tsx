@@ -94,8 +94,21 @@ function renderPanel(props: Partial<Parameters<typeof CoveragePanel>[0]> = {}) {
   );
 }
 
+/** A matrix cell; date headings are buttons too, so pick the cell explicitly. */
 function cell(name: RegExp) {
-  return screen.getByRole("button", { name });
+  const found = screen
+    .getAllByRole("button", { name })
+    .find((button) => button.classList.contains("dg-cc-cell"));
+  if (!found) throw new Error(`no cell named ${name}`);
+  return found;
+}
+
+function dateHeading(name: RegExp) {
+  const found = screen
+    .getAllByRole("button", { name })
+    .find((button) => button.classList.contains("dg-cc-day"));
+  if (!found) throw new Error(`no date named ${name}`);
+  return found;
 }
 
 describe("CoveragePanel", () => {
@@ -420,10 +433,21 @@ describe("CoveragePanel", () => {
     });
     const view = (id: string, kind: CoverageSuggestion["kind"], title = `Do ${id}`) => ({
       suggestion: suggestion(id, kind),
-      text: { title, detail: `Detail ${id}`, effect: kind === "pattern" ? null : "Closes 1 gap" },
+      text: {
+        title,
+        detail: `Detail ${id}`,
+        outcome: kind === "pattern" ? null : `Outcome ${id}`,
+        effect: kind === "pattern" ? null : "Closes 1 gap",
+        changes:
+          kind === "pattern"
+            ? []
+            : [
+                `Wed, Oct 28 · North Wing · Day Shift · Med Aide: 2/3 staffed now, 3/3 after (${id})`,
+              ],
+      },
     });
     const items = [
-      view("a", "moveBack", "Move Ana Crawford's Day Shift back to Wed, Oct 28"),
+      view("a", "moveBack", "Move Ana Crawford's Day Shift from Thu, Oct 29 back to Wed, Oct 28"),
       view("b", "restore"),
       view("c", "assign"),
       view("d", "approvePickup"),
@@ -445,47 +469,77 @@ describe("CoveragePanel", () => {
         },
         ...overrides,
       });
-    const list = () => within(screen.getByRole("region", { name: "Suggestions" }));
+    const day = () =>
+      within(screen.getByRole("region", { name: "Suggestions for Wednesday, October 28" }));
 
-    it("shows the top three, then all of them", () => {
+    it("lists no suggestions until a date is picked, and marks the dates that have them", () => {
       withSuggestions();
 
-      expect(list().getAllByRole("listitem")).toHaveLength(3);
-      fireEvent.click(list().getByRole("button", { name: "Show all 5" }));
-      expect(list().getAllByRole("listitem")).toHaveLength(5);
-    });
-
-    it("labels each action and gives a repeating gap none", () => {
-      withSuggestions();
-      fireEvent.click(list().getByRole("button", { name: "Show all 5" }));
-
-      for (const label of ["Move back", "Restore", "Schedule", "Approve"]) {
-        expect(list().getByRole("button", { name: new RegExp(`^${label}:`) })).toBeInTheDocument();
-      }
-      expect(list().getByText("Detail e")).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
       expect(
-        list().getAllByRole("button", { name: /^(Move back|Restore|Schedule|Approve):/ }),
-      ).toHaveLength(4);
+        screen.getByText("1 day has suggestions. Select a date to see them."),
+      ).toBeInTheDocument();
+      expect(dateHeading(/Wednesday, October 28, has suggestions/)).toBeInTheDocument();
+      expect(dateHeading(/Tuesday, October 27/)).not.toHaveAccessibleName(/has suggestions/);
+      expect(screen.getByText("Date with suggestions")).toBeInTheDocument();
     });
 
-    it("applies a suggestion and selects its cell when its text is chosen", () => {
+    it("shows a picked date's suggestions in full, each with its action", () => {
+      withSuggestions();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+
+      expect(dateHeading(/Wednesday, October 28/)).toHaveAttribute("aria-pressed", "true");
+      expect(day().getByText("5 suggestions")).toBeInTheDocument();
+      expect(day().getByText("1 staff short")).toBeInTheDocument();
+      for (const label of ["Move back", "Restore", "Schedule", "Approve"]) {
+        expect(day().getByRole("button", { name: new RegExp(`^${label}:`) })).toBeInTheDocument();
+      }
+      expect(
+        day().getAllByRole("button", { name: /^(Move back|Restore|Schedule|Approve):/ }),
+      ).toHaveLength(4);
+      expect(day().getByText("Detail a")).toBeInTheDocument();
+      expect(day().getByText("Outcome a")).toBeInTheDocument();
+      expect(
+        day().getByText(
+          "Wed, Oct 28 · North Wing · Day Shift · Med Aide: 2/3 staffed now, 3/3 after (a)",
+        ),
+      ).toBeInTheDocument();
+      expect(day().getByText("Detail e")).toBeInTheDocument();
+      expect(day().queryByText("Outcome e")).not.toBeInTheDocument();
+
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
+    });
+
+    it("applies a suggestion from the picked date", () => {
       const onApplySuggestion = vi.fn();
       withSuggestions({ onApplySuggestion });
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
 
-      fireEvent.click(list().getByRole("button", { name: /^Move back:/ }));
+      fireEvent.click(day().getByRole("button", { name: /^Move back: Move Ana/ }));
       expect(onApplySuggestion).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
-      fireEvent.click(list().getByRole("button", { name: /^Show in Coverage Check: Move Ana/ }));
-      expect(screen.getByRole("region", { name: "Selected day" })).toBeInTheDocument();
     });
 
-    it("lists applied changes with Undo, and an approval as published", () => {
+    it("selects a date or a cell, never both", () => {
+      withSuggestions();
+
+      fireEvent.click(cell(/Wednesday, October 28/));
+      expect(screen.getByRole("region", { name: "Selected day" })).toBeInTheDocument();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      expect(screen.queryByRole("region", { name: "Selected day" })).not.toBeInTheDocument();
+      expect(day().getByText("5 suggestions")).toBeInTheDocument();
+      fireEvent.click(cell(/Wednesday, October 28/));
+      expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
+    });
+
+    it("keeps applied changes in view with Undo, and an approval as published", () => {
       const onUndoSuggestion = vi.fn();
       withSuggestions({
         onUndoSuggestion,
         appliedSuggestions: [
           {
             id: "x",
-            text: appliedSuggestionText("Restore Ben Shepherd's Day Shift"),
+            text: appliedSuggestionText("Restore Ben Shepherd's Day Shift on Wed, Oct 28"),
             final: false,
           },
           {
@@ -493,27 +547,49 @@ describe("CoveragePanel", () => {
             text: appliedSuggestionText("Approve Ana Crawford's pickup request"),
             final: true,
           },
+          {
+            id: "z",
+            text: appliedSuggestionText("Change Cat Morrison back to Day Shift on Wed, Oct 28"),
+            final: false,
+          },
         ],
       });
+      const applied = within(screen.getByRole("region", { name: "Applied" }));
 
       fireEvent.click(
-        list().getByRole("button", { name: "Undo: Restored Ben Shepherd's Day Shift" }),
+        applied.getByRole("button", {
+          name: "Undo: Restored Ben Shepherd's Day Shift on Wed, Oct 28",
+        }),
       );
       expect(onUndoSuggestion).toHaveBeenCalledWith("x");
-      expect(list().getByText("Approved Ana Crawford's pickup request")).toBeInTheDocument();
-      expect(list().getByText("Published")).toBeInTheDocument();
-    });
-
-    it("says so when there are gaps and no fixes", () => {
-      renderPanel({ suggestions: { items: [], notSuggestedByCell: new Map() } });
+      expect(applied.getByText("Approved Ana Crawford's pickup request")).toBeInTheDocument();
+      expect(applied.getByText("Published")).toBeInTheDocument();
       expect(
-        list().getByText("No fixes found. Each short day's detail says why."),
+        applied.getByText("Changed Cat Morrison back to Day Shift on Wed, Oct 28"),
       ).toBeInTheDocument();
     });
 
-    it("shows nothing to someone who cannot edit shifts", () => {
+    it("says so when short dates have no fixes", () => {
+      renderPanel({ suggestions: { items: [], notSuggestedByCell: new Map() } });
+
+      expect(
+        screen.getByText("No fixes found. Select a short cell to see why."),
+      ).toBeInTheDocument();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      expect(
+        day().getByText(
+          "No fixes found for this day. Select a short cell to see why each qualified person isn't suggested.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("gives someone who cannot edit shifts no suggestions and plain date headings", () => {
       withSuggestions({ canEditShifts: false });
-      expect(screen.queryByRole("region", { name: "Suggestions" })).not.toBeInTheDocument();
+
+      expect(screen.queryByText(/Select a date/)).not.toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button").filter((button) => button.classList.contains("dg-cc-day")),
+      ).toHaveLength(0);
     });
 
     it("shows Ways to fix and Not suggested for a short cell, and neither for a staffed one", () => {
@@ -523,6 +599,7 @@ describe("CoveragePanel", () => {
       const detail = within(screen.getByRole("region", { name: "Selected day" }));
       expect(detail.getByText("Ways to fix")).toBeInTheDocument();
       expect(detail.getByText("Detail a")).toBeInTheDocument();
+      expect(detail.getByText("Outcome a")).toBeInTheDocument();
       expect(detail.getByText("Not suggested")).toBeInTheDocument();
       expect(
         detail

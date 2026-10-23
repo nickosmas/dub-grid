@@ -863,6 +863,42 @@
   text-decoration: underline solid 2px;
   text-underline-offset: 3px;
 }
+.dg-cc-day--button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+  border: 0;
+  border-radius: var(--dg-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--dg-fs-footnote);
+  cursor: pointer;
+}
+.dg-cc-day--button:hover {
+  background: var(--dg-color-surface-hover);
+}
+.dg-cc-day--button:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 1px;
+}
+.dg-cc-day--picked {
+  background: var(--dg-color-brand-bg);
+  opacity: 1;
+}
+.dg-cc-day-dot-slot {
+  display: flex;
+  justify-content: center;
+  height: 6px;
+  margin-top: 2px;
+}
+.dg-cc-day-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dg-color-brand);
+}
 .dg-cc-short {
   text-align: center;
   font-size: var(--dg-fs-footnote);
@@ -1080,8 +1116,7 @@
 button.dg-cc-sg-main {
   cursor: pointer;
 }
-.dg-cc-sg-main:focus-visible,
-.dg-cc-more:focus-visible {
+.dg-cc-sg-main:focus-visible {
   outline: 2px solid var(--dg-color-brand);
   outline-offset: 2px;
 }
@@ -1102,20 +1137,35 @@ button.dg-cc-sg-main {
   font-weight: 600;
   color: var(--dg-color-success-text);
 }
+.dg-cc-sg-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0 0 0 14px;
+  list-style: disc;
+  font-size: var(--dg-fs-footnote);
+  line-height: 1.4;
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-sg-outcome {
+  font-size: var(--dg-fs-footnote);
+  line-height: 1.4;
+  color: var(--dg-color-text-subtle);
+}
 .dg-cc-sg-action {
   flex-shrink: 0;
   min-width: 96px;
   white-space: nowrap;
 }
-.dg-cc-more {
-  align-self: flex-start;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-  color: var(--dg-color-brand);
-  font-size: var(--dg-fs-caption);
-  font-weight: 600;
-  cursor: pointer;
+@media (max-width: 767px) {
+  .dg-cc-sg {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dg-cc-sg-action {
+    width: 100%;
+  }
 }
 .dg-cc-applied {
   display: flex;

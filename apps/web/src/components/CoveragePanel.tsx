@@ -26,7 +26,8 @@ import {
   type CoverageCellRef,
 } from "@/components/coverage-check/CoverageMatrixGrid";
 import {
-  CoverageSuggestions,
+  CoverageAppliedList,
+  CoverageDayDetail,
   type AppliedCoverageSuggestion,
   type CoverageSuggestionView,
 } from "@/components/coverage-check/CoverageSuggestions";
@@ -77,10 +78,12 @@ function Legend({
   view,
   hasPast,
   hasUnpublished,
+  hasSuggestions,
 }: {
   view: CoverageCheckView;
   hasPast: boolean;
   hasUnpublished: boolean;
+  hasSuggestions: boolean;
 }) {
   return (
     <div className="dg-cc-legend" aria-label="Legend">
@@ -124,6 +127,12 @@ function Legend({
           Dashed date: not published yet
         </span>
       )}
+      {hasSuggestions && (
+        <span className="dg-cc-legend-item">
+          <span className="dg-cc-day-dot" />
+          Date with suggestions
+        </span>
+      )}
     </div>
   );
 }
@@ -159,7 +168,9 @@ export default function CoveragePanel({
     setFilterFocusArea(activeFocusArea ?? "all");
   }
   const [view, setView] = useState<CoverageCheckView>("all");
+  // A cell or a date is selected, never both: a date shows that day's suggestions.
   const [selected, setSelected] = useState<CoverageCellRef | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
   const dates = useMemo(() => matrix?.dateKeys.map(parseLocalDateKey) ?? [], [matrix]);
   const rows = useMemo(
@@ -183,8 +194,10 @@ export default function CoveragePanel({
   const detailRef = useRef<HTMLDivElement>(null);
   // Keyed on the pick, not the cell, so a live update never scrolls the panel.
   useEffect(() => {
-    if (selected) detailRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-  }, [selected]);
+    if (selected || selectedDateKey) {
+      detailRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selected, selectedDateKey]);
   const suggestionItems = useMemo(() => {
     if (!suggestions) return [];
     const rowKeys = new Set(rows.map((row) => row.rowKey));
@@ -192,6 +205,37 @@ export default function CoveragePanel({
       view.suggestion.targets.some((target) => rowKeys.has(target.rowKey)),
     );
   }, [suggestions, rows]);
+  // A pattern is advice, not a fix, so it never marks a date.
+  const suggestionDateKeys = useMemo(() => {
+    const rowKeys = new Set(rows.map((row) => row.rowKey));
+    const keys = new Set<string>();
+    for (const view of suggestionItems) {
+      if (view.suggestion.kind === "pattern") continue;
+      for (const target of view.suggestion.targets) {
+        if (rowKeys.has(target.rowKey)) keys.add(target.dateKey);
+      }
+    }
+    return keys;
+  }, [suggestionItems, rows]);
+  const dayItems = useMemo(
+    () =>
+      selectedDateKey
+        ? suggestionItems.filter((view) =>
+            view.suggestion.targets.some((target) => target.dateKey === selectedDateKey),
+          )
+        : [],
+    [suggestionItems, selectedDateKey],
+  );
+  const selectedDateIndex = selectedDateKey
+    ? (matrix?.dateKeys.indexOf(selectedDateKey) ?? -1)
+    : -1;
+  const offersSuggestions = canEditShifts && suggestions != null;
+  const suggestionHint =
+    suggestionDateKeys.size > 0
+      ? `${suggestionDateKeys.size === 1 ? "1 day has" : `${suggestionDateKeys.size} days have`} suggestions. Select a date to see them.`
+      : totals.short > 0
+        ? "No fixes found. Select a short cell to see why."
+        : null;
   const hasPast = rows.some((row) => row.cells.some((cell) => cell?.past));
   const areaName =
     filterFocusArea === "all"
@@ -369,16 +413,19 @@ export default function CoveragePanel({
                 />
               ) : (
                 <>
-                  {canEditShifts && suggestions && (
-                    <CoverageSuggestions
-                      items={suggestionItems}
-                      applied={appliedSuggestions}
-                      hasGaps={totals.short > 0}
-                      busyId={busySuggestionId}
-                      onSelect={(target) => setSelected(target)}
-                      onApply={onApplySuggestion}
-                      onUndo={onUndoSuggestion}
-                    />
+                  {offersSuggestions && (
+                    <>
+                      <CoverageAppliedList
+                        applied={appliedSuggestions}
+                        busy={busySuggestionId != null}
+                        onUndo={onUndoSuggestion}
+                      />
+                      {!selected && !selectedDateKey && suggestionHint && (
+                        <p className="dg-cc-detail-line dg-cc-detail-line--muted dg-tabular-nums">
+                          {suggestionHint}
+                        </p>
+                      )}
+                    </>
                   )}
                   <CoverageMatrixGrid
                     dates={dates}
@@ -390,19 +437,42 @@ export default function CoveragePanel({
                     view={activeView}
                     todayKey={todayKey}
                     selected={selected}
-                    onSelect={(cell) =>
+                    onSelect={(cell) => {
+                      setSelectedDateKey(null);
                       setSelected((current) =>
                         current?.rowKey === cell.rowKey && current.dateKey === cell.dateKey
                           ? null
                           : cell,
-                      )
+                      );
+                    }}
+                    selectedDateKey={selectedDateKey}
+                    onSelectDate={
+                      offersSuggestions
+                        ? (dateKey) => {
+                            setSelected(null);
+                            setSelectedDateKey((current) => (current === dateKey ? null : dateKey));
+                          }
+                        : undefined
                     }
+                    suggestionDateKeys={offersSuggestions ? suggestionDateKeys : undefined}
                   />
                   <Legend
                     view={activeView}
                     hasPast={hasPast}
                     hasUnpublished={canEditShifts && isPartial}
+                    hasSuggestions={offersSuggestions && suggestionDateKeys.size > 0}
                   />
+                  {selectedDateKey && selectedDateIndex >= 0 && (
+                    <div ref={detailRef}>
+                      <CoverageDayDetail
+                        date={dates[selectedDateIndex]}
+                        staffShort={totals.staffShortByDate[selectedDateKey] ?? 0}
+                        items={dayItems}
+                        busy={busySuggestionId != null}
+                        onApply={onApplySuggestion}
+                      />
+                    </div>
+                  )}
                   {selection && (
                     <div ref={detailRef}>
                       <CoverageCellDetail

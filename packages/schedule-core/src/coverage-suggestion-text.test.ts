@@ -14,7 +14,9 @@ import {
   DAY_MA,
   EVE_SC,
   NAMES,
+  ROW_CN,
   ROW_MA,
+  ROW_SC,
   buildSuggestionWorld,
 } from "./coverage-suggestions.fixture";
 
@@ -32,9 +34,16 @@ const LOOKUPS: CoverageSuggestionTextLookups = {
   assignmentFocusAreaId: (id) => (id === EVE_SC ? 2 : 1),
   focusAreaName: (id) => ({ 1: "Skilled Nursing", 2: "Sheltered Care" })[id] ?? null,
   absenceName: (id) => ({ 7: "Sick", 8: "Jury Duty (archived)" })[id] ?? "Unknown absence",
+  rowLabel: (rowKey) =>
+    ({
+      [ROW_MA]: "Skilled Nursing · Day Shift · Med Aide",
+      [ROW_CN]: "Skilled Nursing · Day Shift · Charge Nurse",
+      [ROW_SC]: "Sheltered Care · Evening Shift",
+    })[rowKey] ?? null,
   formatDate: (dateKey) =>
     ({ [SUN]: "Sun, Oct 25", [MON]: "Mon, Oct 26", [TUE]: "Tue, Oct 27" })[dateKey] ?? dateKey,
 };
+const DRAFT_OUTCOME = "Changes the draft only. Staff see it after you publish.";
 const MA_ONLY = [
   {
     focusAreaId: 1,
@@ -73,9 +82,15 @@ describe("describeCoverageSuggestion", () => {
       }),
     );
     expect(first("moveBack", suggestions)).toEqual({
-      title: "Move Ana Crawford's Day Shift · Med Aide back to Mon, Oct 26",
-      detail: "Skilled Nursing. This draft moved it to Tue, Oct 27.",
+      title:
+        "Move Ana Crawford's Day Shift · Med Aide in Skilled Nursing from Tue, Oct 27 back to Mon, Oct 26",
+      detail: "It was published on Mon, Oct 26, and this draft moved it.",
+      outcome: DRAFT_OUTCOME,
       effect: "Closes 1 gap, and clears 1 over",
+      changes: [
+        "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 1/2 staffed now, 2/2 after (staffed)",
+        "Tue, Oct 27 · Skilled Nursing · Day Shift · Med Aide: 3/2 staffed now, 2/2 after (staffed)",
+      ],
     });
   });
 
@@ -89,10 +104,14 @@ describe("describeCoverageSuggestion", () => {
       }),
     );
     expect(first("moveBack", suggestions)).toEqual({
-      title: "Move Ana Crawford back to Day Shift · Med Aide",
+      title: "Change Ana Crawford back to Day Shift · Med Aide in Skilled Nursing on Mon, Oct 26",
       detail:
-        "Skilled Nursing, Mon, Oct 26. This draft changed it to Evening Shift in Sheltered Care.",
+        "It was published as Day Shift · Med Aide, and this draft changed it to Evening Shift in Sheltered Care.",
+      outcome: DRAFT_OUTCOME,
       effect: "Closes 1 gap",
+      changes: [
+        "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 1/2 staffed now, 2/2 after (staffed)",
+      ],
     });
   });
 
@@ -106,10 +125,13 @@ describe("describeCoverageSuggestion", () => {
       }),
     );
     expect(first("restore", suggestions)).toEqual({
-      title: "Restore Ana Crawford's Day Shift · Med Aide",
-      detail:
-        "Skilled Nursing, Mon, Oct 26. Removed in this draft with no absence or request recorded.",
+      title: "Restore Ana Crawford's Day Shift · Med Aide in Skilled Nursing on Mon, Oct 26",
+      detail: "It was published, and this draft removed it with no absence or request recorded.",
+      outcome: DRAFT_OUTCOME,
       effect: "Closes 1 gap",
+      changes: [
+        "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 1/2 staffed now, 2/2 after (staffed)",
+      ],
     });
   });
 
@@ -125,10 +147,14 @@ describe("describeCoverageSuggestion", () => {
       (suggestion) => suggestion.kind === "assign" && suggestion.subject.dateKey === MON,
     );
     expect(describeCoverageSuggestion(assign!, LOOKUPS)).toEqual({
-      title: "Schedule Ana Crawford for Day Shift · Med Aide on Mon, Oct 26",
+      title: "Schedule Ana Crawford for Day Shift · Med Aide in Skilled Nursing on Mon, Oct 26",
       detail:
-        "Skilled Nursing. Qualified and free that day. Also works Evening Shift in Sheltered Care that day.",
-      effect: "Still short 1 on Mon, Oct 26 after this",
+        "Qualified for this shift and free at that time. Also works Evening Shift in Sheltered Care that day.",
+      outcome: DRAFT_OUTCOME,
+      effect: "Fills 1 spot",
+      changes: [
+        "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 0/2 staffed now, 1/2 after (still short 1)",
+      ],
     });
   });
 
@@ -142,9 +168,9 @@ describe("describeCoverageSuggestion", () => {
     const assign = suggestCoverageFixes(world).suggestions.find(
       (suggestion) => suggestion.kind === "assign" && suggestion.subject.dateKey === MON,
     );
-    expect(describeCoverageSuggestion(assign!, LOOKUPS).effect).toBe(
-      "Still short 0.65 on Mon, Oct 26 after this",
-    );
+    expect(describeCoverageSuggestion(assign!, LOOKUPS).changes).toEqual([
+      "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 0.35/2 staffed now, 1.35/2 after (still short 0.65)",
+    ]);
   });
 
   it("approves a pickup", () => {
@@ -165,11 +191,37 @@ describe("describeCoverageSuggestion", () => {
       }),
     );
     expect(first("approvePickup", suggestions)).toEqual({
-      title: "Approve Ben Shepherd's pickup request",
-      detail:
-        "Skilled Nursing Day Shift · Med Aide, Mon, Oct 26. Takes effect for staff right away, without a publish.",
+      title:
+        "Approve Ben Shepherd's pickup request for Day Shift · Med Aide in Skilled Nursing on Mon, Oct 26",
+      detail: "Ben Shepherd asked to pick up this shift, and the request is waiting for approval.",
+      outcome:
+        "Publishes right away: staff see it without a publish, and it replaces any draft of that day.",
       effect: "Closes 1 gap",
+      changes: [
+        "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 1/2 staffed now, 2/2 after (staffed)",
+      ],
     });
+  });
+
+  it("tells apart the same shift name in two focus areas", () => {
+    const lookups: CoverageSuggestionTextLookups = {
+      ...LOOKUPS,
+      // A shift without a job reads as its plain name in each focus area.
+      assignmentName: (id) => (id === DAY_CN ? LOOKUPS.assignmentName(id) : "Day Shift"),
+    };
+    const { suggestions } = suggestCoverageFixes(
+      buildSuggestionWorld({ people: ["ana"], draft: {} }),
+    );
+    const titles = suggestions
+      .filter((suggestion) => suggestion.kind === "assign" && suggestion.subject.dateKey === MON)
+      .map((suggestion) => describeCoverageSuggestion(suggestion, lookups).title);
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(titles).toContain(
+      "Schedule Ana Crawford for Day Shift in Skilled Nursing on Mon, Oct 26",
+    );
+    expect(titles).toContain(
+      "Schedule Ana Crawford for Day Shift in Sheltered Care on Mon, Oct 26",
+    );
   });
 
   it("names a repeating gap without an effect", () => {
@@ -190,9 +242,11 @@ describe("describeCoverageSuggestion", () => {
       }),
     );
     expect(first("pattern", suggestions)).toEqual({
-      title: "Skilled Nursing Day Shift · Med Aide is short every Monday in this period",
+      title: "Skilled Nursing · Day Shift · Med Aide is short every Monday in this period",
       detail: "Nobody qualified is free on those days. A repeating shift would stop it recurring.",
+      outcome: null,
       effect: null,
+      changes: [],
     });
   });
 });
