@@ -28,6 +28,11 @@ interface CoverageMatrixGridProps {
   todayKey: string;
   selected: CoverageCellRef | null;
   onSelect: (cell: CoverageCellRef) => void;
+  /** Editors pick a date to see its suggestions; without it dates are plain headings. */
+  selectedDateKey?: string | null;
+  onSelectDate?: (dateKey: string) => void;
+  /** Dates with at least one suggestion that can be applied. */
+  suggestionDateKeys?: ReadonlySet<string>;
 }
 
 function cellClassName(cell: CoverageMatrixCell, view: CoverageCheckView, selected: boolean) {
@@ -63,6 +68,9 @@ export function CoverageMatrixGrid({
   todayKey,
   selected,
   onSelect,
+  selectedDateKey = null,
+  onSelectDate,
+  suggestionDateKeys,
 }: CoverageMatrixGridProps) {
   const gridStyle = { "--dg-cc-days": dates.length } as CSSProperties;
   const weekBreak = (index: number) => (index > 0 && index % 7 === 0 ? " dg-cc-week-start" : "");
@@ -75,24 +83,48 @@ export function CoverageMatrixGrid({
           {dates.map((date, index) => {
             const key = dateKeys[index];
             const unpublished = showUnpublishedMarks && !publishedDateKeys.has(key);
+            const hasSuggestion = suggestionDateKeys?.has(key) ?? false;
+            const isPicked = selectedDateKey === key;
             const classes = ["dg-cc-day"];
             if (key === todayKey) classes.push("dg-cc-day--today");
             if (key < todayKey) classes.push("dg-cc-day--past");
             if (unpublished) classes.push("dg-cc-day--unpublished");
-            if (selected?.dateKey === key) classes.push("dg-cc-day--selected");
-            return (
-              <div key={key} className={classes.join(" ") + weekBreak(index)}>
+            if (isPicked || selected?.dateKey === key) classes.push("dg-cc-day--selected");
+            if (isPicked) classes.push("dg-cc-day--picked");
+            const content = (
+              <>
                 <span aria-hidden>
                   {date.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
                 </span>
                 <b aria-hidden className="dg-tabular-nums">
                   {date.getDate()}
                 </b>
+                {suggestionDateKeys && (
+                  <span aria-hidden className="dg-cc-day-dot-slot">
+                    {hasSuggestion && <span className="dg-cc-day-dot" />}
+                  </span>
+                )}
                 <span className="sr-only">
                   {formatLongDate(date)}
                   {key === todayKey ? ", today" : ""}
                   {unpublished ? ", not published yet" : ""}
+                  {hasSuggestion ? ", has suggestions" : ""}
                 </span>
+              </>
+            );
+            return onSelectDate ? (
+              <button
+                key={key}
+                type="button"
+                className={`${classes.join(" ")} dg-cc-day--button${weekBreak(index)}`}
+                aria-pressed={isPicked}
+                onClick={() => onSelectDate(key)}
+              >
+                {content}
+              </button>
+            ) : (
+              <div key={key} className={classes.join(" ") + weekBreak(index)}>
+                {content}
               </div>
             );
           })}

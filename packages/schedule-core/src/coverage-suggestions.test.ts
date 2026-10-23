@@ -300,6 +300,41 @@ describe("suggestCoverageFixes: people and pickups", () => {
       [ROW_CN, ROW_MA, ROW_SC].sort(),
     );
   });
+  it("suggests one action once, even when it fills two short requirements", () => {
+    // A legacy requirement by shift and a job requirement both count Day Shift ·
+    // Med Aide, so scheduling Ana once helps two rows that are short together.
+    const { suggestions } = run({
+      requirements: [
+        {
+          focusAreaId: 1,
+          jobId: null,
+          preferredShiftId: null,
+          assignmentId: DAY_MA,
+          dayOfWeek: null,
+          minStaff: 1,
+        },
+        {
+          focusAreaId: 1,
+          jobId: 5,
+          preferredShiftId: 2,
+          assignmentId: null,
+          dayOfWeek: null,
+          minStaff: 1,
+        },
+      ],
+      people: ["ana"],
+      qualified: { ana: [DAY_MA] },
+      draft: {},
+    });
+
+    const forAna = suggestions.filter(
+      (suggestion) => suggestion.employeeId === "ana" && suggestion.subject.dateKey === MON,
+    );
+    expect(forAna.map((suggestion) => suggestion.id)).toEqual([`assign:ana:${MON}:${DAY_MA}`]);
+    expect(forAna[0].closes).toBe(2);
+    expect(forAna[0].targets).toHaveLength(2);
+    expect(new Set(suggestions.map((suggestion) => suggestion.id)).size).toBe(suggestions.length);
+  });
 });
 
 describe("suggestCoverageFixes: order and repeating gaps", () => {

@@ -1,4 +1,5 @@
 import type { CoverageRuledOut, CoverageSuggestion } from "./coverage-suggestions";
+import type { CoverageStatus } from "./coverage";
 import { parseLocalDateKey } from "./dates";
 
 export interface CoverageSuggestionTextLookups {
@@ -7,16 +8,28 @@ export interface CoverageSuggestionTextLookups {
   assignmentFocusAreaId: (assignmentId: number) => number | null;
   focusAreaName: (focusAreaId: number) => string | null;
   absenceName: (absenceTypeId: number) => string;
+  /** A requirement row as the matrix names it, "Skilled Nursing · Day Shift · Med Aide". */
+  rowLabel: (rowKey: string) => string | null;
   /** The shared short date, "Sat, Oct 24". */
   formatDate: (dateKey: string) => string;
 }
 
 export interface CoverageSuggestionText {
+  /** The whole action: who, which shift, and when. */
   title: string;
+  /** Why it is suggested. */
   detail: string;
-  /** What it fixes, from the measured effects; null for a pattern. */
+  /** What applying it does; null for a pattern, which is advice. */
+  outcome: string | null;
+  /** What it fixes in one line; null for a pattern. */
   effect: string | null;
+  /** One line per cell it changes: when, which requirement, now and after. */
+  changes: string[];
 }
+
+const DRAFT_OUTCOME = "Changes the draft only. Staff see it after you publish.";
+const APPROVAL_OUTCOME =
+  "Publishes right away: staff see it without a publish, and it replaces any draft of that day.";
 
 function formatNumber(value: number): string {
   return String(Number(value.toFixed(2)));
@@ -42,22 +55,40 @@ function describeWork(
     .join(" and ");
 }
 
-function effectLine(
+function statusWord(status: CoverageStatus): string {
+  const gap = status.required - status.actual;
+  if (gap > 0) return `still short ${formatNumber(gap)}`;
+  if (gap < 0) return `${formatNumber(-gap)} over`;
+  return "staffed";
+}
+
+function countText(status: CoverageStatus): string {
+  return `${formatNumber(status.actual)}/${formatNumber(status.required)}`;
+}
+
+/** Every cell whose draft count the suggestion moves, in date order. */
+function changeLines(
   suggestion: CoverageSuggestion,
   lookups: CoverageSuggestionTextLookups,
-): string {
-  const { subject } = suggestion;
+): string[] {
+  return suggestion.effects
+    .filter((effect) => effect.draftBefore.actual !== effect.draftAfter.actual)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.rowKey.localeCompare(b.rowKey))
+    .map((effect) => {
+      const row = lookups.rowLabel(effect.rowKey) ?? "This requirement";
+      return `${lookups.formatDate(effect.dateKey)} · ${row}: ${countText(
+        effect.draftBefore,
+      )} staffed now, ${countText(effect.draftAfter)} after (${statusWord(effect.draftAfter)})`;
+    });
+}
+
+/** The summary: the gaps it closes, or how much it fills when it closes none. */
+function effectLine(suggestion: CoverageSuggestion): string {
   let line: string;
   if (suggestion.closes > 0) {
     line = `Closes ${suggestion.closes} ${suggestion.closes === 1 ? "gap" : "gaps"}`;
   } else {
-    const effect = suggestion.effects.find(
-      (candidate) => candidate.rowKey === subject.rowKey && candidate.dateKey === subject.dateKey,
-    );
-    const left = effect
-      ? Math.max(0, effect.draftAfter.required - effect.draftAfter.actual)
-      : suggestion.filled;
-    line = `Still short ${formatNumber(left)} on ${lookups.formatDate(subject.dateKey)} after this`;
+    line = `Fills ${formatNumber(suggestion.filled)} ${suggestion.filled === 1 ? "spot" : "spots"}`;
   }
   if (suggestion.clearsOver > 0) line += `, and clears ${suggestion.clearsOver} over`;
   return line;
@@ -70,33 +101,44 @@ export function describeCoverageSuggestion(
 ): CoverageSuggestionText {
   const { subject } = suggestion;
   const name = personOf(lookups, suggestion.employeeId);
-  const shift = lookups.assignmentName(subject.assignmentId);
-  const area = lookups.focusAreaName(subject.focusAreaId) ?? "";
+  // The shift's own focus area: two areas can each have a "Day Shift", and
+  // without it their suggestions read the same.
+  const shiftAreaId = lookups.assignmentFocusAreaId(subject.assignmentId) ?? subject.focusAreaId;
+  const area = lookups.focusAreaName(shiftAreaId) ?? lookups.focusAreaName(subject.focusAreaId);
+  const shiftName = lookups.assignmentName(subject.assignmentId);
+  const shift = area ? `${shiftName} in ${area}` : shiftName;
   const date = lookups.formatDate(subject.dateKey);
+  const measured = {
+    outcome: suggestion.final ? APPROVAL_OUTCOME : DRAFT_OUTCOME,
+    effect: effectLine(suggestion),
+    changes: changeLines(suggestion, lookups),
+  };
 
   switch (suggestion.kind) {
     case "moveBack":
       if (subject.otherDateKey) {
         return {
-          title: `Move ${name}'s ${shift} back to ${date}`,
-          detail: `${area}. This draft moved it to ${lookups.formatDate(subject.otherDateKey)}.`,
-          effect: effectLine(suggestion, lookups),
+          title: `Move ${name}'s ${shift} from ${lookups.formatDate(
+            subject.otherDateKey,
+          )} back to ${date}`,
+          detail: `It was published on ${date}, and this draft moved it.`,
+          ...measured,
         };
       }
       return {
-        title: `Move ${name} back to ${shift}`,
-        detail: `${area}, ${date}. This draft changed it to ${describeWork(
+        title: `Change ${name} back to ${shift} on ${date}`,
+        detail: `It was published as ${shiftName}, and this draft changed it to ${describeWork(
           lookups,
           subject.otherAssignmentIds,
           subject.focusAreaId,
         )}.`,
-        effect: effectLine(suggestion, lookups),
+        ...measured,
       };
     case "restore":
       return {
-        title: `Restore ${name}'s ${shift}`,
-        detail: `${area}, ${date}. Removed in this draft with no absence or request recorded.`,
-        effect: effectLine(suggestion, lookups),
+        title: `Restore ${name}'s ${shift} on ${date}`,
+        detail: "It was published, and this draft removed it with no absence or request recorded.",
+        ...measured,
       };
     case "assign": {
       const also =
@@ -105,25 +147,27 @@ export function describeCoverageSuggestion(
           : "";
       return {
         title: `Schedule ${name} for ${shift} on ${date}`,
-        detail: `${area}. Qualified and free that day.${also}`,
-        effect: effectLine(suggestion, lookups),
+        detail: `Qualified for this shift and free at that time.${also}`,
+        ...measured,
       };
     }
     case "approvePickup":
       return {
-        title: `Approve ${name}'s pickup request`,
-        detail: `${area} ${shift}, ${date}. Takes effect for staff right away, without a publish.`,
-        effect: effectLine(suggestion, lookups),
+        title: `Approve ${name}'s pickup request for ${shift} on ${date}`,
+        detail: `${name} asked to pick up this shift, and the request is waiting for approval.`,
+        ...measured,
       };
     case "pattern": {
       const weekday = parseLocalDateKey(subject.dateKey).toLocaleDateString("en-US", {
         weekday: "long",
       });
       return {
-        title: `${area} ${shift} is short every ${weekday} in this period`,
+        title: `${lookups.rowLabel(subject.rowKey) ?? shift} is short every ${weekday} in this period`,
         detail:
           "Nobody qualified is free on those days. A repeating shift would stop it recurring.",
+        outcome: null,
         effect: null,
+        changes: [],
       };
     }
   }

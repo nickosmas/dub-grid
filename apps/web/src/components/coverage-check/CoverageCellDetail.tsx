@@ -156,7 +156,6 @@ export function CoverageCellDetail({
                 view={view}
                 busy={busy}
                 onApply={onApply}
-                showDetail
               />
             ))}
           </ul>

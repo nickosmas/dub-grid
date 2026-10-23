@@ -34,14 +34,19 @@ Select a cell to see it in detail:
 
 ### Suggestions
 
-People who edit shifts also see **Suggestions** above the matrix: ways to fix the gaps, best first. Select **Show all** for the rest. Each one says what it does, for example "Closes 1 gap", and is measured on a copy of the schedule first, so it never fixes one gap by opening another.
+People who edit shifts see a dot under each date that has a suggestion. Select a date to see that day's suggestions, best first; select it again to close them. Each suggestion is measured on a copy of the schedule first, so it never fixes one gap by opening another, and it reads complete on its own:
+
+- who, which shift in which focus area, and the date (both dates for a move);
+- why it is suggested;
+- what it fixes, for example "Closes 1 gap" or "Fills 1 spot", and each requirement it changes with its count now and after;
+- what applying it does: a draft change staff see after you publish, or, for an approval, a change published right away.
 
 - **Move back** returns a shift this draft moved to another day or changed to other work.
 - **Restore** puts back a shift this draft removed, when no absence or request explains the removal.
-- **Schedule** adds someone who is qualified for the shift and free that day: no absence, and no shift that overlaps it.
+- **Schedule** adds someone who is qualified for the shift and free at that time: no absence, and no shift that overlaps it.
 - **Approve** approves a pickup request already waiting for the shift. Coverage Check asks first, because an approval takes effect for staff right away, without a publish, and replaces any draft change of yours for that person's day.
 
-Move back, Restore and Schedule change only the draft, the same way an edit in the grid does, and appear under **Applied** with **Undo**. When nothing can fix a requirement that is short on the same day every week, Coverage Check says so.
+Move back, Restore and Schedule change only the draft, the same way an edit in the grid does, and appear under **Applied** above the matrix with **Undo**. When nothing can fix a requirement that is short on the same day every week, Coverage Check says so.
 
 **All requirements met** means no requirement is short or over for the period. If your Organization has not set any requirements, Coverage Check says so and points to [Coverage settings](/configuration/coverage-requirements).
 
