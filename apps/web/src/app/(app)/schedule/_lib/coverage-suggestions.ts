@@ -1,6 +1,7 @@
 import {
   parseLocalDateKey,
   type CoverageAvailability,
+  type CoverageDayOverride,
   type CoverageMatrix,
   type CoverageMeasureInput,
   type CoveragePickupRequest,
@@ -194,6 +195,53 @@ export function availabilityFromShifts(
     if (first == null || key < first || key > last) return { kind: "unverified", dateKey: key };
   }
   return { kind: "free" };
+}
+
+/**
+ * Availability once Apply all's planned days are written: the page's own
+ * check, then each planned shift's default times on that day and the days
+ * either side, so a planned overnight shift still blocks the next morning.
+ */
+export function availabilityWithPlanned(
+  input: Pick<
+    CoverageSuggestionAdapterInput,
+    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys"
+  >,
+  planned: ReadonlyArray<CoverageDayOverride>,
+): (employeeId: string, dateKey: string, assignmentId: number) => CoverageAvailability {
+  const rangeOf = (assignmentId: number) => {
+    const assignment = input.assignments.find((candidate) => candidate.id === assignmentId);
+    return assignment ? assignmentTimeRange(assignment, input.shiftCategories) : null;
+  };
+  return (employeeId, dateKey, assignmentId) => {
+    const base = availabilityFromShifts(input, employeeId, dateKey, assignmentId);
+    if (base.kind !== "free") return base;
+    const range = rangeOf(assignmentId);
+    const date = parseLocalDateKey(dateKey);
+    const sideOf = new Map([
+      [formatDateKey(addDays(date, -1)), "prev" as const],
+      [formatDateKey(addDays(date, 1)), "next" as const],
+    ]);
+    for (const day of planned) {
+      if (day.side !== "draft" || day.employeeId !== employeeId) continue;
+      const side = sideOf.get(day.dateKey);
+      if (day.dateKey !== dateKey && !side) continue;
+      if (day.dateKey === dateKey && day.day.absenceTypeId != null) {
+        return { kind: "absence", absenceTypeId: day.day.absenceTypeId };
+      }
+      for (const plannedId of day.day.assignmentIds) {
+        const existing = rangeOf(plannedId);
+        const overlaps =
+          !existing ||
+          !range ||
+          (side
+            ? checkCrossDateOverlap(range, { [side]: existing }).length > 0
+            : timesOverlap([existing], [range]));
+        if (overlaps) return { kind: "overlap", dateKey: day.dateKey, assignmentId: plannedId };
+      }
+    }
+    return base;
+  };
 }
 
 /** The engine's input and its words, from the schedule page's own data. */

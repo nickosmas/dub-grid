@@ -389,9 +389,12 @@ function ToolsMenu({
           </>
         )}
 
-        {/* Auto Fill */}
+        {/* Fill from Recurring Schedules */}
         {canApplyRecurringSchedule && onApplyRecurring && (
-          <Hint content={hint("Apply all recurring shift templates to the schedule")} side="left">
+          <Hint
+            content={hint("Fill empty slots from each person's recurring schedule")}
+            side="left"
+          >
             <MenuItem
               data-tour="toolbar-autofill"
               disabled={scheduleTargetActionsDisabled || isApplyingRecurring}
@@ -419,7 +422,7 @@ function ToolsMenu({
                   </svg>
                 }
               >
-                Auto Fill
+                Fill from Recurring Schedules
               </ButtonLoading>
             </MenuItem>
           </Hint>

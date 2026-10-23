@@ -26,8 +26,10 @@ import {
   type CoverageCellRef,
 } from "@/components/coverage-check/CoverageMatrixGrid";
 import {
+  APPLY_ALL_NOTE,
   CoverageAppliedList,
   CoverageDayDetail,
+  hasDraftFix,
   type AppliedCoverageSuggestion,
   type CoverageSuggestionView,
 } from "@/components/coverage-check/CoverageSuggestions";
@@ -66,6 +68,8 @@ interface CoveragePanelProps {
   busySuggestionId?: string | null;
   onApplySuggestion?: (suggestion: CoverageSuggestion) => void;
   onUndoSuggestion?: (appliedId: string) => void;
+  /** Applies every draft fix, for one date or (null) the whole period. */
+  onApplyAllSuggestions?: (dateKey: string | null) => void;
   onClose: () => void;
 }
 
@@ -155,6 +159,7 @@ export default function CoveragePanel({
   busySuggestionId = null,
   onApplySuggestion = () => {},
   onUndoSuggestion = () => {},
+  onApplyAllSuggestions,
   onClose,
 }: CoveragePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
@@ -421,9 +426,28 @@ export default function CoveragePanel({
                         onUndo={onUndoSuggestion}
                       />
                       {!selected && !selectedDateKey && suggestionHint && (
-                        <p className="dg-cc-detail-line dg-cc-detail-line--muted dg-tabular-nums">
-                          {suggestionHint}
-                        </p>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="dg-cc-detail-line dg-cc-detail-line--muted dg-tabular-nums">
+                              {suggestionHint}
+                            </p>
+                            {onApplyAllSuggestions && hasDraftFix(suggestionItems) && (
+                              <Button
+                                type="button"
+                                className="dg-btn dg-btn-secondary dg-btn-sm"
+                                onClick={() => onApplyAllSuggestions(null)}
+                                disabled={busySuggestionId != null}
+                              >
+                                Apply all draft fixes
+                              </Button>
+                            )}
+                          </div>
+                          {onApplyAllSuggestions && hasDraftFix(suggestionItems) && (
+                            <p className="dg-cc-detail-line dg-cc-detail-line--muted">
+                              {APPLY_ALL_NOTE}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </>
                   )}
@@ -470,6 +494,11 @@ export default function CoveragePanel({
                         items={dayItems}
                         busy={busySuggestionId != null}
                         onApply={onApplySuggestion}
+                        onApplyAll={
+                          onApplyAllSuggestions
+                            ? () => onApplyAllSuggestions(selectedDateKey)
+                            : undefined
+                        }
                       />
                     </div>
                   )}

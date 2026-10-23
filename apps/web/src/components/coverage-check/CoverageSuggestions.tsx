@@ -132,6 +132,18 @@ interface CoverageDayDetailProps {
   items: CoverageSuggestionView[];
   busy: boolean;
   onApply: (suggestion: CoverageSuggestion) => void;
+  /** Applies every draft fix for this day; omitted when there is none. */
+  onApplyAll?: () => void;
+}
+
+/** What Apply all does, said wherever it is offered. */
+export const APPLY_ALL_NOTE =
+  "Applies the draft fixes one at a time, counting again after each so no spot is filled twice. Approvals are not included.";
+
+export function hasDraftFix(items: CoverageSuggestionView[]): boolean {
+  return items.some(
+    (view) => suggestionActionLabel(view.suggestion.kind) && !view.suggestion.final,
+  );
 }
 
 /** One selected date: how short it is and every suggestion for it. */
@@ -141,6 +153,7 @@ export function CoverageDayDetail({
   items,
   busy,
   onApply,
+  onApplyAll,
 }: CoverageDayDetailProps) {
   const label = formatLongDate(date);
   return (
@@ -155,9 +168,24 @@ export function CoverageDayDetail({
       </div>
       {items.length > 0 ? (
         <div className="flex flex-col gap-1.5">
-          <div className="dg-cc-caption">
-            {items.length === 1 ? "1 suggestion" : `${items.length} suggestions`}
+          <div className="flex items-center justify-between gap-3">
+            <div className="dg-cc-caption">
+              {items.length === 1 ? "1 suggestion" : `${items.length} suggestions`}
+            </div>
+            {onApplyAll && hasDraftFix(items) && (
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={onApplyAll}
+                disabled={busy}
+              >
+                Apply all for this day
+              </Button>
+            )}
           </div>
+          {onApplyAll && hasDraftFix(items) && (
+            <p className="dg-cc-detail-line dg-cc-detail-line--muted">{APPLY_ALL_NOTE}</p>
+          )}
           <ul className="dg-cc-sg-list">
             {items.map((view) => (
               <CoverageSuggestionRow

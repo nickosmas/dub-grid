@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { suggestCoverageFixes, type CoverageSuggestion } from "./coverage-suggestions";
+import {
+  planCoverageFixes,
+  suggestCoverageFixes,
+  type CoverageSuggestion,
+} from "./coverage-suggestions";
 import {
   DAY_CN,
   DAY_MA,
@@ -420,5 +424,101 @@ describe("suggestCoverageFixes: order and repeating gaps", () => {
 
     expect(suggestions.map((suggestion) => suggestion.kind)).toEqual(["assign"]);
     expect(suggestions[0].subject.dateKey).toBe(NEXT_MON);
+  });
+});
+
+describe("planCoverageFixes", () => {
+  it("fills a gap once, however many people could fill it", () => {
+    // Two short on Monday, five free people: two are scheduled, not five.
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const plan = planCoverageFixes(world, { dateKey: MON });
+
+    expect(plan.every((fix) => fix.kind === "assign")).toBe(true);
+    expect(plan).toHaveLength(2);
+    expect(new Set(plan.map((fix) => fix.employeeId)).size).toBe(2);
+    expect(plan.every((fix) => fix.targets.some((target) => target.dateKey === MON))).toBe(true);
+  });
+
+  it("covers every date when no date is given, leaving nothing short", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const plan = planCoverageFixes(world);
+
+    const scheduled = plan.map((fix) => `${fix.employeeId}|${fix.subject.dateKey}`);
+    expect(new Set(scheduled).size).toBe(plan.length);
+    expect(plan).toHaveLength(2 * world.matrix.dateKeys.length);
+  });
+
+  it("puts back the draft's own changes before adding anyone", () => {
+    const plan = planCoverageFixes(
+      buildSuggestionWorld({
+        requirements: MA_ONLY,
+        published: { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${MON}`]: { work: [DAY_MA] } },
+        draft: { [`ben|${MON}`]: { work: [DAY_MA] } },
+      }),
+      { dateKey: MON },
+    );
+
+    expect(plan.map((fix) => [fix.kind, fix.employeeId])).toEqual([["restore", "ana"]]);
+  });
+
+  it("never approves a pickup, which would publish", () => {
+    const plan = planCoverageFixes(
+      buildSuggestionWorld({
+        requirements: MA_ONLY,
+        people: ["ana", "ben"],
+        qualified: { ben: [] },
+        draft: { [`ana|${MON}`]: { work: [DAY_MA] } },
+        pendingPickups: [
+          {
+            requestId: "r1",
+            employeeId: "ben",
+            dateKey: MON,
+            focusAreaId: 1,
+            assignmentIds: [DAY_MA],
+          },
+        ],
+      }),
+      { dateKey: MON },
+    );
+
+    expect(plan.some((fix) => fix.kind === "approvePickup")).toBe(false);
+  });
+
+  it("gives one person one fix a day, even with two short requirements", () => {
+    const plan = planCoverageFixes(buildSuggestionWorld({ people: ["ana"], draft: {} }), {
+      dateKey: MON,
+    });
+
+    expect(plan.filter((fix) => fix.employeeId === "ana")).toHaveLength(1);
+  });
+
+  it("asks the caller whether a planned day leaves someone free", () => {
+    // One short on Monday and Tuesday, only Ana free: the caller says a
+    // Monday shift does not stop a Tuesday one, so she gets both.
+    const world = buildSuggestionWorld({
+      requirements: [{ ...MA_ONLY[0], minStaff: 1 }],
+      people: ["ana"],
+      draft: {},
+    });
+    const cautious = planCoverageFixes(world);
+    const exact = planCoverageFixes(world, {
+      availabilityWith: (planned) => (employeeId, dateKey) =>
+        planned.some((day) => day.employeeId === employeeId && day.dateKey === dateKey)
+          ? { kind: "overlap", dateKey, assignmentId: DAY_MA }
+          : { kind: "free" },
+    });
+
+    expect(cautious.map((fix) => fix.subject.dateKey)).not.toContain(TUE);
+    expect(exact.map((fix) => fix.subject.dateKey)).toContain(TUE);
+    expect(exact.length).toBeGreaterThan(cautious.length);
+  });
+
+  it("is empty when nothing is short", () => {
+    const staffed = { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${MON}`]: { work: [DAY_MA] } };
+    expect(
+      planCoverageFixes(buildSuggestionWorld({ requirements: MA_ONLY, draft: staffed }), {
+        dateKey: MON,
+      }),
+    ).toEqual([]);
   });
 });

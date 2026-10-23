@@ -3,7 +3,11 @@ import {
   type CoverageComputationInput,
   type CoverageStatus,
 } from "./coverage";
-import type { CoverageMatrix, CoverageMatrixCell } from "./coverage-matrix";
+import {
+  buildCoverageMatrix,
+  type CoverageMatrix,
+  type CoverageMatrixCell,
+} from "./coverage-matrix";
 import { formatLocalDateKey, parseLocalDateKey } from "./dates";
 
 /** One person's day on one side. Satisfies 47b's `CoverageDaySide`. */
@@ -649,4 +653,106 @@ export function suggestCoverageFixes(input: CoverageSuggestionInput): CoverageSu
       (nameOf.get(left.employeeId) ?? "").localeCompare(nameOf.get(right.employeeId) ?? ""),
   );
   return { suggestions: [...fixes, ...patterns], ruledOut };
+}
+
+const DRAFT_KINDS: ReadonlySet<CoverageSuggestionKind> = new Set(["moveBack", "restore", "assign"]);
+
+/** The input again with some draft days changed, coverage counted afresh. */
+function withDraftOverrides(
+  input: CoverageSuggestionInput,
+  overrides: ReadonlyArray<CoverageDayOverride>,
+): CoverageSuggestionInput {
+  const changed = new Map(
+    overrides
+      .filter((override) => override.side === "draft")
+      .map((override) => [`${override.employeeId}|${override.dateKey}`, override.day]),
+  );
+  const draftDay = (employeeId: string, dateKey: string) =>
+    changed.get(`${employeeId}|${dateKey}`) ?? input.draftDay(employeeId, dateKey);
+  const started = new Set<string>();
+  const publishedDateKeys = new Set<string>();
+  for (const row of input.matrix.rows) {
+    for (const cell of row.cells) {
+      if (cell?.past) started.add(`${row.rowKey}|${cell.dateKey}`);
+      if (cell?.published) publishedDateKeys.add(cell.dateKey);
+    }
+  }
+  const dates = input.matrix.dateKeys.map(parseLocalDateKey);
+  const snapshots = (dayOf: typeof draftDay) =>
+    computeCoverageCategorySnapshots({
+      ...input.coverage,
+      dates,
+      assignmentIdsForKey: (employeeId, date) =>
+        dayOf(employeeId, formatLocalDateKey(date)).assignmentIds,
+      coverageCreditForKey: (employeeId, date, assignmentId) =>
+        dayOf(employeeId, formatLocalDateKey(date)).mentoredAssignmentIds.includes(assignmentId)
+          ? input.mentoredCredit
+          : 1,
+      includeContributors: true,
+    });
+  const matrix = buildCoverageMatrix({
+    draft: snapshots(draftDay),
+    published: snapshots(input.publishedDay),
+    dates,
+    publishedDateKeys,
+    isStarted: (snapshot) => started.has(`${snapshot.rowKey}|${formatLocalDateKey(snapshot.date)}`),
+  });
+  return { ...input, matrix, draftDay };
+}
+
+function dayNumber(dateKey: string): number {
+  return Math.round(parseLocalDateKey(dateKey).getTime() / 86_400_000);
+}
+
+export interface PlanCoverageFixesOptions {
+  /** Only fixes for this date. */
+  dateKey?: string;
+  /**
+   * Availability once the planned days are written, from the caller's own
+   * shift times. Without it, a person a fix changed is not used again on that
+   * day or the days either side, since overnight work could overlap.
+   */
+  availabilityWith?: (
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => CoverageSuggestionInput["availability"];
+}
+
+/**
+ * Every draft fix to apply together, chosen one at a time: after each, the
+ * schedule is counted again and suggestions are made afresh, so two fixes
+ * never fill the same spot and none undoes another. Approvals publish, so
+ * they are left out, and no two fixes write the same person's same day.
+ */
+export function planCoverageFixes(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions = {},
+): CoverageSuggestion[] {
+  const plan: CoverageSuggestion[] = [];
+  const overrides: CoverageDayOverride[] = [];
+  const reach = options.availabilityWith ? 0 : 1;
+  const clashes = (override: CoverageDayOverride) =>
+    overrides.some(
+      (planned) =>
+        planned.employeeId === override.employeeId &&
+        Math.abs(dayNumber(planned.dateKey) - dayNumber(override.dateKey)) <= reach,
+    );
+  let current = input;
+  // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
+  for (let step = 0; step < 500; step += 1) {
+    const next = suggestCoverageFixes(current).suggestions.find(
+      (suggestion) =>
+        DRAFT_KINDS.has(suggestion.kind) &&
+        (options.dateKey == null ||
+          suggestion.targets.some((target) => target.dateKey === options.dateKey)) &&
+        !suggestion.overrides.some(clashes),
+    );
+    if (!next) return plan;
+    plan.push(next);
+    overrides.push(...next.overrides);
+    current = withDraftOverrides(input, overrides);
+    if (options.availabilityWith) {
+      current = { ...current, availability: options.availabilityWith(overrides) };
+    }
+  }
+  return plan;
 }

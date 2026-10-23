@@ -194,10 +194,9 @@ describe("Toolbar — Tools dropdown", () => {
       "aria-disabled",
       "true",
     );
-    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+    expect(
+      screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
+    ).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -248,10 +247,9 @@ describe("Toolbar — Tools dropdown", () => {
       "aria-disabled",
       "true",
     );
-    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).not.toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+    expect(
+      screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
+    ).not.toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).not.toHaveAttribute(
       "aria-disabled",
       "true",
@@ -293,14 +291,18 @@ describe("Toolbar — Tools dropdown", () => {
     );
     await user.click(screen.getByRole("button", { name: /Tools/i }));
     expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /Auto Fill/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows Auto Fill only when recurring apply permission is granted", async () => {
+  it("shows Fill from Recurring Schedules only when recurring apply permission is granted", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} canApplyRecurringSchedule onApplyRecurring={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
-    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
+    ).toBeInTheDocument();
   });
 });
 

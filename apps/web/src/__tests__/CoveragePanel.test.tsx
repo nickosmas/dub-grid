@@ -532,6 +532,37 @@ describe("CoveragePanel", () => {
       expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
     });
 
+    it("applies every draft fix for the picked date, or for the whole period", () => {
+      const onApplyAllSuggestions = vi.fn();
+      withSuggestions({ onApplyAllSuggestions });
+
+      fireEvent.click(screen.getByRole("button", { name: "Apply all draft fixes" }));
+      expect(onApplyAllSuggestions).toHaveBeenLastCalledWith(null);
+
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      fireEvent.click(day().getByRole("button", { name: "Apply all for this day" }));
+      expect(onApplyAllSuggestions).toHaveBeenLastCalledWith("2026-10-28");
+      expect(day().getByText(/Approvals are not included/)).toBeInTheDocument();
+    });
+
+    it("offers no Apply all when only approvals and advice remain", () => {
+      renderPanel({
+        onApplyAllSuggestions: vi.fn(),
+        suggestions: {
+          items: [view("d", "approvePickup"), view("e", "pattern")],
+          notSuggestedByCell: new Map(),
+        },
+      });
+
+      expect(
+        screen.queryByRole("button", { name: "Apply all draft fixes" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      expect(
+        day().queryByRole("button", { name: "Apply all for this day" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("keeps applied changes in view with Undo, and an approval as published", () => {
       const onUndoSuggestion = vi.fn();
       withSuggestions({

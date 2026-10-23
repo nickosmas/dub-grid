@@ -95,6 +95,7 @@ import {
   describeCoverageRuledOut,
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
+  planCoverageFixes,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
@@ -105,7 +106,12 @@ import {
   type CoverageMatrixRow,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
-import { buildCoverageSuggestionInput, planSuggestionWrites } from "./_lib/coverage-suggestions";
+import {
+  availabilityWithPlanned,
+  buildCoverageSuggestionInput,
+  planSuggestionWrites,
+  type SuggestionWrite,
+} from "./_lib/coverage-suggestions";
 import {
   appliedSuggestionText,
   type AppliedCoverageSuggestion,
@@ -614,8 +620,9 @@ function SchedulerContent({
   const [, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  // Print lists sections in the grid's order: by department, then within it.
-  const printFocusAreas = useMemo(
+  // The grid's order: by department, then within it. Print and Coverage Check
+  // list focus areas the same way.
+  const orderedFocusAreas = useMemo(
     () => orderFocusAreasByDepartment(focusAreas, departments),
     [departments, focusAreas],
   );
@@ -3525,7 +3532,7 @@ function SchedulerContent({
 
   const coverageBase = useMemo(
     () => ({
-      focusAreas,
+      focusAreas: orderedFocusAreas,
       shiftCategories,
       assignments,
       requirements: coverageRequirements,
@@ -3535,7 +3542,7 @@ function SchedulerContent({
       assignmentNameMap,
     }),
     [
-      focusAreas,
+      orderedFocusAreas,
       shiftCategories,
       assignments,
       coverageRequirements,
@@ -5765,7 +5772,7 @@ function SchedulerContent({
       }
 
       if (count === 0) {
-        toast.info("No empty schedule slots matched recurring templates for this date range");
+        toast.info("No empty slots in these dates match a recurring schedule.");
         return;
       }
 
@@ -5785,7 +5792,7 @@ function SchedulerContent({
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     startScheduleOperation({
       kind: "autofill",
-      title: "Filling shifts",
+      title: "Filling from recurring schedules",
       detail: autoFillPreview?.count
         ? `Applying recurring templates to ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${dateRange}.`
         : `Applying recurring templates for ${dateRange}.`,
@@ -5808,7 +5815,7 @@ function SchedulerContent({
         });
         const refreshed = await refetchScheduleData();
         toast.success(
-          `Applied recurring templates to ${generated.length} schedule slot${generated.length === 1 ? "" : "s"}`,
+          `Filled ${generated.length} slot${generated.length === 1 ? "" : "s"} from recurring schedules`,
         );
         const realtimeDiff = refreshed
           ? buildRealtimeDraftDiff(
@@ -5825,9 +5832,9 @@ function SchedulerContent({
       } else {
         finishScheduleOperation(
           "autofill",
-          "No empty schedule slots matched recurring templates for this date range.",
+          "No empty slots in these dates match a recurring schedule.",
         );
-        toast.info("No empty schedule slots matched recurring templates for this date range");
+        toast.info("No empty slots in these dates match a recurring schedule.");
       }
     } catch (err) {
       clearScheduleOperation("autofill");
@@ -6573,7 +6580,7 @@ function SchedulerContent({
   // copy of the schedule by the engine, so this reruns as the draft changes.
   const coverageSuggestions = useMemo(() => {
     if (!coverageMatrix || !canEditShifts) return null;
-    const { engine, text } = buildCoverageSuggestionInput({
+    const adapterInput = {
       matrix: coverageMatrix,
       coverage: coverageBase,
       mentoredCredit:
@@ -6589,7 +6596,8 @@ function SchedulerContent({
       assignmentNames: assignmentNameMap,
       absenceNames: new Map(allAbsenceTypes.map((type) => [type.id, type.name])),
       loadedDateKeys: availableSwapDates,
-    });
+    };
+    const { engine, text } = buildCoverageSuggestionInput(adapterInput);
     const result = suggestCoverageFixes(engine);
     const notSuggestedByCell = new Map<string, string[]>();
     for (const entry of result.ruledOut) {
@@ -6606,6 +6614,8 @@ function SchedulerContent({
       })),
       notSuggestedByCell,
       text,
+      engine,
+      adapterInput,
     };
   }, [
     allAbsenceTypes,
@@ -6736,6 +6746,62 @@ function SchedulerContent({
       toast.success(text);
     },
     [buildSuggestedAssignInput, coverageSuggestions, setShift, shifts],
+  );
+
+  // Apply all: the engine plans the fixes one at a time, counting again after
+  // each, and every planned day is written like a single Apply. One Applied
+  // entry with Undo puts the whole batch back.
+  const applyAllCoverageSuggestions = useCallback(
+    (dateKey: string | null) => {
+      if (!coverageSuggestions) return;
+      const { engine, adapterInput } = coverageSuggestions;
+      const plan = planCoverageFixes(engine, {
+        dateKey: dateKey ?? undefined,
+        availabilityWith: (planned) => availabilityWithPlanned(adapterInput, planned),
+      });
+      if (plan.length === 0) {
+        toast.error("Nothing here can be fixed in the draft.");
+        return;
+      }
+      setBusySuggestionId("apply-all");
+      const before: SuggestionWrite[] = [];
+      for (const suggestion of plan) {
+        const writes = planSuggestionWrites(
+          suggestion,
+          shiftsRef.current,
+          buildSuggestedAssignInput,
+        );
+        const failed =
+          !writes ||
+          writes.writes.some((write, index) => {
+            if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
+              return true;
+            }
+            before.push(writes.before[index]);
+            return false;
+          });
+        if (failed) {
+          // Put back the whole batch so the draft is never left half applied.
+          for (const undo of [...before].reverse()) {
+            setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
+          }
+          setBusySuggestionId(null);
+          toast.error("Those changes couldn't be saved. Nothing was changed.");
+          return;
+        }
+      }
+      setBusySuggestionId(null);
+      const fixes = plan.length === 1 ? "1 fix" : `${plan.length} fixes`;
+      const text = dateKey
+        ? `Applied ${fixes} for ${formatShortDate(parseLocalDateKey(dateKey))}`
+        : `Applied ${fixes} across this period`;
+      setAppliedSuggestions((current) => [
+        ...current,
+        { id: `apply-all@${Date.now()}`, text, final: false, before },
+      ]);
+      toast.success(text);
+    },
+    [buildSuggestedAssignInput, coverageSuggestions, setShift],
   );
 
   const undoCoverageSuggestion = useCallback(
@@ -8634,7 +8700,7 @@ function SchedulerContent({
             <CoveragePanel
               matrix={coverageMatrix}
               publishedDateKeys={publishedDateSet}
-              focusAreas={focusAreas}
+              focusAreas={orderedFocusAreas}
               activeFocusArea={activeFocusArea}
               publishedWindowState={canEditShifts ? publishedWindowState : rawPublishedWindowState}
               canEditShifts={canEditShifts}
@@ -8647,6 +8713,7 @@ function SchedulerContent({
               busySuggestionId={busySuggestionId}
               onApplySuggestion={applyCoverageSuggestion}
               onUndoSuggestion={undoCoverageSuggestion}
+              onApplyAllSuggestions={applyAllCoverageSuggestions}
               onFillSpot={fillCoverageCell}
               onShowInGrid={showCoverageInGrid}
               onClose={() => setShowCoveragePanel(false)}
@@ -8661,7 +8728,7 @@ function SchedulerContent({
 
           {showPrintOptions && (
             <PrintOptionsModal
-              focusAreas={printFocusAreas}
+              focusAreas={orderedFocusAreas}
               currentSpanWeeks={spanWeeks}
               onPrint={(config) => {
                 setShowPrintOptions(false);
@@ -8680,7 +8747,7 @@ function SchedulerContent({
               config={activePrintConfig}
               employees={employees}
               allEmployees={employees}
-              focusAreas={printFocusAreas}
+              focusAreas={orderedFocusAreas}
               assignments={assignments}
               shiftCategories={shiftCategories}
               jobs={jobs}
@@ -8800,8 +8867,8 @@ function SchedulerContent({
 
           {showAutoFillConfirm && autoFillPreview && (
             <ConfirmDialog
-              title="Auto Fill Shifts?"
-              message={`This will fill ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring templates. Existing visible shifts will not be overwritten.`}
+              title="Fill from Recurring Schedules?"
+              message={`This fills ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} from recurring schedules. Shifts already on the schedule are not overwritten.`}
               confirmLabel="Fill"
               variant="info"
               isLoading={isApplyingRecurring}
