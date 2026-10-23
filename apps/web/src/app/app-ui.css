@@ -440,6 +440,16 @@
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: -2px;
 }
+.dg-segment-btn:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: not-allowed;
+}
+.dg-segment-btn:disabled:hover {
+  background: transparent;
+}
+.dg-segment-grid .dg-segment-btn:disabled:hover {
+  background: var(--dg-color-surface);
+}
 
 /* ── Segment Control ────────────────────────────────────── */
 .dg-segment-btn.active {
