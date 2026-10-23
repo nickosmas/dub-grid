@@ -1284,7 +1284,7 @@ async function checkShiftCategoryDependenciesForOrg(
     buildSummary([
       scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
       recurringCount
-        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        ? `${recurringCount} recurring schedule${recurringCount !== 1 ? "s" : ""}`
         : "",
       coverageRes.count
         ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
@@ -1315,7 +1315,7 @@ async function checkJobDependenciesForOrg(jobId: number, orgId: string): Promise
     buildSummary([
       scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
       recurringCount
-        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        ? `${recurringCount} recurring schedule${recurringCount !== 1 ? "s" : ""}`
         : "",
       coverageRes.count
         ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
@@ -1343,7 +1343,7 @@ async function checkAbsenceTypeDependenciesForOrg(
     buildSummary([
       scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
       recurringCount
-        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        ? `${recurringCount} recurring schedule${recurringCount !== 1 ? "s" : ""}`
         : "",
     ]),
     hasAny,

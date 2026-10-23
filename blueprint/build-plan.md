@@ -987,7 +987,7 @@
         considers, previews the shifts it adds, the gaps it closes and the
         gaps it leaves before anything changes, and Build applies it through
         the draft with one Undo.
-  - [ ] 48b. **Recurring schedules first** - the build applies recurring
+  - [x] 48b. **Recurring schedules first** - the build applies recurring
         schedules for the period (effective dates, archived shifts, never
         overwriting) before it fills gaps; Fill from Recurring Schedules stays
         its own tool.

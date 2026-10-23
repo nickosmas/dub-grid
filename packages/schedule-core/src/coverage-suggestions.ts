@@ -710,6 +710,11 @@ export interface PlanCoverageFixesOptions {
   /** Only fixes for these requirement rows, such as one focus area's. */
   rowKeys?: ReadonlySet<string>;
   /**
+   * Draft days fixed before any fix is planned, such as recurring schedule
+   * fills: counted as written, seen by availability, and never written twice.
+   */
+  baseOverrides?: ReadonlyArray<CoverageDayOverride>;
+  /**
    * Availability once the planned days are written, from the caller's own
    * shift times. Without it, a person a fix changed is not used again on that
    * day or the days either side, since overnight work could overlap.
@@ -730,7 +735,7 @@ export function planCoverageFixes(
   options: PlanCoverageFixesOptions = {},
 ): CoverageSuggestion[] {
   const plan: CoverageSuggestion[] = [];
-  const overrides: CoverageDayOverride[] = [];
+  const overrides: CoverageDayOverride[] = [...(options.baseOverrides ?? [])];
   const reach = options.availabilityWith ? 0 : 1;
   const clashes = (override: CoverageDayOverride) =>
     overrides.some(
@@ -738,7 +743,13 @@ export function planCoverageFixes(
         planned.employeeId === override.employeeId &&
         Math.abs(dayNumber(planned.dateKey) - dayNumber(override.dateKey)) <= reach,
     );
-  let current = input;
+  const withPlanned = (): CoverageSuggestionInput => {
+    const next = withDraftOverrides(input, overrides);
+    return options.availabilityWith
+      ? { ...next, availability: options.availabilityWith(overrides) }
+      : next;
+  };
+  let current = overrides.length > 0 ? withPlanned() : input;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
   for (let step = 0; step < 500; step += 1) {
     const next = suggestCoverageFixes(current).suggestions.find(
@@ -754,18 +765,17 @@ export function planCoverageFixes(
     if (!next) return plan;
     plan.push(next);
     overrides.push(...next.overrides);
-    current = withDraftOverrides(input, overrides);
-    if (options.availabilityWith) {
-      current = { ...current, availability: options.availabilityWith(overrides) };
-    }
+    current = withPlanned();
   }
   return plan;
 }
 
 /** What a build would do to the draft, counted exactly before anything changes. */
 export interface CoverageBuildPreview {
-  /** In the order they will be applied. */
+  /** In the order they will be applied, after the base days. */
   fixes: CoverageSuggestion[];
+  /** The base days (recurring schedule fills) that are shifts and absences. */
+  recurring: { shifts: number; absences: number };
   counts: { assign: number; restore: number; moveBack: number };
   /** Distinct people the build changes. */
   people: number;
@@ -804,10 +814,8 @@ export function previewCoverageBuild(
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
   const fixes = planCoverageFixes(input, options);
-  const after = withDraftOverrides(
-    input,
-    fixes.flatMap((fix) => fix.overrides),
-  );
+  const base = options.baseOverrides ?? [];
+  const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const before = countOpen(input.matrix, options.rowKeys);
   const result = countOpen(after.matrix, options.rowKeys);
   const counts = { assign: 0, restore: 0, moveBack: 0 };
@@ -818,8 +826,15 @@ export function previewCoverageBuild(
   }
   return {
     fixes,
+    recurring: {
+      shifts: base.filter((day) => day.day.assignmentIds.length > 0).length,
+      absences: base.filter(
+        (day) => day.day.assignmentIds.length === 0 && day.day.absenceTypeId != null,
+      ).length,
+    },
     counts,
-    people: new Set(fixes.map((fix) => fix.employeeId)).size,
+    people: new Set([...base.map((day) => day.employeeId), ...fixes.map((fix) => fix.employeeId)])
+      .size,
     shortBefore: before.short,
     shortAfter: result.short,
     overBefore: before.over,

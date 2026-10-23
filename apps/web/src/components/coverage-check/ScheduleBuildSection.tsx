@@ -23,13 +23,30 @@ interface ScheduleBuildSectionProps {
 }
 
 const CONSIDERS = [
-  "Puts back shifts this draft removed or moved away, first.",
+  "Starts from each person's recurring schedule, filling the empty cells it covers.",
+  "Puts back shifts this draft removed or moved away.",
   "Then fills short shifts with people who are qualified and free at that time.",
   "Never moves or replaces anyone already scheduled.",
   "Never overrides an absence or a waiting request, and never approves a pickup.",
 ];
 
-/** "Schedules 14 people · Restores 1 shift", leaving out kinds it does not use. */
+/** Everything a build writes: recurring fills and fixes. */
+export function buildChangeCount(preview: CoverageBuildPreview): number {
+  return preview.recurring.shifts + preview.recurring.absences + preview.fixes.length;
+}
+
+/** "From recurring schedules: 12 shifts, 2 absences", or null when it fills none. */
+export function recurringLine(preview: CoverageBuildPreview): string | null {
+  const { shifts, absences } = preview.recurring;
+  if (shifts + absences === 0) return null;
+  const parts = [
+    shifts > 0 ? pluralize(shifts, "shift", "shifts") : null,
+    absences > 0 ? pluralize(absences, "absence", "absences") : null,
+  ].filter(Boolean);
+  return `From recurring schedules: ${parts.join(", ")}.`;
+}
+
+/** "Schedules 14 shifts · Restores 1 shift", leaving out kinds it does not use. */
 export function buildBreakdown(preview: CoverageBuildPreview): string {
   const { assign, restore, moveBack } = preview.counts;
   return [
@@ -43,15 +60,18 @@ export function buildBreakdown(preview: CoverageBuildPreview): string {
 
 function PreviewSummary({ preview }: { preview: CoverageBuildPreview }) {
   const showOver = preview.overBefore > 0 || preview.overAfter > 0;
+  const recurring = recurringLine(preview);
+  const breakdown = buildBreakdown(preview);
   return (
     <div className="flex flex-col gap-1.5">
       <p className="dg-cc-detail-line dg-tabular-nums">
         <span className="font-semibold">
-          {pluralize(preview.fixes.length, "change", "changes")} for{" "}
+          {pluralize(buildChangeCount(preview), "change", "changes")} for{" "}
           {pluralize(preview.people, "person", "people")}.
-        </span>{" "}
-        {buildBreakdown(preview)}.
+        </span>
+        {breakdown ? ` ${breakdown}.` : ""}
       </p>
+      {recurring && <p className="dg-cc-detail-line dg-tabular-nums">{recurring}</p>}
       <dl className="dg-cc-build-counts dg-tabular-nums">
         <div>
           <dt>Short shifts</dt>
@@ -104,7 +124,7 @@ export function ScheduleBuildSection({
       </div>
 
       {state.status === "ready" ? (
-        state.preview.fixes.length > 0 ? (
+        buildChangeCount(state.preview) > 0 ? (
           <>
             <PreviewSummary preview={state.preview} />
             <p className="dg-cc-detail-line dg-cc-detail-line--muted">

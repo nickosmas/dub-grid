@@ -654,6 +654,7 @@ describe("CoveragePanel", () => {
   describe("build", () => {
     const preview = (overrides: Partial<CoverageBuildPreview> = {}): CoverageBuildPreview => ({
       fixes: [],
+      recurring: { shifts: 0, absences: 0 },
       counts: { assign: 0, restore: 0, moveBack: 0 },
       people: 0,
       shortBefore: 2,
@@ -711,7 +712,38 @@ describe("CoveragePanel", () => {
       expect(build.onCancel).toHaveBeenCalled();
     });
 
-    it("says when there is nothing to build, and when the preview failed", () => {
+    it("starts from recurring schedules and counts their fills", () => {
+      withBuild({ status: "idle" });
+      expect(
+        section().getByText(
+          "Starts from each person's recurring schedule, filling the empty cells it covers.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      [{ shifts: 12, absences: 0 }, "From recurring schedules: 12 shifts."],
+      [{ shifts: 0, absences: 1 }, "From recurring schedules: 1 absence."],
+      [{ shifts: 3, absences: 2 }, "From recurring schedules: 3 shifts, 2 absences."],
+    ])("shows the recurring fills %o", (recurring, line) => {
+      withBuild({ status: "ready", preview: preview({ recurring, people: 2 }) });
+      expect(section().getByText(line)).toBeInTheDocument();
+      const total = recurring.shifts + recurring.absences;
+      expect(
+        section().getByText(new RegExp(`^${total} changes? for 2 people\\.`)),
+      ).toBeInTheDocument();
+      expect(section().getByRole("button", { name: "Build" })).toBeInTheDocument();
+    });
+
+    it("shows no recurring line when no recurring schedule fills anything", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+      });
+      expect(section().queryByText(/From recurring schedules/)).not.toBeInTheDocument();
+    });
+
+    it("says when there is nothing to build", () => {
       withBuild({ status: "ready", preview: preview() });
       expect(
         section().getByText(/Nothing to build\. Nobody qualified is free/),

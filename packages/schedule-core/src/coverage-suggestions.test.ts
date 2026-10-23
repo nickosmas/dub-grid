@@ -597,3 +597,68 @@ describe("previewCoverageBuild", () => {
     expect(previewCoverageBuild(world)).toEqual(previewCoverageBuild(world));
   });
 });
+
+describe("previewCoverageBuild on top of recurring fills", () => {
+  const day = (
+    employeeId: string,
+    dateKey: string,
+    work: number[],
+    absence: number | null = null,
+  ) => ({
+    employeeId,
+    dateKey,
+    side: "draft" as const,
+    day: {
+      assignmentIds: work,
+      mentoredAssignmentIds: [],
+      absenceTypeId: absence,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+
+  it("counts a recurring fill that closes a gap, and plans nothing more for it", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      baseOverrides: [day("ana", MON, [DAY_MA]), day("ben", MON, [DAY_MA])],
+    });
+
+    expect(preview.recurring).toEqual({ shifts: 2, absences: 0 });
+    expect(preview.fixes).toEqual([]);
+    expect(preview.people).toBe(2);
+    expect(preview.staffShortAfter).toBe(preview.staffShortBefore - 2);
+  });
+
+  it("never books someone again on a day their recurring schedule fills", () => {
+    const world = buildSuggestionWorld({ people: ["ana", "ben"], draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      baseOverrides: [day("ana", MON, [DAY_MA])],
+    });
+
+    expect(
+      preview.fixes.some((fix) => fix.employeeId === "ana" && fix.subject.dateKey === MON),
+    ).toBe(false);
+  });
+
+  it("treats a recurring absence as unavailable", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      people: ["ana", "ben"],
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      baseOverrides: [day("ana", MON, [], 7)],
+    });
+
+    expect(preview.recurring).toEqual({ shifts: 0, absences: 1 });
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["ben"]);
+  });
+
+  it("is the plain build with no recurring fills", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    expect(previewCoverageBuild(world, { baseOverrides: [] })).toEqual(previewCoverageBuild(world));
+    expect(previewCoverageBuild(world).recurring).toEqual({ shifts: 0, absences: 0 });
+  });
+});

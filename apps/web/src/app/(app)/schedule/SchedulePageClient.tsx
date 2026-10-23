@@ -97,6 +97,7 @@ import {
   normalizeCoverageRuleConfig,
   planCoverageFixes,
   previewCoverageBuild,
+  type CoverageBuildPreview,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
@@ -115,6 +116,7 @@ import {
   planUndo,
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
+import { planRecurringFills } from "./_lib/recurring-fills";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
   appliedSuggestionText,
@@ -5711,7 +5713,7 @@ function SchedulerContent({
     if (!org) return;
     const { startDate, endDate } = getAutoFillRange();
 
-    // The counting pass below fetches every recurring template and then walks
+    // The counting pass below fetches every recurring schedule and then walks
     // the whole span, so this runs long before the confirm dialog it ends in.
     // The toolbar's spinner reads this same flag; without setting it here the
     // menu item sat inert for the entire wait.
@@ -5727,53 +5729,18 @@ function SchedulerContent({
       );
       setRecurringShifts(freshRecurringShifts);
 
-      // Count empty slots that would be filled (matches server-side RPC logic)
-      const byEmp: Record<string, RecurringShift[]> = {};
-      for (const rs of freshRecurringShifts) {
-        if (!byEmp[rs.empId]) byEmp[rs.empId] = [];
-        byEmp[rs.empId].push(rs);
-      }
-
-      let count = 0;
-      const cellKeys: string[] = [];
-      // DST-safe iteration using UTC arithmetic
-      for (const { dateKey, dayOfWeek } of iterateDateRange(startDate, endDate)) {
-        for (const [empId, empShifts] of Object.entries(byEmp)) {
-          if (hasVisibleGridShiftEntry(shifts[`${empId}_${dateKey}`])) continue;
-          // Match RPC logic: filter by dayOfWeek, effectiveFrom/Until, most recent first
-          const candidates = empShifts
-            .filter((rs) => rs.dayOfWeek === dayOfWeek)
-            .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
-          const match = candidates.find((rs) => {
-            const from = rs.effectiveFrom;
-            const until = rs.effectiveUntil;
-            return from <= dateKey && (!until || until >= dateKey);
-          });
-          // Verify the canonical recurring state still references active schedule definitions.
-          if (match) {
-            if (match.input.kind === "worked") {
-              const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
-              const activeJobIds = new Set(jobs.map((job) => job.id));
-              const isActive = match.input.segments.every(
-                (segment) =>
-                  activeJobIds.has(segment.jobId) &&
-                  (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
-              );
-              if (isActive) {
-                count++;
-                cellKeys.push(`${empId}_${dateKey}`);
-              }
-            } else if (
-              match.input.kind === "absence" &&
-              match.input.absenceTypeId != null &&
-              absenceTypes.some((at) => at.id === match.input.absenceTypeId)
-            ) {
-              count++;
-              cellKeys.push(`${empId}_${dateKey}`);
-            }
-          }
-        }
-      }
+      // The server's own fill rule, shared with the Schedule Builder.
+      const fills = planRecurringFills({
+        recurringShifts: freshRecurringShifts,
+        shifts,
+        startDate,
+        endDate,
+        activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
+        activeJobIds: new Set(jobs.map((job) => job.id)),
+        activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
+      });
+      const count = fills.length;
+      const cellKeys = fills.map((fill) => `${fill.employeeId}_${fill.dateKey}`);
 
       if (count === 0) {
         toast.info("No empty slots in these dates match a recurring schedule.");
@@ -5798,8 +5765,8 @@ function SchedulerContent({
       kind: "autofill",
       title: "Filling from recurring schedules",
       detail: autoFillPreview?.count
-        ? `Applying recurring templates to ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${dateRange}.`
-        : `Applying recurring templates for ${dateRange}.`,
+        ? `Filling ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} for ${dateRange} from recurring schedules.`
+        : `Filling ${dateRange} from recurring schedules.`,
       progress: 10,
     });
     startOperationTrickle("autofill", 72);
@@ -5815,7 +5782,7 @@ function SchedulerContent({
         // Refetch to get accurate state (including from_recurring flags)
         updateScheduleOperation("autofill", {
           progress: 88,
-          detail: `Applied recurring templates to ${generated.length} schedule slot${generated.length === 1 ? "" : "s"}. Refreshing the schedule...`,
+          detail: `Filled ${generated.length} slot${generated.length === 1 ? "" : "s"} from recurring schedules. Refreshing the schedule...`,
         });
         const refreshed = await refetchScheduleData();
         toast.success(
@@ -6757,10 +6724,33 @@ function SchedulerContent({
   // Writes a planned batch like single Applies, putting back what it wrote if
   // any cell fails, and records one Applied entry whose Undo covers it all.
   const applyCoveragePlan = useCallback(
-    (plan: CoverageSuggestion[], text: string, id: string): boolean => {
+    (
+      plan: CoverageSuggestion[],
+      text: string,
+      id: string,
+      /** Written first, such as recurring schedule fills into empty cells. */
+      fixedWrites: SuggestionWrite[] = [],
+    ): boolean => {
       setBusySuggestionId(id);
       const before: SuggestionWrite[] = [];
       const written: SuggestionWrite[] = [];
+      const putBack = () => {
+        for (const undo of [...before].reverse()) {
+          setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
+        }
+        setBusySuggestionId(null);
+        toast.error("Those changes couldn't be saved. Nothing was changed.");
+      };
+      for (const write of fixedWrites) {
+        const entry = shiftsRef.current[`${write.employeeId}_${write.dateKey}`];
+        const previous = entry?.isDelete ? null : scheduleCellSnapshotToInput(entry?.effective);
+        if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
+          putBack();
+          return false;
+        }
+        before.push({ ...write, input: previous });
+        written.push(write);
+      }
       for (const suggestion of plan) {
         const writes = planSuggestionWrites(
           suggestion,
@@ -6778,11 +6768,7 @@ function SchedulerContent({
             return false;
           });
         if (failed) {
-          for (const undo of [...before].reverse()) {
-            setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
-          }
-          setBusySuggestionId(null);
-          toast.error("Those changes couldn't be saved. Nothing was changed.");
+          putBack();
           return false;
         }
       }
@@ -6798,7 +6784,11 @@ function SchedulerContent({
   );
 
   const planOptions = useCallback(
-    (options: { dateKey?: string; rowKeys?: ReadonlySet<string> }) => {
+    (options: {
+      dateKey?: string;
+      rowKeys?: ReadonlySet<string>;
+      baseOverrides?: CoverageDayOverride[];
+    }) => {
       if (!coverageSuggestions) return null;
       const { engine, adapterInput } = coverageSuggestions;
       return {
@@ -6859,49 +6849,145 @@ function SchedulerContent({
       ? buildPreview.state
       : { status: "idle" };
 
-  const previewBuild = useCallback(
-    (rowKeys: string[]) => {
-      const planned = planOptions({ rowKeys: new Set(rowKeys) });
-      if (!planned) return;
-      const plannedFrom = coverageCountsKey;
-      setBuildPreview({ state: { status: "previewing" }, rowKeys, plannedFrom });
-      // Planned after the spinner has painted: a large period takes a moment.
-      window.setTimeout(() => {
-        try {
-          const preview = previewCoverageBuild(planned.engine, planned.options);
-          setBuildPreview({ state: { status: "ready", preview }, rowKeys, plannedFrom });
-        } catch (err) {
-          Sentry.captureException(err);
-          setBuildPreview({ state: { status: "failed" }, rowKeys, plannedFrom });
-        }
-      }, 0);
+  // A build plans from fresh recurring schedules: each empty cell one fills
+  // in scope becomes a fixed draft day, converted exactly as a save would be,
+  // and the fixes are planned on top of them.
+  const planBuild = useCallback(
+    async (rowKeys: string[]) => {
+      if (!org || !coverageMatrix) return null;
+      const recurring = await fetchRecurringShifts(
+        org.id,
+        undefined,
+        assignmentLabelMapRef.current,
+        false,
+        absenceTypeMapRef.current,
+      );
+      const scopedAreas = new Set(
+        coverageMatrix.rows
+          .filter((row) => rowKeys.includes(row.rowKey))
+          .map((row) => row.focusAreaId),
+      );
+      const allAreas = coverageMatrix.rows.every((row) => rowKeys.includes(row.rowKey));
+      const dateKeys = coverageMatrix.dateKeys;
+      const fills = planRecurringFills({
+        recurringShifts: recurring,
+        shifts: shiftsRef.current,
+        startDate: parseLocalDateKey(dateKeys[0]),
+        endDate: parseLocalDateKey(dateKeys[dateKeys.length - 1]),
+        activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
+        activeJobIds: new Set(jobs.map((job) => job.id)),
+        activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
+        employeeIds: allAreas
+          ? undefined
+          : new Set(
+              employees
+                .filter((employee) =>
+                  employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
+                )
+                .map((employee) => employee.id),
+            ),
+      });
+      const fixedWrites: SuggestionWrite[] = [];
+      const baseOverrides: CoverageDayOverride[] = [];
+      for (const fill of fills) {
+        const input: ScheduleCellInput = { ...fill.input, fromRecurring: true };
+        const snapshot = resolveInputSnapshot(input);
+        // A fill the page can't resolve would be a count Build can't write.
+        if (snapshot.kind === "worked" && snapshot.assignmentIds.length === 0) continue;
+        fixedWrites.push({ employeeId: fill.employeeId, dateKey: fill.dateKey, input });
+        baseOverrides.push({
+          employeeId: fill.employeeId,
+          dateKey: fill.dateKey,
+          side: "draft",
+          day: {
+            assignmentIds: snapshot.assignmentIds,
+            mentoredAssignmentIds: snapshot.assignmentIds.filter(
+              (_, index) => snapshot.segments[index]?.isMentored === true,
+            ),
+            absenceTypeId: snapshot.kind === "absence" ? (snapshot.absenceTypeId ?? null) : null,
+            restOfDayAbsenceTypeId: snapshot.restOfDayAbsenceTypeId ?? null,
+          },
+        });
+      }
+      const planned = planOptions({ rowKeys: new Set(rowKeys), baseOverrides });
+      if (!planned) return null;
+      return { preview: previewCoverageBuild(planned.engine, planned.options), fixedWrites };
     },
-    [coverageCountsKey, planOptions],
+    [
+      absenceTypes,
+      coverageMatrix,
+      employees,
+      jobs,
+      org,
+      planOptions,
+      resolveInputSnapshot,
+      shiftCategories,
+    ],
   );
 
-  const runBuild = useCallback(() => {
+  const previewBuild = useCallback(
+    (rowKeys: string[]) => {
+      const plannedFrom = coverageCountsKey;
+      setBuildPreview({ state: { status: "previewing" }, rowKeys, plannedFrom });
+      planBuild(rowKeys)
+        .then((built) => {
+          setBuildPreview(
+            built
+              ? { state: { status: "ready", preview: built.preview }, rowKeys, plannedFrom }
+              : { state: { status: "failed" }, rowKeys, plannedFrom },
+          );
+        })
+        .catch((err: unknown) => {
+          Sentry.captureException(err);
+          setBuildPreview({ state: { status: "failed" }, rowKeys, plannedFrom });
+        });
+    },
+    [coverageCountsKey, planBuild],
+  );
+
+  const runBuild = useCallback(async () => {
     if (!buildPreview || buildState.status !== "ready") return;
-    const planned = planOptions({ rowKeys: new Set(buildPreview.rowKeys) });
-    if (!planned) return;
-    // Planned again at Build; if the draft moved on, show what Build would do now.
-    const preview = previewCoverageBuild(planned.engine, planned.options);
-    const sameAsShown =
-      preview.fixes.map((fix) => fix.id).join() ===
-      buildState.preview.fixes.map((fix) => fix.id).join();
-    if (!sameAsShown) {
-      setBuildPreview({
-        state: { status: "ready", preview },
-        rowKeys: buildPreview.rowKeys,
-        plannedFrom: coverageCountsKey,
-      });
-      toast.info("The draft changed, so the preview was updated. Check it and build again.");
+    const shown = buildState.preview;
+    const rowKeys = buildPreview.rowKeys;
+    setBusySuggestionId("build");
+    let built: Awaited<ReturnType<typeof planBuild>> = null;
+    try {
+      built = await planBuild(rowKeys);
+    } catch (err) {
+      Sentry.captureException(err);
+    }
+    setBusySuggestionId(null);
+    if (!built) {
+      toast.error("The build couldn't be worked out. Nothing was changed.");
       return;
     }
-    const changes = preview.fixes.length === 1 ? "1 change" : `${preview.fixes.length} changes`;
-    if (applyCoveragePlan(preview.fixes, `Built the draft: ${changes}`, "build")) {
+    // Planned again at Build; if anything moved on, show what Build would do now.
+    const signature = (preview: CoverageBuildPreview) =>
+      `${preview.recurring.shifts}/${preview.recurring.absences}|${preview.fixes
+        .map((fix) => fix.id)
+        .join()}`;
+    if (signature(built.preview) !== signature(shown)) {
+      setBuildPreview({
+        state: { status: "ready", preview: built.preview },
+        rowKeys,
+        plannedFrom: coverageCountsKey,
+      });
+      toast.info("The schedule changed, so the preview was updated. Check it and build again.");
+      return;
+    }
+    const total = built.fixedWrites.length + built.preview.fixes.length;
+    const changes = total === 1 ? "1 change" : `${total} changes`;
+    if (
+      applyCoveragePlan(
+        built.preview.fixes,
+        `Built the draft: ${changes}`,
+        "build",
+        built.fixedWrites,
+      )
+    ) {
       setBuildPreview(null);
     }
-  }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planOptions]);
+  }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planBuild]);
 
   const undoCoverageSuggestion = useCallback(
     (appliedId: string) => {
