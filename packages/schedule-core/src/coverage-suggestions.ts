@@ -203,6 +203,10 @@ export type CoverageAvailability =
   | { kind: "request"; dateKey: string }
   /** Working this day would make `days` in a row, over the limit. */
   | { kind: "workRun"; days: number }
+  /** Working this day would make `days` in its Sunday-to-Saturday week, over the limit. */
+  | { kind: "workWeek"; days: number }
+  /** The person already works that day; only a scheduler adds a second shift. */
+  | { kind: "doubleShift" }
   /** The person works only the shifts they chose, and this is not one. */
   | { kind: "onlyShifts" };
 
@@ -815,12 +819,14 @@ export interface PlanCoverageFixesOptions {
   skippedRecurring?: ReadonlyArray<CoverageSkippedRecurring>;
 }
 
-/** A recurring schedule fill left out because it would make too many days in a row. */
+/** A recurring schedule fill left out because it would make too many days in a row or a week. */
 export interface CoverageSkippedRecurring {
   employeeId: string;
   dateKey: string;
-  /** Days in a row it would have made. */
+  /** Days it would have made, in a row or in its week. */
   days: number;
+  /** Which limit it would have broken; days in a row when left out. */
+  limit?: "row" | "week";
 }
 
 const FAIRNESS_REASONS = ["daysOff", "preference", "weekends", "nights", "hours"] as const;
@@ -1048,6 +1054,8 @@ export interface CoverageBuildPreview {
   daysOff: { employeeId: string; dateKey: string }[];
   /** Days the build gives someone a sixth day in a row, when allowed; added by the caller. */
   sixthDays: { employeeId: string; dateKey: string }[];
+  /** Weeks the build gives someone a sixth day, when allowed; added by the caller. */
+  sixthWeeks: { employeeId: string; weekStart: string }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1157,6 +1165,7 @@ function summarizeBuild(
     recurringSkipped: [...(options.skippedRecurring ?? [])],
     daysOff: [],
     sixthDays: [],
+    sixthWeeks: [],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

@@ -1,5 +1,6 @@
 import {
   MAX_DAYS_IN_A_ROW,
+  MAX_DAYS_IN_A_WEEK,
   computeShiftSegmentHours,
   parseLocalDateKey,
   type CoverageAvailability,
@@ -65,8 +66,12 @@ export interface CoverageSuggestionAdapterInput {
   loadedDateKeys: string[];
   /** Each person's shift preference, by employee id; people without one are left out. */
   preferences?: ReadonlyMap<string, CoverageShiftPreference>;
-  /** Days in a row allowed; the usual limit unless the scheduler allows a sixth. */
+  /** Days in a row allowed; the usual limit unless the scheduler allows 6 days. */
   maxDaysInARow?: number;
+  /** Days in a week allowed; the usual limit unless the scheduler allows 6 days. */
+  maxDaysInAWeek?: number;
+  /** Planning a build or Apply all: never a second shift on a day already worked. */
+  noDoubleShifts?: boolean;
 }
 
 /** The shift an assignment belongs to, for matching a preference. */
@@ -189,38 +194,76 @@ export function daysInARowWith(worked: (dateKey: string) => boolean, dateKey: st
   return days;
 }
 
-/** Working a day the person has free would go past the days-in-a-row limit. */
-function overWorkRun(
-  worked: (dateKey: string) => boolean,
-  dateKey: string,
-  limit: number = MAX_DAYS_IN_A_ROW,
-): CoverageAvailability | null {
-  if (worked(dateKey)) return null;
-  const days = daysInARowWith(worked, dateKey);
-  return days > limit ? { kind: "workRun", days } : null;
+/** How many days the person works in the Sunday-to-Saturday week holding a date, with that date worked. */
+export function daysInWeekWith(worked: (dateKey: string) => boolean, dateKey: string): number {
+  const date = parseLocalDateKey(dateKey);
+  const sunday = addDays(date, -date.getDay());
+  let days = 0;
+  for (let offset = 0; offset < 7; offset += 1) {
+    const key = formatDateKey(addDays(sunday, offset));
+    if (key === dateKey || worked(key)) days += 1;
+  }
+  return days;
 }
 
-/** The days a plan puts someone past the usual days-in-a-row limit, by person and date. */
+/** The limits on a person's work a build or suggestion must keep. */
+export interface WorkLimits {
+  maxDaysInARow?: number;
+  maxDaysInAWeek?: number;
+  /** Planning a build: never a second shift on a day already worked. */
+  noDoubleShifts?: boolean;
+}
+
+/** Why working this day would break a limit, or null. A day already worked adds no days. */
+function overWorkLimits(
+  worked: (dateKey: string) => boolean,
+  dateKey: string,
+  limits: WorkLimits,
+): CoverageAvailability | null {
+  if (worked(dateKey)) return limits.noDoubleShifts ? { kind: "doubleShift" } : null;
+  const run = daysInARowWith(worked, dateKey);
+  if (run > (limits.maxDaysInARow ?? MAX_DAYS_IN_A_ROW)) return { kind: "workRun", days: run };
+  const week = daysInWeekWith(worked, dateKey);
+  if (week > (limits.maxDaysInAWeek ?? MAX_DAYS_IN_A_WEEK)) return { kind: "workWeek", days: week };
+  return null;
+}
+
+/**
+ * Where a plan goes past the usual limits: each planned day in a run longer
+ * than five, and each week with more than five days worked.
+ */
 export function daysPastUsualLimit(
   shifts: ShiftMap,
   planned: ReadonlyArray<CoverageDayOverride>,
-): { employeeId: string; dateKey: string }[] {
+): {
+  runs: { employeeId: string; dateKey: string }[];
+  weeks: { employeeId: string; weekStart: string }[];
+} {
   const byPerson = new Map<string, CoverageDayOverride[]>();
   for (const day of planned) {
     if (day.side !== "draft") continue;
     byPerson.set(day.employeeId, [...(byPerson.get(day.employeeId) ?? []), day]);
   }
-  const found: { employeeId: string; dateKey: string }[] = [];
+  const runs: { employeeId: string; dateKey: string }[] = [];
+  const weeks = new Map<string, { employeeId: string; weekStart: string }>();
   for (const [employeeId, days] of byPerson) {
     const worked = workedWith(shifts, days, employeeId);
     for (const day of days) {
       if (day.day.assignmentIds.length === 0) continue;
       if (daysInARowWith(worked, day.dateKey) > MAX_DAYS_IN_A_ROW) {
-        found.push({ employeeId, dateKey: day.dateKey });
+        runs.push({ employeeId, dateKey: day.dateKey });
+      }
+      if (daysInWeekWith(worked, day.dateKey) > MAX_DAYS_IN_A_WEEK) {
+        const date = parseLocalDateKey(day.dateKey);
+        const weekStart = formatDateKey(addDays(date, -date.getDay()));
+        weeks.set(`${employeeId}|${weekStart}`, { employeeId, weekStart });
       }
     }
   }
-  return found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  return {
+    runs: runs.sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
+    weeks: [...weeks.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart)),
+  };
 }
 
 /**
@@ -232,7 +275,7 @@ export function limitRecurringRuns<
 >(
   fills: ReadonlyArray<F>,
   shifts: ShiftMap,
-  limit: number = MAX_DAYS_IN_A_ROW,
+  limits: WorkLimits = {},
 ): { kept: F[]; skipped: CoverageSkippedRecurring[] } {
   const kept: F[] = [];
   const skipped: CoverageSkippedRecurring[] = [];
@@ -241,9 +284,17 @@ export function limitRecurringRuns<
     const works = fill.input.kind === "worked" && fill.input.segments.length > 0;
     const planned = accepted.get(fill.employeeId) ?? [];
     if (works) {
-      const run = overWorkRun(workedWith(shifts, planned, fill.employeeId), fill.dateKey, limit);
-      if (run?.kind === "workRun") {
-        skipped.push({ employeeId: fill.employeeId, dateKey: fill.dateKey, days: run.days });
+      const over = overWorkLimits(workedWith(shifts, planned, fill.employeeId), fill.dateKey, {
+        ...limits,
+        noDoubleShifts: false,
+      });
+      if (over?.kind === "workRun" || over?.kind === "workWeek") {
+        skipped.push({
+          employeeId: fill.employeeId,
+          dateKey: fill.dateKey,
+          days: over.days,
+          limit: over.kind === "workWeek" ? "week" : "row",
+        });
         continue;
       }
       planned.push({
@@ -306,8 +357,8 @@ export function availabilityFromShifts(
       };
     }
   }
-  const run = overWorkRun(workedWith(input.shifts, [], employeeId), dateKey, input.maxDaysInARow);
-  if (run) return run;
+  const over = overWorkLimits(workedWith(input.shifts, [], employeeId), dateKey, input);
+  if (over) return over;
   if (!range) return { kind: "free" };
 
   const date = parseLocalDateKey(dateKey);
@@ -384,10 +435,7 @@ export function availabilityWithPlanned(
         if (overlaps) return { kind: "overlap", dateKey: day.dateKey, assignmentId: plannedId };
       }
     }
-    return (
-      overWorkRun(workedWith(input.shifts, planned, employeeId), dateKey, input.maxDaysInARow) ??
-      base
-    );
+    return overWorkLimits(workedWith(input.shifts, planned, employeeId), dateKey, input) ?? base;
   };
 }
 

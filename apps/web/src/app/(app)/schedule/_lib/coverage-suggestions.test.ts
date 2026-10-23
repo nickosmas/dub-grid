@@ -563,8 +563,82 @@ describe("days in a row", () => {
   it("names the planned days that go past five in a row", () => {
     expect(
       daysPastUsualLimit(fiveDays, [planDay("2026-10-25", [DAY]), planDay("2026-10-27", [DAY])]),
-    ).toEqual([{ employeeId: "ana", dateKey: "2026-10-25" }]);
-    expect(daysPastUsualLimit(fiveDays, [planDay("2026-10-25", [])])).toEqual([]);
+    ).toEqual({ runs: [{ employeeId: "ana", dateKey: "2026-10-25" }], weeks: [] });
+    expect(daysPastUsualLimit(fiveDays, [planDay("2026-10-25", [])])).toEqual({
+      runs: [],
+      weeks: [],
+    });
+  });
+
+  it("names the weeks a plan gives someone a sixth day", () => {
+    const weekdays = Object.fromEntries(
+      ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29"].map((dateKey) => [
+        `ana_${dateKey}`,
+        worked([DAY]),
+      ]),
+    );
+    expect(daysPastUsualLimit(weekdays, [planDay("2026-10-31", [DAY])]).weeks).toEqual([
+      { employeeId: "ana", weekStart: "2026-10-25" },
+    ]);
+  });
+
+  describe("days in a week", () => {
+    // Ana works Sunday, Oct 25 to Thursday, Oct 29; Friday is off.
+    const weekdays = Object.fromEntries(
+      ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29"].map((dateKey) => [
+        `ana_${dateKey}`,
+        worked([DAY]),
+      ]),
+    );
+    const weekInput = { ...input, shifts: weekdays };
+
+    it("rules out a sixth day in a Sunday-to-Saturday week, even after a day off", () => {
+      expect(availabilityFromShifts(weekInput, "ana", "2026-10-31", DAY)).toEqual({
+        kind: "workWeek",
+        days: 6,
+      });
+      // The next week starts again.
+      expect(availabilityFromShifts(weekInput, "ana", "2026-11-02", DAY).kind).not.toBe("workWeek");
+    });
+
+    it("allows a sixth day in a week when the scheduler allows 6", () => {
+      const allowed = { ...weekInput, maxDaysInAWeek: 6, maxDaysInARow: 6 };
+      expect(availabilityFromShifts(allowed, "ana", "2026-10-31", DAY).kind).not.toBe("workWeek");
+    });
+
+    it("leaves out a recurring shift that would make a sixth day in the week", () => {
+      const fill = {
+        employeeId: "ana",
+        dateKey: "2026-10-31",
+        input: scheduleCellSnapshotToInput(worked([DAY]).effective)!,
+      };
+      expect(limitRecurringRuns([fill], weekdays).skipped).toEqual([
+        { employeeId: "ana", dateKey: "2026-10-31", days: 6, limit: "week" },
+      ]);
+      expect(limitRecurringRuns([fill], weekdays, { maxDaysInAWeek: 6 }).kept).toEqual([fill]);
+    });
+  });
+
+  describe("double shifts", () => {
+    it("never adds a second shift on a worked day when planning a build", () => {
+      const planning = { ...input, noDoubleShifts: true };
+      expect(availabilityFromShifts(planning, "ana", "2026-10-24", EVENING)).toEqual({
+        kind: "doubleShift",
+      });
+      expect(
+        availabilityWithPlanned({ ...planning, shifts: {} }, [planDay("2026-10-27", [DAY])])(
+          "ana",
+          "2026-10-27",
+          EVENING,
+        ),
+      ).toEqual({ kind: "doubleShift" });
+    });
+
+    it("still lets a single suggestion offer one", () => {
+      expect(availabilityFromShifts(input, "ana", "2026-10-24", EVENING).kind).not.toBe(
+        "doubleShift",
+      );
+    });
   });
 
   it("leaves out a recurring shift that would make a sixth day, and keeps absences", () => {
@@ -592,7 +666,7 @@ describe("days in a row", () => {
       "2026-10-24",
       "2026-10-26",
     ]);
-    expect(skipped).toEqual([{ employeeId: "ana", dateKey: "2026-10-25", days: 6 }]);
+    expect(skipped).toEqual([{ employeeId: "ana", dateKey: "2026-10-25", days: 6, limit: "row" }]);
   });
 });
 

@@ -675,6 +675,7 @@ describe("CoveragePanel", () => {
       recurringSkipped: [],
       daysOff: [],
       sixthDays: [],
+      sixthWeeks: [],
       ...overrides,
     });
     const skippedWords = {
@@ -730,7 +731,9 @@ describe("CoveragePanel", () => {
       ).toBeInTheDocument();
       expect(
         section().getByText(/^Fills open shifts with qualified staff who are free/),
-      ).toHaveTextContent(/Nobody works more than 5 days in a row, days off stay together/);
+      ).toHaveTextContent(
+        /Nobody works more than 5 days a week or 5 in a row, days off stay together/,
+      );
       fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
     });
@@ -938,7 +941,7 @@ describe("CoveragePanel", () => {
             { employeeId: "ben", dateKey: "2026-10-26", days: 6 },
           ],
         });
-        const name = "Recurring shifts left out: over 5 days in a row";
+        const name = "Recurring shifts left out: too many days in a row or in a week";
         expect(
           within(section().getByRole("list", { name }))
             .getAllByRole("listitem")
@@ -1034,9 +1037,9 @@ describe("CoveragePanel", () => {
       expect(section().getByText(/No day off absence is set/)).toBeInTheDocument();
     });
 
-    it("offers a sixth day in a row before generating, with a warning once on", () => {
+    it("offers 6 days in a week before generating, with a warning once on", () => {
       const build = withBuild({ status: "idle" });
-      const option = section().getByRole("switch", { name: "Allow a sixth day in a row" });
+      const option = section().getByRole("switch", { name: "Allow 6 days in a week" });
       expect(option).not.toBeChecked();
       expect(section().queryByRole("note")).not.toBeInTheDocument();
       fireEvent.click(option);
@@ -1045,11 +1048,11 @@ describe("CoveragePanel", () => {
 
       withBuild({ status: "idle" }, {}, {}, true);
       expect(section().getByRole("note")).toHaveTextContent(
-        "Some people may work 6 days in a row, never 7.",
+        "Some people may work 6 days in a week or 6 in a row, never 7.",
       );
     });
 
-    it("names everyone a build gives a sixth day in a row", () => {
+    it("names everyone a build gives a sixth day, by week and by run", () => {
       withBuild({
         status: "ready",
         preview: preview({
@@ -1060,6 +1063,7 @@ describe("CoveragePanel", () => {
             { employeeId: "ana", dateKey: "2026-10-26" },
             { employeeId: "ben", dateKey: "2026-10-28" },
           ],
+          sixthWeeks: [{ employeeId: "ana", weekStart: "2026-10-25" }],
         }),
       });
       expect(
@@ -1067,6 +1071,11 @@ describe("CoveragePanel", () => {
           .getAllByRole("listitem")
           .map((item) => item.textContent),
       ).toEqual(["Ana Crawford Mon, Oct 26 to Tue, Oct 27", "Ben Shepherd 2026-10-28"]);
+      expect(
+        within(section().getByRole("list", { name: "6 days in a week" }))
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Ana Crawford week of Sun, Oct 25"]);
     });
 
     it("lists nobody when nobody was skipped", () => {
