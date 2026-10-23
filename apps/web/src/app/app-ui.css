@@ -1151,6 +1151,26 @@ button.dg-cc-sg-main {
   outline: 2px solid var(--dg-color-brand);
   outline-offset: 2px;
 }
+.dg-cc-build-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--dg-fs-caption);
+  color: var(--dg-color-text-secondary);
+}
+.dg-cc-progress-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dg-color-border-light);
+  overflow: hidden;
+}
+.dg-cc-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dg-color-brand);
+  transition: width 160ms ease-out;
+}
 .dg-cc-build-counts {
   display: flex;
   flex-wrap: wrap;

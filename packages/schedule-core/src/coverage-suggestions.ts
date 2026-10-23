@@ -838,11 +838,32 @@ interface PlanWithLeftovers {
   choices: CoverageFairChoice[];
 }
 
-/** The plan, plus who the last pass ruled out and the schedule it ended on. */
+/** Runs the planner's steps to the end at once. */
 function planWithLeftovers(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions,
 ): PlanWithLeftovers {
+  const steps = planSteps(input, options);
+  for (let step = steps.next(); ; step = steps.next()) {
+    if (step.done) return step.value;
+  }
+}
+
+/** How far a build has got: fixes placed, and staff filled out of those needed at the start. */
+export interface CoverageBuildProgress {
+  placed: number;
+  filled: number;
+  needed: number;
+}
+
+/**
+ * The plan one fix at a time, yielding its progress after each, then the
+ * plan, who the last pass ruled out and the schedule it ended on.
+ */
+function* planSteps(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+): Generator<CoverageBuildProgress, PlanWithLeftovers> {
   const plan: CoverageSuggestion[] = [];
   const overtime = options.overtime;
   const taken: Omit<CoverageOverThreshold, "hours">[] = [];
@@ -925,6 +946,8 @@ function planWithLeftovers(
     choices,
   });
   let current = overrides.length > 0 ? withPlanned() : input;
+  const needed = countOpen(current.matrix, options.rowKeys).staffShort;
+  let filled = 0;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
   for (let step = 0; step < 500; step += 1) {
     const pass = suggestCoverageFixes(current);
@@ -952,6 +975,8 @@ function planWithLeftovers(
     plan.push(next);
     overrides.push(...next.overrides);
     current = withPlanned();
+    filled += next.filled;
+    yield { placed: plan.length, filled: Math.min(filled, needed), needed };
   }
   return finish(current);
 }
@@ -1009,7 +1034,34 @@ export function previewCoverageBuild(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
-  const { fixes, ruledOut, final, overThreshold, choices } = planWithLeftovers(input, options);
+  return summarizeBuild(input, options, planWithLeftovers(input, options));
+}
+
+export interface CoverageBuildPacing {
+  /** Awaited after each fix is placed, so the caller can let the page draw. */
+  pause: () => Promise<void>;
+  onProgress?: (progress: CoverageBuildProgress) => void;
+}
+
+/** {@link previewCoverageBuild}, handing control back between fixes. */
+export async function previewCoverageBuildAsync(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+  pacing: CoverageBuildPacing,
+): Promise<CoverageBuildPreview> {
+  const steps = planSteps(input, options);
+  for (let step = steps.next(); ; step = steps.next()) {
+    if (step.done) return summarizeBuild(input, options, step.value);
+    pacing.onProgress?.(step.value);
+    await pacing.pause();
+  }
+}
+
+function summarizeBuild(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+  { fixes, ruledOut, final, overThreshold, choices }: PlanWithLeftovers,
+): CoverageBuildPreview {
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const stillShort = new Set<string>();

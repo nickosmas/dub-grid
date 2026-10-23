@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 48 are
-shipped. Item 40 is in progress.
+shipped. Items 40 and 49 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,6 +83,7 @@ shipped. Item 40 is in progress.
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
+| 49   | In progress | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 
 Item 40 is split:
 
@@ -269,6 +270,25 @@ Item 48 is split, and every part has shipped:
 - **48f - Build report:** shipped; after a build the section reports what
   each person was given and why, anyone over 40 hours a week, and each shift
   still short as a link to its cell, until Done or the build's Undo.
+
+Item 49 is split:
+
+- **49a - Loading that never freezes:** shipped; planning yields with a percentage bar, and Apply counts every save before the report.
+- **49b - Auto-build naming:** planned.
+- **49c - Five days in a row, days off in pairs:** planned.
+- **49d - Day off absence:** planned.
+- **49e - Shift preferences:** planned (migration 089).
+- **49f - Fill the rest with overtime:** planned.
+
+A build never goes over 40 hours a week or five days in a row; when gaps
+remain, a second option fills the rest allowing overtime and a sixth day in
+a row (never a seventh), with a warning and a confirmation. Between people
+for a shift it ranks: days off kept in pairs (split only when nobody can
+fill the shift otherwise); shift preference; fewest weekends and nights;
+fewest hours (owner decisions, 2026-10-23). It is named Auto-build, with
+a short plain description under the title, Generate schedule, Apply and
+Discard, and the day off absence is a Schedule Rules setting pre-detected
+by name.
 
 The builder only fills: it applies recurring schedules, fills empty cells
 and puts back the draft's own removals, and never moves or replaces anyone

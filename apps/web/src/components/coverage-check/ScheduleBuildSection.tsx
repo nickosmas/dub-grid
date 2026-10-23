@@ -6,19 +6,30 @@ import {
   formatLocalDateKey,
   parseLocalDateKey,
   type CoverageBuildPreview,
+  type CoverageBuildProgress,
   type CoverageFairChoice,
   type CoverageOverThreshold,
   type CoverageRuledOut,
 } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
+import { Loader } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatCoverageNumber, pluralize } from "./coverage-check-text";
 
 export type ScheduleBuildState =
   | { status: "idle" }
-  | { status: "previewing" }
+  /** `progress` is null while the build's data is still loading. */
+  | { status: "previewing"; progress: CoverageBuildProgress | null }
   | { status: "failed" }
   | { status: "ready"; preview: CoverageBuildPreview }
+  /** Being applied: `saved` is null while the plan is checked again. */
+  | {
+      status: "applying";
+      preview: CoverageBuildPreview;
+      checking: CoverageBuildProgress | null;
+      saved: number | null;
+      total: number;
+    }
   /** Built: the preview it applied, as the report of what it did. */
   | { status: "built"; preview: CoverageBuildPreview };
 
@@ -383,6 +394,36 @@ function PreviewSummary({
   );
 }
 
+/** Share of the open spots filled so far, 0 to 100; 0 before planning starts. */
+export function planningPercent(progress: CoverageBuildProgress | null): number {
+  if (!progress) return 0;
+  return progress.needed > 0 ? Math.round((progress.filled / progress.needed) * 100) : 100;
+}
+
+/** What a build is doing right now, with a bar and its percentage. */
+function BuildProgress({ label, percent }: { label: string; percent: number }) {
+  const shown = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="dg-cc-build-progress dg-tabular-nums" role="status" aria-live="polite">
+        <Loader aria-hidden className="animate-spin shrink-0" size={14} />
+        <span className="min-w-0 flex-1">{label}</span>
+        <span>{shown}%</span>
+      </div>
+      <div
+        className="dg-cc-progress-track"
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={shown}
+      >
+        <div className="dg-cc-progress-bar" style={{ width: `${shown}%` }} />
+      </div>
+    </div>
+  );
+}
+
 /** The Schedule Builder's top part: what a build does, its preview, and Build. */
 export function ScheduleBuildSection({
   scope,
@@ -409,6 +450,21 @@ export function ScheduleBuildSection({
           onSelectCell={onSelectCell}
           onDone={onCancel}
         />
+      ) : state.status === "applying" ? (
+        <>
+          <PreviewSummary preview={state.preview} />
+          {state.saved == null ? (
+            <BuildProgress
+              label="Checking the plan against the latest schedule"
+              percent={planningPercent(state.checking)}
+            />
+          ) : (
+            <BuildProgress
+              label={`Saving changes: ${state.saved} of ${state.total}`}
+              percent={state.total > 0 ? (state.saved / state.total) * 100 : 100}
+            />
+          )}
+        </>
       ) : state.status === "ready" ? (
         buildChangeCount(state.preview) > 0 ? (
           <>
@@ -457,6 +513,16 @@ export function ScheduleBuildSection({
       ) : (
         <>
           <p className="dg-cc-detail-line dg-cc-detail-line--muted">{BUILD_SUMMARY}</p>
+          {state.status === "previewing" && (
+            <BuildProgress
+              label={
+                state.progress == null
+                  ? "Loading recurring schedules and recent weeks"
+                  : `Placing shifts: ${state.progress.placed} placed`
+              }
+              percent={planningPercent(state.progress)}
+            />
+          )}
           {state.status === "failed" && (
             <p className="dg-cc-detail-line" role="alert">
               The build couldn&apos;t be worked out. Try again.

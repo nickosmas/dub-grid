@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   planCoverageFixes,
   previewCoverageBuild,
+  previewCoverageBuildAsync,
   suggestCoverageFixes,
   type CoverageDayOverride,
   type CoverageFairnessRule,
@@ -975,5 +976,58 @@ describe("the shifts a build leaves short", () => {
 
     expect(preview.shortCells.length).toBeGreaterThan(0);
     expect(preview.shortCells.every((cell) => cell.rowKey === ROW_SC)).toBe(true);
+  });
+});
+
+describe("previewCoverageBuildAsync", () => {
+  it("gives the same preview as the synchronous build, pausing after each fix", async () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      published: { [`ana|${MON}`]: { work: [DAY_MA] } },
+      draft: {},
+    });
+    const progress: { placed: number; filled: number; needed: number }[] = [];
+    let pauses = 0;
+    const preview = await previewCoverageBuildAsync(
+      world,
+      {},
+      {
+        pause: async () => {
+          pauses += 1;
+        },
+        onProgress: (placed) => progress.push(placed),
+      },
+    );
+
+    expect(preview).toEqual(previewCoverageBuild(world));
+    expect(pauses).toBe(preview.fixes.length);
+    expect(progress.map((step) => step.placed)).toEqual(preview.fixes.map((_, index) => index + 1));
+    // Every spot gets filled here, so the last step reports all of them.
+    expect(progress.every((step) => step.needed === preview.staffShortBefore)).toBe(true);
+    expect(progress.at(-1)?.filled).toBe(preview.staffShortBefore);
+    expect(progress.map((step) => step.filled)).toEqual(
+      [...progress.map((step) => step.filled)].sort((a, b) => a - b),
+    );
+  });
+
+  it("finishes without pausing when there is nothing to place", async () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: {},
+      qualified: { ana: [], ben: [], cat: [], dan: [], eve: [] },
+    });
+    let pauses = 0;
+    const preview = await previewCoverageBuildAsync(
+      world,
+      {},
+      {
+        pause: async () => {
+          pauses += 1;
+        },
+      },
+    );
+
+    expect(preview.fixes).toEqual([]);
+    expect(pauses).toBe(0);
   });
 });

@@ -1003,3 +1003,28 @@
   - [x] 48f. **Build report** - after a build, what each person was given,
         who went over the threshold, and every gap left with its reason,
         each linked to its cell.
+- [ ] 49. **Schedule Builder refinements** - Auto-build stays responsive,
+      reads as an auto builder, never schedules six days in a row, keeps days
+      off together and writes them, and follows each person's shift
+      preferences.
+  - [x] 49a. **Loading that never freezes** - planning yields with
+        progress, and Apply shows its progress until every change is saved.
+  - [ ] 49b. **Auto-build naming** - the section is Auto-build, with a short
+        plain description of how it works under the title; Generate
+        schedule, then Apply or Discard; the toolbar button gets a calendar
+        icon and no count.
+  - [ ] 49c. **Five days in a row, days off in pairs** - no sixth day in a
+        row from a build or a suggestion, counted across periods; a recurring
+        fill that would make one is skipped and reported; days off stay in
+        pairs unless nobody can fill a shift without splitting them.
+  - [ ] 49d. **Day off absence** - Schedule Rules names the absence that
+        means a day off (pre-detected by name); a build writes it into each
+        scheduled person's remaining empty days, in pairs where it can.
+  - [ ] 49e. **Shift preferences** - per person, Prefers or Only a set of
+        shifts on the Recurring schedule tab (migration 089); Auto-build and
+        suggestions never give an Only person another shift and pick
+        preferred people first.
+  - [ ] 49f. **Fill the rest with overtime** - the first build stays within
+        40 hours and five days in a row; when gaps remain, a second option
+        plans again allowing overtime and a sixth day in a row (never a
+        seventh), names who it affects and asks before it applies.

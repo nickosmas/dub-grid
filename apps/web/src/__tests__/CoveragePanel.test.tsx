@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildCoverageMatrix,
@@ -9,7 +9,10 @@ import {
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import { appliedSuggestionText } from "@/components/coverage-check/CoverageSuggestions";
-import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
+import {
+  planningPercent,
+  type ScheduleBuildState,
+} from "@/components/coverage-check/ScheduleBuildSection";
 
 import CoveragePanel from "@/components/CoveragePanel";
 import type { FocusArea } from "@/types";
@@ -825,6 +828,51 @@ describe("CoveragePanel", () => {
       expect(list().getAllByRole("listitem")).toHaveLength(5);
       fireEvent.click(section().getByRole("button", { name: "Show all 7" }));
       expect(list().getAllByRole("listitem")).toHaveLength(7);
+    });
+
+    describe("progress", () => {
+      const bar = () => section().getByRole("progressbar");
+      const status = () =>
+        section()
+          .getAllByRole("status")
+          .find((element) => element.classList.contains("dg-cc-build-progress"));
+
+      it("shows loading, then shifts placed with the share of spots filled", () => {
+        withBuild({ status: "previewing", progress: null });
+        expect(status()).toHaveTextContent("Loading recurring schedules and recent weeks0%");
+        expect(bar()).toHaveAttribute("aria-valuenow", "0");
+        expect(section().getByRole("button", { name: /Preview build/ })).toBeDisabled();
+      });
+
+      it("counts the spots filled while placing", () => {
+        withBuild({ status: "previewing", progress: { placed: 3, filled: 3, needed: 12 } });
+        expect(status()).toHaveTextContent("Placing shifts: 3 placed25%");
+        expect(bar()).toHaveAttribute("aria-valuenow", "25");
+      });
+
+      it("checks the plan again, then counts the saves, while applying", () => {
+        const applying = preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 });
+        withBuild({
+          status: "applying",
+          preview: applying,
+          checking: { placed: 1, filled: 2, needed: 4 },
+          saved: null,
+          total: 0,
+        });
+        expect(status()).toHaveTextContent("Checking the plan against the latest schedule50%");
+        expect(section().queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+        cleanup();
+
+        withBuild({ status: "applying", preview: applying, checking: null, saved: 12, total: 48 });
+        expect(status()).toHaveTextContent("Saving changes: 12 of 4825%");
+        expect(bar()).toHaveAttribute("aria-valuenow", "25");
+        expect(section().getByText("1 change for 1 person")).toBeInTheDocument();
+      });
+
+      it("reads a build with nothing to fill as complete", () => {
+        expect(planningPercent({ placed: 0, filled: 0, needed: 0 })).toBe(100);
+        expect(planningPercent(null)).toBe(0);
+      });
     });
 
     describe("after a build", () => {
