@@ -1009,7 +1009,7 @@
       preferences.
   - [x] 49a. **Loading that never freezes** - planning yields with
         progress, and Apply shows its progress until every change is saved.
-  - [ ] 49b. **Auto-build naming** - the section is Auto-build, with a short
+  - [x] 49b. **Auto-build naming** - the section is Auto-build, with a short
         plain description of how it works under the title; Generate
         schedule, then Apply or Discard; the toolbar button gets a calendar
         icon and no count.

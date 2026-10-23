@@ -7043,7 +7043,7 @@ function SchedulerContent({
     if (!built) {
       setBuildApplying(null);
       setBusySuggestionId(null);
-      toast.error("The build couldn't be worked out. Nothing was changed.");
+      toast.error("The schedule couldn't be generated. Nothing was changed.");
       return;
     }
     // Planned again at Build; if anything moved on, show what Build would do now.
@@ -7059,14 +7059,14 @@ function SchedulerContent({
         rowKeys,
         plannedFrom: coverageCountsKey,
       });
-      toast.info("The schedule changed, so the preview was updated. Check it and build again.");
+      toast.info("The schedule changed, so the result was updated. Check it and apply again.");
       return;
     }
     const total = built.fixedWrites.length + built.preview.fixes.length;
     const changes = total === 1 ? "1 change" : `${total} changes`;
     const written = applyCoveragePlan(
       built.preview.fixes,
-      `Built the draft: ${changes}`,
+      `Auto-build: ${changes}`,
       "build",
       built.fixedWrites,
     );
@@ -8227,7 +8227,6 @@ function SchedulerContent({
                 }
                 requestsBadgeCount={shiftRequests.badgeCount}
                 onRequestsToggle={() => setShowRequestBoard((prev) => !prev)}
-                coverageGapCount={visibleCoverageGaps.length}
                 onCoverageToggle={
                   canViewCoveragePanel ? () => setShowCoveragePanel((prev) => !prev) : undefined
                 }

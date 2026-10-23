@@ -710,7 +710,7 @@ describe("CoveragePanel", () => {
       });
       return build;
     };
-    const section = () => within(screen.getByRole("region", { name: "Build the draft" }));
+    const section = () => within(screen.getByRole("region", { name: "Auto-build" }));
 
     it("says what a build does and previews the rows shown", () => {
       const build = withBuild({ status: "idle" });
@@ -719,9 +719,9 @@ describe("CoveragePanel", () => {
         section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
       ).toBeInTheDocument();
       expect(
-        section().getByText(/^Fills empty cells from recurring schedules, then short shifts/),
-      ).toHaveTextContent("It never changes anyone already scheduled.");
-      fireEvent.click(section().getByRole("button", { name: "Preview build" }));
+        section().getByText(/^Fills open shifts with qualified staff who are free\./),
+      ).toHaveTextContent("Never moves anyone already scheduled.");
+      fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
     });
 
@@ -742,9 +742,9 @@ describe("CoveragePanel", () => {
       expect(section().getByText("2 new shifts · 1 restored")).toBeInTheDocument();
       expect(section().getByLabelText("2 now, 0 after")).toHaveTextContent("2 → 0");
       expect(section().getByLabelText("4 now, 1 after")).toHaveTextContent("4 → 1");
-      fireEvent.click(section().getByRole("button", { name: "Build" }));
+      fireEvent.click(section().getByRole("button", { name: "Apply" }));
       expect(build.onBuild).toHaveBeenCalled();
-      fireEvent.click(section().getByRole("button", { name: "Cancel" }));
+      fireEvent.click(section().getByRole("button", { name: "Discard" }));
       expect(build.onCancel).toHaveBeenCalled();
     });
 
@@ -761,7 +761,7 @@ describe("CoveragePanel", () => {
       expect(section().getByText(headline)).toBeInTheDocument();
       if (breakdown) expect(section().getByText(breakdown)).toBeInTheDocument();
       else expect(section().queryByText(/·/)).not.toBeInTheDocument();
-      expect(section().getByRole("button", { name: "Build" })).toBeInTheDocument();
+      expect(section().getByRole("button", { name: "Apply" })).toBeInTheDocument();
     });
 
     it("names each person skipped once, with every date and reason in order", () => {
@@ -841,7 +841,7 @@ describe("CoveragePanel", () => {
         withBuild({ status: "previewing", progress: null });
         expect(status()).toHaveTextContent("Loading recurring schedules and recent weeks0%");
         expect(bar()).toHaveAttribute("aria-valuenow", "0");
-        expect(section().getByRole("button", { name: /Preview build/ })).toBeDisabled();
+        expect(section().getByRole("button", { name: /Generate schedule/ })).toBeDisabled();
       });
 
       it("counts the spots filled while placing", () => {
@@ -860,7 +860,7 @@ describe("CoveragePanel", () => {
           total: 0,
         });
         expect(status()).toHaveTextContent("Checking the plan against the latest schedule50%");
-        expect(section().queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+        expect(section().queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
         cleanup();
 
         withBuild({ status: "applying", preview: applying, checking: null, saved: 12, total: 48 });
@@ -912,13 +912,13 @@ describe("CoveragePanel", () => {
 
       it("says what each person was given and why", () => {
         built();
-        expect(section().getByText("Built 5 changes for 2 people")).toBeInTheDocument();
+        expect(section().getByText("Applied 5 changes for 2 people")).toBeInTheDocument();
         const list = within(section().getByRole("list", { name: "What each person was given" }));
         expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
           "Ana Crawford 2 shifts · Fewest hours, Only one free",
           "Ben Shepherd 3 shifts · Recurring schedule, Restored",
         ]);
-        expect(section().queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+        expect(section().queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
       });
 
       it("links each shift still short to its cell", () => {
@@ -964,14 +964,12 @@ describe("CoveragePanel", () => {
 
     it("says when there is nothing to build", () => {
       withBuild({ status: "ready", preview: preview() });
-      expect(
-        section().getByText(/Nothing to build\. Nobody qualified is free/),
-      ).toBeInTheDocument();
+      expect(section().getByText(/Nothing to fill\. Nobody qualified is free/)).toBeInTheDocument();
     });
 
-    it("says when the preview could not be worked out", () => {
+    it("says when the schedule could not be generated", () => {
       withBuild({ status: "failed" });
-      expect(section().getByRole("alert")).toHaveTextContent("The build couldn't be worked out.");
+      expect(section().getByRole("alert")).toHaveTextContent("The schedule couldn't be generated.");
     });
 
     it("holds Build while another change is being applied", () => {
@@ -982,17 +980,17 @@ describe("CoveragePanel", () => {
         },
         { busySuggestionId: "a" },
       );
-      expect(section().getByRole("button", { name: "Build" })).toBeDisabled();
+      expect(section().getByRole("button", { name: "Apply" })).toBeDisabled();
     });
 
     it("offers no build to someone who cannot edit shifts, or in Month view", () => {
       withBuild({ status: "idle" }, { canEditShifts: false });
-      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Auto-build" })).not.toBeInTheDocument();
     });
 
     it("offers no build in Month view", () => {
       withBuild({ status: "idle" }, { matrix: null });
-      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Auto-build" })).not.toBeInTheDocument();
     });
 
     it("clears the preview when the focus area filter changes", () => {

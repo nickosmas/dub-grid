@@ -223,7 +223,7 @@ function BuildReport({
     <>
       <div className="flex flex-col gap-2">
         <p className="dg-cc-detail-line dg-tabular-nums font-semibold">
-          Built {pluralize(buildChangeCount(preview), "change", "changes")} for{" "}
+          Applied {pluralize(buildChangeCount(preview), "change", "changes")} for{" "}
           {pluralize(preview.people, "person", "people")}
         </p>
         <NameList label="What each person was given" rows={people.shown} />
@@ -313,7 +313,7 @@ interface ScheduleBuildSectionProps {
   onSelectCell?: (rowKey: string, dateKey: string) => void;
 }
 
-export const BUILD_SUMMARY = `Fills empty cells from recurring schedules, then short shifts with qualified people who are free, keeping each person within ${WEEKLY_OVERTIME_HOURS} hours a week when it can and sharing weekends, nights and hours evenly. It never changes anyone already scheduled.`;
+export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free. Starts from recurring schedules, keeps everyone within ${WEEKLY_OVERTIME_HOURS} hours a week when it can, and shares weekends and nights fairly. Never moves anyone already scheduled.`;
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {
@@ -437,9 +437,9 @@ export function ScheduleBuildSection({
 }: ScheduleBuildSectionProps) {
   const previewing = state.status === "previewing";
   return (
-    <section className="dg-cc-detail" aria-label="Build the draft">
+    <section className="dg-cc-detail" aria-label="Auto-build">
       <div className="min-w-0">
-        <h3 className="dg-cc-detail-title">Build the draft</h3>
+        <h3 className="dg-cc-detail-title">Auto-build</h3>
         <div className="dg-cc-detail-date dg-tabular-nums">{scope}</div>
       </div>
 
@@ -476,7 +476,7 @@ export function ScheduleBuildSection({
                 onClick={onCancel}
                 disabled={busy}
               >
-                Cancel
+                Discard
               </Button>
               <Button
                 type="button"
@@ -484,7 +484,7 @@ export function ScheduleBuildSection({
                 onClick={onBuild}
                 disabled={busy}
               >
-                Build
+                Apply
               </Button>
             </div>
             <p className="dg-cc-detail-line dg-cc-detail-line--muted">
@@ -495,12 +495,12 @@ export function ScheduleBuildSection({
           <>
             <p className="dg-cc-detail-line dg-tabular-nums">
               {state.preview.shortBefore > 0
-                ? `Nothing to build. Nobody qualified is free for the ${pluralize(
+                ? `Nothing to fill. Nobody qualified is free for the ${pluralize(
                     state.preview.shortBefore,
                     "short shift",
                     "short shifts",
                   )}.`
-                : "Nothing to build. Every shift here is staffed."}
+                : "Nothing to fill. Every shift here is staffed."}
             </p>
             {skippedWords && (
               <SkippedList people={groupSkipped(state.preview.skipped, skippedWords)} />
@@ -525,7 +525,7 @@ export function ScheduleBuildSection({
           )}
           {state.status === "failed" && (
             <p className="dg-cc-detail-line" role="alert">
-              The build couldn&apos;t be worked out. Try again.
+              The schedule couldn&apos;t be generated. Try again.
             </p>
           )}
           <Button
@@ -535,7 +535,7 @@ export function ScheduleBuildSection({
             disabled={busy || previewing}
           >
             <ButtonLoading loading={previewing} spinnerSize={14}>
-              Preview build
+              Generate schedule
             </ButtonLoading>
           </Button>
         </>

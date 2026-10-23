@@ -274,7 +274,7 @@ Item 48 is split, and every part has shipped:
 Item 49 is split:
 
 - **49a - Loading that never freezes:** shipped; planning yields with a percentage bar, and Apply counts every save before the report.
-- **49b - Auto-build naming:** planned.
+- **49b - Auto-build naming:** shipped; Auto-build with a plain description, Generate schedule, Apply and Discard, and a calendar toolbar button with no count.
 - **49c - Five days in a row, days off in pairs:** planned.
 - **49d - Day off absence:** planned.
 - **49e - Shift preferences:** planned (migration 089).
