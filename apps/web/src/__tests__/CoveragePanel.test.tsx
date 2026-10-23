@@ -667,6 +667,8 @@ describe("CoveragePanel", () => {
       skipped: [],
       overThreshold: [],
       choices: [],
+      recurringPeople: [],
+      shortCells: [],
       ...overrides,
     });
     const skippedWords = {
@@ -680,6 +682,7 @@ describe("CoveragePanel", () => {
         })[dateKey] ?? dateKey,
       reason: (entry: CoverageRuledOut) =>
         entry.reason.kind === "absence" ? "Sick that day" : "has a request waiting that day",
+      rowLabel: (rowKey: string) => (rowKey === "1:5:1" ? "North Wing · Day MA" : rowKey),
     };
     const skip = (employeeId: string, dateKey: string, kind: "absence" | "request") =>
       ({
@@ -822,6 +825,83 @@ describe("CoveragePanel", () => {
       expect(list().getAllByRole("listitem")).toHaveLength(5);
       fireEvent.click(section().getByRole("button", { name: "Show all 7" }));
       expect(list().getAllByRole("listitem")).toHaveLength(7);
+    });
+
+    describe("after a build", () => {
+      const built = (overrides: Partial<CoverageBuildPreview> = {}) =>
+        withBuild({
+          status: "built",
+          preview: preview({
+            fixes: [
+              { id: "o", kind: "assign", employeeId: "ana" },
+              { id: "a", kind: "assign", employeeId: "ana" },
+              { id: "r", kind: "restore", employeeId: "ben" },
+            ] as CoverageSuggestion[],
+            recurring: { shifts: 2, absences: 0 },
+            recurringPeople: [{ employeeId: "ben", shifts: 2, absences: 0 }],
+            choices: [
+              {
+                suggestionId: "o",
+                employeeId: "ana",
+                dateKey: "2026-10-26",
+                reason: "only",
+                count: 0,
+                others: 0,
+              },
+              {
+                suggestionId: "a",
+                employeeId: "ana",
+                dateKey: "2026-10-27",
+                reason: "hours",
+                count: 8,
+                others: 2,
+              },
+            ],
+            people: 2,
+            ...overrides,
+          }),
+        });
+
+      it("says what each person was given and why", () => {
+        built();
+        expect(section().getByText("Built 5 changes for 2 people")).toBeInTheDocument();
+        const list = within(section().getByRole("list", { name: "What each person was given" }));
+        expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+          "Ana Crawford 2 shifts · Fewest hours, Only one free",
+          "Ben Shepherd 3 shifts · Recurring schedule, Restored",
+        ]);
+        expect(section().queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+      });
+
+      it("links each shift still short to its cell", () => {
+        built({ shortCells: [{ rowKey: "1:5:1", dateKey: "2026-10-27", staffShort: 1 }] });
+        expect(section().getByText("Still short: 1 shift")).toBeInTheDocument();
+        fireEvent.click(
+          section().getByRole("button", { name: "North Wing · Day MA, Tue, Oct 27: 1 short" }),
+        );
+        expect(
+          within(screen.getByRole("region", { name: "Selected day" })).getByText("Tue, Oct 27"),
+        ).toBeInTheDocument();
+      });
+
+      it("shows five shifts still short, then all of them", () => {
+        const dates = ["2026-10-26", "2026-10-27", "2026-10-28", "a", "b", "c"];
+        built({
+          shortCells: dates.map((dateKey) => ({ rowKey: "1:5:1", dateKey, staffShort: 1 })),
+        });
+        const list = () => within(section().getByRole("list", { name: "Still short" }));
+        expect(list().getAllByRole("listitem")).toHaveLength(5);
+        fireEvent.click(section().getByRole("button", { name: "Show all 6" }));
+        expect(list().getAllByRole("listitem")).toHaveLength(6);
+      });
+
+      it("leaves out empty lists and closes with Done", () => {
+        const build = built();
+        expect(section().queryByText(/Still short/)).not.toBeInTheDocument();
+        expect(section().queryByText("Over 40 hours a week")).not.toBeInTheDocument();
+        fireEvent.click(section().getByRole("button", { name: "Done" }));
+        expect(build.onCancel).toHaveBeenCalled();
+      });
     });
 
     it("lists nobody when nobody was skipped", () => {

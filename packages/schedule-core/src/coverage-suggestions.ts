@@ -979,6 +979,10 @@ export interface CoverageBuildPreview {
   overThreshold: CoverageOverThreshold[];
   /** Why each shift went to its person, when fairness chose between people. */
   choices: CoverageFairChoice[];
+  /** Recurring schedule fills per person, in the order first filled. */
+  recurringPeople: { employeeId: string; shifts: number; absences: number }[];
+  /** Shifts still short after the build that have not started, by date then row. */
+  shortCells: { rowKey: string; dateKey: string; staffShort: number }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1009,13 +1013,26 @@ export function previewCoverageBuild(
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const stillShort = new Set<string>();
+  const shortCells: CoverageBuildPreview["shortCells"] = [];
   for (const row of final.matrix.rows) {
     if (options.rowKeys && !options.rowKeys.has(row.rowKey)) continue;
     for (const cell of row.cells) {
       if (!cell || cell.past || cell.kind !== "short") continue;
       if (options.dateKey != null && cell.dateKey !== options.dateKey) continue;
       stillShort.add(`${row.rowKey}|${cell.dateKey}`);
+      shortCells.push({
+        rowKey: row.rowKey,
+        dateKey: cell.dateKey,
+        staffShort: Math.round(shortageOf(cell.draft) * 1e6) / 1e6,
+      });
     }
+  }
+  const recurringByPerson = new Map<string, { shifts: number; absences: number }>();
+  for (const day of base) {
+    const counts = recurringByPerson.get(day.employeeId) ?? { shifts: 0, absences: 0 };
+    if (day.day.assignmentIds.length > 0) counts.shifts += 1;
+    else if (day.day.absenceTypeId != null) counts.absences += 1;
+    recurringByPerson.set(day.employeeId, counts);
   }
   const before = countOpen(input.matrix, options.rowKeys);
   const result = countOpen(after.matrix, options.rowKeys);
@@ -1045,5 +1062,14 @@ export function previewCoverageBuild(
     skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
     overThreshold,
     choices,
+    recurringPeople: [...recurringByPerson.entries()]
+      .filter(([, counts]) => counts.shifts + counts.absences > 0)
+      .map(([employeeId, counts]) => ({ employeeId, ...counts })),
+    shortCells: shortCells.sort(
+      (left, right) =>
+        left.dateKey.localeCompare(right.dateKey) ||
+        final.matrix.rows.findIndex((row) => row.rowKey === left.rowKey) -
+          final.matrix.rows.findIndex((row) => row.rowKey === right.rowKey),
+    ),
   };
 }

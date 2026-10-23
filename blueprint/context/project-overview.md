@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 47 are
-shipped. Items 40 and 48 are in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 48 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -82,7 +82,7 @@ shipped. Items 40 and 48 are in progress.
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
-| 48   | In progress | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
+| 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 
 Item 40 is split:
 
@@ -242,7 +242,7 @@ approval publishes at once and replaces any earlier draft of the cells it
 writes, with a warning first (owner decisions, 2026-10-21). Design
 reference: the "Staffing check panel" canvas.
 
-Item 48 is split; 48a to 48e have shipped:
+Item 48 is split, and every part has shipped:
 
 - **48a - Rename and Build section:** shipped; Coverage Check is named
   Schedule Builder, and a Build section previews a build of the period and
@@ -266,7 +266,9 @@ Item 48 is split; 48a to 48e have shipped:
   to the fewest recent nights (the four published weeks before and the
   period), and otherwise to the fewest hours in the period; each choice
   records why for the report.
-- **48f - Build report:** planned.
+- **48f - Build report:** shipped; after a build the section reports what
+  each person was given and why, anyone over 40 hours a week, and each shift
+  still short as a link to its cell, until Done or the build's Undo.
 
 The builder only fills: it applies recurring schedules, fills empty cells
 and puts back the draft's own removals, and never moves or replaces anyone

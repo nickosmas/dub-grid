@@ -453,6 +453,10 @@ export default function CoveragePanel({
                           onBuild={build.onBuild}
                           onCancel={build.onCancel}
                           skippedWords={build.skippedWords}
+                          onSelectCell={(rowKey, dateKey) => {
+                            setSelectedDateKey(null);
+                            setSelected({ rowKey, dateKey });
+                          }}
                         />
                       )}
                       {!selected && !selectedDateKey && suggestionHint && (

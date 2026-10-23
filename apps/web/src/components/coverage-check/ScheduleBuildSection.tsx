@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   WEEKLY_OVERTIME_HOURS,
   formatLocalDateKey,
   parseLocalDateKey,
   type CoverageBuildPreview,
+  type CoverageFairChoice,
   type CoverageOverThreshold,
   type CoverageRuledOut,
 } from "@dubgrid/schedule-core";
@@ -17,13 +18,17 @@ export type ScheduleBuildState =
   | { status: "idle" }
   | { status: "previewing" }
   | { status: "failed" }
-  | { status: "ready"; preview: CoverageBuildPreview };
+  | { status: "ready"; preview: CoverageBuildPreview }
+  /** Built: the preview it applied, as the report of what it did. */
+  | { status: "built"; preview: CoverageBuildPreview };
 
 /** Words for the people a build names, from the page's own lookups. */
 export interface SkippedWords {
   personName: (employeeId: string) => string;
   formatDate: (dateKey: string) => string;
   reason: (entry: CoverageRuledOut) => string;
+  /** A requirement row's name, such as "Day Shift · Supervisor". */
+  rowLabel: (rowKey: string) => string;
 }
 
 interface SkippedPerson {
@@ -100,14 +105,159 @@ function NameList({
   );
 }
 
-const SKIPPED_SHOWN = 5;
+const WHY_ORDER = [
+  "Recurring schedule",
+  "Restored",
+  "Moved back",
+  "Fewest weekends",
+  "Fewest nights",
+  "Fewest hours",
+  "Even",
+  "Only one free",
+  "Qualified and free",
+];
+
+const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
+  only: "Only one free",
+  weekends: "Fewest weekends",
+  nights: "Fewest nights",
+  hours: "Fewest hours",
+  tie: "Even",
+};
+
+/** Each person a build changed: shifts given and why, by name. */
+export function buildReportPeople(
+  preview: CoverageBuildPreview,
+  words: Pick<SkippedWords, "personName">,
+): { key: string; name: string; detail: string }[] {
+  const people = new Map<string, { shifts: number; absences: number; why: Set<string> }>();
+  const personOf = (employeeId: string) => {
+    const person = people.get(employeeId) ?? { shifts: 0, absences: 0, why: new Set<string>() };
+    people.set(employeeId, person);
+    return person;
+  };
+  for (const recurring of preview.recurringPeople) {
+    const person = personOf(recurring.employeeId);
+    person.shifts += recurring.shifts;
+    person.absences += recurring.absences;
+    person.why.add("Recurring schedule");
+  }
+  const choiceOf = new Map(preview.choices.map((choice) => [choice.suggestionId, choice]));
+  for (const fix of preview.fixes) {
+    if (!fix.employeeId) continue;
+    const person = personOf(fix.employeeId);
+    person.shifts += 1;
+    const choice = choiceOf.get(fix.id);
+    person.why.add(
+      fix.kind === "restore"
+        ? "Restored"
+        : fix.kind === "moveBack"
+          ? "Moved back"
+          : choice
+            ? CHOICE_WHY[choice.reason]
+            : "Qualified and free",
+    );
+  }
+  return [...people.entries()]
+    .map(([employeeId, person]) => ({
+      key: employeeId,
+      name: words.personName(employeeId),
+      detail: [
+        person.shifts > 0 ? pluralize(person.shifts, "shift", "shifts") : null,
+        person.absences > 0 ? pluralize(person.absences, "absence", "absences") : null,
+        [...person.why].sort((a, b) => WHY_ORDER.indexOf(a) - WHY_ORDER.indexOf(b)).join(", "),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const LIST_SHOWN = 5;
+
+/** The first five, then all of them on request. */
+function useShowAll<T>(items: T[]): { shown: T[]; toggle: ReactNode } {
+  const [showAll, setShowAll] = useState(false);
+  return {
+    shown: showAll ? items : items.slice(0, LIST_SHOWN),
+    toggle:
+      items.length > LIST_SHOWN ? (
+        <button
+          type="button"
+          className="dg-cc-show-all"
+          aria-expanded={showAll}
+          onClick={() => setShowAll((current) => !current)}
+        >
+          {showAll ? "Show fewer" : `Show all ${items.length}`}
+        </button>
+      ) : null,
+  };
+}
+
+function BuildReport({
+  preview,
+  words,
+  onSelectCell,
+  onDone,
+}: {
+  preview: CoverageBuildPreview;
+  words: SkippedWords;
+  onSelectCell?: (rowKey: string, dateKey: string) => void;
+  onDone: () => void;
+}) {
+  const people = useShowAll(buildReportPeople(preview, words));
+  const short = useShowAll(preview.shortCells);
+  const over = overThresholdLines(preview.overThreshold, words);
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <p className="dg-cc-detail-line dg-tabular-nums font-semibold">
+          Built {pluralize(buildChangeCount(preview), "change", "changes")} for{" "}
+          {pluralize(preview.people, "person", "people")}
+        </p>
+        <NameList label="What each person was given" rows={people.shown} />
+        {people.toggle}
+        {over.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="dg-cc-caption">Over {WEEKLY_OVERTIME_HOURS} hours a week</div>
+            <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
+          </div>
+        )}
+        {preview.shortCells.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="dg-cc-caption dg-tabular-nums">
+              Still short: {pluralize(preview.shortCells.length, "shift", "shifts")}
+            </div>
+            <ul className="dg-cc-changes" aria-label="Still short">
+              {short.shown.map((cell) => (
+                <li key={`${cell.rowKey}|${cell.dateKey}`} className="dg-cc-change">
+                  <button
+                    type="button"
+                    className="dg-cc-show-all dg-tabular-nums"
+                    onClick={() => onSelectCell?.(cell.rowKey, cell.dateKey)}
+                  >
+                    {words.rowLabel(cell.rowKey)}, {words.formatDate(cell.dateKey)}:{" "}
+                    {formatCoverageNumber(cell.staffShort)} short
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {short.toggle}
+          </div>
+        )}
+      </div>
+      <Button type="button" className="dg-btn dg-btn-secondary" onClick={onDone}>
+        Done
+      </Button>
+    </>
+  );
+}
 
 /** Who could not take the shifts left short: a count, with the reasons on request. */
 function SkippedList({ people }: { people: SkippedPerson[] }) {
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const list = useShowAll(people);
   if (people.length === 0) return null;
-  const shown = showAll ? people : people.slice(0, SKIPPED_SHOWN);
   return (
     <div className="flex flex-col gap-1.5">
       <button
@@ -124,22 +274,13 @@ function SkippedList({ people }: { people: SkippedPerson[] }) {
         <>
           <NameList
             label="Not scheduled"
-            rows={shown.map((person) => ({
+            rows={list.shown.map((person) => ({
               key: person.employeeId,
               name: person.name,
               detail: person.lines.join("; "),
             }))}
           />
-          {people.length > SKIPPED_SHOWN && (
-            <button
-              type="button"
-              className="dg-cc-show-all"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((current) => !current)}
-            >
-              {showAll ? "Show fewer" : `Show all ${people.length}`}
-            </button>
-          )}
+          {list.toggle}
         </>
       )}
     </div>
@@ -157,6 +298,8 @@ interface ScheduleBuildSectionProps {
   onCancel: () => void;
   /** Words for the people a build names; without them those lists are left out. */
   skippedWords?: SkippedWords;
+  /** Selects a still-short shift's cell in the matrix. */
+  onSelectCell?: (rowKey: string, dateKey: string) => void;
 }
 
 export const BUILD_SUMMARY = `Fills empty cells from recurring schedules, then short shifts with qualified people who are free, keeping each person within ${WEEKLY_OVERTIME_HOURS} hours a week when it can and sharing weekends, nights and hours evenly. It never changes anyone already scheduled.`;
@@ -249,6 +392,7 @@ export function ScheduleBuildSection({
   onBuild,
   onCancel,
   skippedWords,
+  onSelectCell,
 }: ScheduleBuildSectionProps) {
   const previewing = state.status === "previewing";
   return (
@@ -258,7 +402,14 @@ export function ScheduleBuildSection({
         <div className="dg-cc-detail-date dg-tabular-nums">{scope}</div>
       </div>
 
-      {state.status === "ready" ? (
+      {state.status === "built" && skippedWords ? (
+        <BuildReport
+          preview={state.preview}
+          words={skippedWords}
+          onSelectCell={onSelectCell}
+          onDone={onCancel}
+        />
+      ) : state.status === "ready" ? (
         buildChangeCount(state.preview) > 0 ? (
           <>
             <PreviewSummary preview={state.preview} skippedWords={skippedWords} />

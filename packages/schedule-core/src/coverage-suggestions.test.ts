@@ -632,6 +632,23 @@ describe("previewCoverageBuild on top of recurring fills", () => {
     expect(preview.staffShortAfter).toBe(preview.staffShortBefore - 2);
   });
 
+  it("counts each person's recurring fills for the report", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      baseOverrides: [
+        day("ben", MON, [DAY_MA]),
+        day("ana", MON, [DAY_MA]),
+        day("ben", TUE, [], 4),
+        day("ben", NEXT_MON, [DAY_MA]),
+      ],
+    });
+
+    expect(preview.recurringPeople).toEqual([
+      { employeeId: "ben", shifts: 2, absences: 1 },
+      { employeeId: "ana", shifts: 1, absences: 0 },
+    ]);
+  });
+
   it("never books someone again on a day their recurring schedule fills", () => {
     const world = buildSuggestionWorld({ people: ["ana", "ben"], draft: {} });
     const preview = previewCoverageBuild(world, {
@@ -924,5 +941,39 @@ describe("fairness in a build", () => {
     });
 
     expect(plan.map((fix) => fix.employeeId)).toEqual(["ana", "ben"]);
+  });
+});
+
+describe("the shifts a build leaves short", () => {
+  it("lists each by date, then in the matrix's row order, with the staff still needed", () => {
+    // Only Ana is qualified for anything, so every day stays short.
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: {},
+      qualified: { ben: [], cat: [], dan: [], eve: [] },
+    });
+    const preview = previewCoverageBuild(world);
+
+    expect(preview.shortCells.map((cell) => cell.dateKey)).toEqual(world.matrix.dateKeys);
+    expect(preview.shortCells.length).toBe(preview.shortAfter);
+    expect(preview.shortCells.reduce((sum, cell) => sum + cell.staffShort, 0)).toBe(
+      preview.staffShortAfter,
+    );
+  });
+
+  it("lists nothing when the build staffs everything", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    expect(previewCoverageBuild(world).shortCells).toEqual([]);
+  });
+
+  it("keeps to the rows built", () => {
+    const world = buildSuggestionWorld({
+      draft: {},
+      qualified: { ana: [], ben: [], cat: [], dan: [], eve: [] },
+    });
+    const preview = previewCoverageBuild(world, { rowKeys: new Set([ROW_SC]) });
+
+    expect(preview.shortCells.length).toBeGreaterThan(0);
+    expect(preview.shortCells.every((cell) => cell.rowKey === ROW_SC)).toBe(true);
   });
 });

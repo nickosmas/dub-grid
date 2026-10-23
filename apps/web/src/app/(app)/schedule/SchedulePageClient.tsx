@@ -6865,10 +6865,14 @@ function SchedulerContent({
     rowKeys: string[];
     plannedFrom: string;
   } | null>(null);
+  // What the last build did, kept until Done, a new preview or its Undo.
+  const [buildReport, setBuildReport] = useState<CoverageBuildPreview | null>(null);
   const buildState: ScheduleBuildState =
     buildPreview && buildPreview.plannedFrom === coverageCountsKey
       ? buildPreview.state
-      : { status: "idle" };
+      : buildReport
+        ? { status: "built", preview: buildReport }
+        : { status: "idle" };
 
   // A build plans from fresh recurring schedules: each empty cell one fills
   // in scope becomes a fixed draft day, converted exactly as a save would be,
@@ -6967,12 +6971,14 @@ function SchedulerContent({
       personName: (employeeId: string) => text.personName(employeeId) ?? "Someone",
       formatDate: text.formatDate,
       reason: (entry: CoverageRuledOut) => describeCoverageRuledOutReason(entry, text),
+      rowLabel: (rowKey: string) => text.rowLabel(rowKey) ?? "A requirement",
     };
   }, [coverageSuggestions]);
 
   const previewBuild = useCallback(
     (rowKeys: string[]) => {
       const plannedFrom = coverageCountsKey;
+      setBuildReport(null);
       setBuildPreview({ state: { status: "previewing" }, rowKeys, plannedFrom });
       planBuild(rowKeys)
         .then((built) => {
@@ -7031,6 +7037,7 @@ function SchedulerContent({
       )
     ) {
       setBuildPreview(null);
+      setBuildReport(built.preview);
     }
   }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planBuild]);
 
@@ -7044,6 +7051,7 @@ function SchedulerContent({
         setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
       }
       setAppliedSuggestions((current) => current.filter((item) => item.id !== appliedId));
+      if (appliedId.startsWith("build@")) setBuildReport(null);
       toast.success(
         kept === 0
           ? `Undone: ${entry.text}`
@@ -8956,7 +8964,10 @@ function SchedulerContent({
                       state: buildState,
                       onPreview: previewBuild,
                       onBuild: runBuild,
-                      onCancel: () => setBuildPreview(null),
+                      onCancel: () => {
+                        setBuildPreview(null);
+                        setBuildReport(null);
+                      },
                       skippedWords: buildSkippedWords,
                     }
                   : undefined

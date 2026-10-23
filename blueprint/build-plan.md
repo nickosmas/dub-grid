@@ -971,7 +971,7 @@
         approve through the existing request approval behind a confirmation,
         and the opened and closed counts in the Publish dialog. Approve
         needs the approval-replaces-draft fix first.
-- [ ] 48. **Schedule Builder** - Coverage Check becomes the Schedule
+- [x] 48. **Schedule Builder** - Coverage Check becomes the Schedule
       Builder: one action builds the draft for the period from recurring
       schedules, absences, qualifications, coverage requirements, overtime
       and fairness, previews the result before anything changes, explains
@@ -1000,6 +1000,6 @@
   - [x] 48e. **Fairness** - balance hours across people in the period and
         rotate weekends and nights from recent published schedules, with the
         reason for each choice.
-  - [ ] 48f. **Build report** - after a build, what each person was given,
+  - [x] 48f. **Build report** - after a build, what each person was given,
         who went over the threshold, and every gap left with its reason,
         each linked to its cell.
