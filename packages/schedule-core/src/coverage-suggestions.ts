@@ -737,6 +737,37 @@ export interface CoverageOverThreshold {
   hours: number;
 }
 
+/** A person's standing for one shift; lower is fairer to give them. */
+export interface CoverageFairnessStanding {
+  /** Weekend shifts recently and this period, or null when the shift is not on a weekend. */
+  weekends: number | null;
+  /** Night shifts recently and this period, or null when the shift is not a night. */
+  nights: number | null;
+  /** Hours this period. */
+  hours: number;
+}
+
+export interface CoverageFairnessRule {
+  standing: (
+    employeeId: string,
+    dateKey: string,
+    assignmentId: number,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => CoverageFairnessStanding;
+}
+
+/** Why the plan gave a shift to this person rather than another who could fill it. */
+export interface CoverageFairChoice {
+  suggestionId: string;
+  employeeId: string;
+  dateKey: string;
+  reason: "only" | "weekends" | "nights" | "hours" | "tie";
+  /** The chosen person's count for that reason (hours for a tie). */
+  count: number;
+  /** How many others could have filled it the same way. */
+  others: number;
+}
+
 export interface PlanCoverageFixesOptions {
   /** Only fixes for this date. */
   dateKey?: string;
@@ -760,6 +791,30 @@ export interface PlanCoverageFixesOptions {
    * goes over only when no other fix is left.
    */
   overtime?: CoverageOvertimeRule;
+  /**
+   * Between people who would fill the same shift the same way, give it to
+   * the one with the fewest weekends, nights or hours, and say why.
+   */
+  fairness?: CoverageFairnessRule;
+}
+
+const FAIRNESS_REASONS = ["weekends", "nights", "hours"] as const;
+
+function standingKey(standing: CoverageFairnessStanding): number[] {
+  return [standing.weekends ?? 0, standing.nights ?? 0, standing.hours];
+}
+
+/** Same shift, same cell, same effect: only who fills it differs. */
+function samePeer(left: CoverageSuggestion, right: CoverageSuggestion): boolean {
+  return (
+    left.kind === "assign" &&
+    right.kind === "assign" &&
+    left.subject.rowKey === right.subject.rowKey &&
+    left.subject.dateKey === right.subject.dateKey &&
+    left.subject.assignmentId === right.subject.assignmentId &&
+    left.closes === right.closes &&
+    Math.abs(left.filled - right.filled) < EPSILON
+  );
 }
 
 /**
@@ -780,6 +835,7 @@ interface PlanWithLeftovers {
   ruledOut: CoverageRuledOut[];
   final: CoverageSuggestionInput;
   overThreshold: CoverageOverThreshold[];
+  choices: CoverageFairChoice[];
 }
 
 /** The plan, plus who the last pass ruled out and the schedule it ended on. */
@@ -790,6 +846,44 @@ function planWithLeftovers(
   const plan: CoverageSuggestion[] = [];
   const overtime = options.overtime;
   const taken: Omit<CoverageOverThreshold, "hours">[] = [];
+  const choices: CoverageFairChoice[] = [];
+  // The fairest of the equal candidates for the first one's shift, and why.
+  const fairest = (candidates: CoverageSuggestion[]): CoverageSuggestion | undefined => {
+    const first = candidates[0];
+    const fairness = options.fairness;
+    if (!first || !fairness || first.kind !== "assign" || !first.employeeId) return first;
+    const ranked = candidates
+      .filter((candidate) => candidate.employeeId && samePeer(first, candidate))
+      .map((candidate, order) => ({
+        candidate,
+        order,
+        key: standingKey(
+          fairness.standing(
+            candidate.employeeId!,
+            candidate.subject.dateKey,
+            candidate.subject.assignmentId,
+            overrides,
+          ),
+        ),
+      }))
+      .sort((left, right) => {
+        const index = left.key.findIndex((value, position) => value !== right.key[position]);
+        return index >= 0 ? left.key[index] - right.key[index] : left.order - right.order;
+      });
+    const [best, runnerUp] = ranked;
+    const decided = runnerUp
+      ? best.key.findIndex((value, position) => value < runnerUp.key[position])
+      : -1;
+    choices.push({
+      suggestionId: best.candidate.id,
+      employeeId: best.candidate.employeeId!,
+      dateKey: best.candidate.subject.dateKey,
+      reason: !runnerUp ? "only" : decided >= 0 ? FAIRNESS_REASONS[decided] : "tie",
+      count: best.key[decided >= 0 ? decided : 2],
+      others: ranked.length - 1,
+    });
+    return best.candidate;
+  };
   const overrides: CoverageDayOverride[] = [...(options.baseOverrides ?? [])];
   const reach = options.availabilityWith ? 0 : 1;
   const clashes = (override: CoverageDayOverride) =>
@@ -828,6 +922,7 @@ function planWithLeftovers(
           hours: overtime.weekHours(entry.employeeId, entry.dateKey, overrides),
         }))
       : [],
+    choices,
   });
   let current = overrides.length > 0 ? withPlanned() : input;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
@@ -844,7 +939,8 @@ function planWithLeftovers(
         ) &&
         !suggestion.overrides.some(clashes),
     );
-    const next = eligible.find((suggestion) => goesOver(suggestion).length === 0) ?? eligible[0];
+    const within = eligible.filter((suggestion) => goesOver(suggestion).length === 0);
+    const next = fairest(within.length > 0 ? within : eligible);
     if (!next) return finish(current);
     for (const override of goesOver(next)) {
       taken.push({
@@ -881,6 +977,8 @@ export interface CoverageBuildPreview {
   skipped: CoverageRuledOut[];
   /** Fixes taken over the overtime threshold because no other fix was left. */
   overThreshold: CoverageOverThreshold[];
+  /** Why each shift went to its person, when fairness chose between people. */
+  choices: CoverageFairChoice[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -907,7 +1005,7 @@ export function previewCoverageBuild(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
-  const { fixes, ruledOut, final, overThreshold } = planWithLeftovers(input, options);
+  const { fixes, ruledOut, final, overThreshold, choices } = planWithLeftovers(input, options);
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const stillShort = new Set<string>();
@@ -946,5 +1044,6 @@ export function previewCoverageBuild(
     staffShortAfter: result.staffShort,
     skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
     overThreshold,
+    choices,
   };
 }

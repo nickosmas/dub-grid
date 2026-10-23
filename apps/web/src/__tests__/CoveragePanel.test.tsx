@@ -666,6 +666,7 @@ describe("CoveragePanel", () => {
       staffShortAfter: 4,
       skipped: [],
       overThreshold: [],
+      choices: [],
       ...overrides,
     });
     const skippedWords = {

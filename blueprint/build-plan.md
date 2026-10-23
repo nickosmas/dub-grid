@@ -997,7 +997,7 @@
   - [x] 48d. **Overtime threshold** - fixed at 40 hours a week (US, no
         setting); the builder prefers people under it, goes over only when
         nobody else can fill a gap, and names them in the preview.
-  - [ ] 48e. **Fairness** - balance hours across people in the period and
+  - [x] 48e. **Fairness** - balance hours across people in the period and
         rotate weekends and nights from recent published schedules, with the
         reason for each choice.
   - [ ] 48f. **Build report** - after a build, what each person was given,

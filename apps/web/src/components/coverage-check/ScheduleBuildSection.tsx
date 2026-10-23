@@ -159,7 +159,7 @@ interface ScheduleBuildSectionProps {
   skippedWords?: SkippedWords;
 }
 
-export const BUILD_SUMMARY = `Fills empty cells from recurring schedules, then short shifts with qualified people who are free, keeping each person within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. It never changes anyone already scheduled.`;
+export const BUILD_SUMMARY = `Fills empty cells from recurring schedules, then short shifts with qualified people who are free, keeping each person within ${WEEKLY_OVERTIME_HOURS} hours a week when it can and sharing weekends, nights and hours evenly. It never changes anyone already scheduled.`;
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {

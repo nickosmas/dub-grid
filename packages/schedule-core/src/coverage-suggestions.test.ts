@@ -4,6 +4,7 @@ import {
   previewCoverageBuild,
   suggestCoverageFixes,
   type CoverageDayOverride,
+  type CoverageFairnessRule,
   type CoverageOvertimeRule,
   type CoverageSuggestion,
 } from "./coverage-suggestions";
@@ -804,5 +805,124 @@ describe("the overtime threshold in a build", () => {
 
     expect(preview.fixes).toHaveLength(2);
     expect(preview.overThreshold).toEqual([]);
+  });
+});
+
+describe("fairness in a build", () => {
+  const SAT = "2026-10-31";
+  const planned = (employeeId: string, days: ReadonlyArray<CoverageDayOverride>) =>
+    days.filter((day) => day.employeeId === employeeId && day.day.assignmentIds.length > 0).length;
+  const rule = (
+    hours: Record<string, number>,
+    options: { weekends?: Record<string, number>; nights?: Record<string, number> } = {},
+  ): CoverageFairnessRule => ({
+    standing: (employeeId, dateKey, _assignmentId, days) => {
+      const day = new Date(`${dateKey}T00:00:00`).getDay();
+      const weekend = day === 0 || day === 6;
+      return {
+        weekends: weekend && options.weekends ? (options.weekends[employeeId] ?? 0) : null,
+        nights: options.nights ? (options.nights[employeeId] ?? 0) : null,
+        hours: (hours[employeeId] ?? 0) + 8 * planned(employeeId, days),
+      };
+    },
+  });
+
+  it("gives a shift to the person with the fewest hours, and says why", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      fairness: rule({ ana: 30, ben: 30, cat: 0, dan: 10, eve: 20 }),
+    });
+
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["cat", "dan"]);
+    expect(
+      preview.choices.map(({ employeeId, reason, count, others }) => [
+        employeeId,
+        reason,
+        count,
+        others,
+      ]),
+    ).toEqual([
+      ["cat", "hours", 0, 4],
+      ["dan", "hours", 10, 3],
+    ]);
+  });
+
+  it("rotates weekends before balancing hours", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const plan = planCoverageFixes(world, {
+      dateKey: SAT,
+      fairness: rule(
+        { ana: 0, ben: 0, cat: 0, dan: 40, eve: 40 },
+        { weekends: { ana: 3, ben: 2, cat: 4, dan: 0, eve: 1 } },
+      ),
+    });
+
+    expect(plan.map((fix) => fix.employeeId)).toEqual(["dan", "eve"]);
+  });
+
+  it("rotates nights before balancing hours", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      fairness: rule(
+        { ana: 0, ben: 8, cat: 40 },
+        { nights: { ana: 2, ben: 2, cat: 0, dan: 5, eve: 5 } },
+      ),
+    });
+
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["cat", "ana"]);
+    expect(preview.choices.map((choice) => choice.reason)).toEqual(["nights", "hours"]);
+  });
+
+  it("chooses by name when everyone stands the same, and calls it a tie", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, { dateKey: MON, fairness: rule({}) });
+
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["ana", "ben"]);
+    expect(preview.choices[0]).toMatchObject({ reason: "tie", count: 0, others: 4 });
+  });
+
+  it("says when only one person could fill it", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: { [`ana|${MON}`]: { work: [DAY_MA] } },
+      qualified: { cat: [], dan: [], eve: [] },
+    });
+    const preview = previewCoverageBuild(world, { dateKey: MON, fairness: rule({}) });
+
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["ben"]);
+    expect(preview.choices).toEqual([
+      expect.objectContaining({ employeeId: "ben", reason: "only", others: 0 }),
+    ]);
+  });
+
+  it("still puts back the draft's own changes first", () => {
+    const plan = planCoverageFixes(
+      buildSuggestionWorld({
+        requirements: MA_ONLY,
+        published: { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${MON}`]: { work: [DAY_MA] } },
+        draft: { [`ben|${MON}`]: { work: [DAY_MA] } },
+      }),
+      { dateKey: MON, fairness: rule({ ana: 100 }) },
+    );
+
+    expect(plan.map((fix) => [fix.kind, fix.employeeId])).toEqual([["restore", "ana"]]);
+  });
+
+  it("keeps people within 40 hours ahead of fairness", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const overtime: CoverageOvertimeRule = {
+      thresholdHours: 40,
+      weekHours: (employeeId, _dateKey, days) =>
+        (employeeId === "ana" || employeeId === "ben" ? 0 : 40) + 8 * planned(employeeId, days),
+    };
+    const plan = planCoverageFixes(world, {
+      dateKey: MON,
+      overtime,
+      fairness: rule({ ana: 30, ben: 30 }),
+    });
+
+    expect(plan.map((fix) => fix.employeeId)).toEqual(["ana", "ben"]);
   });
 });

@@ -3,6 +3,7 @@ import {
   parseLocalDateKey,
   type CoverageAvailability,
   type CoverageDayOverride,
+  type CoverageFairnessRule,
   type CoverageOvertimeRule,
   type CoverageMatrix,
   type CoverageMeasureInput,
@@ -246,44 +247,129 @@ export function availabilityWithPlanned(
   };
 }
 
+type DraftHoursInput = Pick<
+  CoverageSuggestionAdapterInput,
+  "shifts" | "assignments" | "shiftCategories"
+>;
+
 /**
- * A person's draft hours in the schedule week (Sunday to Saturday) holding a
- * date, with the planned days written. A planned day takes its shifts' usual
- * times unless it keeps the day's own shifts unchanged.
+ * A person's draft days with the planned days written: each date's work and
+ * its hours. A planned day takes its shifts' usual times unless it keeps the
+ * day's own shifts unchanged.
  */
-export function weekHoursWithPlanned(
-  input: Pick<CoverageSuggestionAdapterInput, "shifts" | "assignments" | "shiftCategories">,
-): CoverageOvertimeRule["weekHours"] {
+function draftDaysWithPlanned(input: DraftHoursInput) {
   const assignmentById = new Map(
     input.assignments.map((assignment) => [assignment.id, assignment]),
   );
   const categoryById = new Map(input.shiftCategories.map((category) => [category.id, category]));
-  return (employeeId, dateKey, planned) => {
+  return (
+    employeeId: string,
+    dateKeys: ReadonlyArray<string>,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ): { dateKey: string; assignmentIds: number[]; hours: number }[] => {
     const plannedDays = new Map<string, CoverageSuggestionDay>();
     for (const override of planned) {
       if (override.side === "draft" && override.employeeId === employeeId) {
         plannedDays.set(override.dateKey, override.day);
       }
     }
-    const date = parseLocalDateKey(dateKey);
-    const sunday = addDays(date, -date.getDay());
-    let total = 0;
-    for (let offset = 0; offset < 7; offset += 1) {
-      const key = formatDateKey(addDays(sunday, offset));
-      const entry = input.shifts[`${employeeId}_${key}`];
+    return dateKeys.flatMap((dateKey) => {
+      const entry = input.shifts[`${employeeId}_${dateKey}`];
       const saved = entry && !entry.isDelete ? entry.assignmentIds : [];
-      const assignmentIds = plannedDays.get(key)?.assignmentIds ?? saved;
-      if (assignmentIds.length === 0) continue;
+      const assignmentIds = plannedDays.get(dateKey)?.assignmentIds ?? saved;
+      if (assignmentIds.length === 0) return [];
       const keepsTimes = assignmentIds.join(",") === saved.join(",");
-      total += computeShiftSegmentHours(
+      const hours = computeShiftSegmentHours(
         assignmentIds,
         assignmentById,
         keepsTimes ? entry?.customStartTime : null,
         keepsTimes ? entry?.customEndTime : null,
         categoryById,
       );
+      return [{ dateKey, assignmentIds, hours }];
+    });
+  };
+}
+
+function roundHours(hours: number): number {
+  return Math.round(hours * 100) / 100;
+}
+
+/** A person's draft hours in the schedule week (Sunday to Saturday) holding a date. */
+export function weekHoursWithPlanned(input: DraftHoursInput): CoverageOvertimeRule["weekHours"] {
+  const daysOf = draftDaysWithPlanned(input);
+  return (employeeId, dateKey, planned) => {
+    const date = parseLocalDateKey(dateKey);
+    const sunday = addDays(date, -date.getDay());
+    const week = Array.from({ length: 7 }, (_, offset) => formatDateKey(addDays(sunday, offset)));
+    return roundHours(daysOf(employeeId, week, planned).reduce((sum, day) => sum + day.hours, 0));
+  };
+}
+
+function isWeekendDateKey(dateKey: string): boolean {
+  const day = parseLocalDateKey(dateKey).getDay();
+  return day === 0 || day === 6;
+}
+
+/** A night shift starts from 9 PM to before 5 AM. */
+export function isNightAssignment(
+  assignment: AssignmentDefinition | undefined,
+  shiftCategories: ShiftCategory[],
+): boolean {
+  const range = assignment ? assignmentTimeRange(assignment, shiftCategories) : null;
+  if (!range) return false;
+  const [hour] = range.start.split(":").map(Number);
+  return hour >= 21 || hour < 5;
+}
+
+/**
+ * Each person's standing for a shift: weekend and night shifts over the
+ * published history plus the draft period, and hours over the period, with
+ * the planned days written. History holds published cells before the period.
+ */
+export function fairnessStandingWithPlanned(
+  input: DraftHoursInput,
+  periodDateKeys: ReadonlyArray<string>,
+  history: ShiftMap = {},
+): CoverageFairnessRule["standing"] {
+  const daysOf = draftDaysWithPlanned(input);
+  const assignmentById = new Map(
+    input.assignments.map((assignment) => [assignment.id, assignment]),
+  );
+  const night = new Map<number, boolean>();
+  const isNight = (assignmentId: number) => {
+    if (!night.has(assignmentId)) {
+      night.set(
+        assignmentId,
+        isNightAssignment(assignmentById.get(assignmentId), input.shiftCategories),
+      );
     }
-    return Math.round(total * 100) / 100;
+    return night.get(assignmentId)!;
+  };
+  const past = new Map<string, { weekends: number; nights: number }>();
+  for (const [key, entry] of Object.entries(history)) {
+    const separator = key.lastIndexOf("_");
+    const employeeId = key.slice(0, separator);
+    const dateKey = key.slice(separator + 1);
+    const worked = entry.publishedAssignmentDefinitionIds ?? [];
+    if (worked.length === 0) continue;
+    const counts = past.get(employeeId) ?? { weekends: 0, nights: 0 };
+    if (isWeekendDateKey(dateKey)) counts.weekends += 1;
+    if (worked.some(isNight)) counts.nights += 1;
+    past.set(employeeId, counts);
+  }
+  return (employeeId, dateKey, assignmentId, planned) => {
+    const days = daysOf(employeeId, periodDateKeys, planned);
+    const before = past.get(employeeId) ?? { weekends: 0, nights: 0 };
+    return {
+      weekends: isWeekendDateKey(dateKey)
+        ? before.weekends + days.filter((day) => isWeekendDateKey(day.dateKey)).length
+        : null,
+      nights: isNight(assignmentId)
+        ? before.nights + days.filter((day) => day.assignmentIds.some(isNight)).length
+        : null,
+      hours: roundHours(days.reduce((sum, day) => sum + day.hours, 0)),
+    };
   };
 }
 

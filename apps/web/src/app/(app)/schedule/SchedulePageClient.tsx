@@ -114,6 +114,7 @@ import {
 } from "@dubgrid/schedule-core";
 import {
   availabilityWithPlanned,
+  fairnessStandingWithPlanned,
   weekHoursWithPlanned,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
@@ -386,6 +387,8 @@ const scheduleEditorSessionIds = new Map<string, string>();
 
 /** How long teardown waits for a joining channel to settle before forcing it. */
 const CHANNEL_SETTLE_TIMEOUT_MS = 5_000;
+/** Published weeks before a build's period that count toward weekend and night rotation. */
+const FAIRNESS_HISTORY_DAYS = 28;
 
 function newEditorSessionId(): string {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -6792,18 +6795,28 @@ function SchedulerContent({
       dateKey?: string;
       rowKeys?: ReadonlySet<string>;
       baseOverrides?: CoverageDayOverride[];
+      /** Published cells before the period, for rotating weekends and nights. */
+      history?: ShiftMap;
     }) => {
       if (!coverageSuggestions) return null;
       const { engine, adapterInput } = coverageSuggestions;
+      const { history, ...planned } = options;
       return {
         engine,
         options: {
-          ...options,
+          ...planned,
           availabilityWith: (planned: ReadonlyArray<CoverageDayOverride>) =>
             availabilityWithPlanned(adapterInput, planned),
           overtime: {
             thresholdHours: WEEKLY_OVERTIME_HOURS,
             weekHours: weekHoursWithPlanned(adapterInput),
+          },
+          fairness: {
+            standing: fairnessStandingWithPlanned(
+              adapterInput,
+              adapterInput.matrix.dateKeys,
+              history,
+            ),
           },
         },
       };
@@ -6863,13 +6876,26 @@ function SchedulerContent({
   const planBuild = useCallback(
     async (rowKeys: string[]) => {
       if (!org || !coverageMatrix) return null;
-      const recurring = await fetchRecurringShifts(
-        org.id,
-        undefined,
-        assignmentLabelMapRef.current,
-        false,
-        absenceTypeMapRef.current,
-      );
+      const periodStart = parseLocalDateKey(coverageMatrix.dateKeys[0]);
+      const [recurring, history] = await Promise.all([
+        fetchRecurringShifts(
+          org.id,
+          undefined,
+          assignmentLabelMapRef.current,
+          false,
+          absenceTypeMapRef.current,
+        ),
+        // Without the history a build still shares the period's work fairly.
+        fetchShifts(
+          org.id,
+          canEditShiftsRef.current,
+          assignmentLabelMapRef.current,
+          absenceTypeMapRef.current,
+          formatDateKey(addDays(periodStart, -FAIRNESS_HISTORY_DAYS)),
+          formatDateKey(addDays(periodStart, -1)),
+          segmentCompatibility,
+        ).catch((): ShiftMap => ({})),
+      ]);
       const scopedAreas = new Set(
         coverageMatrix.rows
           .filter((row) => rowKeys.includes(row.rowKey))
@@ -6917,7 +6943,7 @@ function SchedulerContent({
           },
         });
       }
-      const planned = planOptions({ rowKeys: new Set(rowKeys), baseOverrides });
+      const planned = planOptions({ rowKeys: new Set(rowKeys), baseOverrides, history });
       if (!planned) return null;
       return { preview: previewCoverageBuild(planned.engine, planned.options), fixedWrites };
     },
@@ -6929,6 +6955,7 @@ function SchedulerContent({
       org,
       planOptions,
       resolveInputSnapshot,
+      segmentCompatibility,
       shiftCategories,
     ],
   );

@@ -12,6 +12,8 @@ import {
   pendingPickupsFromRequests,
   planSuggestionWrites,
   planUndo,
+  fairnessStandingWithPlanned,
+  isNightAssignment,
   publishedDayFromShifts,
   weekHoursWithPlanned,
 } from "./coverage-suggestions";
@@ -421,5 +423,60 @@ describe("weekHoursWithPlanned", () => {
 
   it("keeps a day's custom times when a planned day leaves its shifts as they are", () => {
     expect(weekHours("ana", "2026-10-26", [plannedDay("2026-10-26", [DAY])])).toBe(12);
+  });
+});
+
+describe("fairnessStandingWithPlanned", () => {
+  const PERIOD = ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-31"];
+  const shifts = {
+    "ana_2026-10-25": worked([DAY]),
+    "ana_2026-10-26": worked([NIGHT]),
+    "ana_2026-10-28": absent(4),
+  };
+  const history = {
+    "ana_2026-10-17": worked([DAY]),
+    "ana_2026-10-24": worked([NIGHT]),
+    "ana_2026-10-21": absent(4),
+    "ben_2026-10-24": worked([EVENING]),
+  };
+  const standing = fairnessStandingWithPlanned(
+    { shifts, assignments, shiftCategories },
+    PERIOD,
+    history,
+  );
+  const nightOn = (dateKey: string): CoverageDayOverride => ({
+    employeeId: "ana",
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds: [NIGHT],
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+
+  it("knows a night shift by its start", () => {
+    expect(isNightAssignment(assignments[2], shiftCategories)).toBe(true);
+    expect(isNightAssignment(assignments[1], shiftCategories)).toBe(false);
+    expect(isNightAssignment(undefined, shiftCategories)).toBe(false);
+  });
+
+  it("counts weekends over history and the period for a weekend shift", () => {
+    // History: two Saturdays; the period: Sunday. Hours: Sunday 8 and Monday's night 8.5.
+    expect(standing("ana", "2026-10-31", DAY, [])).toEqual({
+      weekends: 3,
+      nights: null,
+      hours: 16.5,
+    });
+    expect(standing("ben", "2026-10-31", DAY, [])).toEqual({ weekends: 1, nights: null, hours: 0 });
+  });
+
+  it("counts nights with the planned days written for a night shift", () => {
+    expect(standing("ana", "2026-10-27", NIGHT, [nightOn("2026-10-27")])).toEqual({
+      weekends: null,
+      nights: 3,
+      hours: 25,
+    });
   });
 });

@@ -242,7 +242,7 @@ approval publishes at once and replaces any earlier draft of the cells it
 writes, with a warning first (owner decisions, 2026-10-21). Design
 reference: the "Staffing check panel" canvas.
 
-Item 48 is split; 48a to 48d have shipped:
+Item 48 is split; 48a to 48e have shipped:
 
 - **48a - Rename and Build section:** shipped; Coverage Check is named
   Schedule Builder, and a Build section previews a build of the period and
@@ -261,7 +261,11 @@ Item 48 is split; 48a to 48d have shipped:
   and names anyone it takes over with their weekly hours. The Build section
   is lean: one summary line, before and after pairs, and the people left out
   collapsed.
-- **48e - Fairness:** planned; balance hours and rotate weekends and nights.
+- **48e - Fairness:** shipped; between people who would fill a shift the
+  same way, a weekend shift goes to the fewest recent weekends, a night shift
+  to the fewest recent nights (the four published weeks before and the
+  period), and otherwise to the fewest hours in the period; each choice
+  records why for the report.
 - **48f - Build report:** planned.
 
 The builder only fills: it applies recurring schedules, fills empty cells
