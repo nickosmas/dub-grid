@@ -226,6 +226,7 @@ const WHY_ORDER = [
   "Recurring schedule",
   "Restored",
   "Moved back",
+  "Up to their usual days",
   "Keeps days off together",
   "Prefers this shift",
   "Fewest weekends",
@@ -244,6 +245,7 @@ const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   nights: "Fewest nights",
   hours: "Fewest hours",
   tie: "Even",
+  weekDays: "Up to their usual days",
 };
 
 /** Each person a build changed: shifts given and why, by name. */
@@ -438,7 +440,7 @@ interface ScheduleBuildSectionProps {
   onAllowSixthDayChange?: (allow: boolean) => void;
 }
 
-export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules. Nobody works more than ${MAX_DAYS_IN_A_WEEK} days a week or ${MAX_DAYS_IN_A_ROW} in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled or gives anyone two shifts in a day.`;
+export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules, then gives anyone scheduled fewer than ${MAX_DAYS_IN_A_WEEK} days a week (or their recurring schedule's days) more shifts where staff are thinnest, even if that staffs a shift above what it needs. Nobody works more than ${MAX_DAYS_IN_A_WEEK} days a week or ${MAX_DAYS_IN_A_ROW} in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled or gives anyone two shifts in a day.`;
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {

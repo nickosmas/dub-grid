@@ -8,6 +8,8 @@ import {
   type CoverageFairnessRule,
   type CoverageOvertimeRule,
   type CoverageSuggestion,
+  type CoverageSuggestionInput,
+  type CoverageTopUpRule,
 } from "./coverage-suggestions";
 import {
   DAY_CN,
@@ -16,9 +18,11 @@ import {
   ROW_CN,
   ROW_MA,
   ROW_SC,
+  DATE_KEYS,
   buildSuggestionWorld,
   type SuggestionWorldOptions,
 } from "./coverage-suggestions.fixture";
+import { getScheduleWeekStartDate } from "./dates";
 
 const MON = "2026-10-26";
 const TUE = "2026-10-27";
@@ -599,6 +603,121 @@ describe("previewCoverageBuild", () => {
   it("previews the same build every time", () => {
     const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
     expect(previewCoverageBuild(world)).toEqual(previewCoverageBuild(world));
+  });
+});
+
+describe("previewCoverageBuild topping up the week", () => {
+  const ONE_MA = [{ ...MA_ONLY[0], minStaff: 1 }];
+  // Ana covers every day; Ben and Cat have nothing yet.
+  const anaEveryDay = Object.fromEntries(
+    DATE_KEYS.map((dateKey) => [`ana|${dateKey}`, { work: [DAY_MA] }]),
+  );
+  // Ben and Cat each already work one day: Saturday Oct 31.
+  const withSaturdays = {
+    ...anaEveryDay,
+    "ben|2026-10-31": { work: [DAY_MA] },
+    "cat|2026-10-31": { work: [DAY_MA] },
+  };
+  const daysWorked = (
+    world: CoverageSuggestionInput,
+    employeeId: string,
+    week: string,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) =>
+    DATE_KEYS.filter((dateKey) => {
+      if (getScheduleWeekStartDate(dateKey) !== getScheduleWeekStartDate(week)) return false;
+      const override = planned.find(
+        (day) => day.employeeId === employeeId && day.dateKey === dateKey,
+      );
+      return (override?.day ?? world.draftDay(employeeId, dateKey)).assignmentIds.length > 0;
+    }).length;
+  const topUp = (
+    world: CoverageSuggestionInput,
+    target: number,
+    employeeIds = ["ben", "cat"],
+  ): CoverageTopUpRule => ({
+    employeeIds,
+    target: () => target,
+    weekDays: (employeeId, dateKey, planned) => daysWorked(world, employeeId, dateKey, planned),
+  });
+  const daysOf = (fixes: CoverageSuggestion[], employeeId: string) =>
+    fixes
+      .filter((fix) => fix.employeeId === employeeId)
+      .map((fix) => fix.subject.dateKey)
+      .sort();
+
+  it("gives people below their usual days more shifts, spread over the least-staffed days", () => {
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben", "cat"],
+      draft: withSaturdays,
+    });
+    const preview = previewCoverageBuild(world, { topUp: topUp(world, 2) });
+
+    // Week of Oct 25 (Mon to Sat loaded, Saturday already worked), then Sun Nov 1 and Mon Nov 2.
+    expect(daysOf(preview.fixes, "ben")).toEqual(["2026-10-26", "2026-11-01", "2026-11-02"]);
+    expect(daysOf(preview.fixes, "cat")).toEqual(["2026-10-27", "2026-11-01", "2026-11-02"]);
+    expect(preview.fixes.every((fix) => fix.kind === "assign")).toBe(true);
+    expect(new Set(preview.choices.map((choice) => choice.reason))).toEqual(new Set(["weekDays"]));
+    expect(preview.shortAfter).toBe(0);
+  });
+
+  it("leaves alone someone with no shift in the period", () => {
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben"],
+      draft: anaEveryDay,
+    });
+    expect(previewCoverageBuild(world, { topUp: topUp(world, 5, ["ben"]) }).fixes).toEqual([]);
+  });
+
+  it("tops up nobody already at their usual days", () => {
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben"],
+      draft: withSaturdays,
+    });
+    expect(previewCoverageBuild(world, { topUp: topUp(world, 0, ["ben"]) }).fixes).toEqual([]);
+  });
+
+  it("skips a day with an absence or a waiting request", () => {
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben"],
+      draft: { ...withSaturdays, [`ben|${MON}`]: { absence: 7 } },
+      requests: [`ben|${TUE}`],
+    });
+    const days = daysOf(
+      previewCoverageBuild(world, { topUp: topUp(world, 3, ["ben"]) }).fixes,
+      "ben",
+    );
+
+    expect(days).not.toContain(MON);
+    expect(days).not.toContain(TUE);
+    expect(days.filter((dateKey) => dateKey < "2026-11-01")).toHaveLength(2);
+  });
+
+  it("goes past the overtime threshold to reach the usual days, and names it", () => {
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben"],
+      draft: withSaturdays,
+    });
+    const overtime: CoverageOvertimeRule = {
+      thresholdHours: 8,
+      weekHours: (employeeId, dateKey, planned) =>
+        8 * daysWorked(world, employeeId, dateKey, planned),
+    };
+    const preview = previewCoverageBuild(world, {
+      topUp: topUp(world, 2, ["ben"]),
+      overtime,
+    });
+
+    expect(daysOf(preview.fixes, "ben")).toHaveLength(3);
+    expect(preview.overThreshold.map((entry) => entry.dateKey)).toEqual([
+      "2026-10-26",
+      "2026-11-02",
+    ]);
   });
 });
 

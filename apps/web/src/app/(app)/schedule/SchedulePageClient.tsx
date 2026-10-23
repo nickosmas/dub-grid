@@ -109,6 +109,7 @@ import {
   type CoverageBuildProgress,
   type CoverageShiftPreference,
   type CoverageSkippedRecurring,
+  type CoverageTopUpRule,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
@@ -125,6 +126,8 @@ import {
   availabilityFromShifts,
   availabilityWithPlanned,
   daysPastUsualLimit,
+  usualDaysInAWeek,
+  weekDaysWithPlanned,
   fairnessStandingWithPlanned,
   planDaysOff,
   limitRecurringRuns,
@@ -6925,9 +6928,11 @@ function SchedulerContent({
       skippedRecurring?: CoverageSkippedRecurring[];
       /** 6 days in a week and in a row are allowed, never 7. */
       allowSixthDay?: boolean;
+      /** A build: bring these people up to their usual days a week. */
+      topUp?: Pick<CoverageTopUpRule, "employeeIds" | "target">;
     }) => {
       if (!coverageSuggestions) return null;
-      const { history, allowSixthDay, ...planned } = options;
+      const { history, allowSixthDay, topUp, ...planned } = options;
       // Planning never adds a second shift on a day already worked; only a scheduler does.
       const adapterInput = {
         ...coverageSuggestions.adapterInput,
@@ -6955,6 +6960,7 @@ function SchedulerContent({
               history,
             ),
           },
+          topUp: topUp && { ...topUp, weekDays: weekDaysWithPlanned(adapterInput) },
         },
       };
     },
@@ -7103,6 +7109,17 @@ function SchedulerContent({
         history,
         skippedRecurring: limited.skipped,
         allowSixthDay,
+        // Then everyone short of their usual days a week gets more, even where staffed.
+        topUp: {
+          employeeIds: scopedEmployeeIds.filter(
+            (id) => employees.find((employee) => employee.id === id)?.status === "active",
+          ),
+          target: (employeeId) =>
+            usualDaysInAWeek(recurring, employeeId, {
+              start: dateKeys[0],
+              end: dateKeys[dateKeys.length - 1],
+            }),
+        },
       });
       if (!planned) return null;
       const preview = await previewCoverageBuildAsync(planned.engine, planned.options, {

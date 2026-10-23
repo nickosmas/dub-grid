@@ -16,6 +16,7 @@ import {
   type CoverageSuggestionDay,
   type CoverageSuggestionInput,
   type CoverageSuggestionTextLookups,
+  type CoverageTopUpRule,
 } from "@dubgrid/schedule-core";
 import type { Employee } from "@dubgrid/domain";
 import type {
@@ -24,6 +25,7 @@ import type {
   NamedItem,
   ShiftCategory,
   ScheduleCellInput,
+  RecurringShift,
   ShiftMap,
   ShiftRequest,
 } from "@/types";
@@ -496,6 +498,48 @@ export function weekHoursWithPlanned(input: DraftHoursInput): CoverageOvertimeRu
     const week = Array.from({ length: 7 }, (_, offset) => formatDateKey(addDays(sunday, offset)));
     return roundHours(daysOf(employeeId, week, planned).reduce((sum, day) => sum + day.hours, 0));
   };
+}
+
+/** Days a person works in the Sunday-to-Saturday week holding a date, with the planned days written. */
+export function weekDaysWithPlanned(
+  input: Pick<CoverageSuggestionAdapterInput, "shifts">,
+): CoverageTopUpRule["weekDays"] {
+  return (employeeId, dateKey, planned) => {
+    const worked = workedWith(input.shifts, planned, employeeId);
+    const date = parseLocalDateKey(dateKey);
+    const sunday = addDays(date, -date.getDay());
+    return Array.from({ length: 7 }, (_, offset) => formatDateKey(addDays(sunday, offset))).filter(
+      worked,
+    ).length;
+  };
+}
+
+/**
+ * The days a week a person usually works: the weekdays their recurring
+ * schedule works when they have one in the period (so a schedule with more
+ * days off keeps them), otherwise five.
+ */
+export function usualDaysInAWeek(
+  recurringShifts: ReadonlyArray<RecurringShift>,
+  employeeId: string,
+  period: { start: string; end: string },
+): number {
+  const current = recurringShifts.filter(
+    (shift) =>
+      shift.empId === employeeId &&
+      !shift.archivedAt &&
+      shift.effectiveFrom <= period.end &&
+      (shift.effectiveUntil == null || shift.effectiveUntil >= period.start),
+  );
+  if (current.length === 0) return MAX_DAYS_IN_A_WEEK;
+  // Each weekday by its latest schedule, as recurring fills choose.
+  const latest = new Map<number, RecurringShift>();
+  for (const shift of current) {
+    const other = latest.get(shift.dayOfWeek);
+    if (!other || shift.effectiveFrom > other.effectiveFrom) latest.set(shift.dayOfWeek, shift);
+  }
+  const worked = [...latest.values()].filter((shift) => shift.input.kind === "worked").length;
+  return Math.min(worked, MAX_DAYS_IN_A_WEEK);
 }
 
 function isWeekendDateKey(dateKey: string): boolean {
