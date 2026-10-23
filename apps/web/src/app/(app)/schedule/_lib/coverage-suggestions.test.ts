@@ -17,6 +17,7 @@ import {
   fairnessStandingWithPlanned,
   isNightAssignment,
   limitRecurringRuns,
+  planDaysOff,
   publishedDayFromShifts,
   weekHoursWithPlanned,
 } from "./coverage-suggestions";
@@ -594,5 +595,52 @@ describe("days off in pairs", () => {
       "ana_2026-10-27": worked([DAY]),
     });
     expect(standing("ana", "2026-10-27", EVENING, []).splitsDaysOff).toBe(false);
+  });
+});
+
+describe("planDaysOff", () => {
+  const DAYS = ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"];
+  const OFF = 133;
+  const plannedShift = (employeeId: string, dateKey: string): CoverageDayOverride => ({
+    employeeId,
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds: [DAY],
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+
+  it("marks each empty day of everyone who works in the period", () => {
+    const writes = planDaysOff({
+      shifts: { "ana_2026-10-25": worked([DAY]), "ana_2026-10-27": absent(4) },
+      planned: [plannedShift("ben", "2026-10-26")],
+      employeeIds: ["ana", "ben", "cat"],
+      dateKeys: DAYS,
+      absenceTypeId: OFF,
+    });
+
+    expect(writes.map((write) => `${write.employeeId} ${write.dateKey}`)).toEqual([
+      "ana 2026-10-26",
+      "ana 2026-10-28",
+      "ben 2026-10-25",
+      "ben 2026-10-27",
+      "ben 2026-10-28",
+    ]);
+    expect(writes[0].input).toMatchObject({ kind: "absence", absenceTypeId: OFF, segments: [] });
+  });
+
+  it("leaves people who work no day in the period alone", () => {
+    expect(
+      planDaysOff({
+        shifts: { "cat_2026-10-25": absent(4) },
+        planned: [],
+        employeeIds: ["cat"],
+        dateKeys: DAYS,
+        absenceTypeId: OFF,
+      }),
+    ).toEqual([]);
   });
 });

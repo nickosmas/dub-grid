@@ -97,6 +97,7 @@ import {
   describeCoverageRuledOutReason,
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
+  resolveDayOffAbsenceType,
   WEEKLY_OVERTIME_HOURS,
   planCoverageFixes,
   previewCoverageBuildAsync,
@@ -118,6 +119,7 @@ import {
 import {
   availabilityWithPlanned,
   fairnessStandingWithPlanned,
+  planDaysOff,
   limitRecurringRuns,
   weekHoursWithPlanned,
   buildCoverageSuggestionInput,
@@ -6923,6 +6925,11 @@ function SchedulerContent({
       );
       const allAreas = coverageMatrix.rows.every((row) => rowKeys.includes(row.rowKey));
       const dateKeys = coverageMatrix.dateKeys;
+      const scopedEmployeeIds = employees
+        .filter(
+          (employee) => allAreas || employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
+        )
+        .map((employee) => employee.id);
       const fills = planRecurringFills({
         recurringShifts: recurring,
         shifts: shiftsRef.current,
@@ -6931,15 +6938,7 @@ function SchedulerContent({
         activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
         activeJobIds: new Set(jobs.map((job) => job.id)),
         activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
-        employeeIds: allAreas
-          ? undefined
-          : new Set(
-              employees
-                .filter((employee) =>
-                  employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
-                )
-                .map((employee) => employee.id),
-            ),
+        employeeIds: allAreas ? undefined : new Set(scopedEmployeeIds),
       });
       const fixedWrites: SuggestionWrite[] = [];
       const baseOverrides: CoverageDayOverride[] = [];
@@ -6977,7 +6976,32 @@ function SchedulerContent({
         pause: createTimeSlicer(BUILD_SLICE_MS),
         onProgress,
       });
-      return { preview, fixedWrites };
+      // Then everyone who works in the period gets the day off absence on each empty day.
+      const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
+      if (!dayOff) return { preview, fixedWrites };
+      const todayKey = formatDateKey(new Date());
+      const daysOff = planDaysOff({
+        shifts: shiftsRef.current,
+        planned: [...baseOverrides, ...preview.fixes.flatMap((fix) => fix.overrides)],
+        employeeIds: scopedEmployeeIds.filter(
+          (id) => employees.find((employee) => employee.id === id)?.status === "active",
+        ),
+        dateKeys: dateKeys.filter((dateKey) => dateKey >= todayKey),
+        absenceTypeId: dayOff.absenceType.id,
+      });
+      const people = new Set([
+        ...baseOverrides.map((day) => day.employeeId),
+        ...preview.fixes.flatMap((fix) => (fix.employeeId ? [fix.employeeId] : [])),
+        ...daysOff.map((day) => day.employeeId),
+      ]);
+      return {
+        preview: {
+          ...preview,
+          people: people.size,
+          daysOff: daysOff.map(({ employeeId, dateKey }) => ({ employeeId, dateKey })),
+        },
+        fixedWrites: [...fixedWrites, ...daysOff],
+      };
     },
     [
       absenceTypes,
@@ -7000,8 +7024,10 @@ function SchedulerContent({
       formatDate: text.formatDate,
       reason: (entry: CoverageRuledOut) => describeCoverageRuledOutReason(entry, text),
       rowLabel: (rowKey: string) => text.rowLabel(rowKey) ?? "A requirement",
+      dayOffName:
+        resolveDayOffAbsenceType(org?.coverageRuleConfig, absenceTypes)?.absenceType.name ?? null,
     };
-  }, [coverageSuggestions]);
+  }, [absenceTypes, coverageSuggestions, org?.coverageRuleConfig]);
 
   const previewBuild = useCallback(
     (rowKeys: string[]) => {
@@ -7060,7 +7086,7 @@ function SchedulerContent({
     const signature = (preview: CoverageBuildPreview) =>
       `${preview.recurring.shifts}/${preview.recurring.absences}|${preview.fixes
         .map((fix) => fix.id)
-        .join()}`;
+        .join()}|${preview.daysOff.length}`;
     if (signature(built.preview) !== signature(shown)) {
       setBuildApplying(null);
       setBusySuggestionId(null);

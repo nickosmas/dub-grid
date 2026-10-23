@@ -1030,6 +1030,8 @@ export interface CoverageBuildPreview {
   shortCells: { rowKey: string; dateKey: string; staffShort: number }[];
   /** Recurring fills left out for the days-in-a-row limit. */
   recurringSkipped: CoverageSkippedRecurring[];
+  /** Empty days the build marks with the day off absence; added by the caller. */
+  daysOff: { employeeId: string; dateKey: string }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1137,6 +1139,7 @@ function summarizeBuild(
     overThreshold,
     choices,
     recurringSkipped: [...(options.skippedRecurring ?? [])],
+    daysOff: [],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

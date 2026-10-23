@@ -377,12 +377,46 @@ describe("settings dirty save controls", () => {
       fontSize: "var(--dg-type-field-title-size)",
       fontWeight: "400",
     });
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     for (const row of Array.from(rows).slice(1)) {
       expect(row.getAttribute("style")).toContain(
         "border-top: 1px solid var(--dg-color-border-light)",
       );
     }
+  });
+
+  it("pre-selects a day off absence detected by name and asks to save it", () => {
+    render(
+      <ScheduleRules
+        organization={baseOrganization}
+        absenceTypes={[
+          {
+            id: 7,
+            orgId: "org-1",
+            label: "PTO",
+            name: "Paid Time Off",
+            color: "",
+            border: "",
+            text: "",
+            sortOrder: 0,
+          },
+          {
+            id: 8,
+            orgId: "org-1",
+            label: "X",
+            name: "Off",
+            color: "",
+            border: "",
+            text: "",
+            sortOrder: 1,
+          },
+        ]}
+        onOrganizationSave={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Picked from its name; save to confirm it\./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
   it("schedule rules save a biweekly pay-period anchor date", async () => {

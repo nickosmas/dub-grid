@@ -276,7 +276,7 @@ Item 49 is split:
 - **49a - Loading that never freezes:** shipped; planning yields with a percentage bar, and Apply counts every save before the report.
 - **49b - Auto-build naming:** shipped; Auto-build with a plain description, Generate schedule, Apply and Discard, and a calendar toolbar button with no count.
 - **49c - Five days in a row, days off in pairs:** shipped; no sixth day in a row from a build, a suggestion or a recurring fill, counted across periods, and days off kept in pairs unless nobody can.
-- **49d - Day off absence:** planned.
+- **49d - Day off absence:** shipped; Schedule Rules names the day off absence (pre-detected by name), and a build writes it into each scheduled person's empty days.
 - **49e - Shift preferences:** planned (migration 089).
 - **49f - Allow a sixth day:** planned.
 

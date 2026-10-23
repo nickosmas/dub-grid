@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
+import { normalizeCoverageRuleConfig } from "@dubgrid/schedule-core";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
@@ -56,6 +57,7 @@ const bodySchema = z.object({
   coverageRuleConfig: z
     .object({
       mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
+      dayOffAbsenceTypeId: z.number().int().positive().nullable().optional(),
     })
     .optional(),
   openShiftVisibility: z
@@ -263,6 +265,22 @@ export async function PUT(req: NextRequest) {
       return buildConflictResponse(currentOrg);
     }
 
+    // The day off absence must be one of this organization's own, still in use.
+    const dayOffAbsenceTypeId = fields.coverageRuleConfig?.dayOffAbsenceTypeId;
+    if (dayOffAbsenceTypeId != null) {
+      const { data: dayOffType, error: dayOffError } = await serviceClient
+        .from("absence_types")
+        .select("id")
+        .eq("id", dayOffAbsenceTypeId)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (dayOffError) throw dayOffError;
+      if (!dayOffType) {
+        return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
+      }
+    }
+
     const nextAddress = {
       addressLine1: fields.addressLine1 ?? currentOrg.addressLine1 ?? "",
       addressLine2: fields.addressLine2 ?? currentOrg.addressLine2 ?? "",
@@ -356,7 +374,12 @@ export async function PUT(req: NextRequest) {
       enforceConflictPrevention:
         fields.enforceConflictPrevention ?? currentOrg.enforceConflictPrevention,
       defaultShiftEnabled: fields.defaultShiftEnabled ?? currentOrg.defaultShiftEnabled,
-      coverageRuleConfig: fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
+      coverageRuleConfig: fields.coverageRuleConfig
+        ? normalizeCoverageRuleConfig({
+            ...currentOrg.coverageRuleConfig,
+            ...fields.coverageRuleConfig,
+          })
+        : currentOrg.coverageRuleConfig,
       openShiftVisibility: fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
       dataRetentionDays: fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
       featureOverrides: fields.featureOverrides ?? currentOrg.featureOverrides,

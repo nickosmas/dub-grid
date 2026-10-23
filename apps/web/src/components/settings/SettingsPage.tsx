@@ -360,7 +360,11 @@ export default function SettingsPage({
       {/* ── Scheduling group ─────────────────────────────────── */}
 
       {activeSection === "schedule-rules" && isSuperAdmin && (
-        <ScheduleRules organization={organization} onOrganizationSave={onOrganizationSave} />
+        <ScheduleRules
+          organization={organization}
+          absenceTypes={absenceTypes}
+          onOrganizationSave={onOrganizationSave}
+        />
       )}
 
       {activeSection === "schedule-shifts" &&

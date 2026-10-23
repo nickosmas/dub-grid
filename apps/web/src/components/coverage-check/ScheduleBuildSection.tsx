@@ -42,6 +42,8 @@ export interface SkippedWords {
   reason: (entry: CoverageRuledOut) => string;
   /** A requirement row's name, such as "Day Shift · Supervisor". */
   rowLabel: (rowKey: string) => string;
+  /** The day off absence's name, or null when the organization has none. */
+  dayOffName?: string | null;
 }
 
 interface SkippedPerson {
@@ -180,9 +182,17 @@ export function buildReportPeople(
   preview: CoverageBuildPreview,
   words: Pick<SkippedWords, "personName">,
 ): { key: string; name: string; detail: string }[] {
-  const people = new Map<string, { shifts: number; absences: number; why: Set<string> }>();
+  const people = new Map<
+    string,
+    { shifts: number; absences: number; daysOff: number; why: Set<string> }
+  >();
   const personOf = (employeeId: string) => {
-    const person = people.get(employeeId) ?? { shifts: 0, absences: 0, why: new Set<string>() };
+    const person = people.get(employeeId) ?? {
+      shifts: 0,
+      absences: 0,
+      daysOff: 0,
+      why: new Set<string>(),
+    };
     people.set(employeeId, person);
     return person;
   };
@@ -192,6 +202,7 @@ export function buildReportPeople(
     person.absences += recurring.absences;
     person.why.add("Recurring schedule");
   }
+  for (const dayOff of preview.daysOff) personOf(dayOff.employeeId).daysOff += 1;
   const choiceOf = new Map(preview.choices.map((choice) => [choice.suggestionId, choice]));
   for (const fix of preview.fixes) {
     if (!fix.employeeId) continue;
@@ -215,6 +226,7 @@ export function buildReportPeople(
       detail: [
         person.shifts > 0 ? pluralize(person.shifts, "shift", "shifts") : null,
         person.absences > 0 ? pluralize(person.absences, "absence", "absences") : null,
+        person.daysOff > 0 ? pluralize(person.daysOff, "day off", "days off") : null,
         [...person.why].sort((a, b) => WHY_ORDER.indexOf(a) - WHY_ORDER.indexOf(b)).join(", "),
       ]
         .filter(Boolean)
@@ -357,7 +369,12 @@ export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are fre
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {
-  return preview.recurring.shifts + preview.recurring.absences + preview.fixes.length;
+  return (
+    preview.recurring.shifts +
+    preview.recurring.absences +
+    preview.fixes.length +
+    preview.daysOff.length
+  );
 }
 
 /** "4 recurring shifts · 11 new shifts · 1 restored", or null when there is only one kind. */
@@ -370,6 +387,7 @@ export function buildBreakdown(preview: CoverageBuildPreview): string | null {
     assign > 0 ? pluralize(assign, "new shift", "new shifts") : null,
     restore > 0 ? `${formatCoverageNumber(restore)} restored` : null,
     moveBack > 0 ? `${formatCoverageNumber(moveBack)} moved back` : null,
+    preview.daysOff.length > 0 ? pluralize(preview.daysOff.length, "day off", "days off") : null,
   ].filter((part): part is string => part != null);
   return parts.length > 1 ? parts.join(" · ") : null;
 }
@@ -425,6 +443,12 @@ function PreviewSummary({
         </div>
       )}
       {skippedWords && <RecurringSkipped entries={preview.recurringSkipped} words={skippedWords} />}
+      {skippedWords?.dayOffName === null && (
+        <p className="dg-cc-detail-line dg-cc-detail-line--muted">
+          No day off absence is set, so empty days stay empty. Choose one in Settings &gt; Schedule
+          Rules.
+        </p>
+      )}
       {preview.shortAfter > 0 && (!skippedWords || preview.skipped.length === 0) && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
           Nobody qualified is free for the shifts left short. Select one to see why.

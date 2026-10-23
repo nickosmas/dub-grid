@@ -1017,7 +1017,7 @@
         row from a build or a suggestion, counted across periods; a recurring
         fill that would make one is skipped and reported; days off stay in
         pairs unless nobody can fill a shift without splitting them.
-  - [ ] 49d. **Day off absence** - Schedule Rules names the absence that
+  - [x] 49d. **Day off absence** - Schedule Rules names the absence that
         means a day off (pre-detected by name); a build writes it into each
         scheduled person's remaining empty days, in pairs where it can.
   - [ ] 49e. **Shift preferences** - per person, Prefers or Only a set of

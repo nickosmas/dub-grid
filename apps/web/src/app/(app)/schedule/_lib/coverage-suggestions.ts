@@ -466,6 +466,47 @@ export function fairnessStandingWithPlanned(
   };
 }
 
+/**
+ * The day off absence for each empty day of everyone who works in the period
+ * once the build's days are written. Only days not yet past, never a cell
+ * that holds anything or that the build writes.
+ */
+export function planDaysOff(input: {
+  shifts: ShiftMap;
+  planned: ReadonlyArray<CoverageDayOverride>;
+  employeeIds: ReadonlyArray<string>;
+  dateKeys: ReadonlyArray<string>;
+  absenceTypeId: number;
+}): { employeeId: string; dateKey: string; input: ScheduleCellInput }[] {
+  const writes: { employeeId: string; dateKey: string; input: ScheduleCellInput }[] = [];
+  for (const employeeId of input.employeeIds) {
+    const planned = input.planned.filter(
+      (day) => day.side === "draft" && day.employeeId === employeeId,
+    );
+    const worked = workedWith(input.shifts, planned, employeeId);
+    if (!input.dateKeys.some(worked)) continue;
+    const plannedKeys = new Set(planned.map((day) => day.dateKey));
+    for (const dateKey of input.dateKeys) {
+      const entry = input.shifts[`${employeeId}_${dateKey}`];
+      if (plannedKeys.has(dateKey) || (entry != null && !entry.isDelete)) continue;
+      writes.push({
+        employeeId,
+        dateKey,
+        input: {
+          kind: "absence",
+          segments: [],
+          absenceTypeId: input.absenceTypeId,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+      });
+    }
+  }
+  return writes;
+}
+
 /** The engine's input and its words, from the schedule page's own data. */
 export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInput): {
   engine: CoverageSuggestionInput;

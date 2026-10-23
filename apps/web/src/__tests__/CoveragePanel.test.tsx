@@ -673,6 +673,7 @@ describe("CoveragePanel", () => {
       recurringPeople: [],
       shortCells: [],
       recurringSkipped: [],
+      daysOff: [],
       ...overrides,
     });
     const skippedWords = {
@@ -696,13 +697,17 @@ describe("CoveragePanel", () => {
         requestId: null,
         reason: kind === "absence" ? { kind, absenceTypeId: 7 } : { kind, dateKey },
       }) as CoverageRuledOut;
-    const withBuild = (state: ScheduleBuildState, overrides = {}) => {
+    const withBuild = (
+      state: ScheduleBuildState,
+      overrides = {},
+      words: Partial<typeof skippedWords> & { dayOffName?: string | null } = {},
+    ) => {
       const build = {
         state,
         onPreview: vi.fn(),
         onBuild: vi.fn(),
         onCancel: vi.fn(),
-        skippedWords,
+        skippedWords: { ...skippedWords, ...words },
       };
       renderPanel({
         suggestions: { items: [], notSuggestedByCell: new Map() },
@@ -957,6 +962,25 @@ describe("CoveragePanel", () => {
         ).toBeInTheDocument();
       });
 
+      it("counts days off in the headline and for each person", () => {
+        built({
+          daysOff: [
+            { employeeId: "ana", dateKey: "2026-10-26" },
+            { employeeId: "ana", dateKey: "2026-10-28" },
+            { employeeId: "cat", dateKey: "2026-10-26" },
+          ],
+          people: 3,
+        });
+        expect(section().getByText("Applied 8 changes for 3 people")).toBeInTheDocument();
+        const rows = within(
+          section().getByRole("list", { name: "What each person was given" }),
+        ).getAllByRole("listitem");
+        expect(rows.map((row) => row.textContent)).toContain(
+          "Ana Crawford 2 shifts · 2 days off · Fewest hours, Only one free",
+        );
+        expect(rows.map((row) => row.textContent)).toContain("cat 1 day off");
+      });
+
       it("links each shift still short to its cell", () => {
         built({ shortCells: [{ rowKey: "1:5:1", dateKey: "2026-10-27", staffShort: 1 }] });
         expect(section().getByText("Still short: 1 shift")).toBeInTheDocument();
@@ -986,6 +1010,24 @@ describe("CoveragePanel", () => {
         fireEvent.click(section().getByRole("button", { name: "Done" }));
         expect(build.onCancel).toHaveBeenCalled();
       });
+    });
+
+    it("says when no day off absence is set, and lists days off in the breakdown", () => {
+      withBuild(
+        {
+          status: "ready",
+          preview: preview({
+            fixes: [{ id: "x" }] as CoverageSuggestion[],
+            counts: { assign: 1, restore: 0, moveBack: 0 },
+            daysOff: [{ employeeId: "ana", dateKey: "2026-10-26" }],
+            people: 1,
+          }),
+        },
+        {},
+        { dayOffName: null },
+      );
+      expect(section().getByText("1 new shift · 1 day off")).toBeInTheDocument();
+      expect(section().getByText(/No day off absence is set/)).toBeInTheDocument();
     });
 
     it("lists nobody when nobody was skipped", () => {

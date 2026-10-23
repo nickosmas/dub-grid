@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Organization } from "@/types";
+import { AbsenceType, Organization } from "@/types";
+import { resolveDayOffAbsenceType } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { DEFAULT_OPEN_SHIFT_VISIBILITY, type OpenShiftVisibilityMode } from "@dubgrid/domain";
 import { toast } from "sonner";
@@ -35,15 +36,25 @@ const ruleRowStyle: React.CSSProperties = {
   borderTop: "1px solid var(--dg-color-border-light)",
 };
 
+type DayOffChoice = number | "none";
+
 export default function ScheduleRules({
   organization,
+  absenceTypes = [],
   onOrganizationSave,
 }: {
   organization: Organization;
+  absenceTypes?: AbsenceType[];
   onOrganizationSave: (o: Organization) => void;
 }) {
   const organizationMentoredCredit =
     organization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100;
+  const savedDayOff = organization.coverageRuleConfig?.dayOffAbsenceTypeId;
+  const resolvedDayOff = resolveDayOffAbsenceType(organization.coverageRuleConfig, absenceTypes);
+  const organizationDayOff: DayOffChoice = resolvedDayOff?.absenceType.id ?? "none";
+  // A detected absence has not been saved yet, so saving it is a change.
+  const dayOffDetected = resolvedDayOff?.detected === true && savedDayOff === undefined;
+  const [dayOffChoice, setDayOffChoice] = useState<DayOffChoice>(organizationDayOff);
   const [enforceConflictPrevention, setEnforceConflictPrevention] = useState(
     organization.enforceConflictPrevention,
   );
@@ -70,11 +81,13 @@ export default function ScheduleRules({
     setEnforceConflictPrevention(organization.enforceConflictPrevention);
     setPayPeriodStartDate(organization.payPeriodStartDate ?? "");
     setMentoredCoverageCreditPercent(organizationMentoredCredit);
+    setDayOffChoice(organizationDayOff);
     setCoverageGapVisibility(organizationCoverageGapVisibility);
     setCalloffVisibility(organizationCalloffVisibility);
   }, [
     organization.coverageRuleConfig,
     organizationMentoredCredit,
+    organizationDayOff,
     organization.enforceConflictPrevention,
     organization.payPeriodStartDate,
     organizationCoverageGapVisibility,
@@ -86,6 +99,8 @@ export default function ScheduleRules({
     enforceConflictPrevention !== organization.enforceConflictPrevention ||
     payPeriodStartDate !== (organization.payPeriodStartDate ?? "") ||
     mentoredCoverageCreditPercent !== organizationMentoredCredit ||
+    dayOffChoice !== organizationDayOff ||
+    dayOffDetected ||
     coverageGapVisibility !== organizationCoverageGapVisibility ||
     calloffVisibility !== organizationCalloffVisibility;
 
@@ -107,6 +122,7 @@ export default function ScheduleRules({
           coverageRuleConfig: {
             ...(organization.coverageRuleConfig ?? {}),
             mentoredCoverageCreditPercent,
+            dayOffAbsenceTypeId: dayOffChoice === "none" ? null : dayOffChoice,
           },
           openShiftVisibility: {
             coverageGap: coverageGapVisibility,
@@ -120,6 +136,10 @@ export default function ScheduleRules({
         setPayPeriodStartDate(result.organization.payPeriodStartDate ?? "");
         setMentoredCoverageCreditPercent(
           result.organization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100,
+        );
+        setDayOffChoice(
+          resolveDayOffAbsenceType(result.organization.coverageRuleConfig, absenceTypes)
+            ?.absenceType.id ?? "none",
         );
         setCoverageGapVisibility(
           result.organization.openShiftVisibility?.coverageGap ??
@@ -141,6 +161,7 @@ export default function ScheduleRules({
   }, [
     calloffVisibility,
     coverageGapVisibility,
+    dayOffChoice,
     enforceConflictPrevention,
     mentoredCoverageCreditPercent,
     onOrganizationSave,
@@ -226,6 +247,33 @@ export default function ScheduleRules({
               { value: 100, label: "Counts fully" },
               { value: 50, label: "Counts as half" },
               { value: 0, label: "Does not count" },
+            ]}
+          />
+        </div>
+
+        <div data-schedule-rule-row style={ruleRowStyle}>
+          <div>
+            <label htmlFor="day-off-absence" style={ruleTitleStyle}>
+              Day off absence
+            </label>
+            <div style={ruleDescriptionStyle}>
+              The absence that means a regular day off. Auto-build writes it into the empty days of
+              everyone it schedules.
+              {dayOffDetected && " Picked from its name; save to confirm it."}
+            </div>
+          </div>
+          <CustomSelect
+            id="day-off-absence"
+            value={dayOffChoice}
+            onChange={setDayOffChoice}
+            options={[
+              ...absenceTypes
+                .filter((type) => !type.archivedAt)
+                .map((type) => ({
+                  value: type.id as DayOffChoice,
+                  label: `${type.name} (${type.label})`,
+                })),
+              { value: "none" as DayOffChoice, label: "None" },
             ]}
           />
         </div>

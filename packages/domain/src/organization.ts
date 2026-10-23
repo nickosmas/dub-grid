@@ -4,6 +4,12 @@ export type WorkspaceKind = "real" | "sandbox";
 
 export interface CoverageRuleConfig {
   mentoredCoverageCreditPercent: number;
+  /**
+   * The absence that means a regular day off, which Auto-build writes into
+   * empty days. Null when the organization chose none; left out when no
+   * choice has been saved, so the name is detected instead.
+   */
+  dayOffAbsenceTypeId?: number | null;
 }
 
 /**
