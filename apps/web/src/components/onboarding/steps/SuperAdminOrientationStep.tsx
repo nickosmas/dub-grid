@@ -23,7 +23,7 @@ const sections = [
   {
     icon: <ScheduleIcon size={22} />,
     name: "Schedule",
-    desc: "Build, publish, and manage schedules with conflict prevention and recurring templates.",
+    desc: "Build, publish, and manage schedules with conflict prevention and recurring schedules.",
   },
   {
     icon: <PeopleIcon size={22} />,

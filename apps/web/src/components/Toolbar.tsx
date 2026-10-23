@@ -389,9 +389,12 @@ function ToolsMenu({
           </>
         )}
 
-        {/* Auto Fill */}
+        {/* Fill from Recurring Schedules */}
         {canApplyRecurringSchedule && onApplyRecurring && (
-          <Hint content={hint("Apply all recurring shift templates to the schedule")} side="left">
+          <Hint
+            content={hint("Fill empty slots from each person's recurring schedule")}
+            side="left"
+          >
             <MenuItem
               data-tour="toolbar-autofill"
               disabled={scheduleTargetActionsDisabled || isApplyingRecurring}
@@ -419,7 +422,7 @@ function ToolsMenu({
                   </svg>
                 }
               >
-                Auto Fill
+                Fill from Recurring Schedules
               </ButtonLoading>
             </MenuItem>
           </Hint>
@@ -948,7 +951,7 @@ export default function Toolbar({
           {/* Coverage button */}
           {onCoverageToggle && (
             <Hint
-              content={hint("Check staffing against coverage requirements, day by day")}
+              content={hint("Build the draft and check staffing against coverage requirements")}
               side="bottom"
             >
               <Button
@@ -975,7 +978,7 @@ export default function Toolbar({
                 >
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
-                Coverage Check
+                Schedule Builder
                 <NumericBadge
                   count={coverageGapCount}
                   label={`${coverageGapCount} coverage ${coverageGapCount === 1 ? "gap" : "gaps"}`}

@@ -3,7 +3,11 @@ import {
   type CoverageComputationInput,
   type CoverageStatus,
 } from "./coverage";
-import type { CoverageMatrix, CoverageMatrixCell } from "./coverage-matrix";
+import {
+  buildCoverageMatrix,
+  type CoverageMatrix,
+  type CoverageMatrixCell,
+} from "./coverage-matrix";
 import { formatLocalDateKey, parseLocalDateKey } from "./dates";
 
 /** One person's day on one side. Satisfies 47b's `CoverageDaySide`. */
@@ -194,7 +198,9 @@ export type CoverageAvailability =
   | { kind: "absence"; absenceTypeId: number }
   | { kind: "restOfDayAbsence"; absenceTypeId: number }
   | { kind: "overlap"; dateKey: string; assignmentId: number }
-  | { kind: "unverified"; dateKey: string };
+  | { kind: "unverified"; dateKey: string }
+  /** A pickup, swap or call-off waits on this person that day. */
+  | { kind: "request"; dateKey: string };
 
 export interface CoveragePickupRequest {
   requestId: string;
@@ -509,6 +515,17 @@ function staffingSuggestions(
       if (draftHere.assignmentIds.some((id) => eligible.has(id))) continue;
       const assignmentId = tryOrder.find((id) => input.qualifiedFor(person.id, id));
       if (assignmentId == null) continue;
+      // A request waiting on them that day decides their day first.
+      if (input.hasRequest(person.id, cell.dateKey)) {
+        ruledOut.push({
+          rowKey,
+          dateKey: cell.dateKey,
+          employeeId: person.id,
+          requestId: null,
+          reason: { kind: "request", dateKey: cell.dateKey },
+        });
+        continue;
+      }
 
       const availability = input.availability(person.id, cell.dateKey, assignmentId);
       if (availability.kind !== "free") {
@@ -649,4 +666,410 @@ export function suggestCoverageFixes(input: CoverageSuggestionInput): CoverageSu
       (nameOf.get(left.employeeId) ?? "").localeCompare(nameOf.get(right.employeeId) ?? ""),
   );
   return { suggestions: [...fixes, ...patterns], ruledOut };
+}
+
+const DRAFT_KINDS: ReadonlySet<CoverageSuggestionKind> = new Set(["moveBack", "restore", "assign"]);
+
+/** The input again with some draft days changed, coverage counted afresh. */
+function withDraftOverrides(
+  input: CoverageSuggestionInput,
+  overrides: ReadonlyArray<CoverageDayOverride>,
+): CoverageSuggestionInput {
+  const changed = new Map(
+    overrides
+      .filter((override) => override.side === "draft")
+      .map((override) => [`${override.employeeId}|${override.dateKey}`, override.day]),
+  );
+  const draftDay = (employeeId: string, dateKey: string) =>
+    changed.get(`${employeeId}|${dateKey}`) ?? input.draftDay(employeeId, dateKey);
+  const started = new Set<string>();
+  const publishedDateKeys = new Set<string>();
+  for (const row of input.matrix.rows) {
+    for (const cell of row.cells) {
+      if (cell?.past) started.add(`${row.rowKey}|${cell.dateKey}`);
+      if (cell?.published) publishedDateKeys.add(cell.dateKey);
+    }
+  }
+  const dates = input.matrix.dateKeys.map(parseLocalDateKey);
+  const snapshots = (dayOf: typeof draftDay) =>
+    computeCoverageCategorySnapshots({
+      ...input.coverage,
+      dates,
+      assignmentIdsForKey: (employeeId, date) =>
+        dayOf(employeeId, formatLocalDateKey(date)).assignmentIds,
+      coverageCreditForKey: (employeeId, date, assignmentId) =>
+        dayOf(employeeId, formatLocalDateKey(date)).mentoredAssignmentIds.includes(assignmentId)
+          ? input.mentoredCredit
+          : 1,
+      includeContributors: true,
+    });
+  const matrix = buildCoverageMatrix({
+    draft: snapshots(draftDay),
+    published: snapshots(input.publishedDay),
+    dates,
+    publishedDateKeys,
+    isStarted: (snapshot) => started.has(`${snapshot.rowKey}|${formatLocalDateKey(snapshot.date)}`),
+  });
+  return { ...input, matrix, draftDay };
+}
+
+function dayNumber(dateKey: string): number {
+  return Math.round(parseLocalDateKey(dateKey).getTime() / 86_400_000);
+}
+
+/** The organization's weekly overtime threshold, with the caller's own hour counting. */
+export interface CoverageOvertimeRule {
+  thresholdHours: number;
+  /** The person's draft hours in the week holding the date, with the planned days written. */
+  weekHours: (
+    employeeId: string,
+    dateKey: string,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => number;
+}
+
+/** A fix the plan took although it puts the person over the threshold. */
+export interface CoverageOverThreshold {
+  employeeId: string;
+  dateKey: string;
+  suggestionId: string;
+  /** Their hours that week once the whole plan is written. */
+  hours: number;
+}
+
+/** A person's standing for one shift; lower is fairer to give them. */
+export interface CoverageFairnessStanding {
+  /** Weekend shifts recently and this period, or null when the shift is not on a weekend. */
+  weekends: number | null;
+  /** Night shifts recently and this period, or null when the shift is not a night. */
+  nights: number | null;
+  /** Hours this period. */
+  hours: number;
+}
+
+export interface CoverageFairnessRule {
+  standing: (
+    employeeId: string,
+    dateKey: string,
+    assignmentId: number,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => CoverageFairnessStanding;
+}
+
+/** Why the plan gave a shift to this person rather than another who could fill it. */
+export interface CoverageFairChoice {
+  suggestionId: string;
+  employeeId: string;
+  dateKey: string;
+  reason: "only" | "weekends" | "nights" | "hours" | "tie";
+  /** The chosen person's count for that reason (hours for a tie). */
+  count: number;
+  /** How many others could have filled it the same way. */
+  others: number;
+}
+
+export interface PlanCoverageFixesOptions {
+  /** Only fixes for this date. */
+  dateKey?: string;
+  /** Only fixes for these requirement rows, such as one focus area's. */
+  rowKeys?: ReadonlySet<string>;
+  /**
+   * Draft days fixed before any fix is planned, such as recurring schedule
+   * fills: counted as written, seen by availability, and never written twice.
+   */
+  baseOverrides?: ReadonlyArray<CoverageDayOverride>;
+  /**
+   * Availability once the planned days are written, from the caller's own
+   * shift times. Without it, a person a fix changed is not used again on that
+   * day or the days either side, since overnight work could overlap.
+   */
+  availabilityWith?: (
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => CoverageSuggestionInput["availability"];
+  /**
+   * Prefer fixes that keep everyone at or under the threshold; take one that
+   * goes over only when no other fix is left.
+   */
+  overtime?: CoverageOvertimeRule;
+  /**
+   * Between people who would fill the same shift the same way, give it to
+   * the one with the fewest weekends, nights or hours, and say why.
+   */
+  fairness?: CoverageFairnessRule;
+}
+
+const FAIRNESS_REASONS = ["weekends", "nights", "hours"] as const;
+
+function standingKey(standing: CoverageFairnessStanding): number[] {
+  return [standing.weekends ?? 0, standing.nights ?? 0, standing.hours];
+}
+
+/** Same shift, same cell, same effect: only who fills it differs. */
+function samePeer(left: CoverageSuggestion, right: CoverageSuggestion): boolean {
+  return (
+    left.kind === "assign" &&
+    right.kind === "assign" &&
+    left.subject.rowKey === right.subject.rowKey &&
+    left.subject.dateKey === right.subject.dateKey &&
+    left.subject.assignmentId === right.subject.assignmentId &&
+    left.closes === right.closes &&
+    Math.abs(left.filled - right.filled) < EPSILON
+  );
+}
+
+/**
+ * Every draft fix to apply together, chosen one at a time: after each, the
+ * schedule is counted again and suggestions are made afresh, so two fixes
+ * never fill the same spot and none undoes another. Approvals publish, so
+ * they are left out, and no two fixes write the same person's same day.
+ */
+export function planCoverageFixes(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions = {},
+): CoverageSuggestion[] {
+  return planWithLeftovers(input, options).fixes;
+}
+
+interface PlanWithLeftovers {
+  fixes: CoverageSuggestion[];
+  ruledOut: CoverageRuledOut[];
+  final: CoverageSuggestionInput;
+  overThreshold: CoverageOverThreshold[];
+  choices: CoverageFairChoice[];
+}
+
+/** The plan, plus who the last pass ruled out and the schedule it ended on. */
+function planWithLeftovers(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+): PlanWithLeftovers {
+  const plan: CoverageSuggestion[] = [];
+  const overtime = options.overtime;
+  const taken: Omit<CoverageOverThreshold, "hours">[] = [];
+  const choices: CoverageFairChoice[] = [];
+  // The fairest of the equal candidates for the first one's shift, and why.
+  const fairest = (candidates: CoverageSuggestion[]): CoverageSuggestion | undefined => {
+    const first = candidates[0];
+    const fairness = options.fairness;
+    if (!first || !fairness || first.kind !== "assign" || !first.employeeId) return first;
+    const ranked = candidates
+      .filter((candidate) => candidate.employeeId && samePeer(first, candidate))
+      .map((candidate, order) => ({
+        candidate,
+        order,
+        key: standingKey(
+          fairness.standing(
+            candidate.employeeId!,
+            candidate.subject.dateKey,
+            candidate.subject.assignmentId,
+            overrides,
+          ),
+        ),
+      }))
+      .sort((left, right) => {
+        const index = left.key.findIndex((value, position) => value !== right.key[position]);
+        return index >= 0 ? left.key[index] - right.key[index] : left.order - right.order;
+      });
+    const [best, runnerUp] = ranked;
+    const decided = runnerUp
+      ? best.key.findIndex((value, position) => value < runnerUp.key[position])
+      : -1;
+    choices.push({
+      suggestionId: best.candidate.id,
+      employeeId: best.candidate.employeeId!,
+      dateKey: best.candidate.subject.dateKey,
+      reason: !runnerUp ? "only" : decided >= 0 ? FAIRNESS_REASONS[decided] : "tie",
+      count: best.key[decided >= 0 ? decided : 2],
+      others: ranked.length - 1,
+    });
+    return best.candidate;
+  };
+  const overrides: CoverageDayOverride[] = [...(options.baseOverrides ?? [])];
+  const reach = options.availabilityWith ? 0 : 1;
+  const clashes = (override: CoverageDayOverride) =>
+    overrides.some(
+      (planned) =>
+        planned.employeeId === override.employeeId &&
+        Math.abs(dayNumber(planned.dateKey) - dayNumber(override.dateKey)) <= reach,
+    );
+  const withPlanned = (): CoverageSuggestionInput => {
+    const next = withDraftOverrides(input, overrides);
+    return options.availabilityWith
+      ? { ...next, availability: options.availabilityWith(overrides) }
+      : next;
+  };
+  let ruledOut: CoverageRuledOut[] = [];
+  // A fix goes over when it adds hours to a week that ends up past the threshold.
+  const goesOver = (suggestion: CoverageSuggestion) => {
+    if (!overtime) return [];
+    const planned = [...overrides, ...suggestion.overrides];
+    return suggestion.overrides.filter((override) => {
+      if (override.side !== "draft" || override.day.assignmentIds.length === 0) return false;
+      const after = overtime.weekHours(override.employeeId, override.dateKey, planned);
+      return (
+        after > overtime.thresholdHours + EPSILON &&
+        after > overtime.weekHours(override.employeeId, override.dateKey, overrides) + EPSILON
+      );
+    });
+  };
+  const finish = (final: CoverageSuggestionInput): PlanWithLeftovers => ({
+    fixes: plan,
+    ruledOut,
+    final,
+    overThreshold: overtime
+      ? taken.map((entry) => ({
+          ...entry,
+          hours: overtime.weekHours(entry.employeeId, entry.dateKey, overrides),
+        }))
+      : [],
+    choices,
+  });
+  let current = overrides.length > 0 ? withPlanned() : input;
+  // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
+  for (let step = 0; step < 500; step += 1) {
+    const pass = suggestCoverageFixes(current);
+    ruledOut = pass.ruledOut;
+    const eligible = pass.suggestions.filter(
+      (suggestion) =>
+        DRAFT_KINDS.has(suggestion.kind) &&
+        suggestion.targets.some(
+          (target) =>
+            (options.dateKey == null || target.dateKey === options.dateKey) &&
+            (options.rowKeys == null || options.rowKeys.has(target.rowKey)),
+        ) &&
+        !suggestion.overrides.some(clashes),
+    );
+    const within = eligible.filter((suggestion) => goesOver(suggestion).length === 0);
+    const next = fairest(within.length > 0 ? within : eligible);
+    if (!next) return finish(current);
+    for (const override of goesOver(next)) {
+      taken.push({
+        employeeId: override.employeeId,
+        dateKey: override.dateKey,
+        suggestionId: next.id,
+      });
+    }
+    plan.push(next);
+    overrides.push(...next.overrides);
+    current = withPlanned();
+  }
+  return finish(current);
+}
+
+/** What a build would do to the draft, counted exactly before anything changes. */
+export interface CoverageBuildPreview {
+  /** In the order they will be applied, after the base days. */
+  fixes: CoverageSuggestion[];
+  /** The base days (recurring schedule fills) that are shifts and absences. */
+  recurring: { shifts: number; absences: number };
+  counts: { assign: number; restore: number; moveBack: number };
+  /** Distinct people the build changes. */
+  people: number;
+  /** Short and over cells that have not started, before and after. */
+  shortBefore: number;
+  shortAfter: number;
+  overBefore: number;
+  overAfter: number;
+  /** People still needed across those cells, before and after (mentored credit counts). */
+  staffShortBefore: number;
+  staffShortAfter: number;
+  /** Why each qualified person was not scheduled into a shift the build leaves short. */
+  skipped: CoverageRuledOut[];
+  /** Fixes taken over the overtime threshold because no other fix was left. */
+  overThreshold: CoverageOverThreshold[];
+  /** Why each shift went to its person, when fairness chose between people. */
+  choices: CoverageFairChoice[];
+  /** Recurring schedule fills per person, in the order first filled. */
+  recurringPeople: { employeeId: string; shifts: number; absences: number }[];
+  /** Shifts still short after the build that have not started, by date then row. */
+  shortCells: { rowKey: string; dateKey: string; staffShort: number }[];
+}
+
+/** Short and over cells that have not started, within the given rows. */
+function countOpen(matrix: CoverageMatrix, rowKeys?: ReadonlySet<string>) {
+  let short = 0;
+  let over = 0;
+  let staffShort = 0;
+  for (const row of matrix.rows) {
+    if (rowKeys && !rowKeys.has(row.rowKey)) continue;
+    for (const cell of row.cells) {
+      if (!cell || cell.past) continue;
+      if (cell.kind === "short") {
+        short += 1;
+        staffShort += shortageOf(cell.draft);
+      }
+      if (cell.kind === "over") over += 1;
+    }
+  }
+  return { short, over, staffShort: Math.round(staffShort * 1e6) / 1e6 };
+}
+
+/** Plans a build with {@link planCoverageFixes} and counts its result. */
+export function previewCoverageBuild(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions = {},
+): CoverageBuildPreview {
+  const { fixes, ruledOut, final, overThreshold, choices } = planWithLeftovers(input, options);
+  const base = options.baseOverrides ?? [];
+  const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
+  const stillShort = new Set<string>();
+  const shortCells: CoverageBuildPreview["shortCells"] = [];
+  for (const row of final.matrix.rows) {
+    if (options.rowKeys && !options.rowKeys.has(row.rowKey)) continue;
+    for (const cell of row.cells) {
+      if (!cell || cell.past || cell.kind !== "short") continue;
+      if (options.dateKey != null && cell.dateKey !== options.dateKey) continue;
+      stillShort.add(`${row.rowKey}|${cell.dateKey}`);
+      shortCells.push({
+        rowKey: row.rowKey,
+        dateKey: cell.dateKey,
+        staffShort: Math.round(shortageOf(cell.draft) * 1e6) / 1e6,
+      });
+    }
+  }
+  const recurringByPerson = new Map<string, { shifts: number; absences: number }>();
+  for (const day of base) {
+    const counts = recurringByPerson.get(day.employeeId) ?? { shifts: 0, absences: 0 };
+    if (day.day.assignmentIds.length > 0) counts.shifts += 1;
+    else if (day.day.absenceTypeId != null) counts.absences += 1;
+    recurringByPerson.set(day.employeeId, counts);
+  }
+  const before = countOpen(input.matrix, options.rowKeys);
+  const result = countOpen(after.matrix, options.rowKeys);
+  const counts = { assign: 0, restore: 0, moveBack: 0 };
+  for (const fix of fixes) {
+    if (fix.kind === "assign" || fix.kind === "restore" || fix.kind === "moveBack") {
+      counts[fix.kind] += 1;
+    }
+  }
+  return {
+    fixes,
+    recurring: {
+      shifts: base.filter((day) => day.day.assignmentIds.length > 0).length,
+      absences: base.filter(
+        (day) => day.day.assignmentIds.length === 0 && day.day.absenceTypeId != null,
+      ).length,
+    },
+    counts,
+    people: new Set([...base.map((day) => day.employeeId), ...fixes.map((fix) => fix.employeeId)])
+      .size,
+    shortBefore: before.short,
+    shortAfter: result.short,
+    overBefore: before.over,
+    overAfter: result.over,
+    staffShortBefore: before.staffShort,
+    staffShortAfter: result.staffShort,
+    skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
+    overThreshold,
+    choices,
+    recurringPeople: [...recurringByPerson.entries()]
+      .filter(([, counts]) => counts.shifts + counts.absences > 0)
+      .map(([employeeId, counts]) => ({ employeeId, ...counts })),
+    shortCells: shortCells.sort(
+      (left, right) =>
+        left.dateKey.localeCompare(right.dateKey) ||
+        final.matrix.rows.findIndex((row) => row.rowKey === left.rowKey) -
+          final.matrix.rows.findIndex((row) => row.rowKey === right.rowKey),
+    ),
+  };
 }

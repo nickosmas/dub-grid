@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { CoverageCategorySnapshot } from "./coverage";
+import {
+  buildAssignmentDefinitionIdsByFocusArea,
+  computeCoverageCategorySnapshots,
+  type CoverageCategorySnapshot,
+} from "./coverage";
 import { buildCoverageMatrix, summarizeCoverageMatrixRows } from "./coverage-matrix";
+import { ASSIGNMENTS, SC, SN } from "./coverage-suggestions.fixture";
 
 const MON = new Date(2026, 9, 26);
 const TUE = new Date(2026, 9, 27);
@@ -171,6 +176,58 @@ describe("buildCoverageMatrix", () => {
 
     expect(matrix.rows.map((row) => row.rowKey)).toEqual(["2:1", "1:5:1"]);
     expect(matrix.totals.short).toBe(0);
+  });
+
+  it("keeps focus areas in the order it is given, as the schedule grid shows them", () => {
+    // Sheltered Care first, and its requirement only on Wednesday, so its row
+    // starts after Skilled Nursing's first cell and still comes first.
+    const focusAreas = [SC, SN];
+    const requirements = [
+      {
+        focusAreaId: 1,
+        jobId: 5,
+        preferredShiftId: 2,
+        assignmentId: null,
+        dayOfWeek: null,
+        minStaff: 1,
+      },
+      {
+        focusAreaId: 2,
+        jobId: 5,
+        preferredShiftId: 3,
+        assignmentId: null,
+        dayOfWeek: 3,
+        minStaff: 1,
+      },
+    ];
+    const snapshots = computeCoverageCategorySnapshots({
+      focusAreas,
+      shiftCategories: [
+        { id: 2, name: "Day Shift" },
+        { id: 3, name: "Evening Shift" },
+      ],
+      assignments: ASSIGNMENTS,
+      requirements,
+      employeesByFocusArea: new Map([
+        [1, []],
+        [2, []],
+      ]),
+      assignmentIdsByFocusArea: buildAssignmentDefinitionIdsByFocusArea(focusAreas, ASSIGNMENTS),
+      dates: [MON, TUE, WED],
+      assignmentIdsForKey: () => [],
+    });
+    const matrix = buildCoverageMatrix({
+      draft: snapshots,
+      published: snapshots,
+      dates: [MON, TUE, WED],
+      publishedDateKeys: allPublished,
+      isStarted: notStarted,
+    });
+
+    expect(matrix.rows.map((row) => row.focusAreaName)).toEqual([
+      "Sheltered Care",
+      "Skilled Nursing",
+    ]);
   });
 
   it("is empty for empty input", () => {

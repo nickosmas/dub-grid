@@ -35,6 +35,14 @@ export function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+/** "Sun, Oct 18 to Sat, Oct 31", or one date when the period is a day. */
+export function formatDateRange(dates: Date[]): string {
+  if (dates.length === 0) return "";
+  const first = formatShortDate(dates[0]);
+  const last = formatShortDate(dates[dates.length - 1]);
+  return first === last ? first : `${first} to ${last}`;
+}
+
 export function cellAccessibleName(args: {
   cell: CoverageMatrixCell;
   focusAreaName: string;

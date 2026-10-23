@@ -11,9 +11,14 @@ import {
   hasOpenRequest,
   pendingPickupsFromRequests,
   planSuggestionWrites,
+  planUndo,
+  fairnessStandingWithPlanned,
+  isNightAssignment,
   publishedDayFromShifts,
+  weekHoursWithPlanned,
 } from "./coverage-suggestions";
-import type { CoverageSuggestion } from "@dubgrid/schedule-core";
+import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
+import type { CoverageDayOverride, CoverageSuggestion } from "@dubgrid/schedule-core";
 
 const shiftCategories: ShiftCategory[] = [
   { id: 1, orgId: "org", name: "Day", startTime: "07:00", endTime: "15:00", sortOrder: 0 },
@@ -339,5 +344,139 @@ describe("planSuggestionWrites", () => {
       planSuggestionWrites(suggestion("assign", ["2026-10-26"]), {}, () => built)?.writes[0].input,
     ).toBe(built);
     expect(planSuggestionWrites(suggestion("assign", ["2026-10-26"]), {}, noAssign)).toBeNull();
+  });
+});
+
+describe("planUndo", () => {
+  const asInput = (entry: ScheduleCellStateEntry) => scheduleCellSnapshotToInput(entry.effective);
+  const write = (dateKey: string, entry: ScheduleCellStateEntry | null) => ({
+    employeeId: "ana",
+    dateKey,
+    input: entry ? asInput(entry) : null,
+  });
+  // The build wrote a Day shift on Monday and emptied Tuesday.
+  const applied = {
+    writes: [write("2026-10-26", worked([DAY])), write("2026-10-27", null)],
+    before: [write("2026-10-26", null), write("2026-10-27", worked([EVENING]))],
+  };
+
+  it("puts back every cell that still holds what was written", () => {
+    const shifts = { "ana_2026-10-26": worked([DAY]) };
+    expect(planUndo(applied, shifts)).toEqual({ restore: applied.before, kept: 0 });
+  });
+
+  it("keeps a cell someone changed since, and counts it", () => {
+    const shifts = {
+      "ana_2026-10-26": worked([DAY], { mentored: [true] }),
+      "ana_2026-10-27": { ...worked([NIGHT]) },
+    };
+    expect(planUndo(applied, shifts)).toEqual({ restore: [], kept: 2 });
+  });
+
+  it("treats a deleted cell as empty", () => {
+    const shifts = {
+      "ana_2026-10-26": worked([DAY]),
+      "ana_2026-10-27": { ...worked([EVENING]), isDelete: true },
+    };
+    expect(planUndo(applied, shifts).restore).toEqual(applied.before);
+  });
+});
+
+describe("weekHoursWithPlanned", () => {
+  const plannedDay = (dateKey: string, assignmentIds: number[]): CoverageDayOverride => ({
+    employeeId: "ana",
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds,
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+  const shorter = { ...worked([DAY]), customStartTime: "07:00", customEndTime: "11:00" };
+  const shifts = {
+    "ana_2026-10-25": worked([DAY]),
+    "ana_2026-10-26": shorter,
+    "ana_2026-10-27": absent(4),
+    "ana_2026-11-01": worked([DAY]),
+    "ben_2026-10-28": worked([DAY]),
+  };
+  const weekHours = weekHoursWithPlanned({ shifts, assignments, shiftCategories });
+
+  it("counts the person's own Sunday-to-Saturday week, with their custom times", () => {
+    // Sunday 8 and Monday's custom 4; the absence has no hours, next Sunday is another week.
+    expect(weekHours("ana", "2026-10-28", [])).toBe(12);
+    expect(weekHours("ana", "2026-10-31", [])).toBe(12);
+    expect(weekHours("ana", "2026-11-01", [])).toBe(8);
+  });
+
+  it("adds planned days and replaces the days they rewrite", () => {
+    const planned = [
+      plannedDay("2026-10-28", [NIGHT]),
+      plannedDay("2026-10-26", [EVENING]),
+      { ...plannedDay("2026-10-29", [DAY]), employeeId: "ben" },
+    ];
+    // Sunday 8, Monday now an Evening at its usual 8, Wednesday's Night 8.5.
+    expect(weekHours("ana", "2026-10-26", planned)).toBe(24.5);
+  });
+
+  it("keeps a day's custom times when a planned day leaves its shifts as they are", () => {
+    expect(weekHours("ana", "2026-10-26", [plannedDay("2026-10-26", [DAY])])).toBe(12);
+  });
+});
+
+describe("fairnessStandingWithPlanned", () => {
+  const PERIOD = ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-31"];
+  const shifts = {
+    "ana_2026-10-25": worked([DAY]),
+    "ana_2026-10-26": worked([NIGHT]),
+    "ana_2026-10-28": absent(4),
+  };
+  const history = {
+    "ana_2026-10-17": worked([DAY]),
+    "ana_2026-10-24": worked([NIGHT]),
+    "ana_2026-10-21": absent(4),
+    "ben_2026-10-24": worked([EVENING]),
+  };
+  const standing = fairnessStandingWithPlanned(
+    { shifts, assignments, shiftCategories },
+    PERIOD,
+    history,
+  );
+  const nightOn = (dateKey: string): CoverageDayOverride => ({
+    employeeId: "ana",
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds: [NIGHT],
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+
+  it("knows a night shift by its start", () => {
+    expect(isNightAssignment(assignments[2], shiftCategories)).toBe(true);
+    expect(isNightAssignment(assignments[1], shiftCategories)).toBe(false);
+    expect(isNightAssignment(undefined, shiftCategories)).toBe(false);
+  });
+
+  it("counts weekends over history and the period for a weekend shift", () => {
+    // History: two Saturdays; the period: Sunday. Hours: Sunday 8 and Monday's night 8.5.
+    expect(standing("ana", "2026-10-31", DAY, [])).toEqual({
+      weekends: 3,
+      nights: null,
+      hours: 16.5,
+    });
+    expect(standing("ben", "2026-10-31", DAY, [])).toEqual({ weekends: 1, nights: null, hours: 0 });
+  });
+
+  it("counts nights with the planned days written for a night shift", () => {
+    expect(standing("ana", "2026-10-27", NIGHT, [nightOn("2026-10-27")])).toEqual({
+      weekends: null,
+      nights: 3,
+      hours: 25,
+    });
   });
 });

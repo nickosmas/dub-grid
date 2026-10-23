@@ -757,7 +757,7 @@
     width: min(1200px, calc(100vw - 24px));
   }
 }
-/* Coverage Check matrix: one row per requirement, one column per day. */
+/* Schedule Builder matrix: one row per requirement, one column per day. */
 .dg-cc-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -1136,6 +1136,39 @@ button.dg-cc-sg-main {
   font-size: var(--dg-fs-footnote);
   font-weight: 600;
   color: var(--dg-color-success-text);
+}
+.dg-cc-show-all {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-brand);
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dg-cc-show-all:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
+.dg-cc-build-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--dg-fs-caption);
+}
+.dg-cc-build-counts div {
+  display: flex;
+  gap: 6px;
+}
+.dg-cc-build-counts dt {
+  color: var(--dg-color-text-muted);
+}
+.dg-cc-build-counts dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--dg-color-text-primary);
 }
 .dg-cc-sg-changes {
   display: flex;

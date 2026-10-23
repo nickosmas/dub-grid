@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   describeCoverageRuledOut,
+  describeCoverageRuledOutReason,
   describeCoverageSuggestion,
   type CoverageSuggestionTextLookups,
 } from "./coverage-suggestion-text";
@@ -301,5 +302,21 @@ describe("describeCoverageRuledOut", () => {
         LOOKUPS,
       ),
     ).toBe("Someone: Sick that day");
+  });
+});
+
+describe("describeCoverageRuledOutReason", () => {
+  it("gives the reason alone, including a waiting request", () => {
+    const entry: CoverageRuledOut = {
+      rowKey: ROW_MA,
+      dateKey: MON,
+      employeeId: "ana",
+      requestId: null,
+      reason: { kind: "request", dateKey: MON },
+    };
+    expect(describeCoverageRuledOutReason(entry, LOOKUPS)).toBe("has a request waiting that day");
+    expect(describeCoverageRuledOut(entry, LOOKUPS)).toBe(
+      "Ana Crawford: has a request waiting that day",
+    );
   });
 });

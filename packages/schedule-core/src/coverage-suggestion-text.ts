@@ -190,7 +190,17 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
     }
     case "unverified":
       return `${lookups.formatDate(reason.dateKey)} isn't loaded, so it couldn't be checked`;
+    case "request":
+      return "has a request waiting that day";
   }
+}
+
+/** Just the reason, for lists that already name the person and the date. */
+export function describeCoverageRuledOutReason(
+  entry: CoverageRuledOut,
+  lookups: CoverageSuggestionTextLookups,
+): string {
+  return reasonText(entry, lookups);
 }
 
 /** One "Not suggested" line: who, and why. */

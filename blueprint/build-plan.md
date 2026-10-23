@@ -971,3 +971,35 @@
         approve through the existing request approval behind a confirmation,
         and the opened and closed counts in the Publish dialog. Approve
         needs the approval-replaces-draft fix first.
+- [x] 48. **Schedule Builder** - Coverage Check becomes the Schedule
+      Builder: one action builds the draft for the period from recurring
+      schedules, absences, qualifications, coverage requirements, overtime
+      and fairness, previews the result before anything changes, explains
+      every choice and every gap it leaves, and applies as one undoable
+      draft change; the day check and suggestions stay below it (owner,
+      2026-10-22). Overtime is an organization threshold (default 40 hours a
+      week) the builder avoids and crosses only when nobody else can fill a
+      gap; no rest rules yet; the builder only fills and never moves or
+      replaces anyone already scheduled; fairness balances hours and rotates
+      weekends and nights (owner decisions, 2026-10-22).
+  - [x] 48a. **Rename and Build section** - the button, panel and guides say
+        Schedule Builder; a Build section at the top says what the build
+        considers, previews the shifts it adds, the gaps it closes and the
+        gaps it leaves before anything changes, and Build applies it through
+        the draft with one Undo.
+  - [x] 48b. **Recurring schedules first** - the build applies recurring
+        schedules for the period (effective dates, archived shifts, never
+        overwriting) before it fills gaps; Fill from Recurring Schedules stays
+        its own tool.
+  - [x] 48c. **Absences and requests** - every absence type, whole-day and
+        rest-of-day, and pending call-offs and requests block a person; the
+        preview names who was skipped and why.
+  - [x] 48d. **Overtime threshold** - fixed at 40 hours a week (US, no
+        setting); the builder prefers people under it, goes over only when
+        nobody else can fill a gap, and names them in the preview.
+  - [x] 48e. **Fairness** - balance hours across people in the period and
+        rotate weekends and nights from recent published schedules, with the
+        reason for each choice.
+  - [x] 48f. **Build report** - after a build, what each person was given,
+        who went over the threshold, and every gap left with its reason,
+        each linked to its cell.

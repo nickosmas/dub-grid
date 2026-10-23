@@ -3,10 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCoverageMatrix,
   type CoverageCategorySnapshot,
+  type CoverageBuildPreview,
   type CoverageMatrix,
+  type CoverageRuledOut,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import { appliedSuggestionText } from "@/components/coverage-check/CoverageSuggestions";
+import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 
 import CoveragePanel from "@/components/CoveragePanel";
 import type { FocusArea } from "@/types";
@@ -156,7 +159,7 @@ describe("CoveragePanel", () => {
   it("reads and names each cell from the matrix", () => {
     renderPanel();
 
-    expect(screen.getByRole("dialog", { name: "Coverage Check" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Schedule Builder" })).toBeInTheDocument();
     expect(screen.getByText("1 shift short · 0 over")).toBeInTheDocument();
     const wednesday = cell(/North Wing, Day Shift · Med Aide, Wednesday, October 28/);
     expect(wednesday).toHaveTextContent("2/3");
@@ -532,6 +535,37 @@ describe("CoveragePanel", () => {
       expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
     });
 
+    it("applies every draft fix for the picked date", () => {
+      const onApplyAllSuggestions = vi.fn();
+      withSuggestions({ onApplyAllSuggestions });
+
+      expect(
+        screen.queryByRole("button", { name: "Apply all draft fixes" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      fireEvent.click(day().getByRole("button", { name: "Apply all for this day" }));
+      expect(onApplyAllSuggestions).toHaveBeenLastCalledWith("2026-10-28");
+      expect(day().getByText(/Approvals are not included/)).toBeInTheDocument();
+    });
+
+    it("offers no Apply all when only approvals and advice remain", () => {
+      renderPanel({
+        onApplyAllSuggestions: vi.fn(),
+        suggestions: {
+          items: [view("d", "approvePickup"), view("e", "pattern")],
+          notSuggestedByCell: new Map(),
+        },
+      });
+
+      expect(
+        screen.queryByRole("button", { name: "Apply all draft fixes" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(dateHeading(/Wednesday, October 28/));
+      expect(
+        day().queryByRole("button", { name: "Apply all for this day" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("keeps applied changes in view with Undo, and an approval as published", () => {
       const onUndoSuggestion = vi.fn();
       withSuggestions({
@@ -615,6 +649,309 @@ describe("CoveragePanel", () => {
       const staffed = within(screen.getByRole("region", { name: "Selected day" }));
       expect(staffed.queryByText("Ways to fix")).not.toBeInTheDocument();
       expect(staffed.queryByText("Not suggested")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("build", () => {
+    const preview = (overrides: Partial<CoverageBuildPreview> = {}): CoverageBuildPreview => ({
+      fixes: [],
+      recurring: { shifts: 0, absences: 0 },
+      counts: { assign: 0, restore: 0, moveBack: 0 },
+      people: 0,
+      shortBefore: 2,
+      shortAfter: 2,
+      overBefore: 0,
+      overAfter: 0,
+      staffShortBefore: 4,
+      staffShortAfter: 4,
+      skipped: [],
+      overThreshold: [],
+      choices: [],
+      recurringPeople: [],
+      shortCells: [],
+      ...overrides,
+    });
+    const skippedWords = {
+      personName: (id: string) => ({ ana: "Ana Crawford", ben: "Ben Shepherd" })[id] ?? id,
+      formatDate: (dateKey: string) =>
+        ({
+          "2026-10-25": "Sun, Oct 25",
+          "2026-10-26": "Mon, Oct 26",
+          "2026-10-27": "Tue, Oct 27",
+          "2026-11-01": "Sun, Nov 1",
+        })[dateKey] ?? dateKey,
+      reason: (entry: CoverageRuledOut) =>
+        entry.reason.kind === "absence" ? "Sick that day" : "has a request waiting that day",
+      rowLabel: (rowKey: string) => (rowKey === "1:5:1" ? "North Wing · Day MA" : rowKey),
+    };
+    const skip = (employeeId: string, dateKey: string, kind: "absence" | "request") =>
+      ({
+        rowKey: "1:5:1",
+        dateKey,
+        employeeId,
+        requestId: null,
+        reason: kind === "absence" ? { kind, absenceTypeId: 7 } : { kind, dateKey },
+      }) as CoverageRuledOut;
+    const withBuild = (state: ScheduleBuildState, overrides = {}) => {
+      const build = {
+        state,
+        onPreview: vi.fn(),
+        onBuild: vi.fn(),
+        onCancel: vi.fn(),
+        skippedWords,
+      };
+      renderPanel({
+        suggestions: { items: [], notSuggestedByCell: new Map() },
+        build,
+        ...overrides,
+      });
+      return build;
+    };
+    const section = () => within(screen.getByRole("region", { name: "Build the draft" }));
+
+    it("says what a build does and previews the rows shown", () => {
+      const build = withBuild({ status: "idle" });
+
+      expect(
+        section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
+      ).toBeInTheDocument();
+      expect(
+        section().getByText(/^Fills empty cells from recurring schedules, then short shifts/),
+      ).toHaveTextContent("It never changes anyone already scheduled.");
+      fireEvent.click(section().getByRole("button", { name: "Preview build" }));
+      expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
+    });
+
+    it("shows the preview's counts, then builds or cancels", () => {
+      const fixes = [{ id: "x" }, { id: "y" }, { id: "z" }] as CoverageSuggestion[];
+      const build = withBuild({
+        status: "ready",
+        preview: preview({
+          fixes,
+          counts: { assign: 2, restore: 1, moveBack: 0 },
+          people: 3,
+          shortAfter: 0,
+          staffShortAfter: 1,
+        }),
+      });
+
+      expect(section().getByText("3 changes for 3 people")).toBeInTheDocument();
+      expect(section().getByText("2 new shifts · 1 restored")).toBeInTheDocument();
+      expect(section().getByLabelText("2 now, 0 after")).toHaveTextContent("2 → 0");
+      expect(section().getByLabelText("4 now, 1 after")).toHaveTextContent("4 → 1");
+      fireEvent.click(section().getByRole("button", { name: "Build" }));
+      expect(build.onBuild).toHaveBeenCalled();
+      fireEvent.click(section().getByRole("button", { name: "Cancel" }));
+      expect(build.onCancel).toHaveBeenCalled();
+    });
+
+    it.each([
+      [{ shifts: 12, absences: 0 }, "12 changes for 2 people", null],
+      [{ shifts: 0, absences: 1 }, "1 change for 2 people", null],
+      [
+        { shifts: 3, absences: 2 },
+        "5 changes for 2 people",
+        "3 recurring shifts · 2 recurring absences",
+      ],
+    ])("counts the recurring fills %o", (recurring, headline, breakdown) => {
+      withBuild({ status: "ready", preview: preview({ recurring, people: 2 }) });
+      expect(section().getByText(headline)).toBeInTheDocument();
+      if (breakdown) expect(section().getByText(breakdown)).toBeInTheDocument();
+      else expect(section().queryByText(/·/)).not.toBeInTheDocument();
+      expect(section().getByRole("button", { name: "Build" })).toBeInTheDocument();
+    });
+
+    it("names each person skipped once, with every date and reason in order", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }] as CoverageSuggestion[],
+          people: 1,
+          skipped: [
+            skip("ben", "2026-10-27", "request"),
+            skip("ben", "2026-10-26", "absence"),
+            skip("ana", "2026-10-26", "absence"),
+            skip("ana", "2026-10-26", "absence"),
+          ],
+        }),
+      });
+      expect(section().queryByRole("list", { name: "Not scheduled" })).not.toBeInTheDocument();
+      fireEvent.click(section().getByRole("button", { name: "2 people couldn't be scheduled" }));
+      const list = within(section().getByRole("list", { name: "Not scheduled" }));
+      expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Ana Crawford Mon, Oct 26: Sick that day",
+        "Ben Shepherd Mon, Oct 26: Sick that day; Tue, Oct 27: has a request waiting that day",
+      ]);
+    });
+
+    it("names each person it takes over the threshold, once per week", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }, { id: "y" }, { id: "z" }] as CoverageSuggestion[],
+          people: 2,
+          overThreshold: [
+            { employeeId: "ben", dateKey: "2026-10-27", suggestionId: "x", hours: 44 },
+            { employeeId: "ben", dateKey: "2026-10-26", suggestionId: "y", hours: 44 },
+            { employeeId: "ben", dateKey: "2026-11-02", suggestionId: "z", hours: 42.5 },
+            { employeeId: "ana", dateKey: "2026-10-31", suggestionId: "w", hours: 48 },
+          ],
+        }),
+      });
+      const list = within(section().getByRole("list", { name: "Over 40 hours a week" }));
+      expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Ana Crawford 48 hours, week of Sun, Oct 25",
+        "Ben Shepherd 44 hours, week of Sun, Oct 25",
+        "Ben Shepherd 42.5 hours, week of Sun, Nov 1",
+      ]);
+    });
+
+    it("shows no overtime list when nobody goes over", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+      });
+      expect(section().queryByText("Over 40 hours a week")).not.toBeInTheDocument();
+    });
+
+    it("shows five people, then all of them", () => {
+      const ids = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"];
+      withBuild({
+        status: "ready",
+        preview: preview({ skipped: ids.map((id) => skip(id, "2026-10-26", "absence")) }),
+      });
+      fireEvent.click(section().getByRole("button", { name: "7 people couldn't be scheduled" }));
+      const list = () => within(section().getByRole("list", { name: "Not scheduled" }));
+      expect(list().getAllByRole("listitem")).toHaveLength(5);
+      fireEvent.click(section().getByRole("button", { name: "Show all 7" }));
+      expect(list().getAllByRole("listitem")).toHaveLength(7);
+    });
+
+    describe("after a build", () => {
+      const built = (overrides: Partial<CoverageBuildPreview> = {}) =>
+        withBuild({
+          status: "built",
+          preview: preview({
+            fixes: [
+              { id: "o", kind: "assign", employeeId: "ana" },
+              { id: "a", kind: "assign", employeeId: "ana" },
+              { id: "r", kind: "restore", employeeId: "ben" },
+            ] as CoverageSuggestion[],
+            recurring: { shifts: 2, absences: 0 },
+            recurringPeople: [{ employeeId: "ben", shifts: 2, absences: 0 }],
+            choices: [
+              {
+                suggestionId: "o",
+                employeeId: "ana",
+                dateKey: "2026-10-26",
+                reason: "only",
+                count: 0,
+                others: 0,
+              },
+              {
+                suggestionId: "a",
+                employeeId: "ana",
+                dateKey: "2026-10-27",
+                reason: "hours",
+                count: 8,
+                others: 2,
+              },
+            ],
+            people: 2,
+            ...overrides,
+          }),
+        });
+
+      it("says what each person was given and why", () => {
+        built();
+        expect(section().getByText("Built 5 changes for 2 people")).toBeInTheDocument();
+        const list = within(section().getByRole("list", { name: "What each person was given" }));
+        expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+          "Ana Crawford 2 shifts · Fewest hours, Only one free",
+          "Ben Shepherd 3 shifts · Recurring schedule, Restored",
+        ]);
+        expect(section().queryByRole("button", { name: "Build" })).not.toBeInTheDocument();
+      });
+
+      it("links each shift still short to its cell", () => {
+        built({ shortCells: [{ rowKey: "1:5:1", dateKey: "2026-10-27", staffShort: 1 }] });
+        expect(section().getByText("Still short: 1 shift")).toBeInTheDocument();
+        fireEvent.click(
+          section().getByRole("button", { name: "North Wing · Day MA, Tue, Oct 27: 1 short" }),
+        );
+        expect(
+          within(screen.getByRole("region", { name: "Selected day" })).getByText("Tue, Oct 27"),
+        ).toBeInTheDocument();
+      });
+
+      it("shows five shifts still short, then all of them", () => {
+        const dates = ["2026-10-26", "2026-10-27", "2026-10-28", "a", "b", "c"];
+        built({
+          shortCells: dates.map((dateKey) => ({ rowKey: "1:5:1", dateKey, staffShort: 1 })),
+        });
+        const list = () => within(section().getByRole("list", { name: "Still short" }));
+        expect(list().getAllByRole("listitem")).toHaveLength(5);
+        fireEvent.click(section().getByRole("button", { name: "Show all 6" }));
+        expect(list().getAllByRole("listitem")).toHaveLength(6);
+      });
+
+      it("leaves out empty lists and closes with Done", () => {
+        const build = built();
+        expect(section().queryByText(/Still short/)).not.toBeInTheDocument();
+        expect(section().queryByText("Over 40 hours a week")).not.toBeInTheDocument();
+        fireEvent.click(section().getByRole("button", { name: "Done" }));
+        expect(build.onCancel).toHaveBeenCalled();
+      });
+    });
+
+    it("lists nobody when nobody was skipped", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+      });
+      expect(
+        section().queryByRole("button", { name: /couldn't be scheduled/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says when there is nothing to build", () => {
+      withBuild({ status: "ready", preview: preview() });
+      expect(
+        section().getByText(/Nothing to build\. Nobody qualified is free/),
+      ).toBeInTheDocument();
+    });
+
+    it("says when the preview could not be worked out", () => {
+      withBuild({ status: "failed" });
+      expect(section().getByRole("alert")).toHaveTextContent("The build couldn't be worked out.");
+    });
+
+    it("holds Build while another change is being applied", () => {
+      withBuild(
+        {
+          status: "ready",
+          preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+        },
+        { busySuggestionId: "a" },
+      );
+      expect(section().getByRole("button", { name: "Build" })).toBeDisabled();
+    });
+
+    it("offers no build to someone who cannot edit shifts, or in Month view", () => {
+      withBuild({ status: "idle" }, { canEditShifts: false });
+      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+    });
+
+    it("offers no build in Month view", () => {
+      withBuild({ status: "idle" }, { matrix: null });
+      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+    });
+
+    it("clears the preview when the focus area filter changes", () => {
+      const build = withBuild({ status: "idle" });
+      fireEvent.click(screen.getByText("All Focus Areas"));
+      fireEvent.click(screen.getByRole("option", { name: "North Wing" }));
+      expect(build.onCancel).toHaveBeenCalled();
     });
   });
 });

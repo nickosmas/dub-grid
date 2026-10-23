@@ -9,9 +9,19 @@ Coverage compares the people scheduled for a shift and job with the minimum your
 
 On the web schedule, every focus-area section has count rows. They show how many people are scheduled against how many are needed.
 
-## Coverage Check
+## Schedule Builder
 
-Select **Coverage Check** on the schedule toolbar to see every coverage requirement for the period at once. The button's number is how many shifts are short. Coverage Check is available in **1 Week** and **2 Weeks**, to people who can see dashboard analytics.
+Select **Schedule Builder** on the schedule toolbar to see every coverage requirement for the period at once, and, if you can edit shifts, to build the draft. The button's number is how many shifts are short. The Schedule Builder is available in **1 Week** and **2 Weeks**, to people who can see dashboard analytics.
+
+### Building the draft
+
+People who edit shifts see **Build the draft** at the top, for the period on screen and the focus areas the filter shows. A build starts from each person's recurring schedule: it fills the empty cells a recurring schedule covers, the same cells **Fill from Recurring Schedules** fills, including recurring absences. Then it puts back shifts the draft removed or moved away, and fills short shifts with people who are qualified and free at that time. It prefers people who stay within 40 hours a week (Sunday to Saturday) and takes someone past that only when nobody else can fill the shift. When several people could fill a shift the same way, it shares the work: a weekend shift goes to whoever has had the fewest weekend shifts, and a night shift to whoever has had the fewest nights, over the four published weeks before the period and the period itself; otherwise it goes to whoever has the fewest hours in the period. Nobody is booked twice, and someone with a recurring absence is not scheduled that day. With a focus area filter, only people in the focus areas shown get recurring fills. It never moves or replaces anyone already scheduled, never overrides an absence or a waiting request, and never approves a pickup.
+
+Select **Preview build** to see what it would do before anything changes: how many changes for how many people (and, when there is more than one kind, how many are recurring shifts, recurring absences, new shifts, restored or moved back), and the short shifts and staff short now and after, so a build that adds people without filling a shift completely still shows its progress. **Over 40 hours a week** names anyone the build takes past 40 hours, with their hours for that week. When qualified people were left out of shifts the build leaves short, select **N people couldn't be scheduled** to see each one with every date and reason, such as an absence, a shift that overlaps, or a request waiting that day. Someone with a pickup, swap or call-off request waiting on a day is never scheduled that day by a suggestion or a build; approve or decline the request first. Select **Build** to apply it, or **Cancel**. If the draft changes after the preview, the preview is cleared; if it changed while the preview was open, **Build** shows the new preview instead of applying.
+
+After a build, the section shows what it did: each person with the shifts they were given and why (from their recurring schedule, restored, moved back, the fewest weekends, nights or hours, an even choice, or the only one free), anyone over 40 hours a week, and each shift still short. Select a shift still short to open its cell and see why nobody could fill it. **Done** closes the report. A build changes the draft only, as one line under **Applied**. **Undo** puts back every cell the build changed, except a cell someone has changed since, which keeps that change; Undo says how many it left alone.
+
+### The matrix
 
 Each row is one requirement, such as Day Shift for a job in a focus area, and each column is a day. A cell reads staffed / needed, for example **3/5**, and is marked:
 
@@ -28,8 +38,8 @@ Select a cell to see it in detail:
 - **Before** is what staff see now, and **After** is the draft.
 - **Still needed** lists the jobs that are short.
 - **What changed** lists, for people who edit shifts, each person whose draft change moved the cell's count, for example a shift moved to another day, taken off, or replaced by an absence. The lines always add up to the difference between Before and After. A cell the draft did not touch says so.
-- **Fill a spot** opens the list of qualified people for that gap, the same as selecting the open shift. If pickup requests are already waiting for the shift, Coverage Check says how many.
-- **Show in grid** closes Coverage Check and outlines that day in the focus area's section.
+- **Fill a spot** opens the list of qualified people for that gap, the same as selecting the open shift. If pickup requests are already waiting for the shift, the Schedule Builder says how many.
+- **Show in grid** closes the Schedule Builder and outlines that day in the focus area's section.
 - **Ways to fix** lists the suggestions for that day, and **Not suggested** says why each other qualified person was left out, for example an absence or a shift that overlaps.
 
 ### Suggestions
@@ -44,11 +54,15 @@ People who edit shifts see a dot under each date that has a suggestion. Select a
 - **Move back** returns a shift this draft moved to another day or changed to other work.
 - **Restore** puts back a shift this draft removed, when no absence or request explains the removal.
 - **Schedule** adds someone who is qualified for the shift and free at that time: no absence, and no shift that overlaps it.
-- **Approve** approves a pickup request already waiting for the shift. Coverage Check asks first, because an approval takes effect for staff right away, without a publish, and replaces any draft change of yours for that person's day.
+- **Approve** approves a pickup request already waiting for the shift. The Schedule Builder asks first, because an approval takes effect for staff right away, without a publish, and replaces any draft change of yours for that person's day.
 
-Move back, Restore and Schedule change only the draft, the same way an edit in the grid does, and appear under **Applied** above the matrix with **Undo**. When nothing can fix a requirement that is short on the same day every week, Coverage Check says so.
+Move back, Restore and Schedule change only the draft, the same way an edit in the grid does, and appear under **Applied** above the matrix with **Undo**. When nothing can fix a requirement that is short on the same day every week, the Schedule Builder says so.
 
-**All requirements met** means no requirement is short or over for the period. If your Organization has not set any requirements, Coverage Check says so and points to [Coverage settings](/configuration/coverage-requirements).
+**Apply all for this day** applies every draft fix for the selected date. Like a build, it applies them one at a time and counts again after each, so no spot is filled twice and no one is given two shifts that overlap. Approvals are never included; approve each one yourself. The whole batch appears as one line under **Applied**, and **Undo** puts it all back.
+
+Focus areas are listed in the same order as the schedule grid.
+
+**All requirements met** means no requirement is short or over for the period. If your Organization has not set any requirements, the Schedule Builder says so and points to [Coverage settings](/configuration/coverage-requirements).
 
 Your Super Admin controls the requirements in [Coverage settings](/configuration/coverage-requirements). They also choose whether staff see coverage shortages and call-off vacancies in [Schedule Rules](/configuration/schedule-rules-and-display).
 
