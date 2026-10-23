@@ -198,7 +198,9 @@ export type CoverageAvailability =
   | { kind: "absence"; absenceTypeId: number }
   | { kind: "restOfDayAbsence"; absenceTypeId: number }
   | { kind: "overlap"; dateKey: string; assignmentId: number }
-  | { kind: "unverified"; dateKey: string };
+  | { kind: "unverified"; dateKey: string }
+  /** A pickup, swap or call-off waits on this person that day. */
+  | { kind: "request"; dateKey: string };
 
 export interface CoveragePickupRequest {
   requestId: string;
@@ -513,6 +515,17 @@ function staffingSuggestions(
       if (draftHere.assignmentIds.some((id) => eligible.has(id))) continue;
       const assignmentId = tryOrder.find((id) => input.qualifiedFor(person.id, id));
       if (assignmentId == null) continue;
+      // A request waiting on them that day decides their day first.
+      if (input.hasRequest(person.id, cell.dateKey)) {
+        ruledOut.push({
+          rowKey,
+          dateKey: cell.dateKey,
+          employeeId: person.id,
+          requestId: null,
+          reason: { kind: "request", dateKey: cell.dateKey },
+        });
+        continue;
+      }
 
       const availability = input.availability(person.id, cell.dateKey, assignmentId);
       if (availability.kind !== "free") {
@@ -734,6 +747,14 @@ export function planCoverageFixes(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageSuggestion[] {
+  return planWithLeftovers(input, options).fixes;
+}
+
+/** The plan, plus who the last pass ruled out and the schedule it ended on. */
+function planWithLeftovers(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions,
+): { fixes: CoverageSuggestion[]; ruledOut: CoverageRuledOut[]; final: CoverageSuggestionInput } {
   const plan: CoverageSuggestion[] = [];
   const overrides: CoverageDayOverride[] = [...(options.baseOverrides ?? [])];
   const reach = options.availabilityWith ? 0 : 1;
@@ -751,8 +772,11 @@ export function planCoverageFixes(
   };
   let current = overrides.length > 0 ? withPlanned() : input;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
+  let ruledOut: CoverageRuledOut[] = [];
   for (let step = 0; step < 500; step += 1) {
-    const next = suggestCoverageFixes(current).suggestions.find(
+    const pass = suggestCoverageFixes(current);
+    ruledOut = pass.ruledOut;
+    const next = pass.suggestions.find(
       (suggestion) =>
         DRAFT_KINDS.has(suggestion.kind) &&
         suggestion.targets.some(
@@ -762,12 +786,12 @@ export function planCoverageFixes(
         ) &&
         !suggestion.overrides.some(clashes),
     );
-    if (!next) return plan;
+    if (!next) return { fixes: plan, ruledOut, final: current };
     plan.push(next);
     overrides.push(...next.overrides);
     current = withPlanned();
   }
-  return plan;
+  return { fixes: plan, ruledOut, final: current };
 }
 
 /** What a build would do to the draft, counted exactly before anything changes. */
@@ -787,6 +811,8 @@ export interface CoverageBuildPreview {
   /** People still needed across those cells, before and after (mentored credit counts). */
   staffShortBefore: number;
   staffShortAfter: number;
+  /** Why each qualified person was not scheduled into a shift the build leaves short. */
+  skipped: CoverageRuledOut[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -813,9 +839,18 @@ export function previewCoverageBuild(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
-  const fixes = planCoverageFixes(input, options);
+  const { fixes, ruledOut, final } = planWithLeftovers(input, options);
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
+  const stillShort = new Set<string>();
+  for (const row of final.matrix.rows) {
+    if (options.rowKeys && !options.rowKeys.has(row.rowKey)) continue;
+    for (const cell of row.cells) {
+      if (!cell || cell.past || cell.kind !== "short") continue;
+      if (options.dateKey != null && cell.dateKey !== options.dateKey) continue;
+      stillShort.add(`${row.rowKey}|${cell.dateKey}`);
+    }
+  }
   const before = countOpen(input.matrix, options.rowKeys);
   const result = countOpen(after.matrix, options.rowKeys);
   const counts = { assign: 0, restore: 0, moveBack: 0 };
@@ -841,5 +876,6 @@ export function previewCoverageBuild(
     overAfter: result.over,
     staffShortBefore: before.staffShort,
     staffShortAfter: result.staffShort,
+    skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
   };
 }

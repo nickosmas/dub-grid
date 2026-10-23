@@ -5,6 +5,7 @@ import {
   type CoverageCategorySnapshot,
   type CoverageBuildPreview,
   type CoverageMatrix,
+  type CoverageRuledOut,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import { appliedSuggestionText } from "@/components/coverage-check/CoverageSuggestions";
@@ -663,10 +664,32 @@ describe("CoveragePanel", () => {
       overAfter: 0,
       staffShortBefore: 4,
       staffShortAfter: 4,
+      skipped: [],
       ...overrides,
     });
+    const skippedWords = {
+      personName: (id: string) => ({ ana: "Ana Crawford", ben: "Ben Shepherd" })[id] ?? id,
+      formatDate: (dateKey: string) =>
+        ({ "2026-10-26": "Mon, Oct 26", "2026-10-27": "Tue, Oct 27" })[dateKey] ?? dateKey,
+      reason: (entry: CoverageRuledOut) =>
+        entry.reason.kind === "absence" ? "Sick that day" : "has a request waiting that day",
+    };
+    const skip = (employeeId: string, dateKey: string, kind: "absence" | "request") =>
+      ({
+        rowKey: "1:5:1",
+        dateKey,
+        employeeId,
+        requestId: null,
+        reason: kind === "absence" ? { kind, absenceTypeId: 7 } : { kind, dateKey },
+      }) as CoverageRuledOut;
     const withBuild = (state: ScheduleBuildState, overrides = {}) => {
-      const build = { state, onPreview: vi.fn(), onBuild: vi.fn(), onCancel: vi.fn() };
+      const build = {
+        state,
+        onPreview: vi.fn(),
+        onBuild: vi.fn(),
+        onCancel: vi.fn(),
+        skippedWords,
+      };
       renderPanel({
         suggestions: { items: [], notSuggestedByCell: new Map() },
         build,
@@ -741,6 +764,47 @@ describe("CoveragePanel", () => {
         preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
       });
       expect(section().queryByText(/From recurring schedules/)).not.toBeInTheDocument();
+    });
+
+    it("names each person skipped once, with every date and reason in order", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }] as CoverageSuggestion[],
+          people: 1,
+          skipped: [
+            skip("ben", "2026-10-27", "request"),
+            skip("ben", "2026-10-26", "absence"),
+            skip("ana", "2026-10-26", "absence"),
+            skip("ana", "2026-10-26", "absence"),
+          ],
+        }),
+      });
+      const list = within(section().getByRole("list", { name: "Not scheduled" }));
+      expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Ana Crawford Mon, Oct 26: Sick that day",
+        "Ben Shepherd Mon, Oct 26: Sick that day; Tue, Oct 27: has a request waiting that day",
+      ]);
+    });
+
+    it("shows five people, then all of them", () => {
+      const ids = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"];
+      withBuild({
+        status: "ready",
+        preview: preview({ skipped: ids.map((id) => skip(id, "2026-10-26", "absence")) }),
+      });
+      const list = () => within(section().getByRole("list", { name: "Not scheduled" }));
+      expect(list().getAllByRole("listitem")).toHaveLength(5);
+      fireEvent.click(section().getByRole("button", { name: "Show all 7" }));
+      expect(list().getAllByRole("listitem")).toHaveLength(7);
+    });
+
+    it("lists nobody when nobody was skipped", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+      });
+      expect(section().queryByRole("list", { name: "Not scheduled" })).not.toBeInTheDocument();
     });
 
     it("says when there is nothing to build", () => {

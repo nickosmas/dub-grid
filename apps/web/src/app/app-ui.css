@@ -1137,6 +1137,20 @@ button.dg-cc-sg-main {
   font-weight: 600;
   color: var(--dg-color-success-text);
 }
+.dg-cc-show-all {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-brand);
+  font-size: var(--dg-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dg-cc-show-all:focus-visible {
+  outline: 2px solid var(--dg-color-brand);
+  outline-offset: 2px;
+}
 .dg-cc-build-counts {
   display: flex;
   flex-wrap: wrap;

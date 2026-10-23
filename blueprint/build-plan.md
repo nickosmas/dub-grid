@@ -991,7 +991,7 @@
         schedules for the period (effective dates, archived shifts, never
         overwriting) before it fills gaps; Fill from Recurring Schedules stays
         its own tool.
-  - [ ] 48c. **Absences and requests** - every absence type, whole-day and
+  - [x] 48c. **Absences and requests** - every absence type, whole-day and
         rest-of-day, and pending call-offs and requests block a person; the
         preview names who was skipped and why.
   - [ ] 48d. **Overtime threshold** - an organization setting (default 40

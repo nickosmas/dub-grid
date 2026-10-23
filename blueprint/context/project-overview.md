@@ -242,7 +242,7 @@ approval publishes at once and replaces any earlier draft of the cells it
 writes, with a warning first (owner decisions, 2026-10-21). Design
 reference: the "Staffing check panel" canvas.
 
-Item 48 is split; 48a and 48b have shipped:
+Item 48 is split; 48a to 48c have shipped:
 
 - **48a - Rename and Build section:** shipped; Coverage Check is named
   Schedule Builder, and a Build section previews a build of the period and
@@ -253,7 +253,9 @@ Item 48 is split; 48a and 48b have shipped:
   cells recurring schedules cover in its scope first, by the same rule as Fill
   from Recurring Schedules, and plans the fixes on top, in the same preview
   and Undo.
-- **48c - Absences and requests:** planned.
+- **48c - Absences and requests:** shipped; a waiting request blocks
+  scheduling that person that day, and the preview's Not scheduled names
+  everyone left out of a shift it leaves short, with each date and reason.
 - **48d - Overtime threshold:** planned; an organization setting (default
   40 hours a week, migration).
 - **48e - Fairness:** planned; balance hours and rotate weekends and nights.

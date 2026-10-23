@@ -38,6 +38,7 @@ import {
 import {
   ScheduleBuildSection,
   type ScheduleBuildState,
+  type SkippedWords,
 } from "@/components/coverage-check/ScheduleBuildSection";
 import {
   comparisonSentence,
@@ -80,6 +81,7 @@ interface CoveragePanelProps {
     onPreview: (rowKeys: string[]) => void;
     onBuild: () => void;
     onCancel: () => void;
+    skippedWords?: SkippedWords;
   };
   onClose: () => void;
 }
@@ -450,6 +452,7 @@ export default function CoveragePanel({
                           onPreview={() => build.onPreview(rows.map((row) => row.rowKey))}
                           onBuild={build.onBuild}
                           onCancel={build.onCancel}
+                          skippedWords={build.skippedWords}
                         />
                       )}
                       {!selected && !selectedDateKey && suggestionHint && (

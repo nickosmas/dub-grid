@@ -1,6 +1,7 @@
 "use client";
 
-import type { CoverageBuildPreview } from "@dubgrid/schedule-core";
+import { useState } from "react";
+import type { CoverageBuildPreview, CoverageRuledOut } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatCoverageNumber, pluralize } from "./coverage-check-text";
@@ -11,6 +12,74 @@ export type ScheduleBuildState =
   | { status: "failed" }
   | { status: "ready"; preview: CoverageBuildPreview };
 
+/** Words for the people a build skipped, from the page's own lookups. */
+export interface SkippedWords {
+  personName: (employeeId: string) => string;
+  formatDate: (dateKey: string) => string;
+  reason: (entry: CoverageRuledOut) => string;
+}
+
+interface SkippedPerson {
+  employeeId: string;
+  name: string;
+  lines: string[];
+}
+
+/** One entry per person, each date and reason once, people by name. */
+export function groupSkipped(
+  skipped: ReadonlyArray<CoverageRuledOut>,
+  words: SkippedWords,
+): SkippedPerson[] {
+  const byPerson = new Map<string, CoverageRuledOut[]>();
+  for (const entry of skipped) {
+    byPerson.set(entry.employeeId, [...(byPerson.get(entry.employeeId) ?? []), entry]);
+  }
+  return [...byPerson.entries()]
+    .map(([employeeId, entries]) => ({
+      employeeId,
+      name: words.personName(employeeId),
+      lines: [
+        ...new Set(
+          [...entries]
+            .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+            .map((entry) => `${words.formatDate(entry.dateKey)}: ${words.reason(entry)}`),
+        ),
+      ],
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const SKIPPED_SHOWN = 5;
+
+function SkippedList({ people }: { people: SkippedPerson[] }) {
+  const [showAll, setShowAll] = useState(false);
+  if (people.length === 0) return null;
+  const shown = showAll ? people : people.slice(0, SKIPPED_SHOWN);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="dg-cc-caption">Not scheduled</div>
+      <ul className="dg-cc-changes" aria-label="Not scheduled">
+        {shown.map((person) => (
+          <li key={person.employeeId} className="dg-cc-change dg-cc-detail-line">
+            <span className="font-semibold">{person.name}</span>
+            <span className="dg-tabular-nums"> {person.lines.join("; ")}</span>
+          </li>
+        ))}
+      </ul>
+      {people.length > SKIPPED_SHOWN && (
+        <button
+          type="button"
+          className="dg-cc-show-all"
+          aria-expanded={showAll}
+          onClick={() => setShowAll((current) => !current)}
+        >
+          {showAll ? "Show fewer" : `Show all ${people.length}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface ScheduleBuildSectionProps {
   /** What the build covers, such as "All focus areas, Oct 18 - 31". */
   scope: string;
@@ -20,6 +89,8 @@ interface ScheduleBuildSectionProps {
   onPreview: () => void;
   onBuild: () => void;
   onCancel: () => void;
+  /** Words for "Not scheduled"; without them the list is left out. */
+  skippedWords?: SkippedWords;
 }
 
 const CONSIDERS = [
@@ -58,7 +129,13 @@ export function buildBreakdown(preview: CoverageBuildPreview): string {
     .join(" · ");
 }
 
-function PreviewSummary({ preview }: { preview: CoverageBuildPreview }) {
+function PreviewSummary({
+  preview,
+  skippedWords,
+}: {
+  preview: CoverageBuildPreview;
+  skippedWords?: SkippedWords;
+}) {
   const showOver = preview.overBefore > 0 || preview.overAfter > 0;
   const recurring = recurringLine(preview);
   const breakdown = buildBreakdown(preview);
@@ -97,11 +174,12 @@ function PreviewSummary({ preview }: { preview: CoverageBuildPreview }) {
           </div>
         )}
       </dl>
-      {preview.shortAfter > 0 && (
+      {preview.shortAfter > 0 && (!skippedWords || preview.skipped.length === 0) && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
           Nobody qualified is free for the shifts left short. Select one to see why.
         </p>
       )}
+      {skippedWords && <SkippedList people={groupSkipped(preview.skipped, skippedWords)} />}
     </div>
   );
 }
@@ -114,6 +192,7 @@ export function ScheduleBuildSection({
   onPreview,
   onBuild,
   onCancel,
+  skippedWords,
 }: ScheduleBuildSectionProps) {
   const previewing = state.status === "previewing";
   return (
@@ -126,7 +205,7 @@ export function ScheduleBuildSection({
       {state.status === "ready" ? (
         buildChangeCount(state.preview) > 0 ? (
           <>
-            <PreviewSummary preview={state.preview} />
+            <PreviewSummary preview={state.preview} skippedWords={skippedWords} />
             <p className="dg-cc-detail-line dg-cc-detail-line--muted">
               Changes the draft only. Staff see it after you publish, and Undo puts it all back.
             </p>
@@ -160,6 +239,9 @@ export function ScheduleBuildSection({
                   )}; select one to see why.`
                 : "Nothing to build. Every shift here is staffed."}
             </p>
+            {skippedWords && (
+              <SkippedList people={groupSkipped(state.preview.skipped, skippedWords)} />
+            )}
             <Button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
               Done
             </Button>

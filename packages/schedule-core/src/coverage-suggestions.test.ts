@@ -662,3 +662,88 @@ describe("previewCoverageBuild on top of recurring fills", () => {
     expect(previewCoverageBuild(world).recurring).toEqual({ shifts: 0, absences: 0 });
   });
 });
+
+describe("absences and requests in a build", () => {
+  it("never schedules someone with a request waiting that day, and says so", () => {
+    const { suggestions, ruledOut } = run({
+      requirements: MA_ONLY,
+      people: ["ana", "ben"],
+      requests: [`ana|${MON}`],
+      draft: {},
+    });
+
+    expect(suggestions.some((fix) => fix.employeeId === "ana" && fix.subject.dateKey === MON)).toBe(
+      false,
+    );
+    expect(ruledOut).toContainEqual(
+      expect.objectContaining({
+        employeeId: "ana",
+        dateKey: MON,
+        reason: { kind: "request", dateKey: MON },
+      }),
+    );
+  });
+
+  it("still suggests approving someone's own waiting pickup", () => {
+    const { suggestions } = run({
+      requirements: MA_ONLY,
+      people: ["ana", "ben"],
+      requests: [`ben|${MON}`],
+      draft: { [`ana|${MON}`]: { work: [DAY_MA] } },
+      pendingPickups: [
+        {
+          requestId: "r1",
+          employeeId: "ben",
+          dateKey: MON,
+          focusAreaId: 1,
+          assignmentIds: [DAY_MA],
+        },
+      ],
+    });
+
+    expect(suggestions.map((fix) => [fix.kind, fix.employeeId])).toContainEqual([
+      "approvePickup",
+      "ben",
+    ]);
+  });
+
+  it("names who was skipped for the shifts a build leaves short, and why", () => {
+    // Two needed on Monday; Ana is free, Ben is Sick, Cat has a request.
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      people: ["ana", "ben", "cat"],
+      requests: [`cat|${MON}`],
+      // The page reads Ben's Sick day as unavailable; the fixture is told so.
+      availability: { [`ben|${MON}`]: { kind: "absence", absenceTypeId: 7 } },
+      draft: { [`ben|${MON}`]: { absence: 7 } },
+    });
+    const preview = previewCoverageBuild(world, { dateKey: MON });
+
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["ana"]);
+    expect(
+      preview.skipped.map((entry) => [entry.employeeId, entry.dateKey, entry.reason.kind]).sort(),
+    ).toEqual([
+      ["ben", MON, "absence"],
+      ["cat", MON, "request"],
+    ]);
+  });
+
+  it("names nobody for shifts the build fills, or rows outside it", () => {
+    const filled = previewCoverageBuild(
+      buildSuggestionWorld({ requirements: MA_ONLY, draft: {} }),
+      { dateKey: MON },
+    );
+    expect(filled.skipped.some((entry) => entry.dateKey === MON)).toBe(false);
+
+    const outside = previewCoverageBuild(
+      buildSuggestionWorld({
+        people: ["ana"],
+        availability: { [`ana|${MON}`]: { kind: "absence", absenceTypeId: 7 } },
+        draft: { [`ana|${MON}`]: { absence: 7 } },
+      }),
+      { dateKey: MON, rowKeys: new Set([ROW_SC]) },
+    );
+    expect(outside.skipped.length).toBeGreaterThan(0);
+    expect(outside.skipped.every((entry) => entry.rowKey === ROW_SC)).toBe(true);
+  });
+});

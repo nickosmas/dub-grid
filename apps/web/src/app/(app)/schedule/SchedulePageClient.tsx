@@ -93,6 +93,7 @@ import {
   computeCoverageCategorySnapshots,
   describeCoverageCellChanges,
   describeCoverageRuledOut,
+  describeCoverageRuledOutReason,
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
   planCoverageFixes,
@@ -105,6 +106,7 @@ import {
   type CoverageCategorySnapshot,
   type CoverageDaySide,
   type CoverageDayOverride,
+  type CoverageRuledOut,
   type CoverageMatrixCell,
   type CoverageMatrixRow,
   type CoverageSuggestion,
@@ -6925,6 +6927,16 @@ function SchedulerContent({
     ],
   );
 
+  const buildSkippedWords = useMemo(() => {
+    const text = coverageSuggestions?.text;
+    if (!text) return undefined;
+    return {
+      personName: (employeeId: string) => text.personName(employeeId) ?? "Someone",
+      formatDate: text.formatDate,
+      reason: (entry: CoverageRuledOut) => describeCoverageRuledOutReason(entry, text),
+    };
+  }, [coverageSuggestions]);
+
   const previewBuild = useCallback(
     (rowKeys: string[]) => {
       const plannedFrom = coverageCountsKey;
@@ -8912,6 +8924,7 @@ function SchedulerContent({
                       onPreview: previewBuild,
                       onBuild: runBuild,
                       onCancel: () => setBuildPreview(null),
+                      skippedWords: buildSkippedWords,
                     }
                   : undefined
               }
