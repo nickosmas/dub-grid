@@ -26,10 +26,8 @@ import {
   type CoverageCellRef,
 } from "@/components/coverage-check/CoverageMatrixGrid";
 import {
-  APPLY_ALL_NOTE,
   CoverageAppliedList,
   CoverageDayDetail,
-  hasDraftFix,
   type AppliedCoverageSuggestion,
   type CoverageSuggestionView,
 } from "@/components/coverage-check/CoverageSuggestions";
@@ -38,8 +36,13 @@ import {
   type CoverageCellFill,
 } from "@/components/coverage-check/CoverageCellDetail";
 import {
+  ScheduleBuildSection,
+  type ScheduleBuildState,
+} from "@/components/coverage-check/ScheduleBuildSection";
+import {
   comparisonSentence,
   coverageCheckSubtitle,
+  formatDateRange,
   type CoverageCheckView,
 } from "@/components/coverage-check/coverage-check-text";
 
@@ -68,8 +71,16 @@ interface CoveragePanelProps {
   busySuggestionId?: string | null;
   onApplySuggestion?: (suggestion: CoverageSuggestion) => void;
   onUndoSuggestion?: (appliedId: string) => void;
-  /** Applies every draft fix, for one date or (null) the whole period. */
-  onApplyAllSuggestions?: (dateKey: string | null) => void;
+  /** Applies every draft fix for one date. */
+  onApplyAllSuggestions?: (dateKey: string) => void;
+  /** Editors only: the Build section's state and actions. */
+  build?: {
+    state: ScheduleBuildState;
+    /** Plans a build of the rows shown. */
+    onPreview: (rowKeys: string[]) => void;
+    onBuild: () => void;
+    onCancel: () => void;
+  };
   onClose: () => void;
 }
 
@@ -160,6 +171,7 @@ export default function CoveragePanel({
   onApplySuggestion = () => {},
   onUndoSuggestion = () => {},
   onApplyAllSuggestions,
+  build,
   onClose,
 }: CoveragePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
@@ -273,7 +285,7 @@ export default function CoveragePanel({
         className={`dg-panel${showsMatrix ? " dg-panel--cols-2" : ""}${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Coverage Check"
+        aria-label="Schedule Builder"
       >
         <div
           style={{
@@ -315,7 +327,7 @@ export default function CoveragePanel({
                 color: "var(--dg-color-text-secondary)",
               }}
             >
-              Coverage Check
+              Schedule Builder
             </div>
             <div
               className="dg-tabular-nums"
@@ -328,7 +340,9 @@ export default function CoveragePanel({
               {subtitle}
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close Coverage Check" />}
+          {!isMobile && (
+            <CloseButton size="md" onClick={close} aria-label="Close Schedule Builder" />
+          )}
         </div>
 
         {showsMatrix && (
@@ -352,7 +366,7 @@ export default function CoveragePanel({
             <div className="flex flex-wrap items-center gap-2">
               {comparable && (
                 <SpanTabs
-                  aria-label="Coverage Check view"
+                  aria-label="Schedule Builder view"
                   items={VIEW_ITEMS}
                   value={activeView}
                   onChange={setView}
@@ -365,7 +379,10 @@ export default function CoveragePanel({
                   { value: "all", label: "All Focus Areas" },
                   ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
                 ]}
-                onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
+                onChange={(val) => {
+                  setFilterFocusArea(val === "all" ? "all" : Number(val));
+                  build?.onCancel();
+                }}
                 fontSize="var(--dg-fs-caption)"
               />
             </div>
@@ -392,7 +409,7 @@ export default function CoveragePanel({
               size="compact"
               style={{ minHeight: 260 }}
               title="No coverage requirements"
-              description="Coverage Check compares the schedule with how many people each shift needs. Set those numbers in Settings > Coverage."
+              description="Schedule Builder compares the schedule with how many people each shift needs. Set those numbers in Settings > Coverage."
             />
           ) : hidesForViewer ? (
             <EmptyState
@@ -425,29 +442,20 @@ export default function CoveragePanel({
                         busy={busySuggestionId != null}
                         onUndo={onUndoSuggestion}
                       />
+                      {build && (
+                        <ScheduleBuildSection
+                          scope={`${areaName ?? "All focus areas"}, ${formatDateRange(dates)}`}
+                          state={build.state}
+                          busy={busySuggestionId != null}
+                          onPreview={() => build.onPreview(rows.map((row) => row.rowKey))}
+                          onBuild={build.onBuild}
+                          onCancel={build.onCancel}
+                        />
+                      )}
                       {!selected && !selectedDateKey && suggestionHint && (
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="dg-cc-detail-line dg-cc-detail-line--muted dg-tabular-nums">
-                              {suggestionHint}
-                            </p>
-                            {onApplyAllSuggestions && hasDraftFix(suggestionItems) && (
-                              <Button
-                                type="button"
-                                className="dg-btn dg-btn-secondary dg-btn-sm"
-                                onClick={() => onApplyAllSuggestions(null)}
-                                disabled={busySuggestionId != null}
-                              >
-                                Apply all draft fixes
-                              </Button>
-                            )}
-                          </div>
-                          {onApplyAllSuggestions && hasDraftFix(suggestionItems) && (
-                            <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-                              {APPLY_ALL_NOTE}
-                            </p>
-                          )}
-                        </div>
+                        <p className="dg-cc-detail-line dg-cc-detail-line--muted dg-tabular-nums">
+                          {suggestionHint}
+                        </p>
                       )}
                     </>
                   )}

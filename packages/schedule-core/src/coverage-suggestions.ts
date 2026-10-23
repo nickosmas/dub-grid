@@ -707,6 +707,8 @@ function dayNumber(dateKey: string): number {
 export interface PlanCoverageFixesOptions {
   /** Only fixes for this date. */
   dateKey?: string;
+  /** Only fixes for these requirement rows, such as one focus area's. */
+  rowKeys?: ReadonlySet<string>;
   /**
    * Availability once the planned days are written, from the caller's own
    * shift times. Without it, a person a fix changed is not used again on that
@@ -742,8 +744,11 @@ export function planCoverageFixes(
     const next = suggestCoverageFixes(current).suggestions.find(
       (suggestion) =>
         DRAFT_KINDS.has(suggestion.kind) &&
-        (options.dateKey == null ||
-          suggestion.targets.some((target) => target.dateKey === options.dateKey)) &&
+        suggestion.targets.some(
+          (target) =>
+            (options.dateKey == null || target.dateKey === options.dateKey) &&
+            (options.rowKeys == null || options.rowKeys.has(target.rowKey)),
+        ) &&
         !suggestion.overrides.some(clashes),
     );
     if (!next) return plan;
@@ -755,4 +760,71 @@ export function planCoverageFixes(
     }
   }
   return plan;
+}
+
+/** What a build would do to the draft, counted exactly before anything changes. */
+export interface CoverageBuildPreview {
+  /** In the order they will be applied. */
+  fixes: CoverageSuggestion[];
+  counts: { assign: number; restore: number; moveBack: number };
+  /** Distinct people the build changes. */
+  people: number;
+  /** Short and over cells that have not started, before and after. */
+  shortBefore: number;
+  shortAfter: number;
+  overBefore: number;
+  overAfter: number;
+  /** People still needed across those cells, before and after (mentored credit counts). */
+  staffShortBefore: number;
+  staffShortAfter: number;
+}
+
+/** Short and over cells that have not started, within the given rows. */
+function countOpen(matrix: CoverageMatrix, rowKeys?: ReadonlySet<string>) {
+  let short = 0;
+  let over = 0;
+  let staffShort = 0;
+  for (const row of matrix.rows) {
+    if (rowKeys && !rowKeys.has(row.rowKey)) continue;
+    for (const cell of row.cells) {
+      if (!cell || cell.past) continue;
+      if (cell.kind === "short") {
+        short += 1;
+        staffShort += shortageOf(cell.draft);
+      }
+      if (cell.kind === "over") over += 1;
+    }
+  }
+  return { short, over, staffShort: Math.round(staffShort * 1e6) / 1e6 };
+}
+
+/** Plans a build with {@link planCoverageFixes} and counts its result. */
+export function previewCoverageBuild(
+  input: CoverageSuggestionInput,
+  options: PlanCoverageFixesOptions = {},
+): CoverageBuildPreview {
+  const fixes = planCoverageFixes(input, options);
+  const after = withDraftOverrides(
+    input,
+    fixes.flatMap((fix) => fix.overrides),
+  );
+  const before = countOpen(input.matrix, options.rowKeys);
+  const result = countOpen(after.matrix, options.rowKeys);
+  const counts = { assign: 0, restore: 0, moveBack: 0 };
+  for (const fix of fixes) {
+    if (fix.kind === "assign" || fix.kind === "restore" || fix.kind === "moveBack") {
+      counts[fix.kind] += 1;
+    }
+  }
+  return {
+    fixes,
+    counts,
+    people: new Set(fixes.map((fix) => fix.employeeId)).size,
+    shortBefore: before.short,
+    shortAfter: result.short,
+    overBefore: before.over,
+    overAfter: result.over,
+    staffShortBefore: before.staffShort,
+    staffShortAfter: result.staffShort,
+  };
 }

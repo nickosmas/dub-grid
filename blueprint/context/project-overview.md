@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 47 are
-shipped. Item 40 is in progress.
+shipped. Items 40 and 48 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -82,6 +82,7 @@ shipped. Item 40 is in progress.
 | 45   | Shipped     | A worked shift plus an absence in one cell, such as D/Bereavement or D/E/Sick.                                                  |
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
+| 48   | In progress | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 
 Item 40 is split:
 
@@ -240,6 +241,27 @@ Every staffing insight is measured on the schedule and must be exact; an
 approval publishes at once and replaces any earlier draft of the cells it
 writes, with a warning first (owner decisions, 2026-10-21). Design
 reference: the "Staffing check panel" canvas.
+
+Item 48 is split; 48a has shipped:
+
+- **48a - Rename and Build section:** shipped; Coverage Check is named
+  Schedule Builder, and a Build section previews a build of the period and
+  focus areas shown (changes, people, short shifts and staff short now and
+  after) and applies it through the draft with one Undo, which leaves any
+  cell changed since alone.
+- **48b - Recurring schedules first:** planned.
+- **48c - Absences and requests:** planned.
+- **48d - Overtime threshold:** planned; an organization setting (default
+  40 hours a week, migration).
+- **48e - Fairness:** planned; balance hours and rotate weekends and nights.
+- **48f - Build report:** planned.
+
+The builder only fills: it applies recurring schedules, fills empty cells
+and puts back the draft's own removals, and never moves or replaces anyone
+already scheduled. It avoids the overtime threshold and crosses it only when
+nobody else can fill a gap, has no rest rules yet, and never includes
+approvals (owner decisions, 2026-10-22). The Tools item that fills from
+recurring schedules is named Fill from Recurring Schedules (2026-10-22).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

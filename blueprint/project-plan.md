@@ -153,6 +153,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Staffing check: the Schedule page's Coverage panel checks the draft against
   the coverage requirements and the published schedule, and offers exact,
   one-click suggestions that fix gaps or explains why nobody can fill them.
+- Schedule Builder: the staffing check grows into a builder that fills the
+  draft for a period from recurring schedules, absences, qualifications,
+  coverage requirements, an overtime threshold and fair rotation, previews
+  and explains the result, and applies it as one undoable draft change.
 - Documentation truth and drift prevention: public documentation and the
   living engineering references describe the current `dev` through
   source-derived inventories and a machine-checked accuracy manifest, with

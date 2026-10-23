@@ -344,3 +344,43 @@ export function planSuggestionWrites(
   }));
   return { writes, before };
 }
+
+function sameCellInput(left: ScheduleCellInput | null, right: ScheduleCellInput | null): boolean {
+  if (!left || !right) return left === right;
+  return (
+    left.kind === right.kind &&
+    (left.absenceTypeId ?? null) === (right.absenceTypeId ?? null) &&
+    (left.customStartTime ?? null) === (right.customStartTime ?? null) &&
+    (left.customEndTime ?? null) === (right.customEndTime ?? null) &&
+    left.segments.length === right.segments.length &&
+    left.segments.every((segment, index) => {
+      const other = right.segments[index];
+      return (
+        segment.shiftId === other.shiftId &&
+        segment.jobId === other.jobId &&
+        segment.position === other.position &&
+        Boolean(segment.isMentored) === Boolean(other.isMentored)
+      );
+    })
+  );
+}
+
+/**
+ * What Undo may put back: only the cells that still hold what was written.
+ * A cell someone changed since keeps that change, and is counted so Undo can
+ * say so. `before[i]` is the cell `writes[i]` replaced.
+ */
+export function planUndo(
+  applied: { before: SuggestionWrite[]; writes: SuggestionWrite[] },
+  shifts: ShiftMap,
+): { restore: SuggestionWrite[]; kept: number } {
+  const restore: SuggestionWrite[] = [];
+  let kept = 0;
+  applied.writes.forEach((write, index) => {
+    const entry = shifts[`${write.employeeId}_${write.dateKey}`];
+    const current = entry?.isDelete ? null : scheduleCellSnapshotToInput(entry?.effective);
+    if (sameCellInput(current, write.input)) restore.push(applied.before[index]);
+    else kept += 1;
+  });
+  return { restore, kept };
+}

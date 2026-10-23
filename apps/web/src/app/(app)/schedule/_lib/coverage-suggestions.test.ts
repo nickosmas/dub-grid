@@ -11,8 +11,10 @@ import {
   hasOpenRequest,
   pendingPickupsFromRequests,
   planSuggestionWrites,
+  planUndo,
   publishedDayFromShifts,
 } from "./coverage-suggestions";
+import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
 import type { CoverageSuggestion } from "@dubgrid/schedule-core";
 
 const shiftCategories: ShiftCategory[] = [
@@ -339,5 +341,40 @@ describe("planSuggestionWrites", () => {
       planSuggestionWrites(suggestion("assign", ["2026-10-26"]), {}, () => built)?.writes[0].input,
     ).toBe(built);
     expect(planSuggestionWrites(suggestion("assign", ["2026-10-26"]), {}, noAssign)).toBeNull();
+  });
+});
+
+describe("planUndo", () => {
+  const asInput = (entry: ScheduleCellStateEntry) => scheduleCellSnapshotToInput(entry.effective);
+  const write = (dateKey: string, entry: ScheduleCellStateEntry | null) => ({
+    employeeId: "ana",
+    dateKey,
+    input: entry ? asInput(entry) : null,
+  });
+  // The build wrote a Day shift on Monday and emptied Tuesday.
+  const applied = {
+    writes: [write("2026-10-26", worked([DAY])), write("2026-10-27", null)],
+    before: [write("2026-10-26", null), write("2026-10-27", worked([EVENING]))],
+  };
+
+  it("puts back every cell that still holds what was written", () => {
+    const shifts = { "ana_2026-10-26": worked([DAY]) };
+    expect(planUndo(applied, shifts)).toEqual({ restore: applied.before, kept: 0 });
+  });
+
+  it("keeps a cell someone changed since, and counts it", () => {
+    const shifts = {
+      "ana_2026-10-26": worked([DAY], { mentored: [true] }),
+      "ana_2026-10-27": { ...worked([NIGHT]) },
+    };
+    expect(planUndo(applied, shifts)).toEqual({ restore: [], kept: 2 });
+  });
+
+  it("treats a deleted cell as empty", () => {
+    const shifts = {
+      "ana_2026-10-26": worked([DAY]),
+      "ana_2026-10-27": { ...worked([EVENING]), isDelete: true },
+    };
+    expect(planUndo(applied, shifts).restore).toEqual(applied.before);
   });
 });

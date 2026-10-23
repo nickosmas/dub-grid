@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   planCoverageFixes,
+  previewCoverageBuild,
   suggestCoverageFixes,
   type CoverageSuggestion,
 } from "./coverage-suggestions";
@@ -520,5 +521,79 @@ describe("planCoverageFixes", () => {
         dateKey: MON,
       }),
     ).toEqual([]);
+  });
+});
+
+describe("previewCoverageBuild", () => {
+  it("counts what the build does, by kind, people and gaps", () => {
+    // Monday: Ana's shift was removed in the draft (restore) and one more is
+    // short (schedule). Every other day is short two (schedule two).
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      published: { [`ana|${MON}`]: { work: [DAY_MA] } },
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world);
+
+    expect(preview.counts.restore).toBe(1);
+    expect(preview.counts.moveBack).toBe(0);
+    expect(preview.counts.assign).toBe(preview.fixes.length - 1);
+    expect(preview.fixes[0].kind).toBe("restore");
+    expect(preview.shortBefore).toBe(world.matrix.dateKeys.length);
+    expect(preview.shortAfter).toBe(0);
+    expect(preview.staffShortBefore).toBe(2 * world.matrix.dateKeys.length);
+    expect(preview.staffShortAfter).toBe(0);
+    expect(preview.people).toBe(new Set(preview.fixes.map((fix) => fix.employeeId)).size);
+  });
+
+  it("does not count cells that have started", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: {},
+      startedDateKeys: [MON],
+    });
+    const preview = previewCoverageBuild(world);
+
+    expect(preview.shortBefore).toBe(world.matrix.dateKeys.length - 1);
+    expect(preview.fixes.some((fix) => fix.subject.dateKey === MON)).toBe(false);
+  });
+
+  it("builds only the rows it is given, and counts only them", () => {
+    const world = buildSuggestionWorld({ draft: {} });
+    const preview = previewCoverageBuild(world, { rowKeys: new Set([ROW_SC]) });
+
+    expect(preview.fixes.length).toBeGreaterThan(0);
+    expect(
+      preview.fixes.every((fix) => fix.targets.every((target) => target.rowKey === ROW_SC)),
+    ).toBe(true);
+    expect(preview.shortBefore).toBe(world.matrix.dateKeys.length);
+  });
+
+  it("counts people still needed, so a partial fill shows progress", () => {
+    // Two needed each day, one person free: every day goes from 2 to 1 short.
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, people: ["ana"], draft: {} });
+    const preview = previewCoverageBuild(world, { dateKey: MON });
+
+    expect(preview.shortAfter).toBe(preview.shortBefore);
+    expect(preview.staffShortAfter).toBe(preview.staffShortBefore - 1);
+  });
+
+  it("is empty, with nothing changed, when nobody can fill anything", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      qualified: { ana: [], ben: [], cat: [], dan: [], eve: [] },
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world);
+
+    expect(preview.fixes).toEqual([]);
+    expect(preview.counts).toEqual({ assign: 0, restore: 0, moveBack: 0 });
+    expect(preview.shortAfter).toBe(preview.shortBefore);
+    expect(preview.staffShortAfter).toBe(preview.staffShortBefore);
+  });
+
+  it("previews the same build every time", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    expect(previewCoverageBuild(world)).toEqual(previewCoverageBuild(world));
   });
 });

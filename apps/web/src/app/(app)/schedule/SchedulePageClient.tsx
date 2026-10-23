@@ -96,12 +96,14 @@ import {
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
   planCoverageFixes,
+  previewCoverageBuild,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
   parseLocalDateKey,
   type CoverageCategorySnapshot,
   type CoverageDaySide,
+  type CoverageDayOverride,
   type CoverageMatrixCell,
   type CoverageMatrixRow,
   type CoverageSuggestion,
@@ -110,8 +112,10 @@ import {
   availabilityWithPlanned,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
+  planUndo,
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
+import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
   appliedSuggestionText,
   type AppliedCoverageSuggestion,
@@ -620,8 +624,8 @@ function SchedulerContent({
   const [, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  // The grid's order: by department, then within it. Print and Coverage Check
-  // list focus areas the same way.
+  // The grid's order: by department, then within it. Print and the Schedule
+  // Builder list focus areas the same way.
   const orderedFocusAreas = useMemo(
     () => orderFocusAreasByDepartment(focusAreas, departments),
     [departments, focusAreas],
@@ -3553,7 +3557,7 @@ function SchedulerContent({
     ],
   );
 
-  // Built only while Coverage Check is open, so the grid pays nothing for it.
+  // Built only while the Schedule Builder is open, so the grid pays nothing for it.
   const coverageMatrix = useMemo(() => {
     if (!showCoveragePanel || !canViewCoveragePanel || spanWeeks === "month") return null;
     const base = coverageBase;
@@ -6638,7 +6642,9 @@ function SchedulerContent({
   const [appliedSuggestions, setAppliedSuggestions] = useState<
     Array<
       AppliedCoverageSuggestion & {
-        before: { employeeId: string; dateKey: string; input: ScheduleCellInput | null }[];
+        /** What each cell held before, and what was written, so Undo can tell a later edit. */
+        before: SuggestionWrite[];
+        writes: SuggestionWrite[];
       }
     >
   >([]);
@@ -6741,30 +6747,20 @@ function SchedulerContent({
       const text = appliedSuggestionText(view.text.title);
       setAppliedSuggestions((current) => [
         ...current,
-        { id: `${suggestion.id}@${Date.now()}`, text, final: false, before },
+        { id: `${suggestion.id}@${Date.now()}`, text, final: false, before, writes },
       ]);
       toast.success(text);
     },
     [buildSuggestedAssignInput, coverageSuggestions, setShift, shifts],
   );
 
-  // Apply all: the engine plans the fixes one at a time, counting again after
-  // each, and every planned day is written like a single Apply. One Applied
-  // entry with Undo puts the whole batch back.
-  const applyAllCoverageSuggestions = useCallback(
-    (dateKey: string | null) => {
-      if (!coverageSuggestions) return;
-      const { engine, adapterInput } = coverageSuggestions;
-      const plan = planCoverageFixes(engine, {
-        dateKey: dateKey ?? undefined,
-        availabilityWith: (planned) => availabilityWithPlanned(adapterInput, planned),
-      });
-      if (plan.length === 0) {
-        toast.error("Nothing here can be fixed in the draft.");
-        return;
-      }
-      setBusySuggestionId("apply-all");
+  // Writes a planned batch like single Applies, putting back what it wrote if
+  // any cell fails, and records one Applied entry whose Undo covers it all.
+  const applyCoveragePlan = useCallback(
+    (plan: CoverageSuggestion[], text: string, id: string): boolean => {
+      setBusySuggestionId(id);
       const before: SuggestionWrite[] = [];
+      const written: SuggestionWrite[] = [];
       for (const suggestion of plan) {
         const writes = planSuggestionWrites(
           suggestion,
@@ -6778,41 +6774,150 @@ function SchedulerContent({
               return true;
             }
             before.push(writes.before[index]);
+            written.push(write);
             return false;
           });
         if (failed) {
-          // Put back the whole batch so the draft is never left half applied.
           for (const undo of [...before].reverse()) {
             setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
           }
           setBusySuggestionId(null);
           toast.error("Those changes couldn't be saved. Nothing was changed.");
-          return;
+          return false;
         }
       }
       setBusySuggestionId(null);
-      const fixes = plan.length === 1 ? "1 fix" : `${plan.length} fixes`;
-      const text = dateKey
-        ? `Applied ${fixes} for ${formatShortDate(parseLocalDateKey(dateKey))}`
-        : `Applied ${fixes} across this period`;
       setAppliedSuggestions((current) => [
         ...current,
-        { id: `apply-all@${Date.now()}`, text, final: false, before },
+        { id: `${id}@${Date.now()}`, text, final: false, before, writes: written },
       ]);
       toast.success(text);
+      return true;
     },
-    [buildSuggestedAssignInput, coverageSuggestions, setShift],
+    [buildSuggestedAssignInput, setShift],
   );
+
+  const planOptions = useCallback(
+    (options: { dateKey?: string; rowKeys?: ReadonlySet<string> }) => {
+      if (!coverageSuggestions) return null;
+      const { engine, adapterInput } = coverageSuggestions;
+      return {
+        engine,
+        options: {
+          ...options,
+          availabilityWith: (planned: ReadonlyArray<CoverageDayOverride>) =>
+            availabilityWithPlanned(adapterInput, planned),
+        },
+      };
+    },
+    [coverageSuggestions],
+  );
+
+  // A day's Apply all: the engine plans the fixes one at a time, counting
+  // again after each.
+  const applyAllCoverageSuggestions = useCallback(
+    (dateKey: string) => {
+      const planned = planOptions({ dateKey });
+      if (!planned) return;
+      const plan = planCoverageFixes(planned.engine, planned.options);
+      if (plan.length === 0) {
+        toast.error("Nothing here can be fixed in the draft.");
+        return;
+      }
+      const fixes = plan.length === 1 ? "1 fix" : `${plan.length} fixes`;
+      applyCoveragePlan(
+        plan,
+        `Applied ${fixes} for ${formatShortDate(parseLocalDateKey(dateKey))}`,
+        "apply-all",
+      );
+    },
+    [applyCoveragePlan, planOptions],
+  );
+
+  // Build: a preview is tied to the draft's counts it was planned from, so a
+  // draft change that moves any count sends the section back to idle. The
+  // suggestions object is rebuilt on every refresh, so its identity is not
+  // enough; Build plans again anyway and catches a change counts miss.
+  const coverageCountsKey = useMemo(
+    () =>
+      coverageSuggestions?.engine.matrix.rows
+        .map((row) =>
+          row.cells
+            .map((cell) => (cell ? `${cell.draft.actual}/${cell.draft.required}` : "-"))
+            .join(),
+        )
+        .join("|") ?? "",
+    [coverageSuggestions],
+  );
+  const [buildPreview, setBuildPreview] = useState<{
+    state: ScheduleBuildState;
+    rowKeys: string[];
+    plannedFrom: string;
+  } | null>(null);
+  const buildState: ScheduleBuildState =
+    buildPreview && buildPreview.plannedFrom === coverageCountsKey
+      ? buildPreview.state
+      : { status: "idle" };
+
+  const previewBuild = useCallback(
+    (rowKeys: string[]) => {
+      const planned = planOptions({ rowKeys: new Set(rowKeys) });
+      if (!planned) return;
+      const plannedFrom = coverageCountsKey;
+      setBuildPreview({ state: { status: "previewing" }, rowKeys, plannedFrom });
+      // Planned after the spinner has painted: a large period takes a moment.
+      window.setTimeout(() => {
+        try {
+          const preview = previewCoverageBuild(planned.engine, planned.options);
+          setBuildPreview({ state: { status: "ready", preview }, rowKeys, plannedFrom });
+        } catch (err) {
+          Sentry.captureException(err);
+          setBuildPreview({ state: { status: "failed" }, rowKeys, plannedFrom });
+        }
+      }, 0);
+    },
+    [coverageCountsKey, planOptions],
+  );
+
+  const runBuild = useCallback(() => {
+    if (!buildPreview || buildState.status !== "ready") return;
+    const planned = planOptions({ rowKeys: new Set(buildPreview.rowKeys) });
+    if (!planned) return;
+    // Planned again at Build; if the draft moved on, show what Build would do now.
+    const preview = previewCoverageBuild(planned.engine, planned.options);
+    const sameAsShown =
+      preview.fixes.map((fix) => fix.id).join() ===
+      buildState.preview.fixes.map((fix) => fix.id).join();
+    if (!sameAsShown) {
+      setBuildPreview({
+        state: { status: "ready", preview },
+        rowKeys: buildPreview.rowKeys,
+        plannedFrom: coverageCountsKey,
+      });
+      toast.info("The draft changed, so the preview was updated. Check it and build again.");
+      return;
+    }
+    const changes = preview.fixes.length === 1 ? "1 change" : `${preview.fixes.length} changes`;
+    if (applyCoveragePlan(preview.fixes, `Built the draft: ${changes}`, "build")) {
+      setBuildPreview(null);
+    }
+  }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planOptions]);
 
   const undoCoverageSuggestion = useCallback(
     (appliedId: string) => {
       const entry = appliedSuggestions.find((item) => item.id === appliedId);
       if (!entry || entry.final) return;
-      for (const write of entry.before) {
+      // Only cells that still hold what was applied go back; a later edit stays.
+      const { restore, kept } = planUndo(entry, shiftsRef.current);
+      for (const write of restore) {
         setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
       }
       setAppliedSuggestions((current) => current.filter((item) => item.id !== appliedId));
-      toast.success(`Undone: ${entry.text}`);
+      toast.success(
+        kept === 0
+          ? `Undone: ${entry.text}`
+          : `Undone, except ${kept === 1 ? "1 cell" : `${kept} cells`} changed since, which ${kept === 1 ? "keeps its" : "keep their"} change: ${entry.text}`,
+      );
     },
     [appliedSuggestions, setShift],
   );
@@ -6838,7 +6943,7 @@ function SchedulerContent({
     const text = appliedSuggestionText(view?.text.title ?? "Approved the pickup request");
     setAppliedSuggestions((current) => [
       ...current,
-      { id: `${suggestion.id}@${Date.now()}`, text, final: true, before: [] },
+      { id: `${suggestion.id}@${Date.now()}`, text, final: true, before: [], writes: [] },
     ]);
     toast.success(text);
   }, [coverageSuggestions, pendingApproval, shiftRequests]);
@@ -8714,6 +8819,16 @@ function SchedulerContent({
               onApplySuggestion={applyCoverageSuggestion}
               onUndoSuggestion={undoCoverageSuggestion}
               onApplyAllSuggestions={applyAllCoverageSuggestions}
+              build={
+                canEditShifts
+                  ? {
+                      state: buildState,
+                      onPreview: previewBuild,
+                      onBuild: runBuild,
+                      onCancel: () => setBuildPreview(null),
+                    }
+                  : undefined
+              }
               onFillSpot={fillCoverageCell}
               onShowInGrid={showCoverageInGrid}
               onClose={() => setShowCoveragePanel(false)}

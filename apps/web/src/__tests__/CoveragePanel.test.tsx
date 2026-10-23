@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCoverageMatrix,
   type CoverageCategorySnapshot,
+  type CoverageBuildPreview,
   type CoverageMatrix,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import { appliedSuggestionText } from "@/components/coverage-check/CoverageSuggestions";
+import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 
 import CoveragePanel from "@/components/CoveragePanel";
 import type { FocusArea } from "@/types";
@@ -156,7 +158,7 @@ describe("CoveragePanel", () => {
   it("reads and names each cell from the matrix", () => {
     renderPanel();
 
-    expect(screen.getByRole("dialog", { name: "Coverage Check" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Schedule Builder" })).toBeInTheDocument();
     expect(screen.getByText("1 shift short · 0 over")).toBeInTheDocument();
     const wednesday = cell(/North Wing, Day Shift · Med Aide, Wednesday, October 28/);
     expect(wednesday).toHaveTextContent("2/3");
@@ -532,13 +534,13 @@ describe("CoveragePanel", () => {
       expect(screen.queryByRole("region", { name: /^Suggestions for/ })).not.toBeInTheDocument();
     });
 
-    it("applies every draft fix for the picked date, or for the whole period", () => {
+    it("applies every draft fix for the picked date", () => {
       const onApplyAllSuggestions = vi.fn();
       withSuggestions({ onApplyAllSuggestions });
 
-      fireEvent.click(screen.getByRole("button", { name: "Apply all draft fixes" }));
-      expect(onApplyAllSuggestions).toHaveBeenLastCalledWith(null);
-
+      expect(
+        screen.queryByRole("button", { name: "Apply all draft fixes" }),
+      ).not.toBeInTheDocument();
       fireEvent.click(dateHeading(/Wednesday, October 28/));
       fireEvent.click(day().getByRole("button", { name: "Apply all for this day" }));
       expect(onApplyAllSuggestions).toHaveBeenLastCalledWith("2026-10-28");
@@ -646,6 +648,107 @@ describe("CoveragePanel", () => {
       const staffed = within(screen.getByRole("region", { name: "Selected day" }));
       expect(staffed.queryByText("Ways to fix")).not.toBeInTheDocument();
       expect(staffed.queryByText("Not suggested")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("build", () => {
+    const preview = (overrides: Partial<CoverageBuildPreview> = {}): CoverageBuildPreview => ({
+      fixes: [],
+      counts: { assign: 0, restore: 0, moveBack: 0 },
+      people: 0,
+      shortBefore: 2,
+      shortAfter: 2,
+      overBefore: 0,
+      overAfter: 0,
+      staffShortBefore: 4,
+      staffShortAfter: 4,
+      ...overrides,
+    });
+    const withBuild = (state: ScheduleBuildState, overrides = {}) => {
+      const build = { state, onPreview: vi.fn(), onBuild: vi.fn(), onCancel: vi.fn() };
+      renderPanel({
+        suggestions: { items: [], notSuggestedByCell: new Map() },
+        build,
+        ...overrides,
+      });
+      return build;
+    };
+    const section = () => within(screen.getByRole("region", { name: "Build the draft" }));
+
+    it("says what a build does and previews the rows shown", () => {
+      const build = withBuild({ status: "idle" });
+
+      expect(
+        section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
+      ).toBeInTheDocument();
+      expect(
+        section().getByText("Never moves or replaces anyone already scheduled."),
+      ).toBeInTheDocument();
+      fireEvent.click(section().getByRole("button", { name: "Preview build" }));
+      expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
+    });
+
+    it("shows the preview's counts, then builds or cancels", () => {
+      const fixes = [{ id: "x" }, { id: "y" }, { id: "z" }] as CoverageSuggestion[];
+      const build = withBuild({
+        status: "ready",
+        preview: preview({
+          fixes,
+          counts: { assign: 2, restore: 1, moveBack: 0 },
+          people: 3,
+          shortAfter: 0,
+          staffShortAfter: 1,
+        }),
+      });
+
+      expect(section().getByText(/3 changes for 3 people\./)).toBeInTheDocument();
+      expect(section().getByText(/Schedules 2 shifts · Restores 1 shift/)).toBeInTheDocument();
+      expect(section().getByText("2 now, 0 after")).toBeInTheDocument();
+      expect(section().getByText("4 now, 1 after")).toBeInTheDocument();
+      fireEvent.click(section().getByRole("button", { name: "Build" }));
+      expect(build.onBuild).toHaveBeenCalled();
+      fireEvent.click(section().getByRole("button", { name: "Cancel" }));
+      expect(build.onCancel).toHaveBeenCalled();
+    });
+
+    it("says when there is nothing to build, and when the preview failed", () => {
+      withBuild({ status: "ready", preview: preview() });
+      expect(
+        section().getByText(/Nothing to build\. Nobody qualified is free/),
+      ).toBeInTheDocument();
+    });
+
+    it("says when the preview could not be worked out", () => {
+      withBuild({ status: "failed" });
+      expect(section().getByRole("alert")).toHaveTextContent("The build couldn't be worked out.");
+    });
+
+    it("holds Build while another change is being applied", () => {
+      withBuild(
+        {
+          status: "ready",
+          preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+        },
+        { busySuggestionId: "a" },
+      );
+      expect(section().getByRole("button", { name: "Build" })).toBeDisabled();
+    });
+
+    it("offers no build to someone who cannot edit shifts, or in Month view", () => {
+      withBuild({ status: "idle" }, { canEditShifts: false });
+      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+    });
+
+    it("offers no build in Month view", () => {
+      withBuild({ status: "idle" }, { matrix: null });
+      expect(screen.queryByRole("region", { name: "Build the draft" })).not.toBeInTheDocument();
+    });
+
+    it("clears the preview when the focus area filter changes", () => {
+      const build = withBuild({ status: "idle" });
+      fireEvent.click(screen.getByText("All Focus Areas"));
+      fireEvent.click(screen.getByRole("option", { name: "North Wing" }));
+      expect(build.onCancel).toHaveBeenCalled();
     });
   });
 });
