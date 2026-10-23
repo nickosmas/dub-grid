@@ -277,7 +277,7 @@ Item 49 is split:
 - **49b - Auto-build naming:** shipped; Auto-build with a plain description, Generate schedule, Apply and Discard, and a calendar toolbar button with no count.
 - **49c - Five days in a row, days off in pairs:** shipped; no sixth day in a row from a build, a suggestion or a recurring fill, counted across periods, and days off kept in pairs unless nobody can.
 - **49d - Day off absence:** shipped; Schedule Rules names the day off absence (pre-detected by name), and a build writes it into each scheduled person's empty days.
-- **49e - Shift preferences:** planned (migration 089).
+- **49e - Shift preferences:** shipped; per person Prefers or Only a set of shifts on the Recurring Shifts page (migration 089), which Auto-build and its suggestions follow.
 - **49f - Allow a sixth day:** planned.
 
 A build never schedules anyone more than five days in a row, unless the
@@ -465,7 +465,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `088`.
+  checksum-locked through `089`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

@@ -1020,7 +1020,7 @@
   - [x] 49d. **Day off absence** - Schedule Rules names the absence that
         means a day off (pre-detected by name); a build writes it into each
         scheduled person's remaining empty days, in pairs where it can.
-  - [ ] 49e. **Shift preferences** - per person, Prefers or Only a set of
+  - [x] 49e. **Shift preferences** - per person, Prefers or Only a set of
         shifts on the Recurring schedule tab (migration 089); Auto-build and
         suggestions never give an Only person another shift and pick
         preferred people first.

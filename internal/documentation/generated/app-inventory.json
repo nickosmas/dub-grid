@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:6f7ff0e91e0084b33514711d0e1fa5cc5ada8fcfbe556923bef4060308c41196",
+  "sourceDigest": "sha256:440b4dd733c42a7c7b26086a10c130ac5b93250148588c8e01ab1067b64179ba",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4666,6 +4666,16 @@
       "source": {
         "path": "supabase/migrations/088_open_pickup_claims.sql"
       }
+    },
+    {
+      "id": "migration:089_shift_preferences.sql",
+      "version": "089",
+      "name": "shift_preferences",
+      "file": "089_shift_preferences.sql",
+      "sha256": "408fe234a3aa69013d310bc121395a78f8cd87739a65167c8482902267eb7580",
+      "source": {
+        "path": "supabase/migrations/089_shift_preferences.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -4763,6 +4773,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.employee_shift_preferences",
+      "schema": "public",
+      "table": "employee_shift_preferences",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/089_shift_preferences.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/089_shift_preferences.sql"
       }
     },
     {

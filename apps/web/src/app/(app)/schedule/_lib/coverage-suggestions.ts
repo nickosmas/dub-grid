@@ -6,6 +6,7 @@ import {
   type CoverageDayOverride,
   type CoverageFairnessRule,
   type CoverageOvertimeRule,
+  type CoverageShiftPreference,
   type CoverageSkippedRecurring,
   type CoverageMatrix,
   type CoverageMeasureInput,
@@ -62,6 +63,13 @@ export interface CoverageSuggestionAdapterInput {
   absenceNames: ReadonlyMap<number, string>;
   /** Every date the page has loaded, first to last. */
   loadedDateKeys: string[];
+  /** Each person's shift preference, by employee id; people without one are left out. */
+  preferences?: ReadonlyMap<string, CoverageShiftPreference>;
+}
+
+/** The shift an assignment belongs to, for matching a preference. */
+function shiftOfAssignment(assignment: AssignmentDefinition | undefined): number | null {
+  return assignment?.shiftId ?? assignment?.categoryId ?? null;
 }
 
 function mentoredOf(
@@ -229,7 +237,7 @@ export function limitRecurringRuns<
 export function availabilityFromShifts(
   input: Pick<
     CoverageSuggestionAdapterInput,
-    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys"
+    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys" | "preferences"
   >,
   employeeId: string,
   dateKey: string,
@@ -246,6 +254,11 @@ export function availabilityFromShifts(
   }
 
   const assignment = input.assignments.find((candidate) => candidate.id === assignmentId);
+  const preference = input.preferences?.get(employeeId);
+  if (preference?.mode === "only") {
+    const shiftId = shiftOfAssignment(assignment);
+    if (shiftId == null || !preference.shiftIds.includes(shiftId)) return { kind: "onlyShifts" };
+  }
   const range = assignment ? assignmentTimeRange(assignment, input.shiftCategories) : null;
   const sameDay = getStaffingStateAlignedTimeRanges(state, context);
   for (const [index, existing] of sameDay.entries()) {
@@ -296,7 +309,7 @@ export function availabilityFromShifts(
 export function availabilityWithPlanned(
   input: Pick<
     CoverageSuggestionAdapterInput,
-    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys"
+    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys" | "preferences"
   >,
   planned: ReadonlyArray<CoverageDayOverride>,
 ): (employeeId: string, dateKey: string, assignmentId: number) => CoverageAvailability {
@@ -416,7 +429,7 @@ export function isNightAssignment(
  * the planned days written. History holds published cells before the period.
  */
 export function fairnessStandingWithPlanned(
-  input: DraftHoursInput,
+  input: DraftHoursInput & Pick<CoverageSuggestionAdapterInput, "preferences">,
   periodDateKeys: ReadonlyArray<string>,
   history: ShiftMap = {},
 ): CoverageFairnessRule["standing"] {
@@ -452,7 +465,14 @@ export function fairnessStandingWithPlanned(
     const worked = workedWith(input.shifts, planned, employeeId);
     const date = parseLocalDateKey(dateKey);
     const on = (offset: number) => worked(formatDateKey(addDays(date, offset)));
+    const preference = input.preferences?.get(employeeId);
+    const preferred = shiftOfAssignment(assignmentById.get(assignmentId));
     return {
+      preference: !preference
+        ? "none"
+        : preferred != null && preference.shiftIds.includes(preferred)
+          ? "match"
+          : "other",
       // A single day off left between work days on either side.
       splitsDaysOff: !on(0) && ((!on(-1) && on(-2)) || (!on(1) && on(2))),
       weekends: isWeekendDateKey(dateKey)

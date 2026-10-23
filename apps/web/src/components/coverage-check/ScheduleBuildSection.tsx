@@ -160,6 +160,7 @@ const WHY_ORDER = [
   "Restored",
   "Moved back",
   "Keeps days off together",
+  "Prefers this shift",
   "Fewest weekends",
   "Fewest nights",
   "Fewest hours",
@@ -171,6 +172,7 @@ const WHY_ORDER = [
 const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   only: "Only one free",
   daysOff: "Keeps days off together",
+  preference: "Prefers this shift",
   weekends: "Fewest weekends",
   nights: "Fewest nights",
   hours: "Fewest hours",

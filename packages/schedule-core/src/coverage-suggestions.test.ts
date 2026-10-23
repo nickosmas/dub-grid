@@ -836,6 +836,7 @@ describe("fairness in a build", () => {
       weekends?: Record<string, number>;
       nights?: Record<string, number>;
       splits?: string[];
+      prefers?: Record<string, "match" | "none" | "other">;
     } = {},
   ): CoverageFairnessRule => ({
     standing: (employeeId, dateKey, _assignmentId, days) => {
@@ -843,6 +844,7 @@ describe("fairness in a build", () => {
       const weekend = day === 0 || day === 6;
       return {
         splitsDaysOff: options.splits?.includes(employeeId) ?? false,
+        preference: options.prefers?.[employeeId] ?? "none",
         weekends: weekend && options.weekends ? (options.weekends[employeeId] ?? 0) : null,
         nights: options.nights ? (options.nights[employeeId] ?? 0) : null,
         hours: (hours[employeeId] ?? 0) + 8 * planned(employeeId, days),
@@ -947,6 +949,31 @@ describe("fairness in a build", () => {
 
     // Everyone splits, so the shift still goes out, by hours (Ben and Cat tie, Ben by name).
     expect(plan.map((fix) => fix.employeeId)).toEqual(["ben", "cat"]);
+  });
+
+  it("gives a shift to people who prefer it first and to people who prefer others last", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      fairness: rule(
+        { ana: 0, ben: 0, cat: 30, dan: 40, eve: 0 },
+        { prefers: { ana: "other", ben: "other", eve: "other", dan: "match" } },
+      ),
+    });
+
+    // Dan prefers it; then Cat, with no preference, before anyone who prefers other shifts.
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["dan", "cat"]);
+    expect(preview.choices.map((choice) => choice.reason)).toEqual(["preference", "preference"]);
+  });
+
+  it("keeps days off together before a preference", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const plan = planCoverageFixes(world, {
+      dateKey: MON,
+      fairness: rule({}, { prefers: { ana: "match" }, splits: ["ana"] }),
+    });
+
+    expect(plan[0].employeeId).toBe("ben");
   });
 
   it("still puts back the draft's own changes first", () => {

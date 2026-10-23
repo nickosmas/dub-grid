@@ -103,6 +103,7 @@ import {
   previewCoverageBuildAsync,
   type CoverageBuildPreview,
   type CoverageBuildProgress,
+  type CoverageShiftPreference,
   type CoverageSkippedRecurring,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
@@ -180,6 +181,7 @@ import {
   fetchPublishedDateRanges,
   fetchRecentPublishHistory,
   fetchRecurringShifts,
+  fetchShiftPreferences,
   fetchScheduleActorNames,
   fetchSchedulePresenceProfiles,
   fetchScheduleEditorSessionStatus,
@@ -6564,6 +6566,26 @@ function SchedulerContent({
 
   // Editors only, while the panel is open: every suggestion is measured on a
   // copy of the schedule by the engine, so this reruns as the draft changes.
+  // Shift preferences shape the Schedule Builder's choices; read when it opens.
+  const [shiftPreferences, setShiftPreferences] = useState<
+    ReadonlyMap<string, CoverageShiftPreference>
+  >(() => new Map());
+  useEffect(() => {
+    if (!showCoveragePanel || !org?.id || !canEditShifts) return;
+    let cancelled = false;
+    fetchShiftPreferences(org.id)
+      .then((list) => {
+        if (cancelled) return;
+        setShiftPreferences(
+          new Map(list.map(({ employeeId, mode, shiftIds }) => [employeeId, { mode, shiftIds }])),
+        );
+      })
+      // Someone who cannot read recurring schedules builds without preferences.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [showCoveragePanel, org?.id, canEditShifts]);
   const coverageSuggestions = useMemo(() => {
     if (!coverageMatrix || !canEditShifts) return null;
     const adapterInput = {
@@ -6582,6 +6604,7 @@ function SchedulerContent({
       assignmentNames: assignmentNameMap,
       absenceNames: new Map(allAbsenceTypes.map((type) => [type.id, type.name])),
       loadedDateKeys: availableSwapDates,
+      preferences: shiftPreferences,
     };
     const { engine, text } = buildCoverageSuggestionInput(adapterInput);
     const result = suggestCoverageFixes(engine);
@@ -6608,6 +6631,7 @@ function SchedulerContent({
     assignmentById,
     assignmentNameMap,
     availableSwapDates,
+    shiftPreferences,
     canEditShifts,
     coverageBase,
     coverageMatrix,

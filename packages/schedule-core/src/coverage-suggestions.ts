@@ -202,7 +202,16 @@ export type CoverageAvailability =
   /** A pickup, swap or call-off waits on this person that day. */
   | { kind: "request"; dateKey: string }
   /** Working this day would make `days` in a row, over the limit. */
-  | { kind: "workRun"; days: number };
+  | { kind: "workRun"; days: number }
+  /** The person works only the shifts they chose, and this is not one. */
+  | { kind: "onlyShifts" };
+
+/** A person's shift preference: flexible ("prefers") or strict ("only"). */
+export interface CoverageShiftPreference {
+  mode: "prefers" | "only";
+  /** Shift category ids. */
+  shiftIds: number[];
+}
 
 export interface CoveragePickupRequest {
   requestId: string;
@@ -743,6 +752,8 @@ export interface CoverageOverThreshold {
 export interface CoverageFairnessStanding {
   /** Whether this shift would leave the person a single day off between work days. */
   splitsDaysOff?: boolean;
+  /** Their preference against this shift: one they prefer, none, or other shifts. */
+  preference?: "match" | "none" | "other";
   /** Weekend shifts recently and this period, or null when the shift is not on a weekend. */
   weekends: number | null;
   /** Night shifts recently and this period, or null when the shift is not a night. */
@@ -765,7 +776,7 @@ export interface CoverageFairChoice {
   suggestionId: string;
   employeeId: string;
   dateKey: string;
-  reason: "only" | "daysOff" | "weekends" | "nights" | "hours" | "tie";
+  reason: "only" | "daysOff" | "preference" | "weekends" | "nights" | "hours" | "tie";
   /** The chosen person's count for that reason (hours for a tie). */
   count: number;
   /** How many others could have filled it the same way. */
@@ -812,12 +823,15 @@ export interface CoverageSkippedRecurring {
   days: number;
 }
 
-const FAIRNESS_REASONS = ["daysOff", "weekends", "nights", "hours"] as const;
+const FAIRNESS_REASONS = ["daysOff", "preference", "weekends", "nights", "hours"] as const;
+
+const PREFERENCE_RANK = { match: 0, none: 1, other: 2 } as const;
 
 // Days off stay in pairs first: a split is taken only when everyone else splits too.
 function standingKey(standing: CoverageFairnessStanding): number[] {
   return [
     standing.splitsDaysOff ? 1 : 0,
+    PREFERENCE_RANK[standing.preference ?? "none"],
     standing.weekends ?? 0,
     standing.nights ?? 0,
     standing.hours,

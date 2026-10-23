@@ -60,6 +60,7 @@ export const queryKeys = {
   },
   recurringShifts: {
     all: (orgId: string) => ["recurringShifts", orgId] as const,
+    preferences: (orgId: string) => ["recurringShifts", orgId, "preferences"] as const,
   },
   shiftRequests: {
     all: (orgId: string) => ["shiftRequests", orgId] as const,

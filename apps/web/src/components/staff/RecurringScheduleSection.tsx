@@ -1,5 +1,5 @@
 "use client";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -32,6 +32,8 @@ import { absenceStripeFill } from "@/lib/absence-stripes";
 import {
   deleteRecurringDraft,
   fetchRecurringShifts,
+  fetchShiftPreferences,
+  saveShiftPreference,
   getRecurringDraft,
   saveRecurringDraft,
   saveRecurringShifts,
@@ -40,6 +42,8 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
+import type { CoverageShiftPreference } from "@dubgrid/schedule-core";
+import { describeShiftPreference, ShiftPreferenceModal } from "./ShiftPreferenceModal";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 import type {
@@ -561,6 +565,48 @@ export function RecurringScheduleSection({
     queryKey: queryKeys.recurringShifts.all(orgId),
     queryFn: () => fetchRecurringShifts(orgId, undefined, assignmentMap, false, absenceTypeMap),
   });
+  const preferencesQuery = useQuery({
+    queryKey: queryKeys.recurringShifts.preferences(orgId),
+    queryFn: () => fetchShiftPreferences(orgId),
+  });
+  const preferenceByEmployee = useMemo(
+    () =>
+      new Map(
+        (preferencesQuery.data ?? []).map(({ employeeId, mode, shiftIds }) => [
+          employeeId,
+          { mode, shiftIds },
+        ]),
+      ),
+    [preferencesQuery.data],
+  );
+  const [editingPreferenceFor, setEditingPreferenceFor] = useState<Employee | null>(null);
+  // The shifts a person can be given: their focus areas' own and the global ones.
+  const shiftsFor = useCallback(
+    (employee: Employee) =>
+      shiftCategories.filter(
+        (shift) =>
+          !shift.archivedAt &&
+          (shift.focusAreaId == null || employee.focusAreaIds.includes(shift.focusAreaId)),
+      ),
+    [shiftCategories],
+  );
+  const savePreference = useCallback(
+    async (employeeId: string, preference: CoverageShiftPreference | null) => {
+      try {
+        await saveShiftPreference(orgId, employeeId, preference);
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.recurringShifts.preferences(orgId),
+        });
+        toast.success("Shift preference saved");
+      } catch (error) {
+        toast.error(
+          formatClientErrorMessage(error, "We couldn't save that preference. Try again."),
+        );
+        throw error;
+      }
+    },
+    [orgId, queryClient],
+  );
   const allSchedules = useMemo<RecurringScheduleDraft>(() => {
     const schedules: RecurringScheduleDraft = {};
     for (const recurringShift of recurringShiftsQuery.data ?? []) {
@@ -914,6 +960,15 @@ export function RecurringScheduleSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
       <ProgressBar loading={loading} />
+      {editingPreferenceFor && (
+        <ShiftPreferenceModal
+          personName={getEmployeeDisplayName(editingPreferenceFor)}
+          shifts={shiftsFor(editingPreferenceFor)}
+          preference={preferenceByEmployee.get(editingPreferenceFor.id)}
+          onSave={(preference) => savePreference(editingPreferenceFor.id, preference)}
+          onClose={() => setEditingPreferenceFor(null)}
+        />
+      )}
       {hasDirtyChanges && canManage && (
         <div
           style={{
@@ -1228,7 +1283,34 @@ export function RecurringScheduleSection({
                     >
                       {getEmployeeDisplayName(employee)}
                     </div>
+                    {preferenceByEmployee.has(employee.id) && (
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--dg-color-text-muted)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {describeShiftPreference(
+                          preferenceByEmployee.get(employee.id),
+                          (id) => shiftCategoryById.get(id)?.name,
+                        )}
+                      </div>
+                    )}
                   </div>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className="dg-btn dg-btn-ghost"
+                      aria-label={`Shift preference for ${getEmployeeDisplayName(employee)}`}
+                      onClick={() => setEditingPreferenceFor(employee)}
+                      style={{ padding: 4, height: "auto", marginLeft: 4, flexShrink: 0 }}
+                    >
+                      <SlidersHorizontal aria-hidden size={14} />
+                    </button>
+                  )}
                   {certAbbr && designationColors && (
                     <span
                       style={{

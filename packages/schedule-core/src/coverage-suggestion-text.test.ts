@@ -331,5 +331,8 @@ describe("describeCoverageRuledOutReason", () => {
     expect(describeCoverageRuledOut(entry, LOOKUPS)).toBe(
       "Ana Crawford: would work 6 days in a row",
     );
+    expect(describeCoverageRuledOut({ ...entry, reason: { kind: "onlyShifts" } }, LOOKUPS)).toBe(
+      "Ana Crawford: works only their chosen shifts",
+    );
   });
 });

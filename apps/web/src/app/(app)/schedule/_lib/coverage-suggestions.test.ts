@@ -469,12 +469,14 @@ describe("fairnessStandingWithPlanned", () => {
   it("counts weekends over history and the period for a weekend shift", () => {
     // History: two Saturdays; the period: Sunday. Hours: Sunday 8 and Monday's night 8.5.
     expect(standing("ana", "2026-10-31", DAY, [])).toEqual({
+      preference: "none",
       splitsDaysOff: false,
       weekends: 3,
       nights: null,
       hours: 16.5,
     });
     expect(standing("ben", "2026-10-31", DAY, [])).toEqual({
+      preference: "none",
       splitsDaysOff: false,
       weekends: 1,
       nights: null,
@@ -484,6 +486,7 @@ describe("fairnessStandingWithPlanned", () => {
 
   it("counts nights with the planned days written for a night shift", () => {
     expect(standing("ana", "2026-10-27", NIGHT, [nightOn("2026-10-27")])).toEqual({
+      preference: "none",
       splitsDaysOff: false,
       weekends: null,
       nights: 3,
@@ -642,5 +645,39 @@ describe("planDaysOff", () => {
         absenceTypeId: OFF,
       }),
     ).toEqual([]);
+  });
+});
+
+describe("shift preferences", () => {
+  const input = (
+    preferences: Record<string, { mode: "prefers" | "only"; shiftIds: number[] }>,
+  ) => ({
+    shifts: {},
+    assignments,
+    shiftCategories,
+    loadedDateKeys: LOADED,
+    preferences: new Map(Object.entries(preferences)),
+  });
+
+  it("rules out any other shift for someone who works only their chosen shifts", () => {
+    const only = input({ ana: { mode: "only", shiftIds: [2] } });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", DAY)).toEqual({ kind: "onlyShifts" });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", EVENING).kind).not.toBe("onlyShifts");
+    expect(availabilityFromShifts(only, "ben", "2026-10-26", DAY).kind).not.toBe("onlyShifts");
+  });
+
+  it("does not rule anyone out for a flexible preference", () => {
+    const prefers = input({ ana: { mode: "prefers", shiftIds: [2] } });
+    expect(availabilityFromShifts(prefers, "ana", "2026-10-26", DAY).kind).not.toBe("onlyShifts");
+  });
+
+  it("tells the standing whether the shift is one the person prefers", () => {
+    const standing = fairnessStandingWithPlanned(
+      input({ ana: { mode: "prefers", shiftIds: [2] }, ben: { mode: "only", shiftIds: [1] } }),
+      ["2026-10-26"],
+    );
+    expect(standing("ana", "2026-10-26", EVENING, []).preference).toBe("match");
+    expect(standing("ana", "2026-10-26", DAY, []).preference).toBe("other");
+    expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
   });
 });
