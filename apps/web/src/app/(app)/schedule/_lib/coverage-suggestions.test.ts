@@ -13,9 +13,10 @@ import {
   planSuggestionWrites,
   planUndo,
   publishedDayFromShifts,
+  weekHoursWithPlanned,
 } from "./coverage-suggestions";
 import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
-import type { CoverageSuggestion } from "@dubgrid/schedule-core";
+import type { CoverageDayOverride, CoverageSuggestion } from "@dubgrid/schedule-core";
 
 const shiftCategories: ShiftCategory[] = [
   { id: 1, orgId: "org", name: "Day", startTime: "07:00", endTime: "15:00", sortOrder: 0 },
@@ -376,5 +377,49 @@ describe("planUndo", () => {
       "ana_2026-10-27": { ...worked([EVENING]), isDelete: true },
     };
     expect(planUndo(applied, shifts).restore).toEqual(applied.before);
+  });
+});
+
+describe("weekHoursWithPlanned", () => {
+  const plannedDay = (dateKey: string, assignmentIds: number[]): CoverageDayOverride => ({
+    employeeId: "ana",
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds,
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+  const shorter = { ...worked([DAY]), customStartTime: "07:00", customEndTime: "11:00" };
+  const shifts = {
+    "ana_2026-10-25": worked([DAY]),
+    "ana_2026-10-26": shorter,
+    "ana_2026-10-27": absent(4),
+    "ana_2026-11-01": worked([DAY]),
+    "ben_2026-10-28": worked([DAY]),
+  };
+  const weekHours = weekHoursWithPlanned({ shifts, assignments, shiftCategories });
+
+  it("counts the person's own Sunday-to-Saturday week, with their custom times", () => {
+    // Sunday 8 and Monday's custom 4; the absence has no hours, next Sunday is another week.
+    expect(weekHours("ana", "2026-10-28", [])).toBe(12);
+    expect(weekHours("ana", "2026-10-31", [])).toBe(12);
+    expect(weekHours("ana", "2026-11-01", [])).toBe(8);
+  });
+
+  it("adds planned days and replaces the days they rewrite", () => {
+    const planned = [
+      plannedDay("2026-10-28", [NIGHT]),
+      plannedDay("2026-10-26", [EVENING]),
+      { ...plannedDay("2026-10-29", [DAY]), employeeId: "ben" },
+    ];
+    // Sunday 8, Monday now an Evening at its usual 8, Wednesday's Night 8.5.
+    expect(weekHours("ana", "2026-10-26", planned)).toBe(24.5);
+  });
+
+  it("keeps a day's custom times when a planned day leaves its shifts as they are", () => {
+    expect(weekHours("ana", "2026-10-26", [plannedDay("2026-10-26", [DAY])])).toBe(12);
   });
 });

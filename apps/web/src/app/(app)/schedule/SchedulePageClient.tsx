@@ -96,6 +96,7 @@ import {
   describeCoverageRuledOutReason,
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
+  WEEKLY_OVERTIME_HOURS,
   planCoverageFixes,
   previewCoverageBuild,
   type CoverageBuildPreview,
@@ -113,6 +114,7 @@ import {
 } from "@dubgrid/schedule-core";
 import {
   availabilityWithPlanned,
+  weekHoursWithPlanned,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
   planUndo,
@@ -6799,6 +6801,10 @@ function SchedulerContent({
           ...options,
           availabilityWith: (planned: ReadonlyArray<CoverageDayOverride>) =>
             availabilityWithPlanned(adapterInput, planned),
+          overtime: {
+            thresholdHours: WEEKLY_OVERTIME_HOURS,
+            weekHours: weekHoursWithPlanned(adapterInput),
+          },
         },
       };
     },

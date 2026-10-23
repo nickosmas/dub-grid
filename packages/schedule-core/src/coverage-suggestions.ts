@@ -717,6 +717,26 @@ function dayNumber(dateKey: string): number {
   return Math.round(parseLocalDateKey(dateKey).getTime() / 86_400_000);
 }
 
+/** The organization's weekly overtime threshold, with the caller's own hour counting. */
+export interface CoverageOvertimeRule {
+  thresholdHours: number;
+  /** The person's draft hours in the week holding the date, with the planned days written. */
+  weekHours: (
+    employeeId: string,
+    dateKey: string,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => number;
+}
+
+/** A fix the plan took although it puts the person over the threshold. */
+export interface CoverageOverThreshold {
+  employeeId: string;
+  dateKey: string;
+  suggestionId: string;
+  /** Their hours that week once the whole plan is written. */
+  hours: number;
+}
+
 export interface PlanCoverageFixesOptions {
   /** Only fixes for this date. */
   dateKey?: string;
@@ -735,6 +755,11 @@ export interface PlanCoverageFixesOptions {
   availabilityWith?: (
     planned: ReadonlyArray<CoverageDayOverride>,
   ) => CoverageSuggestionInput["availability"];
+  /**
+   * Prefer fixes that keep everyone at or under the threshold; take one that
+   * goes over only when no other fix is left.
+   */
+  overtime?: CoverageOvertimeRule;
 }
 
 /**
@@ -750,12 +775,21 @@ export function planCoverageFixes(
   return planWithLeftovers(input, options).fixes;
 }
 
+interface PlanWithLeftovers {
+  fixes: CoverageSuggestion[];
+  ruledOut: CoverageRuledOut[];
+  final: CoverageSuggestionInput;
+  overThreshold: CoverageOverThreshold[];
+}
+
 /** The plan, plus who the last pass ruled out and the schedule it ended on. */
 function planWithLeftovers(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions,
-): { fixes: CoverageSuggestion[]; ruledOut: CoverageRuledOut[]; final: CoverageSuggestionInput } {
+): PlanWithLeftovers {
   const plan: CoverageSuggestion[] = [];
+  const overtime = options.overtime;
+  const taken: Omit<CoverageOverThreshold, "hours">[] = [];
   const overrides: CoverageDayOverride[] = [...(options.baseOverrides ?? [])];
   const reach = options.availabilityWith ? 0 : 1;
   const clashes = (override: CoverageDayOverride) =>
@@ -770,13 +804,37 @@ function planWithLeftovers(
       ? { ...next, availability: options.availabilityWith(overrides) }
       : next;
   };
+  let ruledOut: CoverageRuledOut[] = [];
+  // A fix goes over when it adds hours to a week that ends up past the threshold.
+  const goesOver = (suggestion: CoverageSuggestion) => {
+    if (!overtime) return [];
+    const planned = [...overrides, ...suggestion.overrides];
+    return suggestion.overrides.filter((override) => {
+      if (override.side !== "draft" || override.day.assignmentIds.length === 0) return false;
+      const after = overtime.weekHours(override.employeeId, override.dateKey, planned);
+      return (
+        after > overtime.thresholdHours + EPSILON &&
+        after > overtime.weekHours(override.employeeId, override.dateKey, overrides) + EPSILON
+      );
+    });
+  };
+  const finish = (final: CoverageSuggestionInput): PlanWithLeftovers => ({
+    fixes: plan,
+    ruledOut,
+    final,
+    overThreshold: overtime
+      ? taken.map((entry) => ({
+          ...entry,
+          hours: overtime.weekHours(entry.employeeId, entry.dateKey, overrides),
+        }))
+      : [],
+  });
   let current = overrides.length > 0 ? withPlanned() : input;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
-  let ruledOut: CoverageRuledOut[] = [];
   for (let step = 0; step < 500; step += 1) {
     const pass = suggestCoverageFixes(current);
     ruledOut = pass.ruledOut;
-    const next = pass.suggestions.find(
+    const eligible = pass.suggestions.filter(
       (suggestion) =>
         DRAFT_KINDS.has(suggestion.kind) &&
         suggestion.targets.some(
@@ -786,12 +844,20 @@ function planWithLeftovers(
         ) &&
         !suggestion.overrides.some(clashes),
     );
-    if (!next) return { fixes: plan, ruledOut, final: current };
+    const next = eligible.find((suggestion) => goesOver(suggestion).length === 0) ?? eligible[0];
+    if (!next) return finish(current);
+    for (const override of goesOver(next)) {
+      taken.push({
+        employeeId: override.employeeId,
+        dateKey: override.dateKey,
+        suggestionId: next.id,
+      });
+    }
     plan.push(next);
     overrides.push(...next.overrides);
     current = withPlanned();
   }
-  return { fixes: plan, ruledOut, final: current };
+  return finish(current);
 }
 
 /** What a build would do to the draft, counted exactly before anything changes. */
@@ -813,6 +879,8 @@ export interface CoverageBuildPreview {
   staffShortAfter: number;
   /** Why each qualified person was not scheduled into a shift the build leaves short. */
   skipped: CoverageRuledOut[];
+  /** Fixes taken over the overtime threshold because no other fix was left. */
+  overThreshold: CoverageOverThreshold[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -839,7 +907,7 @@ export function previewCoverageBuild(
   input: CoverageSuggestionInput,
   options: PlanCoverageFixesOptions = {},
 ): CoverageBuildPreview {
-  const { fixes, ruledOut, final } = planWithLeftovers(input, options);
+  const { fixes, ruledOut, final, overThreshold } = planWithLeftovers(input, options);
   const base = options.baseOverrides ?? [];
   const after = withDraftOverrides(input, [...base, ...fixes.flatMap((fix) => fix.overrides)]);
   const stillShort = new Set<string>();
@@ -877,5 +945,6 @@ export function previewCoverageBuild(
     staffShortBefore: before.staffShort,
     staffShortAfter: result.staffShort,
     skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
+    overThreshold,
   };
 }

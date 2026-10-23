@@ -3,6 +3,8 @@ import {
   planCoverageFixes,
   previewCoverageBuild,
   suggestCoverageFixes,
+  type CoverageDayOverride,
+  type CoverageOvertimeRule,
   type CoverageSuggestion,
 } from "./coverage-suggestions";
 import {
@@ -745,5 +747,62 @@ describe("absences and requests in a build", () => {
     );
     expect(outside.skipped.length).toBeGreaterThan(0);
     expect(outside.skipped.every((entry) => entry.rowKey === ROW_SC)).toBe(true);
+  });
+});
+
+describe("the overtime threshold in a build", () => {
+  // Ana and Ben start the week at 36 hours; each planned shift adds 8.
+  const startingHours: Record<string, number> = { ana: 36, ben: 36 };
+  const overtime: CoverageOvertimeRule = {
+    thresholdHours: 40,
+    weekHours: (employeeId, _dateKey, planned: ReadonlyArray<CoverageDayOverride>) =>
+      (startingHours[employeeId] ?? 0) +
+      8 *
+        planned.filter((day) => day.employeeId === employeeId && day.day.assignmentIds.length > 0)
+          .length,
+  };
+
+  it("schedules people who stay under the threshold first", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const without = planCoverageFixes(world, { dateKey: MON });
+    const withRule = planCoverageFixes(world, { dateKey: MON, overtime });
+
+    expect(without.some((fix) => fix.employeeId === "ana" || fix.employeeId === "ben")).toBe(true);
+    expect(withRule).toHaveLength(2);
+    expect(withRule.some((fix) => fix.employeeId === "ana" || fix.employeeId === "ben")).toBe(
+      false,
+    );
+    expect(previewCoverageBuild(world, { dateKey: MON, overtime }).overThreshold).toEqual([]);
+  });
+
+  it("goes over only when nobody else can fill the gap, and says so", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: {},
+      qualified: { cat: [], dan: [], eve: [] },
+    });
+    const preview = previewCoverageBuild(world, { dateKey: MON, overtime });
+
+    expect(preview.fixes.map((fix) => fix.employeeId).sort()).toEqual(["ana", "ben"]);
+    expect(preview.shortAfter).toBe(preview.shortBefore - 1);
+    expect(
+      preview.overThreshold.map(({ employeeId, dateKey, hours }) => [employeeId, dateKey, hours]),
+    ).toEqual(preview.fixes.map((fix) => [fix.employeeId, MON, 44]));
+    expect(preview.overThreshold.map((entry) => entry.suggestionId)).toEqual(
+      preview.fixes.map((fix) => fix.id),
+    );
+  });
+
+  it("does not mark a fix that adds no hours to a week already over", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      draft: {},
+      qualified: { cat: [], dan: [], eve: [] },
+    });
+    const flat: CoverageOvertimeRule = { thresholdHours: 40, weekHours: () => 50 };
+    const preview = previewCoverageBuild(world, { dateKey: MON, overtime: flat });
+
+    expect(preview.fixes).toHaveLength(2);
+    expect(preview.overThreshold).toEqual([]);
   });
 });

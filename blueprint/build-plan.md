@@ -994,9 +994,9 @@
   - [x] 48c. **Absences and requests** - every absence type, whole-day and
         rest-of-day, and pending call-offs and requests block a person; the
         preview names who was skipped and why.
-  - [ ] 48d. **Overtime threshold** - an organization setting (default 40
-        hours a week, migration); the builder prefers people under it, goes
-        over only when nobody else can fill a gap, and marks those shifts.
+  - [x] 48d. **Overtime threshold** - fixed at 40 hours a week (US, no
+        setting); the builder prefers people under it, goes over only when
+        nobody else can fill a gap, and names them in the preview.
   - [ ] 48e. **Fairness** - balance hours across people in the period and
         rotate weekends and nights from recent published schedules, with the
         reason for each choice.

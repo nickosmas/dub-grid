@@ -242,7 +242,7 @@ approval publishes at once and replaces any earlier draft of the cells it
 writes, with a warning first (owner decisions, 2026-10-21). Design
 reference: the "Staffing check panel" canvas.
 
-Item 48 is split; 48a to 48c have shipped:
+Item 48 is split; 48a to 48d have shipped:
 
 - **48a - Rename and Build section:** shipped; Coverage Check is named
   Schedule Builder, and a Build section previews a build of the period and
@@ -256,14 +256,17 @@ Item 48 is split; 48a to 48c have shipped:
 - **48c - Absences and requests:** shipped; a waiting request blocks
   scheduling that person that day, and the preview's Not scheduled names
   everyone left out of a shift it leaves short, with each date and reason.
-- **48d - Overtime threshold:** planned; an organization setting (default
-  40 hours a week, migration).
+- **48d - Overtime threshold:** shipped; the builder prefers people who stay
+  within 40 hours a week (Sunday to Saturday, fixed for the US, no setting)
+  and names anyone it takes over with their weekly hours. The Build section
+  is lean: one summary line, before and after pairs, and the people left out
+  collapsed.
 - **48e - Fairness:** planned; balance hours and rotate weekends and nights.
 - **48f - Build report:** planned.
 
 The builder only fills: it applies recurring schedules, fills empty cells
 and puts back the draft's own removals, and never moves or replaces anyone
-already scheduled. It avoids the overtime threshold and crosses it only when
+already scheduled. It avoids going past 40 hours a week and does so only when
 nobody else can fill a gap, has no rest rules yet, and never includes
 approvals (owner decisions, 2026-10-22). The Tools item that fills from
 recurring schedules is named Fill from Recurring Schedules (2026-10-22).

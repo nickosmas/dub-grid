@@ -665,12 +665,18 @@ describe("CoveragePanel", () => {
       staffShortBefore: 4,
       staffShortAfter: 4,
       skipped: [],
+      overThreshold: [],
       ...overrides,
     });
     const skippedWords = {
       personName: (id: string) => ({ ana: "Ana Crawford", ben: "Ben Shepherd" })[id] ?? id,
       formatDate: (dateKey: string) =>
-        ({ "2026-10-26": "Mon, Oct 26", "2026-10-27": "Tue, Oct 27" })[dateKey] ?? dateKey,
+        ({
+          "2026-10-25": "Sun, Oct 25",
+          "2026-10-26": "Mon, Oct 26",
+          "2026-10-27": "Tue, Oct 27",
+          "2026-11-01": "Sun, Nov 1",
+        })[dateKey] ?? dateKey,
       reason: (entry: CoverageRuledOut) =>
         entry.reason.kind === "absence" ? "Sick that day" : "has a request waiting that day",
     };
@@ -706,8 +712,8 @@ describe("CoveragePanel", () => {
         section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
       ).toBeInTheDocument();
       expect(
-        section().getByText("Never moves or replaces anyone already scheduled."),
-      ).toBeInTheDocument();
+        section().getByText(/^Fills empty cells from recurring schedules, then short shifts/),
+      ).toHaveTextContent("It never changes anyone already scheduled.");
       fireEvent.click(section().getByRole("button", { name: "Preview build" }));
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
     });
@@ -725,45 +731,30 @@ describe("CoveragePanel", () => {
         }),
       });
 
-      expect(section().getByText(/3 changes for 3 people\./)).toBeInTheDocument();
-      expect(section().getByText(/Schedules 2 shifts · Restores 1 shift/)).toBeInTheDocument();
-      expect(section().getByText("2 now, 0 after")).toBeInTheDocument();
-      expect(section().getByText("4 now, 1 after")).toBeInTheDocument();
+      expect(section().getByText("3 changes for 3 people")).toBeInTheDocument();
+      expect(section().getByText("2 new shifts · 1 restored")).toBeInTheDocument();
+      expect(section().getByLabelText("2 now, 0 after")).toHaveTextContent("2 → 0");
+      expect(section().getByLabelText("4 now, 1 after")).toHaveTextContent("4 → 1");
       fireEvent.click(section().getByRole("button", { name: "Build" }));
       expect(build.onBuild).toHaveBeenCalled();
       fireEvent.click(section().getByRole("button", { name: "Cancel" }));
       expect(build.onCancel).toHaveBeenCalled();
     });
 
-    it("starts from recurring schedules and counts their fills", () => {
-      withBuild({ status: "idle" });
-      expect(
-        section().getByText(
-          "Starts from each person's recurring schedule, filling the empty cells it covers.",
-        ),
-      ).toBeInTheDocument();
-    });
-
     it.each([
-      [{ shifts: 12, absences: 0 }, "From recurring schedules: 12 shifts."],
-      [{ shifts: 0, absences: 1 }, "From recurring schedules: 1 absence."],
-      [{ shifts: 3, absences: 2 }, "From recurring schedules: 3 shifts, 2 absences."],
-    ])("shows the recurring fills %o", (recurring, line) => {
+      [{ shifts: 12, absences: 0 }, "12 changes for 2 people", null],
+      [{ shifts: 0, absences: 1 }, "1 change for 2 people", null],
+      [
+        { shifts: 3, absences: 2 },
+        "5 changes for 2 people",
+        "3 recurring shifts · 2 recurring absences",
+      ],
+    ])("counts the recurring fills %o", (recurring, headline, breakdown) => {
       withBuild({ status: "ready", preview: preview({ recurring, people: 2 }) });
-      expect(section().getByText(line)).toBeInTheDocument();
-      const total = recurring.shifts + recurring.absences;
-      expect(
-        section().getByText(new RegExp(`^${total} changes? for 2 people\\.`)),
-      ).toBeInTheDocument();
+      expect(section().getByText(headline)).toBeInTheDocument();
+      if (breakdown) expect(section().getByText(breakdown)).toBeInTheDocument();
+      else expect(section().queryByText(/·/)).not.toBeInTheDocument();
       expect(section().getByRole("button", { name: "Build" })).toBeInTheDocument();
-    });
-
-    it("shows no recurring line when no recurring schedule fills anything", () => {
-      withBuild({
-        status: "ready",
-        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
-      });
-      expect(section().queryByText(/From recurring schedules/)).not.toBeInTheDocument();
     });
 
     it("names each person skipped once, with every date and reason in order", () => {
@@ -780,11 +771,43 @@ describe("CoveragePanel", () => {
           ],
         }),
       });
+      expect(section().queryByRole("list", { name: "Not scheduled" })).not.toBeInTheDocument();
+      fireEvent.click(section().getByRole("button", { name: "2 people couldn't be scheduled" }));
       const list = within(section().getByRole("list", { name: "Not scheduled" }));
       expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
         "Ana Crawford Mon, Oct 26: Sick that day",
         "Ben Shepherd Mon, Oct 26: Sick that day; Tue, Oct 27: has a request waiting that day",
       ]);
+    });
+
+    it("names each person it takes over the threshold, once per week", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }, { id: "y" }, { id: "z" }] as CoverageSuggestion[],
+          people: 2,
+          overThreshold: [
+            { employeeId: "ben", dateKey: "2026-10-27", suggestionId: "x", hours: 44 },
+            { employeeId: "ben", dateKey: "2026-10-26", suggestionId: "y", hours: 44 },
+            { employeeId: "ben", dateKey: "2026-11-02", suggestionId: "z", hours: 42.5 },
+            { employeeId: "ana", dateKey: "2026-10-31", suggestionId: "w", hours: 48 },
+          ],
+        }),
+      });
+      const list = within(section().getByRole("list", { name: "Over 40 hours a week" }));
+      expect(list.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        "Ana Crawford 48 hours, week of Sun, Oct 25",
+        "Ben Shepherd 44 hours, week of Sun, Oct 25",
+        "Ben Shepherd 42.5 hours, week of Sun, Nov 1",
+      ]);
+    });
+
+    it("shows no overtime list when nobody goes over", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
+      });
+      expect(section().queryByText("Over 40 hours a week")).not.toBeInTheDocument();
     });
 
     it("shows five people, then all of them", () => {
@@ -793,6 +816,7 @@ describe("CoveragePanel", () => {
         status: "ready",
         preview: preview({ skipped: ids.map((id) => skip(id, "2026-10-26", "absence")) }),
       });
+      fireEvent.click(section().getByRole("button", { name: "7 people couldn't be scheduled" }));
       const list = () => within(section().getByRole("list", { name: "Not scheduled" }));
       expect(list().getAllByRole("listitem")).toHaveLength(5);
       fireEvent.click(section().getByRole("button", { name: "Show all 7" }));
@@ -804,7 +828,9 @@ describe("CoveragePanel", () => {
         status: "ready",
         preview: preview({ fixes: [{ id: "x" }] as CoverageSuggestion[], people: 1 }),
       });
-      expect(section().queryByRole("list", { name: "Not scheduled" })).not.toBeInTheDocument();
+      expect(
+        section().queryByRole("button", { name: /couldn't be scheduled/ }),
+      ).not.toBeInTheDocument();
     });
 
     it("says when there is nothing to build", () => {

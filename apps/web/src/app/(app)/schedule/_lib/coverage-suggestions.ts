@@ -1,7 +1,9 @@
 import {
+  computeShiftSegmentHours,
   parseLocalDateKey,
   type CoverageAvailability,
   type CoverageDayOverride,
+  type CoverageOvertimeRule,
   type CoverageMatrix,
   type CoverageMeasureInput,
   type CoveragePickupRequest,
@@ -241,6 +243,47 @@ export function availabilityWithPlanned(
       }
     }
     return base;
+  };
+}
+
+/**
+ * A person's draft hours in the schedule week (Sunday to Saturday) holding a
+ * date, with the planned days written. A planned day takes its shifts' usual
+ * times unless it keeps the day's own shifts unchanged.
+ */
+export function weekHoursWithPlanned(
+  input: Pick<CoverageSuggestionAdapterInput, "shifts" | "assignments" | "shiftCategories">,
+): CoverageOvertimeRule["weekHours"] {
+  const assignmentById = new Map(
+    input.assignments.map((assignment) => [assignment.id, assignment]),
+  );
+  const categoryById = new Map(input.shiftCategories.map((category) => [category.id, category]));
+  return (employeeId, dateKey, planned) => {
+    const plannedDays = new Map<string, CoverageSuggestionDay>();
+    for (const override of planned) {
+      if (override.side === "draft" && override.employeeId === employeeId) {
+        plannedDays.set(override.dateKey, override.day);
+      }
+    }
+    const date = parseLocalDateKey(dateKey);
+    const sunday = addDays(date, -date.getDay());
+    let total = 0;
+    for (let offset = 0; offset < 7; offset += 1) {
+      const key = formatDateKey(addDays(sunday, offset));
+      const entry = input.shifts[`${employeeId}_${key}`];
+      const saved = entry && !entry.isDelete ? entry.assignmentIds : [];
+      const assignmentIds = plannedDays.get(key)?.assignmentIds ?? saved;
+      if (assignmentIds.length === 0) continue;
+      const keepsTimes = assignmentIds.join(",") === saved.join(",");
+      total += computeShiftSegmentHours(
+        assignmentIds,
+        assignmentById,
+        keepsTimes ? entry?.customStartTime : null,
+        keepsTimes ? entry?.customEndTime : null,
+        categoryById,
+      );
+    }
+    return Math.round(total * 100) / 100;
   };
 }
 

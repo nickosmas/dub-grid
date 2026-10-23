@@ -32,6 +32,9 @@ export type HoursShiftCategoryLike = {
  * its default hours/duration when only shiftId+jobId are stored (mobile's
  * schedule_cell_segments), not an assignmentId directly.
  */
+/** Worked hours in a Sunday-to-Saturday week before overtime (US federal rule). */
+export const WEEKLY_OVERTIME_HOURS = 40;
+
 export function buildShiftJobPairKey(shiftId: number | null, jobId: number): string {
   return `${shiftId ?? "null"}:${jobId}`;
 }
