@@ -30,13 +30,13 @@ The [Schedule Builder](/features/coverage-and-open-shifts#auto-build) starts eve
 
 ## Shift preferences
 
-On **People > Recurring Shifts**, the preference button beside a person's name sets which shifts they want:
+On **People > Recurring Shifts**, the **Shift preference** column shows each person's preference. Select it to change it:
 
-- **No preference**: Auto-build can give them any shift they are qualified for.
-- **Prefers these shifts**: Auto-build gives them these shifts first, and others when it needs to.
-- **Only these shifts**: Auto-build and its suggestions never give them any other shift.
+- **Any shift**: Auto-build can give them any shift they're qualified for.
+- **Prefers some shifts**: they get the shifts you tick first, and others when needed.
+- **Only some shifts**: Auto-build and its suggestions never give them any other shift.
 
-The preference shows under their name, such as "Only: Evening Shift". It saves straight away and does not change their recurring schedule, which recurring fills still follow.
+Each focus area has its own shifts, so the dialog lists only the shifts of the person's focus areas (and any shift for every focus area), with their times, grouped by focus area. Choose at least one shift for Prefers or Only. With Only, a focus area where you choose none means they get no shifts there, and the dialog says so. The column then reads, for example, "Only Evening Shift". A preference saves straight away and does not change their recurring schedule, which recurring fills still follow.
 
 ## Repeating shifts
 
@@ -64,7 +64,16 @@ To change or remove a repeating shift, select one of its shifts. Under **Repeati
 
 Then change or remove the shift and select **Confirm**. Removed shifts are marked for deletion and come off the schedule when you publish. Removing **This and later** ends the series the day before, and removing every shift ends the series.
 
-Changing or removing a series affects only its own shifts, never a day you kept when you created it.
+Changing or removing a series this way affects only its own shifts, never a day you kept when you created it.
+
+To change when a repeating shift happens, select one of its shifts and choose **Edit dates and pattern**. The same fields open with the series' current values, and the summary says how many days the change adds and removes. Save or discard any change to the selected day first.
+
+Under **Days already in the series**, choose what happens to days that stay in the pattern:
+
+- **Keep their changes**: a day you changed on its own keeps that change.
+- **Reset to match**: every day goes back to the repeating shift.
+
+Days that leave the pattern are removed the same way as above. If a day joining it already has a shift or absence, DubGrid asks first, as when creating one. Select **Save Repeating Shift** to apply it.
 
 ## Who can do what
 

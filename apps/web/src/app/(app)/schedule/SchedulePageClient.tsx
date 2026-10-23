@@ -100,6 +100,8 @@ import {
   resolveDayOffAbsenceType,
   MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_ROW_STRETCHED,
+  MAX_DAYS_IN_A_WEEK,
+  MAX_DAYS_IN_A_WEEK_STRETCHED,
   WEEKLY_OVERTIME_HOURS,
   planCoverageFixes,
   previewCoverageBuildAsync,
@@ -107,6 +109,7 @@ import {
   type CoverageBuildProgress,
   type CoverageShiftPreference,
   type CoverageSkippedRecurring,
+  type CoverageTopUpRule,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
@@ -123,9 +126,12 @@ import {
   availabilityFromShifts,
   availabilityWithPlanned,
   daysPastUsualLimit,
+  usualDaysInAWeek,
+  weekDaysWithPlanned,
   fairnessStandingWithPlanned,
   planDaysOff,
   limitRecurringRuns,
+  type WorkLimits,
   weekHoursWithPlanned,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
@@ -191,9 +197,11 @@ import {
   fetchScheduleEditorSessionStatus,
   fetchScheduleNotes,
   fetchShifts,
+  fetchShiftSeriesPattern,
   getScheduleLastViewed,
   moveShift,
   publishSchedule,
+  rescheduleShiftSeries,
   updateScheduleLastViewed,
   updateSeriesAllShifts,
   upsertScheduleNote,
@@ -337,6 +345,7 @@ import {
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
+  ShiftSeriesReschedule,
   DraftKind,
   NotePublishChange,
   PublishChange,
@@ -399,6 +408,15 @@ const scheduleEditorSessionIds = new Map<string, string>();
 
 /** How long teardown waits for a joining channel to settle before forcing it. */
 const CHANNEL_SETTLE_TIMEOUT_MS = 5_000;
+/** The work limits a build plans with; 6 days in a week and in a row when allowed. */
+function planningLimits(allowSixthDay: boolean | undefined): WorkLimits {
+  return {
+    maxDaysInARow: allowSixthDay ? MAX_DAYS_IN_A_ROW_STRETCHED : MAX_DAYS_IN_A_ROW,
+    maxDaysInAWeek: allowSixthDay ? MAX_DAYS_IN_A_WEEK_STRETCHED : MAX_DAYS_IN_A_WEEK,
+    noDoubleShifts: true,
+  };
+}
+
 /** How long a build plans before letting the page draw. */
 const BUILD_SLICE_MS = 12;
 /** Published weeks before a build's period that count toward weekend and night rotation. */
@@ -5313,6 +5331,58 @@ function SchedulerContent({
     ],
   );
 
+  const handleLoadSeriesPattern = useCallback(
+    (seriesId: string) => {
+      if (!org) return Promise.reject(new Error("No organization"));
+      return fetchShiftSeriesPattern(seriesId, org.id);
+    },
+    [org],
+  );
+
+  const handleRescheduleSeries = useCallback(
+    async (seriesId: string, pattern: ShiftSeriesReschedule, isAbsence: boolean) => {
+      if (!org || !guardActiveSession()) return;
+      const noun = isAbsence ? "absence" : "shift";
+      setIsCreatingRepeatSeries(true);
+      startScheduleOperation({
+        kind: "repeat_series",
+        title: `Updating repeating ${noun}...`,
+        detail: "Applying the new dates and pattern.",
+        progress: 20,
+      });
+      try {
+        await rescheduleShiftSeries(seriesId, org.id, pattern);
+        updateScheduleOperation("repeat_series", {
+          progress: 90,
+          detail: "Refreshing the schedule...",
+        });
+        broadcastDraftReconcile();
+        await refetchScheduleDataRef.current();
+        toast.success(`Repeating ${noun} updated`);
+        finishScheduleOperation("repeat_series");
+      } catch (err) {
+        clearScheduleOperation("repeat_series");
+        toast.error(
+          formatClientErrorMessage(err, `We couldn't update that repeating ${noun}. Try again.`),
+        );
+        Sentry.captureException(err);
+      } finally {
+        setIsCreatingRepeatSeries(false);
+        closeEditPanel();
+      }
+    },
+    [
+      org,
+      guardActiveSession,
+      startScheduleOperation,
+      updateScheduleOperation,
+      finishScheduleOperation,
+      clearScheduleOperation,
+      broadcastDraftReconcile,
+      closeEditPanel,
+    ],
+  );
+
   // ── Qualification check for drag/paste ──────────────────────────────────
   const focusAreaNameMap = useMemo(
     () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
@@ -6649,12 +6719,20 @@ function SchedulerContent({
     shifts,
   ]);
 
+  // What was built and applied belongs to its period; another period shows its own.
+  const coveragePeriodKey = coverageMatrix
+    ? `${coverageMatrix.dateKeys[0]}..${coverageMatrix.dateKeys[coverageMatrix.dateKeys.length - 1]}`
+    : "";
+  const coveragePeriodKeyRef = useRef(coveragePeriodKey);
+  coveragePeriodKeyRef.current = coveragePeriodKey;
   const [appliedSuggestions, setAppliedSuggestions] = useState<
     Array<
       AppliedCoverageSuggestion & {
         /** What each cell held before, and what was written, so Undo can tell a later edit. */
         before: SuggestionWrite[];
         writes: SuggestionWrite[];
+        /** The period it was applied in; it shows only while that period is on screen. */
+        periodKey: string;
       }
     >
   >([]);
@@ -6757,7 +6835,14 @@ function SchedulerContent({
       const text = appliedSuggestionText(view.text.title);
       setAppliedSuggestions((current) => [
         ...current,
-        { id: `${suggestion.id}@${Date.now()}`, text, final: false, before, writes },
+        {
+          id: `${suggestion.id}@${Date.now()}`,
+          text,
+          final: false,
+          before,
+          writes,
+          periodKey: coveragePeriodKeyRef.current,
+        },
       ]);
       toast.success(text);
     },
@@ -6818,7 +6903,14 @@ function SchedulerContent({
       setBusySuggestionId(null);
       setAppliedSuggestions((current) => [
         ...current,
-        { id: `${id}@${Date.now()}`, text, final: false, before, writes: written },
+        {
+          id: `${id}@${Date.now()}`,
+          text,
+          final: false,
+          before,
+          writes: written,
+          periodKey: coveragePeriodKeyRef.current,
+        },
       ]);
       toast.success(text);
       return written;
@@ -6834,21 +6926,23 @@ function SchedulerContent({
       /** Published cells before the period, for rotating weekends and nights. */
       history?: ShiftMap;
       skippedRecurring?: CoverageSkippedRecurring[];
-      /** A sixth day in a row is allowed, never a seventh. */
+      /** 6 days in a week and in a row are allowed, never 7. */
       allowSixthDay?: boolean;
+      /** A build: bring these people up to their usual days a week. */
+      topUp?: Pick<CoverageTopUpRule, "employeeIds" | "target">;
     }) => {
       if (!coverageSuggestions) return null;
-      const { history, allowSixthDay, ...planned } = options;
-      const adapterInput = allowSixthDay
-        ? { ...coverageSuggestions.adapterInput, maxDaysInARow: MAX_DAYS_IN_A_ROW_STRETCHED }
-        : coverageSuggestions.adapterInput;
-      const engine = allowSixthDay
-        ? {
-            ...coverageSuggestions.engine,
-            availability: (employeeId: string, dateKey: string, assignmentId: number) =>
-              availabilityFromShifts(adapterInput, employeeId, dateKey, assignmentId),
-          }
-        : coverageSuggestions.engine;
+      const { history, allowSixthDay, topUp, ...planned } = options;
+      // Planning never adds a second shift on a day already worked; only a scheduler does.
+      const adapterInput = {
+        ...coverageSuggestions.adapterInput,
+        ...planningLimits(allowSixthDay),
+      };
+      const engine = {
+        ...coverageSuggestions.engine,
+        availability: (employeeId: string, dateKey: string, assignmentId: number) =>
+          availabilityFromShifts(adapterInput, employeeId, dateKey, assignmentId),
+      };
       return {
         engine,
         options: {
@@ -6866,6 +6960,7 @@ function SchedulerContent({
               history,
             ),
           },
+          topUp: topUp && { ...topUp, weekDays: weekDaysWithPlanned(adapterInput) },
         },
       };
     },
@@ -6919,7 +7014,10 @@ function SchedulerContent({
   // Off unless the scheduler turns it on before generating; never more than six in a row.
   const [allowSixthDay, setAllowSixthDay] = useState(false);
   // What the last build did, kept until Done, a new preview or its Undo.
-  const [buildReport, setBuildReport] = useState<CoverageBuildPreview | null>(null);
+  const [buildReport, setBuildReport] = useState<{
+    preview: CoverageBuildPreview;
+    periodKey: string;
+  } | null>(null);
   // Apply in progress, kept apart from the preview, which its own writes make stale.
   const [buildApplying, setBuildApplying] = useState<Extract<
     ScheduleBuildState,
@@ -6929,8 +7027,8 @@ function SchedulerContent({
     ? buildApplying
     : buildPreview && buildPreview.plannedFrom === coverageCountsKey
       ? buildPreview.state
-      : buildReport
-        ? { status: "built", preview: buildReport }
+      : buildReport && buildReport.periodKey === coveragePeriodKey
+        ? { status: "built", preview: buildReport.preview }
         : { status: "idle" };
 
   // A build plans from fresh recurring schedules: each empty cell one fills
@@ -6984,11 +7082,7 @@ function SchedulerContent({
       const fixedWrites: SuggestionWrite[] = [];
       const baseOverrides: CoverageDayOverride[] = [];
       // A recurring schedule never takes anyone past the days-in-a-row limit either.
-      const limited = limitRecurringRuns(
-        fills,
-        shiftsRef.current,
-        allowSixthDay ? MAX_DAYS_IN_A_ROW_STRETCHED : MAX_DAYS_IN_A_ROW,
-      );
+      const limited = limitRecurringRuns(fills, shiftsRef.current, planningLimits(allowSixthDay));
       for (const fill of limited.kept) {
         const input: ScheduleCellInput = { ...fill.input, fromRecurring: true };
         const snapshot = resolveInputSnapshot(input);
@@ -7015,6 +7109,17 @@ function SchedulerContent({
         history,
         skippedRecurring: limited.skipped,
         allowSixthDay,
+        // Then everyone short of their usual days a week gets more, even where staffed.
+        topUp: {
+          employeeIds: scopedEmployeeIds.filter(
+            (id) => employees.find((employee) => employee.id === id)?.status === "active",
+          ),
+          target: (employeeId) =>
+            usualDaysInAWeek(recurring, employeeId, {
+              start: dateKeys[0],
+              end: dateKeys[dateKeys.length - 1],
+            }),
+        },
       });
       if (!planned) return null;
       const preview = await previewCoverageBuildAsync(planned.engine, planned.options, {
@@ -7024,7 +7129,9 @@ function SchedulerContent({
       });
       const plannedDays = [...baseOverrides, ...preview.fixes.flatMap((fix) => fix.overrides)];
       if (allowSixthDay) {
-        preview.sixthDays = daysPastUsualLimit(shiftsRef.current, plannedDays);
+        const past = daysPastUsualLimit(shiftsRef.current, plannedDays);
+        preview.sixthDays = past.runs;
+        preview.sixthWeeks = past.weeks;
       }
       // Then everyone who works in the period gets the day off absence on each empty day.
       const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
@@ -7194,7 +7301,7 @@ function SchedulerContent({
     setBusySuggestionId(null);
     setBuildApplying(null);
     setBuildPreview(null);
-    setBuildReport(built.preview);
+    setBuildReport({ preview: built.preview, periodKey: coveragePeriodKeyRef.current });
   }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planBuild]);
 
   const undoCoverageSuggestion = useCallback(
@@ -7238,7 +7345,14 @@ function SchedulerContent({
     const text = appliedSuggestionText(view?.text.title ?? "Approved the pickup request");
     setAppliedSuggestions((current) => [
       ...current,
-      { id: `${suggestion.id}@${Date.now()}`, text, final: true, before: [], writes: [] },
+      {
+        id: `${suggestion.id}@${Date.now()}`,
+        text,
+        final: true,
+        before: [],
+        writes: [],
+        periodKey: coveragePeriodKeyRef.current,
+      },
     ]);
     toast.success(text);
   }, [coverageSuggestions, pendingApproval, shiftRequests]);
@@ -8905,6 +9019,12 @@ function SchedulerContent({
               onRepeatConfirm={
                 canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined
               }
+              onLoadSeriesPattern={
+                canEditShifts && canManageShiftSeries ? handleLoadSeriesPattern : undefined
+              }
+              onRescheduleSeries={
+                canEditShifts && canManageShiftSeries ? handleRescheduleSeries : undefined
+              }
               isCreatingRepeatSeries={isCreatingRepeatSeries}
               empId={editPanel.empId}
               customStartTime={panelCustomStartTime}
@@ -9108,7 +9228,9 @@ function SchedulerContent({
               getCellFill={getCoverageCellFill}
               describeCellChanges={describeCoverageCell}
               suggestions={coverageSuggestions}
-              appliedSuggestions={appliedSuggestions}
+              appliedSuggestions={appliedSuggestions.filter(
+                (entry) => entry.periodKey === coveragePeriodKey,
+              )}
               busySuggestionId={busySuggestionId}
               onApplySuggestion={applyCoverageSuggestion}
               onUndoSuggestion={undoCoverageSuggestion}

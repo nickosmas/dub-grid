@@ -481,6 +481,30 @@ export interface ShiftSeries {
   archivedAt?: string | null;
 }
 
+/** A series' repeat pattern and the dates it currently holds, for editing the pattern. */
+export interface ShiftSeriesPattern {
+  id: string;
+  frequency: SeriesFrequency;
+  daysOfWeek: number[] | null;
+  startDate: string;
+  endDate: string | null;
+  maxOccurrences: number | null;
+  occurrenceDates: string[];
+}
+
+/** A new repeat pattern for an existing series. */
+export interface ShiftSeriesReschedule {
+  frequency: SeriesFrequency;
+  daysOfWeek: number[] | null;
+  startDate: string;
+  endDate: string | null;
+  maxOccurrences: number | null;
+  /** Skip joining dates that already hold a shift or absence. */
+  keepExisting: boolean;
+  /** Rewrite dates already in the series from the series' shift, dropping their own changes. */
+  resetOccurrences: boolean;
+}
+
 export interface EditModalState {
   empId: string;
   empName: string;

@@ -5,6 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import {
   MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_ROW_STRETCHED,
+  MAX_DAYS_IN_A_WEEK,
+  MAX_DAYS_IN_A_WEEK_STRETCHED,
   WEEKLY_OVERTIME_HOURS,
   formatLocalDateKey,
   parseLocalDateKey,
@@ -129,7 +131,7 @@ function RecurringSkipped({
   words: SkippedWords;
 }) {
   if (entries.length === 0) return null;
-  const caption = `Recurring shifts left out: over ${MAX_DAYS_IN_A_ROW} days in a row`;
+  const caption = "Recurring shifts left out: too many days in a row or in a week";
   return (
     <div className="flex flex-col gap-1.5">
       <div className="dg-cc-caption">{caption}</div>
@@ -175,20 +177,29 @@ export function runLines(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function SixthDays({
-  entries,
-  words,
-}: {
-  entries: ReadonlyArray<{ employeeId: string; dateKey: string }>;
-  words: SkippedWords;
-}) {
-  if (entries.length === 0) return null;
-  const caption = `${MAX_DAYS_IN_A_ROW_STRETCHED} days in a row`;
+/** Everyone the build gives a sixth day, by week and by run. */
+function SixthDays({ preview, words }: { preview: CoverageBuildPreview; words: SkippedWords }) {
+  const weekCaption = `${MAX_DAYS_IN_A_WEEK_STRETCHED} days in a week`;
+  const runCaption = `${MAX_DAYS_IN_A_ROW_STRETCHED} days in a row`;
+  const weeks = recurringSkippedLines(
+    preview.sixthWeeks.map(({ employeeId, weekStart }) => ({ employeeId, dateKey: weekStart })),
+    { ...words, formatDate: (dateKey) => `week of ${words.formatDate(dateKey)}` },
+  );
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="dg-cc-caption">{caption}</div>
-      <NameList label={caption} rows={runLines(entries, words)} />
-    </div>
+    <>
+      {weeks.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <div className="dg-cc-caption">{weekCaption}</div>
+          <NameList label={weekCaption} rows={weeks} />
+        </div>
+      )}
+      {preview.sixthDays.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <div className="dg-cc-caption">{runCaption}</div>
+          <NameList label={runCaption} rows={runLines(preview.sixthDays, words)} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -215,6 +226,7 @@ const WHY_ORDER = [
   "Recurring schedule",
   "Restored",
   "Moved back",
+  "Up to their usual days",
   "Keeps days off together",
   "Prefers this shift",
   "Fewest weekends",
@@ -233,6 +245,7 @@ const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   nights: "Fewest nights",
   hours: "Fewest hours",
   tie: "Even",
+  weekDays: "Up to their usual days",
 };
 
 /** Each person a build changed: shifts given and why, by name. */
@@ -343,7 +356,7 @@ function BuildReport({
             <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
           </div>
         )}
-        <SixthDays entries={preview.sixthDays} words={words} />
+        <SixthDays preview={preview} words={words} />
         <RecurringSkipped entries={preview.recurringSkipped} words={words} />
         {preview.shortCells.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -427,7 +440,7 @@ interface ScheduleBuildSectionProps {
   onAllowSixthDayChange?: (allow: boolean) => void;
 }
 
-export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules. Nobody works more than ${MAX_DAYS_IN_A_ROW} days in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled.`;
+export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules, then gives anyone scheduled fewer than ${MAX_DAYS_IN_A_WEEK} days a week (or their recurring schedule's days) more shifts where staff are thinnest, even if that staffs a shift above what it needs. Nobody works more than ${MAX_DAYS_IN_A_WEEK} days a week or ${MAX_DAYS_IN_A_ROW} in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled or gives anyone two shifts in a day.`;
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {
@@ -504,7 +517,7 @@ function PreviewSummary({
           <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
         </div>
       )}
-      {skippedWords && <SixthDays entries={preview.sixthDays} words={skippedWords} />}
+      {skippedWords && <SixthDays preview={preview} words={skippedWords} />}
       {skippedWords && <RecurringSkipped entries={preview.recurringSkipped} words={skippedWords} />}
       {skippedWords?.dayOffName === null && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
@@ -646,18 +659,19 @@ export function ScheduleBuildSection({
           {onAllowSixthDayChange && (
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-3">
-                <span className="dg-cc-detail-line">Allow a sixth day in a row</span>
+                <span className="dg-cc-detail-line">Allow 6 days in a week</span>
                 <Switch
                   checked={allowSixthDay}
                   onChange={onAllowSixthDayChange}
-                  ariaLabel="Allow a sixth day in a row"
+                  ariaLabel="Allow 6 days in a week"
                   disabled={previewing}
                 />
               </div>
               {allowSixthDay && (
                 <p className="dg-cc-detail-line dg-cc-build-warning" role="note">
-                  Some people may work {MAX_DAYS_IN_A_ROW_STRETCHED} days in a row, never{" "}
-                  {MAX_DAYS_IN_A_ROW_STRETCHED + 1}. The result names everyone who does.
+                  Some people may work {MAX_DAYS_IN_A_WEEK_STRETCHED} days in a week or{" "}
+                  {MAX_DAYS_IN_A_ROW_STRETCHED} in a row, never {MAX_DAYS_IN_A_WEEK_STRETCHED + 1}.
+                  The result names everyone who does.
                 </p>
               )}
             </div>

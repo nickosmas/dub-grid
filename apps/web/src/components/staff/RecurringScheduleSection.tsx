@@ -1,5 +1,5 @@
 "use client";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -43,7 +43,7 @@ import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import type { CoverageShiftPreference } from "@dubgrid/schedule-core";
-import { describeShiftPreference, ShiftPreferenceModal } from "./ShiftPreferenceModal";
+import { describeShiftPreference, ShiftPreferenceModal, shiftLabel } from "./ShiftPreferenceModal";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 import type {
@@ -580,6 +580,13 @@ export function RecurringScheduleSection({
     [preferencesQuery.data],
   );
   const [editingPreferenceFor, setEditingPreferenceFor] = useState<Employee | null>(null);
+  const focusAreaName = useCallback(
+    (focusAreaId: number) => focusAreas.find((area) => area.id === focusAreaId)?.name,
+    [focusAreas],
+  );
+  const gridColumns = `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr)) ${
+    isMobile ? "128px" : "minmax(180px, 1.6fr)"
+  }`;
   // The shifts a person can be given: their focus areas' own and the global ones.
   const shiftsFor = useCallback(
     (employee: Employee) =>
@@ -964,6 +971,7 @@ export function RecurringScheduleSection({
         <ShiftPreferenceModal
           personName={getEmployeeDisplayName(editingPreferenceFor)}
           shifts={shiftsFor(editingPreferenceFor)}
+          focusAreaName={focusAreaName}
           preference={preferenceByEmployee.get(editingPreferenceFor.id)}
           onSave={(preference) => savePreference(editingPreferenceFor.id, preference)}
           onClose={() => setEditingPreferenceFor(null)}
@@ -1180,8 +1188,8 @@ export function RecurringScheduleSection({
           <div
             style={{
               display: "grid",
-              minWidth: isMobile ? 448 : undefined,
-              gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
+              minWidth: isMobile ? 576 : undefined,
+              gridTemplateColumns: gridColumns,
               background: "var(--dg-color-bg)",
               borderBottom: "1px solid var(--dg-color-table-divider-strong)",
             }}
@@ -1220,6 +1228,19 @@ export function RecurringScheduleSection({
                 {day}
               </div>
             ))}
+            <div
+              style={{
+                padding: "10px 12px",
+                fontSize: "var(--dg-type-table-heading-size)",
+                fontWeight: "var(--dg-type-table-heading-weight)",
+                color: "var(--dg-type-table-heading-color)",
+                textTransform: "none",
+                letterSpacing: "var(--dg-type-table-heading-letter-spacing)",
+                borderLeft: "1px solid var(--dg-color-border-light)",
+              }}
+            >
+              Shift preference
+            </div>
           </div>
 
           {sortedEmployees.map((employee, index) => {
@@ -1246,8 +1267,8 @@ export function RecurringScheduleSection({
                 className="dg-table-row"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
-                  minWidth: isMobile ? 448 : undefined,
+                  gridTemplateColumns: gridColumns,
+                  minWidth: isMobile ? 576 : undefined,
                   borderTop: index === 0 ? "none" : "1px solid var(--dg-color-border-light)",
                   background: rowBg,
                   transition: "background 150ms ease",
@@ -1283,34 +1304,7 @@ export function RecurringScheduleSection({
                     >
                       {getEmployeeDisplayName(employee)}
                     </div>
-                    {preferenceByEmployee.has(employee.id) && (
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-caption)",
-                          color: "var(--dg-color-text-muted)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {describeShiftPreference(
-                          preferenceByEmployee.get(employee.id),
-                          (id) => shiftCategoryById.get(id)?.name,
-                        )}
-                      </div>
-                    )}
                   </div>
-                  {canManage && (
-                    <button
-                      type="button"
-                      className="dg-btn dg-btn-ghost"
-                      aria-label={`Shift preference for ${getEmployeeDisplayName(employee)}`}
-                      onClick={() => setEditingPreferenceFor(employee)}
-                      style={{ padding: 4, height: "auto", marginLeft: 4, flexShrink: 0 }}
-                    >
-                      <SlidersHorizontal aria-hidden size={14} />
-                    </button>
-                  )}
                   {certAbbr && designationColors && (
                     <span
                       style={{
@@ -1381,6 +1375,54 @@ export function RecurringScheduleSection({
                     </div>
                   );
                 })}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "4px 8px",
+                    borderLeft: "1px solid var(--dg-color-border-light)",
+                    minWidth: 0,
+                  }}
+                >
+                  {(() => {
+                    const preference = preferenceByEmployee.get(employee.id);
+                    const text =
+                      describeShiftPreference(preference, (id) => {
+                        const shift = shiftCategoryById.get(id);
+                        return shift
+                          ? shiftLabel(shift, shiftCategories, focusAreaName)
+                          : undefined;
+                      }) ?? "Any shift";
+                    const style = {
+                      width: "100%",
+                      textAlign: "left" as const,
+                      fontSize: "var(--dg-fs-caption)",
+                      color: preference
+                        ? "var(--dg-color-text-primary)"
+                        : "var(--dg-color-text-muted)",
+                      whiteSpace: "normal" as const,
+                      lineHeight: 1.3,
+                    };
+                    return canManage ? (
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-ghost"
+                        aria-label={`Shift preference for ${getEmployeeDisplayName(employee)}: ${text}`}
+                        onClick={() => setEditingPreferenceFor(employee)}
+                        style={{
+                          ...style,
+                          height: "auto",
+                          padding: "6px 8px",
+                          justifyContent: "flex-start",
+                        }}
+                      >
+                        {text}
+                      </button>
+                    ) : (
+                      <span style={{ ...style, padding: "6px 8px" }}>{text}</span>
+                    );
+                  })()}
+                </div>
               </div>
             );
           })}

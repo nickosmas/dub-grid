@@ -11,6 +11,8 @@ import type {
   ScheduleCellInput,
   ShiftMap,
   ShiftSeries,
+  ShiftSeriesPattern,
+  ShiftSeriesReschedule,
   ShiftRequest,
   ShiftRequestStatus,
   ShiftRequestType,
@@ -767,6 +769,30 @@ export function createShiftSeries(
     keepExisting: overwrite?.keepExisting,
     originDate: overwrite?.originDate,
   }).then((data) => data.series);
+}
+
+export function fetchShiftSeriesPattern(
+  seriesId: string,
+  orgId: string,
+): Promise<ShiftSeriesPattern> {
+  return requestScheduleManage<{ series: ShiftSeriesPattern }>({
+    action: "getShiftSeries",
+    orgId,
+    seriesId,
+  }).then((data) => data.series);
+}
+
+export function rescheduleShiftSeries(
+  seriesId: string,
+  orgId: string,
+  pattern: ShiftSeriesReschedule,
+): Promise<{ removedCount: number }> {
+  return requestScheduleManage<{ removedCount: number }>({
+    action: "rescheduleShiftSeries",
+    orgId,
+    seriesId,
+    ...pattern,
+  });
 }
 
 export function updateSeriesAllShifts(

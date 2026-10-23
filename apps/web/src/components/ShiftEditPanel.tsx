@@ -20,6 +20,8 @@ import {
   IndicatorType,
   SeriesScope,
   SeriesFrequency,
+  ShiftSeriesPattern,
+  ShiftSeriesReschedule,
   FocusArea,
   NamedItem,
   DraftKind,
@@ -99,7 +101,15 @@ interface ShiftEditPanelProps {
     previewTotal: number,
     keepExisting: boolean,
   ) => void;
-  /** True while a repeating series is being created. */
+  /** Loads the series' dates and pattern so they can be edited. */
+  onLoadSeriesPattern?: (seriesId: string) => Promise<ShiftSeriesPattern>;
+  /** Saves new dates and a new pattern for the series. */
+  onRescheduleSeries?: (
+    seriesId: string,
+    pattern: ShiftSeriesReschedule,
+    isAbsence: boolean,
+  ) => void;
+  /** True while a repeating series is being created or changed. */
   isCreatingRepeatSeries?: boolean;
   /** Employee ID — needed for repeat form overwrite checks */
   empId?: string;
@@ -331,6 +341,8 @@ export default function ShiftEditPanel({
   seriesId,
   fromRecurring = false,
   onRepeatConfirm,
+  onLoadSeriesPattern,
+  onRescheduleSeries,
   isCreatingRepeatSeries = false,
   empId,
   customStartTime,
@@ -400,6 +412,8 @@ export default function ShiftEditPanel({
   // The picker is open to choose the absence for the rest of the day, not a shift.
   const [pickingRestOfDayAbsence, setPickingRestOfDayAbsence] = useState(false);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
+  const [seriesPattern, setSeriesPattern] = useState<ShiftSeriesPattern | null>(null);
+  const [seriesPatternLoad, setSeriesPatternLoad] = useState<"idle" | "loading" | "failed">("idle");
   const [activeRequestMode, setActiveRequestMode] = useState<EditModalState["requestMode"] | null>(
     modal.requestMode ?? null,
   );
@@ -628,6 +642,23 @@ export default function ShiftEditPanel({
     (slot) => slot.added.length > 0 || slot.removed.length > 0,
   );
   const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
+  const canEditSeriesPattern = Boolean(
+    allowShiftEdits && seriesId && empId && onLoadSeriesPattern && onRescheduleSeries,
+  );
+  const showSeriesPatternForm = canEditSeriesPattern && seriesPattern != null;
+  const showCreateRepeatForm = Boolean(showRepeatForm && onRepeatConfirm && empId);
+  const repeatFormOpen = showCreateRepeatForm || showSeriesPatternForm;
+
+  const openSeriesPattern = async () => {
+    if (!seriesId || !onLoadSeriesPattern) return;
+    setSeriesPatternLoad("loading");
+    try {
+      setSeriesPattern(await onLoadSeriesPattern(seriesId));
+      setSeriesPatternLoad("idle");
+    } catch {
+      setSeriesPatternLoad("failed");
+    }
+  };
 
   // Build concise change descriptions for the footer summary
   function describeShiftChange(): string | null {
@@ -954,7 +985,7 @@ export default function ShiftEditPanel({
                     (candidate.shiftId ?? candidate.categoryId ?? null) ===
                       (segment.shiftId ?? null) && candidate.jobId === segment.jobId,
                 ),
-              ).start,
+              ).start ?? shiftCategories.find((shift) => shift.id === segment.shiftId)?.startTime,
           )
         : {
             segments,
@@ -3916,9 +3947,10 @@ export default function ShiftEditPanel({
         >
           {showStandaloneRequestFlow ? (
             renderRequestControls({ standalone: true })
-          ) : showRepeatForm && onRepeatConfirm && empId ? (
+          ) : repeatFormOpen && empId ? (
             // ── Repeat form mode ─────────────────────────────────────────────
             <RepeatForm
+              key={showSeriesPatternForm ? "edit-series" : "create-series"}
               ref={repeatFormRef}
               empId={empId}
               shiftLabel={currentLabels[0] ?? ""}
@@ -3936,6 +3968,14 @@ export default function ShiftEditPanel({
               onConfirm={onRepeatConfirm}
               absenceType={
                 isAbsence ? absenceTypes?.find((at) => at.id === currentAbsenceTypeId) : undefined
+              }
+              editing={
+                showSeriesPatternForm && seriesPattern && seriesId && onRescheduleSeries
+                  ? {
+                      pattern: seriesPattern,
+                      onSave: (pattern) => onRescheduleSeries(seriesId, pattern, isAbsence),
+                    }
+                  : undefined
               }
             />
           ) : inDetailMode ? (
@@ -4075,6 +4115,63 @@ export default function ShiftEditPanel({
                       </Button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {canEditSeriesPattern && (
+                <div style={{ marginBottom: 16 }}>
+                  <Button
+                    onClick={() => openSeriesPattern()}
+                    disabled={hasEdits || seriesPatternLoad === "loading"}
+                    className="dg-btn dg-btn-secondary"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      fontSize: "var(--dg-fs-caption)",
+                      padding: "9px 12px",
+                    }}
+                  >
+                    <ButtonLoading
+                      loading={seriesPatternLoad === "loading"}
+                      spinnerSize={12}
+                      icon={
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="3" y="4" width="18" height="18" rx="2" />
+                          <path d="M16 2v4M8 2v4M3 10h18" />
+                        </svg>
+                      }
+                    >
+                      Edit dates and pattern
+                    </ButtonLoading>
+                  </Button>
+                  {(hasEdits || seriesPatternLoad === "failed") && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: "var(--dg-fs-footnote)",
+                        color:
+                          seriesPatternLoad === "failed"
+                            ? "var(--dg-color-danger)"
+                            : "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      {seriesPatternLoad === "failed"
+                        ? "We couldn't load this repeating series. Try again."
+                        : "Save or discard the changes to this day first."}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -4480,7 +4577,7 @@ export default function ShiftEditPanel({
           </div>
         )}
 
-        {showRepeatForm && onRepeatConfirm && empId && (
+        {repeatFormOpen && (
           <div
             style={{
               flexShrink: 0,
@@ -4492,7 +4589,10 @@ export default function ShiftEditPanel({
             }}
           >
             <Button
-              onClick={() => setShowRepeatForm(false)}
+              onClick={() => {
+                setShowRepeatForm(false);
+                setSeriesPattern(null);
+              }}
               className="dg-btn dg-btn-ghost"
               disabled={isCreatingRepeatSeries}
               style={{
@@ -4511,14 +4611,20 @@ export default function ShiftEditPanel({
               disabled={isCreatingRepeatSeries}
             >
               <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
-                {isAbsence ? "Create Repeating Absence" : "Create Repeating Shift"}
+                {showSeriesPatternForm
+                  ? isAbsence
+                    ? "Save Repeating Absence"
+                    : "Save Repeating Shift"
+                  : isAbsence
+                    ? "Create Repeating Absence"
+                    : "Create Repeating Shift"}
               </ButtonLoading>
             </Button>
           </div>
         )}
 
         {/* Sticky footer — only shown when edits exist */}
-        {hasEdits && !showRepeatForm && (
+        {hasEdits && !repeatFormOpen && (
           <div
             style={{
               flexShrink: 0,

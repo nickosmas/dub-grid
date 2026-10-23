@@ -427,7 +427,7 @@ describe("resolveOpenShiftClickAction", () => {
 });
 
 describe("buildStaffedOpenShiftInput", () => {
-  it("preserves an existing segment and its aligned time while appending the selected option", () => {
+  it("keeps an existing segment and its aligned time, putting the shifts in time order", () => {
     const existingState: StaffingScheduleState = {
       kind: "worked",
       segments: [{ shiftId: 2, jobId: 11, position: 0, isMentored: true }],
@@ -452,15 +452,38 @@ describe("buildStaffedOpenShiftInput", () => {
     ).toEqual({
       kind: "worked",
       segments: [
-        { shiftId: 2, jobId: 11, position: 0, isMentored: true },
-        { shiftId: 1, jobId: 10, position: 1, isMentored: false },
+        { shiftId: 1, jobId: 10, position: 0, isMentored: false },
+        { shiftId: 2, jobId: 11, position: 1, isMentored: true },
       ],
       absenceTypeId: null,
-      customStartTime: "16:00|",
-      customEndTime: "22:00|",
+      customStartTime: "|16:00",
+      customEndTime: "|22:00",
       seriesId: "series-1",
       fromRecurring: true,
     });
+  });
+
+  it("leaves a later staffed shift after an earlier one already worked", () => {
+    const existingState: StaffingScheduleState = {
+      kind: "worked",
+      segments: [{ shiftId: 1, jobId: 10, position: 0, isMentored: false }],
+      assignmentIds: [100],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+    expect(
+      buildStaffedOpenShiftInput({
+        ...baseContext,
+        existingState,
+        option: {
+          assignmentIds: [101],
+          alignedTimeRanges: [{ start: "16:00", end: "22:00" }],
+          timeRanges: [{ start: "16:00", end: "22:00" }],
+          alignedCustomTimeRanges: [null],
+        },
+      })?.segments.map((segment) => segment.shiftId),
+    ).toEqual([1, 2]);
   });
 
   it("writes a calloff's custom time as custom and a default time as nothing", () => {

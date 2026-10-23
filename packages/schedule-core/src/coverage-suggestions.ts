@@ -8,7 +8,7 @@ import {
   type CoverageMatrix,
   type CoverageMatrixCell,
 } from "./coverage-matrix";
-import { formatLocalDateKey, parseLocalDateKey } from "./dates";
+import { formatLocalDateKey, getScheduleWeekStartDate, parseLocalDateKey } from "./dates";
 
 /** One person's day on one side. Satisfies 47b's `CoverageDaySide`. */
 export interface CoverageSuggestionDay {
@@ -203,6 +203,10 @@ export type CoverageAvailability =
   | { kind: "request"; dateKey: string }
   /** Working this day would make `days` in a row, over the limit. */
   | { kind: "workRun"; days: number }
+  /** Working this day would make `days` in its Sunday-to-Saturday week, over the limit. */
+  | { kind: "workWeek"; days: number }
+  /** The person already works that day; only a scheduler adds a second shift. */
+  | { kind: "doubleShift" }
   /** The person works only the shifts they chose, and this is not one. */
   | { kind: "onlyShifts" };
 
@@ -776,7 +780,8 @@ export interface CoverageFairChoice {
   suggestionId: string;
   employeeId: string;
   dateKey: string;
-  reason: "only" | "daysOff" | "preference" | "weekends" | "nights" | "hours" | "tie";
+  /** `weekDays`: given to bring the person up to their usual days that week. */
+  reason: "only" | "daysOff" | "preference" | "weekends" | "nights" | "hours" | "tie" | "weekDays";
   /** The chosen person's count for that reason (hours for a tie). */
   count: number;
   /** How many others could have filled it the same way. */
@@ -813,14 +818,36 @@ export interface PlanCoverageFixesOptions {
   fairness?: CoverageFairnessRule;
   /** Recurring fills the caller left out, such as a sixth day in a row; reported with the preview. */
   skippedRecurring?: ReadonlyArray<CoverageSkippedRecurring>;
+  /**
+   * Once no gap is left to fill, give people working fewer than their usual
+   * days a week more shifts, each in the least-staffed shift they can take
+   * that day, even when it is already staffed.
+   */
+  topUp?: CoverageTopUpRule;
 }
 
-/** A recurring schedule fill left out because it would make too many days in a row. */
+/** Who works fewer days a week than usual, and by how many. */
+export interface CoverageTopUpRule {
+  /** The people to top up; only those who work a day in the period are. */
+  employeeIds: ReadonlyArray<string>;
+  /** Days they usually work in a week. */
+  target: (employeeId: string) => number;
+  /** Days they work in the Sunday-to-Saturday week holding the date, with the planned days written. */
+  weekDays: (
+    employeeId: string,
+    dateKey: string,
+    planned: ReadonlyArray<CoverageDayOverride>,
+  ) => number;
+}
+
+/** A recurring schedule fill left out because it would make too many days in a row or a week. */
 export interface CoverageSkippedRecurring {
   employeeId: string;
   dateKey: string;
-  /** Days in a row it would have made. */
+  /** Days it would have made, in a row or in its week. */
   days: number;
+  /** Which limit it would have broken; days in a row when left out. */
+  limit?: "row" | "week";
 }
 
 const FAIRNESS_REASONS = ["daysOff", "preference", "weekends", "nights", "hours"] as const;
@@ -980,6 +1007,198 @@ function* planSteps(
     choices,
   });
   let current = overrides.length > 0 ? withPlanned() : input;
+  const take = (next: CoverageSuggestion) => {
+    for (const override of goesOver(next)) {
+      taken.push({
+        employeeId: override.employeeId,
+        dateKey: override.dateKey,
+        suggestionId: next.id,
+      });
+    }
+    plan.push(next);
+    overrides.push(...next.overrides);
+    current = withPlanned();
+  };
+  // One shift at a time to whoever is furthest below their usual days in a
+  // week, in the least-staffed shift they can take, even one already staffed.
+  const topUpSteps = (rule: CoverageTopUpRule) => {
+    const dateKeys = input.dateKeys.filter(
+      (dateKey) => options.dateKey == null || dateKey === options.dateKey,
+    );
+    const weeks = [...new Set(dateKeys.map(getScheduleWeekStartDate))];
+    // Only people who work in the period: someone with no shifts is left alone, as with days off.
+    const people = input.people.filter(
+      (person) =>
+        person.active &&
+        rule.employeeIds.includes(person.id) &&
+        dateKeys.some((dateKey) => current.draftDay(person.id, dateKey).assignmentIds.length > 0),
+    );
+    const exhausted = new Set<string>();
+    const candidatesFor = (personId: string, focusAreaIds: number[], week: string) => {
+      const found: {
+        dateKey: string;
+        rowKey: string;
+        focusAreaId: number;
+        cell: CoverageMatrixCell;
+        assignmentId: number;
+      }[] = [];
+      for (const dateKey of dateKeys) {
+        if (getScheduleWeekStartDate(dateKey) !== week) continue;
+        const day = current.draftDay(personId, dateKey);
+        if (
+          day.assignmentIds.length > 0 ||
+          day.absenceTypeId != null ||
+          day.restOfDayAbsenceTypeId != null ||
+          current.hasRequest(personId, dateKey)
+        ) {
+          continue;
+        }
+        const index = current.matrix.dateKeys.indexOf(dateKey);
+        for (const row of current.matrix.rows) {
+          if (options.rowKeys && !options.rowKeys.has(row.rowKey)) continue;
+          if (!focusAreaIds.includes(row.focusAreaId)) continue;
+          const cell = row.cells[index];
+          if (!cell || cell.past) continue;
+          const assignmentId = [
+            cell.preferredOpenAssignmentDefinitionId,
+            ...cell.eligibleAssignmentDefinitionIds,
+          ].find(
+            (id) =>
+              current.qualifiedFor(personId, id) &&
+              current.availability(personId, dateKey, id).kind === "free",
+          );
+          if (assignmentId == null) continue;
+          found.push({
+            dateKey,
+            rowKey: row.rowKey,
+            focusAreaId: row.focusAreaId,
+            cell,
+            assignmentId,
+          });
+        }
+      }
+      return found;
+    };
+    const suggestionFor = (
+      personId: string,
+      candidate: ReturnType<typeof candidatesFor>[number],
+    ): CoverageSuggestion | null => {
+      const overridesHere: CoverageDayOverride[] = [
+        {
+          employeeId: personId,
+          dateKey: candidate.dateKey,
+          side: "draft",
+          day: {
+            ...withAssignments(current.draftDay(personId, candidate.dateKey), [
+              candidate.assignmentId,
+            ]),
+            restOfDayAbsenceTypeId: null,
+          },
+        },
+      ];
+      const measurement = measureCoverageChange(current, overridesHere);
+      if (
+        measurement.opens > 0 ||
+        measurement.worsened > 0 ||
+        measurement.effects.some((effect) => effect.past) ||
+        !measurement.effects.some((effect) => effect.rowKey === candidate.rowKey)
+      ) {
+        return null;
+      }
+      return {
+        id: `assign:${personId}:${candidate.dateKey}:${candidate.assignmentId}`,
+        kind: "assign",
+        employeeId: personId,
+        requestId: null,
+        final: false,
+        subject: {
+          rowKey: candidate.rowKey,
+          focusAreaId: candidate.focusAreaId,
+          assignmentId: candidate.assignmentId,
+          dateKey: candidate.dateKey,
+          otherDateKey: null,
+          otherAssignmentIds: [],
+        },
+        targets: targetsOf(measurement),
+        overrides: overridesHere,
+        effects: measurement.effects,
+        closes: measurement.closes,
+        filled: measurement.filled,
+        clearsOver: measurement.clearsOver,
+      };
+    };
+    return (): CoverageSuggestion | null => {
+      for (;;) {
+        let neediest: {
+          person: CoverageSuggestionPerson;
+          week: string;
+          days: number;
+          short: number;
+        } | null = null;
+        for (const week of weeks) {
+          for (const person of people) {
+            if (exhausted.has(`${person.id}|${week}`)) continue;
+            const days = rule.weekDays(person.id, week, overrides);
+            const short = rule.target(person.id) - days;
+            if (short > 0 && (!neediest || short > neediest.short)) {
+              neediest = { person, week, days, short };
+            }
+          }
+        }
+        if (!neediest) return null;
+        const { person, week, days } = neediest;
+        const ranked = candidatesFor(person.id, person.focusAreaIds, week)
+          .map((candidate) => {
+            const standing = options.fairness?.standing(
+              person.id,
+              candidate.dateKey,
+              candidate.assignmentId,
+              overrides,
+            );
+            return {
+              candidate,
+              key: [
+                standing?.splitsDaysOff ? 1 : 0,
+                PREFERENCE_RANK[standing?.preference ?? "none"],
+                candidate.cell.draft.actual - candidate.cell.draft.required,
+                candidate.cell.draft.actual,
+                dayNumber(candidate.dateKey),
+              ],
+            };
+          })
+          .sort((left, right) => {
+            const index = left.key.findIndex((value, position) => value !== right.key[position]);
+            return index >= 0 ? left.key[index] - right.key[index] : 0;
+          });
+        // Past 40 hours only when every shift they could take goes over.
+        let chosen: CoverageSuggestion | null = null;
+        let over: CoverageSuggestion | null = null;
+        for (const { candidate } of ranked) {
+          const suggestion = suggestionFor(person.id, candidate);
+          if (!suggestion) continue;
+          if (goesOver(suggestion).length === 0) {
+            chosen = suggestion;
+            break;
+          }
+          over ??= suggestion;
+        }
+        chosen ??= over;
+        if (!chosen) {
+          exhausted.add(`${person.id}|${week}`);
+          continue;
+        }
+        choices.push({
+          suggestionId: chosen.id,
+          employeeId: person.id,
+          dateKey: chosen.subject.dateKey,
+          reason: "weekDays",
+          count: days,
+          others: 0,
+        });
+        return chosen;
+      }
+    };
+  };
   const needed = countOpen(current.matrix, options.rowKeys).staffShort;
   let filled = 0;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
@@ -998,19 +1217,17 @@ function* planSteps(
     );
     const within = eligible.filter((suggestion) => goesOver(suggestion).length === 0);
     const next = fairest(within.length > 0 ? within : eligible);
-    if (!next) return finish(current);
-    for (const override of goesOver(next)) {
-      taken.push({
-        employeeId: override.employeeId,
-        dateKey: override.dateKey,
-        suggestionId: next.id,
-      });
-    }
-    plan.push(next);
-    overrides.push(...next.overrides);
-    current = withPlanned();
+    if (!next) break;
+    take(next);
     filled += next.filled;
     yield { placed: plan.length, filled: Math.min(filled, needed), needed };
+  }
+  if (options.topUp) {
+    const steps = topUpSteps(options.topUp);
+    for (let next = steps(); next; next = steps()) {
+      take(next);
+      yield { placed: plan.length, filled: Math.min(filled, needed), needed };
+    }
   }
   return finish(current);
 }
@@ -1048,6 +1265,8 @@ export interface CoverageBuildPreview {
   daysOff: { employeeId: string; dateKey: string }[];
   /** Days the build gives someone a sixth day in a row, when allowed; added by the caller. */
   sixthDays: { employeeId: string; dateKey: string }[];
+  /** Weeks the build gives someone a sixth day, when allowed; added by the caller. */
+  sixthWeeks: { employeeId: string; weekStart: string }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1157,6 +1376,7 @@ function summarizeBuild(
     recurringSkipped: [...(options.skippedRecurring ?? [])],
     daysOff: [],
     sixthDays: [],
+    sixthWeeks: [],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

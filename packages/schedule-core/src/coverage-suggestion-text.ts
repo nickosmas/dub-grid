@@ -194,6 +194,10 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
       return "has a request waiting that day";
     case "workRun":
       return `would work ${reason.days} days in a row`;
+    case "workWeek":
+      return `would work ${reason.days} days that week`;
+    case "doubleShift":
+      return "already works that day";
     case "onlyShifts":
       return "works only their chosen shifts";
   }
