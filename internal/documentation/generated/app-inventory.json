@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:440b4dd733c42a7c7b26086a10c130ac5b93250148588c8e01ab1067b64179ba",
+  "sourceDigest": "sha256:047755d91b55b25db11d1534c0cb1b5963b88105627dd296c70b9091102c8e22",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4675,6 +4675,16 @@
       "sha256": "408fe234a3aa69013d310bc121395a78f8cd87739a65167c8482902267eb7580",
       "source": {
         "path": "supabase/migrations/089_shift_preferences.sql"
+      }
+    },
+    {
+      "id": "migration:090_reschedule_shift_series.sql",
+      "version": "090",
+      "name": "reschedule_shift_series",
+      "file": "090_reschedule_shift_series.sql",
+      "sha256": "7a3ed16349308bd22f010ac6ff3f1d87629646a705566faccb684caf56a41e41",
+      "source": {
+        "path": "supabase/migrations/090_reschedule_shift_series.sql"
       }
     }
   ],

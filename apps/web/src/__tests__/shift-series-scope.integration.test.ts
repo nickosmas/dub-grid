@@ -111,6 +111,47 @@ async function writeCell(fixture: Fixture, date: string, absenceId: number) {
   await db.query("SET LOCAL ROLE authenticated");
 }
 
+/** A change made to one day of a series, which keeps the day in the series. */
+async function writeOccurrence(
+  fixture: Fixture,
+  date: string,
+  absenceId: number,
+  seriesId: string,
+) {
+  await db.query("SET LOCAL ROLE postgres");
+  await db.query(
+    `SELECT public.write_schedule_cell_snapshot_internal(
+       $1::uuid, $2::uuid, $3::date, 'draft', 'absence', '{}', '{}', $4::bigint,
+       NULL, NULL, $5::uuid
+     )`,
+    [fixture.org_id, fixture.emp_id, date, absenceId, seriesId],
+  );
+  await db.query("SET LOCAL ROLE authenticated");
+}
+
+async function reschedule(
+  fixture: Fixture,
+  seriesId: string,
+  range: { start: string; end: string },
+  options: { keepExisting?: boolean; reset?: boolean } = {},
+): Promise<string[]> {
+  const { rows } = await db.query<{ removed_date: string }>(
+    `SELECT to_char(removed_date, 'YYYY-MM-DD') AS removed_date
+     FROM public.reschedule_shift_series(
+       $1::uuid, $2::uuid, 'daily', NULL, $3::date, $4::date, NULL, $5::boolean, $6::boolean
+     )`,
+    [
+      seriesId,
+      fixture.org_id,
+      range.start,
+      range.end,
+      options.keepExisting ?? false,
+      options.reset ?? false,
+    ],
+  );
+  return rows.map((row) => row.removed_date);
+}
+
 async function seriesDates(seriesId: string): Promise<string[]> {
   const { rows } = await db.query<{ date: string }>(
     `SELECT to_char(date, 'YYYY-MM-DD') AS date FROM public.schedule_cells
@@ -133,11 +174,13 @@ async function draftAbsences(fixture: Fixture): Promise<Record<string, number | 
 
 async function seriesRecord(seriesId: string) {
   const { rows } = await db.query<{
+    start_date: string;
     end_date: string | null;
     archived: boolean;
     absence_type_id: number;
   }>(
-    `SELECT to_char(end_date, 'YYYY-MM-DD') AS end_date, archived_at IS NOT NULL AS archived,
+    `SELECT to_char(start_date, 'YYYY-MM-DD') AS start_date,
+       to_char(end_date, 'YYYY-MM-DD') AS end_date, archived_at IS NOT NULL AS archived,
        (state->>'absenceTypeId')::integer AS absence_type_id
      FROM public.shift_series WHERE id = $1`,
     [seriesId],
@@ -303,6 +346,114 @@ describe.runIf(reachable)("shift series scope against the local database", () =>
         fixture.absence_id,
       ]);
       expect((await seriesRecord(seriesId)).absence_type_id).toBe(fixture.absence_id);
+    });
+  });
+
+  it("reschedules to fewer dates, removing those that leave and keeping a day's own change", async () => {
+    await asSuperAdmin(async (fixture) => {
+      const seriesId = await createDailySeries(fixture);
+      await writeOccurrence(fixture, "2031-01-03", fixture.other_absence_id, seriesId);
+
+      const removed = await reschedule(fixture, seriesId, {
+        start: "2031-01-02",
+        end: "2031-01-04",
+      });
+
+      expect(removed).toEqual(["2031-01-01", "2031-01-05"]);
+      expect(await seriesDates(seriesId)).toEqual(["2031-01-02", "2031-01-03", "2031-01-04"]);
+      const absences = await draftAbsences(fixture);
+      expect(Object.keys(absences).sort()).toEqual(["2031-01-02", "2031-01-03", "2031-01-04"]);
+      expect(absences["2031-01-03"]).toBe(fixture.other_absence_id);
+      expect(await seriesRecord(seriesId)).toMatchObject({
+        start_date: "2031-01-02",
+        end_date: "2031-01-04",
+        archived: false,
+      });
+    });
+  });
+
+  it("resets every remaining day to the series when asked", async () => {
+    await asSuperAdmin(async (fixture) => {
+      const seriesId = await createDailySeries(fixture);
+      await writeOccurrence(fixture, "2031-01-03", fixture.other_absence_id, seriesId);
+
+      await reschedule(
+        fixture,
+        seriesId,
+        { start: "2031-01-01", end: "2031-01-05" },
+        { reset: true },
+      );
+
+      const absences = await draftAbsences(fixture);
+      expect(DAYS.map((day) => absences[day])).toEqual(DAYS.map(() => fixture.absence_id));
+    });
+  });
+
+  it("adds the dates that join, replacing or keeping what they already hold", async () => {
+    for (const keepExisting of [true, false]) {
+      await asSuperAdmin(async (fixture) => {
+        const seriesId = randomUUID();
+        await db.query(
+          `SELECT public.create_shift_series(
+             $1::uuid, $2::uuid, $3::uuid, $4::jsonb, 'daily', NULL, '2031-01-01', '2031-01-03'
+           )`,
+          [seriesId, fixture.emp_id, fixture.org_id, absence(fixture.absence_id)],
+        );
+        await writeCell(fixture, "2031-01-05", fixture.other_absence_id);
+
+        const removed = await reschedule(
+          fixture,
+          seriesId,
+          { start: "2031-01-01", end: "2031-01-05" },
+          { keepExisting },
+        );
+
+        expect(removed).toEqual([]);
+        expect(await seriesDates(seriesId)).toEqual(keepExisting ? DAYS.slice(0, 4) : DAYS);
+        expect((await draftAbsences(fixture))["2031-01-05"]).toBe(
+          keepExisting ? fixture.other_absence_id : fixture.absence_id,
+        );
+      });
+    }
+  });
+
+  it("leaves a published date that falls out of the pattern as a draft removal", async () => {
+    await asSuperAdmin(async (fixture) => {
+      const seriesId = await createDailySeries(fixture);
+      await db.query("SET LOCAL ROLE postgres");
+      await db.query(
+        `SELECT public.write_schedule_cell_snapshot_internal(
+           $1::uuid, $2::uuid, '2031-01-05', 'published', 'absence', '{}', '{}', $3::bigint,
+           NULL, NULL, $4::uuid
+         )`,
+        [fixture.org_id, fixture.emp_id, fixture.absence_id, seriesId],
+      );
+      await db.query("SET LOCAL ROLE authenticated");
+
+      await reschedule(fixture, seriesId, { start: "2031-01-01", end: "2031-01-04" });
+
+      const { rows } = await db.query<{ state_kind: string; series_id: string | null }>(
+        `SELECT s.state_kind, c.series_id FROM public.schedule_cells c
+         JOIN public.schedule_cell_snapshots s ON s.cell_id = c.id AND s.snapshot_kind = 'draft'
+         WHERE c.emp_id = $1 AND c.date = '2031-01-05'`,
+        [fixture.emp_id],
+      );
+      expect(rows[0]).toEqual({ state_kind: "deleted", series_id: null });
+    });
+  });
+
+  it("refuses a pattern with no dates", async () => {
+    await asSuperAdmin(async (fixture) => {
+      const seriesId = await createDailySeries(fixture);
+
+      await expect(
+        db.query(
+          `SELECT * FROM public.reschedule_shift_series(
+             $1::uuid, $2::uuid, 'weekly', '{0}', '2031-01-01', '2031-01-03'
+           )`,
+          [seriesId, fixture.org_id],
+        ),
+      ).rejects.toThrow(/has no dates/);
     });
   });
 });

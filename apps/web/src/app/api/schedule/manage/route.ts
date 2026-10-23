@@ -35,6 +35,7 @@ import type {
   ScheduleNote,
   SeriesFrequency,
   ShiftSeries,
+  ShiftSeriesPattern,
   ShiftRequestStatus,
   ShiftRequestType,
 } from "@/types";
@@ -213,6 +214,23 @@ const requestActionSchema = z.discriminatedUnion("action", [
     originDate: z.string().date().optional(),
   }),
   z.object({
+    action: z.literal("getShiftSeries"),
+    orgId: z.string().uuid(),
+    seriesId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("rescheduleShiftSeries"),
+    orgId: z.string().uuid(),
+    seriesId: z.string().uuid(),
+    frequency: seriesFrequencySchema,
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).nullable(),
+    startDate: z.string().date(),
+    endDate: z.string().date().nullable(),
+    maxOccurrences: z.number().int().positive().max(MAX_SERIES_OCCURRENCES).nullable(),
+    keepExisting: z.boolean(),
+    resetOccurrences: z.boolean(),
+  }),
+  z.object({
     action: z.literal("updateSeriesAllShifts"),
     orgId: z.string().uuid(),
     seriesId: z.string().uuid(),
@@ -261,7 +279,8 @@ const requestActionSchema = z.discriminatedUnion("action", [
 
 const requestSchema = requestActionSchema.refine(
   (data) => {
-    if (data.action !== "createShiftSeries" || data.endDate === null) return true;
+    if (data.action !== "createShiftSeries" && data.action !== "rescheduleShiftSeries") return true;
+    if (data.endDate === null) return true;
     const days = (Date.parse(data.endDate) - Date.parse(data.startDate)) / 86_400_000;
     // Allow the slowest supported cadence, one occurrence every two weeks.
     return days >= 0 && days <= MAX_SERIES_OCCURRENCES * 14;
@@ -1573,6 +1592,120 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ series });
+      }
+
+      case "getShiftSeries": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
+          { actor, gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: row, error } = await auth.serviceClient
+          .from("shift_series")
+          .select("id, frequency, days_of_week, start_date, end_date, max_occurrences")
+          .eq("org_id", data.orgId)
+          .eq("id", data.seriesId)
+          .is("archived_at", null)
+          .maybeSingle();
+        if (error) {
+          throw error;
+        }
+        if (!row) {
+          return NextResponse.json({ error: "Repeating series not found" }, { status: 404 });
+        }
+
+        const occurrences = await fetchAllRows<{ date: string }>((from, to) =>
+          auth.serviceClient
+            .from("schedule_cells")
+            .select("date")
+            .eq("org_id", data.orgId)
+            .eq("series_id", data.seriesId)
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
+
+        const series: ShiftSeriesPattern = {
+          id: row.id,
+          frequency: row.frequency as SeriesFrequency,
+          daysOfWeek: row.days_of_week,
+          startDate: row.start_date,
+          endDate: row.end_date,
+          maxOccurrences: row.max_occurrences,
+          occurrenceDates: occurrences.map((cell) => cell.date),
+        };
+        return NextResponse.json({ series });
+      }
+
+      case "rescheduleShiftSeries": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditShifts && permissions.canManageShiftSeries),
+          { actor, gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: removed, error } = await auth.userClient.rpc("reschedule_shift_series", {
+          p_series_id: data.seriesId,
+          p_org_id: data.orgId,
+          p_frequency: data.frequency,
+          p_days_of_week: data.daysOfWeek,
+          p_start_date: data.startDate,
+          p_end_date: data.endDate,
+          p_max_occurrences: data.maxOccurrences,
+          p_keep_existing: data.keepExisting,
+          p_reset_occurrences: data.resetOccurrences,
+        });
+        if (error) {
+          throw error;
+        }
+
+        const removedCells = (
+          (removed ?? []) as Array<{
+            removed_emp_id: string;
+            removed_date: string;
+          }>
+        ).map((cell) => ({ employeeId: cell.removed_emp_id, date: cell.removed_date }));
+        await clearScheduleNotesForCells(
+          auth.serviceClient,
+          data.orgId,
+          auth.actor.id,
+          removedCells,
+        );
+
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift_series.updated",
+          resourceType: "shift_series",
+          resourceId: data.seriesId,
+          details: {
+            frequency: data.frequency,
+            daysOfWeek: data.daysOfWeek,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            maxOccurrences: data.maxOccurrences,
+            keepExisting: data.keepExisting,
+            resetOccurrences: data.resetOccurrences,
+            shiftsRemoved: removedCells.length,
+          },
+        });
+        return NextResponse.json({ removedCount: removedCells.length });
       }
 
       case "updateSeriesAllShifts": {

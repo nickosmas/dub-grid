@@ -1636,4 +1636,115 @@ describe("POST /api/schedule/manage permission gates", () => {
     expect(response.status).not.toBe(403);
     expect(serviceFrom).toHaveBeenCalled();
   });
+
+  it("reschedules a series with the new pattern and clears notes on the dates it removed", async () => {
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    const notes = captureNoteClearing();
+    userRpc.mockResolvedValue({
+      data: [
+        { removed_emp_id: employeeId, removed_date: "2026-08-03" },
+        { removed_emp_id: employeeId, removed_date: "2026-08-31" },
+      ],
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "rescheduleShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+        frequency: "weekly",
+        daysOfWeek: [1, 3],
+        startDate: "2026-08-10",
+        endDate: "2026-08-24",
+        maxOccurrences: null,
+        keepExisting: true,
+        resetOccurrences: false,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ removedCount: 2 });
+    expect(userRpc).toHaveBeenCalledWith("reschedule_shift_series", {
+      p_series_id: "33333333-3333-4333-8333-333333333333",
+      p_org_id: orgId,
+      p_frequency: "weekly",
+      p_days_of_week: [1, 3],
+      p_start_date: "2026-08-10",
+      p_end_date: "2026-08-24",
+      p_max_occurrences: null,
+      p_keep_existing: true,
+      p_reset_occurrences: false,
+    });
+    expect(notes.deleted.map((row) => row.date).sort()).toEqual(["2026-08-03", "2026-08-31"]);
+  });
+
+  it("refuses a reschedule without the series permission or past the date limit", async () => {
+    const body = {
+      action: "rescheduleShiftSeries",
+      orgId,
+      seriesId: "33333333-3333-4333-8333-333333333333",
+      frequency: "daily",
+      daysOfWeek: null,
+      startDate: "2026-08-10",
+      endDate: "2026-08-24",
+      maxOccurrences: null,
+      keepExisting: false,
+      resetOccurrences: false,
+    };
+
+    grant({ canEditShifts: true, canManageShiftSeries: false });
+    expect((await POST(makeRequest(body))).status).toBe(403);
+
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    expect((await POST(makeRequest({ ...body, endDate: "2099-01-01" }))).status).toBe(400);
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it("reads a series' pattern and the dates it holds", async () => {
+    grant({ canEditShifts: true, canManageShiftSeries: true });
+    const row = {
+      id: "33333333-3333-4333-8333-333333333333",
+      frequency: "weekly",
+      days_of_week: [1],
+      start_date: "2026-08-03",
+      end_date: null,
+      max_occurrences: 4,
+    };
+    serviceFrom.mockImplementation((table: string) => {
+      if (table !== "shift_series") throw new Error(`unexpected ${table}`);
+      const query = {
+        select: () => query,
+        eq: () => query,
+        is: () => query,
+        maybeSingle: async () => ({ data: row, error: null }),
+      };
+      return query;
+    });
+    stubSeriesCells([
+      { emp_id: employeeId, date: "2026-08-03" },
+      { emp_id: employeeId, date: "2026-08-10" },
+    ]);
+
+    const response = await POST(
+      makeRequest({
+        action: "getShiftSeries",
+        orgId,
+        seriesId: "33333333-3333-4333-8333-333333333333",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      series: {
+        id: row.id,
+        frequency: "weekly",
+        daysOfWeek: [1],
+        startDate: "2026-08-03",
+        endDate: null,
+        maxOccurrences: 4,
+        occurrenceDates: ["2026-08-03", "2026-08-10"],
+      },
+    });
+  });
 });

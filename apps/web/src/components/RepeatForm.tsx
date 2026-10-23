@@ -22,6 +22,8 @@ import {
   ShiftCategory,
   JobDefinition,
   ShiftJobSegment,
+  ShiftSeriesPattern,
+  ShiftSeriesReschedule,
 } from "@/types";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { NumberField } from "@/components/ui/number-field";
@@ -66,7 +68,7 @@ interface RepeatFormProps {
   assignments: AssignmentDefinition[];
   shiftCategories?: ShiftCategory[];
   jobs?: JobDefinition[];
-  onConfirm: (
+  onConfirm?: (
     frequency: SeriesFrequency,
     daysOfWeek: number[] | null,
     startDate: string,
@@ -77,6 +79,11 @@ interface RepeatFormProps {
   ) => void;
   /** When set, the form is creating a repeating absence instead of a shift. */
   absenceType?: AbsenceType;
+  /** When set, the form changes this series' dates and pattern instead of creating one. */
+  editing?: {
+    pattern: ShiftSeriesPattern;
+    onSave: (pattern: ShiftSeriesReschedule) => void;
+  };
 }
 
 export interface RepeatFormHandle {
@@ -325,6 +332,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     jobs = [],
     onConfirm,
     absenceType,
+    editing,
   }: RepeatFormProps,
   ref,
 ) {
@@ -333,13 +341,21 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const absenceFill = absenceType
     ? absenceStripeFill(absenceType.color, resolvedTheme === "dark")
     : null;
-  const [frequency, setFrequency] = useState<SeriesFrequency>("weekly");
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
+  const pattern = editing?.pattern ?? null;
+  const [frequency, setFrequency] = useState<SeriesFrequency>(pattern?.frequency ?? "weekly");
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(() =>
+    pattern?.daysOfWeek?.length
+      ? pattern.daysOfWeek
+      : [(pattern ? parseLocalDate(pattern.startDate) : startDate).getDay()],
+  );
   const todayStr = formatLocalDate(new Date());
-  const [start, setStart] = useState<string>(formatLocalDate(startDate));
-  const [endType, setEndType] = useState<EndType>("never");
-  const [endDate, setEndDate] = useState<string>("");
-  const [afterN, setAfterN] = useState<number>(10);
+  const [start, setStart] = useState<string>(pattern?.startDate ?? formatLocalDate(startDate));
+  const [endType, setEndType] = useState<EndType>(
+    pattern?.endDate ? "on_date" : pattern?.maxOccurrences != null ? "after_n" : "never",
+  );
+  const [endDate, setEndDate] = useState<string>(pattern?.endDate ?? "");
+  const [afterN, setAfterN] = useState<number>(pattern?.maxOccurrences ?? 10);
+  const [resetOccurrences, setResetOccurrences] = useState(false);
   // Keyed by the dates it was counted for, so a submit never acts on a count
   // that belongs to a different pattern or is still loading.
   const [overwrites, setOverwrites] = useState<{ datesKey: string; count: number } | null>(null);
@@ -403,11 +419,26 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     return countOccurrences(frequency, resolvedDays, start, resolvedEnd, resolvedMax);
   }, [frequency, daysOfWeek, resolvedDays, start, resolvedEnd, resolvedMax]);
 
-  // The day being repeated is never an overwrite: it is the shift itself.
+  const seriesDates = useMemo(() => new Set(pattern?.occurrenceDates ?? []), [pattern]);
+  // The day being repeated is never an overwrite: it is the shift itself. When
+  // editing, neither is any day the series already holds.
   const datesToCheck = useMemo(
-    () => [...new Set(generatedDates.filter((d) => d !== originDateKey))].sort(),
-    [generatedDates, originDateKey],
+    () =>
+      [
+        ...new Set(
+          generatedDates.filter((d) => (pattern ? !seriesDates.has(d) : d !== originDateKey)),
+        ),
+      ].sort(),
+    [generatedDates, originDateKey, pattern, seriesDates],
   );
+  const patternChange = useMemo(() => {
+    if (!pattern) return null;
+    const generated = new Set(generatedDates);
+    return {
+      added: generatedDates.filter((d) => !seriesDates.has(d)).length,
+      removed: pattern.occurrenceDates.filter((d) => !generated.has(d)).length,
+    };
+  }, [generatedDates, pattern, seriesDates]);
   const datesKey = datesToCheck.join(",");
 
   useEffect(() => {
@@ -442,7 +473,19 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const create = useCallback(
     (keepExisting: boolean) => {
       setOverwritePrompt(null);
-      onConfirm(
+      if (editing) {
+        editing.onSave({
+          frequency,
+          daysOfWeek: resolvedDays,
+          startDate: start,
+          endDate: resolvedEnd,
+          maxOccurrences: resolvedMax,
+          keepExisting,
+          resetOccurrences,
+        });
+        return;
+      }
+      onConfirm?.(
         frequency,
         resolvedDays,
         start,
@@ -452,7 +495,17 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
         keepExisting,
       );
     },
-    [frequency, onConfirm, preview.total, resolvedDays, resolvedEnd, resolvedMax, start],
+    [
+      editing,
+      frequency,
+      onConfirm,
+      preview.total,
+      resetOccurrences,
+      resolvedDays,
+      resolvedEnd,
+      resolvedMax,
+      start,
+    ],
   );
 
   const handleConfirm = useCallback(async () => {
@@ -492,7 +545,10 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     <div style={formLayoutStyle}>
       {/* Badge */}
       <div style={badgeRowStyle}>
-        <span style={badgeLabelStyle}>{isAbsence ? "Repeating Absence" : "Repeating Shift"}</span>
+        <span style={badgeLabelStyle}>
+          {editing ? "Edit " : ""}
+          {isAbsence ? "Repeating Absence" : "Repeating Shift"}
+        </span>
         {(isAbsence ? absenceType : assignment || shiftLabel) && (
           <span
             data-repeat-shift-preview="true"
@@ -727,6 +783,43 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
         )}
       </fieldset>
 
+      {editing && (
+        <fieldset style={sectionFieldsetStyle}>
+          <legend style={frequencyLabelStyle}>Days already in the series</legend>
+          <div
+            className="dg-segment dg-segment-grid"
+            role="group"
+            aria-label="Days already in the series"
+          >
+            {[
+              { reset: false, label: "Keep their changes" },
+              { reset: true, label: "Reset to match" },
+            ].map((option) => (
+              <Button
+                key={option.label}
+                type="button"
+                onClick={() => setResetOccurrences(option.reset)}
+                aria-pressed={resetOccurrences === option.reset}
+                className={`dg-segment-btn${resetOccurrences === option.reset ? " active" : ""}`}
+                style={{ fontSize: "var(--dg-fs-footnote)" }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-text-muted)",
+            }}
+          >
+            {resetOccurrences
+              ? `Every day goes back to the repeating ${isAbsence ? "absence" : "shift"}, undoing changes made to a single day.`
+              : "A day changed on its own keeps that change."}
+          </div>
+        </fieldset>
+      )}
+
       {/* Preview summary */}
       {preview.total > 0 && (
         <div
@@ -744,7 +837,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
         >
           <div style={{ fontWeight: 600 }}>
             {preview.total} {isAbsence ? "absence" : "shift"}
-            {preview.total === 1 ? "" : "s"} will be created
+            {preview.total === 1 ? "" : "s"} {editing ? "in the series" : "will be created"}
             {endType === "never" && (
               <span style={{ fontWeight: 400, color: "var(--dg-color-text-subtle)" }}>
                 {" "}
@@ -752,6 +845,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
               </span>
             )}
           </div>
+          {patternChange && <div style={{ marginTop: 4 }}>{patternChangeText(patternChange)}</div>}
           {isCapped && (
             <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
               Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date
@@ -782,6 +876,14 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     </div>
   );
 });
+
+function patternChangeText({ added, removed }: { added: number; removed: number }): string {
+  if (added === 0 && removed === 0) return "No dates change.";
+  const parts = [];
+  if (added > 0) parts.push(`${added} added`);
+  if (removed > 0) parts.push(`${removed} removed`);
+  return `${parts.join(", ")}.`;
+}
 
 function overwriteCountText(count: number): string {
   return count === 1

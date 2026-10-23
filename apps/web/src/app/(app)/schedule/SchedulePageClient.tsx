@@ -194,9 +194,11 @@ import {
   fetchScheduleEditorSessionStatus,
   fetchScheduleNotes,
   fetchShifts,
+  fetchShiftSeriesPattern,
   getScheduleLastViewed,
   moveShift,
   publishSchedule,
+  rescheduleShiftSeries,
   updateScheduleLastViewed,
   updateSeriesAllShifts,
   upsertScheduleNote,
@@ -340,6 +342,7 @@ import {
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
+  ShiftSeriesReschedule,
   DraftKind,
   NotePublishChange,
   PublishChange,
@@ -5325,6 +5328,58 @@ function SchedulerContent({
     ],
   );
 
+  const handleLoadSeriesPattern = useCallback(
+    (seriesId: string) => {
+      if (!org) return Promise.reject(new Error("No organization"));
+      return fetchShiftSeriesPattern(seriesId, org.id);
+    },
+    [org],
+  );
+
+  const handleRescheduleSeries = useCallback(
+    async (seriesId: string, pattern: ShiftSeriesReschedule, isAbsence: boolean) => {
+      if (!org || !guardActiveSession()) return;
+      const noun = isAbsence ? "absence" : "shift";
+      setIsCreatingRepeatSeries(true);
+      startScheduleOperation({
+        kind: "repeat_series",
+        title: `Updating repeating ${noun}...`,
+        detail: "Applying the new dates and pattern.",
+        progress: 20,
+      });
+      try {
+        await rescheduleShiftSeries(seriesId, org.id, pattern);
+        updateScheduleOperation("repeat_series", {
+          progress: 90,
+          detail: "Refreshing the schedule...",
+        });
+        broadcastDraftReconcile();
+        await refetchScheduleDataRef.current();
+        toast.success(`Repeating ${noun} updated`);
+        finishScheduleOperation("repeat_series");
+      } catch (err) {
+        clearScheduleOperation("repeat_series");
+        toast.error(
+          formatClientErrorMessage(err, `We couldn't update that repeating ${noun}. Try again.`),
+        );
+        Sentry.captureException(err);
+      } finally {
+        setIsCreatingRepeatSeries(false);
+        closeEditPanel();
+      }
+    },
+    [
+      org,
+      guardActiveSession,
+      startScheduleOperation,
+      updateScheduleOperation,
+      finishScheduleOperation,
+      clearScheduleOperation,
+      broadcastDraftReconcile,
+      closeEditPanel,
+    ],
+  );
+
   // ── Qualification check for drag/paste ──────────────────────────────────
   const focusAreaNameMap = useMemo(
     () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
@@ -8946,6 +9001,12 @@ function SchedulerContent({
               fromRecurring={panelShiftEntry?.fromRecurring ?? false}
               onRepeatConfirm={
                 canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined
+              }
+              onLoadSeriesPattern={
+                canEditShifts && canManageShiftSeries ? handleLoadSeriesPattern : undefined
+              }
+              onRescheduleSeries={
+                canEditShifts && canManageShiftSeries ? handleRescheduleSeries : undefined
               }
               isCreatingRepeatSeries={isCreatingRepeatSeries}
               empId={editPanel.empId}

@@ -52,6 +52,7 @@ const expectedAuthenticatedSecurityDefiners = [
   "promote_gridmaster_by_email",
   "publish_schedule",
   "remove_focus_area_from_employees",
+  "reschedule_shift_series",
   "resolve_shift_request",
   "respond_to_shift_request",
   "set_gridmaster_account_deactivated",
