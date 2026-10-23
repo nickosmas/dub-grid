@@ -102,6 +102,7 @@ import {
   previewCoverageBuildAsync,
   type CoverageBuildPreview,
   type CoverageBuildProgress,
+  type CoverageSkippedRecurring,
   suggestCoverageFixes,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
@@ -117,6 +118,7 @@ import {
 import {
   availabilityWithPlanned,
   fairnessStandingWithPlanned,
+  limitRecurringRuns,
   weekHoursWithPlanned,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
@@ -6801,6 +6803,7 @@ function SchedulerContent({
       baseOverrides?: CoverageDayOverride[];
       /** Published cells before the period, for rotating weekends and nights. */
       history?: ShiftMap;
+      skippedRecurring?: CoverageSkippedRecurring[];
     }) => {
       if (!coverageSuggestions) return null;
       const { engine, adapterInput } = coverageSuggestions;
@@ -6940,7 +6943,9 @@ function SchedulerContent({
       });
       const fixedWrites: SuggestionWrite[] = [];
       const baseOverrides: CoverageDayOverride[] = [];
-      for (const fill of fills) {
+      // A recurring schedule never takes anyone past the days-in-a-row limit either.
+      const limited = limitRecurringRuns(fills, shiftsRef.current);
+      for (const fill of limited.kept) {
         const input: ScheduleCellInput = { ...fill.input, fromRecurring: true };
         const snapshot = resolveInputSnapshot(input);
         // A fill the page can't resolve would be a count Build can't write.
@@ -6960,7 +6965,12 @@ function SchedulerContent({
           },
         });
       }
-      const planned = planOptions({ rowKeys: new Set(rowKeys), baseOverrides, history });
+      const planned = planOptions({
+        rowKeys: new Set(rowKeys),
+        baseOverrides,
+        history,
+        skippedRecurring: limited.skipped,
+      });
       if (!planned) return null;
       const preview = await previewCoverageBuildAsync(planned.engine, planned.options, {
         // Planning a period takes long enough to freeze the page in one go.

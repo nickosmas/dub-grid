@@ -275,14 +275,15 @@ Item 49 is split:
 
 - **49a - Loading that never freezes:** shipped; planning yields with a percentage bar, and Apply counts every save before the report.
 - **49b - Auto-build naming:** shipped; Auto-build with a plain description, Generate schedule, Apply and Discard, and a calendar toolbar button with no count.
-- **49c - Five days in a row, days off in pairs:** planned.
+- **49c - Five days in a row, days off in pairs:** shipped; no sixth day in a row from a build, a suggestion or a recurring fill, counted across periods, and days off kept in pairs unless nobody can.
 - **49d - Day off absence:** planned.
 - **49e - Shift preferences:** planned (migration 089).
-- **49f - Fill the rest with overtime:** planned.
+- **49f - Allow a sixth day:** planned.
 
-A build never goes over 40 hours a week or five days in a row; when gaps
-remain, a second option fills the rest allowing overtime and a sixth day in
-a row (never a seventh), with a warning and a confirmation. Between people
+A build never schedules anyone more than five days in a row, unless the
+scheduler turns on "Allow a sixth day in a row" before generating (never a
+seventh, with a warning); it avoids going past 40 hours a week and does so
+only when nobody else can fill a gap, naming each person. Between people
 for a shift it ranks: days off kept in pairs (split only when nobody can
 fill the shift otherwise); shift preference; fewest weekends and nights;
 fewest hours (owner decisions, 2026-10-23). It is named Auto-build, with

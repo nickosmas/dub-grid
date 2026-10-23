@@ -200,7 +200,9 @@ export type CoverageAvailability =
   | { kind: "overlap"; dateKey: string; assignmentId: number }
   | { kind: "unverified"; dateKey: string }
   /** A pickup, swap or call-off waits on this person that day. */
-  | { kind: "request"; dateKey: string };
+  | { kind: "request"; dateKey: string }
+  /** Working this day would make `days` in a row, over the limit. */
+  | { kind: "workRun"; days: number };
 
 export interface CoveragePickupRequest {
   requestId: string;
@@ -739,6 +741,8 @@ export interface CoverageOverThreshold {
 
 /** A person's standing for one shift; lower is fairer to give them. */
 export interface CoverageFairnessStanding {
+  /** Whether this shift would leave the person a single day off between work days. */
+  splitsDaysOff?: boolean;
   /** Weekend shifts recently and this period, or null when the shift is not on a weekend. */
   weekends: number | null;
   /** Night shifts recently and this period, or null when the shift is not a night. */
@@ -761,7 +765,7 @@ export interface CoverageFairChoice {
   suggestionId: string;
   employeeId: string;
   dateKey: string;
-  reason: "only" | "weekends" | "nights" | "hours" | "tie";
+  reason: "only" | "daysOff" | "weekends" | "nights" | "hours" | "tie";
   /** The chosen person's count for that reason (hours for a tie). */
   count: number;
   /** How many others could have filled it the same way. */
@@ -796,12 +800,28 @@ export interface PlanCoverageFixesOptions {
    * the one with the fewest weekends, nights or hours, and say why.
    */
   fairness?: CoverageFairnessRule;
+  /** Recurring fills the caller left out, such as a sixth day in a row; reported with the preview. */
+  skippedRecurring?: ReadonlyArray<CoverageSkippedRecurring>;
 }
 
-const FAIRNESS_REASONS = ["weekends", "nights", "hours"] as const;
+/** A recurring schedule fill left out because it would make too many days in a row. */
+export interface CoverageSkippedRecurring {
+  employeeId: string;
+  dateKey: string;
+  /** Days in a row it would have made. */
+  days: number;
+}
 
+const FAIRNESS_REASONS = ["daysOff", "weekends", "nights", "hours"] as const;
+
+// Days off stay in pairs first: a split is taken only when everyone else splits too.
 function standingKey(standing: CoverageFairnessStanding): number[] {
-  return [standing.weekends ?? 0, standing.nights ?? 0, standing.hours];
+  return [
+    standing.splitsDaysOff ? 1 : 0,
+    standing.weekends ?? 0,
+    standing.nights ?? 0,
+    standing.hours,
+  ];
 }
 
 /** Same shift, same cell, same effect: only who fills it differs. */
@@ -900,7 +920,7 @@ function* planSteps(
       employeeId: best.candidate.employeeId!,
       dateKey: best.candidate.subject.dateKey,
       reason: !runnerUp ? "only" : decided >= 0 ? FAIRNESS_REASONS[decided] : "tie",
-      count: best.key[decided >= 0 ? decided : 2],
+      count: best.key[decided >= 0 ? decided : FAIRNESS_REASONS.indexOf("hours")],
       others: ranked.length - 1,
     });
     return best.candidate;
@@ -1008,6 +1028,8 @@ export interface CoverageBuildPreview {
   recurringPeople: { employeeId: string; shifts: number; absences: number }[];
   /** Shifts still short after the build that have not started, by date then row. */
   shortCells: { rowKey: string; dateKey: string; staffShort: number }[];
+  /** Recurring fills left out for the days-in-a-row limit. */
+  recurringSkipped: CoverageSkippedRecurring[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1114,6 +1136,7 @@ function summarizeBuild(
     skipped: ruledOut.filter((entry) => stillShort.has(`${entry.rowKey}|${entry.dateKey}`)),
     overThreshold,
     choices,
+    recurringSkipped: [...(options.skippedRecurring ?? [])],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

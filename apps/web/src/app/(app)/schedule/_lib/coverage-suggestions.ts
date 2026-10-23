@@ -1,10 +1,12 @@
 import {
+  MAX_DAYS_IN_A_ROW,
   computeShiftSegmentHours,
   parseLocalDateKey,
   type CoverageAvailability,
   type CoverageDayOverride,
   type CoverageFairnessRule,
   type CoverageOvertimeRule,
+  type CoverageSkippedRecurring,
   type CoverageMatrix,
   type CoverageMeasureInput,
   type CoveragePickupRequest,
@@ -135,6 +137,90 @@ export function hasOpenRequest(
   );
 }
 
+/** Whether the person works a day: a planned day first, then the draft. */
+function workedWith(
+  shifts: ShiftMap,
+  planned: ReadonlyArray<CoverageDayOverride>,
+  employeeId: string,
+): (dateKey: string) => boolean {
+  const plannedDays = new Map<string, boolean>();
+  for (const override of planned) {
+    if (override.side === "draft" && override.employeeId === employeeId) {
+      plannedDays.set(override.dateKey, override.day.assignmentIds.length > 0);
+    }
+  }
+  return (dateKey) => {
+    const plannedDay = plannedDays.get(dateKey);
+    if (plannedDay != null) return plannedDay;
+    const entry = shifts[`${employeeId}_${dateKey}`];
+    return entry != null && !entry.isDelete && entry.assignmentIds.length > 0;
+  };
+}
+
+/** How many days in a row the person works with this day worked, counted both ways. */
+export function daysInARowWith(worked: (dateKey: string) => boolean, dateKey: string): number {
+  const date = parseLocalDateKey(dateKey);
+  const reach = MAX_DAYS_IN_A_ROW * 2;
+  let days = 1;
+  for (
+    let offset = -1;
+    offset >= -reach && worked(formatDateKey(addDays(date, offset)));
+    offset -= 1
+  ) {
+    days += 1;
+  }
+  for (
+    let offset = 1;
+    offset <= reach && worked(formatDateKey(addDays(date, offset)));
+    offset += 1
+  ) {
+    days += 1;
+  }
+  return days;
+}
+
+/** Working a day the person has free would go past the days-in-a-row limit. */
+function overWorkRun(
+  worked: (dateKey: string) => boolean,
+  dateKey: string,
+): CoverageAvailability | null {
+  if (worked(dateKey)) return null;
+  const days = daysInARowWith(worked, dateKey);
+  return days > MAX_DAYS_IN_A_ROW ? { kind: "workRun", days } : null;
+}
+
+/**
+ * Recurring fills in date order, leaving out any shift that would make more
+ * days in a row than the limit once the earlier fills are in.
+ */
+export function limitRecurringRuns<
+  F extends { employeeId: string; dateKey: string; input: ScheduleCellInput },
+>(fills: ReadonlyArray<F>, shifts: ShiftMap): { kept: F[]; skipped: CoverageSkippedRecurring[] } {
+  const kept: F[] = [];
+  const skipped: CoverageSkippedRecurring[] = [];
+  const accepted = new Map<string, CoverageDayOverride[]>();
+  for (const fill of [...fills].sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
+    const works = fill.input.kind === "worked" && fill.input.segments.length > 0;
+    const planned = accepted.get(fill.employeeId) ?? [];
+    if (works) {
+      const run = overWorkRun(workedWith(shifts, planned, fill.employeeId), fill.dateKey);
+      if (run?.kind === "workRun") {
+        skipped.push({ employeeId: fill.employeeId, dateKey: fill.dateKey, days: run.days });
+        continue;
+      }
+      planned.push({
+        employeeId: fill.employeeId,
+        dateKey: fill.dateKey,
+        side: "draft",
+        day: { ...EMPTY_DAY, assignmentIds: [0] },
+      });
+      accepted.set(fill.employeeId, planned);
+    }
+    kept.push(fill);
+  }
+  return { kept, skipped };
+}
+
 /**
  * Whether a person can take an assignment that day, by the Fill a spot
  * dialog's own rules, plus not on an absence: a suggestion never overrides
@@ -172,6 +258,8 @@ export function availabilityFromShifts(
       };
     }
   }
+  const run = overWorkRun(workedWith(input.shifts, [], employeeId), dateKey);
+  if (run) return run;
   if (!range) return { kind: "free" };
 
   const date = parseLocalDateKey(dateKey);
@@ -243,7 +331,7 @@ export function availabilityWithPlanned(
         if (overlaps) return { kind: "overlap", dateKey: day.dateKey, assignmentId: plannedId };
       }
     }
-    return base;
+    return overWorkRun(workedWith(input.shifts, planned, employeeId), dateKey) ?? base;
   };
 }
 
@@ -361,7 +449,12 @@ export function fairnessStandingWithPlanned(
   return (employeeId, dateKey, assignmentId, planned) => {
     const days = daysOf(employeeId, periodDateKeys, planned);
     const before = past.get(employeeId) ?? { weekends: 0, nights: 0 };
+    const worked = workedWith(input.shifts, planned, employeeId);
+    const date = parseLocalDateKey(dateKey);
+    const on = (offset: number) => worked(formatDateKey(addDays(date, offset)));
     return {
+      // A single day off left between work days on either side.
+      splitsDaysOff: !on(0) && ((!on(-1) && on(-2)) || (!on(1) && on(2))),
       weekends: isWeekendDateKey(dateKey)
         ? before.weekends + days.filter((day) => isWeekendDateKey(day.dateKey)).length
         : null,

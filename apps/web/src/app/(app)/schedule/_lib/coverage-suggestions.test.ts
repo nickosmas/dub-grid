@@ -7,6 +7,8 @@ import type {
 } from "@/types";
 import {
   availabilityFromShifts,
+  availabilityWithPlanned,
+  daysInARowWith,
   draftDayFromShifts,
   hasOpenRequest,
   pendingPickupsFromRequests,
@@ -14,6 +16,7 @@ import {
   planUndo,
   fairnessStandingWithPlanned,
   isNightAssignment,
+  limitRecurringRuns,
   publishedDayFromShifts,
   weekHoursWithPlanned,
 } from "./coverage-suggestions";
@@ -465,18 +468,131 @@ describe("fairnessStandingWithPlanned", () => {
   it("counts weekends over history and the period for a weekend shift", () => {
     // History: two Saturdays; the period: Sunday. Hours: Sunday 8 and Monday's night 8.5.
     expect(standing("ana", "2026-10-31", DAY, [])).toEqual({
+      splitsDaysOff: false,
       weekends: 3,
       nights: null,
       hours: 16.5,
     });
-    expect(standing("ben", "2026-10-31", DAY, [])).toEqual({ weekends: 1, nights: null, hours: 0 });
+    expect(standing("ben", "2026-10-31", DAY, [])).toEqual({
+      splitsDaysOff: false,
+      weekends: 1,
+      nights: null,
+      hours: 0,
+    });
   });
 
   it("counts nights with the planned days written for a night shift", () => {
     expect(standing("ana", "2026-10-27", NIGHT, [nightOn("2026-10-27")])).toEqual({
+      splitsDaysOff: false,
       weekends: null,
       nights: 3,
       hours: 25,
     });
+  });
+});
+
+describe("days in a row", () => {
+  // Ana works Tuesday, Oct 20 to Saturday, Oct 24: five days in a row.
+  const fiveDays = Object.fromEntries(
+    ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"].map((dateKey) => [
+      `ana_${dateKey}`,
+      worked([DAY]),
+    ]),
+  );
+  const input = { shifts: fiveDays, assignments, shiftCategories, loadedDateKeys: LOADED };
+  const planDay = (dateKey: string, ids: number[]): CoverageDayOverride => ({
+    employeeId: "ana",
+    dateKey,
+    side: "draft",
+    day: {
+      assignmentIds: ids,
+      mentoredAssignmentIds: [],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+
+  it("counts the days worked on both sides", () => {
+    const worked = (dateKey: string) => fiveDays[`ana_${dateKey}`] != null;
+    expect(daysInARowWith(worked, "2026-10-25")).toBe(6);
+    expect(daysInARowWith(worked, "2026-10-19")).toBe(6);
+    expect(daysInARowWith(worked, "2026-10-27")).toBe(1);
+  });
+
+  it("rules out a sixth day in a row, across the period's start", () => {
+    expect(availabilityFromShifts(input, "ana", "2026-10-25", DAY)).toEqual({
+      kind: "workRun",
+      days: 6,
+    });
+    expect(availabilityFromShifts(input, "ana", "2026-10-26", DAY).kind).not.toBe("workRun");
+  });
+
+  it("allows a second shift on a day already worked", () => {
+    expect(availabilityFromShifts(input, "ana", "2026-10-24", EVENING).kind).not.toBe("workRun");
+  });
+
+  it("counts planned days, and a planned day off breaks the run", () => {
+    const shortRun = { ...input, shifts: { "ana_2026-10-21": worked([DAY]) } };
+    const planned = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"].map((dateKey) =>
+      planDay(dateKey, [DAY]),
+    );
+    expect(availabilityWithPlanned(shortRun, planned)("ana", "2026-10-26", DAY)).toEqual({
+      kind: "workRun",
+      days: 6,
+    });
+    const withDayOff = [...planned.slice(0, 3), planDay("2026-10-25", [])];
+    expect(availabilityWithPlanned(shortRun, withDayOff)("ana", "2026-10-26", DAY).kind).not.toBe(
+      "workRun",
+    );
+  });
+
+  it("leaves out a recurring shift that would make a sixth day, and keeps absences", () => {
+    const fill = (dateKey: string, kind: "worked" | "absence") => ({
+      employeeId: "ana",
+      dateKey,
+      input:
+        kind === "worked"
+          ? scheduleCellSnapshotToInput(worked([DAY]).effective)!
+          : scheduleCellSnapshotToInput(absent(4).effective)!,
+    });
+    const shortRun = { "ana_2026-10-20": worked([DAY]), "ana_2026-10-21": worked([DAY]) };
+    const fills = [
+      fill("2026-10-25", "worked"),
+      fill("2026-10-22", "worked"),
+      fill("2026-10-23", "worked"),
+      fill("2026-10-24", "worked"),
+      fill("2026-10-26", "absence"),
+    ];
+    const { kept, skipped } = limitRecurringRuns(fills, shortRun);
+
+    expect(kept.map((item) => item.dateKey)).toEqual([
+      "2026-10-22",
+      "2026-10-23",
+      "2026-10-24",
+      "2026-10-26",
+    ]);
+    expect(skipped).toEqual([{ employeeId: "ana", dateKey: "2026-10-25", days: 6 }]);
+  });
+});
+
+describe("days off in pairs", () => {
+  const PERIOD = ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29"];
+  const standingFor = (shifts: Record<string, ScheduleCellStateEntry>) =>
+    fairnessStandingWithPlanned({ shifts, assignments, shiftCategories }, PERIOD);
+
+  it("marks a shift that would leave a single day off between work days", () => {
+    // Works Sunday; Tuesday would leave Monday alone.
+    const standing = standingFor({ "ana_2026-10-25": worked([DAY]) });
+    expect(standing("ana", "2026-10-27", DAY, []).splitsDaysOff).toBe(true);
+    expect(standing("ana", "2026-10-26", DAY, []).splitsDaysOff).toBe(false);
+    expect(standing("ana", "2026-10-28", DAY, []).splitsDaysOff).toBe(false);
+  });
+
+  it("does not mark a second shift on a day already worked", () => {
+    const standing = standingFor({
+      "ana_2026-10-25": worked([DAY]),
+      "ana_2026-10-27": worked([DAY]),
+    });
+    expect(standing("ana", "2026-10-27", EVENING, []).splitsDaysOff).toBe(false);
   });
 });

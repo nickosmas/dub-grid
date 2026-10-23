@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import {
+  MAX_DAYS_IN_A_ROW,
   WEEKLY_OVERTIME_HOURS,
   formatLocalDateKey,
   parseLocalDateKey,
@@ -10,6 +11,7 @@ import {
   type CoverageFairChoice,
   type CoverageOverThreshold,
   type CoverageRuledOut,
+  type CoverageSkippedRecurring,
 } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { Loader } from "lucide-react";
@@ -97,6 +99,41 @@ export function overThresholdLines(
     .map(({ key, name, detail }) => ({ key, name, detail }));
 }
 
+/** "Ana Diaz", "Fri, Oct 30 and Sat, Oct 31": recurring shifts the limit left out, per person. */
+export function recurringSkippedLines(
+  entries: ReadonlyArray<CoverageSkippedRecurring>,
+  words: Pick<SkippedWords, "personName" | "formatDate">,
+): { key: string; name: string; detail: string }[] {
+  const byPerson = new Map<string, string[]>();
+  for (const entry of [...entries].sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
+    byPerson.set(entry.employeeId, [...(byPerson.get(entry.employeeId) ?? []), entry.dateKey]);
+  }
+  return [...byPerson.entries()]
+    .map(([employeeId, dateKeys]) => ({
+      key: employeeId,
+      name: words.personName(employeeId),
+      detail: dateKeys.map(words.formatDate).join(", "),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function RecurringSkipped({
+  entries,
+  words,
+}: {
+  entries: ReadonlyArray<CoverageSkippedRecurring>;
+  words: SkippedWords;
+}) {
+  if (entries.length === 0) return null;
+  const caption = `Recurring shifts left out: over ${MAX_DAYS_IN_A_ROW} days in a row`;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="dg-cc-caption">{caption}</div>
+      <NameList label={caption} rows={recurringSkippedLines(entries, words)} />
+    </div>
+  );
+}
+
 function NameList({
   label,
   rows,
@@ -120,6 +157,7 @@ const WHY_ORDER = [
   "Recurring schedule",
   "Restored",
   "Moved back",
+  "Keeps days off together",
   "Fewest weekends",
   "Fewest nights",
   "Fewest hours",
@@ -130,6 +168,7 @@ const WHY_ORDER = [
 
 const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   only: "Only one free",
+  daysOff: "Keeps days off together",
   weekends: "Fewest weekends",
   nights: "Fewest nights",
   hours: "Fewest hours",
@@ -234,6 +273,7 @@ function BuildReport({
             <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
           </div>
         )}
+        <RecurringSkipped entries={preview.recurringSkipped} words={words} />
         {preview.shortCells.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <div className="dg-cc-caption dg-tabular-nums">
@@ -313,7 +353,7 @@ interface ScheduleBuildSectionProps {
   onSelectCell?: (rowKey: string, dateKey: string) => void;
 }
 
-export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free. Starts from recurring schedules, keeps everyone within ${WEEKLY_OVERTIME_HOURS} hours a week when it can, and shares weekends and nights fairly. Never moves anyone already scheduled.`;
+export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules. Nobody works more than ${MAX_DAYS_IN_A_ROW} days in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled.`;
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {
@@ -384,6 +424,7 @@ function PreviewSummary({
           <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
         </div>
       )}
+      {skippedWords && <RecurringSkipped entries={preview.recurringSkipped} words={skippedWords} />}
       {preview.shortAfter > 0 && (!skippedWords || preview.skipped.length === 0) && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
           Nobody qualified is free for the shifts left short. Select one to see why.

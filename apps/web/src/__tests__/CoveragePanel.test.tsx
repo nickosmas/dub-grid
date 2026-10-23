@@ -672,6 +672,7 @@ describe("CoveragePanel", () => {
       choices: [],
       recurringPeople: [],
       shortCells: [],
+      recurringSkipped: [],
       ...overrides,
     });
     const skippedWords = {
@@ -719,8 +720,8 @@ describe("CoveragePanel", () => {
         section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
       ).toBeInTheDocument();
       expect(
-        section().getByText(/^Fills open shifts with qualified staff who are free\./),
-      ).toHaveTextContent("Never moves anyone already scheduled.");
+        section().getByText(/^Fills open shifts with qualified staff who are free/),
+      ).toHaveTextContent(/Nobody works more than 5 days in a row, days off stay together/);
       fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
     });
@@ -919,6 +920,41 @@ describe("CoveragePanel", () => {
           "Ben Shepherd 3 shifts · Recurring schedule, Restored",
         ]);
         expect(section().queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+      });
+
+      it("names recurring shifts left out for the days-in-a-row limit", () => {
+        built({
+          recurringSkipped: [
+            { employeeId: "ben", dateKey: "2026-10-27", days: 6 },
+            { employeeId: "ben", dateKey: "2026-10-26", days: 6 },
+          ],
+        });
+        const name = "Recurring shifts left out: over 5 days in a row";
+        expect(
+          within(section().getByRole("list", { name }))
+            .getAllByRole("listitem")
+            .map((item) => item.textContent),
+        ).toEqual(["Ben Shepherd Mon, Oct 26, Tue, Oct 27"]);
+      });
+
+      it("says when a shift kept someone's days off together", () => {
+        built({
+          choices: [
+            {
+              suggestionId: "a",
+              employeeId: "ana",
+              dateKey: "2026-10-27",
+              reason: "daysOff",
+              count: 0,
+              others: 2,
+            },
+          ],
+        });
+        expect(
+          within(section().getByRole("list", { name: "What each person was given" })).getByText(
+            /Keeps days off together/,
+          ),
+        ).toBeInTheDocument();
       });
 
       it("links each shift still short to its cell", () => {

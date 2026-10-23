@@ -192,6 +192,8 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
       return `${lookups.formatDate(reason.dateKey)} isn't loaded, so it couldn't be checked`;
     case "request":
       return "has a request waiting that day";
+    case "workRun":
+      return `would work ${reason.days} days in a row`;
   }
 }
 

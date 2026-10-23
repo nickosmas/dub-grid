@@ -35,6 +35,9 @@ export type HoursShiftCategoryLike = {
 /** Worked hours in a Sunday-to-Saturday week before overtime (US federal rule). */
 export const WEEKLY_OVERTIME_HOURS = 40;
 
+/** The most days in a row the Schedule Builder gives anyone, across periods. */
+export const MAX_DAYS_IN_A_ROW = 5;
+
 export function buildShiftJobPairKey(shiftId: number | null, jobId: number): string {
   return `${shiftId ?? "null"}:${jobId}`;
 }

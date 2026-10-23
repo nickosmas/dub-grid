@@ -832,12 +832,17 @@ describe("fairness in a build", () => {
     days.filter((day) => day.employeeId === employeeId && day.day.assignmentIds.length > 0).length;
   const rule = (
     hours: Record<string, number>,
-    options: { weekends?: Record<string, number>; nights?: Record<string, number> } = {},
+    options: {
+      weekends?: Record<string, number>;
+      nights?: Record<string, number>;
+      splits?: string[];
+    } = {},
   ): CoverageFairnessRule => ({
     standing: (employeeId, dateKey, _assignmentId, days) => {
       const day = new Date(`${dateKey}T00:00:00`).getDay();
       const weekend = day === 0 || day === 6;
       return {
+        splitsDaysOff: options.splits?.includes(employeeId) ?? false,
         weekends: weekend && options.weekends ? (options.weekends[employeeId] ?? 0) : null,
         nights: options.nights ? (options.nights[employeeId] ?? 0) : null,
         hours: (hours[employeeId] ?? 0) + 8 * planned(employeeId, days),
@@ -913,6 +918,35 @@ describe("fairness in a build", () => {
     expect(preview.choices).toEqual([
       expect.objectContaining({ employeeId: "ben", reason: "only", others: 0 }),
     ]);
+  });
+
+  it("keeps days off together before balancing anything else", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      fairness: rule(
+        { ana: 0, ben: 4, cat: 30, dan: 40, eve: 40 },
+        { splits: ["ana", "ben", "dan", "eve"] },
+      ),
+    });
+
+    // Only Cat keeps days off together; the next pick splits for everyone, so hours decide.
+    expect(preview.fixes.map((fix) => fix.employeeId)).toEqual(["cat", "ana"]);
+    expect(preview.choices.map((choice) => choice.reason)).toEqual(["daysOff", "hours"]);
+  });
+
+  it("splits days off only when everyone who could fill the shift would split them", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const plan = planCoverageFixes(world, {
+      dateKey: MON,
+      fairness: rule(
+        { ana: 8, ben: 0, cat: 0, dan: 4, eve: 4 },
+        { splits: ["ana", "ben", "cat", "dan", "eve"] },
+      ),
+    });
+
+    // Everyone splits, so the shift still goes out, by hours (Ben and Cat tie, Ben by name).
+    expect(plan.map((fix) => fix.employeeId)).toEqual(["ben", "cat"]);
   });
 
   it("still puts back the draft's own changes first", () => {
@@ -1029,5 +1063,16 @@ describe("previewCoverageBuildAsync", () => {
 
     expect(preview.fixes).toEqual([]);
     expect(pauses).toBe(0);
+  });
+});
+
+describe("recurring fills left out", () => {
+  it("are reported with the preview as given", () => {
+    const world = buildSuggestionWorld({ requirements: MA_ONLY, draft: {} });
+    const skipped = [{ employeeId: "ana", dateKey: MON, days: 6 }];
+    expect(previewCoverageBuild(world, { skippedRecurring: skipped }).recurringSkipped).toEqual(
+      skipped,
+    );
+    expect(previewCoverageBuild(world).recurringSkipped).toEqual([]);
   });
 });

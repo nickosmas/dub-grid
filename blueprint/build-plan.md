@@ -1013,7 +1013,7 @@
         plain description of how it works under the title; Generate
         schedule, then Apply or Discard; the toolbar button gets a calendar
         icon and no count.
-  - [ ] 49c. **Five days in a row, days off in pairs** - no sixth day in a
+  - [x] 49c. **Five days in a row, days off in pairs** - no sixth day in a
         row from a build or a suggestion, counted across periods; a recurring
         fill that would make one is skipped and reported; days off stay in
         pairs unless nobody can fill a shift without splitting them.
@@ -1024,7 +1024,6 @@
         shifts on the Recurring schedule tab (migration 089); Auto-build and
         suggestions never give an Only person another shift and pick
         preferred people first.
-  - [ ] 49f. **Fill the rest with overtime** - the first build stays within
-        40 hours and five days in a row; when gaps remain, a second option
-        plans again allowing overtime and a sixth day in a row (never a
-        seventh), names who it affects and asks before it applies.
+  - [ ] 49f. **Allow a sixth day** - an option chosen before generating
+        lets a build give someone a sixth day in a row (never a seventh),
+        with a warning, and the result names everyone given one.
