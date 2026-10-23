@@ -11,6 +11,7 @@ import type {
 import type { Employee } from "@dubgrid/domain";
 import { isEmployeeQualifiedForAssignmentDefinition } from "@/lib/assignable-shifts";
 import { checkCrossDateOverlap, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
+import { orderSegmentsByStartTime } from "@/components/shiftEditTime";
 
 export interface StaffingScheduleState {
   kind: ScheduleCellInput["kind"];
@@ -309,6 +310,7 @@ export function buildStaffedOpenShiftInput({
   existingState,
   option,
   assignments,
+  shiftCategories,
 }: BuildStaffedInput): ScheduleCellInput | null {
   const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
   const addedSegments = option.assignmentIds.flatMap((assignmentId, index) => {
@@ -329,20 +331,40 @@ export function buildStaffedOpenShiftInput({
   const existingSegments = existingWorkedState?.segments ?? [];
   const existingStarts = splitAlignedTimes(existingState?.customStartTime, existingSegments.length);
   const existingEnds = splitAlignedTimes(existingState?.customEndTime, existingSegments.length);
+  const existingRanges = getStaffingStateAlignedTimeRanges(existingWorkedState, {
+    assignments,
+    shiftCategories,
+  });
   const addedStarts = option.alignedCustomTimeRanges.map((range) => range?.start ?? null);
   const addedEnds = option.alignedCustomTimeRanges.map((range) => range?.end ?? null);
+  // A shift staffed beside one already worked still reads in time order.
+  const ordered = orderSegmentsByStartTime(
+    [
+      ...existingSegments.map((segment, index) => ({
+        segment,
+        start: existingRanges[index]?.start ?? null,
+      })),
+      ...addedSegments.map((segment, index) => ({
+        segment,
+        start: option.alignedTimeRanges[index]?.start ?? null,
+      })),
+    ],
+    joinAlignedTimes([...existingStarts, ...addedStarts]),
+    joinAlignedTimes([...existingEnds, ...addedEnds]),
+    (item) => item.start,
+  );
 
   return {
     kind: "worked",
-    segments: [...existingSegments, ...addedSegments].map((segment, position) => ({
+    segments: ordered.segments.map(({ segment }, position) => ({
       shiftId: segment.shiftId ?? null,
       jobId: segment.jobId,
       position,
       isMentored: segment.isMentored ?? false,
     })),
     absenceTypeId: null,
-    customStartTime: joinAlignedTimes([...existingStarts, ...addedStarts]),
-    customEndTime: joinAlignedTimes([...existingEnds, ...addedEnds]),
+    customStartTime: ordered.customStartTime,
+    customEndTime: ordered.customEndTime,
     seriesId: existingWorkedState?.seriesId ?? null,
     fromRecurring: existingWorkedState?.fromRecurring ?? false,
   };

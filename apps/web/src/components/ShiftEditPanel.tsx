@@ -985,7 +985,7 @@ export default function ShiftEditPanel({
                     (candidate.shiftId ?? candidate.categoryId ?? null) ===
                       (segment.shiftId ?? null) && candidate.jobId === segment.jobId,
                 ),
-              ).start,
+              ).start ?? shiftCategories.find((shift) => shift.id === segment.shiftId)?.startTime,
           )
         : {
             segments,
