@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Switch } from "@/components/ui/switch";
 import {
   MAX_DAYS_IN_A_ROW,
+  MAX_DAYS_IN_A_ROW_STRETCHED,
   WEEKLY_OVERTIME_HOURS,
   formatLocalDateKey,
   parseLocalDateKey,
@@ -101,9 +103,9 @@ export function overThresholdLines(
     .map(({ key, name, detail }) => ({ key, name, detail }));
 }
 
-/** "Ana Diaz", "Fri, Oct 30 and Sat, Oct 31": recurring shifts the limit left out, per person. */
+/** "Ana Diaz", "Fri, Oct 30, Sat, Oct 31": each person's dates, by name. */
 export function recurringSkippedLines(
-  entries: ReadonlyArray<CoverageSkippedRecurring>,
+  entries: ReadonlyArray<{ employeeId: string; dateKey: string }>,
   words: Pick<SkippedWords, "personName" | "formatDate">,
 ): { key: string; name: string; detail: string }[] {
   const byPerson = new Map<string, string[]>();
@@ -132,6 +134,60 @@ function RecurringSkipped({
     <div className="flex flex-col gap-1.5">
       <div className="dg-cc-caption">{caption}</div>
       <NameList label={caption} rows={recurringSkippedLines(entries, words)} />
+    </div>
+  );
+}
+
+/** "Ana Diaz", "Sun, Oct 25 to Fri, Oct 30": each person's runs of days, by name. */
+export function runLines(
+  entries: ReadonlyArray<{ employeeId: string; dateKey: string }>,
+  words: Pick<SkippedWords, "personName" | "formatDate">,
+): { key: string; name: string; detail: string }[] {
+  const byPerson = new Map<string, string[]>();
+  for (const entry of entries) {
+    byPerson.set(entry.employeeId, [...(byPerson.get(entry.employeeId) ?? []), entry.dateKey]);
+  }
+  const nextDay = (dateKey: string) => {
+    const date = parseLocalDateKey(dateKey);
+    date.setDate(date.getDate() + 1);
+    return formatLocalDateKey(date);
+  };
+  return [...byPerson.entries()]
+    .map(([employeeId, dateKeys]) => {
+      const runs: string[][] = [];
+      for (const dateKey of [...new Set(dateKeys)].sort()) {
+        const last = runs.at(-1);
+        if (last && nextDay(last[last.length - 1]) === dateKey) last.push(dateKey);
+        else runs.push([dateKey]);
+      }
+      return {
+        key: employeeId,
+        name: words.personName(employeeId),
+        detail: runs
+          .map((run) =>
+            run.length === 1
+              ? words.formatDate(run[0])
+              : `${words.formatDate(run[0])} to ${words.formatDate(run[run.length - 1])}`,
+          )
+          .join(", "),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function SixthDays({
+  entries,
+  words,
+}: {
+  entries: ReadonlyArray<{ employeeId: string; dateKey: string }>;
+  words: SkippedWords;
+}) {
+  if (entries.length === 0) return null;
+  const caption = `${MAX_DAYS_IN_A_ROW_STRETCHED} days in a row`;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="dg-cc-caption">{caption}</div>
+      <NameList label={caption} rows={runLines(entries, words)} />
     </div>
   );
 }
@@ -287,6 +343,7 @@ function BuildReport({
             <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
           </div>
         )}
+        <SixthDays entries={preview.sixthDays} words={words} />
         <RecurringSkipped entries={preview.recurringSkipped} words={words} />
         {preview.shortCells.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -365,6 +422,9 @@ interface ScheduleBuildSectionProps {
   skippedWords?: SkippedWords;
   /** Selects a still-short shift's cell in the matrix. */
   onSelectCell?: (rowKey: string, dateKey: string) => void;
+  /** Whether a build may give someone a sixth day in a row; the option is left out without a handler. */
+  allowSixthDay?: boolean;
+  onAllowSixthDayChange?: (allow: boolean) => void;
 }
 
 export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules. Nobody works more than ${MAX_DAYS_IN_A_ROW} days in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled.`;
@@ -444,6 +504,7 @@ function PreviewSummary({
           <NameList label={`Over ${WEEKLY_OVERTIME_HOURS} hours a week`} rows={over} />
         </div>
       )}
+      {skippedWords && <SixthDays entries={preview.sixthDays} words={skippedWords} />}
       {skippedWords && <RecurringSkipped entries={preview.recurringSkipped} words={skippedWords} />}
       {skippedWords?.dayOffName === null && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
@@ -501,6 +562,8 @@ export function ScheduleBuildSection({
   onCancel,
   skippedWords,
   onSelectCell,
+  allowSixthDay = false,
+  onAllowSixthDayChange,
 }: ScheduleBuildSectionProps) {
   const previewing = state.status === "previewing";
   return (
@@ -580,6 +643,25 @@ export function ScheduleBuildSection({
       ) : (
         <>
           <p className="dg-cc-detail-line dg-cc-detail-line--muted">{BUILD_SUMMARY}</p>
+          {onAllowSixthDayChange && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="dg-cc-detail-line">Allow a sixth day in a row</span>
+                <Switch
+                  checked={allowSixthDay}
+                  onChange={onAllowSixthDayChange}
+                  ariaLabel="Allow a sixth day in a row"
+                  disabled={previewing}
+                />
+              </div>
+              {allowSixthDay && (
+                <p className="dg-cc-detail-line dg-cc-build-warning" role="note">
+                  Some people may work {MAX_DAYS_IN_A_ROW_STRETCHED} days in a row, never{" "}
+                  {MAX_DAYS_IN_A_ROW_STRETCHED + 1}. The result names everyone who does.
+                </p>
+              )}
+            </div>
+          )}
           {state.status === "previewing" && (
             <BuildProgress
               label={

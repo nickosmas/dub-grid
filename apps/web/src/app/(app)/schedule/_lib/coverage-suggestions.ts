@@ -65,6 +65,8 @@ export interface CoverageSuggestionAdapterInput {
   loadedDateKeys: string[];
   /** Each person's shift preference, by employee id; people without one are left out. */
   preferences?: ReadonlyMap<string, CoverageShiftPreference>;
+  /** Days in a row allowed; the usual limit unless the scheduler allows a sixth. */
+  maxDaysInARow?: number;
 }
 
 /** The shift an assignment belongs to, for matching a preference. */
@@ -191,10 +193,34 @@ export function daysInARowWith(worked: (dateKey: string) => boolean, dateKey: st
 function overWorkRun(
   worked: (dateKey: string) => boolean,
   dateKey: string,
+  limit: number = MAX_DAYS_IN_A_ROW,
 ): CoverageAvailability | null {
   if (worked(dateKey)) return null;
   const days = daysInARowWith(worked, dateKey);
-  return days > MAX_DAYS_IN_A_ROW ? { kind: "workRun", days } : null;
+  return days > limit ? { kind: "workRun", days } : null;
+}
+
+/** The days a plan puts someone past the usual days-in-a-row limit, by person and date. */
+export function daysPastUsualLimit(
+  shifts: ShiftMap,
+  planned: ReadonlyArray<CoverageDayOverride>,
+): { employeeId: string; dateKey: string }[] {
+  const byPerson = new Map<string, CoverageDayOverride[]>();
+  for (const day of planned) {
+    if (day.side !== "draft") continue;
+    byPerson.set(day.employeeId, [...(byPerson.get(day.employeeId) ?? []), day]);
+  }
+  const found: { employeeId: string; dateKey: string }[] = [];
+  for (const [employeeId, days] of byPerson) {
+    const worked = workedWith(shifts, days, employeeId);
+    for (const day of days) {
+      if (day.day.assignmentIds.length === 0) continue;
+      if (daysInARowWith(worked, day.dateKey) > MAX_DAYS_IN_A_ROW) {
+        found.push({ employeeId, dateKey: day.dateKey });
+      }
+    }
+  }
+  return found.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
 
 /**
@@ -203,7 +229,11 @@ function overWorkRun(
  */
 export function limitRecurringRuns<
   F extends { employeeId: string; dateKey: string; input: ScheduleCellInput },
->(fills: ReadonlyArray<F>, shifts: ShiftMap): { kept: F[]; skipped: CoverageSkippedRecurring[] } {
+>(
+  fills: ReadonlyArray<F>,
+  shifts: ShiftMap,
+  limit: number = MAX_DAYS_IN_A_ROW,
+): { kept: F[]; skipped: CoverageSkippedRecurring[] } {
   const kept: F[] = [];
   const skipped: CoverageSkippedRecurring[] = [];
   const accepted = new Map<string, CoverageDayOverride[]>();
@@ -211,7 +241,7 @@ export function limitRecurringRuns<
     const works = fill.input.kind === "worked" && fill.input.segments.length > 0;
     const planned = accepted.get(fill.employeeId) ?? [];
     if (works) {
-      const run = overWorkRun(workedWith(shifts, planned, fill.employeeId), fill.dateKey);
+      const run = overWorkRun(workedWith(shifts, planned, fill.employeeId), fill.dateKey, limit);
       if (run?.kind === "workRun") {
         skipped.push({ employeeId: fill.employeeId, dateKey: fill.dateKey, days: run.days });
         continue;
@@ -237,7 +267,12 @@ export function limitRecurringRuns<
 export function availabilityFromShifts(
   input: Pick<
     CoverageSuggestionAdapterInput,
-    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys" | "preferences"
+    | "shifts"
+    | "assignments"
+    | "shiftCategories"
+    | "loadedDateKeys"
+    | "preferences"
+    | "maxDaysInARow"
   >,
   employeeId: string,
   dateKey: string,
@@ -271,7 +306,7 @@ export function availabilityFromShifts(
       };
     }
   }
-  const run = overWorkRun(workedWith(input.shifts, [], employeeId), dateKey);
+  const run = overWorkRun(workedWith(input.shifts, [], employeeId), dateKey, input.maxDaysInARow);
   if (run) return run;
   if (!range) return { kind: "free" };
 
@@ -309,7 +344,12 @@ export function availabilityFromShifts(
 export function availabilityWithPlanned(
   input: Pick<
     CoverageSuggestionAdapterInput,
-    "shifts" | "assignments" | "shiftCategories" | "loadedDateKeys" | "preferences"
+    | "shifts"
+    | "assignments"
+    | "shiftCategories"
+    | "loadedDateKeys"
+    | "preferences"
+    | "maxDaysInARow"
   >,
   planned: ReadonlyArray<CoverageDayOverride>,
 ): (employeeId: string, dateKey: string, assignmentId: number) => CoverageAvailability {
@@ -344,7 +384,10 @@ export function availabilityWithPlanned(
         if (overlaps) return { kind: "overlap", dateKey: day.dateKey, assignmentId: plannedId };
       }
     }
-    return overWorkRun(workedWith(input.shifts, planned, employeeId), dateKey) ?? base;
+    return (
+      overWorkRun(workedWith(input.shifts, planned, employeeId), dateKey, input.maxDaysInARow) ??
+      base
+    );
   };
 }
 

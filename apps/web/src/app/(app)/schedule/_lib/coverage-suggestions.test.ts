@@ -9,6 +9,7 @@ import {
   availabilityFromShifts,
   availabilityWithPlanned,
   daysInARowWith,
+  daysPastUsualLimit,
   draftDayFromShifts,
   hasOpenRequest,
   pendingPickupsFromRequests,
@@ -548,6 +549,22 @@ describe("days in a row", () => {
     expect(availabilityWithPlanned(shortRun, withDayOff)("ana", "2026-10-26", DAY).kind).not.toBe(
       "workRun",
     );
+  });
+
+  it("allows a sixth day but never a seventh when the scheduler allows it", () => {
+    const stretched = { ...input, maxDaysInARow: 6 };
+    expect(availabilityFromShifts(stretched, "ana", "2026-10-25", DAY).kind).not.toBe("workRun");
+    const sixDays = { ...fiveDays, "ana_2026-10-25": worked([DAY]) };
+    expect(
+      availabilityFromShifts({ ...stretched, shifts: sixDays }, "ana", "2026-10-26", DAY),
+    ).toEqual({ kind: "workRun", days: 7 });
+  });
+
+  it("names the planned days that go past five in a row", () => {
+    expect(
+      daysPastUsualLimit(fiveDays, [planDay("2026-10-25", [DAY]), planDay("2026-10-27", [DAY])]),
+    ).toEqual([{ employeeId: "ana", dateKey: "2026-10-25" }]);
+    expect(daysPastUsualLimit(fiveDays, [planDay("2026-10-25", [])])).toEqual([]);
   });
 
   it("leaves out a recurring shift that would make a sixth day, and keeps absences", () => {

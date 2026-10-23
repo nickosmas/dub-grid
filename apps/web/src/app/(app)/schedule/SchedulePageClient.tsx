@@ -98,6 +98,8 @@ import {
   describeCoverageSuggestion,
   normalizeCoverageRuleConfig,
   resolveDayOffAbsenceType,
+  MAX_DAYS_IN_A_ROW,
+  MAX_DAYS_IN_A_ROW_STRETCHED,
   WEEKLY_OVERTIME_HOURS,
   planCoverageFixes,
   previewCoverageBuildAsync,
@@ -118,7 +120,9 @@ import {
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
 import {
+  availabilityFromShifts,
   availabilityWithPlanned,
+  daysPastUsualLimit,
   fairnessStandingWithPlanned,
   planDaysOff,
   limitRecurringRuns,
@@ -6830,10 +6834,21 @@ function SchedulerContent({
       /** Published cells before the period, for rotating weekends and nights. */
       history?: ShiftMap;
       skippedRecurring?: CoverageSkippedRecurring[];
+      /** A sixth day in a row is allowed, never a seventh. */
+      allowSixthDay?: boolean;
     }) => {
       if (!coverageSuggestions) return null;
-      const { engine, adapterInput } = coverageSuggestions;
-      const { history, ...planned } = options;
+      const { history, allowSixthDay, ...planned } = options;
+      const adapterInput = allowSixthDay
+        ? { ...coverageSuggestions.adapterInput, maxDaysInARow: MAX_DAYS_IN_A_ROW_STRETCHED }
+        : coverageSuggestions.adapterInput;
+      const engine = allowSixthDay
+        ? {
+            ...coverageSuggestions.engine,
+            availability: (employeeId: string, dateKey: string, assignmentId: number) =>
+              availabilityFromShifts(adapterInput, employeeId, dateKey, assignmentId),
+          }
+        : coverageSuggestions.engine;
       return {
         engine,
         options: {
@@ -6901,6 +6916,8 @@ function SchedulerContent({
     rowKeys: string[];
     plannedFrom: string;
   } | null>(null);
+  // Off unless the scheduler turns it on before generating; never more than six in a row.
+  const [allowSixthDay, setAllowSixthDay] = useState(false);
   // What the last build did, kept until Done, a new preview or its Undo.
   const [buildReport, setBuildReport] = useState<CoverageBuildPreview | null>(null);
   // Apply in progress, kept apart from the preview, which its own writes make stale.
@@ -6967,7 +6984,11 @@ function SchedulerContent({
       const fixedWrites: SuggestionWrite[] = [];
       const baseOverrides: CoverageDayOverride[] = [];
       // A recurring schedule never takes anyone past the days-in-a-row limit either.
-      const limited = limitRecurringRuns(fills, shiftsRef.current);
+      const limited = limitRecurringRuns(
+        fills,
+        shiftsRef.current,
+        allowSixthDay ? MAX_DAYS_IN_A_ROW_STRETCHED : MAX_DAYS_IN_A_ROW,
+      );
       for (const fill of limited.kept) {
         const input: ScheduleCellInput = { ...fill.input, fromRecurring: true };
         const snapshot = resolveInputSnapshot(input);
@@ -6993,6 +7014,7 @@ function SchedulerContent({
         baseOverrides,
         history,
         skippedRecurring: limited.skipped,
+        allowSixthDay,
       });
       if (!planned) return null;
       const preview = await previewCoverageBuildAsync(planned.engine, planned.options, {
@@ -7000,13 +7022,17 @@ function SchedulerContent({
         pause: createTimeSlicer(BUILD_SLICE_MS),
         onProgress,
       });
+      const plannedDays = [...baseOverrides, ...preview.fixes.flatMap((fix) => fix.overrides)];
+      if (allowSixthDay) {
+        preview.sixthDays = daysPastUsualLimit(shiftsRef.current, plannedDays);
+      }
       // Then everyone who works in the period gets the day off absence on each empty day.
       const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
       if (!dayOff) return { preview, fixedWrites };
       const todayKey = formatDateKey(new Date());
       const daysOff = planDaysOff({
         shifts: shiftsRef.current,
-        planned: [...baseOverrides, ...preview.fixes.flatMap((fix) => fix.overrides)],
+        planned: plannedDays,
         employeeIds: scopedEmployeeIds.filter(
           (id) => employees.find((employee) => employee.id === id)?.status === "active",
         ),
@@ -7033,6 +7059,7 @@ function SchedulerContent({
       employees,
       jobs,
       org,
+      allowSixthDay,
       planOptions,
       resolveInputSnapshot,
       segmentCompatibility,
@@ -9097,6 +9124,12 @@ function SchedulerContent({
                         setBuildReport(null);
                       },
                       skippedWords: buildSkippedWords,
+                      allowSixthDay,
+                      onAllowSixthDayChange: (allow: boolean) => {
+                        // A result planned the other way no longer applies.
+                        setAllowSixthDay(allow);
+                        setBuildPreview(null);
+                      },
                     }
                   : undefined
               }

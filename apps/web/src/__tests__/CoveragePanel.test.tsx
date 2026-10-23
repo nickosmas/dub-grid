@@ -674,6 +674,7 @@ describe("CoveragePanel", () => {
       shortCells: [],
       recurringSkipped: [],
       daysOff: [],
+      sixthDays: [],
       ...overrides,
     });
     const skippedWords = {
@@ -701,6 +702,7 @@ describe("CoveragePanel", () => {
       state: ScheduleBuildState,
       overrides = {},
       words: Partial<typeof skippedWords> & { dayOffName?: string | null } = {},
+      allowSixthDay = false,
     ) => {
       const build = {
         state,
@@ -708,6 +710,8 @@ describe("CoveragePanel", () => {
         onBuild: vi.fn(),
         onCancel: vi.fn(),
         skippedWords: { ...skippedWords, ...words },
+        allowSixthDay,
+        onAllowSixthDayChange: vi.fn(),
       };
       renderPanel({
         suggestions: { items: [], notSuggestedByCell: new Map() },
@@ -1028,6 +1032,41 @@ describe("CoveragePanel", () => {
       );
       expect(section().getByText("1 new shift · 1 day off")).toBeInTheDocument();
       expect(section().getByText(/No day off absence is set/)).toBeInTheDocument();
+    });
+
+    it("offers a sixth day in a row before generating, with a warning once on", () => {
+      const build = withBuild({ status: "idle" });
+      const option = section().getByRole("switch", { name: "Allow a sixth day in a row" });
+      expect(option).not.toBeChecked();
+      expect(section().queryByRole("note")).not.toBeInTheDocument();
+      fireEvent.click(option);
+      expect(build.onAllowSixthDayChange).toHaveBeenCalledWith(true);
+      cleanup();
+
+      withBuild({ status: "idle" }, {}, {}, true);
+      expect(section().getByRole("note")).toHaveTextContent(
+        "Some people may work 6 days in a row, never 7.",
+      );
+    });
+
+    it("names everyone a build gives a sixth day in a row", () => {
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }] as CoverageSuggestion[],
+          people: 1,
+          sixthDays: [
+            { employeeId: "ana", dateKey: "2026-10-27" },
+            { employeeId: "ana", dateKey: "2026-10-26" },
+            { employeeId: "ben", dateKey: "2026-10-28" },
+          ],
+        }),
+      });
+      expect(
+        within(section().getByRole("list", { name: "6 days in a row" }))
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Ana Crawford Mon, Oct 26 to Tue, Oct 27", "Ben Shepherd 2026-10-28"]);
     });
 
     it("lists nobody when nobody was skipped", () => {

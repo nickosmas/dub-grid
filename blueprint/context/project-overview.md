@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 48 are
-shipped. Items 40 and 49 are in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 49 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,7 +83,7 @@ shipped. Items 40 and 49 are in progress.
 | 46   | Shipped     | Every shift change reads the same detailed way everywhere; organizations can hide change details and the publisher from staff.  |
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
-| 49   | In progress | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
+| 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 
 Item 40 is split:
 
@@ -271,14 +271,14 @@ Item 48 is split, and every part has shipped:
   each person was given and why, anyone over 40 hours a week, and each shift
   still short as a link to its cell, until Done or the build's Undo.
 
-Item 49 is split:
+Item 49 is split, and every part has shipped:
 
 - **49a - Loading that never freezes:** shipped; planning yields with a percentage bar, and Apply counts every save before the report.
 - **49b - Auto-build naming:** shipped; Auto-build with a plain description, Generate schedule, Apply and Discard, and a calendar toolbar button with no count.
 - **49c - Five days in a row, days off in pairs:** shipped; no sixth day in a row from a build, a suggestion or a recurring fill, counted across periods, and days off kept in pairs unless nobody can.
 - **49d - Day off absence:** shipped; Schedule Rules names the day off absence (pre-detected by name), and a build writes it into each scheduled person's empty days.
 - **49e - Shift preferences:** shipped; per person Prefers or Only a set of shifts on the Recurring Shifts page (migration 089), which Auto-build and its suggestions follow.
-- **49f - Allow a sixth day:** planned.
+- **49f - Allow a sixth day:** shipped; an option before generating lets a build give someone a sixth day in a row, never a seventh, with a warning and each run named.
 
 A build never schedules anyone more than five days in a row, unless the
 scheduler turns on "Allow a sixth day in a row" before generating (never a

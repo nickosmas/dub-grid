@@ -82,6 +82,8 @@ interface CoveragePanelProps {
     onBuild: () => void;
     onCancel: () => void;
     skippedWords?: SkippedWords;
+    allowSixthDay?: boolean;
+    onAllowSixthDayChange?: (allow: boolean) => void;
   };
   onClose: () => void;
 }
@@ -453,6 +455,8 @@ export default function CoveragePanel({
                           onBuild={build.onBuild}
                           onCancel={build.onCancel}
                           skippedWords={build.skippedWords}
+                          allowSixthDay={build.allowSixthDay}
+                          onAllowSixthDayChange={build.onAllowSixthDayChange}
                           onSelectCell={(rowKey, dateKey) => {
                             setSelectedDateKey(null);
                             setSelected({ rowKey, dateKey });

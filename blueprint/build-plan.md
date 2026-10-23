@@ -1003,7 +1003,7 @@
   - [x] 48f. **Build report** - after a build, what each person was given,
         who went over the threshold, and every gap left with its reason,
         each linked to its cell.
-- [ ] 49. **Schedule Builder refinements** - Auto-build stays responsive,
+- [x] 49. **Schedule Builder refinements** - Auto-build stays responsive,
       reads as an auto builder, never schedules six days in a row, keeps days
       off together and writes them, and follows each person's shift
       preferences.
@@ -1024,6 +1024,6 @@
         shifts on the Recurring schedule tab (migration 089); Auto-build and
         suggestions never give an Only person another shift and pick
         preferred people first.
-  - [ ] 49f. **Allow a sixth day** - an option chosen before generating
+  - [x] 49f. **Allow a sixth day** - an option chosen before generating
         lets a build give someone a sixth day in a row (never a seventh),
         with a warning, and the result names everyone given one.

@@ -1046,6 +1046,8 @@ export interface CoverageBuildPreview {
   recurringSkipped: CoverageSkippedRecurring[];
   /** Empty days the build marks with the day off absence; added by the caller. */
   daysOff: { employeeId: string; dateKey: string }[];
+  /** Days the build gives someone a sixth day in a row, when allowed; added by the caller. */
+  sixthDays: { employeeId: string; dateKey: string }[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1154,6 +1156,7 @@ function summarizeBuild(
     choices,
     recurringSkipped: [...(options.skippedRecurring ?? [])],
     daysOff: [],
+    sixthDays: [],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),
