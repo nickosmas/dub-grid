@@ -674,6 +674,7 @@ describe("CoveragePanel", () => {
       shortCells: [],
       recurringSkipped: [],
       daysOff: [],
+      blankDays: [],
       sixthDays: [],
       sixthWeeks: [],
       ...overrides,
@@ -986,6 +987,18 @@ describe("CoveragePanel", () => {
           "Ana Crawford 2 shifts · 2 days off · Fewest hours, Only one free",
         );
         expect(rows.map((row) => row.textContent)).toContain("cat 1 day off");
+      });
+
+      it("names the days left blank for someone short of their usual days", () => {
+        built({
+          daysOff: [{ employeeId: "cat", dateKey: "2026-10-26" }],
+          blankDays: [{ employeeId: "cat", dateKey: "2026-10-27" }],
+          people: 2,
+        });
+        const rows = within(
+          section().getByRole("list", { name: "What each person was given" }),
+        ).getAllByRole("listitem");
+        expect(rows.map((row) => row.textContent)).toContain("cat 1 day off · 1 day left blank");
       });
 
       it("links each shift still short to its cell", () => {

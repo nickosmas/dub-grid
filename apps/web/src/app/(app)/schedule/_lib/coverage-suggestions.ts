@@ -2,6 +2,7 @@ import {
   MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_WEEK,
   computeShiftSegmentHours,
+  getScheduleWeekStartDate,
   parseLocalDateKey,
   type CoverageAvailability,
   type CoverageDayOverride,
@@ -228,6 +229,14 @@ function overWorkLimits(
   const week = daysInWeekWith(worked, dateKey);
   if (week > (limits.maxDaysInAWeek ?? MAX_DAYS_IN_A_WEEK)) return { kind: "workWeek", days: week };
   return null;
+}
+
+/** The limits as a restore or move back checks them: a day already worked adds no days. */
+export function workLimitWith(
+  limits: WorkLimits,
+): NonNullable<CoverageSuggestionInput["workLimit"]> {
+  return (_employeeId, dateKey, worked) =>
+    overWorkLimits(worked, dateKey, { ...limits, noDoubleShifts: false });
 }
 
 /**
@@ -621,10 +630,45 @@ export function fairnessStandingWithPlanned(
   };
 }
 
+/** Every way to pick `size` of the items, in order. */
+function combinations<T>(items: ReadonlyArray<T>, size: number): T[][] {
+  if (size === 0) return [[]];
+  return items.flatMap((item, index) =>
+    combinations(items.slice(index + 1), size - 1).map((rest) => [item, ...rest]),
+  );
+}
+
 /**
- * The day off absence for each empty day of everyone who works in the period
- * once the build's days are written. Only days not yet past, never a cell
- * that holds anything or that the build writes.
+ * Which of a week's empty days get the day off absence, leaving `blanks` of
+ * them blank: the days that sit next to the most days off, then the earliest,
+ * so days off stay together and the blanks come last. A week has at most
+ * seven empty days, so every choice is tried.
+ */
+function chooseDaysOff(
+  empty: ReadonlyArray<string>,
+  blanks: number,
+  isOff: (dateKey: string) => boolean,
+): string[] {
+  let best: { days: string[]; together: number } | null = null;
+  for (const days of combinations(empty, empty.length - blanks)) {
+    const together = days.filter((dateKey) => {
+      const date = parseLocalDateKey(dateKey);
+      return [-1, 1].some((offset) => {
+        const key = formatDateKey(addDays(date, offset));
+        return days.includes(key) || isOff(key);
+      });
+    }).length;
+    if (!best || together > best.together) best = { days, together };
+  }
+  return best?.days ?? [];
+}
+
+/**
+ * The day off absence for the empty days of everyone who works in the period
+ * once the build's days are written, leaving one day blank for each day a
+ * week they are short of their usual days. Only days not yet past, never a
+ * cell that holds anything or that the build writes; a day the build empties,
+ * such as a move back's other end, counts as empty but can only stay blank.
  */
 export function planDaysOff(input: {
   shifts: ShiftMap;
@@ -632,34 +676,97 @@ export function planDaysOff(input: {
   employeeIds: ReadonlyArray<string>;
   dateKeys: ReadonlyArray<string>;
   absenceTypeId: number;
-}): { employeeId: string; dateKey: string; input: ScheduleCellInput }[] {
+  /** Days the person usually works in a week. */
+  usualDays: (employeeId: string) => number;
+  /** Days before this have passed, so one without work was a day off. */
+  todayKey: string;
+}): {
+  writes: { employeeId: string; dateKey: string; input: ScheduleCellInput }[];
+  blanks: { employeeId: string; dateKey: string }[];
+} {
   const writes: { employeeId: string; dateKey: string; input: ScheduleCellInput }[] = [];
+  const blanks: { employeeId: string; dateKey: string }[] = [];
   for (const employeeId of input.employeeIds) {
     const planned = input.planned.filter(
       (day) => day.side === "draft" && day.employeeId === employeeId,
     );
     const worked = workedWith(input.shifts, planned, employeeId);
     if (!input.dateKeys.some(worked)) continue;
-    const plannedKeys = new Set(planned.map((day) => day.dateKey));
-    for (const dateKey of input.dateKeys) {
+    const plannedDays = new Map(planned.map((day) => [day.dateKey, day.day]));
+    const absenceOn = (dateKey: string): number | null => {
+      if (plannedDays.has(dateKey)) return plannedDays.get(dateKey)!.absenceTypeId;
       const entry = input.shifts[`${employeeId}_${dateKey}`];
-      if (plannedKeys.has(dateKey) || (entry != null && !entry.isDelete)) continue;
-      writes.push({
-        employeeId,
-        dateKey,
-        input: {
-          kind: "absence",
-          segments: [],
-          absenceTypeId: input.absenceTypeId,
-          customStartTime: null,
-          customEndTime: null,
-          seriesId: null,
-          fromRecurring: false,
-        },
-      });
+      return entry && !entry.isDelete ? (entry.absenceTypeId ?? null) : null;
+    };
+    // Writable: nothing saved or planned. A planned day left with nothing is empty too.
+    const isWritable = (dateKey: string) => {
+      const entry = input.shifts[`${employeeId}_${dateKey}`];
+      return !plannedDays.has(dateKey) && (entry == null || entry.isDelete === true);
+    };
+    const isEmptied = (dateKey: string) => {
+      const day = plannedDays.get(dateKey);
+      return (
+        day != null &&
+        day.assignmentIds.length === 0 &&
+        day.absenceTypeId == null &&
+        day.restOfDayAbsenceTypeId == null
+      );
+    };
+    const weeks = new Map<string, { writable: string[]; emptied: string[] }>();
+    for (const dateKey of input.dateKeys) {
+      const writable = isWritable(dateKey);
+      if (!writable && !isEmptied(dateKey)) continue;
+      const week = getScheduleWeekStartDate(dateKey);
+      const days = weeks.get(week) ?? { writable: [], emptied: [] };
+      (writable ? days.writable : days.emptied).push(dateKey);
+      weeks.set(week, days);
+    }
+    for (const [week, { writable, emptied }] of weeks) {
+      const days = Array.from({ length: 7 }, (_, offset) =>
+        formatDateKey(addDays(parseLocalDateKey(week), offset)),
+      );
+      // Another absence, such as vacation, stands in for a workday.
+      const accounted = days.filter((dateKey) => {
+        if (worked(dateKey)) return true;
+        const absence = absenceOn(dateKey);
+        return absence != null && absence !== input.absenceTypeId;
+      }).length;
+      const short = Math.max(0, input.usualDays(employeeId) - accounted);
+      const offCount =
+        writable.length + emptied.length - Math.min(short, writable.length + emptied.length);
+      // Known days off: the day off absence, or a day already past without work.
+      const daysOff = new Set(
+        chooseDaysOff(
+          writable,
+          Math.max(0, writable.length - offCount),
+          (dateKey) =>
+            absenceOn(dateKey) === input.absenceTypeId ||
+            (dateKey < input.todayKey && !worked(dateKey) && absenceOn(dateKey) == null),
+        ),
+      );
+      for (const dateKey of emptied) blanks.push({ employeeId, dateKey });
+      for (const dateKey of writable) {
+        if (!daysOff.has(dateKey)) {
+          blanks.push({ employeeId, dateKey });
+          continue;
+        }
+        writes.push({
+          employeeId,
+          dateKey,
+          input: {
+            kind: "absence",
+            segments: [],
+            absenceTypeId: input.absenceTypeId,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+        });
+      }
     }
   }
-  return writes;
+  return { writes, blanks };
 }
 
 /** The engine's input and its words, from the schedule page's own data. */
@@ -703,6 +810,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
       availabilityFromShifts(input, employeeId, dateKey, assignmentId),
     hasRequest: (employeeId, dateKey) => hasOpenRequest(input.requests, employeeId, dateKey),
     pendingPickups: pendingPickupsFromRequests(input.requests),
+    workLimit: workLimitWith(input),
   };
   const rowLabels = new Map(
     input.matrix.rows.map((row) => [row.rowKey, `${row.focusAreaName} · ${row.rowLabel}`]),

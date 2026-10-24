@@ -255,13 +255,14 @@ export function buildReportPeople(
 ): { key: string; name: string; detail: string }[] {
   const people = new Map<
     string,
-    { shifts: number; absences: number; daysOff: number; why: Set<string> }
+    { shifts: number; absences: number; daysOff: number; blanks: number; why: Set<string> }
   >();
   const personOf = (employeeId: string) => {
     const person = people.get(employeeId) ?? {
       shifts: 0,
       absences: 0,
       daysOff: 0,
+      blanks: 0,
       why: new Set<string>(),
     };
     people.set(employeeId, person);
@@ -274,6 +275,8 @@ export function buildReportPeople(
     person.why.add("Recurring schedule");
   }
   for (const dayOff of preview.daysOff) personOf(dayOff.employeeId).daysOff += 1;
+  // A blank day is one the build could not fill toward the person's usual days.
+  for (const blank of preview.blankDays) personOf(blank.employeeId).blanks += 1;
   const choiceOf = new Map(preview.choices.map((choice) => [choice.suggestionId, choice]));
   for (const fix of preview.fixes) {
     if (!fix.employeeId) continue;
@@ -298,6 +301,7 @@ export function buildReportPeople(
         person.shifts > 0 ? pluralize(person.shifts, "shift", "shifts") : null,
         person.absences > 0 ? pluralize(person.absences, "absence", "absences") : null,
         person.daysOff > 0 ? pluralize(person.daysOff, "day off", "days off") : null,
+        person.blanks > 0 ? pluralize(person.blanks, "day left blank", "days left blank") : null,
         [...person.why].sort((a, b) => WHY_ORDER.indexOf(a) - WHY_ORDER.indexOf(b)).join(", "),
       ]
         .filter(Boolean)

@@ -133,6 +133,7 @@ import {
   limitRecurringRuns,
   type WorkLimits,
   weekHoursWithPlanned,
+  workLimitWith,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
   planUndo,
@@ -6942,6 +6943,7 @@ function SchedulerContent({
         ...coverageSuggestions.engine,
         availability: (employeeId: string, dateKey: string, assignmentId: number) =>
           availabilityFromShifts(adapterInput, employeeId, dateKey, assignmentId),
+        workLimit: workLimitWith(adapterInput),
       };
       return {
         engine,
@@ -7103,6 +7105,11 @@ function SchedulerContent({
           },
         });
       }
+      const usualDaysOf = (employeeId: string) =>
+        usualDaysInAWeek(recurring, employeeId, {
+          start: dateKeys[0],
+          end: dateKeys[dateKeys.length - 1],
+        });
       const planned = planOptions({
         rowKeys: new Set(rowKeys),
         baseOverrides,
@@ -7114,11 +7121,7 @@ function SchedulerContent({
           employeeIds: scopedEmployeeIds.filter(
             (id) => employees.find((employee) => employee.id === id)?.status === "active",
           ),
-          target: (employeeId) =>
-            usualDaysInAWeek(recurring, employeeId, {
-              start: dateKeys[0],
-              end: dateKeys[dateKeys.length - 1],
-            }),
+          target: usualDaysOf,
         },
       });
       if (!planned) return null;
@@ -7137,7 +7140,7 @@ function SchedulerContent({
       const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
       if (!dayOff) return { preview, fixedWrites };
       const todayKey = formatDateKey(new Date());
-      const daysOff = planDaysOff({
+      const { writes: daysOff, blanks } = planDaysOff({
         shifts: shiftsRef.current,
         planned: plannedDays,
         employeeIds: scopedEmployeeIds.filter(
@@ -7145,6 +7148,8 @@ function SchedulerContent({
         ),
         dateKeys: dateKeys.filter((dateKey) => dateKey >= todayKey),
         absenceTypeId: dayOff.absenceType.id,
+        usualDays: usualDaysOf,
+        todayKey,
       });
       const people = new Set([
         ...baseOverrides.map((day) => day.employeeId),
@@ -7156,6 +7161,7 @@ function SchedulerContent({
           ...preview,
           people: people.size,
           daysOff: daysOff.map(({ employeeId, dateKey }) => ({ employeeId, dateKey })),
+          blankDays: blanks,
         },
         fixedWrites: [...fixedWrites, ...daysOff],
       };

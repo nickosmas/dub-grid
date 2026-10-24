@@ -242,6 +242,16 @@ export interface CoverageSuggestionInput extends CoverageMeasureInput {
   /** A pending request where the person is requester or target on that date. */
   hasRequest: (employeeId: string, dateKey: string) => boolean;
   pendingPickups: ReadonlyArray<CoveragePickupRequest>;
+  /**
+   * Why working this day, with the days `worked` reports, would break a limit
+   * on days worked, or null. A restore or move back adds work without asking
+   * `availability`, so it checks this for each day it adds.
+   */
+  workLimit?: (
+    employeeId: string,
+    dateKey: string,
+    worked: (dateKey: string) => boolean,
+  ) => CoverageAvailability | null;
 }
 
 export type CoverageSuggestionKind =
@@ -374,6 +384,26 @@ function targetsOf(measurement: CoverageMeasurement): { rowKey: string; dateKey:
     .map(({ rowKey, dateKey }) => ({ rowKey, dateKey }));
 }
 
+/** Whether a day these overrides add work to would break the input's limit on days worked. */
+function breaksWorkLimit(
+  input: CoverageSuggestionInput,
+  overrides: ReadonlyArray<CoverageDayOverride>,
+): boolean {
+  const { workLimit } = input;
+  if (!workLimit) return false;
+  return overrides.some((override) => {
+    const { employeeId, dateKey } = override;
+    if (override.day.assignmentIds.length === 0) return false;
+    if (input.draftDay(employeeId, dateKey).assignmentIds.length > 0) return false;
+    // The other days as the overrides leave them, this one as it stands.
+    const worked = (key: string) => {
+      const other = key === dateKey ? undefined : overrides.find((day) => day.dateKey === key);
+      return (other?.day ?? input.draftDay(employeeId, key)).assignmentIds.length > 0;
+    };
+    return workLimit(employeeId, dateKey, worked) != null;
+  });
+}
+
 /** The draft's own losses in short cells: moves to undo and removals to restore. */
 function draftUndoSuggestions(
   input: CoverageSuggestionInput,
@@ -418,6 +448,7 @@ function draftUndoSuggestions(
         side: "draft" as const,
         day: input.publishedDay(employeeId, dateKey),
       }));
+      if (breaksWorkLimit(input, overrides)) continue;
       const measurement = measureCoverageChange(input, overrides);
       if (!keeps(measurement)) continue;
       found.push({
@@ -1022,7 +1053,8 @@ function* planSteps(
   // One shift at a time to whoever is furthest below their usual days in a
   // week, in the least-staffed shift they can take, even one already staffed.
   const topUpSteps = (rule: CoverageTopUpRule) => {
-    const dateKeys = input.dateKeys.filter(
+    // The period's dates: the input loads more around it, for moves into the next week.
+    const dateKeys = current.matrix.dateKeys.filter(
       (dateKey) => options.dateKey == null || dateKey === options.dateKey,
     );
     const weeks = [...new Set(dateKeys.map(getScheduleWeekStartDate))];
@@ -1263,6 +1295,8 @@ export interface CoverageBuildPreview {
   recurringSkipped: CoverageSkippedRecurring[];
   /** Empty days the build marks with the day off absence; added by the caller. */
   daysOff: { employeeId: string; dateKey: string }[];
+  /** Empty days left blank, one for each day a week someone is short of their usual days; added by the caller. */
+  blankDays: { employeeId: string; dateKey: string }[];
   /** Days the build gives someone a sixth day in a row, when allowed; added by the caller. */
   sixthDays: { employeeId: string; dateKey: string }[];
   /** Weeks the build gives someone a sixth day, when allowed; added by the caller. */
@@ -1375,6 +1409,7 @@ function summarizeBuild(
     choices,
     recurringSkipped: [...(options.skippedRecurring ?? [])],
     daysOff: [],
+    blankDays: [],
     sixthDays: [],
     sixthWeeks: [],
     recurringPeople: [...recurringByPerson.entries()]
