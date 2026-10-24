@@ -490,6 +490,10 @@ export interface ShiftSeriesPattern {
   endDate: string | null;
   maxOccurrences: number | null;
   occurrenceDates: string[];
+  /** Days whose shift or absence no longer matches the series'. */
+  changedDates: string[];
+  /** The shift or absence every day of the series is written with. */
+  state: ScheduleCellState;
 }
 
 /** A new repeat pattern for an existing series. */

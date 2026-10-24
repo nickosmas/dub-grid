@@ -1299,7 +1299,7 @@ describe("ShiftEditPanel", () => {
       expect(secondCard).toHaveAttribute("data-shift-edit-card-diff", "new");
     });
 
-    it("keeps split-shift card corners aligned with the outer card radius", () => {
+    it("keeps split-shift card corners concentric around the inset header", () => {
       renderPanel({
         currentShift: "D/E",
         currentAssignmentIds: [1, 2],
@@ -1315,10 +1315,10 @@ describe("ShiftEditPanel", () => {
         '[data-shift-edit-card-body="0"]',
       ) as HTMLElement | null;
 
-      expect(card?.style.borderRadius).toBe("var(--dg-radius-md)");
-      expect(header?.style.borderRadius).toBe(
-        "calc(var(--dg-radius-md) - 2px) calc(var(--dg-radius-md) - 2px) 0 0",
-      );
+      // Outer radius = header radius + 5px inset + 1.5px border.
+      expect(card?.style.borderRadius).toBe("calc(var(--dg-radius-md) + 6.5px)");
+      expect(card?.style.padding).toBe("5px");
+      expect(header?.style.borderRadius).toBe("var(--dg-radius-md)");
       expect(body?.style.borderRadius).toBe(
         "0 0 calc(var(--dg-radius-md) - 2px) calc(var(--dg-radius-md) - 2px)",
       );
@@ -1674,7 +1674,7 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Repeating shift scope", () => {
-    it("offers this shift, all, earlier and later, and removes with the chosen scope", async () => {
+    it("opens on the view and removes with the days chosen", async () => {
       const user = userEvent.setup();
       const { onSelect } = renderPanel({
         currentShift: "D",
@@ -1683,28 +1683,28 @@ describe("ShiftEditPanel", () => {
         seriesId: "series-1",
       });
 
-      const scope = screen.getByRole("group", { name: "Apply changes to" });
+      expect(screen.queryByRole("group", { name: "Apply changes to" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Remove" }));
+      const dialog = await screen.findByRole("dialog", { name: /Remove repeating shift/ });
+      const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
       expect(
-        within(scope)
-          .getAllByRole("button")
-          .map((button) => button.textContent),
-      ).toEqual(["This shift", "All in series", "This and earlier", "This and later"]);
+        within(choices)
+          .getAllByRole("radio")
+          .map((radio) => radio.textContent),
+      ).toEqual([
+        expect.stringContaining("This day only"),
+        "This and later days",
+        "This and earlier days",
+        "All days in the series",
+      ]);
 
-      await user.click(within(scope).getByRole("button", { name: "This and later" }));
-      expect(within(scope).getByRole("button", { name: "This and later" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-
-      await user.click(screen.getByRole("button", { name: "Remove shift" }));
-      const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent("This also applies to every later date in the series.");
+      await user.click(within(choices).getByRole("radio", { name: /This and later days/ }));
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(null, "following");
     });
 
-    it("removes with the earlier scope", async () => {
+    it("removes with the earlier days", async () => {
       const user = userEvent.setup();
       const { onSelect } = renderPanel({
         currentShift: "D",
@@ -1713,13 +1713,33 @@ describe("ShiftEditPanel", () => {
         seriesId: "series-1",
       });
 
-      await user.click(screen.getByRole("button", { name: "This and earlier" }));
-      await user.click(screen.getByRole("button", { name: "Remove shift" }));
-      await user.click(
-        within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove" }));
+      const dialog = await screen.findByRole("dialog", { name: /Remove repeating shift/ });
+      await user.click(within(dialog).getByRole("radio", { name: /This and earlier days/ }));
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(null, "previous");
+    });
+
+    it("asks which days an edit reaches and keeps times to a single day", async () => {
+      const user = userEvent.setup();
+      renderPanel({
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        allowShiftEdits: true,
+        seriesId: "series-1",
+        onCustomTimeChange: vi.fn(),
+      });
+
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const dialog = await screen.findByRole("dialog", { name: /Edit repeating shift/ });
+      await user.click(within(dialog).getByRole("radio", { name: /This and later days/ }));
+      await user.click(within(dialog).getByRole("button", { name: "Continue" }));
+
+      expect(screen.getByText("Editing this and later days")).toBeInTheDocument();
+      expect(screen.getByText(/Times and notes change one day at a time/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Custom time/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     });
   });
 
@@ -1950,7 +1970,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText("After")).toBeInTheDocument();
       expect(screen.getByText("Sick (rest of day)")).toBeInTheDocument();
       expect(screen.getByText("Added")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Undo" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -2014,10 +2034,18 @@ describe("ShiftEditPanel", () => {
 
     it("offers an absence on a repeating shift only for this date", async () => {
       const user = userEvent.setup();
+      const editDays = async (choice: RegExp) => {
+        await user.click(screen.getByRole("button", { name: "Edit" }));
+        const dialog = await screen.findByRole("dialog", { name: /Edit repeating shift/ });
+        await user.click(within(dialog).getByRole("radio", { name: choice }));
+        await user.click(within(dialog).getByRole("button", { name: "Continue" }));
+      };
       renderDay({ seriesId: "series-1" });
 
+      await editDays(/This day only/);
       expect(screen.getByRole("button", { name: "Add an absence" })).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "This and later" }));
+      await user.click(screen.getByRole("button", { name: "Back" }));
+      await editDays(/This and later days/);
       expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
     });
   });
@@ -2472,14 +2500,14 @@ describe("ShiftEditPanel", () => {
       render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} />);
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
-      expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Undo" }));
-      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
       expect(onConfirmDraft).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
-      await user.click(screen.getByRole("button", { name: "Confirm" }));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(onConfirmDraft).toHaveBeenCalledTimes(1);
       expect(onConfirmDraft).toHaveBeenCalledWith(undefined);
@@ -2498,7 +2526,7 @@ describe("ShiftEditPanel", () => {
           "This shift changed in another tab or by another editor. Close and reopen it before saving.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     });
   });
 

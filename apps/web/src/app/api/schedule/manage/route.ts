@@ -9,6 +9,11 @@ import type {
 } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
+import {
+  seriesDayDiffers,
+  type SeriesSnapshotLike,
+  type SeriesStateLike,
+} from "@/lib/series-summary";
 import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
 import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
 import {
@@ -1610,7 +1615,7 @@ export async function POST(req: NextRequest) {
 
         const { data: row, error } = await auth.serviceClient
           .from("shift_series")
-          .select("id, frequency, days_of_week, start_date, end_date, max_occurrences")
+          .select("id, frequency, days_of_week, start_date, end_date, max_occurrences, state")
           .eq("org_id", data.orgId)
           .eq("id", data.seriesId)
           .is("archived_at", null)
@@ -1622,10 +1627,15 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Repeating series not found" }, { status: 404 });
         }
 
-        const occurrences = await fetchAllRows<{ date: string }>((from, to) =>
+        const occurrences = await fetchAllRows<{
+          date: string;
+          snapshots: Array<SeriesSnapshotLike & { snapshot_kind: string }> | null;
+        }>((from, to) =>
           auth.serviceClient
             .from("schedule_cells")
-            .select("date")
+            .select(
+              "date, snapshots:schedule_cell_snapshots(snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, segments:schedule_cell_segments(position, shift_id, job_id, is_mentored))",
+            )
             .eq("org_id", data.orgId)
             .eq("series_id", data.seriesId)
             .order("date", { ascending: true })
@@ -1641,6 +1651,17 @@ export async function POST(req: NextRequest) {
           endDate: row.end_date,
           maxOccurrences: row.max_occurrences,
           occurrenceDates: occurrences.map((cell) => cell.date),
+          // What an editor sees in each cell: its draft, else its published state.
+          changedDates: occurrences
+            .filter((cell) => {
+              const snapshots = cell.snapshots ?? [];
+              const current =
+                snapshots.find((snapshot) => snapshot.snapshot_kind === "draft") ??
+                snapshots.find((snapshot) => snapshot.snapshot_kind === "published");
+              return current != null && seriesDayDiffers(row.state as SeriesStateLike, current);
+            })
+            .map((cell) => cell.date),
+          state: row.state as ScheduleCellState,
         };
         return NextResponse.json({ series });
       }
