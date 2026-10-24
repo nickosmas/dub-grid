@@ -6931,6 +6931,8 @@ function SchedulerContent({
       allowSixthDay?: boolean;
       /** A build: bring these people up to their usual days a week. */
       topUp?: Pick<CoverageTopUpRule, "employeeIds" | "target">;
+      /** A build: people the scheduler left out. */
+      excludedEmployeeIds?: ReadonlySet<string>;
     }) => {
       if (!coverageSuggestions) return null;
       const { history, allowSixthDay, topUp, ...planned } = options;
@@ -7015,6 +7017,33 @@ function SchedulerContent({
   } | null>(null);
   // Off unless the scheduler turns it on before generating; never more than six in a row.
   const [allowSixthDay, setAllowSixthDay] = useState(false);
+  // Who the scheduler leaves out of the next build; Apply or another period clears it.
+  const [buildExclusions, setBuildExclusions] = useState<{
+    periodKey: string;
+    employeeIds: string[];
+  } | null>(null);
+  // The period on screen, kept while the panel is closed, unlike coveragePeriodKey.
+  const schedulePeriodKey = `${formatDateKey(dates[0])}..${formatDateKey(dates[dates.length - 1])}`;
+  if (buildExclusions && buildExclusions.periodKey !== schedulePeriodKey) {
+    setBuildExclusions(null);
+  }
+  const excludedFromBuild = useMemo(() => buildExclusions?.employeeIds ?? [], [buildExclusions]);
+  // Everyone a build of these rows covers: all staff, or those in the focus areas shown.
+  const employeesInBuildScope = useCallback(
+    (rowKeys: string[]) => {
+      if (!coverageMatrix) return [];
+      const scopedAreas = new Set(
+        coverageMatrix.rows
+          .filter((row) => rowKeys.includes(row.rowKey))
+          .map((row) => row.focusAreaId),
+      );
+      const allAreas = coverageMatrix.rows.every((row) => rowKeys.includes(row.rowKey));
+      return employees.filter(
+        (employee) => allAreas || employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
+      );
+    },
+    [coverageMatrix, employees],
+  );
   // What the last build did, kept until Done, a new preview or its Undo.
   const [buildReport, setBuildReport] = useState<{
     preview: CoverageBuildPreview;
@@ -7059,18 +7088,17 @@ function SchedulerContent({
           segmentCompatibility,
         ).catch((): ShiftMap => ({})),
       ]);
-      const scopedAreas = new Set(
-        coverageMatrix.rows
-          .filter((row) => rowKeys.includes(row.rowKey))
-          .map((row) => row.focusAreaId),
-      );
       const allAreas = coverageMatrix.rows.every((row) => rowKeys.includes(row.rowKey));
       const dateKeys = coverageMatrix.dateKeys;
-      const scopedEmployeeIds = employees
-        .filter(
-          (employee) => allAreas || employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
-        )
-        .map((employee) => employee.id);
+      const scopedEmployeeIds = employeesInBuildScope(rowKeys).map((employee) => employee.id);
+      // Someone left out while other focus areas were shown is not in this build.
+      const excluded = new Set(excludedFromBuild.filter((id) => scopedEmployeeIds.includes(id)));
+      // The people a build may give shifts or days off: active, and not left out.
+      const buildableIds = scopedEmployeeIds.filter(
+        (id) =>
+          !excluded.has(id) &&
+          employees.find((employee) => employee.id === id)?.status === "active",
+      );
       const fills = planRecurringFills({
         recurringShifts: recurring,
         shifts: shiftsRef.current,
@@ -7116,11 +7144,10 @@ function SchedulerContent({
         history,
         skippedRecurring: limited.skipped,
         allowSixthDay,
+        excludedEmployeeIds: excluded,
         // Then everyone short of their usual days a week gets more, even where staffed.
         topUp: {
-          employeeIds: scopedEmployeeIds.filter(
-            (id) => employees.find((employee) => employee.id === id)?.status === "active",
-          ),
+          employeeIds: buildableIds,
           target: usualDaysOf,
         },
       });
@@ -7143,9 +7170,7 @@ function SchedulerContent({
       const { writes: daysOff, blanks } = planDaysOff({
         shifts: shiftsRef.current,
         planned: plannedDays,
-        employeeIds: scopedEmployeeIds.filter(
-          (id) => employees.find((employee) => employee.id === id)?.status === "active",
-        ),
+        employeeIds: buildableIds,
         dateKeys: dateKeys.filter((dateKey) => dateKey >= todayKey),
         absenceTypeId: dayOff.absenceType.id,
         usualDays: usualDaysOf,
@@ -7173,6 +7198,8 @@ function SchedulerContent({
       jobs,
       org,
       allowSixthDay,
+      employeesInBuildScope,
+      excludedFromBuild,
       planOptions,
       resolveInputSnapshot,
       segmentCompatibility,
@@ -7308,6 +7335,8 @@ function SchedulerContent({
     setBuildApplying(null);
     setBuildPreview(null);
     setBuildReport({ preview: built.preview, periodKey: coveragePeriodKeyRef.current });
+    // The exclusions were for this build; the next one starts with nobody left out.
+    setBuildExclusions(null);
   }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planBuild]);
 
   const undoCoverageSuggestion = useCallback(
@@ -9256,6 +9285,19 @@ function SchedulerContent({
                       onAllowSixthDayChange: (allow: boolean) => {
                         // A result planned the other way no longer applies.
                         setAllowSixthDay(allow);
+                        setBuildPreview(null);
+                      },
+                      excluded: excludedFromBuild,
+                      excludeOptions: (rowKeys: string[]) =>
+                        employeesInBuildScope(rowKeys)
+                          .filter((employee) => employee.status === "active")
+                          .map((employee) => ({
+                            id: employee.id,
+                            name: getEmployeeDisplayName(employee),
+                          }))
+                          .sort((a, b) => a.name.localeCompare(b.name)),
+                      onExcludedChange: (employeeIds: string[]) => {
+                        setBuildExclusions({ periodKey: schedulePeriodKey, employeeIds });
                         setBuildPreview(null);
                       },
                     }

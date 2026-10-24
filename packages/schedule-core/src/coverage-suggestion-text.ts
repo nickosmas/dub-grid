@@ -200,6 +200,8 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
       return "already works that day";
     case "onlyShifts":
       return "works only their chosen shifts";
+    case "excluded":
+      return "excluded from this build";
   }
 }
 

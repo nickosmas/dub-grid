@@ -841,6 +841,40 @@ describe("previewCoverageBuild with a limit on days worked", () => {
   });
 });
 
+describe("previewCoverageBuild leaving people out", () => {
+  it("gives the people left out no shift, restore or top-up, and says why", () => {
+    // Ben's Monday shift was taken off in the draft; Mon and Tue each need 2.
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      people: ["ana", "ben", "cat"],
+      focusAreasByPerson: { ana: [1], ben: [1], cat: [1] },
+      draft: { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${TUE}`]: { work: [DAY_MA] } },
+      published: {
+        [`ana|${MON}`]: { work: [DAY_MA] },
+        [`ben|${MON}`]: { work: [DAY_MA] },
+        [`ben|${TUE}`]: { work: [DAY_MA] },
+      },
+    });
+    const all = previewCoverageBuild(world, {});
+    expect(all.fixes.some((fix) => fix.employeeId === "ben")).toBe(true);
+
+    const preview = previewCoverageBuild(world, {
+      excludedEmployeeIds: new Set(["ben"]),
+      topUp: {
+        employeeIds: ["ben", "cat"],
+        target: () => 5,
+        weekDays: () => 0,
+      },
+    });
+    expect(preview.fixes.some((fix) => fix.employeeId === "ben")).toBe(false);
+    expect(preview.fixes.some((fix) => fix.employeeId === "cat")).toBe(true);
+    expect(preview.excluded).toEqual(["ben"]);
+    expect(
+      preview.skipped.filter((entry) => entry.employeeId === "ben").map((entry) => entry.reason),
+    ).toContainEqual({ kind: "excluded" });
+  });
+});
+
 describe("previewCoverageBuild on top of recurring fills", () => {
   const day = (
     employeeId: string,

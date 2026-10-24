@@ -208,7 +208,9 @@ export type CoverageAvailability =
   /** The person already works that day; only a scheduler adds a second shift. */
   | { kind: "doubleShift" }
   /** The person works only the shifts they chose, and this is not one. */
-  | { kind: "onlyShifts" };
+  | { kind: "onlyShifts" }
+  /** The scheduler left the person out of this build. */
+  | { kind: "excluded" };
 
 /** A person's shift preference: flexible ("prefers") or strict ("only"). */
 export interface CoverageShiftPreference {
@@ -847,6 +849,8 @@ export interface PlanCoverageFixesOptions {
    * the one with the fewest weekends, nights or hours, and say why.
    */
   fairness?: CoverageFairnessRule;
+  /** People the scheduler excluded from this build: given no fixes and no top-up. */
+  excludedEmployeeIds?: ReadonlySet<string>;
   /** Recurring fills the caller left out, such as a sixth day in a row; reported with the preview. */
   skippedRecurring?: ReadonlyArray<CoverageSkippedRecurring>;
   /**
@@ -1005,11 +1009,24 @@ function* planSteps(
         planned.employeeId === override.employeeId &&
         Math.abs(dayNumber(planned.dateKey) - dayNumber(override.dateKey)) <= reach,
     );
+  const leftOut = options.excludedEmployeeIds ?? new Set<string>();
+  const withLeftOut = (next: CoverageSuggestionInput): CoverageSuggestionInput =>
+    leftOut.size === 0
+      ? next
+      : {
+          ...next,
+          availability: (employeeId, dateKey, assignmentId) =>
+            leftOut.has(employeeId)
+              ? { kind: "excluded" }
+              : next.availability(employeeId, dateKey, assignmentId),
+        };
   const withPlanned = (): CoverageSuggestionInput => {
     const next = withDraftOverrides(input, overrides);
-    return options.availabilityWith
-      ? { ...next, availability: options.availabilityWith(overrides) }
-      : next;
+    return withLeftOut(
+      options.availabilityWith
+        ? { ...next, availability: options.availabilityWith(overrides) }
+        : next,
+    );
   };
   let ruledOut: CoverageRuledOut[] = [];
   // A fix goes over when it adds hours to a week that ends up past the threshold.
@@ -1037,7 +1054,7 @@ function* planSteps(
       : [],
     choices,
   });
-  let current = overrides.length > 0 ? withPlanned() : input;
+  let current = overrides.length > 0 ? withPlanned() : withLeftOut(input);
   const take = (next: CoverageSuggestion) => {
     for (const override of goesOver(next)) {
       taken.push({
@@ -1063,6 +1080,7 @@ function* planSteps(
       (person) =>
         person.active &&
         rule.employeeIds.includes(person.id) &&
+        !leftOut.has(person.id) &&
         dateKeys.some((dateKey) => current.draftDay(person.id, dateKey).assignmentIds.length > 0),
     );
     const exhausted = new Set<string>();
@@ -1245,7 +1263,9 @@ function* planSteps(
             (options.dateKey == null || target.dateKey === options.dateKey) &&
             (options.rowKeys == null || options.rowKeys.has(target.rowKey)),
         ) &&
-        !suggestion.overrides.some(clashes),
+        !suggestion.overrides.some(clashes) &&
+        // A restore or move back changes the person too.
+        !(suggestion.employeeId && leftOut.has(suggestion.employeeId)),
     );
     const within = eligible.filter((suggestion) => goesOver(suggestion).length === 0);
     const next = fairest(within.length > 0 ? within : eligible);
@@ -1301,6 +1321,8 @@ export interface CoverageBuildPreview {
   sixthDays: { employeeId: string; dateKey: string }[];
   /** Weeks the build gives someone a sixth day, when allowed; added by the caller. */
   sixthWeeks: { employeeId: string; weekStart: string }[];
+  /** People the scheduler left out of the build. */
+  excluded: string[];
 }
 
 /** Short and over cells that have not started, within the given rows. */
@@ -1412,6 +1434,7 @@ function summarizeBuild(
     blankDays: [],
     sixthDays: [],
     sixthWeeks: [],
+    excluded: [...(options.excludedEmployeeIds ?? [])],
     recurringPeople: [...recurringByPerson.entries()]
       .filter(([, counts]) => counts.shifts + counts.absences > 0)
       .map(([employeeId, counts]) => ({ employeeId, ...counts })),

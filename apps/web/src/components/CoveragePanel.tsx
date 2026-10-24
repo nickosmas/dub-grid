@@ -19,6 +19,7 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import CustomSelect from "@/components/CustomSelect";
+import type { StaffOption } from "@/components/StaffMultiSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
@@ -84,6 +85,10 @@ interface CoveragePanelProps {
     skippedWords?: SkippedWords;
     allowSixthDay?: boolean;
     onAllowSixthDayChange?: (allow: boolean) => void;
+    /** People left out of the next build, and who can be, for the rows shown. */
+    excluded?: string[];
+    excludeOptions?: (rowKeys: string[]) => StaffOption[];
+    onExcludedChange?: (employeeIds: string[]) => void;
   };
   onClose: () => void;
 }
@@ -204,6 +209,12 @@ export default function CoveragePanel({
   const totals = useMemo(
     () => summarizeCoverageMatrixRows(rows, matrix?.dateKeys ?? []),
     [rows, matrix],
+  );
+  // Who a build of the rows shown may leave out; a choice outside them is not shown.
+  const excludeOptions = build?.excludeOptions;
+  const buildStaff = useMemo(
+    () => excludeOptions?.(rows.map((row) => row.rowKey)),
+    [excludeOptions, rows],
   );
   const selection = useMemo(() => {
     if (!selected || !matrix) return null;
@@ -457,6 +468,11 @@ export default function CoveragePanel({
                           skippedWords={build.skippedWords}
                           allowSixthDay={build.allowSixthDay}
                           onAllowSixthDayChange={build.onAllowSixthDayChange}
+                          excluded={build.excluded?.filter((id) =>
+                            buildStaff?.some((option) => option.id === id),
+                          )}
+                          excludeOptions={buildStaff}
+                          onExcludedChange={build.onExcludedChange}
                           onSelectCell={(rowKey, dateKey) => {
                             setSelectedDateKey(null);
                             setSelected({ rowKey, dateKey });
