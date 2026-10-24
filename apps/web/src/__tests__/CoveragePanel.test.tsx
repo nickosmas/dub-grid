@@ -674,8 +674,10 @@ describe("CoveragePanel", () => {
       shortCells: [],
       recurringSkipped: [],
       daysOff: [],
+      blankDays: [],
       sixthDays: [],
       sixthWeeks: [],
+      excluded: [],
       ...overrides,
     });
     const skippedWords = {
@@ -730,12 +732,61 @@ describe("CoveragePanel", () => {
         section().getByText("All focus areas, Mon, Oct 26 to Wed, Oct 28"),
       ).toBeInTheDocument();
       expect(
-        section().getByText(/^Fills open shifts with qualified staff who are free/),
-      ).toHaveTextContent(
-        /Nobody works more than 5 days a week or 5 in a row, days off stay together/,
-      );
+        within(section().getByRole("list", { name: "How Auto-build works" }))
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([
+        "Fills open shifts with qualified staff who are free.",
+        "Starts from recurring schedules and respects time off.",
+        "Nothing changes until you apply it.",
+      ]);
       fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
+    });
+
+    it("leaves out the people picked before generating, and names them in the result", () => {
+      const onExcludedChange = vi.fn();
+      const excludeOptions = vi.fn(() => [
+        { id: "ana", name: "Ana Crawford" },
+        { id: "ben", name: "Ben Shepherd" },
+      ]);
+      renderPanel({
+        suggestions: { items: [], notSuggestedByCell: new Map() },
+        build: {
+          state: { status: "idle" },
+          onPreview: vi.fn(),
+          onBuild: vi.fn(),
+          onCancel: vi.fn(),
+          skippedWords,
+          // "zed" was left out while other focus areas were shown.
+          excluded: ["ben", "zed"],
+          excludeOptions,
+          onExcludedChange,
+        },
+      });
+
+      expect(excludeOptions).toHaveBeenCalledWith(["1:5:1"]);
+      const picker = section().getByRole("button", { name: "Exclude staff" });
+      expect(picker).toHaveTextContent("Ben Shepherd");
+      expect(
+        section().getByText(
+          "Their recurring schedules still fill in. Nothing else changes for them.",
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(picker);
+      fireEvent.click(screen.getByRole("option", { name: /Ana Crawford/ }));
+      expect(onExcludedChange).toHaveBeenCalledWith(["ben", "ana"]);
+
+      cleanup();
+      withBuild({
+        status: "ready",
+        preview: preview({
+          fixes: [{ id: "x" }] as CoverageSuggestion[],
+          people: 1,
+          excluded: ["ben", "ana"],
+        }),
+      });
+      expect(section().getByText("Excluded: Ana Crawford, Ben Shepherd")).toBeInTheDocument();
     });
 
     it("shows the preview's counts, then builds or cancels", () => {
@@ -986,6 +1037,18 @@ describe("CoveragePanel", () => {
           "Ana Crawford 2 shifts · 2 days off · Fewest hours, Only one free",
         );
         expect(rows.map((row) => row.textContent)).toContain("cat 1 day off");
+      });
+
+      it("names the days left blank for someone short of their usual days", () => {
+        built({
+          daysOff: [{ employeeId: "cat", dateKey: "2026-10-26" }],
+          blankDays: [{ employeeId: "cat", dateKey: "2026-10-27" }],
+          people: 2,
+        });
+        const rows = within(
+          section().getByRole("list", { name: "What each person was given" }),
+        ).getAllByRole("listitem");
+        expect(rows.map((row) => row.textContent)).toContain("cat 1 day off · 1 day left blank");
       });
 
       it("links each shift still short to its cell", () => {

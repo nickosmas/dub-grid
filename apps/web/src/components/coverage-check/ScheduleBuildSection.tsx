@@ -3,9 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Switch } from "@/components/ui/switch";
 import {
-  MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_ROW_STRETCHED,
-  MAX_DAYS_IN_A_WEEK,
   MAX_DAYS_IN_A_WEEK_STRETCHED,
   WEEKLY_OVERTIME_HOURS,
   formatLocalDateKey,
@@ -20,6 +18,7 @@ import {
 import { Button } from "@/components/Button";
 import { Loader } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
 import { formatCoverageNumber, pluralize } from "./coverage-check-text";
 
 export type ScheduleBuildState =
@@ -255,13 +254,14 @@ export function buildReportPeople(
 ): { key: string; name: string; detail: string }[] {
   const people = new Map<
     string,
-    { shifts: number; absences: number; daysOff: number; why: Set<string> }
+    { shifts: number; absences: number; daysOff: number; blanks: number; why: Set<string> }
   >();
   const personOf = (employeeId: string) => {
     const person = people.get(employeeId) ?? {
       shifts: 0,
       absences: 0,
       daysOff: 0,
+      blanks: 0,
       why: new Set<string>(),
     };
     people.set(employeeId, person);
@@ -274,6 +274,8 @@ export function buildReportPeople(
     person.why.add("Recurring schedule");
   }
   for (const dayOff of preview.daysOff) personOf(dayOff.employeeId).daysOff += 1;
+  // A blank day is one the build could not fill toward the person's usual days.
+  for (const blank of preview.blankDays) personOf(blank.employeeId).blanks += 1;
   const choiceOf = new Map(preview.choices.map((choice) => [choice.suggestionId, choice]));
   for (const fix of preview.fixes) {
     if (!fix.employeeId) continue;
@@ -298,6 +300,7 @@ export function buildReportPeople(
         person.shifts > 0 ? pluralize(person.shifts, "shift", "shifts") : null,
         person.absences > 0 ? pluralize(person.absences, "absence", "absences") : null,
         person.daysOff > 0 ? pluralize(person.daysOff, "day off", "days off") : null,
+        person.blanks > 0 ? pluralize(person.blanks, "day left blank", "days left blank") : null,
         [...person.why].sort((a, b) => WHY_ORDER.indexOf(a) - WHY_ORDER.indexOf(b)).join(", "),
       ]
         .filter(Boolean)
@@ -358,6 +361,7 @@ function BuildReport({
         )}
         <SixthDays preview={preview} words={words} />
         <RecurringSkipped entries={preview.recurringSkipped} words={words} />
+        <LeftOut preview={preview} words={words} />
         {preview.shortCells.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <div className="dg-cc-caption dg-tabular-nums">
@@ -438,9 +442,25 @@ interface ScheduleBuildSectionProps {
   /** Whether a build may give someone a sixth day in a row; the option is left out without a handler. */
   allowSixthDay?: boolean;
   onAllowSixthDayChange?: (allow: boolean) => void;
+  /** People excluded from this build, chosen from `excludeOptions`; left out without a handler. */
+  excluded?: string[];
+  excludeOptions?: StaffOption[];
+  onExcludedChange?: (employeeIds: string[]) => void;
 }
 
-export const BUILD_SUMMARY = `Fills open shifts with qualified staff who are free, starting from recurring schedules, then gives anyone scheduled fewer than ${MAX_DAYS_IN_A_WEEK} days a week (or their recurring schedule's days) more shifts where staff are thinnest, even if that staffs a shift above what it needs. Nobody works more than ${MAX_DAYS_IN_A_WEEK} days a week or ${MAX_DAYS_IN_A_ROW} in a row, days off stay together, and everyone stays within ${WEEKLY_OVERTIME_HOURS} hours a week when it can. Weekends and nights are shared fairly. Never moves anyone already scheduled or gives anyone two shifts in a day.`;
+/** "Excluded: Ben Shepherd, Cat Morrison", or nothing. */
+function LeftOut({ preview, words }: { preview: CoverageBuildPreview; words?: SkippedWords }) {
+  if (!words || preview.excluded.length === 0) return null;
+  const names = preview.excluded.map((employeeId) => words.personName(employeeId)).sort();
+  return <p className="dg-cc-detail-line dg-cc-detail-line--muted">Excluded: {names.join(", ")}</p>;
+}
+
+/** What a build does, one point each, shown under the title. */
+export const BUILD_POINTS = [
+  "Fills open shifts with qualified staff who are free.",
+  "Starts from recurring schedules and respects time off.",
+  "Nothing changes until you apply it.",
+];
 
 /** Everything a build writes: recurring fills and fixes. */
 export function buildChangeCount(preview: CoverageBuildPreview): number {
@@ -519,6 +539,7 @@ function PreviewSummary({
       )}
       {skippedWords && <SixthDays preview={preview} words={skippedWords} />}
       {skippedWords && <RecurringSkipped entries={preview.recurringSkipped} words={skippedWords} />}
+      <LeftOut preview={preview} words={skippedWords} />
       {skippedWords?.dayOffName === null && (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
           No day off absence is set, so empty days stay empty. Choose one in Settings &gt; Schedule
@@ -577,6 +598,9 @@ export function ScheduleBuildSection({
   onSelectCell,
   allowSixthDay = false,
   onAllowSixthDayChange,
+  excluded = [],
+  excludeOptions = [],
+  onExcludedChange,
 }: ScheduleBuildSectionProps) {
   const previewing = state.status === "previewing";
   return (
@@ -655,7 +679,13 @@ export function ScheduleBuildSection({
         )
       ) : (
         <>
-          <p className="dg-cc-detail-line dg-cc-detail-line--muted">{BUILD_SUMMARY}</p>
+          <ul className="dg-cc-changes" aria-label="How Auto-build works">
+            {BUILD_POINTS.map((point) => (
+              <li key={point} className="dg-cc-change dg-cc-detail-line dg-cc-detail-line--muted">
+                {point}
+              </li>
+            ))}
+          </ul>
           {onAllowSixthDayChange && (
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-3">
@@ -672,6 +702,24 @@ export function ScheduleBuildSection({
                   Some people may work {MAX_DAYS_IN_A_WEEK_STRETCHED} days in a week or{" "}
                   {MAX_DAYS_IN_A_ROW_STRETCHED} in a row, never {MAX_DAYS_IN_A_WEEK_STRETCHED + 1}.
                   The result names everyone who does.
+                </p>
+              )}
+            </div>
+          )}
+          {onExcludedChange && excludeOptions.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="dg-cc-detail-line">Exclude staff</span>
+              <StaffMultiSelect
+                ariaLabel="Exclude staff"
+                placeholder="Nobody"
+                options={excludeOptions}
+                value={excluded}
+                onChange={onExcludedChange}
+                style={{ width: "100%" }}
+              />
+              {excluded.length > 0 && (
+                <p className="dg-cc-detail-line dg-cc-detail-line--muted">
+                  Their recurring schedules still fill in. Nothing else changes for them.
                 </p>
               )}
             </div>

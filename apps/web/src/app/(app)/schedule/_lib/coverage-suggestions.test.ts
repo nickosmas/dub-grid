@@ -25,6 +25,7 @@ import {
   usualDaysInAWeek,
   weekDaysWithPlanned,
   weekHoursWithPlanned,
+  workLimitWith,
 } from "./coverage-suggestions";
 import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
 import type { CoverageDayOverride, CoverageSuggestion } from "@dubgrid/schedule-core";
@@ -793,9 +794,35 @@ describe("weekDaysWithPlanned", () => {
   });
 });
 
+describe("workLimitWith", () => {
+  // Mon to Fri worked, Oct 26 to 30.
+  const worked = (dateKey: string) => dateKey >= "2026-10-26" && dateKey <= "2026-10-30";
+
+  it("refuses a sixth day in a week or in a row, and allows it with 6 days", () => {
+    expect(workLimitWith({})("ana", "2026-10-31", worked)).toEqual({ kind: "workRun", days: 6 });
+    expect(
+      workLimitWith({ maxDaysInARow: 6, maxDaysInAWeek: 6 })("ana", "2026-10-31", worked),
+    ).toBeNull();
+  });
+
+  it("adds no day for a day already worked, even when doubles are refused", () => {
+    expect(workLimitWith({ noDoubleShifts: true })("ana", "2026-10-28", worked)).toBeNull();
+  });
+});
+
 describe("planDaysOff", () => {
-  const DAYS = ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"];
+  // Sunday Oct 25 to Saturday Oct 31.
+  const WEEK = [
+    "2026-10-25",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30",
+    "2026-10-31",
+  ];
   const OFF = 133;
+  const VACATION = 4;
   const plannedShift = (employeeId: string, dateKey: string): CoverageDayOverride => ({
     employeeId,
     dateKey,
@@ -807,36 +834,100 @@ describe("planDaysOff", () => {
       restOfDayAbsenceTypeId: null,
     },
   });
-
-  it("marks each empty day of everyone who works in the period", () => {
-    const writes = planDaysOff({
-      shifts: { "ana_2026-10-25": worked([DAY]), "ana_2026-10-27": absent(4) },
-      planned: [plannedShift("ben", "2026-10-26")],
-      employeeIds: ["ana", "ben", "cat"],
-      dateKeys: DAYS,
+  const workingOn = (employeeId: string, dateKeys: string[]) =>
+    Object.fromEntries(dateKeys.map((dateKey) => [`${employeeId}_${dateKey}`, worked([DAY])]));
+  const plan = (options: Partial<Parameters<typeof planDaysOff>[0]>) =>
+    planDaysOff({
+      shifts: {},
+      planned: [],
+      employeeIds: ["ana"],
+      dateKeys: WEEK,
       absenceTypeId: OFF,
+      usualDays: () => 5,
+      todayKey: WEEK[0],
+      ...options,
     });
+  const keys = (days: { employeeId: string; dateKey: string }[]) =>
+    days.map((day) => `${day.employeeId} ${day.dateKey}`);
 
-    expect(writes.map((write) => `${write.employeeId} ${write.dateKey}`)).toEqual([
-      "ana 2026-10-26",
-      "ana 2026-10-28",
-      "ben 2026-10-25",
-      "ben 2026-10-27",
-      "ben 2026-10-28",
-    ]);
+  it("marks the empty days of a full week, including the build's own days", () => {
+    const { writes, blanks } = plan({
+      shifts: workingOn("ana", WEEK.slice(1, 4)),
+      planned: [plannedShift("ana", WEEK[4]), plannedShift("ana", WEEK[5])],
+    });
+    expect(keys(writes)).toEqual(["ana 2026-10-25", "ana 2026-10-31"]);
     expect(writes[0].input).toMatchObject({ kind: "absence", absenceTypeId: OFF, segments: [] });
+    expect(blanks).toEqual([]);
+  });
+
+  it("leaves one day blank for each day short of their usual days, after the days off", () => {
+    // Mon to Thu worked: 3 empty days, 1 short of 5.
+    const { writes, blanks } = plan({ shifts: workingOn("ana", WEEK.slice(1, 5)) });
+    expect(keys(writes)).toEqual(["ana 2026-10-30", "ana 2026-10-31"]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-25"]);
+  });
+
+  it("keeps the days off next to each other", () => {
+    // Sun, Mon, Wed, Thu worked: Tue, Fri, Sat empty, 1 short.
+    const { writes, blanks } = plan({
+      shifts: workingOn("ana", [WEEK[0], WEEK[1], WEEK[3], WEEK[4]]),
+    });
+    expect(keys(writes)).toEqual(["ana 2026-10-30", "ana 2026-10-31"]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-27"]);
+  });
+
+  it("counts another absence as a workday it stands in for, and a day off already marked as off", () => {
+    const { writes, blanks } = plan({
+      shifts: {
+        ...workingOn("ana", WEEK.slice(1, 4)),
+        "ana_2026-10-29": absent(VACATION),
+        "ana_2026-10-25": absent(OFF),
+      },
+    });
+    // 3 worked and a vacation day: 1 short, so of Fri and Sat the later stays blank.
+    expect(keys(writes)).toEqual(["ana 2026-10-30"]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-31"]);
+  });
+
+  it("uses the person's usual days", () => {
+    const { writes, blanks } = plan({
+      shifts: workingOn("ana", WEEK.slice(1, 5)),
+      usualDays: () => 4,
+    });
+    expect(keys(writes)).toEqual(["ana 2026-10-25", "ana 2026-10-30", "ana 2026-10-31"]);
+    expect(blanks).toEqual([]);
+  });
+
+  it("counts the whole week, but only marks the days given", () => {
+    // Today is Wednesday: Sunday passed without work, then Mon to Wed worked.
+    const { writes, blanks } = plan({
+      shifts: workingOn("ana", [WEEK[1], WEEK[2], WEEK[3]]),
+      dateKeys: WEEK.slice(3),
+      todayKey: WEEK[3],
+    });
+    // 2 short, so Sunday and one more are the days off.
+    expect(keys(writes)).toEqual(["ana 2026-10-29"]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-30", "ana 2026-10-31"]);
+  });
+
+  it("counts a day the build empties, and leaves it blank since nothing else may write it", () => {
+    // Mon to Thu worked, Friday's shift having moved to Wednesday; the build moves it back.
+    const emptied: CoverageDayOverride = { ...plannedShift("ana", WEEK[3]) };
+    emptied.day = { ...emptied.day, assignmentIds: [] };
+    const { writes, blanks } = plan({
+      shifts: workingOn("ana", WEEK.slice(1, 5)),
+      planned: [emptied, plannedShift("ana", WEEK[5])],
+    });
+    // Sun, Wed and Sat are empty and she is 1 short: Wed stays blank, Sun and Sat are off.
+    expect(keys(writes)).toEqual(["ana 2026-10-25", "ana 2026-10-31"]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-28"]);
   });
 
   it("leaves people who work no day in the period alone", () => {
-    expect(
-      planDaysOff({
-        shifts: { "cat_2026-10-25": absent(4) },
-        planned: [],
-        employeeIds: ["cat"],
-        dateKeys: DAYS,
-        absenceTypeId: OFF,
-      }),
-    ).toEqual([]);
+    expect(plan({ shifts: { "cat_2026-10-25": absent(4) }, employeeIds: ["cat"] })).toEqual({
+      writes: [],
+      blanks: [],
+    });
   });
 });
 

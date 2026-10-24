@@ -671,6 +671,17 @@ describe("previewCoverageBuild topping up the week", () => {
     expect(previewCoverageBuild(world, { topUp: topUp(world, 5, ["ben"]) }).fixes).toEqual([]);
   });
 
+  it("leaves them alone when their only shift is on a loaded date outside the period", () => {
+    const EARLIER = "2026-10-19";
+    const world = buildSuggestionWorld({
+      requirements: ONE_MA,
+      people: ["ana", "ben"],
+      draft: { ...anaEveryDay, [`ben|${EARLIER}`]: { work: [DAY_MA] } },
+    });
+    const loaded = { ...world, dateKeys: [EARLIER, ...DATE_KEYS] };
+    expect(previewCoverageBuild(loaded, { topUp: topUp(loaded, 5, ["ben"]) }).fixes).toEqual([]);
+  });
+
   it("tops up nobody already at their usual days", () => {
     const world = buildSuggestionWorld({
       requirements: ONE_MA,
@@ -718,6 +729,149 @@ describe("previewCoverageBuild topping up the week", () => {
       "2026-10-26",
       "2026-11-02",
     ]);
+  });
+});
+
+describe("previewCoverageBuild with a limit on days worked", () => {
+  const WED = "2026-10-28";
+  const SAT = "2026-10-31";
+  const addDays = (dateKey: string, days: number) => {
+    const date = new Date(`${dateKey}T00:00:00`);
+    date.setDate(date.getDate() + days);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
+  // At most 5 in a row and 5 in a Sunday-to-Saturday week, as the web adapter counts.
+  const overLimit = (dateKey: string, worked: (dateKey: string) => boolean) => {
+    if (worked(dateKey)) return null;
+    let run = 1;
+    for (let offset = -1; worked(addDays(dateKey, offset)); offset -= 1) run += 1;
+    for (let offset = 1; worked(addDays(dateKey, offset)); offset += 1) run += 1;
+    if (run > 5) return { kind: "workRun" as const, days: run };
+    const sunday = getScheduleWeekStartDate(dateKey);
+    const week = Array.from({ length: 7 }, (_, offset) => addDays(sunday, offset)).filter(
+      (key) => key === dateKey || worked(key),
+    ).length;
+    return week > 5 ? { kind: "workWeek" as const, days: week } : null;
+  };
+  const withPlanned =
+    (world: CoverageSuggestionInput, planned: ReadonlyArray<CoverageDayOverride>) =>
+    (employeeId: string, key: string) => {
+      const day = planned.find((item) => item.employeeId === employeeId && item.dateKey === key);
+      return (day?.day ?? world.draftDay(employeeId, key)).assignmentIds.length > 0;
+    };
+
+  it("never restores a shift that would make a sixth day after a build's own assign", () => {
+    // Ben was published Mon to Fri, and the draft took Wednesday off. Wednesday
+    // needs 2 Med Aides with both regulars absent, so restoring Ben only fills
+    // it; Saturday's Charge Nurse is short and only Ben is free for it.
+    const draft: SuggestionWorldOptions["draft"] = {};
+    const published: SuggestionWorldOptions["draft"] = {};
+    for (const dateKey of DATE_KEYS) {
+      for (const person of ["ana", "dan"]) {
+        published[`${person}|${dateKey}`] = { work: [DAY_MA] };
+        draft[`${person}|${dateKey}`] = dateKey === WED ? { absence: 7 } : { work: [DAY_MA] };
+      }
+      const cat = dateKey === SAT ? { absence: 7 } : { work: [DAY_CN] };
+      published[`cat|${dateKey}`] = cat;
+      draft[`cat|${dateKey}`] = cat;
+    }
+    for (const dateKey of DATE_KEYS.slice(0, 5)) {
+      published[`ben|${dateKey}`] = { work: [DAY_MA] };
+      if (dateKey !== WED) draft[`ben|${dateKey}`] = { work: [DAY_MA] };
+    }
+    const base = buildSuggestionWorld({
+      requirements: [
+        { ...MA_ONLY[0], minStaff: 2 },
+        { ...MA_ONLY[0], jobId: 6, minStaff: 1 },
+      ],
+      people: ["ana", "ben", "cat", "dan"],
+      focusAreasByPerson: { ana: [1], ben: [1], cat: [1], dan: [1] },
+      draft,
+      published,
+    });
+    const availabilityWith =
+      (planned: ReadonlyArray<CoverageDayOverride>) => (employeeId: string, dateKey: string) => {
+        const worked = withPlanned(base, planned)(employeeId, dateKey);
+        const day =
+          planned.find((item) => item.employeeId === employeeId && item.dateKey === dateKey)?.day ??
+          base.draftDay(employeeId, dateKey);
+        if (day.absenceTypeId != null) {
+          return { kind: "absence" as const, absenceTypeId: day.absenceTypeId };
+        }
+        if (worked) return { kind: "doubleShift" as const };
+        return (
+          overLimit(dateKey, (key) => withPlanned(base, planned)(employeeId, key)) ?? {
+            kind: "free" as const,
+          }
+        );
+      };
+    const world: CoverageSuggestionInput = {
+      ...base,
+      availability: availabilityWith([]),
+      workLimit: (_employeeId, dateKey, worked) => overLimit(dateKey, worked),
+    };
+    const preview = previewCoverageBuild(world, { availabilityWith });
+    const planned = preview.fixes.flatMap((fix) => fix.overrides);
+    const benDays = DATE_KEYS.slice(0, 6).filter((dateKey) =>
+      withPlanned(world, planned)("ben", dateKey),
+    );
+
+    expect(preview.fixes.map((fix) => `${fix.kind} ${fix.subject.dateKey}`)).toEqual([
+      `assign ${SAT}`,
+    ]);
+    expect(benDays).toHaveLength(5);
+  });
+
+  it("still restores when the limit allows it", () => {
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      people: ["ana", "ben"],
+      draft: { [`ana|${MON}`]: { work: [DAY_MA] } },
+      published: { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${MON}`]: { work: [DAY_MA] } },
+    });
+    const limited = { ...world, workLimit: () => null };
+    expect(suggestCoverageFixes(limited).suggestions.map((fix) => fix.kind)).toContain("restore");
+    const refused = {
+      ...world,
+      workLimit: () => ({ kind: "workWeek" as const, days: 6 }),
+    };
+    expect(suggestCoverageFixes(refused).suggestions.map((fix) => fix.kind)).not.toContain(
+      "restore",
+    );
+  });
+});
+
+describe("previewCoverageBuild leaving people out", () => {
+  it("gives the people left out no shift, restore or top-up, and says why", () => {
+    // Ben's Monday shift was taken off in the draft; Mon and Tue each need 2.
+    const world = buildSuggestionWorld({
+      requirements: MA_ONLY,
+      people: ["ana", "ben", "cat"],
+      focusAreasByPerson: { ana: [1], ben: [1], cat: [1] },
+      draft: { [`ana|${MON}`]: { work: [DAY_MA] }, [`ben|${TUE}`]: { work: [DAY_MA] } },
+      published: {
+        [`ana|${MON}`]: { work: [DAY_MA] },
+        [`ben|${MON}`]: { work: [DAY_MA] },
+        [`ben|${TUE}`]: { work: [DAY_MA] },
+      },
+    });
+    const all = previewCoverageBuild(world, {});
+    expect(all.fixes.some((fix) => fix.employeeId === "ben")).toBe(true);
+
+    const preview = previewCoverageBuild(world, {
+      excludedEmployeeIds: new Set(["ben"]),
+      topUp: {
+        employeeIds: ["ben", "cat"],
+        target: () => 5,
+        weekDays: () => 0,
+      },
+    });
+    expect(preview.fixes.some((fix) => fix.employeeId === "ben")).toBe(false);
+    expect(preview.fixes.some((fix) => fix.employeeId === "cat")).toBe(true);
+    expect(preview.excluded).toEqual(["ben"]);
+    expect(
+      preview.skipped.filter((entry) => entry.employeeId === "ben").map((entry) => entry.reason),
+    ).toContainEqual({ kind: "excluded" });
   });
 });
 
