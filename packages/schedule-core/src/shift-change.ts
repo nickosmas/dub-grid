@@ -84,6 +84,14 @@ export interface ShiftChange {
   barScale: { start: string; end: string; minutes: number } | null;
 }
 
+/**
+ * A day that had nothing before. It reads as what is new, never as Before and
+ * After, since there is nothing it changed from.
+ */
+export function isNewShiftChange(change: ShiftChange): boolean {
+  return change.kind !== "none" && change.before.items.length === 0;
+}
+
 /** Which fields of one item differ from its partner on the other side. */
 export interface ShiftChangeMarks {
   all?: boolean;

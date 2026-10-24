@@ -11,7 +11,6 @@ import {
   ShiftCategory,
   JobDefinition,
   NamedItem,
-  ShiftDisplayMode,
 } from "@/types";
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
@@ -52,8 +51,6 @@ interface ShiftPickerProps {
   /** Lists shifts that clash with `workingShift` as unavailable instead of offering them. */
   blockClashes?: boolean;
   absenceScope?: "allDay" | "restOfDay";
-  /** Tiles read as on the grid: codes, or full names. */
-  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export default function ShiftPicker({
@@ -81,7 +78,6 @@ export default function ShiftPicker({
   workingShift = null,
   blockClashes = false,
   absenceScope = "allDay",
-  shiftDisplayMode = "name",
 }: ShiftPickerProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -97,29 +93,12 @@ export default function ShiftPicker({
       focusAreaIds: empFocusAreaIds,
       roleIds: empRoleIds,
     },
-    shiftDisplayMode,
+    // Tiles always spell names out, whatever the grid shows.
+    shiftDisplayMode: "name",
     defaultShiftEnabled,
   });
-  // Screen readers always hear full names, whatever the tiles show.
   const spokenLabelById = new Map(
-    (shiftDisplayMode === "name"
-      ? assignableOptions
-      : buildAssignableShiftOptions({
-          assignments,
-          shiftCategories,
-          jobs,
-          focusAreas,
-          orgRoles,
-          certifications,
-          employee: {
-            certificationId: empCertificationId,
-            focusAreaIds: empFocusAreaIds,
-            roleIds: empRoleIds,
-          },
-          shiftDisplayMode: "name",
-          defaultShiftEnabled,
-        })
-    ).map((option) => [
+    assignableOptions.map((option) => [
       option.id,
       `${option.primaryLabel}${option.secondaryLabel ? ` - ${option.secondaryLabel}` : ""}`,
     ]),
@@ -550,7 +529,6 @@ export default function ShiftPicker({
                 const isActive = currentAbsenceTypeId === at.id;
                 const atFill = absenceStripeFill(at.color, isDarkTheme);
                 const name = at.name || at.label;
-                const tileLabel = shiftDisplayMode === "code" ? at.label || name : name;
                 return (
                   <Button
                     key={at.id}
@@ -563,7 +541,7 @@ export default function ShiftPicker({
                     style={getTileStyle(atFill.background, atFill.text, isActive)}
                   >
                     <MaybeHint content={name} side="left">
-                      <span style={tilePrimaryStyle}>{tileLabel}</span>
+                      <span style={tilePrimaryStyle}>{name}</span>
                     </MaybeHint>
                   </Button>
                 );

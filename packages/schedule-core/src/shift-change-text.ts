@@ -1,6 +1,7 @@
 import { formatScheduleTimeValue } from "./dates";
 import {
   formatShiftChangeHours,
+  isNewShiftChange,
   type ShiftChange,
   type ShiftChangeItem,
   type ShiftChangeItemLabel,
@@ -15,7 +16,8 @@ const LABEL_TEXT: Record<ShiftChangeItemLabel, string> = {
 
 const NO_SHIFT = "No shift";
 
-function statusSuffix(item: ShiftChangeItem): string {
+function statusSuffix(item: ShiftChangeItem, isNew: boolean): string {
+  if (isNew) return "";
   if (item.status === "removed") return " (removed)";
   if (item.status === "added") return " (added)";
   return "";
@@ -27,10 +29,15 @@ function breakLine(item: ShiftChangeItem): string | null {
   return `Break: ${formatShiftChangeHours(minutes)}, ${formatScheduleTimeValue(start)} - ${formatScheduleTimeValue(end)}`;
 }
 
-function sideLines(heading: "Before" | "After", side: ShiftChangeSide, multi: boolean): string[] {
+function sideLines(
+  heading: "Before" | "After" | "New",
+  side: ShiftChangeSide,
+  multi: boolean,
+): string[] {
+  const isNew = heading === "New";
   if (!multi) {
     const [item] = side.items;
-    return [`${heading}: ${item ? `${item.plain}${statusSuffix(item)}` : NO_SHIFT}`];
+    return [`${heading}: ${item ? `${item.plain}${statusSuffix(item, isNew)}` : NO_SHIFT}`];
   }
   if (side.items.length === 0) return [`${heading}: ${NO_SHIFT}`];
   const total = side.totalMinutes != null ? ` (${formatShiftChangeHours(side.totalMinutes)})` : "";
@@ -39,15 +46,19 @@ function sideLines(heading: "Before" | "After", side: ShiftChangeSide, multi: bo
     const gap = breakLine(item);
     if (gap) lines.push(gap);
     const label = item.label ? `${LABEL_TEXT[item.label]}: ` : "";
-    lines.push(`${label}${item.plain}${statusSuffix(item)}`);
+    lines.push(`${label}${item.plain}${statusSuffix(item, isNew)}`);
   }
   return lines;
 }
 
-/** Before and After lines for email text parts and screen readers; empty when nothing changed. */
+/**
+ * Before and After lines for email text parts and screen readers, or one New
+ * side for a day that had nothing; empty when nothing changed.
+ */
 export function formatShiftChangePlain(change: ShiftChange): string[] {
   if (change.kind === "none") return [];
   const multi = change.kind === "multi";
+  if (isNewShiftChange(change)) return sideLines("New", change.after, multi);
   return [...sideLines("Before", change.before, multi), ...sideLines("After", change.after, multi)];
 }
 
@@ -58,5 +69,6 @@ function compactSide(side: ShiftChangeSide): string {
 /** One line with an arrow, for compact spaces such as push notifications. */
 export function formatShiftChangeCompact(change: ShiftChange): string {
   if (change.kind === "none") return "";
+  if (isNewShiftChange(change)) return `New: ${compactSide(change.after)}`;
   return `${compactSide(change.before)} → ${compactSide(change.after)}`;
 }

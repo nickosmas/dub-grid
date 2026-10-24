@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import {
   formatScheduleTimeValue,
   formatShiftChangeHours,
+  isNewShiftChange,
   type ShiftChange,
   type ShiftChangeItem,
   type ShiftChangeItemLabel,
@@ -81,15 +82,24 @@ function BreakLine({ item }: { item: ShiftChangeItem }) {
   );
 }
 
-function ChangeItem({ item, tone }: { item: ShiftChangeItem; tone: SideTone }) {
-  const hasKicker = item.label != null || item.status === "added" || item.status === "removed";
+function ChangeItem({
+  item,
+  tone,
+  showStatus,
+}: {
+  item: ShiftChangeItem;
+  tone: SideTone;
+  showStatus: boolean;
+}) {
+  const hasStatus = showStatus && (item.status === "added" || item.status === "removed");
+  const hasKicker = item.label != null || hasStatus;
   const removed = item.status === "removed";
   return (
     <div className="flex flex-col gap-0.5">
       {hasKicker ? (
         <div className="flex items-center gap-1.5 text-[length:var(--dg-fs-micro)] font-semibold text-text-muted">
           {item.label ? <span>{LABEL_TEXT[item.label]}</span> : null}
-          <StatusTag item={item} />
+          {hasStatus ? <StatusTag item={item} /> : null}
         </div>
       ) : null}
       <div
@@ -173,12 +183,14 @@ function SideBlock({
   tone,
   showTotal,
   scale,
+  showStatus = true,
 }: {
   heading: string;
   side: ShiftChangeSide;
   tone: SideTone;
   showTotal: boolean;
   scale: ShiftChange["barScale"];
+  showStatus?: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
@@ -202,7 +214,7 @@ function SideBlock({
         side.items.map((item, index) => (
           <Fragment key={index}>
             <BreakLine item={item} />
-            <ChangeItem item={item} tone={tone} />
+            <ChangeItem item={item} tone={tone} showStatus={showStatus} />
           </Fragment>
         ))
       )}
@@ -210,7 +222,10 @@ function SideBlock({
   );
 }
 
-/** Before and After, side by side when wide, stacked when narrow. */
+/**
+ * Before and After, side by side when wide, stacked when narrow. A day that
+ * had nothing shows only what is new.
+ */
 export function ShiftChangeCard({
   change,
   layout = "wide",
@@ -225,6 +240,25 @@ export function ShiftChangeCard({
   if (change.kind === "none") return null;
   const multi = change.kind === "multi";
   const scale = showDayBar ? change.barScale : null;
+  if (isNewShiftChange(change)) {
+    return (
+      <div
+        className={cn(
+          "overflow-hidden rounded-[10px] border border-border-light bg-surface px-3.5 py-3",
+          className,
+        )}
+      >
+        <SideBlock
+          heading="New"
+          side={change.after}
+          tone="after"
+          showTotal={multi}
+          scale={scale}
+          showStatus={false}
+        />
+      </div>
+    );
+  }
   return (
     <div
       className={cn(
@@ -262,7 +296,7 @@ export function ShiftChangeCard({
 
 /** Only the old side, for places that already show the new shift. */
 export function ShiftChangeWas({ change, className }: { change: ShiftChange; className?: string }) {
-  if (change.kind === "none") return null;
+  if (change.kind === "none" || isNewShiftChange(change)) return null;
   return (
     <div className={cn("rounded-[8px] border border-border-light bg-bg px-3 py-2.5", className)}>
       <SideBlock

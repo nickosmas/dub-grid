@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   describeShiftChange,
+  isNewShiftChange,
   describeShiftChangeItem,
   type ShiftChangeShiftInput,
 } from "./shift-change";
@@ -383,5 +384,29 @@ describe("describeShiftChange, breaks and the day bar", () => {
     );
     expect(change.barScale).toEqual({ start: "07:00", end: "00:00", minutes: 17 * 60 });
     expect(change.after.items[1].bar).toEqual({ from: 480, to: 17 * 60 });
+  });
+});
+
+describe("isNewShiftChange", () => {
+  it("is true only for a day that had nothing", () => {
+    const date = { date: DATES.thu };
+    expect(isNewShiftChange(describeShiftChange({ items: [] }, { items: [shift()] }, date))).toBe(
+      true,
+    );
+    expect(
+      isNewShiftChange(describeShiftChange({ items: [] }, { items: [shift(), evening()] }, date)),
+    ).toBe(true);
+    expect(
+      isNewShiftChange(describeShiftChange({ items: [shift()] }, { items: [evening()] }, date)),
+    ).toBe(false);
+    expect(
+      isNewShiftChange(
+        describeShiftChange({ items: [shift()] }, { items: [shift(), evening()] }, date),
+      ),
+    ).toBe(false);
+    expect(isNewShiftChange(describeShiftChange({ items: [shift()] }, { items: [] }, date))).toBe(
+      false,
+    );
+    expect(isNewShiftChange(describeShiftChange({ items: [] }, { items: [] }, date))).toBe(false);
   });
 });
