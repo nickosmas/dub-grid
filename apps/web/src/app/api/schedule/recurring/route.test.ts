@@ -263,6 +263,63 @@ describe("POST /api/schedule/recurring", () => {
       expect(db.calls.some((call) => call.method === "upsert")).toBe(false);
     });
 
+    it("reads and saves a job preference against the organization's jobs", async () => {
+      const read = client({
+        employee_job_preferences: {
+          data: [{ employee_id: EMPLOYEE_ID, mode: "only", job_ids: ["43"] }],
+          error: null,
+        },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: read,
+      });
+      const fetched = await post({ action: "fetchJobPreferences" });
+      expect(await fetched.json()).toEqual({
+        preferences: [{ employeeId: EMPLOYEE_ID, mode: "only", jobIds: [43] }],
+      });
+
+      const db = client({
+        employees: { data: { id: EMPLOYEE_ID }, error: null },
+        jobs: { data: [{ id: 43 }], error: null },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: db,
+      });
+      const saved = await post({
+        action: "saveJobPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: { mode: "only", jobIds: [43, 43] },
+      });
+      expect(saved.status).toBe(200);
+      expect(db.calls).toContainEqual({ table: "jobs", method: "eq", args: ["org_id", ORG_ID] });
+      expect(db.calls).toContainEqual({
+        table: "employee_job_preferences",
+        method: "upsert",
+        args: [
+          expect.objectContaining({ employee_id: EMPLOYEE_ID, mode: "only", job_ids: [43] }),
+          { onConflict: "employee_id" },
+        ],
+      });
+
+      const foreign = client({
+        employees: { data: { id: EMPLOYEE_ID }, error: null },
+        jobs: { data: [], error: null },
+      });
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: foreign,
+      });
+      const refused = await post({
+        action: "saveJobPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: { mode: "prefers", jobIds: [999] },
+      });
+      expect(refused.status).toBe(400);
+      expect(foreign.calls.some((call) => call.method === "upsert")).toBe(false);
+    });
+
     it("clears a preference", async () => {
       const db = client({ employees: { data: { id: EMPLOYEE_ID }, error: null } });
       requireOrgPermissions.mockResolvedValue({

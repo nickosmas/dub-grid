@@ -282,6 +282,7 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
     expect(policylessTables.map((row) => row.table_name)).toEqual([
       "billing_invoice_events",
       "calendar_feed_tokens",
+      "employee_job_preferences",
       "employee_shift_preferences",
       "platform_billing_settings",
       "subscription_seat_history",

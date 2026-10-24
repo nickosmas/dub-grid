@@ -97,6 +97,7 @@ export type AuditAction =
   | "recurring_shift.deleted"
   | "recurring_schedule.applied"
   | "shift_preference.saved"
+  | "job_preference.saved"
   // Shift series
   | "shift_series.created"
   | "shift_series.updated"

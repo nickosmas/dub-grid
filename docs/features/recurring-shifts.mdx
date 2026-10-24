@@ -28,15 +28,15 @@ It leaves a cell empty when it already has a visible entry, the recurring patter
 
 The [Schedule Builder](/features/coverage-and-open-shifts#auto-build) starts every build the same way, filling empty cells from recurring schedules by the same rules, before it fills the shifts still short.
 
-## Shift preferences
+## Preferences
 
-On **People > Recurring Shifts**, the **Shift preference** column shows each person's preference. Select it to change it:
+On **People > Recurring Shifts**, the **Preferences** column shows each person's shift and job preferences. Select it to open the dialog, then choose **Shifts** or **Jobs**; each shows its current setting. **Back** returns to that first step and keeps what you chose, and **Save** saves both.
 
-- **Any shift**: Auto-build can give them any shift they're qualified for.
-- **Prefers some shifts**: they get the shifts you tick first, and others when needed.
-- **Only some shifts**: Auto-build and its suggestions never give them any other shift.
+- **Any shift** or **Any job**: Auto-build can give them any shift or job they're qualified for.
+- **Prefers some shifts** or **Prefers some jobs**: they get the ones you tick first, and others when needed.
+- **Only some shifts** or **Only some jobs**: Auto-build and its suggestions never give them any other, for example someone who only supervises.
 
-Each focus area has its own shifts, so the dialog lists only the shifts of the person's focus areas (and any shift for every focus area), with their times, grouped by focus area. Choose at least one shift for Prefers or Only. With Only, a focus area where you choose none means they get no shifts there, and the dialog says so. The column then reads, for example, "Only Evening Shift". A preference saves straight away and does not change their recurring schedule, which recurring fills still follow.
+Each focus area has its own shifts, so the dialog lists only the shifts of the person's focus areas (and any shift for every focus area), with their times, grouped by focus area. With Only, a focus area where you choose no shift means they get no shifts there, and the dialog says so. The jobs listed are the ones they're qualified for in their focus areas. Choose at least one for Prefers or Only. Both apply together: someone with Only Supervisor and Prefers Day Shift gets only Supervisor work, Day shifts first. The column then reads, for example, "Only Supervisor · Prefers Day Shift". A preference saves straight away and does not change their recurring schedule, which recurring fills still follow.
 
 ## Repeating shifts
 

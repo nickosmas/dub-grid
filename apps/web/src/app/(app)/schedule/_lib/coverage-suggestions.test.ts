@@ -934,3 +934,56 @@ describe("shift preferences", () => {
     expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
   });
 });
+
+describe("job preferences", () => {
+  // Day shift, job 11 (say, Supervisor), beside the fixtures' job 10.
+  const DAY_SUPERVISOR = 103;
+  const input = (
+    jobPreferences: Record<string, { mode: "prefers" | "only"; jobIds: number[] }>,
+    preferences: Record<string, { mode: "prefers" | "only"; shiftIds: number[] }> = {},
+  ) => ({
+    shifts: {},
+    assignments: [...assignments, { ...assignment(DAY_SUPERVISOR, 1), jobId: 11 }],
+    shiftCategories,
+    loadedDateKeys: LOADED,
+    preferences: new Map(Object.entries(preferences)),
+    jobPreferences: new Map(Object.entries(jobPreferences)),
+  });
+
+  it("rules out any other job for someone who works only their chosen jobs", () => {
+    const only = input({ ana: { mode: "only", jobIds: [11] } });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", DAY)).toEqual({ kind: "onlyJobs" });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", DAY_SUPERVISOR).kind).toBe("free");
+    expect(availabilityFromShifts(only, "ben", "2026-10-26", DAY).kind).toBe("free");
+    const prefers = input({ ana: { mode: "prefers", jobIds: [11] } });
+    expect(availabilityFromShifts(prefers, "ana", "2026-10-26", DAY).kind).toBe("free");
+  });
+
+  it("applies with a shift preference: only shifts and only jobs both rule out", () => {
+    const both = input(
+      { ana: { mode: "only", jobIds: [11] } },
+      { ana: { mode: "only", shiftIds: [2] } },
+    );
+    expect(availabilityFromShifts(both, "ana", "2026-10-26", DAY_SUPERVISOR)).toEqual({
+      kind: "onlyShifts",
+    });
+    expect(availabilityFromShifts(both, "ana", "2026-10-26", EVENING)).toEqual({
+      kind: "onlyJobs",
+    });
+  });
+
+  it("prefers someone only for a shift that matches every preference they set", () => {
+    const standing = fairnessStandingWithPlanned(
+      input(
+        { ana: { mode: "prefers", jobIds: [11] }, ben: { mode: "prefers", jobIds: [11] } },
+        { ben: { mode: "prefers", shiftIds: [2] } },
+      ),
+      ["2026-10-26"],
+    );
+    expect(standing("ana", "2026-10-26", DAY_SUPERVISOR, []).preference).toBe("match");
+    expect(standing("ana", "2026-10-26", DAY, []).preference).toBe("other");
+    // Ben prefers Supervisor and Evening: a Day Supervisor shift matches one, not both.
+    expect(standing("ben", "2026-10-26", DAY_SUPERVISOR, []).preference).toBe("other");
+    expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
+  });
+});

@@ -19,7 +19,7 @@ import type {
   SeriesFrequency,
 } from "@/types";
 import type { ShiftRequestDraftCell } from "@dubgrid/domain";
-import type { CoverageShiftPreference } from "@dubgrid/schedule-core";
+import type { CoverageJobPreference, CoverageShiftPreference } from "@dubgrid/schedule-core";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -373,6 +373,35 @@ export function saveShiftPreference(
 ): Promise<void> {
   return requestRecurringAction<{ success: true }>({
     action: "saveShiftPreference",
+    orgId,
+    employeeId,
+    preference,
+  }).then(() => undefined);
+}
+
+export interface EmployeeJobPreference extends CoverageJobPreference {
+  employeeId: string;
+}
+
+export function fetchJobPreferences(
+  orgId: string,
+  employeeId?: string,
+): Promise<EmployeeJobPreference[]> {
+  return requestRecurringAction<{ preferences: EmployeeJobPreference[] }>({
+    action: "fetchJobPreferences",
+    orgId,
+    employeeId,
+  }).then((data) => data.preferences);
+}
+
+/** Saves one person's job preference; null clears it. */
+export function saveJobPreference(
+  orgId: string,
+  employeeId: string,
+  preference: CoverageJobPreference | null,
+): Promise<void> {
+  return requestRecurringAction<{ success: true }>({
+    action: "saveJobPreference",
     orgId,
     employeeId,
     preference,

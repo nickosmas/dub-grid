@@ -209,6 +209,8 @@ export type CoverageAvailability =
   | { kind: "doubleShift" }
   /** The person works only the shifts they chose, and this is not one. */
   | { kind: "onlyShifts" }
+  /** The person works only the jobs they chose, and this is not one. */
+  | { kind: "onlyJobs" }
   /** The scheduler left the person out of this build. */
   | { kind: "excluded" };
 
@@ -217,6 +219,12 @@ export interface CoverageShiftPreference {
   mode: "prefers" | "only";
   /** Shift category ids. */
   shiftIds: number[];
+}
+
+/** A person's job preference, as for shifts: flexible ("prefers") or strict ("only"). */
+export interface CoverageJobPreference {
+  mode: "prefers" | "only";
+  jobIds: number[];
 }
 
 export interface CoveragePickupRequest {

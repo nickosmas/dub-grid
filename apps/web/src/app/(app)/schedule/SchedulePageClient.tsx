@@ -107,6 +107,7 @@ import {
   previewCoverageBuildAsync,
   type CoverageBuildPreview,
   type CoverageBuildProgress,
+  type CoverageJobPreference,
   type CoverageShiftPreference,
   type CoverageSkippedRecurring,
   type CoverageTopUpRule,
@@ -191,6 +192,7 @@ import {
   fetchPublishedDateRanges,
   fetchRecentPublishHistory,
   fetchRecurringShifts,
+  fetchJobPreferences,
   fetchShiftPreferences,
   fetchScheduleActorNames,
   fetchSchedulePresenceProfiles,
@@ -419,6 +421,14 @@ function planningLimits(allowSixthDay: boolean | undefined): WorkLimits {
 
 /** How long a build plans before letting the page draw. */
 const BUILD_SLICE_MS = 12;
+
+/** Changes whenever a recurring schedule is added, edited or removed. */
+function recurringKeyOf(rows: ReadonlyArray<RecurringShift>): string {
+  return rows
+    .map((row) => `${row.id}@${row.updatedAt}`)
+    .sort()
+    .join();
+}
 /** Published weeks before a build's period that count toward weekend and night rotation. */
 const FAIRNESS_HISTORY_DAYS = 28;
 
@@ -6640,10 +6650,13 @@ function SchedulerContent({
 
   // Editors only, while the panel is open: every suggestion is measured on a
   // copy of the schedule by the engine, so this reruns as the draft changes.
-  // Shift preferences shape the Schedule Builder's choices; read when it opens.
+  // Shift and job preferences shape the Schedule Builder's choices; read when it opens.
   const [shiftPreferences, setShiftPreferences] = useState<
     ReadonlyMap<string, CoverageShiftPreference>
   >(() => new Map());
+  const [jobPreferences, setJobPreferences] = useState<ReadonlyMap<string, CoverageJobPreference>>(
+    () => new Map(),
+  );
   useEffect(() => {
     if (!showCoveragePanel || !org?.id || !canEditShifts) return;
     let cancelled = false;
@@ -6655,6 +6668,14 @@ function SchedulerContent({
         );
       })
       // Someone who cannot read recurring schedules builds without preferences.
+      .catch(() => undefined);
+    fetchJobPreferences(org.id)
+      .then((list) => {
+        if (cancelled) return;
+        setJobPreferences(
+          new Map(list.map(({ employeeId, mode, jobIds }) => [employeeId, { mode, jobIds }])),
+        );
+      })
       .catch(() => undefined);
     return () => {
       cancelled = true;
@@ -6679,6 +6700,7 @@ function SchedulerContent({
       absenceNames: new Map(allAbsenceTypes.map((type) => [type.id, type.name])),
       loadedDateKeys: availableSwapDates,
       preferences: shiftPreferences,
+      jobPreferences,
     };
     const { engine, text } = buildCoverageSuggestionInput(adapterInput);
     const result = suggestCoverageFixes(engine);
@@ -6706,6 +6728,7 @@ function SchedulerContent({
     assignmentNameMap,
     availableSwapDates,
     shiftPreferences,
+    jobPreferences,
     canEditShifts,
     coverageBase,
     coverageMatrix,
@@ -7167,7 +7190,8 @@ function SchedulerContent({
         preview.sixthWeeks = past.weeks;
       }
       // Then everyone who works in the period gets the day off absence on each empty day.
-      if (!dayOff) return { preview, fixedWrites };
+      const recurringKey = recurringKeyOf(recurring);
+      if (!dayOff) return { preview, fixedWrites, recurringKey };
       const todayKey = formatDateKey(new Date());
       const { writes: daysOff, blanks } = planDaysOff({
         shifts: shiftsRef.current,
@@ -7190,6 +7214,7 @@ function SchedulerContent({
           blankDays: blanks,
         },
         fixedWrites: [...fixedWrites, ...daysOff],
+        recurringKey,
       };
     },
     [
@@ -7277,14 +7302,26 @@ function SchedulerContent({
     let built: Awaited<ReturnType<typeof planBuild>> = null;
     const planned = previewPlanRef.current;
     if (
+      org &&
       planned &&
       planned.built.preview === shown &&
       planned.planBuild === planBuild &&
       planned.shifts === shiftsRef.current &&
       planned.todayKey === formatDateKey(new Date())
     ) {
-      built = planned.built;
-    } else {
+      // The page does not follow recurring schedules live, so read them again to compare.
+      const recurring = await fetchRecurringShifts(
+        org.id,
+        undefined,
+        assignmentLabelMapRef.current,
+        false,
+        absenceTypeMapRef.current,
+      ).catch(() => null);
+      if (recurring && recurringKeyOf(recurring) === planned.built.recurringKey) {
+        built = planned.built;
+      }
+    }
+    if (!built) {
       // Something changed since the preview, such as another scheduler's edit: plan again.
       checking(null);
       try {
@@ -7363,7 +7400,7 @@ function SchedulerContent({
     setBuildReport({ preview: built.preview, periodKey: coveragePeriodKeyRef.current });
     // The exclusions were for this build; the next one starts with nobody left out.
     setBuildExclusions(null);
-  }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, planBuild]);
+  }, [applyCoveragePlan, buildPreview, buildState, coverageCountsKey, org, planBuild]);
 
   const undoCoverageSuggestion = useCallback(
     (appliedId: string) => {

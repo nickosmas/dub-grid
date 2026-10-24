@@ -2,12 +2,17 @@
 
 import { useCallback, useRef, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
+import { ChevronLeft } from "lucide-react";
 import React from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 
 interface ModalProps {
   title: string;
+  /** A muted line under the title, such as who the dialog is about. */
+  subtitle?: string;
+  /** Shows a back button before the title, for a dialog with steps. */
+  onBack?: () => void;
   onClose: () => void;
   children: React.ReactNode;
   className?: string;
@@ -29,6 +34,8 @@ interface ModalProps {
 
 export default function Modal({
   title,
+  subtitle,
+  onBack,
   onClose,
   children,
   className,
@@ -80,14 +87,29 @@ export default function Modal({
             aria-modal={headerSafe ? undefined : true}
             initialFocus
             finalFocus={returnFocus ?? true}
-            aria-label={title}
+            aria-label={subtitle ? `${title}, ${subtitle}` : title}
             aria-describedby={ariaDescribedby}
             className={`dg-modal${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
             style={style}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dg-modal-header">
-              <span className="dg-modal-title">{title}</span>
+              <div className="dg-modal-heading">
+                {onBack ? (
+                  <button
+                    type="button"
+                    className="dg-close-btn dg-close-btn--lg"
+                    onClick={onBack}
+                    aria-label="Back"
+                  >
+                    <ChevronLeft size={20} strokeWidth={2.25} aria-hidden="true" />
+                  </button>
+                ) : null}
+                <div className="dg-modal-titles">
+                  <span className="dg-modal-title">{title}</span>
+                  {subtitle ? <span className="dg-modal-subtitle">{subtitle}</span> : null}
+                </div>
+              </div>
               {showCloseButton ? (
                 <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
               ) : null}

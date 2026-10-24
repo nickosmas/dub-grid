@@ -939,6 +939,12 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "create",
     headline: () => "Applied the recurring schedule",
   },
+  "job_preference.saved": {
+    category: "recurring",
+    severity: "update",
+    headline: (d) =>
+      d.rawValue("cleared") === true ? "Cleared a job preference" : "Saved a job preference",
+  },
   "shift_preference.saved": {
     category: "recurring",
     severity: "update",

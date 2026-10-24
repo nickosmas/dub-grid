@@ -21,6 +21,7 @@ const READS = new Set([
   "fetchRecurringShifts",
   "getRecurringDraft",
   "fetchShiftPreferences",
+  "fetchJobPreferences",
   "fetchShiftRequests",
 ]);
 
