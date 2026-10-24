@@ -363,9 +363,9 @@ describe("PrintScheduleView", () => {
       ]);
       expect(cellPills(mixed)[0].textContent).toContain("7");
       expect(cellPills(mixed)[1].style.background).toContain("repeating-linear-gradient(135deg");
-      // The absence starts where the shift ends, so the two touch.
+      // The absence starts where the shift ends, so the two touch, with one line between.
       expect(cellPills(mixed)[0].style.borderRightStyle).toBe("none");
-      expect(cellPills(mixed)[1].style.borderLeftStyle).toBe("none");
+      expect(cellPills(mixed)[1].style.borderLeftStyle).not.toBe("none");
       expect(cellPills(triple)).toHaveLength(3);
       expect(cellPills(triple)[2].textContent).toBe("S");
     });

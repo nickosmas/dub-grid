@@ -35,15 +35,18 @@ export function attachedPillSeams(axis: AttachedPillAxis, joins: boolean[]): Pil
 }
 
 /**
- * Per-side borders on an attached pill, so a seam can drop its border. An
- * unattached pill keeps the plain shorthand.
+ * Per-side borders on an attached pill. Each seam keeps one line, the later
+ * pill's border, so two pills of similar colour still read as two; the earlier
+ * pill drops its side so the line is never doubled. An unattached pill keeps
+ * the plain shorthand.
  */
 export function seamBorders(
   border: string,
   seams: readonly PillSeam[],
 ): Pick<CSSProperties, "border" | "borderTop" | "borderRight" | "borderBottom" | "borderLeft"> {
   if (seams.length === 0) return { border };
-  const side = (edge: PillSeam) => (seams.includes(edge) ? "none" : border);
+  const side = (edge: PillSeam) =>
+    (edge === "bottom" || edge === "right") && seams.includes(edge) ? "none" : border;
   return {
     borderTop: side("top"),
     borderRight: side("right"),

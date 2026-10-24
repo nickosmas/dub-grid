@@ -166,7 +166,7 @@ describe("MobileDayView absence for the rest of the day", () => {
     expect(absencePill).toHaveStyle({ color: stripes.text });
     expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
     expect(shiftPill.style.borderBottomStyle).toBe("none");
-    expect(absencePill.style.borderTopStyle).toBe("none");
+    expect(absencePill.style.borderTop).toContain("solid");
   });
 
   it("counts only the shift in the tally", () => {

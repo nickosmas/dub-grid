@@ -32,12 +32,19 @@ describe("attachedPillSeams", () => {
 });
 
 describe("seam styling", () => {
-  it("drops only the seam's border", () => {
+  it("keeps one dividing line per seam, drawn by the later pill", () => {
     expect(seamBorders("1px solid red", ["bottom"])).toEqual({
       borderTop: "1px solid red",
       borderRight: "1px solid red",
       borderBottom: "none",
       borderLeft: "1px solid red",
+    });
+    expect(seamBorders("1px solid red", ["right"]).borderRight).toBe("none");
+    expect(seamBorders("1px solid blue", ["top"]).borderTop).toBe("1px solid blue");
+    expect(seamBorders("1px solid blue", ["left"]).borderLeft).toBe("1px solid blue");
+    expect(seamBorders("1px solid blue", ["top", "bottom"])).toMatchObject({
+      borderTop: "1px solid blue",
+      borderBottom: "none",
     });
     expect(seamBorders("1px solid red", [])).toEqual({ border: "1px solid red" });
   });

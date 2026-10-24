@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bab9b63de5be7d91094d490a34ff22fafaec06cb3dc760920e404d938164fd36"
+      "evidenceFingerprint": "sha256:3912c229fdb8e1bbc685466b7922828c67a46d9c69701b62f28c0bedd0436c1f"
     },
     {
       "id": "draft-publish",
@@ -1926,7 +1926,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:6ccec83e1739185667806ce6bf2cc147d8ddf6b52d7953a59c8ed42d32759608"
+      "evidenceFingerprint": "sha256:1076036d85b4525c575ac32635927612ffc8cd3a96d4ddfc5a7a77a63ce7513a"
     },
     {
       "id": "coverage-open-shifts",
