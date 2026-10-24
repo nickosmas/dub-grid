@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createGestureHandlerModule,
@@ -221,8 +221,9 @@ describe("RootLayout", () => {
       screen.getByText("This build is missing a reachable web connection."),
     ).toBeInTheDocument();
     // StartupSplashGate never mounts on this path, so without its own hide the
-    // screen sits behind the launch image forever.
-    expect(splashScreen.hideAsync).toHaveBeenCalledTimes(1);
+    // screen sits behind the launch image forever. The hide is an effect that
+    // can land after the text under load.
+    await waitFor(() => expect(splashScreen.hideAsync).toHaveBeenCalledTimes(1));
   });
 
   it("renders the app shell when env validation passes", async () => {
