@@ -33,6 +33,7 @@ import {
   ShiftJobSegment,
 } from "@/types";
 import CustomSelect from "./CustomSelect";
+import { formatShiftWindow, type WorkingShift } from "@/lib/shift-picker-groups";
 import ShiftPicker from "./ShiftPicker";
 import {
   fmt12h,
@@ -56,7 +57,21 @@ import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, Clock, Trash2, User } from "lucide-react";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
+import {
+  ShiftPanelView,
+  type PanelViewDetail,
+  type PanelViewStatus,
+} from "@/components/shift-panel/ShiftPanelView";
+import { SeriesSummaryCard } from "@/components/shift-panel/SeriesSummaryCard";
+import { SeriesScopeChoices } from "@/components/shift-panel/SeriesScopeChoices";
+import { describeSeriesPattern, formatSeriesSpan, seriesScopeOptions } from "@/lib/series-summary";
 import { buildShiftChangeResolvers, describeCellStateChange } from "@/lib/shift-change-web";
+import {
+  cellStateToChangeDay,
+  describeShiftChangeItem,
+  formatShiftChangeHours,
+  shiftChangeItemMinutes,
+} from "@dubgrid/schedule-core";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
   buildShiftDiffDescriptors,
@@ -125,6 +140,8 @@ interface ShiftEditPanelProps {
   publishedAbsenceTypeId?: number | null;
   /** Published rest-of-day absence on a worked cell (item 45). */
   publishedRestOfDayAbsenceTypeId?: number | null;
+  /** The shifts as published, to say how the draft differs. */
+  publishedSegments?: ShiftJobSegment[];
   /** Published custom start time override — used for published-vs-current diff badges. */
   publishedCustomStartTime?: string | null;
   /** Published custom end time override — used for published-vs-current diff badges. */
@@ -211,22 +228,6 @@ interface ShiftEditPanelProps {
   shiftDisplayMode?: ShiftDisplayMode;
 }
 
-// Ordered for the two-column grid: the single and whole-series choices on top,
-// the two partial ones below.
-const SERIES_SCOPE_OPTIONS: Array<{ scope: SeriesScope; label: string; absenceLabel?: string }> = [
-  { scope: "this", label: "This shift", absenceLabel: "This only" },
-  { scope: "all", label: "All in series" },
-  { scope: "previous", label: "This and earlier" },
-  { scope: "following", label: "This and later" },
-];
-
-function seriesScopeRemovalNote(scope: SeriesScope): string {
-  if (scope === "previous") return " This also applies to every earlier date in the series.";
-  if (scope === "following") return " This also applies to every later date in the series.";
-  if (scope === "all") return " This applies to every date in the series.";
-  return " Other dates in the series stay as they are.";
-}
-
 function formatTimeRangeLabel(range: TimeRange): string {
   return `${fmt12h(range.start)} - ${fmt12h(range.end)}`;
 }
@@ -297,7 +298,12 @@ function getPanelDiffBadgeBackground(kind: ShiftDiffBadgeDescriptor["kind"]): st
   }
 }
 
-const shiftEditCardOuterRadius = "var(--dg-radius-md)";
+// The colored header sits inset in its card. Concentric corners need the outer
+// radius to equal the header's plus the gap between them (padding and border).
+const SHIFT_EDIT_CARD_INSET = 5;
+const SHIFT_EDIT_CARD_BORDER = 1.5;
+const shiftEditCardHeaderRadius = "var(--dg-radius-md)";
+const shiftEditCardOuterRadius = `calc(${shiftEditCardHeaderRadius} + ${SHIFT_EDIT_CARD_INSET + SHIFT_EDIT_CARD_BORDER}px)`;
 const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
 
 function getPanelDiffBorder(args: { diffKind: ShiftDiffBorderKind; fallback: string }): string {
@@ -351,6 +357,7 @@ export default function ShiftEditPanel({
   publishedAssignmentIds = [],
   publishedAbsenceTypeId = null,
   publishedRestOfDayAbsenceTypeId = null,
+  publishedSegments,
   publishedCustomStartTime = null,
   publishedCustomEndTime = null,
   draftKind = null,
@@ -414,6 +421,24 @@ export default function ShiftEditPanel({
   const [showRepeatForm, setShowRepeatForm] = useState(false);
   const [seriesPattern, setSeriesPattern] = useState<ShiftSeriesPattern | null>(null);
   const [seriesPatternLoad, setSeriesPatternLoad] = useState<"idle" | "loading" | "failed">("idle");
+  const [seriesFormOpen, setSeriesFormOpen] = useState(false);
+  const [seriesSummary, setSeriesSummary] = useState<{
+    status: "loading" | "failed" | "ready";
+    pattern: ShiftSeriesPattern | null;
+  } | null>(null);
+  // A repeating item opens on what it holds and its series; Edit moves to the
+  // day editor. Every other item opens straight in the editor.
+  const [viewing, setViewing] = useState(
+    () =>
+      allowShiftEdits &&
+      !modal.requestMode &&
+      !!seriesId &&
+      !!currentShift &&
+      currentShift !== "OFF",
+  );
+  // Remove changes the draft, then saves it once the panel sees the change.
+  const [pendingCommitScope, setPendingCommitScope] = useState<SeriesScope | null>(null);
+  const [editScopeOpen, setEditScopeOpen] = useState(false);
   const [activeRequestMode, setActiveRequestMode] = useState<EditModalState["requestMode"] | null>(
     modal.requestMode ?? null,
   );
@@ -645,7 +670,7 @@ export default function ShiftEditPanel({
   const canEditSeriesPattern = Boolean(
     allowShiftEdits && seriesId && empId && onLoadSeriesPattern && onRescheduleSeries,
   );
-  const showSeriesPatternForm = canEditSeriesPattern && seriesPattern != null;
+  const showSeriesPatternForm = canEditSeriesPattern && seriesFormOpen && seriesPattern != null;
   const showCreateRepeatForm = Boolean(showRepeatForm && onRepeatConfirm && empId);
   const repeatFormOpen = showCreateRepeatForm || showSeriesPatternForm;
 
@@ -654,11 +679,38 @@ export default function ShiftEditPanel({
     setSeriesPatternLoad("loading");
     try {
       setSeriesPattern(await onLoadSeriesPattern(seriesId));
+      setSeriesFormOpen(true);
       setSeriesPatternLoad("idle");
     } catch {
       setSeriesPatternLoad("failed");
     }
   };
+
+  // Loaded once per panel; returning to the view keeps what was loaded.
+  const canLoadSeriesSummary = Boolean(
+    viewing && seriesId && onLoadSeriesPattern && seriesSummary?.status !== "ready",
+  );
+  useEffect(() => {
+    if (!canLoadSeriesSummary || !seriesId || !onLoadSeriesPattern) return;
+    let cancelled = false;
+    setSeriesSummary({ status: "loading", pattern: null });
+    onLoadSeriesPattern(seriesId)
+      .then((pattern) => {
+        if (!cancelled) setSeriesSummary({ status: "ready", pattern });
+      })
+      .catch(() => {
+        if (!cancelled) setSeriesSummary({ status: "failed", pattern: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadSeriesSummary, seriesId, onLoadSeriesPattern]);
+
+  useEffect(() => {
+    if (pendingCommitScope == null || !hasEdits) return;
+    setPendingCommitScope(null);
+    onConfirmDraft?.(seriesId ? pendingCommitScope : undefined);
+  }, [pendingCommitScope, hasEdits, onConfirmDraft, seriesId]);
 
   // Build concise change descriptions for the footer summary
   function describeShiftChange(): string | null {
@@ -966,6 +1018,26 @@ export default function ShiftEditPanel({
     : isAddingSecondShift
       ? assignments.filter((sc) => sc.id !== firstShiftId)
       : assignments;
+
+  const firstAssignment =
+    firstShiftId != null
+      ? assignments.find((assignment) => assignment.id === firstShiftId)
+      : undefined;
+  const firstDefaultTimes = resolveDefaultTimes(firstAssignment);
+  const pickerWorkingShift: WorkingShift | null =
+    isAddingSecondShift && firstAssignment
+      ? {
+          name:
+            shiftCategories.find(
+              (shift) => shift.id === (firstAssignment.shiftId ?? firstAssignment.categoryId),
+            )?.name ??
+            firstAssignment.name ??
+            firstAssignment.label,
+          shiftId: firstAssignment.shiftId ?? firstAssignment.categoryId ?? null,
+          start: customStartTime ?? firstDefaultTimes.start,
+          end: customEndTime ?? firstDefaultTimes.end,
+        }
+      : null;
 
   // A cell carries at most one absence, so a second shift's picker offers none.
   const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
@@ -3080,6 +3152,8 @@ export default function ShiftEditPanel({
                 borderRadius: shiftEditCardOuterRadius,
                 overflow: "visible",
                 position: "relative",
+                padding: SHIFT_EDIT_CARD_INSET,
+                background: "var(--dg-color-surface)",
               }}
             >
               {renderShiftDiffBadge(pillDiff.badge, i)}
@@ -3088,13 +3162,13 @@ export default function ShiftEditPanel({
                 data-shift-edit-card-header={i}
                 style={{
                   background: s.color,
-                  borderBottom: `1px solid ${darkenColor(s.color, 0.2)}`,
+                  border: `1px solid ${darkenColor(s.color, 0.2)}`,
                   minHeight: 44,
                   padding: isNameMode ? "10px 12px" : "8px 12px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: `${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius} 0 0`,
+                  borderRadius: shiftEditCardHeaderRadius,
                   position: "relative",
                   gap: 2,
                 }}
@@ -3142,6 +3216,22 @@ export default function ShiftEditPanel({
                       </div>
                     </MaybeHint>
                   ) : null}
+                  {focusAreaLabel ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-badge)",
+                        color: s.text,
+                        opacity: 0.78,
+                        lineHeight: 1.3,
+                        marginTop: 2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {focusAreaLabel}
+                    </div>
+                  ) : null}
                 </div>
                 {renderNoteDots(pillNoteTypes)}
               </div>
@@ -3149,59 +3239,14 @@ export default function ShiftEditPanel({
               <div
                 data-shift-edit-card-body={i}
                 style={{
-                  padding: "10px 12px",
+                  padding: "10px 6px 4px",
                   background: "var(--dg-color-surface)",
                   borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
                 }}
               >
-                {/* Default time info */}
-                {(defaultStart || defaultEnd) && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-text-subtle)",
-                    }}
-                  >
-                    <Clock size={11} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                    <span style={{ fontWeight: 500 }}>
-                      {[
-                        defaultStart ? fmt12h(defaultStart) : null,
-                        defaultEnd ? fmt12h(defaultEnd) : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" – ")}
-                    </span>
-                    {calcTimeDuration(defaultStart, defaultEnd) && (
-                      <span style={{ opacity: 0.7 }}>
-                        · {calcTimeDuration(defaultStart, defaultEnd)}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {focusAreaLabel ? (
-                  <div
-                    style={{
-                      marginTop: defaultStart || defaultEnd ? 6 : 0,
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-text-secondary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {focusAreaLabel}
-                  </div>
-                ) : null}
                 {allowShiftEdits && currentSegments[i] ? (
                   <div
                     style={{
-                      marginTop: defaultStart || defaultEnd || focusAreaLabel ? 10 : 0,
-                      paddingTop: defaultStart || defaultEnd || focusAreaLabel ? 10 : 0,
-                      borderTop:
-                        defaultStart || defaultEnd || focusAreaLabel
-                          ? "1px solid var(--dg-color-border-light)"
-                          : "none",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -3499,6 +3544,8 @@ export default function ShiftEditPanel({
           position: "relative",
           marginTop: currentLabels.length > 1 ? 10 : 0,
           marginBottom: 16,
+          padding: SHIFT_EDIT_CARD_INSET,
+          background: "var(--dg-color-surface)",
         }}
       >
         {renderShiftDiffBadge(diff?.badge ?? null)}
@@ -3510,7 +3557,7 @@ export default function ShiftEditPanel({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: `${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius} 0 0`,
+            borderRadius: shiftEditCardHeaderRadius,
             position: "relative",
           }}
         >
@@ -3532,7 +3579,7 @@ export default function ShiftEditPanel({
         </div>
         <div
           style={{
-            padding: "10px 12px",
+            padding: "10px 6px 4px",
             background: "var(--dg-color-surface)",
             borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
             fontSize: "var(--dg-fs-footnote)",
@@ -3757,6 +3804,238 @@ export default function ShiftEditPanel({
   // Detail mode: show when we have an active shift and aren't in picker mode
   // (or when shift edits are not allowed)
   const inDetailMode = !allowShiftEdits || (!showPicker && hasActiveShift);
+  const dateKey = formatDateKey(modal.date);
+
+  function buildViewDetails(): PanelViewDetail[] {
+    if (isAbsence) return [{ label: "Time", value: "Whole day · no hours" }];
+
+    const count = currentSegments.length;
+    const starts = parseMultiTimes(customStartTime, count);
+    const ends = parseMultiTimes(customEndTime, count);
+    let lastEnd: string | null = null;
+
+    const details: PanelViewDetail[] = currentSegments.flatMap((segment, index) => {
+      const assignment =
+        assignments.find((candidate) => candidate.id === currentAssignmentIds[index]) ?? undefined;
+      const resolved = shiftChangeResolvers.segment(segment.shiftId ?? null, segment.jobId);
+      const defaults = resolveDefaultTimes(assignment);
+      const isCustom = starts[index] != null || ends[index] != null;
+      const start = starts[index] ?? defaults.start ?? resolved?.defaultStart ?? null;
+      const end = ends[index] ?? defaults.end ?? resolved?.defaultEnd ?? null;
+      if (end) lastEnd = end;
+      const window = formatShiftWindow(start, end, dateKey);
+      const minutes =
+        start && end
+          ? shiftChangeItemMinutes({
+              kind: "shift",
+              key: String(index),
+              shiftName: null,
+              jobName: "",
+              focusAreaName: null,
+              start,
+              end,
+              breakMinutes: resolved?.breakMinutes ?? null,
+            })
+          : null;
+      const time = window
+        ? [
+            window,
+            minutes != null ? formatShiftChangeHours(minutes) : null,
+            isCustom ? "custom time" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : null;
+      const noteFocusAreaId = assignment?.focusAreaId ?? activeTab;
+      const noteNames = (getActiveIndicatorIds?.(noteFocusAreaId, noteShiftOf(segment)) ?? [])
+        .map((id) => indicatorTypes.find((type) => type.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+      const prefix = count > 1 ? `Shift ${index + 1} ` : "";
+      return [
+        ...(time ? [{ label: count > 1 ? `Shift ${index + 1}` : "Time", value: time }] : []),
+        { label: `${prefix}mentored`.replace(/^m/, "M"), value: segment.isMentored ? "Yes" : "No" },
+        ...(noteNames.length > 0
+          ? [{ label: `${prefix}notes`.replace(/^n/, "N"), value: noteNames.join(", ") }]
+          : []),
+      ];
+    });
+
+    if (hasRestOfDayAbsence) {
+      const name = absenceName(currentRestOfDayAbsenceTypeId);
+      const from = lastEnd ? `, from ${fmt12h(lastEnd)}` : "";
+      details.push({ label: "Absence", value: `${name} for the rest of the day${from}` });
+    }
+    return details;
+  }
+
+  function buildViewStatus(): PanelViewStatus {
+    if (draftKind === "new") return { kind: "unpublished", personName: modal.empName };
+    if (draftKind !== "modified") return null;
+    const change = describeCellStateChange(
+      buildPanelInput({
+        segments: publishedSegments ?? [],
+        absenceTypeId: publishedAbsenceTypeId ?? null,
+        customStartTime: publishedCustomStartTime ?? null,
+        customEndTime: publishedCustomEndTime ?? null,
+        restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId ?? null,
+      }),
+      buildPanelInput({
+        segments: currentSegments,
+        absenceTypeId: currentAbsenceTypeId ?? null,
+        customStartTime: customStartTime ?? null,
+        customEndTime: customEndTime ?? null,
+        restOfDayAbsenceTypeId: currentRestOfDayAbsenceTypeId,
+      }),
+      dateKey,
+      shiftChangeResolvers,
+    );
+    return change.kind === "none" ? null : { kind: "changed", change };
+  }
+
+  function describeSeriesItem(pattern: ShiftSeriesPattern | null): string | null {
+    if (!pattern) return null;
+    const items = cellStateToChangeDay(pattern.state, shiftChangeResolvers).items;
+    const text = items
+      .map((item) => describeShiftChangeItem(item, { date: dateKey }).plain)
+      .join("; ");
+    return text || null;
+  }
+
+  function describeLastChange(): string | null {
+    if (!auditInfo) return null;
+    if (auditInfo.updatedByName && auditInfo.updatedAt) {
+      return `Last changed by ${auditInfo.updatedByName} · ${formatRelativeTime(auditInfo.updatedAt)}`;
+    }
+    if (auditInfo.createdByName && auditInfo.createdAt) {
+      return `Added by ${auditInfo.createdByName} · ${formatRelativeTime(auditInfo.createdAt)}`;
+    }
+    return null;
+  }
+
+  const holdsSeveralItems = currentSegments.length > 1 || hasRestOfDayAbsence;
+  const initialHadContent = !!initialShift && initialShift !== "OFF";
+  const canReturnToView = allowShiftEdits && !!seriesId && initialHadContent;
+  const scopeOptions = seriesScopeOptions(seriesSummary?.pattern?.occurrenceDates ?? null, dateKey);
+  const chosenScopeOption = scopeOptions.find((option) => option.scope === seriesScope);
+  const repeatingNoun = isAbsence ? "repeating absence" : "repeating shift";
+  // A range edit reaches only the shift itself; times and notes stay per day.
+  const editingRange =
+    !!seriesId && !(viewing && hasActiveShift && allowShiftEdits) && seriesScope !== "this";
+  const repeatBlockedReason =
+    currentLabels.length > 1
+      ? "A day with two shifts can't repeat. Remove one to make it repeating."
+      : hasRestOfDayAbsence
+        ? "A shift with an absence for the rest of the day can't repeat. Remove the absence to make it repeating."
+        : null;
+  const inViewMode = viewing && hasActiveShift && allowShiftEdits;
+
+  function returnToView() {
+    handleUndo();
+    setShowPicker(false);
+    setViewing(true);
+  }
+
+  function renderSeriesEditScope() {
+    if (!chosenScopeOption) return null;
+    const pattern = seriesSummary?.pattern ?? null;
+    const label =
+      chosenScopeOption.label.charAt(0).toLowerCase() + chosenScopeOption.label.slice(1);
+    return (
+      <div
+        style={{
+          marginBottom: 16,
+          padding: "12px 14px",
+          borderRadius: "var(--dg-radius-lg)",
+          background: "var(--dg-color-primary-bg)",
+          border: "1px solid var(--dg-color-border)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 600,
+              color: "var(--dg-color-text-primary)",
+            }}
+          >
+            Editing {label}
+          </div>
+          {chosenScopeOption.detail ? (
+            <div
+              className="dg-tabular-nums"
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              {chosenScopeOption.detail}
+            </div>
+          ) : null}
+        </div>
+        {editingRange ? (
+          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
+            Times and notes change one day at a time. To change them, edit this day only.
+          </div>
+        ) : null}
+        {seriesScope === "all" && canEditSeriesPattern ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              paddingTop: 8,
+              borderTop: "1px solid var(--dg-color-border)",
+            }}
+          >
+            {pattern ? (
+              <div
+                className="dg-tabular-nums"
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--dg-color-text-secondary)",
+                }}
+              >
+                {describeSeriesPattern(pattern)}
+                {formatSeriesSpan(pattern.occurrenceDates)
+                  ? ` · ${formatSeriesSpan(pattern.occurrenceDates)}`
+                  : ""}
+              </div>
+            ) : null}
+            <Button
+              onClick={() => openSeriesPattern()}
+              disabled={hasEdits || seriesPatternLoad === "loading"}
+              className="dg-btn dg-btn-secondary"
+              style={{ fontSize: "var(--dg-fs-caption)", padding: "8px 12px" }}
+            >
+              <ButtonLoading loading={seriesPatternLoad === "loading"} spinnerSize={12}>
+                Edit dates and pattern
+              </ButtonLoading>
+            </Button>
+            {hasEdits || seriesPatternLoad === "failed" ? (
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color:
+                    seriesPatternLoad === "failed"
+                      ? "var(--dg-color-danger)"
+                      : "var(--dg-color-text-muted)",
+                }}
+              >
+                {seriesPatternLoad === "failed"
+                  ? "We couldn't load this repeating series. Try again."
+                  : "Save or cancel the change above first."}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   const showStandaloneRequestFlow =
     !requestOnlyMode && activeRequestMode != null && (canRenderCoverage || canRenderSwap);
 
@@ -3879,9 +4158,9 @@ export default function ShiftEditPanel({
             background: "var(--dg-color-surface)",
           }}
         >
-          {isMobile && (
+          {(isMobile || (!inViewMode && canReturnToView)) && (
             <Button
-              onClick={close}
+              onClick={!inViewMode && canReturnToView ? returnToView : close}
               aria-label="Back"
               style={{
                 display: "flex",
@@ -3978,9 +4257,29 @@ export default function ShiftEditPanel({
                   : undefined
               }
             />
+          ) : inViewMode ? (
+            <ShiftPanelView
+              header={renderCurrentShiftPill()}
+              details={buildViewDetails()}
+              status={buildViewStatus()}
+              series={
+                seriesId ? (
+                  <SeriesSummaryCard
+                    date={dateKey}
+                    pattern={seriesSummary?.pattern ?? null}
+                    status={
+                      onLoadSeriesPattern ? (seriesSummary?.status ?? "loading") : "unavailable"
+                    }
+                    seriesItemText={describeSeriesItem(seriesSummary?.pattern ?? null)}
+                  />
+                ) : null
+              }
+              lastChange={describeLastChange()}
+            />
           ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
             <>
+              {seriesId && allowShiftEdits && chosenScopeOption && renderSeriesEditScope()}
               {/* Current shift displayed prominently */}
               {renderCurrentShiftPill()}
 
@@ -4034,6 +4333,7 @@ export default function ShiftEditPanel({
                 !currentAbsenceTypeId &&
                 allowShiftEdits &&
                 onCustomTimeChange &&
+                !editingRange &&
                 currentLabels.length <= 1 &&
                 (() => {
                   const matchedCode =
@@ -4078,172 +4378,72 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Series scope selector — shown when editing a repeating shift */}
-              {allowShiftEdits && seriesId && (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    padding: "10px 12px",
-                    background: "var(--dg-color-warning-bg)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    borderRadius: "var(--dg-radius-md)",
-                  }}
-                >
-                  <div
-                    style={{
-                      ...sectionLabel,
-                      marginBottom: 6,
-                      color: "var(--dg-color-warning-text)",
-                    }}
-                  >
-                    {isAbsence ? "Repeating: edit scope" : "Repeating shift: edit scope"}
-                  </div>
-                  <div
-                    className="dg-segment dg-segment-grid"
-                    role="group"
-                    aria-label="Apply changes to"
-                  >
-                    {SERIES_SCOPE_OPTIONS.map((option) => (
-                      <Button
-                        key={option.scope}
-                        onClick={() => setSeriesScope(option.scope)}
-                        aria-pressed={seriesScope === option.scope}
-                        className={`dg-segment-btn${seriesScope === option.scope ? " active" : ""}`}
-                        style={{ fontSize: "var(--dg-fs-footnote)" }}
-                      >
-                        {isAbsence ? (option.absenceLabel ?? option.label) : option.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {canEditSeriesPattern && (
+              {/* Make repeating; a double shift or a shift with an absence says why it can't */}
+              {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && (
                 <div style={{ marginBottom: 16 }}>
-                  <Button
-                    onClick={() => openSeriesPattern()}
-                    disabled={hasEdits || seriesPatternLoad === "loading"}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "9px 12px",
-                    }}
+                  <div style={sectionLabel}>Repeating</div>
+                  <Hint
+                    content={hint(
+                      repeatBlockedReason ?? "Create a recurring pattern (daily, weekly, biweekly)",
+                    )}
+                    side="top"
                   >
-                    <ButtonLoading
-                      loading={seriesPatternLoad === "loading"}
-                      spinnerSize={12}
-                      icon={
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect x="3" y="4" width="18" height="18" rx="2" />
-                          <path d="M16 2v4M8 2v4M3 10h18" />
-                        </svg>
-                      }
+                    <Button
+                      data-tour="edit-panel-repeat-btn"
+                      disabled={repeatBlockedReason != null}
+                      onClick={() => {
+                        setShowRepeatForm(true);
+                      }}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                      }}
                     >
-                      Edit dates and pattern
-                    </ButtonLoading>
-                  </Button>
-                  {(hasEdits || seriesPatternLoad === "failed") && (
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="17 1 21 5 17 9" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                        <polyline points="7 23 3 19 7 15" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                      </svg>
+                      {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
+                    </Button>
+                  </Hint>
+                  {repeatBlockedReason && (
                     <div
                       style={{
                         marginTop: 6,
                         fontSize: "var(--dg-fs-footnote)",
-                        color:
-                          seriesPatternLoad === "failed"
-                            ? "var(--dg-color-danger)"
-                            : "var(--dg-color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
-                      {seriesPatternLoad === "failed"
-                        ? "We couldn't load this repeating series. Try again."
-                        : "Save or discard the changes to this day first."}
+                      {repeatBlockedReason}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Make repeating — disabled for split shifts (max 1 code) */}
-              {allowShiftEdits &&
-                hasActiveShift &&
-                !seriesId &&
-                onRepeatConfirm &&
-                currentLabels.length <= 1 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={sectionLabel}>Repeating</div>
-                    <Hint
-                      content={hint(
-                        hasRestOfDayAbsence
-                          ? "A shift with an absence for the rest of the day can't repeat"
-                          : "Create a recurring pattern (daily, weekly, biweekly)",
-                      )}
-                      side="top"
-                    >
-                      <Button
-                        data-tour="edit-panel-repeat-btn"
-                        disabled={hasRestOfDayAbsence}
-                        onClick={() => {
-                          setShowRepeatForm(true);
-                        }}
-                        className="dg-btn dg-btn-secondary"
-                        style={{
-                          width: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6,
-                          fontSize: "var(--dg-fs-caption)",
-                          padding: "9px 12px",
-                        }}
-                      >
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="17 1 21 5 17 9" />
-                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                          <polyline points="7 23 3 19 7 15" />
-                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                        </svg>
-                        {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                      </Button>
-                    </Hint>
-                    {hasRestOfDayAbsence && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--dg-color-text-muted)",
-                        }}
-                      >
-                        A shift with an absence for the rest of the day can&apos;t repeat. Remove
-                        the absence to make it repeating.
-                      </div>
-                    )}
-                  </div>
-                )}
-
               {/* Notes / Indicators — single shift only; multi-shift shows inline per pill; hidden for
                   absences and for an empty cell, since an indicator describes a shift */}
-              {hasActiveShift && currentLabels.length <= 1 && !isAbsence && renderNotesSection()}
+              {hasActiveShift &&
+                currentLabels.length <= 1 &&
+                !isAbsence &&
+                !editingRange &&
+                renderNotesSection()}
 
               {/* Audit metadata footer — admin+ only */}
               {auditInfo && (auditInfo.createdByName || auditInfo.updatedByName) && (
@@ -4280,8 +4480,8 @@ export default function ShiftEditPanel({
                 </div>
               )}
 
-              {/* Remove shift */}
-              {allowShiftEdits && hasActiveShift && (
+              {/* Remove shift; a repeating item is removed from its view, which asks which days */}
+              {allowShiftEdits && hasActiveShift && !seriesId && (
                 <div style={{ marginTop: 16 }}>
                   <Button
                     onClick={() => setPendingDelete({ type: "all" })}
@@ -4316,7 +4516,7 @@ export default function ShiftEditPanel({
               {/* Add another shift (hidden at two shifts or on a whole-day absence) and Add an
                   absence (hidden once there is one, and on a series edited beyond this date,
                   which the server refuses) */}
-              {(canAddShift || canAddRestOfDayAbsence) && (
+              {(canAddShift || canAddRestOfDayAbsence) && !editingRange && (
                 <div
                   style={{
                     marginTop: 8,
@@ -4513,6 +4713,11 @@ export default function ShiftEditPanel({
                     }))}
                     currentAbsenceTypeId={currentAbsenceTypeId}
                     defaultShiftEnabled={defaultShiftEnabled}
+                    date={formatDateKey(modal.date)}
+                    workingShift={pickerWorkingShift}
+                    blockClashes={enforceConflicts}
+                    shiftDisplayMode={shiftDisplayMode}
+                    absenceScope={pickingRestOfDayAbsence ? "restOfDay" : "allDay"}
                     onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
                       if (pickingRestOfDayAbsence) {
@@ -4592,6 +4797,7 @@ export default function ShiftEditPanel({
               onClick={() => {
                 setShowRepeatForm(false);
                 setSeriesPattern(null);
+                setSeriesFormOpen(false);
               }}
               className="dg-btn dg-btn-ghost"
               disabled={isCreatingRepeatSeries}
@@ -4623,8 +4829,43 @@ export default function ShiftEditPanel({
           </div>
         )}
 
-        {/* Sticky footer — only shown when edits exist */}
-        {hasEdits && !repeatFormOpen && (
+        {inViewMode && !repeatFormOpen && (
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 20px",
+              borderTop: "1px solid var(--dg-color-border)",
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 8,
+              background: "var(--dg-color-surface)",
+            }}
+          >
+            <Button
+              onClick={() => {
+                setSeriesScope("this");
+                setPendingDelete({ type: "all" });
+              }}
+              className="dg-btn dg-btn-danger"
+              style={{ fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+            >
+              {holdsSeveralItems ? "Clear day" : "Remove"}
+            </Button>
+            <Button
+              onClick={() => {
+                setSeriesScope("this");
+                if (seriesId) setEditScopeOpen(true);
+                else setViewing(false);
+              }}
+              className="dg-btn dg-btn-primary"
+              style={{ fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+            >
+              Edit
+            </Button>
+          </div>
+        )}
+
+        {!inViewMode && !repeatFormOpen && (hasEdits || canReturnToView) && (
           <div
             style={{
               flexShrink: 0,
@@ -4658,24 +4899,19 @@ export default function ShiftEditPanel({
             )}
             <div style={{ display: "flex", gap: 8 }}>
               <Button
-                onClick={handleUndo}
-                className="dg-btn dg-btn-ghost"
-                style={{
-                  flex: 1,
-                  fontSize: "var(--dg-fs-caption)",
-                  padding: "9px 12px",
-                  border: "1px solid var(--dg-color-border)",
-                }}
+                onClick={canReturnToView ? returnToView : handleUndo}
+                className="dg-btn dg-btn-secondary"
+                style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
               >
-                Undo
+                Cancel
               </Button>
               <Button
                 onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
                 className="dg-btn dg-btn-primary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-                disabled={confirmBlocked}
+                disabled={confirmBlocked || !hasEdits}
               >
-                Confirm
+                Save changes
               </Button>
             </div>
           </div>
@@ -4686,7 +4922,73 @@ export default function ShiftEditPanel({
       {renderPendingRequestConfirmation()}
 
       {/* Confirm delete dialog */}
-      {pendingDelete && (
+      {pendingDelete && pendingDelete.type === "all" && seriesId && (
+        <ConfirmDialog
+          title={`Remove ${repeatingNoun}?`}
+          message={
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <span>
+                {isAbsence
+                  ? absenceName(currentAbsenceTypeId ?? null)
+                  : formatPreviewLabel(
+                      resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name")
+                        .displayParts,
+                    )}{" "}
+                for {modal.empName}. Choose which days to remove.
+              </span>
+              <SeriesScopeChoices
+                label="Days to remove"
+                options={scopeOptions}
+                value={seriesScope}
+                onChange={setSeriesScope}
+              />
+              <span style={{ fontSize: "var(--dg-fs-footnote)" }}>
+                Published days are removed in the draft and leave the schedule when you publish.
+              </span>
+            </div>
+          }
+          confirmLabel={
+            chosenScopeOption?.count != null
+              ? `Remove ${chosenScopeOption.count} ${chosenScopeOption.count === 1 ? "day" : "days"}`
+              : "Remove"
+          }
+          variant="danger"
+          onConfirm={() => {
+            onSelect(null, seriesScope);
+            if (onCustomTimeChange) onCustomTimeChange(null, null);
+            setPendingCommitScope(seriesScope);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {editScopeOpen && (
+        <ConfirmDialog
+          title={`Edit ${repeatingNoun}`}
+          message={
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <span>Which days should this change?</span>
+              <SeriesScopeChoices
+                label="Days to edit"
+                options={scopeOptions}
+                value={seriesScope}
+                onChange={setSeriesScope}
+                notes={{ all: "You can also change the dates and pattern." }}
+              />
+            </div>
+          }
+          confirmLabel="Continue"
+          variant="info"
+          onConfirm={() => {
+            setEditScopeOpen(false);
+            setViewing(false);
+          }}
+          onCancel={() => setEditScopeOpen(false)}
+        />
+      )}
+
+      {pendingDelete && !(pendingDelete.type === "all" && seriesId) && (
         <ConfirmDialog
           title={
             pendingDelete.type === "restOfDay"
@@ -4696,7 +4998,7 @@ export default function ShiftEditPanel({
                 : "Remove Shift?"
           }
           message={
-            (isAbsence
+            isAbsence
               ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
               : pendingDelete.type === "restOfDay"
                 ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}? The shifts stay.`
@@ -4706,8 +5008,7 @@ export default function ShiftEditPanel({
                     ? `Remove the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}" from ${modal.empName} on ${formatDate(modal.date)}?`
                     : currentLabels.length > 1
                       ? `Remove both shifts, ${quotedShiftLabels}, from ${modal.empName} on ${formatDate(modal.date)}?`
-                      : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`) +
-            (seriesId ? seriesScopeRemovalNote(seriesScope) : "")
+                      : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
           }
           confirmLabel="Remove"
           variant="danger"
@@ -4715,6 +5016,7 @@ export default function ShiftEditPanel({
             if (pendingDelete.type === "all") {
               onSelect(null, seriesId ? seriesScope : undefined);
               if (onCustomTimeChange) onCustomTimeChange(null, null);
+              setPendingCommitScope(seriesScope);
             } else if (pendingDelete.type === "restOfDay") {
               onSelect(
                 buildPanelInput({

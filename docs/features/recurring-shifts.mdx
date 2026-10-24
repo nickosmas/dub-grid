@@ -53,20 +53,24 @@ A repeating shift runs for at most 183 occurrences, about six months. Its shifts
 
 If some of its days already have a shift or absence, DubGrid asks before creating it. **Replace** puts the repeating shift on those days too. **Keep existing** leaves them as they are, and those days are not part of the series.
 
-To change or remove a repeating shift, select one of its shifts. Under **Repeating shift: edit scope**, choose what the change applies to:
+Selecting a repeating shift or absence opens its details: how often it repeats, its dates and day count, which day of the series this is, and a calendar of its days. The calendar marks the day you selected and any day changed on its own. A day changed on its own also says what the rest of the series has.
 
-| Scope                | Applies to                                     |
-| -------------------- | ---------------------------------------------- |
-| **This shift**       | Only the shift you selected                    |
-| **This and earlier** | That shift and every earlier one in the series |
-| **This and later**   | That shift and every later one in the series   |
-| **All in series**    | Every shift in the series                      |
+**Edit** and **Remove** at the bottom each ask which days they apply to:
 
-Then change or remove the shift and select **Confirm**. Removed shifts are marked for deletion and come off the schedule when you publish. Removing **This and later** ends the series the day before, and removing every shift ends the series.
+| Choice                     | Applies to                                   |
+| -------------------------- | -------------------------------------------- |
+| **This day only**          | Only the day you selected                    |
+| **This and later days**    | That day and every later one in the series   |
+| **This and earlier days**  | That day and every earlier one in the series |
+| **All days in the series** | Every day in the series                      |
 
-Changing or removing a series this way affects only its own shifts, never a day you kept when you created it.
+Each choice shows its dates and how many days it reaches. When you remove, the button counts them, such as **Remove 3 days**, and the removal is saved to the draft at once. Removed days that were published come off the schedule when you publish. Removing **This and later days** ends the series the day before, and removing every day ends the series.
 
-To change when a repeating shift happens, select one of its shifts and choose **Edit dates and pattern**. The same fields open with the series' current values, and the summary says how many days the change adds and removes. Save or discard any change to the selected day first.
+When you edit more than one day, the change reaches only the shift or absence itself. Times and notes change one day at a time, so edit **This day only** to change them. Select **Save changes** to apply the edit.
+
+Changing or removing a series this way affects only its own days, never a day you kept when you created it.
+
+To change when a repeating shift happens, choose **Edit**, then **All days in the series**, and select **Edit dates and pattern**. The same fields open with the series' current values, and the summary says how many days the change adds and removes. Save or cancel any change to the shift itself first.
 
 Under **Days already in the series**, choose what happens to days that stay in the pattern:
 

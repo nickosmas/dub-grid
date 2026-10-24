@@ -1,3 +1,4 @@
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { calcTimeDuration } from "@/lib/utils";
@@ -201,7 +202,9 @@ export function PillTimeEditor({
     );
   }
 
-  // State 2: Custom time is set and not editing — show formatted text with Edit/Remove
+  const standardTime = formatScheduleTimeRange(defaultStart ?? null, defaultEnd ?? null);
+
+  // State 2: Custom time is set and not editing — show formatted text with Edit and a reset
   if (hasCustomTime && !editing) {
     const duration = calcTimeDuration(customStart ?? null, customEnd ?? null);
     return (
@@ -275,26 +278,20 @@ export function PillTimeEditor({
             >
               Edit
             </Button>
-            <Button
-              onClick={() => {
-                onRemove();
-              }}
-              style={{
-                fontSize: "var(--dg-fs-badge)",
-                color: "var(--dg-color-danger)",
-                background: "var(--dg-color-surface)",
-                border: "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-sm)",
-                cursor: "pointer",
-                padding: "4px 10px",
-                fontFamily: "inherit",
-                fontWeight: 600,
-              }}
-            >
-              Remove
-            </Button>
           </div>
         </div>
+        <Button
+          onClick={() => onRemove()}
+          className="dg-btn dg-btn-secondary dg-tabular-nums"
+          style={{
+            width: "100%",
+            marginTop: 10,
+            fontSize: "var(--dg-fs-footnote)",
+            padding: "6px 10px",
+          }}
+        >
+          {standardTime ? `Reset to standard shift time (${standardTime})` : "Remove custom time"}
+        </Button>
       </div>
     );
   }
@@ -364,7 +361,7 @@ export function PillTimeEditor({
                 fontWeight: 600,
               }}
             >
-              Remove
+              Reset
             </Button>
           )}
         </div>

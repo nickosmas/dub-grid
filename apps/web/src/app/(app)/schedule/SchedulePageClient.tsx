@@ -9146,6 +9146,11 @@ function SchedulerContent({
                   ?.publishedRestOfDayAbsenceTypeId ??
                 null
               }
+              publishedSegments={
+                panelShiftEntry?.publishedSegments ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.publishedSegments ??
+                undefined
+              }
               publishedCustomStartTime={
                 panelShiftEntry?.publishedCustomStartTime ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]

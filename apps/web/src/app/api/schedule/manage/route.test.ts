@@ -23,7 +23,7 @@ function stubCellSnapshot(stateKind: "worked" | "absence" | "deleted" | null) {
  * which cells were cleared without standing up a real query builder.
  */
 /** Serves a series' cells the way PostgREST does: windowed, and capped at max_rows. */
-function stubSeriesCells(cells: Array<{ emp_id: string; date: string }>) {
+function stubSeriesCells(cells: Array<{ emp_id: string; date: string; snapshots?: unknown[] }>) {
   const MAX_ROWS = 1_000;
   const previousFrom = serviceFrom.getMockImplementation()!;
   serviceFrom.mockImplementation((table: string) => {
@@ -1710,6 +1710,18 @@ describe("POST /api/schedule/manage permission gates", () => {
       start_date: "2026-08-03",
       end_date: null,
       max_occurrences: 4,
+      state: {
+        kind: "worked",
+        absenceTypeId: null,
+        segments: [{ shiftId: 1, jobId: 7, position: 0, isMentored: false }],
+      },
+    };
+    const seriesShift = {
+      state_kind: "worked",
+      absence_type_id: null,
+      custom_start_time: null,
+      custom_end_time: null,
+      segments: [{ position: 0, shift_id: 1, job_id: 7, is_mentored: false }],
     };
     serviceFrom.mockImplementation((table: string) => {
       if (table !== "shift_series") throw new Error(`unexpected ${table}`);
@@ -1722,8 +1734,19 @@ describe("POST /api/schedule/manage permission gates", () => {
       return query;
     });
     stubSeriesCells([
-      { emp_id: employeeId, date: "2026-08-03" },
-      { emp_id: employeeId, date: "2026-08-10" },
+      {
+        emp_id: employeeId,
+        date: "2026-08-03",
+        snapshots: [{ snapshot_kind: "published", ...seriesShift }],
+      },
+      {
+        emp_id: employeeId,
+        date: "2026-08-10",
+        snapshots: [
+          { snapshot_kind: "published", ...seriesShift },
+          { snapshot_kind: "draft", ...seriesShift, custom_end_time: "13:00:00" },
+        ],
+      },
     ]);
 
     const response = await POST(
@@ -1744,6 +1767,8 @@ describe("POST /api/schedule/manage permission gates", () => {
         endDate: null,
         maxOccurrences: 4,
         occurrenceDates: ["2026-08-03", "2026-08-10"],
+        changedDates: ["2026-08-10"],
+        state: row.state,
       },
     });
   });
