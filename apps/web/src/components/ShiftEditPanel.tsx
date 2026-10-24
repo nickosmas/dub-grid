@@ -712,106 +712,6 @@ export default function ShiftEditPanel({
     onConfirmDraft?.(seriesId ? pendingCommitScope : undefined);
   }, [pendingCommitScope, hasEdits, onConfirmDraft, seriesId]);
 
-  // Build concise change descriptions for the footer summary
-  function describeShiftChange(): string | null {
-    if (!hasShiftEdit) return null;
-
-    // Absence type changed — no per-pill detail needed
-    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId) {
-      const resolveLabel = (shift: string | null, absId: number | null): string | null => {
-        if (absId != null) {
-          const at = absenceTypes.find((a) => a.id === absId);
-          if (!at) return null;
-          return at.name || at.label;
-        }
-        return shift && shift !== "OFF" ? shift : null;
-      };
-      const from = resolveLabel(initialShift, initialAbsenceTypeId);
-      const to = resolveLabel(currentShift, currentAbsenceTypeId ?? null);
-      if (!from && to) return `Shift: added ${to}`;
-      if (from && !to) return `Shift: ${from} removed`;
-      if (from && to) return `Shift: ${from} \u2192 ${to}`;
-      return null;
-    }
-
-    const codeLabel = (id: number): string => {
-      return assignableShiftDisplayMap.get(id) ?? "?";
-    };
-
-    const initIds = initialAssignmentIds;
-    const curIds = currentAssignmentIds;
-
-    // Single pill
-    if (initIds.length <= 1 && curIds.length <= 1) {
-      const from = initIds[0] != null ? codeLabel(initIds[0]) : null;
-      const to = curIds[0] != null ? codeLabel(curIds[0]) : null;
-      if (!from && to) return `Shift: added ${to}`;
-      if (from && !to) return `Shift: ${from} removed`;
-      if (from && to && initIds[0] !== curIds[0]) return `Shift: ${from} \u2192 ${to}`;
-      return null;
-    }
-
-    // Multi-pill: per-pill detail
-    const maxLen = Math.max(initIds.length, curIds.length);
-    const parts: string[] = [];
-    for (let i = 0; i < maxLen; i++) {
-      const fromId = initIds[i];
-      const toId = curIds[i];
-      const from = fromId != null ? codeLabel(fromId) : null;
-      const to = toId != null ? codeLabel(toId) : null;
-      if (fromId === toId) continue;
-      if (!from && to) parts.push(`added ${to}`);
-      else if (from && !to) parts.push(`removed ${from}`);
-      else if (from && to) parts.push(`${from} \u2192 ${to}`);
-    }
-    return parts.length > 0 ? `Shift: ${parts.join(", ")}` : null;
-  }
-
-  function describeTimeChange(): string | null {
-    if (!hasTimeEdit) return null;
-
-    const pillCount = currentAssignmentIds.length;
-    const codeLabel = (id: number): string => {
-      return assignableShiftDisplayMap.get(id) ?? "?";
-    };
-
-    // Single pill
-    if (pillCount <= 1) {
-      const hadTime = initialCustomStartTime != null || initialCustomEndTime != null;
-      const hasTime = (customStartTime ?? null) != null || (customEndTime ?? null) != null;
-      if (!hadTime && hasTime) {
-        return `Time: added ${fmt12h(customStartTime)} \u2013 ${fmt12h(customEndTime)}`;
-      }
-      if (hadTime && !hasTime) return "Time: removed custom time";
-      return `Time: ${fmt12h(initialCustomStartTime)} \u2013 ${fmt12h(initialCustomEndTime)} \u2192 ${fmt12h(customStartTime)} \u2013 ${fmt12h(customEndTime)}`;
-    }
-
-    // Multi-pill: per-pill detail
-    const maxPills = Math.max(initialAssignmentIds.length, pillCount);
-    const initStarts = parseMultiTimes(initialCustomStartTime, maxPills);
-    const initEnds = parseMultiTimes(initialCustomEndTime, maxPills);
-    const curStarts = parseMultiTimes(customStartTime, maxPills);
-    const curEnds = parseMultiTimes(customEndTime, maxPills);
-
-    const parts: string[] = [];
-    for (let i = 0; i < pillCount; i++) {
-      if (initStarts[i] === curStarts[i] && initEnds[i] === curEnds[i]) continue;
-      const label = currentAssignmentIds[i] != null ? codeLabel(currentAssignmentIds[i]) : "?";
-      const hadPillTime = initStarts[i] != null || initEnds[i] != null;
-      const hasPillTime = curStarts[i] != null || curEnds[i] != null;
-      if (!hadPillTime && hasPillTime) {
-        parts.push(`${label}: added ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`);
-      } else if (hadPillTime && !hasPillTime) {
-        parts.push(`${label}: removed custom time`);
-      } else {
-        parts.push(
-          `${label}: ${fmt12h(initStarts[i])} \u2013 ${fmt12h(initEnds[i])} \u2192 ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`,
-        );
-      }
-    }
-    return parts.length > 0 ? `Time: ${parts.join("; ")}` : null;
-  }
-
   function describeNoteChange(): string | null {
     if (!hasNoteEdit) return null;
     const nameOf = (id: number) => indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
@@ -830,18 +730,9 @@ export default function ShiftEditPanel({
     const absence = absenceTypes.find((candidate) => candidate.id === id);
     return absence ? absence.name || absence.label : "an absence";
   };
-  const restOfDaySummary = hasRestOfDayEdit
-    ? initialRestOfDayAbsenceTypeId == null
-      ? `Rest of the day: added ${absenceName(currentRestOfDayAbsenceTypeId)}`
-      : currentRestOfDayAbsenceTypeId == null
-        ? `Rest of the day: ${absenceName(initialRestOfDayAbsenceTypeId)} removed`
-        : `Rest of the day: ${absenceName(initialRestOfDayAbsenceTypeId)} \u2192 ${absenceName(currentRestOfDayAbsenceTypeId)}`
-    : null;
-  const shiftSummary = hasShiftEdit ? describeShiftChange() : null;
-  const timeSummary = hasTimeEdit ? describeTimeChange() : null;
   // Compared with the cell as the panel opened, paired by what each shift is.
   const unsavedChange =
-    hasShiftEdit || hasTimeEdit
+    hasShiftEdit || hasTimeEdit || hasRestOfDayEdit
       ? describeCellStateChange(
           buildPanelInput({
             segments: initialSegments,
@@ -861,7 +752,12 @@ export default function ShiftEditPanel({
           shiftChangeResolvers,
         )
       : null;
-  const showsUnsavedChange = !!unsavedChange && unsavedChange.kind !== "none";
+  // Before and After only when a shift that was there is changed; an addition
+  // or removal already reads plainly in the panel above.
+  const showsUnsavedChange =
+    !!unsavedChange &&
+    unsavedChange.kind !== "none" &&
+    unsavedChange.after.items.some((item) => item.status === "changed");
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
@@ -3370,107 +3266,75 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderInlineIndicators(focusAreaId: number, shift: ScheduleNoteShift | null) {
-    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(focusAreaId, shift, true);
-    if (indicatorTypes.length === 0) return null;
+  /** One row per note: its dot, its name, and a switch to turn it on or off. */
+  function renderNoteToggles(focusAreaId: number, shift: ScheduleNoteShift | null) {
+    const activeIds = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId, shift) : [];
     return (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
-        {indicatorTypes.map(({ id, name, color }) => {
-          const isActive = getActiveIndicatorIds
-            ? getActiveIndicatorIds(focusAreaId, shift).includes(id)
-            : false;
-          if (isActive) {
-            return (
-              <div
-                key={id}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  border: `1.5px solid ${color}`,
-                  borderRadius: 20,
-                  background: `${color}18`,
-                  color,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    paddingLeft: 10,
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  {name}
-                </div>
-                <Button
-                  aria-label={`Remove ${name} schedule note`}
-                  onClick={() => onNoteToggle?.(id, false, focusAreaId, shift)}
-                  className="dg-btn dg-btn-ghost"
-                  style={{
-                    height: 28,
-                    minHeight: 28,
-                    padding: "0 9px",
-                    marginLeft: 6,
-                    borderLeft: `1px solid ${color}40`,
-                    borderRadius: 0,
-                    fontSize: "var(--dg-fs-footnote)",
-                    color,
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-            );
-          }
-          return (
-            <Button
+      <div>
+        <div style={sectionLabel}>Schedule notes</div>
+        <div
+          role="group"
+          aria-label="Schedule notes"
+          style={{
+            border: "1px solid var(--dg-color-border)",
+            borderRadius: "var(--dg-radius-md)",
+            background: "var(--dg-color-surface)",
+            overflow: "hidden",
+          }}
+        >
+          {indicatorTypes.map(({ id, name, color }, index) => (
+            <label
               key={id}
-              aria-label={`Add ${name} schedule note`}
-              onClick={() => onNoteToggle?.(id, true, focusAreaId, shift)}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                border: "1.5px solid var(--dg-color-border)",
-                borderRadius: 20,
-                background: "var(--dg-color-surface)",
+                gap: 10,
+                minHeight: 44,
+                padding: "6px 12px",
+                borderTop: index > 0 ? "1px solid var(--dg-color-border)" : undefined,
                 cursor: "pointer",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-subtle)",
-                fontFamily: "inherit",
-                transition: "border-color 150ms ease, background 150ms ease",
               }}
             >
-              <div
+              <span
+                aria-hidden="true"
                 style={{
-                  width: 7,
-                  height: 7,
+                  width: 10,
+                  height: 10,
                   borderRadius: "50%",
-                  background: "var(--dg-color-border)",
+                  background: color,
                   flexShrink: 0,
                 }}
               />
-              {name}
-            </Button>
-          );
-        })}
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                  color: "var(--dg-color-text-primary)",
+                }}
+              >
+                {name}
+              </span>
+              <Switch
+                checked={activeIds.includes(id)}
+                onChange={(next) => onNoteToggle?.(id, next, focusAreaId, shift)}
+                ariaLabel={`${name} schedule note`}
+              />
+            </label>
+          ))}
+        </div>
       </div>
     );
+  }
+
+  function renderInlineIndicators(focusAreaId: number, shift: ScheduleNoteShift | null) {
+    if (!canEditScheduleIndicators) return renderReadOnlyIndicators(focusAreaId, shift, true);
+    if (indicatorTypes.length === 0) return null;
+    return <div style={{ marginTop: 8 }}>{renderNoteToggles(focusAreaId, shift)}</div>;
   }
 
   /** Where the last worked shift ends: its custom end, else its default end. */
@@ -3695,110 +3559,7 @@ export default function ShiftEditPanel({
   function renderNotesSection() {
     if (!canEditScheduleIndicators) return renderReadOnlyIndicators(activeTab, singleNoteShift);
     if (indicatorTypes.length === 0) return null;
-    return (
-      <div>
-        <div style={sectionLabel}>Schedule notes</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {indicatorTypes.map(({ id, name, color }) => {
-            const isActive = getActiveIndicatorIds
-              ? getActiveIndicatorIds(activeTab, singleNoteShift).includes(id)
-              : false;
-            const identity = (
-              <>
-                <div
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: color,
-                    flexShrink: 0,
-                    border: "1px solid rgba(0,0,0,0.08)",
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 700,
-                      color: isActive ? color : "var(--dg-color-text-secondary)",
-                    }}
-                  >
-                    {name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-badge)",
-                      color: "var(--dg-color-text-subtle)",
-                      marginTop: 1,
-                    }}
-                  >
-                    Appears as a colored dot
-                  </div>
-                </div>
-              </>
-            );
-
-            if (isActive) {
-              return (
-                <div
-                  key={id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 8px 8px 12px",
-                    border: `1.5px solid ${color}`,
-                    borderRadius: "var(--dg-radius-md)",
-                    background: `${color}18`,
-                    width: "100%",
-                  }}
-                >
-                  {identity}
-                  <Button
-                    aria-label={`Remove ${name} schedule note`}
-                    onClick={() => onNoteToggle?.(id, false, activeTab, singleNoteShift)}
-                    className="dg-btn dg-btn-secondary"
-                    style={{
-                      height: 32,
-                      minHeight: 32,
-                      padding: "0 10px",
-                      fontSize: "var(--dg-fs-footnote)",
-                      color,
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              );
-            }
-
-            return (
-              <Button
-                key={id}
-                aria-label={`Add ${name} schedule note`}
-                onClick={() => onNoteToggle?.(id, true, activeTab, singleNoteShift)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 12px",
-                  border: "1.5px solid var(--dg-color-border)",
-                  borderRadius: "var(--dg-radius-md)",
-                  background: "var(--dg-color-surface)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "border-color 150ms ease, background 150ms ease",
-                  width: "100%",
-                  fontFamily: "inherit",
-                }}
-              >
-                {identity}
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-    );
+    return renderNoteToggles(activeTab, singleNoteShift);
   }
 
   // Detail mode: show when we have an active shift and aren't in picker mode
@@ -4716,7 +4477,6 @@ export default function ShiftEditPanel({
                     date={formatDateKey(modal.date)}
                     workingShift={pickerWorkingShift}
                     blockClashes={enforceConflicts}
-                    shiftDisplayMode={shiftDisplayMode}
                     absenceScope={pickingRestOfDayAbsence ? "restOfDay" : "allDay"}
                     onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
@@ -4877,7 +4637,7 @@ export default function ShiftEditPanel({
               background: "var(--dg-color-surface)",
             }}
           >
-            {(shiftSummary || restOfDaySummary || timeSummary || noteSummary) && (
+            {(showsUnsavedChange || noteSummary) && (
               <div
                 style={{
                   fontSize: "var(--dg-fs-badge)",
@@ -4885,14 +4645,8 @@ export default function ShiftEditPanel({
                   lineHeight: 1.4,
                 }}
               >
-                {showsUnsavedChange ? (
+                {showsUnsavedChange && (
                   <ShiftChangeCard change={unsavedChange} layout="stacked" className="mb-1.5" />
-                ) : (
-                  <>
-                    {shiftSummary && <div>{shiftSummary}</div>}
-                    {restOfDaySummary && <div>{restOfDaySummary}</div>}
-                    {timeSummary && <div>{timeSummary}</div>}
-                  </>
                 )}
                 {noteSummary && <div>{noteSummary}</div>}
               </div>

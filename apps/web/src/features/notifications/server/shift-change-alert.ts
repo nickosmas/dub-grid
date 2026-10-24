@@ -36,14 +36,15 @@ function listDays(labels: string[]): string {
 }
 
 /**
- * One labeled email line per side of a day: "Wed, Oct 22 Before" with the
+ * One labeled email line per side of a day: "Wed, Oct 22 Before" (or "New"
+ * for a day that had nothing) with the
  * shift, or with every item of a multi-item day joined, its total kept in the
  * label.
  */
 function emailDetails(day: ChangedDay): NotificationEmailDetail[] {
   const details: NotificationEmailDetail[] = [];
   for (const line of formatShiftChangePlain(day.change)) {
-    const heading = /^(Before|After)(?: \(([^)]*)\))?:\s*(.*)$/.exec(line);
+    const heading = /^(Before|After|New)(?: \(([^)]*)\))?:\s*(.*)$/.exec(line);
     if (heading) {
       const [, side, total, rest] = heading;
       details.push({

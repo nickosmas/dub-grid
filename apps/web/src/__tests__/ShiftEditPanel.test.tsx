@@ -729,7 +729,7 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Schedule indicators", () => {
-    it("gives active and inactive single-shift indicators explicit actions", async () => {
+    it("turns single-shift notes on and off with a switch per note", async () => {
       const user = userEvent.setup();
       const onNoteToggle = vi.fn();
       renderPanel({
@@ -741,10 +741,16 @@ describe("ShiftEditPanel", () => {
         onNoteToggle,
       });
 
-      await user.click(screen.getByRole("button", { name: "Remove Float schedule note" }));
+      const float = screen.getByRole("switch", { name: "Float schedule note" });
+      const training = screen.getByRole("switch", { name: "Training schedule note" });
+      expect(float).toHaveAttribute("aria-checked", "true");
+      expect(training).toHaveAttribute("aria-checked", "false");
+      expect(screen.queryByText(/Appears as/)).not.toBeInTheDocument();
+
+      await user.click(float);
       expect(onNoteToggle).toHaveBeenLastCalledWith(80, false, 1, null);
 
-      await user.click(screen.getByRole("button", { name: "Add Training schedule note" }));
+      await user.click(screen.getByText("Training"));
       expect(onNoteToggle).toHaveBeenLastCalledWith(81, true, 1, null);
     });
 
@@ -764,7 +770,10 @@ describe("ShiftEditPanel", () => {
         onNoteToggle,
       });
 
-      await user.click(screen.getByRole("button", { name: "Remove Training schedule note" }));
+      const cards = Array.from(
+        document.body.querySelectorAll<HTMLElement>("[data-shift-edit-card-body]"),
+      );
+      await user.click(within(cards[1]).getByRole("switch", { name: "Training schedule note" }));
       expect(onNoteToggle).toHaveBeenLastCalledWith(81, false, 2, { shiftId: 12, jobId: 102 });
     });
 
@@ -807,14 +816,14 @@ describe("ShiftEditPanel", () => {
 
       const cards = () =>
         Array.from(document.body.querySelectorAll<HTMLElement>("[data-shift-edit-card-body]"));
-      await user.click(within(cards()[1]).getByRole("button", { name: "Add Float schedule note" }));
+      await user.click(within(cards()[1]).getByRole("switch", { name: "Float schedule note" }));
 
       expect(
-        within(cards()[1]).getByRole("button", { name: "Remove Float schedule note" }),
-      ).toBeInTheDocument();
+        within(cards()[1]).getByRole("switch", { name: "Float schedule note" }),
+      ).toHaveAttribute("aria-checked", "true");
       expect(
-        within(cards()[0]).getByRole("button", { name: "Add Float schedule note" }),
-      ).toBeInTheDocument();
+        within(cards()[0]).getByRole("switch", { name: "Float schedule note" }),
+      ).toHaveAttribute("aria-checked", "false");
     });
   });
 
@@ -1951,7 +1960,49 @@ describe("ShiftEditPanel", () => {
       ).toHaveTextContent(/^Remove$/);
     });
 
-    it("names the added absence in the summary and undoes it", async () => {
+    it("shows Before and After only when a shift that was there is changed", () => {
+      const base = {
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        currentSegments: [daySegment],
+        assignmentsOverride: [timedDay, timedEvening, generalShift],
+        allowShiftEdits: true,
+      };
+      const { rerender } = render(panelElement(base, vi.fn(), vi.fn()));
+      rerender(
+        panelElement(
+          {
+            ...base,
+            currentShift: "E",
+            currentAssignmentIds: [2],
+            currentSegments: [eveningSegment],
+          },
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+      expect(screen.getByText("Before")).toBeInTheDocument();
+      expect(screen.getByText("After")).toBeInTheDocument();
+    });
+
+    it("shows no Before and After for a shift on an empty day", () => {
+      const base = {
+        assignmentsOverride: [timedDay, timedEvening, generalShift],
+        allowShiftEdits: true,
+      };
+      const { rerender } = render(panelElement(base, vi.fn(), vi.fn()));
+      rerender(
+        panelElement(
+          { ...base, currentShift: "D", currentAssignmentIds: [1], currentSegments: [daySegment] },
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+      expect(screen.queryByText("Before")).not.toBeInTheDocument();
+    });
+
+    it("shows no Before and After for an added absence, and Cancel undoes it", async () => {
       const user = userEvent.setup();
       const onSelect = vi.fn();
       const onClose = vi.fn();
@@ -1966,10 +2017,8 @@ describe("ShiftEditPanel", () => {
       const { rerender } = render(panelElement(base, onSelect, onClose));
       rerender(panelElement({ ...base, currentRestOfDayAbsenceTypeId: 8 }, onSelect, onClose));
 
-      expect(screen.getByText("Before")).toBeInTheDocument();
-      expect(screen.getByText("After")).toBeInTheDocument();
-      expect(screen.getByText("Sick (rest of day)")).toBeInTheDocument();
-      expect(screen.getByText("Added")).toBeInTheDocument();
+      expect(screen.queryByText("Before")).not.toBeInTheDocument();
+      expect(screen.queryByText("After")).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(

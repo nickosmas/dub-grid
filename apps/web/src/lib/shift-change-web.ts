@@ -3,6 +3,7 @@ import {
   cellStateToChangeDay,
   describeShiftChange,
   formatShiftChangeHours,
+  isNewShiftChange,
   selectOriginalCellChange,
   UNKNOWN_JOB_NAME,
   UNKNOWN_SHIFT_NAME,
@@ -247,16 +248,14 @@ const LABEL_TEXT = { shift1: "Shift 1", shift2: "Shift 2", absence: "Absence" } 
  */
 export function formatShiftChangeWasText(change: ShiftChange): string | null {
   if (change.kind === "none") return null;
+  if (isNewShiftChange(change)) {
+    return `Added: ${change.after.items.map((item) => item.plain).join(" + ")}`;
+  }
   const before = change.before.items;
   if (change.kind === "single") {
-    if (before.length === 0) {
-      const added = change.after.items[0];
-      return added ? `Added: ${added.plain}` : null;
-    }
     const [item] = before;
     return change.after.items.length === 0 ? `Removed: ${item.plain}` : `Was ${item.plain}`;
   }
-  if (before.length === 0) return "Was no shift";
   const total =
     change.before.totalMinutes != null
       ? ` (${formatShiftChangeHours(change.before.totalMinutes)})`

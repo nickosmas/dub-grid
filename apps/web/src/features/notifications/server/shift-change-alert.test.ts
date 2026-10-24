@@ -74,6 +74,28 @@ describe("buildShiftChangeAlert", () => {
     });
   });
 
+  it("tells a shift on a day that had nothing as New, without Before and After", () => {
+    const added = {
+      date: "2026-10-23",
+      change: describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-23" }),
+    };
+    const alert = buildShiftChangeAlert({
+      days: [added],
+      showDetails: true,
+      publishHistoryId: "h-1",
+    });
+
+    expect(alert?.message).toBe(
+      "Fri, Oct 23: New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+    );
+    expect(alert?.email.details).toEqual([
+      {
+        label: "Fri, Oct 23 New",
+        value: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      },
+    ]);
+  });
+
   it("lists every changed day in date order, a removed shift against No shift", () => {
     const alert = buildShiftChangeAlert({
       days: [moved, removed],

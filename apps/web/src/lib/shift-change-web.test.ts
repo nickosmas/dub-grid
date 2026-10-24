@@ -299,6 +299,20 @@ describe("formatShiftChangeWasText", () => {
     );
   });
 
+  it("writes a new double shift as Added, never as Was no shift", () => {
+    const double: ScheduleCellState = {
+      ...worked(1),
+      segments: [
+        { shiftId: 1, jobId: 10, position: 0 },
+        { shiftId: 2, jobId: 10, position: 1 },
+      ],
+    };
+    const text = formatShiftChangeWasText(
+      describeCellStateChange(null, double, "2026-10-22", resolvers),
+    );
+    expect(text).toMatch(/^Added: Day Shift .* \+ Evening Shift /);
+  });
+
   it("writes the whole old day for a multi-item day", () => {
     const double: ScheduleCellState = {
       ...worked(1),

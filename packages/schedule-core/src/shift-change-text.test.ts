@@ -54,12 +54,14 @@ describe("formatShiftChangePlain", () => {
     ]);
   });
 
-  it("writes an added shift against No shift", () => {
+  it("writes a shift on a day that had nothing as New, without Before and After", () => {
     const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-23" });
     expect(formatShiftChangePlain(change)).toEqual([
-      "Before: No shift",
-      "After: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing (added)",
+      "New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
     ]);
+    expect(formatShiftChangeCompact(change)).toBe(
+      "New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+    );
   });
 
   it("writes the break in a split double", () => {

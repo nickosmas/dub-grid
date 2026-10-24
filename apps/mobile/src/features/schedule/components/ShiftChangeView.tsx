@@ -3,7 +3,11 @@ import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { z } from "zod";
 import type { shiftChangeSchema } from "@dubgrid/contracts";
-import { formatScheduleTimeValue, formatShiftChangeHours } from "@dubgrid/schedule-core";
+import {
+  formatScheduleTimeValue,
+  formatShiftChangeHours,
+  isNewShiftChange,
+} from "@dubgrid/schedule-core";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Text } from "../../../shared/components/Text";
@@ -72,10 +76,12 @@ function ItemLines({
   item,
   styles,
   highlight,
+  showStatus,
 }: {
   item: ShiftChangeItem;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
+  showStatus: boolean;
 }) {
   const changedStyle = highlight ? styles.changed : styles.unchanged;
   return (
@@ -91,7 +97,7 @@ function ItemLines({
             {LABEL_TEXT[item.label]}
           </Text>
         ) : null}
-        {item.status === "added" || item.status === "removed" ? (
+        {showStatus && (item.status === "added" || item.status === "removed") ? (
           <View style={item.status === "added" ? styles.addedTag : styles.removedTag}>
             <Text
               fit="compact"
@@ -114,10 +120,12 @@ function SideItems({
   side,
   styles,
   highlight,
+  showStatus = true,
 }: {
   side: ShiftChangeSide;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
+  showStatus?: boolean;
 }) {
   if (side.items.length === 0) {
     return (
@@ -129,7 +137,13 @@ function SideItems({
   return (
     <View style={styles.items}>
       {side.items.map((item, index) => (
-        <ItemLines key={index} item={item} styles={styles} highlight={highlight} />
+        <ItemLines
+          key={index}
+          item={item}
+          styles={styles}
+          highlight={highlight}
+          showStatus={showStatus}
+        />
       ))}
     </View>
   );
@@ -191,6 +205,7 @@ function DayBar({
 function accessibleSummary(change: ShiftChange): string {
   const side = (heading: string, value: ShiftChangeSide) =>
     `${heading}: ${value.items.length === 0 ? "No shift" : value.items.map((item) => item.plain).join("; ")}`;
+  if (isNewShiftChange(change)) return side("New", change.after);
   return [side("Before", change.before), side("After", change.after)].join(". ");
 }
 
@@ -209,6 +224,18 @@ export function ShiftChangeCard({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (change.kind === "none") return null;
+  if (isNewShiftChange(change)) {
+    return (
+      <View accessibilityLabel={accessibleSummary(change)} style={styles.card}>
+        <View style={styles.side}>
+          <Text fit="fixed" style={[styles.heading, styles.afterHeading]}>
+            {sideHeading("NEW", change.after)}
+          </Text>
+          <SideItems side={change.after} styles={styles} highlight showStatus={false} />
+        </View>
+      </View>
+    );
+  }
   return (
     <View accessibilityLabel={accessibleSummary(change)} style={styles.card}>
       {showDayBar ? <DayBar change={change} styles={styles} /> : null}
@@ -259,7 +286,8 @@ export function ShiftChangeButton({ change }: { change: ShiftChange }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [open, setOpen] = useState(false);
-  if (change.kind === "none") return null;
+  // A shift on a day that had nothing has nothing to compare; the entry shows it.
+  if (change.kind === "none" || isNewShiftChange(change)) return null;
   return (
     <>
       <PressableRow

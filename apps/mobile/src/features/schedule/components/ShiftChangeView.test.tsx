@@ -48,16 +48,33 @@ describe("ShiftChangeCard (46d)", () => {
     expect(screen.getAllByText("7:00 AM").length).toBeGreaterThan(0);
   });
 
-  it("says No shift on an empty side", () => {
-    const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-22" });
+  it("says No shift when a shift was removed", () => {
+    const change = describeShiftChange({ items: [shift()] }, { items: [] }, { date: "2026-10-22" });
     render(<ShiftChangeCard change={change} />);
 
     expect(screen.getByText("No shift")).toBeInTheDocument();
-    expect(screen.getByText("Added")).toBeInTheDocument();
+    expect(screen.getByText("Removed")).toBeInTheDocument();
+  });
+
+  it("shows a day that had nothing as New, without Before and After", () => {
+    const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-22" });
+    render(<ShiftChangeCard change={change} />);
+
+    expect(screen.getByText("NEW")).toBeInTheDocument();
+    expect(screen.queryByText("BEFORE")).not.toBeInTheDocument();
+    expect(screen.queryByText("No shift")).not.toBeInTheDocument();
+    expect(screen.queryByText("Added")).not.toBeInTheDocument();
   });
 });
 
 describe("ShiftChangeButton (46d)", () => {
+  it("offers nothing for a day that had nothing", () => {
+    const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-22" });
+    render(<ShiftChangeButton change={change} />);
+
+    expect(screen.queryByText("What changed")).not.toBeInTheDocument();
+  });
+
   it("offers What changed and opens the Before and After sheet", () => {
     const change = describeShiftChange(
       { items: [shift()] },
