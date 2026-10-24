@@ -131,12 +131,48 @@ const requestSchema = z.discriminatedUnion("action", [
       })
       .nullable(),
   }),
+  z.object({
+    action: z.literal("fetchJobPreferences"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid().optional(),
+  }),
+  z.object({
+    action: z.literal("saveJobPreference"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    // null = no preference
+    preference: z
+      .object({
+        mode: z.enum(["prefers", "only"]),
+        jobIds: z.array(z.number().int().positive()).min(1).max(50),
+      })
+      .nullable(),
+  }),
 ]);
 
-interface ShiftPreferenceRow {
+/** Where each kind of preference lives, and the table its ids must belong to. */
+const PREFERENCE_STORES = {
+  shift: {
+    table: "employee_shift_preferences",
+    idsColumn: "shift_ids",
+    idsKey: "shiftIds",
+    owner: "shift_categories",
+    audit: "shift_preference.saved",
+  },
+  job: {
+    table: "employee_job_preferences",
+    idsColumn: "job_ids",
+    idsKey: "jobIds",
+    owner: "jobs",
+    audit: "job_preference.saved",
+  },
+} as const;
+
+interface PreferenceRow {
   employee_id: string;
   mode: "prefers" | "only";
-  shift_ids: number[];
+  shift_ids?: number[];
+  job_ids?: number[];
 }
 
 function canReadRecurring(
@@ -484,15 +520,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, count: data.changes.length });
       }
 
-      case "fetchShiftPreferences": {
+      case "fetchShiftPreferences":
+      case "fetchJobPreferences": {
         const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
 
+        const store = PREFERENCE_STORES[data.action === "fetchJobPreferences" ? "job" : "shift"];
         let query = auth.serviceClient
-          .from("employee_shift_preferences")
-          .select("employee_id, mode, shift_ids")
+          .from(store.table)
+          .select(`employee_id, mode, ${store.idsColumn}`)
           .eq("org_id", data.orgId);
         if (data.employeeId) {
           query = query.eq("employee_id", data.employeeId);
@@ -503,15 +541,16 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({
-          preferences: ((rows ?? []) as ShiftPreferenceRow[]).map((row) => ({
+          preferences: ((rows ?? []) as PreferenceRow[]).map((row) => ({
             employeeId: row.employee_id,
             mode: row.mode,
-            shiftIds: row.shift_ids.map(Number),
+            [store.idsKey]: (row[store.idsColumn] ?? []).map(Number),
           })),
         });
       }
 
-      case "saveShiftPreference": {
+      case "saveShiftPreference":
+      case "saveJobPreference": {
         const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, {
           actor,
           gridmasterNeedsImpersonation: true,
@@ -534,9 +573,14 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
         }
 
-        if (!data.preference) {
+        const store = PREFERENCE_STORES[data.action === "saveJobPreference" ? "job" : "shift"];
+        const preference = data.preference && {
+          mode: data.preference.mode,
+          ids: "jobIds" in data.preference ? data.preference.jobIds : data.preference.shiftIds,
+        };
+        if (!preference) {
           const { error } = await auth.serviceClient
-            .from("employee_shift_preferences")
+            .from(store.table)
             .delete()
             .eq("org_id", data.orgId)
             .eq("employee_id", data.employeeId);
@@ -544,24 +588,24 @@ export async function POST(req: NextRequest) {
             throw error;
           }
         } else {
-          const shiftIds = [...new Set(data.preference.shiftIds)];
-          const { data: shifts, error: shiftsError } = await auth.serviceClient
-            .from("shift_categories")
+          const ids = [...new Set(preference.ids)];
+          const { data: owned, error: ownedError } = await auth.serviceClient
+            .from(store.owner)
             .select("id")
             .eq("org_id", data.orgId)
-            .in("id", shiftIds);
-          if (shiftsError) {
-            throw shiftsError;
+            .in("id", ids);
+          if (ownedError) {
+            throw ownedError;
           }
-          if ((shifts ?? []).length !== shiftIds.length) {
+          if ((owned ?? []).length !== ids.length) {
             return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
           }
-          const { error } = await auth.serviceClient.from("employee_shift_preferences").upsert(
+          const { error } = await auth.serviceClient.from(store.table).upsert(
             {
               employee_id: data.employeeId,
               org_id: data.orgId,
-              mode: data.preference.mode,
-              shift_ids: shiftIds,
+              mode: preference.mode,
+              [store.idsColumn]: ids,
               updated_by: auth.actor.id,
               updated_at: new Date().toISOString(),
             },
@@ -576,11 +620,14 @@ export async function POST(req: NextRequest) {
           orgId: data.orgId,
           actorId: auth.actor.id,
           actorEmail: auth.actor.email ?? null,
-          action: "shift_preference.saved",
+          action: store.audit,
           resourceType: "employee",
           resourceId: data.employeeId,
-          details: data.preference
-            ? { mode: data.preference.mode, shifts: data.preference.shiftIds.length }
+          details: preference
+            ? {
+                mode: preference.mode,
+                [store === PREFERENCE_STORES.job ? "jobs" : "shifts"]: preference.ids.length,
+              }
             : { cleared: true },
         });
 

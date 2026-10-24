@@ -22,7 +22,6 @@ import {
   limitRecurringRuns,
   planDaysOff,
   publishedDayFromShifts,
-  usualDaysInAWeek,
   weekDaysWithPlanned,
   weekHoursWithPlanned,
   workLimitWith,
@@ -697,70 +696,18 @@ describe("days off in pairs", () => {
   });
 });
 
-describe("usualDaysInAWeek", () => {
-  const PERIOD = { start: "2026-11-01", end: "2026-11-14" };
-  const recurring = (
-    dayOfWeek: number,
-    kind: "worked" | "absence",
-    effectiveFrom = "2026-01-01",
-    effectiveUntil: string | null = null,
-  ) =>
-    ({
-      id: `${dayOfWeek}-${effectiveFrom}`,
-      empId: "ana",
-      orgId: "org",
-      dayOfWeek,
-      input: {
-        kind,
-        segments: [],
-        absenceTypeId: kind === "absence" ? 4 : null,
-        customStartTime: null,
-        customEndTime: null,
-        seriesId: null,
-        fromRecurring: false,
-      } satisfies ScheduleCellInput,
-      absenceTypeId: null,
-      shiftLabel: "",
-      effectiveFrom,
-      effectiveUntil,
-      createdAt: "",
-      updatedAt: "",
-    }) as RecurringShift;
-
-  it("is five without a recurring schedule", () => {
-    expect(usualDaysInAWeek([], "ana", PERIOD)).toBe(5);
-  });
-
-  it("is the weekdays a recurring schedule works, so more days off are kept", () => {
-    const three = [1, 3, 5].map((day) => recurring(day, "worked"));
-    expect(usualDaysInAWeek([...three, recurring(2, "absence")], "ana", PERIOD)).toBe(3);
-  });
-
-  it("never goes above five", () => {
-    const six = [0, 1, 2, 3, 4, 5].map((day) => recurring(day, "worked"));
-    expect(usualDaysInAWeek(six, "ana", PERIOD)).toBe(5);
-  });
-
-  it("reads each weekday from its latest schedule in the period, ignoring ended ones", () => {
-    const shifts = [
-      recurring(1, "worked"),
-      recurring(1, "absence", "2026-10-01"),
-      recurring(2, "worked", "2026-01-01", "2026-06-30"),
-      recurring(3, "worked"),
-    ];
-    expect(usualDaysInAWeek(shifts, "ana", PERIOD)).toBe(1);
-  });
-});
-
 describe("weekDaysWithPlanned", () => {
   it("counts the week's worked days, planned days included and planned removals not", () => {
-    const weekDays = weekDaysWithPlanned({
-      shifts: {
-        "ana_2026-10-25": worked([DAY]),
-        "ana_2026-10-26": worked([DAY]),
-        "ana_2026-11-01": worked([DAY]),
+    const weekDays = weekDaysWithPlanned(
+      {
+        shifts: {
+          "ana_2026-10-25": worked([DAY]),
+          "ana_2026-10-26": worked([DAY]),
+          "ana_2026-11-01": worked([DAY]),
+        },
       },
-    });
+      4,
+    );
     const planned: CoverageDayOverride[] = [
       {
         employeeId: "ana",
@@ -786,11 +733,25 @@ describe("weekDaysWithPlanned", () => {
       },
     ];
 
-    expect(weekDaysWithPlanned({ shifts: {} })("ana", "2026-10-27", [])).toBe(0);
+    expect(weekDaysWithPlanned({ shifts: {} }, 4)("ana", "2026-10-27", [])).toBe(0);
     expect(
-      weekDaysWithPlanned({ shifts: { "ana_2026-10-25": worked([DAY]) } })("ana", "2026-10-31", []),
+      weekDaysWithPlanned({ shifts: { "ana_2026-10-25": worked([DAY]) } }, 4)(
+        "ana",
+        "2026-10-31",
+        [],
+      ),
     ).toBe(1);
     expect(weekDays("ana", "2026-10-27", planned)).toBe(2);
+  });
+
+  it("counts another absence as a day of the week, but not the day off absence", () => {
+    const shifts = {
+      "ana_2026-10-26": worked([DAY]),
+      "ana_2026-10-27": absent(7),
+      "ana_2026-10-28": absent(4),
+    };
+    expect(weekDaysWithPlanned({ shifts }, 4)("ana", "2026-10-27", [])).toBe(2);
+    expect(weekDaysWithPlanned({ shifts }, null)("ana", "2026-10-27", [])).toBe(3);
   });
 });
 
@@ -843,7 +804,6 @@ describe("planDaysOff", () => {
       employeeIds: ["ana"],
       dateKeys: WEEK,
       absenceTypeId: OFF,
-      usualDays: () => 5,
       todayKey: WEEK[0],
       ...options,
     });
@@ -860,7 +820,7 @@ describe("planDaysOff", () => {
     expect(blanks).toEqual([]);
   });
 
-  it("leaves one day blank for each day short of their usual days, after the days off", () => {
+  it("leaves one day blank for each day short of five, after the days off", () => {
     // Mon to Thu worked: 3 empty days, 1 short of 5.
     const { writes, blanks } = plan({ shifts: workingOn("ana", WEEK.slice(1, 5)) });
     expect(keys(writes)).toEqual(["ana 2026-10-30", "ana 2026-10-31"]);
@@ -889,13 +849,23 @@ describe("planDaysOff", () => {
     expect(keys(blanks)).toEqual(["ana 2026-10-31"]);
   });
 
-  it("uses the person's usual days", () => {
+  it("gives two days off at most, leaving the rest blank, however few days are worked", () => {
+    // Tue and Fri worked, as a two-day recurring schedule gives when nothing else fits.
+    const { writes, blanks } = plan({ shifts: workingOn("ana", [WEEK[2], WEEK[5]]) });
+    expect(writes).toHaveLength(2);
+    expect(blanks).toHaveLength(3);
+  });
+
+  it("adds no day off to a week whose recurring schedule already gives two", () => {
     const { writes, blanks } = plan({
-      shifts: workingOn("ana", WEEK.slice(1, 5)),
-      usualDays: () => 4,
+      shifts: {
+        ...workingOn("ana", [WEEK[2], WEEK[5]]),
+        "ana_2026-10-25": absent(OFF),
+        "ana_2026-10-31": absent(OFF),
+      },
     });
-    expect(keys(writes)).toEqual(["ana 2026-10-25", "ana 2026-10-30", "ana 2026-10-31"]);
-    expect(blanks).toEqual([]);
+    expect(writes).toEqual([]);
+    expect(keys(blanks)).toEqual(["ana 2026-10-26", "ana 2026-10-28", "ana 2026-10-29"]);
   });
 
   it("counts the whole week, but only marks the days given", () => {
@@ -961,6 +931,59 @@ describe("shift preferences", () => {
     );
     expect(standing("ana", "2026-10-26", EVENING, []).preference).toBe("match");
     expect(standing("ana", "2026-10-26", DAY, []).preference).toBe("other");
+    expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
+  });
+});
+
+describe("job preferences", () => {
+  // Day shift, job 11 (say, Supervisor), beside the fixtures' job 10.
+  const DAY_SUPERVISOR = 103;
+  const input = (
+    jobPreferences: Record<string, { mode: "prefers" | "only"; jobIds: number[] }>,
+    preferences: Record<string, { mode: "prefers" | "only"; shiftIds: number[] }> = {},
+  ) => ({
+    shifts: {},
+    assignments: [...assignments, { ...assignment(DAY_SUPERVISOR, 1), jobId: 11 }],
+    shiftCategories,
+    loadedDateKeys: LOADED,
+    preferences: new Map(Object.entries(preferences)),
+    jobPreferences: new Map(Object.entries(jobPreferences)),
+  });
+
+  it("rules out any other job for someone who works only their chosen jobs", () => {
+    const only = input({ ana: { mode: "only", jobIds: [11] } });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", DAY)).toEqual({ kind: "onlyJobs" });
+    expect(availabilityFromShifts(only, "ana", "2026-10-26", DAY_SUPERVISOR).kind).toBe("free");
+    expect(availabilityFromShifts(only, "ben", "2026-10-26", DAY).kind).toBe("free");
+    const prefers = input({ ana: { mode: "prefers", jobIds: [11] } });
+    expect(availabilityFromShifts(prefers, "ana", "2026-10-26", DAY).kind).toBe("free");
+  });
+
+  it("applies with a shift preference: only shifts and only jobs both rule out", () => {
+    const both = input(
+      { ana: { mode: "only", jobIds: [11] } },
+      { ana: { mode: "only", shiftIds: [2] } },
+    );
+    expect(availabilityFromShifts(both, "ana", "2026-10-26", DAY_SUPERVISOR)).toEqual({
+      kind: "onlyShifts",
+    });
+    expect(availabilityFromShifts(both, "ana", "2026-10-26", EVENING)).toEqual({
+      kind: "onlyJobs",
+    });
+  });
+
+  it("prefers someone only for a shift that matches every preference they set", () => {
+    const standing = fairnessStandingWithPlanned(
+      input(
+        { ana: { mode: "prefers", jobIds: [11] }, ben: { mode: "prefers", jobIds: [11] } },
+        { ben: { mode: "prefers", shiftIds: [2] } },
+      ),
+      ["2026-10-26"],
+    );
+    expect(standing("ana", "2026-10-26", DAY_SUPERVISOR, []).preference).toBe("match");
+    expect(standing("ana", "2026-10-26", DAY, []).preference).toBe("other");
+    // Ben prefers Supervisor and Evening: a Day Supervisor shift matches one, not both.
+    expect(standing("ben", "2026-10-26", DAY_SUPERVISOR, []).preference).toBe("other");
     expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
   });
 });

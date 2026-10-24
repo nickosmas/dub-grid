@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:047755d91b55b25db11d1534c0cb1b5963b88105627dd296c70b9091102c8e22",
+  "sourceDigest": "sha256:36463be61bb59efdba9826221af5ba433616974fa52d25a7901a78e514538bf7",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4686,6 +4686,16 @@
       "source": {
         "path": "supabase/migrations/090_reschedule_shift_series.sql"
       }
+    },
+    {
+      "id": "migration:091_job_preferences.sql",
+      "version": "091",
+      "name": "job_preferences",
+      "file": "091_job_preferences.sql",
+      "sha256": "5c6ed982412aff2315885468d8e4533989c1daf7b55fab4355ad450d13db6590",
+      "source": {
+        "path": "supabase/migrations/091_job_preferences.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -4783,6 +4793,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.employee_job_preferences",
+      "schema": "public",
+      "table": "employee_job_preferences",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/091_job_preferences.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/091_job_preferences.sql"
       }
     },
     {

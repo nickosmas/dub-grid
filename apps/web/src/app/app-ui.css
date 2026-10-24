@@ -1763,6 +1763,12 @@ button.dg-cc-sg-main {
 .dg-modal.dg-modal--with-footer {
   padding-bottom: 16px;
 }
+/* For a short list of choices: no divider under the last one, and the
+   buttons sit as far below it as the list sits below the title. */
+.dg-modal--quiet-footer .dg-modal-footer {
+  padding-top: 24px;
+  border-top: none;
+}
 .dg-scroll-overflow-cue {
   position: absolute;
   left: 50%;
@@ -1810,6 +1816,25 @@ button.dg-cc-sg-main {
   font-size: var(--dg-fs-title);
   font-weight: 700;
   color: var(--dg-color-text-primary);
+}
+.dg-modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dg-modal-titles {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.dg-modal-subtitle {
+  overflow: hidden;
+  color: var(--dg-color-text-muted);
+  font-size: var(--dg-fs-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dg-modal--auth-help {
   max-width: 360px;
@@ -2270,6 +2295,8 @@ button.dg-cc-sg-main {
   background: var(--dg-color-surface);
   color: var(--dg-color-text-primary);
   text-align: left;
+  /* A row of text, not a button label: its detail wraps on a narrow screen. */
+  white-space: normal;
   cursor: pointer;
 }
 .dg-choice--compact {
@@ -2318,6 +2345,17 @@ button.dg-cc-sg-main {
 .dg-choice-title {
   font-size: var(--dg-fs-body-sm);
   font-weight: 600;
+}
+/* The name and its detail on one line, the detail to the right; it wraps under on a narrow screen. */
+.dg-choice-copy--inline {
+  flex-flow: row wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 12px;
+}
+.dg-choice-chevron {
+  flex: 0 0 auto;
+  color: var(--dg-color-text-muted);
 }
 .dg-choice-detail {
   color: var(--dg-color-text-muted);

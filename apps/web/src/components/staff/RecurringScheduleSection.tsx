@@ -21,7 +21,7 @@ import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
-import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import { buildShiftDisplayParts, isEmployeeQualifiedForJob } from "@/lib/assignable-shifts";
 import {
   borderColor,
   DESIGNATION_COLORS,
@@ -32,7 +32,9 @@ import { absenceStripeFill } from "@/lib/absence-stripes";
 import {
   deleteRecurringDraft,
   fetchRecurringShifts,
+  fetchJobPreferences,
   fetchShiftPreferences,
+  saveJobPreference,
   saveShiftPreference,
   getRecurringDraft,
   saveRecurringDraft,
@@ -42,8 +44,12 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
-import type { CoverageShiftPreference } from "@dubgrid/schedule-core";
-import { describeShiftPreference, ShiftPreferenceModal, shiftLabel } from "./ShiftPreferenceModal";
+import {
+  describePreferences,
+  PreferencesModal,
+  shiftLabel,
+  type PreferencesSave,
+} from "./PreferencesModal";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 import type {
@@ -579,6 +585,20 @@ export function RecurringScheduleSection({
       ),
     [preferencesQuery.data],
   );
+  const jobPreferencesQuery = useQuery({
+    queryKey: queryKeys.recurringShifts.jobPreferences(orgId),
+    queryFn: () => fetchJobPreferences(orgId),
+  });
+  const jobPreferenceByEmployee = useMemo(
+    () =>
+      new Map(
+        (jobPreferencesQuery.data ?? []).map(({ employeeId, mode, jobIds }) => [
+          employeeId,
+          { mode, jobIds },
+        ]),
+      ),
+    [jobPreferencesQuery.data],
+  );
   const [editingPreferenceFor, setEditingPreferenceFor] = useState<Employee | null>(null);
   const focusAreaName = useCallback(
     (focusAreaId: number) => focusAreas.find((area) => area.id === focusAreaId)?.name,
@@ -597,19 +617,48 @@ export function RecurringScheduleSection({
       ),
     [shiftCategories],
   );
-  const savePreference = useCallback(
-    async (employeeId: string, preference: CoverageShiftPreference | null) => {
+  // The jobs a person can be given: qualified, and placed in one of their focus areas or any.
+  const jobsFor = useCallback(
+    (employee: Employee) =>
+      jobs.filter((job) => {
+        if (job.archivedAt) return false;
+        const areas = job.focusAreaIds?.length
+          ? job.focusAreaIds
+          : job.focusAreaId != null
+            ? [job.focusAreaId]
+            : [];
+        return (
+          (areas.length === 0 || areas.some((area) => employee.focusAreaIds.includes(area))) &&
+          isEmployeeQualifiedForJob(employee, job, [], orgRoles)
+        );
+      }),
+    [jobs, orgRoles],
+  );
+  const savePreferences = useCallback(
+    async (employeeId: string, preferences: PreferencesSave) => {
+      if (preferences.shift === undefined && preferences.job === undefined) return;
       try {
-        await saveShiftPreference(orgId, employeeId, preference);
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.recurringShifts.preferences(orgId),
-        });
-        toast.success("Shift preference saved");
+        await Promise.all([
+          preferences.shift !== undefined &&
+            saveShiftPreference(orgId, employeeId, preferences.shift),
+          preferences.job !== undefined && saveJobPreference(orgId, employeeId, preferences.job),
+        ]);
+        toast.success("Preferences saved");
       } catch (error) {
         toast.error(
           formatClientErrorMessage(error, "We couldn't save that preference. Try again."),
         );
         throw error;
+      } finally {
+        // Either may have saved before the other failed.
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.recurringShifts.preferences(orgId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.recurringShifts.jobPreferences(orgId),
+          }),
+        ]);
       }
     },
     [orgId, queryClient],
@@ -968,12 +1017,14 @@ export function RecurringScheduleSection({
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
       <ProgressBar loading={loading} />
       {editingPreferenceFor && (
-        <ShiftPreferenceModal
+        <PreferencesModal
           personName={getEmployeeDisplayName(editingPreferenceFor)}
           shifts={shiftsFor(editingPreferenceFor)}
+          jobs={jobsFor(editingPreferenceFor)}
           focusAreaName={focusAreaName}
-          preference={preferenceByEmployee.get(editingPreferenceFor.id)}
-          onSave={(preference) => savePreference(editingPreferenceFor.id, preference)}
+          shiftPreference={preferenceByEmployee.get(editingPreferenceFor.id)}
+          jobPreference={jobPreferenceByEmployee.get(editingPreferenceFor.id)}
+          onSave={(preferences) => savePreferences(editingPreferenceFor.id, preferences)}
           onClose={() => setEditingPreferenceFor(null)}
         />
       )}
@@ -1239,7 +1290,7 @@ export function RecurringScheduleSection({
                 borderLeft: "1px solid var(--dg-color-border-light)",
               }}
             >
-              Shift preference
+              Preferences
             </div>
           </div>
 
@@ -1379,20 +1430,28 @@ export function RecurringScheduleSection({
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    padding: "4px 8px",
+                    // With the button's own 8px, the text lines up with the header's 12px.
+                    padding: "4px",
                     borderLeft: "1px solid var(--dg-color-border-light)",
                     minWidth: 0,
                   }}
                 >
                   {(() => {
-                    const preference = preferenceByEmployee.get(employee.id);
+                    const preference =
+                      preferenceByEmployee.get(employee.id) ??
+                      jobPreferenceByEmployee.get(employee.id);
                     const text =
-                      describeShiftPreference(preference, (id) => {
-                        const shift = shiftCategoryById.get(id);
-                        return shift
-                          ? shiftLabel(shift, shiftCategories, focusAreaName)
-                          : undefined;
-                      }) ?? "Any shift";
+                      describePreferences(
+                        preferenceByEmployee.get(employee.id),
+                        jobPreferenceByEmployee.get(employee.id),
+                        (id) => {
+                          const shift = shiftCategoryById.get(id);
+                          return shift
+                            ? shiftLabel(shift, shiftCategories, focusAreaName)
+                            : undefined;
+                        },
+                        (id) => jobById.get(id)?.name,
+                      ) ?? "No preference";
                     const style = {
                       width: "100%",
                       textAlign: "left" as const,
@@ -1407,7 +1466,9 @@ export function RecurringScheduleSection({
                       <button
                         type="button"
                         className="dg-btn dg-btn-ghost"
-                        aria-label={`Shift preference for ${getEmployeeDisplayName(employee)}: ${text}`}
+                        aria-label={`Preferences for ${getEmployeeDisplayName(employee)}: ${text}`}
+                        // The pop-up starts from both preferences, so wait for them.
+                        disabled={preferencesQuery.isPending || jobPreferencesQuery.isPending}
                         onClick={() => setEditingPreferenceFor(employee)}
                         style={{
                           ...style,

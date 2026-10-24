@@ -923,7 +923,7 @@ describe("CoveragePanel", () => {
           saved: null,
           total: 0,
         });
-        expect(status()).toHaveTextContent("Checking the plan against the latest schedule50%");
+        expect(status()).toHaveTextContent("Checking for changes made since generating50%");
         expect(section().queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
         cleanup();
 
@@ -1039,7 +1039,7 @@ describe("CoveragePanel", () => {
         expect(rows.map((row) => row.textContent)).toContain("cat 1 day off");
       });
 
-      it("names the days left blank for someone short of their usual days", () => {
+      it("names the days left blank for someone short of 5 days a week", () => {
         built({
           daysOff: [{ employeeId: "cat", dateKey: "2026-10-26" }],
           blankDays: [{ employeeId: "cat", dateKey: "2026-10-27" }],
