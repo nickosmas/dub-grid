@@ -26,7 +26,6 @@ import type {
   NamedItem,
   ShiftCategory,
   ScheduleCellInput,
-  RecurringShift,
   ShiftMap,
   ShiftRequest,
 } from "@/types";
@@ -509,46 +508,37 @@ export function weekHoursWithPlanned(input: DraftHoursInput): CoverageOvertimeRu
   };
 }
 
-/** Days a person works in the Sunday-to-Saturday week holding a date, with the planned days written. */
+/**
+ * Days a person works or is away in the Sunday-to-Saturday week holding a
+ * date, with the planned days written. Another absence, such as vacation,
+ * stands in for a workday; the day off absence does not.
+ */
 export function weekDaysWithPlanned(
   input: Pick<CoverageSuggestionAdapterInput, "shifts">,
+  dayOffAbsenceTypeId: number | null,
 ): CoverageTopUpRule["weekDays"] {
   return (employeeId, dateKey, planned) => {
     const worked = workedWith(input.shifts, planned, employeeId);
+    const plannedDays = new Map(
+      planned
+        .filter((day) => day.side === "draft" && day.employeeId === employeeId)
+        .map((day) => [day.dateKey, day.day]),
+    );
+    const away = (day: string) => {
+      const entry = input.shifts[`${employeeId}_${day}`];
+      const absence = plannedDays.has(day)
+        ? plannedDays.get(day)!.absenceTypeId
+        : entry && !entry.isDelete
+          ? (entry.absenceTypeId ?? null)
+          : null;
+      return absence != null && absence !== dayOffAbsenceTypeId;
+    };
     const date = parseLocalDateKey(dateKey);
     const sunday = addDays(date, -date.getDay());
     return Array.from({ length: 7 }, (_, offset) => formatDateKey(addDays(sunday, offset))).filter(
-      worked,
+      (day) => worked(day) || away(day),
     ).length;
   };
-}
-
-/**
- * The days a week a person usually works: the weekdays their recurring
- * schedule works when they have one in the period (so a schedule with more
- * days off keeps them), otherwise five.
- */
-export function usualDaysInAWeek(
-  recurringShifts: ReadonlyArray<RecurringShift>,
-  employeeId: string,
-  period: { start: string; end: string },
-): number {
-  const current = recurringShifts.filter(
-    (shift) =>
-      shift.empId === employeeId &&
-      !shift.archivedAt &&
-      shift.effectiveFrom <= period.end &&
-      (shift.effectiveUntil == null || shift.effectiveUntil >= period.start),
-  );
-  if (current.length === 0) return MAX_DAYS_IN_A_WEEK;
-  // Each weekday by its latest schedule, as recurring fills choose.
-  const latest = new Map<number, RecurringShift>();
-  for (const shift of current) {
-    const other = latest.get(shift.dayOfWeek);
-    if (!other || shift.effectiveFrom > other.effectiveFrom) latest.set(shift.dayOfWeek, shift);
-  }
-  const worked = [...latest.values()].filter((shift) => shift.input.kind === "worked").length;
-  return Math.min(worked, MAX_DAYS_IN_A_WEEK);
 }
 
 function isWeekendDateKey(dateKey: string): boolean {
@@ -666,7 +656,7 @@ function chooseDaysOff(
 /**
  * The day off absence for the empty days of everyone who works in the period
  * once the build's days are written, leaving one day blank for each day a
- * week they are short of their usual days. Only days not yet past, never a
+ * week they are short of five, so they have two days off at most. Only days not yet past, never a
  * cell that holds anything or that the build writes; a day the build empties,
  * such as a move back's other end, counts as empty but can only stay blank.
  */
@@ -676,8 +666,6 @@ export function planDaysOff(input: {
   employeeIds: ReadonlyArray<string>;
   dateKeys: ReadonlyArray<string>;
   absenceTypeId: number;
-  /** Days the person usually works in a week. */
-  usualDays: (employeeId: string) => number;
   /** Days before this have passed, so one without work was a day off. */
   todayKey: string;
 }): {
@@ -731,7 +719,7 @@ export function planDaysOff(input: {
         const absence = absenceOn(dateKey);
         return absence != null && absence !== input.absenceTypeId;
       }).length;
-      const short = Math.max(0, input.usualDays(employeeId) - accounted);
+      const short = Math.max(0, MAX_DAYS_IN_A_WEEK - accounted);
       const offCount =
         writable.length + emptied.length - Math.min(short, writable.length + emptied.length);
       // Known days off: the day off absence, or a day already past without work.

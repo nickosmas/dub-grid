@@ -225,7 +225,7 @@ const WHY_ORDER = [
   "Recurring schedule",
   "Restored",
   "Moved back",
-  "Up to their usual days",
+  "Up to 5 days a week",
   "Keeps days off together",
   "Prefers this shift",
   "Fewest weekends",
@@ -244,7 +244,7 @@ const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   nights: "Fewest nights",
   hours: "Fewest hours",
   tie: "Even",
-  weekDays: "Up to their usual days",
+  weekDays: "Up to 5 days a week",
 };
 
 /** Each person a build changed: shifts given and why, by name. */
@@ -274,7 +274,7 @@ export function buildReportPeople(
     person.why.add("Recurring schedule");
   }
   for (const dayOff of preview.daysOff) personOf(dayOff.employeeId).daysOff += 1;
-  // A blank day is one the build could not fill toward the person's usual days.
+  // A blank day is one the build could not fill toward 5 days a week.
   for (const blank of preview.blankDays) personOf(blank.employeeId).blanks += 1;
   const choiceOf = new Map(preview.choices.map((choice) => [choice.suggestionId, choice]));
   for (const fix of preview.fixes) {
@@ -622,7 +622,7 @@ export function ScheduleBuildSection({
           <PreviewSummary preview={state.preview} />
           {state.saved == null ? (
             <BuildProgress
-              label="Checking the plan against the latest schedule"
+              label="Checking for changes made since generating"
               percent={planningPercent(state.checking)}
             />
           ) : (

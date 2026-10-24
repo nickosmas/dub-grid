@@ -126,7 +126,6 @@ import {
   availabilityFromShifts,
   availabilityWithPlanned,
   daysPastUsualLimit,
-  usualDaysInAWeek,
   weekDaysWithPlanned,
   fairnessStandingWithPlanned,
   planDaysOff,
@@ -6929,8 +6928,10 @@ function SchedulerContent({
       skippedRecurring?: CoverageSkippedRecurring[];
       /** 6 days in a week and in a row are allowed, never 7. */
       allowSixthDay?: boolean;
-      /** A build: bring these people up to their usual days a week. */
-      topUp?: Pick<CoverageTopUpRule, "employeeIds" | "target">;
+      /** A build: bring these people up to 5 days a week. */
+      topUp?: Pick<CoverageTopUpRule, "employeeIds" | "target"> & {
+        dayOffAbsenceTypeId: number | null;
+      };
       /** A build: people the scheduler left out. */
       excludedEmployeeIds?: ReadonlySet<string>;
     }) => {
@@ -6964,7 +6965,11 @@ function SchedulerContent({
               history,
             ),
           },
-          topUp: topUp && { ...topUp, weekDays: weekDaysWithPlanned(adapterInput) },
+          topUp: topUp && {
+            employeeIds: topUp.employeeIds,
+            target: topUp.target,
+            weekDays: weekDaysWithPlanned(adapterInput, topUp.dayOffAbsenceTypeId),
+          },
         },
       };
     },
@@ -7133,11 +7138,7 @@ function SchedulerContent({
           },
         });
       }
-      const usualDaysOf = (employeeId: string) =>
-        usualDaysInAWeek(recurring, employeeId, {
-          start: dateKeys[0],
-          end: dateKeys[dateKeys.length - 1],
-        });
+      const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
       const planned = planOptions({
         rowKeys: new Set(rowKeys),
         baseOverrides,
@@ -7145,10 +7146,12 @@ function SchedulerContent({
         skippedRecurring: limited.skipped,
         allowSixthDay,
         excludedEmployeeIds: excluded,
-        // Then everyone short of their usual days a week gets more, even where staffed.
+        // Then everyone short of five days a week gets more, even where staffed. A
+        // recurring schedule only gives the days it repeats; the build fills the rest.
         topUp: {
           employeeIds: buildableIds,
-          target: usualDaysOf,
+          target: () => MAX_DAYS_IN_A_WEEK,
+          dayOffAbsenceTypeId: dayOff?.absenceType.id ?? null,
         },
       });
       if (!planned) return null;
@@ -7164,7 +7167,6 @@ function SchedulerContent({
         preview.sixthWeeks = past.weeks;
       }
       // Then everyone who works in the period gets the day off absence on each empty day.
-      const dayOff = resolveDayOffAbsenceType(org.coverageRuleConfig, absenceTypes);
       if (!dayOff) return { preview, fixedWrites };
       const todayKey = formatDateKey(new Date());
       const { writes: daysOff, blanks } = planDaysOff({
@@ -7173,7 +7175,6 @@ function SchedulerContent({
         employeeIds: buildableIds,
         dateKeys: dateKeys.filter((dateKey) => dateKey >= todayKey),
         absenceTypeId: dayOff.absenceType.id,
-        usualDays: usualDaysOf,
         todayKey,
       });
       const people = new Set([
@@ -7220,9 +7221,20 @@ function SchedulerContent({
     };
   }, [absenceTypes, coverageSuggestions, org?.coverageRuleConfig]);
 
+  // The plan behind the preview, which Apply reuses while nothing it read has changed.
+  const previewPlanRef = useRef<{
+    built: NonNullable<Awaited<ReturnType<typeof planBuild>>>;
+    planBuild: typeof planBuild;
+    shifts: ShiftMap;
+    todayKey: string;
+  } | null>(null);
+
   const previewBuild = useCallback(
     (rowKeys: string[]) => {
       const plannedFrom = coverageCountsKey;
+      const shifts = shiftsRef.current;
+      const todayKey = formatDateKey(new Date());
+      previewPlanRef.current = null;
       setBuildReport(null);
       setBuildPreview({ state: { status: "previewing", progress: null }, rowKeys, plannedFrom });
       planBuild(rowKeys, (progress) =>
@@ -7233,6 +7245,8 @@ function SchedulerContent({
         ),
       )
         .then((built) => {
+          previewPlanRef.current =
+            built && shiftsRef.current === shifts ? { built, planBuild, shifts, todayKey } : null;
           setBuildPreview(
             built
               ? { state: { status: "ready", preview: built.preview }, rowKeys, plannedFrom }
@@ -7260,12 +7274,24 @@ function SchedulerContent({
         saved: null,
         total: 0,
       });
-    checking(null);
     let built: Awaited<ReturnType<typeof planBuild>> = null;
-    try {
-      built = await planBuild(rowKeys, checking);
-    } catch (err) {
-      Sentry.captureException(err);
+    const planned = previewPlanRef.current;
+    if (
+      planned &&
+      planned.built.preview === shown &&
+      planned.planBuild === planBuild &&
+      planned.shifts === shiftsRef.current &&
+      planned.todayKey === formatDateKey(new Date())
+    ) {
+      built = planned.built;
+    } else {
+      // Something changed since the preview, such as another scheduler's edit: plan again.
+      checking(null);
+      try {
+        built = await planBuild(rowKeys, checking);
+      } catch (err) {
+        Sentry.captureException(err);
+      }
     }
     if (!built) {
       setBuildApplying(null);
