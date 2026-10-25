@@ -1,8 +1,6 @@
-import {
-  formatScheduleTimeValue,
-  getMinutesSinceMidnight,
-  rangesOverlap,
-} from "@dubgrid/schedule-core";
+import { formatScheduleTimeValue, getMinutesSinceMidnight } from "@dubgrid/schedule-core";
+
+import { sameDayRangesOverlap } from "@/lib/schedule-logic";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -56,7 +54,7 @@ export function secondShiftClash(
   }
   if (!candidate.startTime || !candidate.endTime || !working.start || !working.end) return null;
   // Stored times may carry seconds; the overlap check compares "HH:MM" strings.
-  const overlaps = rangesOverlap(
+  const overlaps = sameDayRangesOverlap(
     { start: candidate.startTime.slice(0, 5), end: candidate.endTime.slice(0, 5) },
     { start: working.start.slice(0, 5), end: working.end.slice(0, 5) },
   );

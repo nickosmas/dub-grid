@@ -1,4 +1,4 @@
-import { cloneScheduleCellEntry, cloneScheduleCellSnapshot } from "@/lib/schedule-cells";
+import { cloneScheduleCellEntry, scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
 import type { DraftKind, ScheduleNoteShift, ShiftJobSegment, ShiftMap } from "@/types";
 
 /** A note in the editor: its type, and the shift it belongs to. */
@@ -191,27 +191,35 @@ export function planNoteWrites(
   return { writes, results };
 }
 
+/**
+ * What a cell holds, never how it reads: the same cell loaded from the server
+ * and rebuilt in the browser carries different labels ("D · M" and "DM"),
+ * segment detail and version (a cell a drag creates has none until the next
+ * fetch), and must still compare equal. Saves send the latest version as the
+ * lock, so leaving it out here loses no protection.
+ */
 export function serializeShiftSnapshot(shift: ShiftMap[string] | null): string {
   if (!shift) return "null";
   return JSON.stringify({
-    draft: cloneScheduleCellSnapshot(shift.draft),
-    published: cloneScheduleCellSnapshot(shift.published),
-    effective: cloneScheduleCellSnapshot(shift.effective),
-    label: shift.label,
-    segments: shift.segments ?? [],
-    assignmentIds: shift.assignmentIds,
+    draft: scheduleCellSnapshotToInput(shift.draft),
+    published: scheduleCellSnapshotToInput(shift.published),
+    effective: scheduleCellSnapshotToInput(shift.effective),
+    segments: (shift.segments ?? []).map(segmentIdentity),
     isDelete: shift.isDelete ?? false,
     draftKind: shift.draftKind,
-    publishedSegments: shift.publishedSegments ?? [],
-    publishedAssignmentDefinitionIds: shift.publishedAssignmentDefinitionIds,
-    publishedLabel: shift.publishedLabel,
+    publishedSegments: (shift.publishedSegments ?? []).map(segmentIdentity),
     customStartTime: shift.customStartTime ?? null,
     customEndTime: shift.customEndTime ?? null,
     publishedCustomStartTime: shift.publishedCustomStartTime ?? null,
     publishedCustomEndTime: shift.publishedCustomEndTime ?? null,
     absenceTypeId: shift.absenceTypeId ?? null,
     publishedAbsenceTypeId: shift.publishedAbsenceTypeId ?? null,
-    version: shift.version,
+    restOfDayAbsenceTypeId: shift.restOfDayAbsenceTypeId ?? null,
+    publishedRestOfDayAbsenceTypeId: shift.publishedRestOfDayAbsenceTypeId ?? null,
+    restOfDayAbsenceStartTime: shift.restOfDayAbsenceStartTime ?? null,
+    restOfDayAbsenceEndTime: shift.restOfDayAbsenceEndTime ?? null,
+    publishedRestOfDayAbsenceStartTime: shift.publishedRestOfDayAbsenceStartTime ?? null,
+    publishedRestOfDayAbsenceEndTime: shift.publishedRestOfDayAbsenceEndTime ?? null,
     seriesId: shift.seriesId ?? null,
   });
 }

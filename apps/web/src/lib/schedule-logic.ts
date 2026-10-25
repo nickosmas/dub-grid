@@ -175,6 +175,27 @@ export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+function minutesOf(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+/**
+ * Whether two shifts that start on the same day overlap in real time: an
+ * overnight shift runs past midnight rather than wrapping onto that morning,
+ * so Early 5 AM - 1 PM and Night 11 PM - 7 AM are a valid double.
+ */
+export function sameDayRangesOverlap(a: TimeRange, b: TimeRange): boolean {
+  const span = (range: TimeRange) => {
+    const start = minutesOf(range.start);
+    const end = minutesOf(range.end);
+    return { start, end: end <= start ? end + 24 * 60 : end };
+  };
+  const first = span(a);
+  const second = span(b);
+  return first.start < second.end && second.start < first.end;
+}
+
 /** True if any range in `a` overlaps with any range in `b`. */
 export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
   return a.some((r1) => b.some((r2) => rangesOverlap(r1, r2)));
@@ -230,12 +251,29 @@ export function checkCrossDateOverlap(
   return warnings;
 }
 
+/** `checkCrossDateOverlap` for cells that may hold two shifts: every pairing, each warning once. */
+export function checkCrossDateOverlaps(
+  currentShifts: TimeRange[],
+  adjacentShifts: { prev: TimeRange[]; next: TimeRange[] },
+): string[] {
+  const warnings = new Set<string>();
+  for (const current of currentShifts) {
+    for (const prev of adjacentShifts.prev) {
+      for (const warning of checkCrossDateOverlap(current, { prev })) warnings.add(warning);
+    }
+    for (const next of adjacentShifts.next) {
+      for (const warning of checkCrossDateOverlap(current, { next })) warnings.add(warning);
+    }
+  }
+  return [...warnings];
+}
+
 /** Checks for time overlaps between multiple schedule options on the same day. */
 export function checkSameDayOverlaps(ranges: TimeRange[], labels: string[]): string[] {
   const warnings: string[] = [];
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
-      if (rangesOverlap(normalizeEnd(ranges[i]), normalizeEnd(ranges[j]))) {
+      if (sameDayRangesOverlap(ranges[i], ranges[j])) {
         warnings.push(`${labels[i]} and ${labels[j]} times overlap`);
       }
     }

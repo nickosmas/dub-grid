@@ -6,6 +6,7 @@ import {
   computeScheduleEntryDraftKind,
   dropNotesOfRemovedShifts,
   planNoteWrites,
+  serializeShiftSnapshot,
   shiftEditableIdentityMatches,
   toggleDraftNote,
   type DraftNoteState,
@@ -136,6 +137,45 @@ describe("schedule editor session helpers", () => {
     expect(
       shiftEditableIdentityMatches(makeShiftEntry(), makeShiftEntry({ restOfDayAbsenceTypeId: 7 })),
     ).toBe(false);
+  });
+
+  it("fingerprints a loaded cell and the same cell rebuilt in the browser alike", () => {
+    const loaded = makeShiftEntry({
+      label: "D · M",
+      segments: [{ shiftId: 10, jobId: 100, label: "D · M", isMentored: true }],
+      version: 3,
+    });
+    const rebuilt = makeShiftEntry({
+      label: "DM",
+      segments: [
+        {
+          shiftId: 10,
+          jobId: 100,
+          position: 0,
+          assignmentId: 1,
+          label: "DM",
+          shiftName: "Day",
+          shiftAbbr: "D",
+          focusAreaId: 1,
+          isMentored: true,
+        },
+      ],
+      version: 3,
+    });
+
+    expect(serializeShiftSnapshot(rebuilt)).toBe(serializeShiftSnapshot(loaded));
+    expect(serializeShiftSnapshot({ ...rebuilt, version: undefined })).toBe(
+      serializeShiftSnapshot(loaded),
+    );
+    expect(
+      serializeShiftSnapshot(
+        makeShiftEntry({
+          label: "D · M",
+          segments: [{ shiftId: 10, jobId: 100, label: "D · M", isMentored: false }],
+          version: 3,
+        }),
+      ),
+    ).not.toBe(serializeShiftSnapshot(loaded));
   });
 
   it("keeps time-only edits out of editable identity comparisons", () => {

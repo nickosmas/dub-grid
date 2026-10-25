@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:0a0ad20854487308023fcf130aa39830afdd37bfcef7093e6449b7cf9488e9e6",
+  "sourceDigest": "sha256:f7507f1bcf1277d2e616f1375598a4fe47a81311d8acd97eec3767c0ee1084a7",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4715,6 +4715,16 @@
       "sha256": "3bfa166a0238a16738d13d920cd6ba76e99029dfaafef86e7589e57ce1f59750",
       "source": {
         "path": "supabase/migrations/093_absence_blocks_overlapping_work.sql"
+      }
+    },
+    {
+      "id": "migration:094_series_times_and_overnight_doubles.sql",
+      "version": "094",
+      "name": "series_times_and_overnight_doubles",
+      "file": "094_series_times_and_overnight_doubles.sql",
+      "sha256": "0d7cefa2032a68c60546ce6e59b5e19d57a77367e4af4383aef14d51a2f04237",
+      "source": {
+        "path": "supabase/migrations/094_series_times_and_overnight_doubles.sql"
       }
     }
   ],

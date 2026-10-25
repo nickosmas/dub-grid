@@ -164,7 +164,7 @@ import {
   createPublishedCoverageCreditResolver,
   filterPublishedDates,
   timesOverlap,
-  checkCrossDateOverlap,
+  checkCrossDateOverlaps,
   checkSameDayOverlaps,
 } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
@@ -3440,86 +3440,37 @@ function SchedulerContent({
         : shifts[`${empId}_${formatDateKey(date)}`];
     if (!entry || (entry.assignmentIds.length === 0 && !entry.absenceTypeId)) return [];
 
-    // Resolve effective start/end: custom times → shift code defaults → category defaults
-    const resolveEffective = (
-      customStart: string | null | undefined,
-      customEnd: string | null | undefined,
-      codeIds: number[],
-    ): { start: string; end: string } | null => {
-      const s = customStart?.split("|")[0];
-      const e = customEnd?.split("|")[0];
-      if (s && e) return { start: s, end: e };
-      const code = codeIds[0] != null ? assignmentById.get(codeIds[0]) : undefined;
-      if (code?.defaultStartTime && code?.defaultEndTime) {
-        return { start: code.defaultStartTime, end: code.defaultEndTime };
-      }
-      const cat =
-        code?.categoryId != null
-          ? shiftCategories.find((c) => c.id === code.categoryId)
-          : undefined;
-      if (cat?.startTime && cat?.endTime) {
-        return { start: cat.startTime, end: cat.endTime };
-      }
-      return null;
-    };
-
-    const currentTimes = resolveEffective(
-      entry.customStartTime,
-      entry.customEndTime,
-      entry.assignmentIds,
-    );
-    if (!currentTimes) return [];
-
-    // D-1 shift
-    const prevDate = addDays(date, -1);
-    const prevEntry = shifts[`${empId}_${formatDateKey(prevDate)}`];
-    const prevTimes =
-      prevEntry && prevEntry.assignmentIds.length > 0
-        ? resolveEffective(
-            prevEntry.customStartTime,
-            prevEntry.customEndTime,
-            prevEntry.assignmentIds,
-          )
-        : null;
-
-    // D+1 shift
-    const nextDate = addDays(date, 1);
-    const nextEntry = shifts[`${empId}_${formatDateKey(nextDate)}`];
-    const nextTimes =
-      nextEntry && nextEntry.assignmentIds.length > 0
-        ? resolveEffective(
-            nextEntry.customStartTime,
-            nextEntry.customEndTime,
-            nextEntry.assignmentIds,
-          )
-        : null;
-
-    const warnings = checkCrossDateOverlap(currentTimes, {
-      prev: prevTimes,
-      next: nextTimes,
-    });
-
-    // Same-day overlap check for multi-code cells
-    if (entry.assignmentIds.length >= 2) {
-      const pillRanges: { start: string; end: string }[] = [];
-      const pillLabels: string[] = [];
-      const startParts = entry.customStartTime?.split("|") ?? [];
-      const endParts = entry.customEndTime?.split("|") ?? [];
-      for (let i = 0; i < entry.assignmentIds.length; i++) {
-        const code = assignmentById.get(entry.assignmentIds[i]);
+    // Each shift's times: its custom times, else the shift code's, else the category's.
+    const shiftTimesOf = (cell: ShiftMap[string] | undefined | null) => {
+      const ranges: { start: string; end: string }[] = [];
+      const labels: string[] = [];
+      if (!cell || cell.isDelete) return { ranges, labels };
+      const startParts = cell.customStartTime?.split("|") ?? [];
+      const endParts = cell.customEndTime?.split("|") ?? [];
+      cell.assignmentIds.forEach((assignmentId, index) => {
+        const code = assignmentById.get(assignmentId);
         const cat =
           code?.categoryId != null
             ? shiftCategories.find((c) => c.id === code.categoryId)
             : undefined;
-        const s = startParts[i] || code?.defaultStartTime || cat?.startTime;
-        const e = endParts[i] || code?.defaultEndTime || cat?.endTime;
-        if (s && e) {
-          pillRanges.push({ start: s, end: e });
-          pillLabels.push(code?.name || code?.label || "?");
+        const start = startParts[index] || code?.defaultStartTime || cat?.startTime;
+        const end = endParts[index] || code?.defaultEndTime || cat?.endTime;
+        if (start && end) {
+          ranges.push({ start, end });
+          labels.push(code?.name || code?.label || "?");
         }
-      }
-      warnings.push(...checkSameDayOverlaps(pillRanges, pillLabels));
-    }
+      });
+      return { ranges, labels };
+    };
+
+    const current = shiftTimesOf(entry);
+    if (current.ranges.length === 0) return [];
+
+    const warnings = checkCrossDateOverlaps(current.ranges, {
+      prev: shiftTimesOf(shifts[`${empId}_${formatDateKey(addDays(date, -1))}`]).ranges,
+      next: shiftTimesOf(shifts[`${empId}_${formatDateKey(addDays(date, 1))}`]).ranges,
+    });
+    warnings.push(...checkSameDayOverlaps(current.ranges, current.labels));
 
     return warnings;
   }, [editPanel, editSessionDraft, shifts, assignmentById, shiftCategories]);

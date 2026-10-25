@@ -7,6 +7,7 @@ import {
   rangesOverlap,
   timesOverlap,
   checkCrossDateOverlap,
+  checkCrossDateOverlaps,
   checkSameDayOverlaps,
   resolveRequirementByAssignment,
   computeCoverageStatus,
@@ -456,6 +457,59 @@ describe("checkSameDayOverlaps", () => {
   it("returns empty for single range", () => {
     const warnings = checkSameDayOverlaps([{ start: "07:00", end: "15:00" }], ["Day"]);
     expect(warnings).toEqual([]);
+  });
+
+  it("reads an overnight shift by its real times, past midnight", () => {
+    expect(
+      checkSameDayOverlaps(
+        [
+          { start: "05:00", end: "13:00" },
+          { start: "23:00", end: "07:00" },
+        ],
+        ["Early", "Night"],
+      ),
+    ).toEqual([]);
+    expect(
+      checkSameDayOverlaps(
+        [
+          { start: "15:00", end: "23:00" },
+          { start: "22:00", end: "06:00" },
+        ],
+        ["Evening", "Night"],
+      ),
+    ).toEqual(["Evening and Night times overlap"]);
+  });
+});
+
+describe("checkCrossDateOverlaps", () => {
+  it("checks the second shift of a double against the next day", () => {
+    expect(
+      checkCrossDateOverlaps(
+        [
+          { start: "05:00", end: "13:00" },
+          { start: "23:00", end: "07:00" },
+        ],
+        { prev: [], next: [{ start: "06:00", end: "14:00" }] },
+      ),
+    ).toEqual(["This overnight shift overlaps with the next day\u2019s shift"]);
+  });
+
+  it("checks a previous day whose second shift is overnight, warning once", () => {
+    expect(
+      checkCrossDateOverlaps(
+        [
+          { start: "05:00", end: "13:00" },
+          { start: "06:00", end: "10:00" },
+        ],
+        {
+          prev: [
+            { start: "05:00", end: "13:00" },
+            { start: "23:00", end: "07:00" },
+          ],
+          next: [],
+        },
+      ),
+    ).toEqual(["Overlaps with yesterday\u2019s overnight shift"]);
   });
 });
 
