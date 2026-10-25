@@ -25,6 +25,13 @@ consented to what:
 6. **No rate limit, and the route can be skipped.** The route has no limiter,
    and `anon` and `authenticated` can insert straight into the table through
    the data API, so any limit on the route could be bypassed.
+7. **`dg-theme` is set before consent without a choice.** `ThemeCookieSync` in
+   `apps/web/src/components/ThemeProvider.tsx` writes the 1-year cookie on
+   every visit, even for someone who never picked a theme. A live scan of
+   www.dubgrid.com on 2026-10-25 found `dg-theme=light` as the only cookie
+   set before consent, and Cookiebot's 2026-09-30 report flags prior consent
+   as missing. A preference cookie is only exempt from consent once the
+   person has made the choice it stores.
 
 ## The fix
 
@@ -46,6 +53,11 @@ Must not break:
   as anonymous. It is never refused.
 - **Rate limiting must not lock out a whole facility on its first day.**
   Staff often share one office IP address, so the limit is generous.
+- **A chosen theme still carries across subdomains**, through the cookie in
+  production and the `?theme=` link parameter, and paints without a flash.
+
+`dg-theme` is written only when someone picks a theme with the toggle. With
+no cookie, the site uses its existing default.
 
 Existing rows stay as they are: old IP hashes and anonymous mobile rows can't
 be backfilled.
@@ -109,6 +121,23 @@ be backfilled.
    or delete, any update is refused, and the route and account deletion still
    work.
 
+5. **Write `dg-theme` only on a real choice.**
+   - Remove the write in `ThemeCookieSync`'s effect. `ThemeToggleButton`
+     calls `writeThemeCookie` when it sets a theme, the only place the app
+     sets one.
+   - The pre-paint seed script (`apps/web/public/dg-theme-seed.js`) still only
+     reads the cookie.
+   - Change the `dg-theme` row in the Cookie Policy to say it is set only once
+     you choose an appearance. Bump `legal-policy-copy.test.ts` to match.
+   - Leave existing cookies alone: a defaulted one can't be told apart from a
+     real choice, and it expires on its own.
+
+   **Done when:** a Playwright test shows that a fresh browser loading the
+   landing page and `/login` has no `dg-theme` cookie and no `theme` in
+   localStorage, and that clicking the toggle sets the cookie. If anything else
+   writes `theme` to localStorage before a choice, find it and stop it in this
+   step.
+
 ## Verify
 
 - Run `npm run type-check`, `npm run lint`, `npm run test`, `npm run docs:check`
@@ -118,6 +147,9 @@ be backfilled.
   rows.
 - **Mobile:** sign in on the simulator and change the choice under
   Profile > Privacy. The new row carries your `user_id` and the mobile user agent.
+- **Theme:** in a fresh browser on production or a preview deploy, the only
+  cookie before consent is none at all. Pick dark on the landing page, then
+  open your organization's sign-in page: it paints dark.
 - **Failure:** with `/api/consent` blocked, a choice still takes effect. Unblock
   it and reload, and the row appears.
 
