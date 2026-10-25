@@ -147,8 +147,8 @@ be backfilled.
   rows.
 - **Mobile:** sign in on the simulator and change the choice under
   Profile > Privacy. The new row carries your `user_id` and the mobile user agent.
-- **Theme:** in a fresh browser on production or a preview deploy, the only
-  cookie before consent is none at all. Pick dark on the landing page, then
+- **Theme:** in a fresh browser on production or a preview deploy, no cookie is
+  set before consent. Pick dark on the landing page, then
   open your organization's sign-in page: it paints dark.
 - **Failure:** with `/api/consent` blocked, a choice still takes effect. Unblock
   it and reload, and the row appears.
