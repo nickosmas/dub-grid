@@ -340,7 +340,7 @@
             "toolbar views, navigation, pay-period alignment, focus tabs, sort, search highlights, coverage",
             "Month is read-only; phones show one day",
             "panel Confirm and Undo, remove actions, right-click and keyboard copy and paste",
-            "absence for the rest of the day: Add an absence, up to two shifts plus one absence, absence last, Worked until, no repeating",
+            "absence for the rest of the day: Add an absence, up to two shifts plus one absence, absence last, Worked until inside the shift, removing it restores the shift, no repeating",
             "drag moves, Shift-drag copies, qualification check",
             "open shift staffing and claims",
             "Tools menu items; print options and legends; print may be unavailable",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3912c229fdb8e1bbc685466b7922828c67a46d9c69701b62f28c0bedd0436c1f"
+      "evidenceFingerprint": "sha256:406511d5b0b913eaa7ea28abecabe3d84275d46f05479812e26f527a86bbb669"
     },
     {
       "id": "draft-publish",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1b023aedc5fa5abbedabc6772d2dca050aa6d806d505f887c5184300f49463fa"
+      "evidenceFingerprint": "sha256:25a6846cbaa0472a6b95eeaa0df3da026136e9ec01cc67a23b439c8b7a73874d"
     },
     {
       "id": "realtime",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6c66cb8cef385a20461fa05d1fbf0457fd9a41f1981bcb8e20a69e78106b0727"
+      "evidenceFingerprint": "sha256:195607df8059e510293d8d676fe233d54ada395a3fb170580d60511beb3ec669"
     },
     {
       "id": "dashboard",
