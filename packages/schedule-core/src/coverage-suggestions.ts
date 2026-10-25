@@ -374,12 +374,20 @@ function findMovedTo(
   return best?.dateKey ?? null;
 }
 
+/** Whether a change adds staff to a requirement already at its most. */
+function pastMaximum(effect: CoverageCellEffect): boolean {
+  const { maximum, actual } = effect.draftAfter;
+  return (
+    maximum != null && actual > maximum + EPSILON && actual > effect.draftBefore.actual + EPSILON
+  );
+}
+
 function keeps(measurement: CoverageMeasurement): boolean {
   return (
     (measurement.closes > 0 || measurement.filled > 0) &&
     measurement.opens === 0 &&
     measurement.worsened === 0 &&
-    !measurement.effects.some((effect) => effect.past)
+    !measurement.effects.some((effect) => effect.past || pastMaximum(effect))
   );
 }
 
@@ -485,6 +493,36 @@ function draftUndoSuggestions(
     }
   }
   return found;
+}
+
+/** A planned shift for one person in one requirement's cell, as measured. */
+function assignFix(
+  employeeId: string,
+  at: { rowKey: string; focusAreaId: number; assignmentId: number; dateKey: string },
+  overrides: CoverageDayOverride[],
+  measurement: CoverageMeasurement,
+): CoverageSuggestion {
+  return {
+    id: `assign:${employeeId}:${at.dateKey}:${at.assignmentId}`,
+    kind: "assign",
+    employeeId,
+    requestId: null,
+    final: false,
+    subject: {
+      rowKey: at.rowKey,
+      focusAreaId: at.focusAreaId,
+      assignmentId: at.assignmentId,
+      dateKey: at.dateKey,
+      otherDateKey: null,
+      otherAssignmentIds: [],
+    },
+    targets: targetsOf(measurement),
+    overrides,
+    effects: measurement.effects,
+    closes: measurement.closes,
+    filled: measurement.filled,
+    clearsOver: measurement.clearsOver,
+  };
 }
 
 function cellAssignments(cell: CoverageMatrixCell): number[] {
@@ -821,8 +859,20 @@ export interface CoverageFairChoice {
   suggestionId: string;
   employeeId: string;
   dateKey: string;
-  /** `weekDays`: given to bring the person up to their usual days that week. */
-  reason: "only" | "daysOff" | "preference" | "weekends" | "nights" | "hours" | "tie" | "weekDays";
+  /**
+   * `weekDays`: given to bring the person up to their usual days that week.
+   * `moved`: given a shift nobody free could fill, their earlier shift going to someone else.
+   */
+  reason:
+    | "only"
+    | "daysOff"
+    | "preference"
+    | "weekends"
+    | "nights"
+    | "hours"
+    | "tie"
+    | "weekDays"
+    | "moved";
   /** The chosen person's count for that reason (hours for a tie). */
   count: number;
   /** How many others could have filled it the same way. */
@@ -1117,6 +1167,9 @@ function* planSteps(
           if (!focusAreaIds.includes(row.focusAreaId)) continue;
           const cell = row.cells[index];
           if (!cell || cell.past) continue;
+          if (cell.draft.maximum != null && cell.draft.actual + 1 > cell.draft.maximum + EPSILON) {
+            continue;
+          }
           const assignmentId = [
             cell.preferredOpenAssignmentDefinitionId,
             ...cell.eligibleAssignmentDefinitionIds,
@@ -1158,32 +1211,12 @@ function* planSteps(
       if (
         measurement.opens > 0 ||
         measurement.worsened > 0 ||
-        measurement.effects.some((effect) => effect.past) ||
+        measurement.effects.some((effect) => effect.past || pastMaximum(effect)) ||
         !measurement.effects.some((effect) => effect.rowKey === candidate.rowKey)
       ) {
         return null;
       }
-      return {
-        id: `assign:${personId}:${candidate.dateKey}:${candidate.assignmentId}`,
-        kind: "assign",
-        employeeId: personId,
-        requestId: null,
-        final: false,
-        subject: {
-          rowKey: candidate.rowKey,
-          focusAreaId: candidate.focusAreaId,
-          assignmentId: candidate.assignmentId,
-          dateKey: candidate.dateKey,
-          otherDateKey: null,
-          otherAssignmentIds: [],
-        },
-        targets: targetsOf(measurement),
-        overrides: overridesHere,
-        effects: measurement.effects,
-        closes: measurement.closes,
-        filled: measurement.filled,
-        clearsOver: measurement.clearsOver,
-      };
+      return assignFix(personId, candidate, overridesHere, measurement);
     };
     return (): CoverageSuggestion | null => {
       for (;;) {
@@ -1213,13 +1246,17 @@ function* planSteps(
               candidate.assignmentId,
               overrides,
             );
+            const { actual, required } = candidate.cell.draft;
             return {
               candidate,
+              // Short shifts first, then the one this person adds least to in
+              // proportion, so a one-person shift is the last to get a second.
               key: [
                 standing?.splitsDaysOff ? 1 : 0,
                 PREFERENCE_RANK[standing?.preference ?? "none"],
-                candidate.cell.draft.actual - candidate.cell.draft.required,
-                candidate.cell.draft.actual,
+                Math.min(0, actual - required),
+                (actual + 1) / Math.max(required, EPSILON),
+                actual,
                 dayNumber(candidate.dateKey),
               ],
             };
@@ -1257,6 +1294,147 @@ function* planSteps(
       }
     };
   };
+  const peopleById = new Map(input.people.map((person) => [person.id, person]));
+  const dayIn = (
+    planned: ReadonlyArray<CoverageDayOverride>,
+    employeeId: string,
+    dateKey: string,
+  ) =>
+    planned.findLast(
+      (override) =>
+        override.side === "draft" &&
+        override.employeeId === employeeId &&
+        override.dateKey === dateKey,
+    )?.day ?? input.draftDay(employeeId, dateKey);
+  const isFree = (
+    planned: ReadonlyArray<CoverageDayOverride>,
+    employeeId: string,
+    dateKey: string,
+    assignmentId: number,
+  ) => {
+    if (leftOut.has(employeeId) || current.hasRequest(employeeId, dateKey)) return false;
+    if (!options.availabilityWith) {
+      const near = planned.some(
+        (day) =>
+          day.employeeId === employeeId &&
+          Math.abs(dayNumber(day.dateKey) - dayNumber(dateKey)) <= 1,
+      );
+      return !near && input.availability(employeeId, dateKey, assignmentId).kind === "free";
+    }
+    return options.availabilityWith(planned)(employeeId, dateKey, assignmentId).kind === "free";
+  };
+  const withShift = (
+    planned: ReadonlyArray<CoverageDayOverride>,
+    employeeId: string,
+    dateKey: string,
+    assignmentId: number,
+  ): CoverageDayOverride => ({
+    employeeId,
+    dateKey,
+    side: "draft",
+    day: {
+      ...withAssignments(dayIn(planned, employeeId, dateKey), [assignmentId]),
+      restOfDayAbsenceTypeId: null,
+    },
+  });
+  // A gap nobody free can fill may still close by moving someone this build
+  // gave a shift within a week of it: they take the gap, and someone free
+  // takes the shift they leave unless it stays staffed without them. The
+  // draft, recurring fills, restores and moves back stay where they are.
+  const rebalanceStep = (): boolean => {
+    for (const gap of shortCells(current.matrix)) {
+      if (options.dateKey != null && gap.cell.dateKey !== options.dateKey) continue;
+      if (options.rowKeys && !options.rowKeys.has(gap.rowKey)) continue;
+      const to = gap.cell.dateKey;
+      const tryOrder = cellAssignments(gap.cell);
+      for (const placed of plan) {
+        const personId = placed.employeeId;
+        if (placed.kind !== "assign" || !personId) continue;
+        const from = placed.subject.dateKey;
+        if (Math.abs(dayNumber(from) - dayNumber(to)) >= 7) continue;
+        if (!peopleById.get(personId)?.focusAreaIds.includes(gap.focusAreaId)) continue;
+        const assignmentId = tryOrder.find((id) => current.qualifiedFor(personId, id));
+        if (assignmentId == null) continue;
+        const rest = overrides.filter((override) => !placed.overrides.includes(override));
+        if (from !== to && rest.some((day) => day.employeeId === personId && day.dateKey === to)) {
+          continue;
+        }
+        if (!isFree(rest, personId, to, assignmentId)) continue;
+        const moved = withShift(rest, personId, to, assignmentId);
+        const back: CoverageDayOverride[] =
+          from === to
+            ? []
+            : [
+                {
+                  employeeId: personId,
+                  dateKey: from,
+                  side: "draft",
+                  day: dayIn(rest, personId, from),
+                },
+              ];
+        const target = { ...gap, assignmentId, dateKey: to };
+        const alone = measureCoverageChange(current, [...back, moved]);
+        if (keeps(alone)) {
+          replace(placed, [assignFix(personId, target, [moved], alone)]);
+          return true;
+        }
+        const left = { ...placed.subject };
+        const afterMove = [...rest, moved];
+        const backfills: CoverageSuggestion[] = [];
+        const leftCell = cellLookup(current.matrix).get(`${left.rowKey}|${from}`);
+        const leftOrder = [left.assignmentId, ...(leftCell?.eligibleAssignmentDefinitionIds ?? [])];
+        for (const other of input.people) {
+          if (other.id === personId || !other.active) continue;
+          if (!other.focusAreaIds.includes(left.focusAreaId)) continue;
+          const otherId = other.id;
+          if (dayIn(afterMove, otherId, from).assignmentIds.some((id) => leftOrder.includes(id))) {
+            continue;
+          }
+          const fillId = leftOrder.find((id) => current.qualifiedFor(otherId, id));
+          if (fillId == null || !isFree(afterMove, otherId, from, fillId)) continue;
+          const fill = withShift(afterMove, otherId, from, fillId);
+          const measurement = measureCoverageChange(current, [...back, moved, fill]);
+          if (keeps(measurement)) {
+            backfills.push(
+              assignFix(otherId, { ...left, assignmentId: fillId }, [fill], measurement),
+            );
+          }
+        }
+        const backfill = fairest(backfills);
+        if (!backfill) continue;
+        replace(placed, [assignFix(personId, target, [moved], alone), backfill]);
+        return true;
+      }
+    }
+    return false;
+  };
+  // Swaps a planned shift for the fixes that take its place, with their reasons.
+  const replace = (placed: CoverageSuggestion, next: CoverageSuggestion[]) => {
+    plan.splice(plan.indexOf(placed), 1);
+    for (const override of placed.overrides) overrides.splice(overrides.indexOf(override), 1);
+    for (let index = taken.length - 1; index >= 0; index -= 1) {
+      if (taken[index].suggestionId === placed.id) taken.splice(index, 1);
+    }
+    for (let index = choices.length - 1; index >= 0; index -= 1) {
+      if (choices[index].suggestionId === placed.id) choices.splice(index, 1);
+    }
+    const [moved] = next;
+    choices.push({
+      suggestionId: moved.id,
+      employeeId: moved.employeeId!,
+      dateKey: moved.subject.dateKey,
+      reason: "moved",
+      count: 0,
+      others: 0,
+    });
+    for (const fix of next) take(fix);
+  };
+  const rebalance = function* (): Generator<CoverageBuildProgress> {
+    for (let step = 0; step < 200 && rebalanceStep(); step += 1) {
+      filled = Math.max(filled, needed - countOpen(current.matrix, options.rowKeys).staffShort);
+      yield { placed: plan.length, filled: Math.min(filled, needed), needed };
+    }
+  };
   const needed = countOpen(current.matrix, options.rowKeys).staffShort;
   let filled = 0;
   // Every fix kept closes or fills a gap, so the loop ends; the bound is a backstop.
@@ -1282,6 +1460,7 @@ function* planSteps(
     filled += next.filled;
     yield { placed: plan.length, filled: Math.min(filled, needed), needed };
   }
+  yield* rebalance();
   if (options.topUp) {
     const steps = topUpSteps(options.topUp);
     for (let next = steps(); next; next = steps()) {

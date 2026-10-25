@@ -109,8 +109,12 @@ export function requirementSummary(cells: ReadonlyArray<CoverageMatrixCell | nul
     (a, b) => a - b,
   );
   if (required.length === 0) return "";
-  if (required.length === 1) return `needs ${formatCoverageNumber(required[0])}`;
-  return `needs ${formatCoverageNumber(required[0])} to ${formatCoverageNumber(
-    required[required.length - 1],
-  )}`;
+  const needs =
+    required.length === 1
+      ? `needs ${formatCoverageNumber(required[0])}`
+      : `needs ${formatCoverageNumber(required[0])} to ${formatCoverageNumber(
+          required[required.length - 1],
+        )}`;
+  const maximum = cells.find((cell) => cell?.draft.maximum != null)?.draft.maximum;
+  return maximum != null ? `${needs}, max ${formatCoverageNumber(maximum)}` : needs;
 }

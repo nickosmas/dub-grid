@@ -231,7 +231,7 @@ export function buildNavGroups(
         Icon: CoverageIcon,
         helpHint: "Coverage sets minimum headcount by focus area, shift, and job.",
         description:
-          "Set minimum staffing requirements by focus area and assignable shift/job combination.",
+          "Set how many people each shift and job needs in each focus area, and the most Auto-build schedules.",
       });
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes)
       schedItems.push({

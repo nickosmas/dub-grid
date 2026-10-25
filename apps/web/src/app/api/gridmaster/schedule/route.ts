@@ -41,7 +41,7 @@ const JOB_COLS =
 const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const COVERAGE_REQUIREMENT_COLS =
-  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 const SHIFT_REQUEST_COLS =
   "id, type, status, requester_emp_id, requester_shift_date, target_emp_id, target_shift_date";
 const SCHEDULE_CELL_SELECT = `

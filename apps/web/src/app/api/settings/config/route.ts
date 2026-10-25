@@ -302,10 +302,16 @@ async function hardDeleteSettingsRowsByIds(
   }
 }
 
-const coverageRequirementInputSchema = z.object({
-  dayOfWeek: z.number().int().min(0).max(6).nullable(),
-  minStaff: z.number().int().min(0),
-});
+const coverageRequirementInputSchema = z
+  .object({
+    dayOfWeek: z.number().int().min(0).max(6).nullable(),
+    minStaff: z.number().int().min(0),
+    maxStaff: z.number().int().min(1).max(999).nullable().optional(),
+  })
+  .refine(
+    (requirement) => requirement.maxStaff == null || requirement.maxStaff >= requirement.minStaff,
+    { message: "The maximum can't be fewer than the minimum.", path: ["maxStaff"] },
+  );
 
 const postBodySchema = z.discriminatedUnion("action", [
   z.object({
@@ -2335,6 +2341,7 @@ export async function POST(req: NextRequest) {
             preferred_shift_id: data.preferredShiftId,
             day_of_week: requirement.dayOfWeek,
             min_staff: requirement.minStaff,
+            max_staff: requirement.maxStaff ?? null,
           }));
 
         if (rows.length > 0) {

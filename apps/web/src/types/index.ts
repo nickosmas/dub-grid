@@ -126,6 +126,8 @@ export interface CoverageRequirement {
   dayOfWeek: number | null;
   /** Minimum headcount required. */
   minStaff: number;
+  /** The most staff Auto-build and suggestions fill it to; null for no limit. */
+  maxStaff?: number | null;
 }
 
 // Coverage status/gap types now live in @dubgrid/schedule-core alongside the

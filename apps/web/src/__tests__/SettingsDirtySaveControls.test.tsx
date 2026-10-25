@@ -739,7 +739,7 @@ describe("settings dirty save controls", () => {
     expect(coverageToggle).toBeDefined();
     await user.click(coverageToggle!);
 
-    const staffInput = await screen.findByRole("spinbutton");
+    const staffInput = await screen.findByRole("spinbutton", { name: "Minimum Staff" });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
     expect(
@@ -757,7 +757,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(discardButton);
 
-    expect(screen.getByRole("spinbutton")).toHaveValue("2");
+    expect(screen.getByRole("spinbutton", { name: "Minimum Staff" })).toHaveValue("2");
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
@@ -821,7 +821,7 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByLabelText("Same every day")).toBeChecked();
 
-    const staffInput = await screen.findByRole("spinbutton");
+    const staffInput = await screen.findByRole("spinbutton", { name: "Minimum Staff" });
     expect(staffInput).toHaveValue("0");
 
     await user.clear(staffInput);
@@ -830,9 +830,128 @@ describe("settings dirty save controls", () => {
 
     await waitFor(() => {
       expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 200, 10, [
-        { dayOfWeek: null, minStaff: 2 },
+        { dayOfWeek: null, minStaff: 2, maxStaff: null },
       ]);
     });
+  });
+
+  it("coverage sets a maximum that starts at, and follows, the minimum", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Days",
+      focusAreaId: 1,
+    });
+    const job: JobDefinition = {
+      id: 200,
+      orgId: "org-1",
+      name: "Supervisor",
+      abbr: "SUP",
+      showOnGrid: true,
+      focusAreaId: 1,
+      applicableShiftIds: [10],
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: "#bfdbfe",
+      border: "#1d4ed8",
+      text: "#1d4ed8",
+      sortOrder: 1,
+      assignmentMode: "with_shift",
+      systemKey: null,
+      archivedAt: null,
+    };
+    const requirement = makeCoverageRequirement({
+      id: 50,
+      orgId: "org-1",
+      focusAreaId: 1,
+      jobId: 200,
+      preferredShiftId: 10,
+      minStaff: 1,
+    });
+    vi.mocked(saveCoverageRequirements).mockResolvedValue([requirement]);
+
+    render(
+      <CoverageRequirementsSettings
+        orgId="org-1"
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        jobs={[job]}
+        coverageRequirements={[requirement]}
+        onCoverageRequirementsChange={vi.fn()}
+        canEdit
+      />,
+    );
+    const toggle = screen
+      .getAllByRole("button")
+      .find((button) => button.getAttribute("aria-expanded") === "false");
+    await user.click(toggle!);
+
+    expect(screen.queryByRole("spinbutton", { name: "Maximum Staff" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Set a maximum" }));
+    const most = screen.getByRole("spinbutton", { name: "Maximum Staff" });
+    expect(most).toHaveValue("1");
+
+    const least = screen.getByRole("spinbutton", { name: "Minimum Staff" });
+    await user.clear(least);
+    await user.type(least, "3");
+    await user.tab();
+    expect(screen.getByRole("spinbutton", { name: "Maximum Staff" })).toHaveValue("3");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 200, 10, [
+        { dayOfWeek: null, minStaff: 3, maxStaff: 3 },
+      ]);
+    });
+  });
+
+  it("coverage offers no maximum until something is required", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Days",
+      focusAreaId: 1,
+    });
+    const job: JobDefinition = {
+      id: 200,
+      orgId: "org-1",
+      name: "Supervisor",
+      abbr: "SUP",
+      showOnGrid: true,
+      focusAreaId: 1,
+      applicableShiftIds: [10],
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: "#bfdbfe",
+      border: "#1d4ed8",
+      text: "#1d4ed8",
+      sortOrder: 1,
+      assignmentMode: "with_shift",
+      systemKey: null,
+      archivedAt: null,
+    };
+
+    render(
+      <CoverageRequirementsSettings
+        orgId="org-1"
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        jobs={[job]}
+        coverageRequirements={[]}
+        onCoverageRequirementsChange={vi.fn()}
+        canEdit
+      />,
+    );
+    const toggle = screen
+      .getAllByRole("button")
+      .find((button) => button.getAttribute("aria-expanded") === "false");
+    await user.click(toggle!);
+
+    expect(screen.queryByRole("checkbox", { name: "Set a maximum" })).not.toBeInTheDocument();
   });
 
   it("coverage shows visible scheduled jobs and shift-only demand targets", () => {
@@ -1045,14 +1164,14 @@ describe("settings dirty save controls", () => {
     expect(coverageToggle).toBeDefined();
     await user.click(coverageToggle!);
 
-    const staffInput = await screen.findByRole("spinbutton");
+    const staffInput = await screen.findByRole("spinbutton", { name: "Minimum Staff" });
     await user.clear(staffInput);
     await user.type(staffInput, "4");
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
       expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 203, 10, [
-        { dayOfWeek: null, minStaff: 4 },
+        { dayOfWeek: null, minStaff: 4, maxStaff: null },
       ]);
     });
   });

@@ -337,6 +337,7 @@ export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRe
     preferredShiftId: row.preferred_shift_id ?? null,
     dayOfWeek: row.day_of_week,
     minStaff: row.min_staff,
+    maxStaff: row.max_staff ?? null,
   };
 }
 

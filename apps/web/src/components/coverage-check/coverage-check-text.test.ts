@@ -66,4 +66,11 @@ describe("coverage check text", () => {
     expect(requirementSummary([cell(3), cell(2)])).toBe("needs 2 to 3");
     expect(requirementSummary([null])).toBe("");
   });
+
+  it("names a requirement's maximum after what it needs", () => {
+    const cell = {
+      draft: { actual: 1, required: 1, isMet: true, hasRequirement: true, maximum: 1 },
+    } as never;
+    expect(requirementSummary([cell, null, cell])).toBe("needs 1, max 1");
+  });
 });

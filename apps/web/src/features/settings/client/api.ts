@@ -382,7 +382,7 @@ export async function saveCoverageRequirements(
   focusAreaId: number,
   jobId: number,
   preferredShiftId: number | null,
-  requirements: { dayOfWeek: number | null; minStaff: number }[],
+  requirements: { dayOfWeek: number | null; minStaff: number; maxStaff: number | null }[],
 ): Promise<CoverageRequirement[]> {
   const body = await postSettingsAction<{ items: CoverageRequirement[] }>(
     {

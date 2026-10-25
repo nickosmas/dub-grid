@@ -297,7 +297,7 @@ export const ORG_ROLE_COLS =
 export const EMPLOYEE_COLS =
   "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 export const COVERAGE_REQ_COLS =
-  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 export const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 export const INDICATOR_TYPE_COLS = "id, org_id, name, color, sort_order, archived_at";
