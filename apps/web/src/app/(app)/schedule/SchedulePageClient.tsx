@@ -1,5 +1,6 @@
 "use client";
 
+import { layoutEntryAbsence, type AbsencePillLayout } from "@/lib/absence-pill";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -3162,6 +3163,25 @@ function SchedulerContent({
   const restOfDayAbsenceTypeIdForKey = useCallback(
     (empId: string, date: Date): number | null =>
       shifts[`${empId}_${formatDateKey(date)}`]?.restOfDayAbsenceTypeId ?? null,
+    [shifts],
+  );
+
+  // Where that absence sits beside the shifts and the time it covers (item 50d).
+  const restOfDayAbsenceLayoutForKey = useCallback(
+    (empId: string, date: Date): AbsencePillLayout | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (entry?.restOfDayAbsenceTypeId == null) return null;
+      return layoutEntryAbsence(
+        {
+          segments: entry.segments ?? [],
+          customStartTime: entry.customStartTime,
+          customEndTime: entry.customEndTime,
+          absenceStartTime: entry.restOfDayAbsenceStartTime,
+          absenceEndTime: entry.restOfDayAbsenceEndTime,
+        },
+        date,
+      );
+    },
     [shifts],
   );
 
@@ -7579,6 +7599,7 @@ function SchedulerContent({
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
           restOfDayAbsenceTypeIdForKey,
+          restOfDayAbsenceLayoutForKey,
           publishedRestOfDayAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
           publishedMetadataForKey,
@@ -7630,6 +7651,7 @@ function SchedulerContent({
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
       restOfDayAbsenceTypeIdForKey,
+      restOfDayAbsenceLayoutForKey,
       publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffKindForKey,
       publishedMetadataForKey,
@@ -8635,6 +8657,7 @@ function SchedulerContent({
                 shiftDisplayMode={org?.shiftDisplayMode}
                 absenceTypeIdForKey={absenceTypeIdForKey}
                 restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+                restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                 absenceTypeMap={absenceTypeObjectMap}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
@@ -9436,6 +9459,7 @@ function SchedulerContent({
               assignmentIdsForKey={assignmentIdsForKey}
               absenceTypeIdForKey={absenceTypeIdForKey}
               restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+              restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
               absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}

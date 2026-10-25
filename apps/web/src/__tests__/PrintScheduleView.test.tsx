@@ -1,3 +1,4 @@
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -312,9 +313,10 @@ describe("PrintScheduleView", () => {
     const firstDay = formatDateKey(new Date(2024, 0, 7));
     const secondDay = formatDateKey(new Date(2024, 0, 8));
 
-    function renderMixed() {
+    function renderMixed(layout: AbsencePillLayout | null = null) {
       return render(
         <PrintScheduleView
+          restOfDayAbsenceLayoutForKey={() => layout}
           weekStart={new Date(2024, 0, 7)}
           config={{ fontSize: 12, selectedFocusAreas: ["North"], spanWeeks: 1 }}
           employees={employees}
@@ -368,6 +370,23 @@ describe("PrintScheduleView", () => {
       expect(cellPills(mixed)[1].style.borderLeftStyle).not.toBe("none");
       expect(cellPills(triple)).toHaveLength(3);
       expect(cellPills(triple)[2].textContent).toBe("S");
+    });
+
+    it("prints an arrived-late absence first, with the time it covers (item 50d)", () => {
+      const { container } = renderMixed({
+        first: true,
+        joinsShift: true,
+        shortTime: "3–7",
+        time: "3:00 AM - 7:00 AM",
+      });
+      const [mixed] = Array.from(container.querySelectorAll("td")).filter(
+        (cell) => cellPills(cell).length > 0,
+      );
+
+      const pills = cellPills(mixed);
+      expect(pills[0].textContent).toBe("S3–7");
+      expect(pills[1].textContent).toContain("D");
+      expect(pills[0].style.borderRightStyle).toBe("none");
     });
 
     it("stacks a three-item cell in a taller row and keeps two items side by side", () => {

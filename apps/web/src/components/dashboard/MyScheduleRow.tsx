@@ -1,3 +1,4 @@
+import { layoutEntryAbsence } from "@/lib/absence-pill";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -335,6 +336,8 @@ function buildMyScheduleDay(input: {
           assignmentIds: entry.publishedAssignmentDefinitionIds,
           absenceTypeId: entry.publishedAbsenceTypeId ?? null,
           restOfDayAbsenceTypeId: entry.publishedRestOfDayAbsenceTypeId ?? null,
+          restOfDayAbsenceStartTime: entry.publishedRestOfDayAbsenceStartTime ?? null,
+          restOfDayAbsenceEndTime: entry.publishedRestOfDayAbsenceEndTime ?? null,
           customStartTime: entry.publishedCustomStartTime ?? null,
           customEndTime: entry.publishedCustomEndTime ?? null,
           label: entry.publishedLabel,
@@ -426,28 +429,56 @@ function buildMyScheduleDay(input: {
     });
   }
 
-  // The absence for the rest of the day comes after the shifts (item 45).
+  // The absence beside the shifts takes its place in time order with the
+  // time it covers (item 50d): first when they arrived late.
   const restOfDayAbsenceTypeId = displayEntry.restOfDayAbsenceTypeId ?? null;
   const hasRestOfDay = restOfDayAbsenceTypeId != null && workedShifts.length > 0;
-  const shifts = hasRestOfDay
-    ? [...workedShifts, absenceShift(restOfDayAbsenceTypeId, "Absence")]
+  const absenceLayout = hasRestOfDay
+    ? layoutEntryAbsence(
+        {
+          segments: workedShifts.map((shift) => ({
+            startTime: shift.startTime,
+            endTime: shift.endTime,
+          })),
+          absenceStartTime: displayEntry.restOfDayAbsenceStartTime,
+          absenceEndTime: displayEntry.restOfDayAbsenceEndTime,
+        },
+        input.date,
+      )
+    : null;
+  const absenceFirst = !!absenceLayout?.first;
+  const absenceItem = hasRestOfDay
+    ? { ...absenceShift(restOfDayAbsenceTypeId, "Absence"), timeRange: absenceLayout?.time ?? null }
+    : null;
+  const shifts = absenceItem
+    ? absenceFirst
+      ? [absenceItem, ...workedShifts]
+      : [...workedShifts, absenceItem]
     : workedShifts;
-  // Pills touch only when connected in time; the absence starts as the last shift ends.
-  const seams = attachedPillSeams("stacked", [
-    ...workedShifts
-      .slice(1)
-      .map((shift, index) => timesMeet(workedShifts[index].endTime, shift.startTime)),
-    ...(hasRestOfDay ? [true] : []),
-  ]);
+  // Pills touch only when connected in time.
+  const shiftJoins = workedShifts
+    .slice(1)
+    .map((shift, index) => timesMeet(workedShifts[index].endTime, shift.startTime));
+  const absenceJoins = absenceItem ? [absenceLayout?.joinsShift ?? true] : [];
+  const seams = attachedPillSeams(
+    "stacked",
+    absenceFirst ? [...absenceJoins, ...shiftJoins] : [...shiftJoins, ...absenceJoins],
+  );
   shifts.forEach((shift, index) => {
     shift.seams = seams[index];
   });
+  // Change badges count the absence after the shifts, so they are matched in
+  // that order and the absence is moved first afterwards.
+  const badged = attachChangeBadges(
+    absenceItem ? [...workedShifts, absenceItem] : workedShifts,
+    badgeInput,
+  );
 
   return {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: attachChangeBadges(shifts, badgeInput),
+    shifts: absenceFirst ? [badged[badged.length - 1], ...badged.slice(0, -1)] : badged,
   };
 }
 

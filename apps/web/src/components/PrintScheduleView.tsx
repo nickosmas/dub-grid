@@ -1,5 +1,6 @@
 "use client";
 
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   AbsenceType,
@@ -184,6 +185,7 @@ interface PrintSectionProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** A worked cell's absence for the rest of the day (item 45), printed after its shifts. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   absenceTypeMap?: Map<number, AbsenceType>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   assignments: AssignmentDefinition[];
@@ -212,6 +214,7 @@ function PrintSection({
   assignmentIdsForKey,
   absenceTypeIdForKey,
   restOfDayAbsenceTypeIdForKey,
+  restOfDayAbsenceLayoutForKey,
   absenceTypeMap,
   getShiftStyle,
   assignments,
@@ -328,6 +331,7 @@ function PrintSection({
     absenceTypeId: number | null,
     customTimes: ReturnType<NonNullable<PrintSectionProps["getCustomShiftTimes"]>>,
     restOfDayAbsenceTypeId: number | null = null,
+    absenceLayout: AbsencePillLayout | null = null,
   ): CellPill[] {
     // An absence carries no assignment id, so a label lookup would resolve it
     // against the assignment list: either finding nothing (printing vacation
@@ -385,26 +389,34 @@ function PrintSection({
       };
     });
 
-    // The absence for the rest of the day prints after the shifts, with no time.
+    // The absence beside the shifts prints in time order with the time it
+    // covers (item 50d): first when they arrived late. An untimed one, saved
+    // before then, prints last with no time.
     const restOfDay =
       restOfDayAbsenceTypeId != null ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null) : null;
-    const pills: CellPill[] = restOfDay
-      ? [
-          ...workedPills,
-          {
-            primaryLabel: isNameMode ? restOfDay.name || restOfDay.label : restOfDay.label,
-            time: null,
-            ...printAbsenceFill(restOfDay),
-          },
-        ]
+    const absencePill: CellPill | null = restOfDay
+      ? {
+          primaryLabel: isNameMode ? restOfDay.name || restOfDay.label : restOfDay.label,
+          time: null,
+          timeLabel: absenceLayout?.shortTime ?? null,
+          ...printAbsenceFill(restOfDay),
+        }
+      : null;
+    const absenceFirst = !!absencePill && !!absenceLayout?.first;
+    const pills: CellPill[] = absencePill
+      ? absenceFirst
+        ? [absencePill, ...workedPills]
+        : [...workedPills, absencePill]
       : workedPills;
     // Pills touch only when connected in time: a shift that runs straight into
-    // the next, or the last shift and the absence that starts as it ends.
+    // the next, or a shift and the absence that meets it.
     const axis = pills.length >= 3 ? "stacked" : "side-by-side";
-    const seams = attachedPillSeams(axis, [
-      ...spans.slice(1).map((span, li) => timesMeet(spans[li].end, span.start)),
-      ...(restOfDay ? [true] : []),
-    ]);
+    const shiftJoins = spans.slice(1).map((span, li) => timesMeet(spans[li].end, span.start));
+    const absenceJoins = absencePill ? [absenceLayout?.joinsShift ?? true] : [];
+    const seams = attachedPillSeams(
+      axis,
+      absenceFirst ? [...absenceJoins, ...shiftJoins] : [...shiftJoins, ...absenceJoins],
+    );
     return pills.map((pill, pi) => ({
       ...pill,
       seams: seams[pi],
@@ -599,6 +611,7 @@ function PrintSection({
                           absenceTypeIdForKey?.(emp.id, date) ?? null,
                           getCustomShiftTimes?.(emp.id, date) ?? null,
                           restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null,
+                          restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null,
                         )
                       : [];
                   // Three items (two shifts and an absence) stack in a taller
@@ -770,6 +783,7 @@ interface PrintScheduleViewProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** A worked cell's absence for the rest of the day (item 45), printed after its shifts. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   absenceTypeMap?: Map<number, AbsenceType>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   getCustomShiftTimes?: (
@@ -802,6 +816,7 @@ export default function PrintScheduleView({
   assignmentIdsForKey,
   absenceTypeIdForKey,
   restOfDayAbsenceTypeIdForKey,
+  restOfDayAbsenceLayoutForKey,
   absenceTypeMap,
   getShiftStyle,
   getCustomShiftTimes,
@@ -1108,6 +1123,7 @@ export default function PrintScheduleView({
                 shiftForKey={shiftForKey}
                 absenceTypeIdForKey={absenceTypeIdForKey}
                 restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+                restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                 absenceTypeMap={absenceTypeMap}
                 assignmentIdsForKey={assignmentIdsForKey}
                 getShiftStyle={getShiftStyle}

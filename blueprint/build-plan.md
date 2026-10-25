@@ -1048,7 +1048,7 @@
         Arrives at) time, a later shift that wasn't worked comes off, a
         "never started" choice that becomes a whole-day absence, and the
         day bar.
-  - [ ] 50d. **Grid and other web surfaces** - pills in time order with the
+  - [x] 50d. **Grid and other web surfaces** - pills in time order with the
         absence's times, joined by time, weekdays on overnight times; print,
         phone Day view, Month, dashboards and person page.
   - [ ] 50e. **Change records** - Before and After, alerts, push, activity

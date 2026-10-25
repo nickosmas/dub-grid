@@ -1,5 +1,6 @@
 "use client";
 
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 import React, { useEffect, useMemo, useRef } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { Button } from "@/components/Button";
@@ -59,6 +60,7 @@ interface MobileDayViewProps {
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn after its shifts. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   /** Map from absence type ID to AbsenceType for color/label resolution. */
   absenceTypeMap?: Map<number, AbsenceType>;
 }
@@ -92,6 +94,7 @@ export default function MobileDayView({
   useCompactRoleCertificationLabels = false,
   absenceTypeIdForKey,
   restOfDayAbsenceTypeIdForKey,
+  restOfDayAbsenceLayoutForKey,
   absenceTypeMap,
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
@@ -531,16 +534,31 @@ export default function MobileDayView({
                             foreignText,
                           };
                         });
-                    // The absence for the rest of the day comes after the shifts and
-                    // starts where the last one ends, so it joins that shift. This view
-                    // has no shift times, so two shifts are never joined here.
+                    // The absence beside the shifts takes its place in time order
+                    // (item 50d): first when they arrived late, joined to the shift
+                    // whose time it meets. This view has no shift times, so two
+                    // shifts are never joined here.
+                    const absenceLayout = restOfDayAbsenceType
+                      ? (restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null)
+                      : null;
+                    const absenceFirst = !!absenceLayout?.first;
                     const shiftPillCount = pills.length;
-                    if (restOfDayAbsenceType) pills.push(absencePill(restOfDayAbsenceType));
+                    if (restOfDayAbsenceType) {
+                      const pill = absencePill(restOfDayAbsenceType);
+                      if (absenceFirst) pills.unshift(pill);
+                      else pills.push(pill);
+                    }
+                    const absenceJoins = absenceLayout?.joinsShift ?? true;
                     const pillSeams = attachedPillSeams(
                       "stacked",
                       pills
                         .slice(1)
-                        .map((_, i) => restOfDayAbsenceType != null && i + 1 === shiftPillCount),
+                        .map(
+                          (_, i) =>
+                            restOfDayAbsenceType != null &&
+                            absenceJoins &&
+                            (absenceFirst ? i === 0 : i + 1 === shiftPillCount),
+                        ),
                     );
 
                     return (

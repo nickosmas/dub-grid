@@ -887,7 +887,15 @@ function buildScheduleItemsFromShiftMap(input: {
         employeeName,
         entry,
         key: `${key}:rest-of-day-absence`,
-        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
+        segment: buildAbsenceSegment(
+          entry,
+          absence,
+          parsedKey.dateKey,
+          input.isDarkTheme,
+          entry.restOfDayAbsenceStartTime && entry.restOfDayAbsenceEndTime
+            ? { start: entry.restOfDayAbsenceStartTime, end: entry.restOfDayAbsenceEndTime }
+            : null,
+        ),
         segmentIndex: rawSegments.length,
         changeBadge: badgeForPill(rawSegments.length),
         isDeletedHistory,
@@ -1052,6 +1060,8 @@ function buildAbsenceSegment(
   absence: AbsenceType | null,
   dateKey: string,
   isDarkTheme: boolean,
+  /** The time an absence beside a shift covers (item 50d); none for a whole day. */
+  times: { start: string; end: string } | null = null,
 ): DashboardScheduleSegment {
   const label = absence?.name ?? absence?.label ?? entry.label ?? "Away";
   const resolved = absence ? absenceStripeFill(absence.color, isDarkTheme) : null;
@@ -1061,7 +1071,7 @@ function buildAbsenceSegment(
     borderColor: resolved?.border ?? "var(--dg-color-border)",
     chipLabel: label,
     dateKey,
-    endTime: null,
+    endTime: times?.end ?? null,
     focusAreaId: null,
     focusAreaName: null,
     isAbsence: true,
@@ -1073,8 +1083,8 @@ function buildAbsenceSegment(
     shiftAbbr: null,
     shiftId: null,
     shiftName: null,
-    sortTime: "99:99:99",
-    startTime: null,
+    sortTime: times ? `${times.start}:00` : "99:99:99",
+    startTime: times?.start ?? null,
     textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
     title: label,
     typeLabel: "Absence",

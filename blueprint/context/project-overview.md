@@ -312,9 +312,10 @@ Item 50 is split:
   or Arrived late (Arrives at), cuts the shift there, takes off a shift that
   wasn't worked and brings it back when the time moves, offers a whole-day
   absence when none of the shift was worked, and draws the day bar.
-- **50d - Grid and other web surfaces:** pills in time order with the
-  absence's times, joined by time, weekdays on overnight times; print,
-  phone Day view, Month, dashboards and person page.
+- **50d - Grid and other web surfaces:** shipped; the grid, print, the
+  phone-width Day view and both dashboards put the absence in time order
+  (first when they arrived late), join it to the shift it meets, and name the
+  time it covers, with the next day named past midnight.
 - **50e - Change records:** Before and After, alerts, push, activity log,
   publish history, reports, CSV and calendar show the absence's time span.
 - **50f - Mobile app:** Your Week, team list, shift detail and Home card.
