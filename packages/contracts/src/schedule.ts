@@ -17,10 +17,32 @@ export const scheduleCellStateSchema = z
     absenceTypeId: z.number().int().nullable().default(null),
     customStartTime: z.string().nullable().default(null),
     customEndTime: z.string().nullable().default(null),
+    /**
+     * The time a worked cell's absence covers (item 50b), `HH:MM`, crossing
+     * midnight when the end is at or before the start. Null on an older,
+     * untimed absence, which reads as "rest of the day".
+     */
+    absenceStartTime: z.string().nullable().optional(),
+    absenceEndTime: z.string().nullable().optional(),
     seriesId: z.string().nullable().default(null),
     fromRecurring: z.boolean().default(false),
   })
   .superRefine((state, ctx) => {
+    const hasAbsenceTimes = state.absenceStartTime != null || state.absenceEndTime != null;
+    if (hasAbsenceTimes && (state.kind !== "worked" || state.absenceTypeId == null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Only an absence beside a shift has its own times",
+        path: ["absenceStartTime"],
+      });
+    } else if ((state.absenceStartTime == null) !== (state.absenceEndTime == null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "An absence needs both a start and an end time",
+        path: [state.absenceStartTime == null ? "absenceStartTime" : "absenceEndTime"],
+      });
+    }
+
     if (state.kind === "worked") {
       if (state.segments.length === 0) {
         ctx.addIssue({

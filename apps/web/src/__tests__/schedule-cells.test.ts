@@ -226,7 +226,11 @@ describe("a worked cell with a rest-of-day absence (item 45)", () => {
     shiftDisplayMode: "code",
   });
 
-  function workedSnapshot(kind: "draft" | "published", absenceTypeId: number | null) {
+  function workedSnapshot(
+    kind: "draft" | "published",
+    absenceTypeId: number | null,
+    times: { absence_start_time?: string; absence_end_time?: string } = {},
+  ) {
     return {
       id: `snap-${kind}`,
       cell_id: "cell-1",
@@ -236,6 +240,7 @@ describe("a worked cell with a rest-of-day absence (item 45)", () => {
       absence_type_id: absenceTypeId,
       custom_start_time: null,
       custom_end_time: null,
+      ...times,
       segments: [
         {
           id: `seg-${kind}`,
@@ -268,6 +273,55 @@ describe("a worked cell with a rest-of-day absence (item 45)", () => {
       publishedRestOfDayAbsenceTypeId: null,
     });
     expect(entry?.draftKind).toBe("modified");
+  });
+
+  it("carries the absence's own times, and a change to them alone is a draft change (50b)", () => {
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+      makeCell({
+        snapshots: [
+          workedSnapshot("draft", 7, { absence_start_time: "07:00", absence_end_time: "09:00" }),
+          workedSnapshot("published", 7, {
+            absence_start_time: "13:00",
+            absence_end_time: "15:00",
+          }),
+        ],
+      }),
+      { isScheduler: true, assignmentLabelMap: new Map([[1, "DST"]]), segmentCompatibility },
+    );
+
+    expect(entry).toMatchObject({
+      restOfDayAbsenceStartTime: "07:00",
+      restOfDayAbsenceEndTime: "09:00",
+      publishedRestOfDayAbsenceStartTime: "13:00",
+      publishedRestOfDayAbsenceEndTime: "15:00",
+    });
+    expect(entry?.draftKind).toBe("modified");
+  });
+
+  it("round-trips the absence's times between a snapshot and saved input (50b)", () => {
+    const snapshot = resolveScheduleCellSnapshotFromInput(
+      {
+        kind: "worked",
+        segments: [{ shiftId: 10, jobId: 100, position: 0, isMentored: false }],
+        absenceTypeId: 7,
+        customStartTime: "09:00",
+        customEndTime: "15:00",
+        absenceStartTime: "07:00",
+        absenceEndTime: "09:00",
+        seriesId: null,
+        fromRecurring: false,
+      },
+      { segmentCompatibility },
+    );
+
+    expect(snapshot).toMatchObject({
+      restOfDayAbsenceStartTime: "07:00",
+      restOfDayAbsenceEndTime: "09:00",
+    });
+    expect(scheduleCellSnapshotToInput(snapshot)).toMatchObject({
+      absenceStartTime: "07:00",
+      absenceEndTime: "09:00",
+    });
   });
 
   it("round-trips the rest-of-day absence between a snapshot and saved input", () => {

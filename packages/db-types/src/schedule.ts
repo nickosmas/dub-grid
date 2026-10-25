@@ -21,6 +21,9 @@ export interface DbScheduleCellSnapshot {
   absence_type_id: number | null;
   custom_start_time: string | null;
   custom_end_time: string | null;
+  /** The time a worked cell's absence covers (092); null when untimed. */
+  absence_start_time?: string | null;
+  absence_end_time?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   segments?: DbScheduleCellSegment[] | null;

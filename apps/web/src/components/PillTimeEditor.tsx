@@ -512,23 +512,22 @@ export function PillTimeEditor({
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-/** When the last shift actually ended, beside an absence for the rest of the day (item 45). */
+/** When the last shift actually ended, beside an absence for the rest of the day (items 45, 50a). */
 export function WorkedUntilField({
-  start,
   end,
+  message,
   onChange,
 }: {
-  /** The shift's effective start, so the end can't equal it. */
-  start: string | null;
-  /** The shift's effective end: its custom end, else its default end. */
+  /** The last shift's custom end, or null while no time is chosen. */
   end: string | null;
+  /** What to pick, or why the time can't stand; null when the time is valid. */
+  message: { text: string; error: boolean } | null;
   onChange: (end: string) => void;
 }) {
   const e = parseTo12h(end);
   function update(hour: string, minute: string, period: "AM" | "PM") {
     const next = to24h(hour, minute, period);
-    if (!next || (start && !isValidTimeOrder(start, next))) return;
-    onChange(next);
+    if (next) onChange(next);
   }
   return (
     <div
@@ -542,6 +541,7 @@ export function WorkedUntilField({
       <div
         role="group"
         aria-label="Worked until"
+        aria-invalid={message?.error || undefined}
         style={{ display: "flex", alignItems: "center", gap: 4 }}
       >
         <span
@@ -586,17 +586,33 @@ export function WorkedUntilField({
           ariaLabel="Worked until AM or PM"
         />
       </div>
-      {end && (
+      {message ? (
         <div
+          data-worked-until-message={message.error ? "error" : "prompt"}
+          role={message.error ? "alert" : undefined}
           className="dg-tabular-nums"
           style={{
             marginTop: 6,
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-muted)",
+            color: message.error ? "var(--dg-color-danger)" : "var(--dg-color-text-muted)",
+            fontWeight: message.error ? 600 : undefined,
           }}
         >
-          Hours count to {fmt12h(end)}. The absence covers the rest.
+          {message.text}
         </div>
+      ) : (
+        end && (
+          <div
+            className="dg-tabular-nums"
+            style={{
+              marginTop: 6,
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-text-muted)",
+            }}
+          >
+            Hours count to {fmt12h(end)}. The absence covers the rest.
+          </div>
+        )
       )}
     </div>
   );

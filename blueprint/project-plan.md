@@ -187,8 +187,8 @@ runtime evidence.
   status
 - Schedules: recurring shifts, published schedule entries, draft state,
   shift snapshots for audit history. A cell holds worked shifts, an
-  absence, or up to two worked shifts plus an absence for the rest of the
-  day
+  absence, or up to two worked shifts plus one absence covering scheduled
+  time that wasn't worked, before or after them
 - Shift requests (pickup/swap/call-off) and their approval/status events
 - Absence types (`absence_types`)
 - Coverage and reporting aggregates

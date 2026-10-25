@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   getScheduleEntryAbsenceTypeId,
+  getScheduleEntryRestOfDayAbsenceTimes,
   getScheduleEntryRestOfDayAbsenceTypeId,
 } from "./entry-accessors";
 import type { ScheduleEntryLike } from "./types";
 
-function entryWithState(kind: "worked" | "absence", absenceTypeId: number | null) {
+function entryWithState(
+  kind: "worked" | "absence",
+  absenceTypeId: number | null,
+  times: { absenceStartTime?: string | null; absenceEndTime?: string | null } = {},
+) {
   return {
     state: {
       kind,
@@ -13,6 +18,7 @@ function entryWithState(kind: "worked" | "absence", absenceTypeId: number | null
       absenceTypeId,
       customStartTime: null,
       customEndTime: null,
+      ...times,
       seriesId: null,
       fromRecurring: false,
     },
@@ -37,5 +43,29 @@ describe("rest-of-day absence accessors (item 45)", () => {
       getScheduleEntryRestOfDayAbsenceTypeId({ absenceTypeId: 7 } as unknown as ScheduleEntryLike),
     ).toBeNull();
     expect(getScheduleEntryRestOfDayAbsenceTypeId(entryWithState("worked", null))).toBeNull();
+  });
+});
+
+describe("rest-of-day absence times (item 50b)", () => {
+  it("reads the time an absence beside a shift covers", () => {
+    const entry = entryWithState("worked", 7, {
+      absenceStartTime: "07:00",
+      absenceEndTime: "11:00",
+    });
+    expect(getScheduleEntryRestOfDayAbsenceTimes(entry)).toEqual({ start: "07:00", end: "11:00" });
+  });
+
+  it("has no times for an untimed absence, a whole-day absence, or a plain shift", () => {
+    expect(getScheduleEntryRestOfDayAbsenceTimes(entryWithState("worked", 7))).toBeNull();
+    expect(
+      getScheduleEntryRestOfDayAbsenceTimes(
+        entryWithState("absence", 7, { absenceStartTime: "07:00", absenceEndTime: "11:00" }),
+      ),
+    ).toBeNull();
+    expect(
+      getScheduleEntryRestOfDayAbsenceTimes(
+        entryWithState("worked", null, { absenceStartTime: "07:00", absenceEndTime: "11:00" }),
+      ),
+    ).toBeNull();
   });
 });

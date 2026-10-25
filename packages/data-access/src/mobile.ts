@@ -365,10 +365,13 @@ function buildStateFromSnapshot(
           position: segment.position,
           isMentored: segment.is_mentored ?? false,
         })),
-        // On a worked cell this is the absence for the rest of the day (082).
+        // On a worked cell this is the absence for the rest of the day (082),
+        // with the time it covers (092).
         absenceTypeId: snapshot.absence_type_id ?? null,
         customStartTime: snapshot.custom_start_time ?? null,
         customEndTime: snapshot.custom_end_time ?? null,
+        absenceStartTime: snapshot.absence_start_time ?? null,
+        absenceEndTime: snapshot.absence_end_time ?? null,
         seriesId: null,
         fromRecurring: false,
       };
@@ -1082,6 +1085,8 @@ async function fetchScheduleCellQueryPage(
           absence_type_id,
           custom_start_time,
           custom_end_time,
+          absence_start_time,
+          absence_end_time,
           segments:schedule_cell_segments(
             id,
             snapshot_id,

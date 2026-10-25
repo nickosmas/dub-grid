@@ -487,6 +487,138 @@ describe("POST /api/schedule/manage", () => {
     );
   });
 
+  it("saves the time an absence beside a shift covers (item 50b)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+          absenceTypeId: 7,
+          customStartTime: "11:00",
+          customEndTime: "15:00",
+          absenceStartTime: "07:00",
+          absenceEndTime: "11:00",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({ p_absence_start_time: "07:00", p_absence_end_time: "11:00" }),
+    );
+  });
+
+  it("leaves a times-only save's absence times for the server to refill (item 50b)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+    serviceRpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "get_schedule_cell_snapshot_payload" || args.p_snapshot_kind !== "draft") {
+        return { data: [], error: null };
+      }
+      return {
+        data: [
+          {
+            version: 2,
+            focus_area_id: null,
+            series_id: null,
+            from_recurring: false,
+            state_kind: "worked",
+            absence_type_id: 7,
+            shift_ids: [3],
+            job_ids: [30],
+            is_mentored_flags: [false],
+            custom_start_time: "07:00",
+            custom_end_time: "11:00",
+            absence_start_time: "11:00",
+            absence_end_time: "15:00",
+          },
+        ],
+        error: null,
+      };
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShiftTimes",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        customStartTime: "07:00",
+        customEndTime: "13:00",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const [, args] = userRpc.mock.calls.find(([fn]) => fn === "write_schedule_cell_snapshot")!;
+    expect(args).toMatchObject({ p_absence_type_id: 7, p_custom_end_time: "13:00" });
+    expect(args).not.toHaveProperty("p_absence_start_time");
+  });
+
+  it("answers an absence that covers no time with 422 (item 50b)", async () => {
+    userRpc.mockResolvedValue({
+      error: {
+        message: "The absence has to cover some of the shift's time, apart from the time worked",
+        code: "23514",
+      },
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+          absenceTypeId: 7,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "ABSENCE_TIMES" });
+  });
+
+  it("drags an absence beside a shift with its times (item 50b)", async () => {
+    userRpc.mockResolvedValue({ error: null });
+
+    // The notes clean-up after the move needs more of the service client than
+    // this suite mocks; the move itself has already been asked for by then.
+    await POST(
+      makeRequest({
+        action: "moveShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        sourceEmpId: "22222222-2222-4222-8222-222222222222",
+        sourceDate: "2026-08-03",
+        targetEmpId: "22222222-2222-4222-8222-222222222222",
+        targetDate: "2026-08-04",
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 30, position: 0 }],
+          absenceTypeId: 7,
+          customStartTime: "11:00",
+          customEndTime: "15:00",
+          absenceStartTime: "07:00",
+          absenceEndTime: "11:00",
+        },
+        dragMode: "move",
+        targetWasEmpty: true,
+      }),
+    );
+
+    expect(userRpc).toHaveBeenCalledWith(
+      "move_shift",
+      expect.objectContaining({ p_absence_start_time: "07:00", p_absence_end_time: "11:00" }),
+    );
+  });
+
   it.each(["createShiftSeries", "updateSeriesAllShifts"])(
     "refuses an absence on a repeating shift (%s) before writing",
     async (action) => {

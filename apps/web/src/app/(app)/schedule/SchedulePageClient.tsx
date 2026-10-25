@@ -5495,10 +5495,20 @@ function SchedulerContent({
 
       const sourceEntry = shifts[sourceKey];
       const targetEntry = shifts[targetKey];
+      // The absence's own times travel with it (item 50b); the grid's drag
+      // data carries only its type.
+      const movePayload: ScheduleCellInput =
+        payload.kind === "worked" && payload.absenceTypeId != null
+          ? {
+              ...payload,
+              absenceStartTime: sourceEntry?.restOfDayAbsenceStartTime ?? null,
+              absenceEndTime: sourceEntry?.restOfDayAbsenceEndTime ?? null,
+            }
+          : payload;
       const buildMovedEntry = (draftKind: DraftKind) =>
         buildScheduleCellEntryFromInput({
           input: {
-            ...payload,
+            ...movePayload,
             customStartTime:
               payload.kind === "worked"
                 ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
@@ -5604,7 +5614,7 @@ function SchedulerContent({
           sourceCellId.dateKey,
           targetCellId.empId,
           targetCellId.dateKey,
-          payload,
+          movePayload,
           mode,
           sourceEntry?.version,
           targetEntry?.version,

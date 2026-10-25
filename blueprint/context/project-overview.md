@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash f419076bf16024a80d8060f9d3dbd33edec5f93ad7120e3e7f9cd030ca400ec7 -->
+<!-- blueprint:source-hash e56a4b1521821810a24b0e4d2769571828400d76971b74999d0e426be2cd5d14 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 49 are
-shipped. Item 40 is in progress.
+shipped. Item 40 is in progress. Item 50 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,6 +84,7 @@ shipped. Item 40 is in progress.
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
+| 50   | In progress | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 
 Item 40 is split:
 
@@ -169,7 +170,7 @@ Item 45 is split, and every part has shipped:
   another shift that day (migration 085).
 
 The absence always comes last and carries no hours; at most two worked
-shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21).
+shifts share a cell with it (owner decisions, 2026-10-19). It is always called an absence (owner, 2026-10-20). Someone absent for the rest of a day takes no more work that day (owner, 2026-10-21). Item 50 replaces the rest-of-day rule and the absence-last rule.
 
 Item 46 is split, and every part has shipped:
 
@@ -298,6 +299,35 @@ nobody else can fill a gap, has no rest rules yet, and never includes
 approvals (owner decisions, 2026-10-22). The Tools item that fills from
 recurring schedules is named Fill from Recurring Schedules (2026-10-22).
 
+Item 50 is split:
+
+- **50a - Worked until limits:** shipped; times stay inside the shift (no
+  23.75-hour shift from a time before the start), the absence must cover
+  some time, and removing it puts the shift's times back.
+- **50b - Data model:** shipped; the absence stores its own start and end; existing
+  rows read as running from the last shift's end to its scheduled end.
+  Migration 092; the server fills times a save leaves out and refuses an
+  absence that covers no time or overlaps the work.
+- **50c - Web panel:** Left early or Arrived late, a Left at (or Arrives
+  at) time, a later shift that wasn't worked comes off, a "never started"
+  choice that becomes a whole-day absence, and the day bar.
+- **50d - Grid and other web surfaces:** pills in time order with the
+  absence's times, joined by time, weekdays on overnight times; print,
+  phone Day view, Month, dashboards and person page.
+- **50e - Change records:** Before and After, alerts, push, activity log,
+  publish history, reports, CSV and calendar show the absence's time span.
+- **50f - Mobile app:** Your Week, team list, shift detail and Home card.
+- **50g - Requests and availability:** the unavailable rule follows the
+  absence's span; pasting a mixed cell copies only its shifts.
+
+An absence beside a shift records the part of a shift someone missed: they
+left early or arrived late. It shows the time it covers, sits in time order,
+joins a shift whose time it meets, and can't be saved when it covers no
+scheduled time. It may come before a shift and still carries no hours; after
+a left-early absence the person takes no more work that day, and an
+arrived-late one blocks only shifts that overlap it (owner decisions,
+2026-10-24). Design reference: the "Absence beside a shift" canvas.
+
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
 endpoints remain internal.
@@ -348,7 +378,8 @@ endpoints remain internal.
 - organization, employee or open-shift identity, date, shift, job, and absence
   facts
 - a cell holds worked shifts, an absence, or (item 45) up to two worked
-  shifts plus an absence for the rest of the day
+  shifts plus an absence for the rest of the day; item 50 makes that one
+  absence cover scheduled time that wasn't worked, before or after them
 - draft and published state with optimistic versioning
 - snapshot fields are the source of truth for schedule-cell audit history
 - recurring shifts generate bounded series through the normal draft workflow

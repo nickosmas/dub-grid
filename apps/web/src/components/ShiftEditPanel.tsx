@@ -41,6 +41,8 @@ import {
   addOneHour,
   orderSegmentsByStartTime,
   withLastShiftEnd,
+  withoutLastShiftTimes,
+  workedUntilProblem,
 } from "./shiftEditTime";
 import { PillTimeEditor, WorkedUntilField } from "./PillTimeEditor";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
@@ -329,6 +331,15 @@ function getFirstTimeSegment(time: string | null | undefined): string | null {
 }
 
 // ── Per-pill custom time editor (custom dropdown views, immediate save) ───
+/** "the Day shift" in a sentence, or "the Day Shift" when the name already says shift. */
+function theShift(name: string): string {
+  return `the ${name}${/\bshift$/i.test(name) ? "" : " shift"}`;
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export default function ShiftEditPanel({
   modal,
   currentShift,
@@ -3337,18 +3348,58 @@ export default function ShiftEditPanel({
     return <div style={{ marginTop: 8 }}>{renderNoteToggles(focusAreaId, shift)}</div>;
   }
 
-  /** Where the last worked shift ends: its custom end, else its default end. */
-  function lastShiftEndTime(): string | null {
-    const lastIndex = currentSegments.length - 1;
-    if (lastIndex < 0) return null;
-    const customEnd = parseMultiTimes(customEndTime, currentSegments.length)[lastIndex];
-    if (customEnd) return customEnd;
+  /**
+   * The last worked shift's "Worked until" beside an absence: its effective
+   * start, scheduled end, the custom end recorded as Worked until (null while
+   * none is chosen), and what is wrong with it, if anything (item 50a).
+   */
+  function lastShiftWorkedUntil() {
+    const count = currentSegments.length;
+    const lastIndex = count - 1;
     const lastId = currentAssignmentIds[lastIndex];
     const assignment =
       lastId != null
         ? assignments.find((candidate) => candidate.id === lastId)
         : assignments.find((candidate) => candidate.label === currentLabels[lastIndex]);
-    return resolveDefaultTimes(assignment).end;
+    const defaults = resolveDefaultTimes(assignment);
+    const start = parseMultiTimes(customStartTime, count)[lastIndex] ?? defaults.start;
+    const workedUntil = parseMultiTimes(customEndTime, count)[lastIndex] ?? null;
+    return {
+      assignment,
+      start,
+      scheduledEnd: defaults.end,
+      workedUntil,
+      problem: workedUntilProblem({ start, scheduledEnd: defaults.end, workedUntil }),
+    };
+  }
+
+  /** Names the scheduled times the last shift returns to when its absence is removed. */
+  function restoredShiftSentence(): string {
+    const count = currentSegments.length;
+    const hasCustomTimes =
+      !!parseMultiTimes(customStartTime, count)[count - 1] ||
+      !!parseMultiTimes(customEndTime, count)[count - 1];
+    const { assignment } = lastShiftWorkedUntil();
+    const { start, end } = resolveDefaultTimes(assignment);
+    if (!hasCustomTimes || !start || !end) return "";
+    const minutes = (time: string) => {
+      const [h, m] = time.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const length = (minutes(end) - minutes(start) + 1440) % 1440 || 1440;
+    const shift = capitalize(theShift(assignment?.name || currentLabels[count - 1] || ""));
+    return ` ${shift} goes back to ${fmt12h(start)} - ${fmt12h(end)} (${formatShiftChangeHours(length)}).`;
+  }
+
+  /** Save waits for a Worked until time inside the shift whenever an absence sits beside it. */
+  function workedUntilBlocksSave(): boolean {
+    return (
+      hasActiveShift &&
+      hasRestOfDayAbsence &&
+      allowShiftEdits &&
+      !!onCustomTimeChange &&
+      lastShiftWorkedUntil().problem != null
+    );
   }
 
   /** "Worked until" on the last shift, beside an absence for the rest of the day. */
@@ -3365,12 +3416,34 @@ export default function ShiftEditPanel({
       return null;
     }
     const count = currentSegments.length;
-    const start = parseMultiTimes(customStartTime, count)[index] ?? defaults.start;
-    const end = parseMultiTimes(customEndTime, count)[index] ?? defaults.end;
+    const {
+      assignment,
+      start,
+      scheduledEnd,
+      workedUntil: recorded,
+      problem,
+    } = lastShiftWorkedUntil();
+    const shift = theShift(assignment?.name || currentLabels[index] || "");
+    const person = modal.empName.split(" ")[0] || modal.empName;
+    const absence = absenceName(currentRestOfDayAbsenceTypeId) ?? "the absence";
+    const message =
+      problem === "unset"
+        ? { text: `When did ${person} leave ${shift}?`, error: false }
+        : problem === "no-time-covered"
+          ? {
+              text: `${capitalize(shift)} ends at ${fmt12h(scheduledEnd)}, so ${absence} would cover no time. Set when ${person} left, or remove ${absence}.`,
+              error: true,
+            }
+          : problem === "outside-shift"
+            ? {
+                text: `Pick a time after ${shift} starts at ${fmt12h(start)} and before it ends at ${fmt12h(scheduledEnd)}.`,
+                error: true,
+              }
+            : null;
     return (
       <WorkedUntilField
-        start={start}
-        end={end}
+        end={recorded}
+        message={message}
         onChange={(workedUntil) => {
           const next = withLastShiftEnd(
             customStartTime ?? null,
@@ -3393,7 +3466,8 @@ export default function ShiftEditPanel({
     if (!absence) return null;
     const absenceLabel = absence.name || absence.label;
     const colors = absenceStripeFill(absence.color, isDarkTheme);
-    const from = lastShiftEndTime();
+    const lastShift = lastShiftWorkedUntil();
+    const from = lastShift.problem == null ? lastShift.workedUntil : null;
     const diff = panelDiff.restOfDayDiff ?? null;
     return (
       <div
@@ -4481,16 +4555,30 @@ export default function ShiftEditPanel({
                     onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
                       if (pickingRestOfDayAbsence) {
+                        // A shift worked to its scheduled end leaves the absence nothing
+                        // to cover, so Worked until starts unset unless it already
+                        // records an earlier time (item 50a).
+                        const keptEnd =
+                          lastShiftWorkedUntil().problem == null
+                            ? (customEndTime ?? null)
+                            : withoutLastShiftTimes(
+                                null,
+                                customEndTime ?? null,
+                                currentSegments.length,
+                              ).customEndTime;
                         onSelect(
                           buildPanelInput({
                             segments: currentSegments,
                             absenceTypeId: null,
                             customStartTime: customStartTime ?? null,
-                            customEndTime: customEndTime ?? null,
+                            customEndTime: keptEnd,
                             restOfDayAbsenceTypeId: at.id,
                           }),
                           seriesId ? seriesScope : undefined,
                         );
+                        if (onCustomTimeChange && keptEnd !== (customEndTime ?? null)) {
+                          onCustomTimeChange(customStartTime ?? null, keptEnd);
+                        }
                         setPickingRestOfDayAbsence(false);
                         setShowPicker(false);
                         return;
@@ -4663,7 +4751,7 @@ export default function ShiftEditPanel({
                 onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
                 className="dg-btn dg-btn-primary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-                disabled={confirmBlocked || !hasEdits}
+                disabled={confirmBlocked || workedUntilBlocksSave() || !hasEdits}
               >
                 Save changes
               </Button>
@@ -4755,7 +4843,7 @@ export default function ShiftEditPanel({
             isAbsence
               ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
               : pendingDelete.type === "restOfDay"
-                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}? The shifts stay.`
+                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}? The shifts stay.${restoredShiftSentence()}`
                 : pendingDelete.type === "pill"
                   ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
                   : hasRestOfDayAbsence
@@ -4772,16 +4860,24 @@ export default function ShiftEditPanel({
               if (onCustomTimeChange) onCustomTimeChange(null, null);
               setPendingCommitScope(seriesScope);
             } else if (pendingDelete.type === "restOfDay") {
+              // Worked until set the last shift's times; without the absence it
+              // goes back to its scheduled times.
+              const restored = withoutLastShiftTimes(
+                customStartTime ?? null,
+                customEndTime ?? null,
+                currentSegments.length,
+              );
               onSelect(
                 buildPanelInput({
                   segments: currentSegments,
                   absenceTypeId: null,
-                  customStartTime: customStartTime ?? null,
-                  customEndTime: customEndTime ?? null,
+                  customStartTime: restored.customStartTime,
+                  customEndTime: restored.customEndTime,
                   restOfDayAbsenceTypeId: null,
                 }),
                 seriesId ? seriesScope : undefined,
               );
+              onCustomTimeChange?.(restored.customStartTime, restored.customEndTime);
             } else {
               const removedIdx = pendingDelete.index;
               const remainingSegments = currentSegments.filter((_, j) => j !== removedIdx);

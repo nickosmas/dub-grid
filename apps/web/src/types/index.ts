@@ -295,6 +295,9 @@ export interface ScheduleCellSnapshot extends ScheduleCellInput {
    * without the kind never mistake D/Bereavement for a whole-day absence.
    */
   restOfDayAbsenceTypeId?: number | null;
+  /** The time that absence covers (item 50b); null when untimed. */
+  restOfDayAbsenceStartTime?: string | null;
+  restOfDayAbsenceEndTime?: string | null;
 }
 
 export type RecurringScheduleDraft = Record<string, Record<number, ScheduleCellInput | null>>;
@@ -420,6 +423,11 @@ export interface ScheduleCellStateEntry {
   restOfDayAbsenceTypeId?: number | null;
   /** Published rest-of-day absence type ID. */
   publishedRestOfDayAbsenceTypeId?: number | null;
+  /** The time the rest-of-day absence covers (item 50b), draft and published. */
+  restOfDayAbsenceStartTime?: string | null;
+  restOfDayAbsenceEndTime?: string | null;
+  publishedRestOfDayAbsenceStartTime?: string | null;
+  publishedRestOfDayAbsenceEndTime?: string | null;
   /** Optimistic lock version. undefined for new (not-yet-persisted) shifts. */
   version?: number;
   /** UUID of the user who created this shift. */

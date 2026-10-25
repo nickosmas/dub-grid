@@ -36,6 +36,9 @@ export interface PublishedShiftRow {
   published_absence_type_id: number | null;
   /** The absence a worked cell carries for the rest of the day (item 45). */
   published_rest_of_day_absence_type_id?: number | null;
+  /** The time that absence covers (item 50b); null when untimed. */
+  published_rest_of_day_absence_start_time?: string | null;
+  published_rest_of_day_absence_end_time?: string | null;
   published_custom_start_time: string | null;
   published_custom_end_time: string | null;
 }
@@ -60,6 +63,9 @@ export interface PublishedScheduleEntry {
   absenceTypeId: number | null;
   /** On a shift entry, the absence for the rest of the day; it adds no hours. */
   restOfDayAbsenceTypeId?: number | null;
+  /** The time that absence covers (item 50b); null when untimed. */
+  restOfDayAbsenceStartTime?: string | null;
+  restOfDayAbsenceEndTime?: string | null;
   startTime: string | null;
   endTime: string | null;
   durationHours: number;
@@ -102,6 +108,8 @@ function buildNormalizedPublishedShiftSelect(extraSelects: string[] = []): strin
       absence_type_id,
       custom_start_time,
       custom_end_time,
+      absence_start_time,
+      absence_end_time,
       segments:schedule_cell_segments(
         id,
         snapshot_id,
@@ -155,6 +163,14 @@ export function mapNormalizedScheduleCellToPublishedShiftRow(
     published_rest_of_day_absence_type_id:
       publishedSnapshot.state_kind === "worked"
         ? (publishedSnapshot.absence_type_id ?? null)
+        : null,
+    published_rest_of_day_absence_start_time:
+      publishedSnapshot.state_kind === "worked"
+        ? (publishedSnapshot.absence_start_time ?? null)
+        : null,
+    published_rest_of_day_absence_end_time:
+      publishedSnapshot.state_kind === "worked"
+        ? (publishedSnapshot.absence_end_time ?? null)
         : null,
     published_custom_start_time: publishedSnapshot.custom_start_time ?? null,
     published_custom_end_time: publishedSnapshot.custom_end_time ?? null,
@@ -469,6 +485,8 @@ export function resolvePublishedScheduleEntry(
     assignmentIds: assignmentIds,
     absenceTypeId: null,
     restOfDayAbsenceTypeId: row.published_rest_of_day_absence_type_id ?? null,
+    restOfDayAbsenceStartTime: row.published_rest_of_day_absence_start_time ?? null,
+    restOfDayAbsenceEndTime: row.published_rest_of_day_absence_end_time ?? null,
     startTime,
     endTime,
     durationHours,

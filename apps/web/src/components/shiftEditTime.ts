@@ -128,3 +128,50 @@ export function withLastShiftEnd(
   ends[last] = workedUntil;
   return { customStartTime: join(starts), customEndTime: join(ends) };
 }
+
+/** Why a "Worked until" time can't stand beside an absence, if it can't. */
+export type WorkedUntilProblem = "unset" | "no-time-covered" | "outside-shift";
+
+/**
+ * Checks "Worked until" against the last shift's start and scheduled end
+ * (item 50a): it must fall strictly inside the shift, or the absence beside it
+ * covers no scheduled time. Times are measured from the start so an overnight
+ * shift works; on that wrapping scale a time before the start can't be told
+ * from one after the end, so both are "outside-shift". Without a known start
+ * or scheduled end only a missing time is reported.
+ */
+export function workedUntilProblem(args: {
+  start: string | null;
+  scheduledEnd: string | null;
+  workedUntil: string | null;
+}): WorkedUntilProblem | null {
+  const { start, scheduledEnd, workedUntil } = args;
+  if (!workedUntil) return "unset";
+  if (!start || !scheduledEnd) return null;
+  if (normalizeTime(workedUntil) === normalizeTime(scheduledEnd)) return "no-time-covered";
+  const minutes = (time: string) => {
+    const [h, m] = normalizeTime(time).split(":").map(Number);
+    return h * 60 + m;
+  };
+  const sinceStart = (time: string) => (minutes(time) - minutes(start) + 1440) % 1440;
+  const offset = sinceStart(workedUntil);
+  return offset === 0 || offset > (sinceStart(scheduledEnd) || 1440) ? "outside-shift" : null;
+}
+
+/**
+ * Clears the last shift's `|`-separated custom times, so it reads its
+ * scheduled times again; the others keep theirs. Used when the absence beside
+ * it is removed, since "Worked until" set both its start and end.
+ */
+export function withoutLastShiftTimes(
+  customStartTime: string | null,
+  customEndTime: string | null,
+  shiftCount: number,
+): { customStartTime: string | null; customEndTime: string | null } {
+  const clearLast = (time: string | null) => {
+    const parts = Array.from({ length: shiftCount }, (_, index) => time?.split("|")[index] || "");
+    parts[shiftCount - 1] = "";
+    return parts.every((part) => !part) ? null : parts.join("|");
+  };
+  return { customStartTime: clearLast(customStartTime), customEndTime: clearLast(customEndTime) };
+}

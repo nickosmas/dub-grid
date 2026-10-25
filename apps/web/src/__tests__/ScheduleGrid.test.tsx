@@ -2319,11 +2319,11 @@ describe("ScheduleGrid", () => {
       expect(absencePill).toHaveTextContent("SICK");
       expect(absencePill).toHaveTextContent("from 11");
       expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
-      // Attached: they touch, with no border or rounding where they meet.
+      // Attached: they touch with one dividing line and no rounding where they meet.
       const shiftPill = pills[pills.length - 2];
       expect(shiftPill.style.borderRightStyle).toBe("none");
       expect(shiftPill.style.borderRadius).toBe("8px 0 0 8px");
-      expect(absencePill.style.borderLeftStyle).toBe("none");
+      expect(absencePill.style.borderLeftStyle).toBe("solid");
       expect(absencePill.style.borderRadius).toBe("0 8px 8px 0");
       expect(absencePill.style.marginLeft).toBe("");
       expect(absencePill.parentElement!.style.gap).toBe("0");
@@ -2362,7 +2362,7 @@ describe("ScheduleGrid", () => {
       expect(second.style.borderTopStyle).not.toBe("none");
       expect(second.style.borderBottomStyle).toBe("none");
       expect(second.style.borderRadius).toBe("8px 8px 0 0");
-      expect(absence.style.borderTopStyle).toBe("none");
+      expect(absence.style.borderTopStyle).toBe("solid");
       expect(absence.style.borderRadius).toBe("0 0 8px 8px");
       expect(absence.style.marginTop).toBe("");
     });
@@ -2431,7 +2431,7 @@ describe("ScheduleGrid", () => {
         evening.style.getPropertyValue(stacked ? "border-bottom-style" : "border-right-style"),
       ).toBe("none");
       expect(night.style.getPropertyValue(stacked ? "border-top-style" : "border-left-style")).toBe(
-        "none",
+        "solid",
       );
     });
 
@@ -4101,6 +4101,28 @@ describe("ScheduleGrid", () => {
       expect(screen.getByText("Schedule notes: Flag")).toBeInTheDocument();
     });
     expect(screen.getByText("Was N.")).toBeInTheDocument();
+  });
+
+  it("says what a new draft cell adds, without a published shift staff still see", async () => {
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
+      draftKindForKey: () => "new",
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Not published yet. Staff don't see it until it's published."),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText(/^Added: /)).toBeInTheDocument();
+    expect(screen.queryByText(/Staff still see the published shift/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Before")).not.toBeInTheDocument();
   });
 
   it("keeps the indicator line on a deleted shift's hover card", async () => {

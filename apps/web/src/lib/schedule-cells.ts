@@ -23,6 +23,8 @@ type BuildScheduleCellSnapshotArgs = {
   absenceTypeId?: number | null;
   customStartTime?: string | null;
   customEndTime?: string | null;
+  absenceStartTime?: string | null;
+  absenceEndTime?: string | null;
   seriesId?: string | null;
   fromRecurring?: boolean;
   assignmentLabelMap?: Map<number, string>;
@@ -122,6 +124,23 @@ export function buildScheduleCellSnapshot(
     label: buildSnapshotLabel(args, orderedSegments),
     assignmentIds: args.kind === "worked" ? [...(args.assignmentIds ?? [])] : [],
     restOfDayAbsenceTypeId: args.kind === "worked" ? (args.absenceTypeId ?? null) : null,
+    ...restOfDayAbsenceTimes(args),
+  };
+}
+
+/** The absence's own times, kept only beside a shift and only as a pair. */
+function restOfDayAbsenceTimes(args: BuildScheduleCellSnapshotArgs): {
+  restOfDayAbsenceStartTime: string | null;
+  restOfDayAbsenceEndTime: string | null;
+} {
+  const timed =
+    args.kind === "worked" &&
+    args.absenceTypeId != null &&
+    !!args.absenceStartTime &&
+    !!args.absenceEndTime;
+  return {
+    restOfDayAbsenceStartTime: timed ? (args.absenceStartTime ?? null) : null,
+    restOfDayAbsenceEndTime: timed ? (args.absenceEndTime ?? null) : null,
   };
 }
 
@@ -154,6 +173,9 @@ export function scheduleCellSnapshotToInput(
         : (snapshot.absenceTypeId ?? null),
     customStartTime: snapshot.customStartTime ?? null,
     customEndTime: snapshot.customEndTime ?? null,
+    absenceStartTime:
+      snapshot.kind === "worked" ? (snapshot.restOfDayAbsenceStartTime ?? null) : null,
+    absenceEndTime: snapshot.kind === "worked" ? (snapshot.restOfDayAbsenceEndTime ?? null) : null,
     seriesId: snapshot.seriesId ?? null,
     fromRecurring: snapshot.fromRecurring ?? false,
   };
@@ -226,6 +248,8 @@ export function resolveScheduleCellSnapshotFromInput(
     absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
+    absenceStartTime: input.absenceStartTime ?? null,
+    absenceEndTime: input.absenceEndTime ?? null,
     seriesId: input.seriesId ?? null,
     fromRecurring: input.fromRecurring ?? false,
   });
@@ -315,6 +339,8 @@ export function classifyScheduleCellDraft(args: {
     draft.kind === published.kind &&
     draft.absenceTypeId === published.absenceTypeId &&
     (draft.restOfDayAbsenceTypeId ?? null) === (published.restOfDayAbsenceTypeId ?? null) &&
+    (draft.restOfDayAbsenceStartTime ?? null) === (published.restOfDayAbsenceStartTime ?? null) &&
+    (draft.restOfDayAbsenceEndTime ?? null) === (published.restOfDayAbsenceEndTime ?? null) &&
     draft.customStartTime === published.customStartTime &&
     draft.customEndTime === published.customEndTime &&
     normalizedSegmentsEqual(draft, published);
@@ -375,6 +401,14 @@ export function buildScheduleCellEntry(args: {
       effective?.kind === "worked" ? (effective.restOfDayAbsenceTypeId ?? null) : null,
     publishedRestOfDayAbsenceTypeId:
       published?.kind === "worked" ? (published.restOfDayAbsenceTypeId ?? null) : null,
+    restOfDayAbsenceStartTime:
+      effective?.kind === "worked" ? (effective.restOfDayAbsenceStartTime ?? null) : null,
+    restOfDayAbsenceEndTime:
+      effective?.kind === "worked" ? (effective.restOfDayAbsenceEndTime ?? null) : null,
+    publishedRestOfDayAbsenceStartTime:
+      published?.kind === "worked" ? (published.restOfDayAbsenceStartTime ?? null) : null,
+    publishedRestOfDayAbsenceEndTime:
+      published?.kind === "worked" ? (published.restOfDayAbsenceEndTime ?? null) : null,
     version: args.version,
     createdBy: args.createdBy ?? null,
     updatedBy: args.updatedBy ?? null,
@@ -504,6 +538,8 @@ function buildScheduleCellSnapshotFromRecord(args: {
     absenceTypeId: snapshot.absence_type_id ?? null,
     customStartTime: snapshot.custom_start_time ?? null,
     customEndTime: snapshot.custom_end_time ?? null,
+    absenceStartTime: snapshot.absence_start_time ?? null,
+    absenceEndTime: snapshot.absence_end_time ?? null,
     seriesId: args.cell.series_id ?? null,
     fromRecurring: args.cell.from_recurring ?? false,
     assignmentLabelMap: args.assignmentLabelMap,

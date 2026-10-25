@@ -318,6 +318,22 @@ function isOverlapConflictError(error: unknown): boolean {
   return typeof message === "string" && message.includes("have overlapping time ranges");
 }
 
+/**
+ * True for 092's refusal of an absence beside a shift that covers no time, or
+ * overlaps the time worked: an edit to put right, not a server fault.
+ */
+function isAbsenceTimesRefusal(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const message = (error as { message?: unknown }).message;
+  return (
+    typeof message === "string" &&
+    (message.includes("The absence has to cover some of the shift's time") ||
+      message.includes("An absence needs both a start and an end time"))
+  );
+}
+
 type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
@@ -404,10 +420,13 @@ function normalizeScheduleInput(
       position: index,
       isMentored: segment.isMentored ?? false,
     })),
-    // The absence for the rest of the day, such as D/Bereavement (item 45).
+    // The absence for the rest of the day, such as D/Bereavement (item 45),
+    // and the time it covers (item 50b), kept only beside an absence.
     absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
+    absenceStartTime: input.absenceTypeId != null ? (input.absenceStartTime ?? null) : null,
+    absenceEndTime: input.absenceTypeId != null ? (input.absenceEndTime ?? null) : null,
     seriesId,
     fromRecurring,
   };
@@ -430,6 +449,8 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
       absenceTypeId: null,
       customStartTime: null,
       customEndTime: null,
+      absenceStartTime: null,
+      absenceEndTime: null,
     };
   }
 
@@ -441,6 +462,8 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
       absenceTypeId: input.absenceTypeId ?? null,
       customStartTime: null,
       customEndTime: null,
+      absenceStartTime: null,
+      absenceEndTime: null,
     };
   }
 
@@ -452,6 +475,8 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
     absenceTypeId: input.absenceTypeId ?? null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
+    absenceStartTime: input.absenceStartTime ?? null,
+    absenceEndTime: input.absenceEndTime ?? null,
   };
 }
 
@@ -504,8 +529,16 @@ async function writeShiftSnapshot(
   }
 
   const state = normalizeScheduleInput(input.state);
-  const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
-    getScheduleCellStorage(state);
+  const {
+    shiftIds,
+    jobIds,
+    isMentoredFlags,
+    absenceTypeId,
+    customStartTime,
+    customEndTime,
+    absenceStartTime,
+    absenceEndTime,
+  } = getScheduleCellStorage(state);
 
   const { error } = await serviceClient.rpc("write_schedule_cell_snapshot", {
     p_org_id: input.orgId,
@@ -519,6 +552,8 @@ async function writeShiftSnapshot(
     p_absence_type_id: absenceTypeId,
     p_custom_start_time: customStartTime,
     p_custom_end_time: customEndTime,
+    p_absence_start_time: absenceStartTime,
+    p_absence_end_time: absenceEndTime,
     p_series_id: state.seriesId ?? null,
     p_from_recurring: state.fromRecurring ?? false,
     p_expected_version: input.expectedVersion ?? null,
@@ -540,7 +575,7 @@ async function writeShiftSnapshot(
 
 /** The nested select `fetchShifts` uses, so echoed cells map identically. */
 const SCHEDULE_CELL_SELECT =
-  "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))";
+  "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, absence_start_time, absence_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))";
 
 type CellEcho = z.infer<typeof cellEchoSchema>;
 
@@ -682,6 +717,8 @@ async function fetchScheduleCellSnapshotPayload(
     is_mentored_flags: boolean[];
     custom_start_time: string | null;
     custom_end_time: string | null;
+    absence_start_time?: string | null;
+    absence_end_time?: string | null;
   }>;
   return rows[0] ?? null;
 }
@@ -703,6 +740,9 @@ function cellStateFromSnapshotPayload(payload: SnapshotPayload | null): Schedule
     absenceTypeId: payload.absence_type_id,
     customStartTime: payload.custom_start_time ?? null,
     customEndTime: payload.custom_end_time ?? null,
+    ...(payload.absence_start_time && payload.absence_end_time
+      ? { absenceStartTime: payload.absence_start_time, absenceEndTime: payload.absence_end_time }
+      : {}),
     seriesId: payload.series_id,
     fromRecurring: payload.from_recurring,
   };
@@ -889,7 +929,7 @@ export async function POST(req: NextRequest) {
           let query = auth.serviceClient
             .from("schedule_cells")
             .select(
-              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
+              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, absence_start_time, absence_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
             )
             .eq("org_id", data.orgId);
           if (data.startDate) {
@@ -1372,6 +1412,8 @@ export async function POST(req: NextRequest) {
           p_job_ids: sourcePayload.job_ids ?? [],
           p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
           // A worked cell's rest-of-day absence (item 45) survives a time edit.
+          // Its times are left for the server to fill from the new end (50b):
+          // kept as they were, they would overlap a later Worked until.
           p_absence_type_id: sourcePayload.absence_type_id ?? null,
           p_custom_start_time: data.customStartTime,
           p_custom_end_time: data.customEndTime,
@@ -1434,8 +1476,16 @@ export async function POST(req: NextRequest) {
         }
 
         const state = normalizeScheduleInput(data.input);
-        const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
-          getScheduleCellStorage(state);
+        const {
+          shiftIds,
+          jobIds,
+          isMentoredFlags,
+          absenceTypeId,
+          customStartTime,
+          customEndTime,
+          absenceStartTime,
+          absenceEndTime,
+        } = getScheduleCellStorage(state);
         const [before, targetBefore] = await Promise.all([
           readCellStateForAudit(auth.serviceClient, data.orgId, data.sourceEmpId, data.sourceDate),
           readCellStateForAudit(auth.serviceClient, data.orgId, data.targetEmpId, data.targetDate),
@@ -1453,6 +1503,8 @@ export async function POST(req: NextRequest) {
           p_absence_type_id: absenceTypeId,
           p_custom_start_time: customStartTime,
           p_custom_end_time: customEndTime,
+          p_absence_start_time: absenceStartTime,
+          p_absence_end_time: absenceEndTime,
           p_drag_mode: data.dragMode ?? "move",
           p_expected_version: data.expectedVersion ?? null,
           p_target_expected_version: data.targetExpectedVersion ?? null,
@@ -1893,7 +1945,7 @@ export async function POST(req: NextRequest) {
           auth.serviceClient
             .from("schedule_cells")
             .select(
-              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
+              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, absence_start_time, absence_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
             )
             .eq("org_id", data.orgId)
             .gte("date", data.startDate)
@@ -2218,6 +2270,16 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    if (isAbsenceTimesRefusal(error)) {
+      return NextResponse.json(
+        {
+          error: "The absence has to cover some of the shift's time, apart from the time worked.",
+          code: "ABSENCE_TIMES",
+        },
+        { status: 422 },
+      );
+    }
+
     if (isOverlapConflictError(error)) {
       return NextResponse.json(
         {
