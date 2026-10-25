@@ -5002,6 +5002,16 @@ function SchedulerContent({
           (workingBaseShift?.customStartTime ?? null) !==
             (session.draftShift?.customStartTime ?? null) ||
           (workingBaseShift?.customEndTime ?? null) !== (session.draftShift?.customEndTime ?? null);
+        // Beside an absence the times-only save would have the server refill
+        // the absence's span as left early, so the whole cell is saved with the
+        // span the panel worked out (item 50c).
+        const absenceSpanChanged =
+          session.draftShift?.restOfDayAbsenceTypeId != null &&
+          (remainingTimeChanged ||
+            (workingBaseShift?.restOfDayAbsenceStartTime ?? null) !==
+              (session.draftShift.restOfDayAbsenceStartTime ?? null) ||
+            (workingBaseShift?.restOfDayAbsenceEndTime ?? null) !==
+              (session.draftShift.restOfDayAbsenceEndTime ?? null));
 
         // Ask the write to hand the changed cell back, so this confirm can
         // merge one cell instead of refetching the org's whole loaded window.
@@ -5012,7 +5022,7 @@ function SchedulerContent({
         };
         let echoedCells: EchoedCells | null = null;
 
-        if (remainingIdentityChanged) {
+        if (remainingIdentityChanged || absenceSpanChanged) {
           if (shiftIsDeleted(session.draftShift)) {
             if (workingShift) {
               echoedCells = await deleteShift(
@@ -9254,6 +9264,8 @@ function SchedulerContent({
               absenceTypes={absenceTypes}
               currentAbsenceTypeId={panelCurrentAbsenceTypeId}
               currentRestOfDayAbsenceTypeId={panelShiftEntry?.restOfDayAbsenceTypeId ?? null}
+              currentRestOfDayAbsenceStartTime={panelShiftEntry?.restOfDayAbsenceStartTime ?? null}
+              currentRestOfDayAbsenceEndTime={panelShiftEntry?.restOfDayAbsenceEndTime ?? null}
             />
           )}
 

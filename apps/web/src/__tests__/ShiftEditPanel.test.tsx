@@ -259,6 +259,8 @@ function renderPanel(
     currentSegments?: ShiftJobSegment[];
     currentAbsenceTypeId?: number | null;
     currentRestOfDayAbsenceTypeId?: number | null;
+    currentRestOfDayAbsenceStartTime?: string | null;
+    currentRestOfDayAbsenceEndTime?: string | null;
     publishedRestOfDayAbsenceTypeId?: number | null;
     onRepeatConfirm?: ReturnType<typeof vi.fn>;
     customStartTime?: string | null;
@@ -313,6 +315,8 @@ function panelElement(
       currentSegments={overrides.currentSegments ?? []}
       currentAbsenceTypeId={overrides.currentAbsenceTypeId ?? null}
       currentRestOfDayAbsenceTypeId={overrides.currentRestOfDayAbsenceTypeId ?? null}
+      currentRestOfDayAbsenceStartTime={overrides.currentRestOfDayAbsenceStartTime ?? null}
+      currentRestOfDayAbsenceEndTime={overrides.currentRestOfDayAbsenceEndTime ?? null}
       publishedRestOfDayAbsenceTypeId={overrides.publishedRestOfDayAbsenceTypeId ?? null}
       onRepeatConfirm={overrides.onRepeatConfirm}
       assignments={overrides.assignmentsOverride ?? assignments}
@@ -1809,19 +1813,24 @@ describe("ShiftEditPanel", () => {
       );
     });
 
-    it("draws the absence last, from where the shift ends, and offers no second absence", () => {
+    it("draws a left-early absence after the shift with what it covers, and offers no second absence", () => {
       renderDay({
         currentRestOfDayAbsenceTypeId: 8,
+        currentRestOfDayAbsenceStartTime: "11:00",
+        currentRestOfDayAbsenceEndTime: "15:00",
         customStartTime: "07:00",
         customEndTime: "11:00",
       });
 
       const card = document.querySelector("[data-rest-of-day-absence-card]");
-      expect(card).toHaveTextContent("Sick");
-      expect(card).toHaveTextContent("Rest of the day, from 11:00 AM");
+      expect(card).toHaveAttribute("data-absence-side", "left-early");
+      expect(card).toHaveTextContent(
+        "Covers 11:00 AM - 3:00 PM, the rest of the Day Shift. No hours.",
+      );
       expect(card).not.toHaveTextContent("Mentored");
       expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
-      expect(screen.getByRole("button", { name: "Add another shift" })).toBeInTheDocument();
+      // Nobody works on after leaving early.
+      expect(screen.queryByRole("button", { name: "Add another shift" })).toBeNull();
     });
 
     it("hides Add another shift at two shifts but still offers an absence", () => {
@@ -1835,9 +1844,15 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByRole("button", { name: "Add an absence" })).toBeInTheDocument();
     });
 
-    it("adds a second shift beside the absence and keeps the absence", async () => {
+    it("adds a later shift beside an arrived-late absence and keeps the absence", async () => {
       const user = userEvent.setup();
-      const { onSelect } = renderDay({ currentRestOfDayAbsenceTypeId: 8 });
+      const { onSelect } = renderDay({
+        currentRestOfDayAbsenceTypeId: 8,
+        currentRestOfDayAbsenceStartTime: "07:00",
+        currentRestOfDayAbsenceEndTime: "11:00",
+        customStartTime: "11:00",
+        customEndTime: "15:00",
+      });
 
       await user.click(screen.getByRole("button", { name: "Add another shift" }));
       expect(screen.queryByRole("button", { name: "S - Sick" })).toBeNull();
@@ -1865,9 +1880,9 @@ describe("ShiftEditPanel", () => {
         currentRestOfDayAbsenceTypeId: 8,
       });
 
-      await user.click(screen.getByRole("button", { name: "Remove Sick for the rest of the day" }));
+      await user.click(screen.getByRole("button", { name: "Remove Sick" }));
       const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent("The shifts stay.");
+      expect(dialog).toHaveTextContent("Remove Sick from Alice Smith on");
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
@@ -1959,9 +1974,9 @@ describe("ShiftEditPanel", () => {
         );
       }
       const absenceCard = document.querySelector<HTMLElement>("[data-rest-of-day-absence-card]");
-      expect(
-        within(absenceCard!).getByRole("button", { name: "Remove Sick for the rest of the day" }),
-      ).toHaveTextContent(/^Remove$/);
+      expect(within(absenceCard!).getByRole("button", { name: "Remove Sick" })).toHaveTextContent(
+        /^Remove$/,
+      );
     });
 
     it("shows Before and After only when a shift that was there is changed", () => {
@@ -2034,223 +2049,391 @@ describe("ShiftEditPanel", () => {
       );
     });
 
-    it("sets only the last shift's end with Worked until, for one shift", async () => {
-      const user = userEvent.setup();
-      const onCustomTimeChange = vi.fn();
-      renderDay({ currentRestOfDayAbsenceTypeId: 8, onCustomTimeChange });
-
-      expect(screen.getByText("When did Alice leave the Day Shift?")).toBeVisible();
-      await user.click(screen.getByRole("button", { name: "Worked until hour" }));
-      await user.click(screen.getByRole("option", { name: "11" }));
-
-      expect(onCustomTimeChange).toHaveBeenLastCalledWith("07:00", "11:00");
-    });
-
-    it("sets only the last shift's end with Worked until, for two shifts", async () => {
-      const user = userEvent.setup();
-      const onCustomTimeChange = vi.fn();
-      renderDay({
-        currentShift: "D/E",
-        currentAssignmentIds: [1, 2],
-        currentSegments: [daySegment, eveningSegment],
-        currentRestOfDayAbsenceTypeId: 8,
-        customStartTime: "06:30|15:00",
-        customEndTime: "14:30|20:00",
-        onCustomTimeChange,
-      });
-
-      expect(screen.getAllByRole("group", { name: "Worked until" })).toHaveLength(1);
-      expect(
-        document.querySelector('[data-shift-edit-card="1"] [data-worked-until]'),
-      ).not.toBeNull();
-      await user.click(screen.getByRole("button", { name: "Worked until hour" }));
-      await user.click(screen.getByRole("option", { name: "7" }));
-
-      expect(onCustomTimeChange).toHaveBeenLastCalledWith("06:30|15:00", "14:30|19:00");
-    });
-
-    describe("Worked until limits (50a)", () => {
+    describe("left early and arrived late (50c)", () => {
       const nightShift = {
         ...timedDay,
         id: 3,
         label: "N",
         name: "Night",
+        shiftId: 13,
         defaultStartTime: "23:00",
         defaultEndTime: "07:00",
       };
+      const segmentFor: Record<number, ShiftJobSegment> = { 11: daySegment, 12: eveningSegment };
+      const labelFor: Record<number, string> = { 11: "D", 12: "E" };
+      const assignmentFor: Record<number, number> = { 11: 1, 12: 2 };
 
-      // Opened on the plain shift, then the absence arrives, so Save has an edit to save.
-      function renderWithAbsence(times: { customStartTime?: string; customEndTime?: string }) {
-        const onSelect = vi.fn();
-        const onClose = vi.fn();
-        const base = {
-          currentShift: "D",
-          currentAssignmentIds: [1],
-          currentSegments: [daySegment],
-          assignmentsOverride: [timedDay, timedEvening, nightShift, generalShift],
-          absenceTypesOverride: [...absenceTypes, sick],
-          allowShiftEdits: true,
-          onCustomTimeChange: vi.fn(),
+      /** The props the schedule page passes back after the panel writes a draft. */
+      function propsFromInput(input: ScheduleCellInput | null) {
+        if (!input || input.kind !== "worked") {
+          return {
+            currentShift: input?.kind === "absence" ? "S" : null,
+            currentSegments: [],
+            currentAssignmentIds: [],
+            currentAbsenceTypeId: input?.kind === "absence" ? input.absenceTypeId : null,
+            currentRestOfDayAbsenceTypeId: null,
+          };
+        }
+        return {
+          currentShift: input.segments.map((segment) => labelFor[segment.shiftId ?? 0]).join("/"),
+          currentSegments: input.segments.map((segment, position) => ({
+            ...segmentFor[segment.shiftId ?? 0],
+            position,
+          })),
+          currentAssignmentIds: input.segments.map(
+            (segment) => assignmentFor[segment.shiftId ?? 0],
+          ),
+          customStartTime: input.customStartTime,
+          customEndTime: input.customEndTime,
+          currentRestOfDayAbsenceTypeId: input.absenceTypeId,
+          currentRestOfDayAbsenceStartTime: input.absenceStartTime ?? null,
+          currentRestOfDayAbsenceEndTime: input.absenceEndTime ?? null,
         };
-        const { rerender } = render(panelElement(base, onSelect, onClose));
-        const reopen = (overrides: Parameters<typeof renderPanel>[0] & object) =>
-          rerender(
-            panelElement(
-              { ...base, currentRestOfDayAbsenceTypeId: 8, ...times, ...overrides },
-              onSelect,
-              onClose,
-            ),
-          );
-        reopen({});
-        return reopen;
       }
 
-      const save = () => screen.getByRole("button", { name: "Save changes" });
+      function DraftHarness({
+        initial,
+        onSelect,
+      }: {
+        initial: Parameters<typeof renderPanel>[0] & object;
+        onSelect: ReturnType<typeof vi.fn>;
+      }) {
+        const [props, setProps] = useState(initial);
+        const [select] = useState(() =>
+          vi.fn((input: ScheduleCellInput | null, scope?: unknown) => {
+            onSelect(input, scope);
+            setProps((previous) => ({ ...previous, ...propsFromInput(input) }));
+          }),
+        );
+        return panelElement(props, select, vi.fn());
+      }
 
-      it("asks for a time and waits to save until one is chosen", () => {
-        renderWithAbsence({});
+      function renderDraft(overrides: Parameters<typeof renderPanel>[0] & object = {}) {
+        const onSelect = vi.fn();
+        render(
+          <DraftHarness
+            onSelect={onSelect}
+            initial={{
+              currentShift: "D",
+              currentAssignmentIds: [1],
+              currentSegments: [daySegment],
+              assignmentsOverride: [timedDay, timedEvening, nightShift, generalShift],
+              absenceTypesOverride: [...absenceTypes, sick],
+              allowShiftEdits: true,
+              onCustomTimeChange: vi.fn(),
+              currentRestOfDayAbsenceTypeId: 8,
+              ...overrides,
+            }}
+          />,
+        );
+        return { onSelect, user: userEvent.setup() };
+      }
+
+      async function pick(
+        user: ReturnType<typeof userEvent.setup>,
+        field: string,
+        part: string,
+        option: string,
+      ) {
+        await user.click(screen.getByRole("button", { name: `${field} ${part}` }));
+        await user.click(screen.getByRole("option", { name: option }));
+      }
+
+      const card = () => document.querySelector<HTMLElement>("[data-rest-of-day-absence-card]")!;
+      const save = () => screen.getByRole("button", { name: "Save changes" });
+      // With no edit to save the footer is hidden; with one, Save waits.
+      const expectSaveBlocked = () => {
+        const button = screen.queryByRole("button", { name: "Save changes" });
+        if (button) expect(button).toBeDisabled();
+      };
+
+      it("asks when they left, then cuts the shift and sends the absence's span", async () => {
+        const { onSelect, user } = renderDraft();
 
         expect(screen.getByText("When did Alice leave the Day Shift?")).toBeVisible();
-        expect(screen.queryByText(/Hours count to/)).toBeNull();
-        expect(save()).toBeDisabled();
+        await pick(user, "Left at", "hour", "11");
+
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            segments: [expect.objectContaining({ shiftId: 11 })],
+            customStartTime: "07:00",
+            customEndTime: "11:00",
+            absenceTypeId: 8,
+            absenceStartTime: "11:00",
+            absenceEndTime: "15:00",
+          }),
+          undefined,
+        );
+        expect(card()).toHaveTextContent(
+          "Covers 11:00 AM - 3:00 PM, the rest of the Day Shift. No hours.",
+        );
+        expect(
+          screen.getByRole("img", { name: "Worked 7:00 AM to 11:00 AM, Sick 11:00 AM to 3:00 PM" }),
+        ).toBeInTheDocument();
+        expect(save()).toBeEnabled();
+      });
+
+      it("moves an arrived-late absence above the shift and covers its start", async () => {
+        const { onSelect, user } = renderDraft({
+          customStartTime: "07:00",
+          customEndTime: "11:00",
+          currentRestOfDayAbsenceStartTime: "11:00",
+          currentRestOfDayAbsenceEndTime: "15:00",
+        });
+
+        await user.click(screen.getByRole("button", { name: "Arrived late" }));
+
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            customStartTime: "11:00",
+            customEndTime: "15:00",
+            absenceStartTime: "07:00",
+            absenceEndTime: "11:00",
+          }),
+          undefined,
+        );
+        expect(card()).toHaveAttribute("data-absence-side", "arrived-late");
+        expect(screen.getByRole("group", { name: "Arrives at" })).toBeInTheDocument();
+        expect(card()).toHaveTextContent(
+          "Covers 7:00 AM - 11:00 AM, the start of the Day Shift. No hours.",
+        );
+        const shiftSwitch = screen.getByRole("switch", { name: "Mentored assignment" });
+        expect(card().compareDocumentPosition(shiftSwitch) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+        expect(
+          screen.getByRole("img", { name: "Sick 7:00 AM to 11:00 AM, Worked 11:00 AM to 3:00 PM" }),
+        ).toBeInTheDocument();
+      });
+
+      it("reopens a stored arrived-late absence on its side", () => {
+        renderDraft({
+          customStartTime: "11:00",
+          customEndTime: "15:00",
+          currentRestOfDayAbsenceStartTime: "07:00",
+          currentRestOfDayAbsenceEndTime: "11:00",
+        });
+
+        expect(card()).toHaveAttribute("data-absence-side", "arrived-late");
+        expect(screen.getByRole("button", { name: "Arrived late" })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+      });
+
+      it("takes off a second shift that wasn't worked, and brings it back when the time moves", async () => {
+        const { onSelect, user } = renderDraft({
+          currentShift: "D/E",
+          currentAssignmentIds: [1, 2],
+          currentSegments: [daySegment, eveningSegment],
+        });
+
+        await pick(user, "Left at", "hour", "1");
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "Pick a time between 7:00 AM, when the Day Shift starts, and 11:00 PM, when the Evening Shift ends.",
+        );
+        await pick(user, "Left at", "AM or PM", "PM");
+
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            segments: [expect.objectContaining({ shiftId: 11, position: 0 })],
+            customStartTime: "07:00",
+            customEndTime: "13:00",
+            absenceStartTime: "13:00",
+            absenceEndTime: "23:00",
+          }),
+          undefined,
+        );
+        expect(card()).toHaveTextContent(
+          "Covers 1:00 PM - 11:00 PM: the rest of the Day Shift and all of the Evening Shift. No hours.",
+        );
+        expect(card()).toHaveTextContent(
+          "The Evening Shift starts after Alice left, so it comes off and Sick covers it.",
+        );
+
+        await pick(user, "Left at", "hour", "7");
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            segments: [
+              expect.objectContaining({ shiftId: 11, position: 0 }),
+              expect.objectContaining({ shiftId: 12, position: 1 }),
+            ],
+            customStartTime: "|15:00",
+            customEndTime: "|19:00",
+            absenceStartTime: "19:00",
+            absenceEndTime: "23:00",
+          }),
+          undefined,
+        );
+      });
+
+      it("brings a shift taken off back when the absence is removed", async () => {
+        const { onSelect, user } = renderDraft({
+          currentShift: "D/E",
+          currentAssignmentIds: [1, 2],
+          currentSegments: [daySegment, eveningSegment],
+        });
+        await pick(user, "Left at", "hour", "1");
+        await pick(user, "Left at", "AM or PM", "PM");
+
+        await user.click(screen.getByRole("button", { name: "Remove Sick" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent(
+          "Remove Sick from Alice Smith on 1/15? The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs). The Evening Shift comes back.",
+        );
+        await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            segments: [
+              expect.objectContaining({ shiftId: 11 }),
+              expect.objectContaining({ shiftId: 12 }),
+            ],
+            customStartTime: null,
+            customEndTime: null,
+            absenceTypeId: null,
+          }),
+          undefined,
+        );
+      });
+
+      it("offers a whole-day absence when the shift was never started", async () => {
+        const { onSelect, user } = renderDraft();
+
+        await pick(user, "Left at", "hour", "7");
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "Alice left when the Day Shift started, so none of it was worked.",
+        );
+        expectSaveBlocked();
+        await user.click(screen.getByRole("button", { name: "Make it Sick for the whole day" }));
+
+        expect(onSelect).toHaveBeenLastCalledWith(
+          expect.objectContaining({ kind: "absence", absenceTypeId: 8, segments: [] }),
+          undefined,
+        );
       });
 
       it("refuses the scheduled end, where the absence covers no time", () => {
-        renderWithAbsence({ customStartTime: "07:00", customEndTime: "15:00" });
+        renderDraft({ customStartTime: "07:00", customEndTime: "15:00" });
 
         expect(screen.getByRole("alert")).toHaveTextContent(
           "The Day Shift ends at 3:00 PM, so Sick would cover no time. Set when Alice left, or remove Sick.",
         );
-        expect(screen.getByRole("group", { name: "Worked until" })).toHaveAttribute(
+        expect(screen.getByRole("group", { name: "Left at" })).toHaveAttribute(
           "aria-invalid",
           "true",
         );
-        expect(save()).toBeDisabled();
+        expectSaveBlocked();
       });
 
       it("refuses a time before the start, which used to count 23.75 hours", () => {
-        renderWithAbsence({ customStartTime: "07:00", customEndTime: "06:45" });
+        renderDraft({ customStartTime: "07:00", customEndTime: "06:45" });
 
         expect(screen.getByRole("alert")).toHaveTextContent(
           "Pick a time after the Day Shift starts at 7:00 AM and before it ends at 3:00 PM.",
         );
-        expect(save()).toBeDisabled();
       });
 
-      it("saves a time inside the shift and counts hours to it", () => {
-        renderWithAbsence({ customStartTime: "07:00", customEndTime: "11:00" });
+      it("names the mirror problem for arrived late", async () => {
+        const { user } = renderDraft({
+          customStartTime: "11:00",
+          customEndTime: "15:00",
+          currentRestOfDayAbsenceStartTime: "07:00",
+          currentRestOfDayAbsenceEndTime: "11:00",
+        });
 
-        expect(screen.queryByRole("alert")).toBeNull();
-        expect(
-          screen.getByText("Hours count to 11:00 AM. The absence covers the rest."),
-        ).toBeVisible();
-        expect(save()).toBeEnabled();
+        await pick(user, "Arrives at", "hour", "7");
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "The Day Shift starts at 7:00 AM, so Sick would cover no time. Set when Alice arrives, or remove Sick.",
+        );
       });
 
       it("accepts a time after midnight on an overnight shift", () => {
-        const reopen = renderWithAbsence({ customStartTime: "23:00", customEndTime: "03:00" });
-        reopen({ currentShift: "N", currentAssignmentIds: [3] });
-
-        expect(screen.queryByRole("alert")).toBeNull();
-        expect(save()).toBeEnabled();
-      });
-
-      it("flags a time the shift no longer covers after the shift changes", () => {
-        const reopen = renderWithAbsence({ customStartTime: "07:00", customEndTime: "11:00" });
-        expect(save()).toBeEnabled();
-
-        reopen({
-          currentShift: "E",
-          currentAssignmentIds: [2],
-          currentSegments: [eveningSegment],
-          customStartTime: "15:00",
+        renderDraft({
+          currentShift: "N",
+          currentAssignmentIds: [3],
+          currentSegments: [{ ...daySegment, shiftId: 13, label: "N" }],
+          customStartTime: "23:00",
+          customEndTime: "03:00",
         });
 
-        expect(screen.getByRole("alert")).toHaveTextContent(
-          "Pick a time after the Evening Shift starts at 3:00 PM and before it ends at 11:00 PM.",
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(card()).toHaveTextContent("Covers 3:00 AM - 7:00 AM");
+      });
+
+      it("keeps a stored span that covered a shift taken off before", () => {
+        renderDraft({
+          customStartTime: "07:00",
+          customEndTime: "13:00",
+          currentRestOfDayAbsenceStartTime: "13:00",
+          currentRestOfDayAbsenceEndTime: "23:00",
+        });
+
+        expect(card()).toHaveTextContent(
+          "Covers 1:00 PM - 11:00 PM: the rest of the Day Shift and the time after it. No hours.",
         );
-        expect(save()).toBeDisabled();
-      });
-
-      it("checks the second of two shifts", () => {
-        const reopen = renderWithAbsence({});
-        reopen({
-          currentShift: "D/E",
-          currentAssignmentIds: [1, 2],
-          currentSegments: [daySegment, eveningSegment],
-          customStartTime: "|15:00",
-          customEndTime: "|19:00",
-        });
-
-        expect(screen.queryByRole("alert")).toBeNull();
-        expect(
-          screen.getByText("Hours count to 7:00 PM. The absence covers the rest."),
-        ).toBeVisible();
-        expect(save()).toBeEnabled();
       });
     });
 
     describe("adding and removing the absence (50a)", () => {
       async function addSick(times: { customStartTime?: string; customEndTime?: string }) {
         const user = userEvent.setup();
-        const onCustomTimeChange = vi.fn();
-        const { onSelect } = renderDay({ ...times, onCustomTimeChange });
+        const { onSelect } = renderDay({ ...times, onCustomTimeChange: vi.fn() });
         await user.click(screen.getByRole("button", { name: "Add an absence" }));
         await user.click(screen.getByRole("button", { name: "S - Sick" }));
-        return { onSelect, onCustomTimeChange };
+        return { onSelect };
       }
 
-      it("leaves Worked until unset on a shift with no time of its own", async () => {
-        const { onSelect, onCustomTimeChange } = await addSick({});
+      it("leaves the time unset on a shift with no time of its own", async () => {
+        const { onSelect } = await addSick({});
 
         expect(onSelect).toHaveBeenLastCalledWith(
-          expect.objectContaining({ absenceTypeId: 8, customEndTime: null }),
+          expect.objectContaining({
+            absenceTypeId: 8,
+            customEndTime: null,
+            absenceStartTime: null,
+          }),
           undefined,
         );
-        expect(onCustomTimeChange).not.toHaveBeenCalled();
       });
 
       it("clears a time at the scheduled end, which the absence could not cover", async () => {
-        const { onSelect, onCustomTimeChange } = await addSick({
-          customStartTime: "07:00",
-          customEndTime: "15:00",
-        });
+        const { onSelect } = await addSick({ customStartTime: "07:00", customEndTime: "15:00" });
 
         expect(onSelect).toHaveBeenLastCalledWith(
           expect.objectContaining({ absenceTypeId: 8, customEndTime: null }),
           undefined,
         );
-        expect(onCustomTimeChange).toHaveBeenLastCalledWith("07:00", null);
       });
 
-      it("keeps a time already before the scheduled end", async () => {
-        const { onSelect, onCustomTimeChange } = await addSick({
-          customStartTime: "07:00",
-          customEndTime: "11:00",
-        });
+      it("keeps a time already before the scheduled end, and times the absence from it", async () => {
+        const { onSelect } = await addSick({ customStartTime: "07:00", customEndTime: "11:00" });
 
         expect(onSelect).toHaveBeenLastCalledWith(
-          expect.objectContaining({ absenceTypeId: 8, customEndTime: "11:00" }),
+          expect.objectContaining({
+            absenceTypeId: 8,
+            customEndTime: "11:00",
+            absenceStartTime: "11:00",
+            absenceEndTime: "15:00",
+          }),
           undefined,
         );
-        expect(onCustomTimeChange).not.toHaveBeenCalled();
       });
 
       it("puts the shift back to its scheduled times when the absence is removed", async () => {
         const user = userEvent.setup();
-        const onCustomTimeChange = vi.fn();
         const { onSelect } = renderDay({
           currentRestOfDayAbsenceTypeId: 8,
+          currentRestOfDayAbsenceStartTime: "11:00",
+          currentRestOfDayAbsenceEndTime: "15:00",
           customStartTime: "07:00",
           customEndTime: "11:00",
-          onCustomTimeChange,
+          onCustomTimeChange: vi.fn(),
         });
 
-        await user.click(
-          screen.getByRole("button", { name: "Remove Sick for the rest of the day" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Remove Sick" }));
         expect(screen.getByRole("dialog")).toHaveTextContent(
-          "The shifts stay. The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs).",
+          "The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs).",
         );
         await user.click(screen.getByRole("button", { name: "Remove" }));
 
@@ -2262,16 +2445,13 @@ describe("ShiftEditPanel", () => {
           }),
           undefined,
         );
-        expect(onCustomTimeChange).toHaveBeenLastCalledWith(null, null);
       });
 
       it("says nothing about times when the shift never had its own", async () => {
         const user = userEvent.setup();
         renderDay({ currentRestOfDayAbsenceTypeId: 8, onCustomTimeChange: vi.fn() });
 
-        await user.click(
-          screen.getByRole("button", { name: "Remove Sick for the rest of the day" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Remove Sick" }));
         expect(screen.getByRole("dialog")).not.toHaveTextContent("goes back to");
       });
 
@@ -2313,9 +2493,9 @@ describe("ShiftEditPanel", () => {
       });
     });
 
-    it("shows no Worked until without an absence", () => {
+    it("shows no Left at without an absence", () => {
       renderDay({ onCustomTimeChange: vi.fn() });
-      expect(screen.queryByRole("group", { name: "Worked until" })).toBeNull();
+      expect(screen.queryByRole("group", { name: "Left at" })).toBeNull();
     });
 
     it("makes Repeat unavailable on a shift with an absence, and says why", () => {

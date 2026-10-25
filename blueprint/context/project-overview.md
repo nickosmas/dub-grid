@@ -308,9 +308,10 @@ Item 50 is split:
   rows read as running from the last shift's end to its scheduled end.
   Migration 092; the server fills times a save leaves out and refuses an
   absence that covers no time or overlaps the work.
-- **50c - Web panel:** Left early or Arrived late, a Left at (or Arrives
-  at) time, a later shift that wasn't worked comes off, a "never started"
-  choice that becomes a whole-day absence, and the day bar.
+- **50c - Web panel:** shipped; the absence card offers Left early (Left at)
+  or Arrived late (Arrives at), cuts the shift there, takes off a shift that
+  wasn't worked and brings it back when the time moves, offers a whole-day
+  absence when none of the shift was worked, and draws the day bar.
 - **50d - Grid and other web surfaces:** pills in time order with the
   absence's times, joined by time, weekdays on overnight times; print,
   phone Day view, Month, dashboards and person page.

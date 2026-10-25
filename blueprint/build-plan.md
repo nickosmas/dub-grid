@@ -1044,7 +1044,7 @@
   - [x] 50b. **Data model** - the absence stores its own start and end;
         existing rows read as running from the last shift's end to its
         scheduled end. Needs a migration.
-  - [ ] 50c. **Web panel** - Left early or Arrived late, a Left at (or
+  - [x] 50c. **Web panel** - Left early or Arrived late, a Left at (or
         Arrives at) time, a later shift that wasn't worked comes off, a
         "never started" choice that becomes a whole-day absence, and the
         day bar.
