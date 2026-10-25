@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 49 are
-shipped. Item 40 is in progress. Item 50 is in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,7 +84,7 @@ shipped. Item 40 is in progress. Item 50 is in progress.
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
-| 50   | In progress | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
+| 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 
 Item 40 is split:
 
@@ -299,7 +299,7 @@ nobody else can fill a gap, has no rest rules yet, and never includes
 approvals (owner decisions, 2026-10-22). The Tools item that fills from
 recurring schedules is named Fill from Recurring Schedules (2026-10-22).
 
-Item 50 is split:
+Item 50 is split, and every part has shipped:
 
 - **50a - Worked until limits:** shipped; times stay inside the shift (no
   23.75-hour shift from a time before the start), the absence must cover
@@ -308,17 +308,25 @@ Item 50 is split:
   rows read as running from the last shift's end to its scheduled end.
   Migration 092; the server fills times a save leaves out and refuses an
   absence that covers no time or overlaps the work.
-- **50c - Web panel:** Left early or Arrived late, a Left at (or Arrives
-  at) time, a later shift that wasn't worked comes off, a "never started"
-  choice that becomes a whole-day absence, and the day bar.
-- **50d - Grid and other web surfaces:** pills in time order with the
-  absence's times, joined by time, weekdays on overnight times; print,
-  phone Day view, Month, dashboards and person page.
-- **50e - Change records:** Before and After, alerts, push, activity log,
-  publish history, reports, CSV and calendar show the absence's time span.
-- **50f - Mobile app:** Your Week, team list, shift detail and Home card.
-- **50g - Requests and availability:** the unavailable rule follows the
-  absence's span; pasting a mixed cell copies only its shifts.
+- **50c - Web panel:** shipped; the absence card offers Left early (Left at)
+  or Arrived late (Arrives at), cuts the shift there, takes off a shift that
+  wasn't worked and brings it back when the time moves, offers a whole-day
+  absence when none of the shift was worked, and draws the day bar.
+- **50d - Grid and other web surfaces:** shipped; the grid, print, the
+  phone-width Day view and both dashboards put the absence in time order
+  (first when they arrived late), join it to the shift it meets, and name the
+  time it covers, with the next day named past midnight.
+- **50e - Change records:** shipped; Before and After, alerts, push, the
+  activity log, reports, CSV, export and the calendar name the time an absence
+  covers ("Sick 11:00 AM - 3:00 PM, not worked"), in time order, and a change
+  to that time alone is a change.
+- **50f - Mobile app:** shipped; Your Week, the Home card and shift detail
+  show the time an absence covers, before the shift when they arrived late,
+  from a span and side the server adds to each entry.
+- **50g - Requests and availability:** shipped; after leaving early someone
+  takes no more work that day, after arriving late only overlapping shifts
+  are out, in requests, volunteering and staffing (migration 093), and
+  copying a cell with an absence copies only its shifts.
 
 An absence beside a shift records the part of a shift someone missed: they
 left early or arrived late. It shows the time it covers, sits in time order,
@@ -496,7 +504,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `089`.
+  checksum-locked through `093`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

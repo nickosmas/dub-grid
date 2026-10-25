@@ -2472,6 +2472,34 @@ describe("ScheduleScreen", () => {
     expect(hero.textContent!.indexOf("Sick")).toBeGreaterThan(hero.textContent!.indexOf("Mentor"));
   });
 
+  it("lists an arrived-late absence before the shift in Your Week, with its time (item 50)", () => {
+    const entry = withRestOfDaySick(createScheduleEntry());
+    meScheduleEntries = [
+      {
+        ...entry,
+        presentation: {
+          ...entry.presentation,
+          restOfDayAbsence: {
+            ...entry.presentation.restOfDayAbsence!,
+            startTime: "07:00",
+            endTime: "09:00",
+            arrivedLate: true,
+          },
+        },
+      },
+    ];
+
+    render(<HomeScheduleScreen />);
+
+    const row = screen.getByTestId("upcoming-rest-of-day-row-2026-04-16");
+    expect(row).toHaveTextContent("7:00 AM - 9:00 AM");
+    expect(row).not.toHaveTextContent("Rest of the day");
+    const list = row.closest("[data-testid]")?.parentElement?.parentElement ?? document.body;
+    expect(list.textContent!.indexOf("7:00 AM - 9:00 AM")).toBeLessThan(
+      list.textContent!.lastIndexOf("Day Shift"),
+    );
+  });
+
   it("puts the absence for the rest of the day after the shift on a team row", () => {
     teamScheduleEntries = teamScheduleEntries.map((entry, index) =>
       index === 0 ? withRestOfDaySick(entry) : entry,

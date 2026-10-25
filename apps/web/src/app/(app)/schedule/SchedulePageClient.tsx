@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  entryAbsenceSpan,
+  layoutEntryAbsence,
+  withoutAbsenceBesideShifts,
+  type AbsencePillLayout,
+} from "@/lib/absence-pill";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -3063,13 +3069,30 @@ function SchedulerContent({
       const text = shiftNameForKey(empId, date);
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!text || !entry) return text;
-      const restOfDayAbsenceTypeId =
-        (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0
-          ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
-          : (entry.restOfDayAbsenceTypeId ?? null);
+      const published = (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0;
+      const restOfDayAbsenceTypeId = published
+        ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
+        : (entry.restOfDayAbsenceTypeId ?? null);
       return withRestOfDayAbsence(
         text,
         restOfDayAbsenceTypeId != null ? absenceTypeMap.get(restOfDayAbsenceTypeId) : undefined,
+        entryAbsenceSpan(
+          published
+            ? {
+                segments: entry.publishedSegments ?? [],
+                customStartTime: entry.publishedCustomStartTime,
+                customEndTime: entry.publishedCustomEndTime,
+                absenceStartTime: entry.publishedRestOfDayAbsenceStartTime,
+                absenceEndTime: entry.publishedRestOfDayAbsenceEndTime,
+              }
+            : {
+                segments: entry.segments ?? [],
+                customStartTime: entry.customStartTime,
+                customEndTime: entry.customEndTime,
+                absenceStartTime: entry.restOfDayAbsenceStartTime,
+                absenceEndTime: entry.restOfDayAbsenceEndTime,
+              },
+        ),
       );
     },
     [absenceTypeMap, shiftNameForKey, shifts],
@@ -3162,6 +3185,36 @@ function SchedulerContent({
   const restOfDayAbsenceTypeIdForKey = useCallback(
     (empId: string, date: Date): number | null =>
       shifts[`${empId}_${formatDateKey(date)}`]?.restOfDayAbsenceTypeId ?? null,
+    [shifts],
+  );
+
+  // Where that absence sits beside the shifts and the time it covers (item 50d).
+  const restOfDayAbsenceLayoutForKey = useCallback(
+    (empId: string, date: Date): AbsencePillLayout | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (entry?.restOfDayAbsenceTypeId == null && entry?.publishedRestOfDayAbsenceTypeId == null) {
+        return null;
+      }
+      const range = (start?: string | null, end?: string | null) =>
+        start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null;
+      return {
+        ...layoutEntryAbsence(
+          {
+            segments: entry.segments ?? [],
+            customStartTime: entry.customStartTime,
+            customEndTime: entry.customEndTime,
+            absenceStartTime: entry.restOfDayAbsenceStartTime,
+            absenceEndTime: entry.restOfDayAbsenceEndTime,
+          },
+          date,
+        ),
+        range: range(entry.restOfDayAbsenceStartTime, entry.restOfDayAbsenceEndTime),
+        publishedRange: range(
+          entry.publishedRestOfDayAbsenceStartTime,
+          entry.publishedRestOfDayAbsenceEndTime,
+        ),
+      };
+    },
     [shifts],
   );
 
@@ -5002,6 +5055,16 @@ function SchedulerContent({
           (workingBaseShift?.customStartTime ?? null) !==
             (session.draftShift?.customStartTime ?? null) ||
           (workingBaseShift?.customEndTime ?? null) !== (session.draftShift?.customEndTime ?? null);
+        // Beside an absence the times-only save would have the server refill
+        // the absence's span as left early, so the whole cell is saved with the
+        // span the panel worked out (item 50c).
+        const absenceSpanChanged =
+          session.draftShift?.restOfDayAbsenceTypeId != null &&
+          (remainingTimeChanged ||
+            (workingBaseShift?.restOfDayAbsenceStartTime ?? null) !==
+              (session.draftShift.restOfDayAbsenceStartTime ?? null) ||
+            (workingBaseShift?.restOfDayAbsenceEndTime ?? null) !==
+              (session.draftShift.restOfDayAbsenceEndTime ?? null));
 
         // Ask the write to hand the changed cell back, so this confirm can
         // merge one cell instead of refetching the org's whole loaded window.
@@ -5012,7 +5075,7 @@ function SchedulerContent({
         };
         let echoedCells: EchoedCells | null = null;
 
-        if (remainingIdentityChanged) {
+        if (remainingIdentityChanged || absenceSpanChanged) {
           if (shiftIsDeleted(session.draftShift)) {
             if (workingShift) {
               echoedCells = await deleteShift(
@@ -5676,7 +5739,15 @@ function SchedulerContent({
       ) {
         return;
       }
-      setClipboard(buildEntryPayload(shift));
+      const payload = buildEntryPayload(shift);
+      // An absence beside the shifts belongs to that day, so a copy takes only
+      // the shifts, with the edge the absence cut back at its scheduled time.
+      if (payload.kind === "worked" && payload.absenceTypeId != null) {
+        setClipboard(withoutAbsenceBesideShifts(payload, shift.segments ?? []));
+        toast.success("Shifts copied, without the absence");
+        return;
+      }
+      setClipboard(payload);
       toast.success("Entry copied");
     },
     [shifts, buildEntryPayload],
@@ -7569,6 +7640,7 @@ function SchedulerContent({
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
           restOfDayAbsenceTypeIdForKey,
+          restOfDayAbsenceLayoutForKey,
           publishedRestOfDayAbsenceTypeIdForKey,
           publishDiffForKey: publishDiffKindForKey,
           publishedMetadataForKey,
@@ -7620,6 +7692,7 @@ function SchedulerContent({
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
       restOfDayAbsenceTypeIdForKey,
+      restOfDayAbsenceLayoutForKey,
       publishedRestOfDayAbsenceTypeIdForKey,
       publishDiffKindForKey,
       publishedMetadataForKey,
@@ -8625,6 +8698,7 @@ function SchedulerContent({
                 shiftDisplayMode={org?.shiftDisplayMode}
                 absenceTypeIdForKey={absenceTypeIdForKey}
                 restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+                restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                 absenceTypeMap={absenceTypeObjectMap}
                 highlightEmpIds={searchMatchedEmployeeIds}
                 highlightScrollKey={normalizedStaffSearch || undefined}
@@ -9254,6 +9328,8 @@ function SchedulerContent({
               absenceTypes={absenceTypes}
               currentAbsenceTypeId={panelCurrentAbsenceTypeId}
               currentRestOfDayAbsenceTypeId={panelShiftEntry?.restOfDayAbsenceTypeId ?? null}
+              currentRestOfDayAbsenceStartTime={panelShiftEntry?.restOfDayAbsenceStartTime ?? null}
+              currentRestOfDayAbsenceEndTime={panelShiftEntry?.restOfDayAbsenceEndTime ?? null}
             />
           )}
 
@@ -9424,6 +9500,7 @@ function SchedulerContent({
               assignmentIdsForKey={assignmentIdsForKey}
               absenceTypeIdForKey={absenceTypeIdForKey}
               restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+              restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
               absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}

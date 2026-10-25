@@ -1,4 +1,5 @@
 "use client";
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 
 import type React from "react";
 
@@ -63,6 +64,8 @@ export interface ScheduleGridAccessors {
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** Where that absence sits and the time it covers (item 50d). */
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,

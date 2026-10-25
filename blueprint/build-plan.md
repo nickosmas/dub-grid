@@ -1027,7 +1027,7 @@
   - [x] 49f. **Allow a sixth day** - an option chosen before generating
         lets a build give someone a sixth day in a row (never a seventh),
         with a warning, and the result names everyone given one.
-- [ ] 50. **An absence covers scheduled time that wasn't worked** - an
+- [x] 50. **An absence covers scheduled time that wasn't worked** - an
       absence beside a shift records the part of the shift someone missed,
       not "the rest of the day": they left early (Sick from 11:00 AM to the
       end of the Day shift) or arrived late (PTO until 11:00 AM, then work).
@@ -1044,17 +1044,17 @@
   - [x] 50b. **Data model** - the absence stores its own start and end;
         existing rows read as running from the last shift's end to its
         scheduled end. Needs a migration.
-  - [ ] 50c. **Web panel** - Left early or Arrived late, a Left at (or
+  - [x] 50c. **Web panel** - Left early or Arrived late, a Left at (or
         Arrives at) time, a later shift that wasn't worked comes off, a
         "never started" choice that becomes a whole-day absence, and the
         day bar.
-  - [ ] 50d. **Grid and other web surfaces** - pills in time order with the
+  - [x] 50d. **Grid and other web surfaces** - pills in time order with the
         absence's times, joined by time, weekdays on overnight times; print,
         phone Day view, Month, dashboards and person page.
-  - [ ] 50e. **Change records** - Before and After, alerts, push, activity
+  - [x] 50e. **Change records** - Before and After, alerts, push, activity
         log, publish history, reports, CSV and calendar show the absence's
         time span.
-  - [ ] 50f. **Mobile app** - Your Week, team list, shift detail and Home
+  - [x] 50f. **Mobile app** - Your Week, team list, shift detail and Home
         card.
-  - [ ] 50g. **Requests and availability** - the unavailable rule follows
+  - [x] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.

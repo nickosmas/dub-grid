@@ -100,6 +100,7 @@ import {
 import { scheduleNoteGroups } from "../lib/scheduleNotes";
 import {
   buildRestOfDayAbsenceChip,
+  restOfDayAbsenceTimeLabel,
   describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
 } from "../lib/scheduleScreenChips";
@@ -1492,9 +1493,13 @@ export default function ShiftDetailScreen() {
               {restOfDayChip ? (
                 <DetailInfoRow
                   iconName="calendar-clear-outline"
-                  label="Rest of the day"
+                  label={restOfDayAbsenceTimeLabel(shiftEntry) ? "Absence" : "Rest of the day"}
                   tone="green"
-                  value={restOfDayChip.label}
+                  value={
+                    restOfDayAbsenceTimeLabel(shiftEntry)
+                      ? `${restOfDayChip.label}, ${restOfDayAbsenceTimeLabel(shiftEntry)}, not worked`
+                      : restOfDayChip.label
+                  }
                 />
               ) : null}
               {hasSplitShift && canCreateRequestsForShift ? (

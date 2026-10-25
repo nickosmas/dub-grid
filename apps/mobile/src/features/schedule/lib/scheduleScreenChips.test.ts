@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { mobileColors } from "../../../shared/theme/tokens";
 import { buildWeeklyHoursSummary } from "./schedule";
 import {
+  restOfDayAbsenceComesFirst,
+  restOfDayAbsenceTimeLabel,
   buildRestOfDayAbsenceChip,
   describeScheduleEntryChanges,
   getScheduleEntrySegmentChange,
@@ -245,5 +247,31 @@ describe("buildRestOfDayAbsenceChip", () => {
       buildWeeklyHoursSummary([entry([day], null)], 40).scheduledHours,
     );
     expect(buildWeeklyHoursSummary([mixed()], 40).scheduledHours).toBeGreaterThan(0);
+  });
+});
+
+describe("restOfDayAbsenceTimeLabel and restOfDayAbsenceComesFirst (item 50)", () => {
+  const entry = (absence: Record<string, unknown> | null) =>
+    ({ presentation: { restOfDayAbsence: absence } }) as never;
+  const sick = {
+    absenceTypeId: 8,
+    label: "S",
+    name: "Sick",
+    color: null,
+    borderColor: null,
+    textColor: null,
+  };
+
+  it("names the time it covers, and nothing for an untimed one", () => {
+    expect(
+      restOfDayAbsenceTimeLabel(entry({ ...sick, startTime: "11:00", endTime: "15:00" })),
+    ).toBe("11:00 AM - 3:00 PM");
+    expect(restOfDayAbsenceTimeLabel(entry(sick))).toBeNull();
+    expect(restOfDayAbsenceTimeLabel(entry(null))).toBeNull();
+  });
+
+  it("comes first only when they arrived late", () => {
+    expect(restOfDayAbsenceComesFirst(entry({ ...sick, arrivedLate: true }))).toBe(true);
+    expect(restOfDayAbsenceComesFirst(entry(sick))).toBe(false);
   });
 });

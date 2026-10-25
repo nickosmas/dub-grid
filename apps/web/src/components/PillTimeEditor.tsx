@@ -514,13 +514,16 @@ export function PillTimeEditor({
 
 /** When the last shift actually ended, beside an absence for the rest of the day (items 45, 50a). */
 export function WorkedUntilField({
+  label,
   end,
   message,
   onChange,
 }: {
-  /** The last shift's custom end, or null while no time is chosen. */
+  /** "Left at" or "Arrives at" (item 50c). */
+  label: string;
+  /** The time chosen, or null while none is. */
   end: string | null;
-  /** What to pick, or why the time can't stand; null when the time is valid. */
+  /** What to pick, what the absence covers, or why the time can't stand. */
   message: { text: string; error: boolean } | null;
   onChange: (end: string) => void;
 }) {
@@ -530,17 +533,10 @@ export function WorkedUntilField({
     if (next) onChange(next);
   }
   return (
-    <div
-      data-worked-until
-      style={{
-        marginTop: 10,
-        paddingTop: 10,
-        borderTop: "1px solid var(--dg-color-border-light)",
-      }}
-    >
+    <div data-worked-until>
       <div
         role="group"
-        aria-label="Worked until"
+        aria-label={label}
         aria-invalid={message?.error || undefined}
         style={{ display: "flex", alignItems: "center", gap: 4 }}
       >
@@ -553,14 +549,14 @@ export function WorkedUntilField({
             whiteSpace: "nowrap",
           }}
         >
-          Worked until
+          {label}
         </span>
         <TimeDropdown
           value={e.hour}
           options={hourOptions}
           onChange={(v) => update(v, e.minute, e.period)}
           width={60}
-          ariaLabel="Worked until hour"
+          ariaLabel={`${label} hour`}
         />
         <span
           style={{
@@ -576,17 +572,17 @@ export function WorkedUntilField({
           options={minuteOptions}
           onChange={(v) => update(e.hour, v, e.period)}
           width={60}
-          ariaLabel="Worked until minute"
+          ariaLabel={`${label} minute`}
         />
         <TimeDropdown
           value={e.period}
           options={periodOptions}
           onChange={(v) => update(e.hour, e.minute, v as "AM" | "PM")}
           width={64}
-          ariaLabel="Worked until AM or PM"
+          ariaLabel={`${label} AM or PM`}
         />
       </div>
-      {message ? (
+      {message && (
         <div
           data-worked-until-message={message.error ? "error" : "prompt"}
           role={message.error ? "alert" : undefined}
@@ -600,19 +596,6 @@ export function WorkedUntilField({
         >
           {message.text}
         </div>
-      ) : (
-        end && (
-          <div
-            className="dg-tabular-nums"
-            style={{
-              marginTop: 6,
-              fontSize: "var(--dg-fs-footnote)",
-              color: "var(--dg-color-text-muted)",
-            }}
-          >
-            Hours count to {fmt12h(end)}. The absence covers the rest.
-          </div>
-        )
       )}
     </div>
   );

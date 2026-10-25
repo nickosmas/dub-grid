@@ -1,3 +1,4 @@
+import { absenceBlocksWork } from "@dubgrid/schedule-core";
 import type {
   AssignmentDefinition,
   GridOpenShift,
@@ -18,8 +19,11 @@ export interface StaffingScheduleState {
   segments: ScheduleCellSegmentInput[];
   assignmentIds: number[];
   absenceTypeId: number | null;
-  /** A worked cell's absence for the rest of the day. */
+  /** A worked cell's absence beside its shifts. */
   restOfDayAbsenceTypeId?: number | null;
+  /** The time it covers (item 50); null when untimed. */
+  restOfDayAbsenceStartTime?: string | null;
+  restOfDayAbsenceEndTime?: string | null;
   customStartTime: string | null;
   customEndTime: string | null;
   seriesId?: string | null;
@@ -38,6 +42,8 @@ export function staffingStateFromEntry(
         assignmentIds: effective.assignmentIds,
         absenceTypeId: effective.absenceTypeId ?? null,
         restOfDayAbsenceTypeId: entry?.restOfDayAbsenceTypeId ?? null,
+        restOfDayAbsenceStartTime: entry?.restOfDayAbsenceStartTime ?? null,
+        restOfDayAbsenceEndTime: entry?.restOfDayAbsenceEndTime ?? null,
         customStartTime: effective.customStartTime ?? null,
         customEndTime: effective.customEndTime ?? null,
         seriesId: effective.seriesId ?? null,
@@ -255,10 +261,27 @@ export function buildOpenShiftStaffingCandidates({
         return [];
       }
       const existingState = scheduleByEmployeeId.get(employee.id) ?? null;
-      // Someone absent for the rest of the day takes no more work that day
-      // (owner, 2026-10-21).
-      if (existingState?.restOfDayAbsenceTypeId != null) return [];
       const existingRanges = getStaffingStateTimeRanges(existingState, context);
+      // After leaving early someone takes no more work that day; after
+      // arriving late, only work the absence overlaps is out (item 50).
+      const absenceSpan =
+        existingState?.restOfDayAbsenceStartTime && existingState.restOfDayAbsenceEndTime
+          ? {
+              start: existingState.restOfDayAbsenceStartTime.slice(0, 5),
+              end: existingState.restOfDayAbsenceEndTime.slice(0, 5),
+            }
+          : null;
+      const workSpan =
+        existingRanges.length > 0
+          ? {
+              start: existingRanges[0].start.slice(0, 5),
+              end: existingRanges[existingRanges.length - 1].end.slice(0, 5),
+            }
+          : null;
+      const absenceBlocks = (ranges: TimeRange[]) =>
+        existingState?.restOfDayAbsenceTypeId != null &&
+        absenceBlocksWork(absenceSpan, workSpan, ranges) != null;
+      if (absenceBlocks([])) return [];
       const existingAlignedRanges = getStaffingStateAlignedTimeRanges(existingState, context);
       // Work with only a duration (a shiftless job with no start and end) has
       // no window to check against, so it cannot be shown as conflict-free.
@@ -278,6 +301,7 @@ export function buildOpenShiftStaffingCandidates({
             );
           }) &&
           !timesOverlap(existingRanges, option.timeRanges) &&
+          !absenceBlocks(option.timeRanges) &&
           !hasAdjacentDateConflict(option, adjacentScheduleByEmployeeId?.get(employee.id), context),
       );
       return qualifiedOptions.length > 0

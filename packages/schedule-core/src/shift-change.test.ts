@@ -410,3 +410,66 @@ describe("isNewShiftChange", () => {
     expect(isNewShiftChange(describeShiftChange({ items: [] }, { items: [] }, date))).toBe(false);
   });
 });
+
+describe("describeShiftChange, an absence with its own time (item 50)", () => {
+  const sick = (start: string, end: string) => ({
+    kind: "absence" as const,
+    key: "absence:4",
+    name: "Sick",
+    scope: "restOfDay" as const,
+    start,
+    end,
+  });
+
+  it("writes the time it covers, not worked, and no hours", () => {
+    const item = describeShiftChangeItem(sick("11:00", "15:00"), { date: WED });
+    expect(text(item.title)).toBe("Sick");
+    expect(text(item.detail)).toBe("11:00 AM - 3:00 PM, not worked");
+    expect(item.plain).toBe("Sick 11:00 AM - 3:00 PM, not worked");
+    expect(item.minutes).toBeNull();
+  });
+
+  it("puts a left-early absence after the shift and draws it on the bar", () => {
+    const change = describeShiftChange(
+      { items: [shift()] },
+      { items: [shift({ end: "11:00" }), sick("11:00", "15:00")] },
+      { date: WED },
+    );
+    expect(change.after.items.map((item) => item.kind)).toEqual(["shift", "absence"]);
+    expect(change.after.items[1].bar).toEqual({ from: 240, to: 480 });
+    expect(change.barScale).toEqual({ start: "07:00", end: "15:00", minutes: 480 });
+    expect(change.after.totalMinutes).toBe(240);
+  });
+
+  it("puts an arrived-late absence first", () => {
+    const change = describeShiftChange(
+      { items: [shift()] },
+      { items: [shift({ start: "11:00" }), sick("07:00", "11:00")] },
+      { date: WED },
+    );
+    expect(change.after.items.map((item) => item.kind)).toEqual(["absence", "shift"]);
+    expect(change.after.items[0].bar).toEqual({ from: 0, to: 240 });
+    expect(change.after.items[1].label).toBe("shift1");
+  });
+
+  it("names the next day on an absence after midnight", () => {
+    const night = shift({ shiftName: "Night", start: "23:00", end: "03:00" });
+    const change = describeShiftChange(
+      { items: [shift({ shiftName: "Night", start: "23:00", end: "07:00" })] },
+      { items: [night, sick("03:00", "07:00")] },
+      { date: WED },
+    );
+    expect(text(change.after.items[1].detail)).toBe("Thu 3:00 AM - 7:00 AM, not worked");
+  });
+
+  it("marks a change to its time alone", () => {
+    const change = describeShiftChange(
+      { items: [shift({ end: "11:00" }), sick("11:00", "15:00")] },
+      { items: [shift({ end: "12:00" }), sick("12:00", "15:00")] },
+      { date: WED },
+    );
+    const absence = change.after.items[1];
+    expect(absence.status).toBe("changed");
+    expect(absence.detail[0]).toEqual({ text: "12:00 PM", changed: true });
+  });
+});

@@ -1,3 +1,4 @@
+import { joinAbsenceBesideShifts } from "@dubgrid/schedule-core";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS, fetchAllRows } from "@/lib/db/shared";
 import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
@@ -408,14 +409,35 @@ export function hasPublishedScheduleContent(row: PublishedShiftRow): boolean {
  * nothing.
  */
 export function publishedCellText(
-  entry: Pick<PublishedScheduleEntry, "kind" | "label" | "restOfDayAbsenceTypeId">,
+  entry: Pick<
+    PublishedScheduleEntry,
+    | "kind"
+    | "label"
+    | "restOfDayAbsenceTypeId"
+    | "restOfDayAbsenceStartTime"
+    | "restOfDayAbsenceEndTime"
+    | "startTime"
+    | "endTime"
+  >,
   absenceTypeById: Map<number, string>,
 ): string {
   const restOfDay =
     entry.kind === "shift" && entry.restOfDayAbsenceTypeId != null
       ? absenceTypeById.get(entry.restOfDayAbsenceTypeId)
       : undefined;
-  return restOfDay ? `${entry.label} / ${restOfDay}` : entry.label;
+  if (!restOfDay) return entry.label;
+  const span =
+    entry.restOfDayAbsenceStartTime && entry.restOfDayAbsenceEndTime
+      ? {
+          start: entry.restOfDayAbsenceStartTime.slice(0, 5),
+          end: entry.restOfDayAbsenceEndTime.slice(0, 5),
+        }
+      : null;
+  const work =
+    entry.startTime && entry.endTime
+      ? { start: entry.startTime.slice(0, 5), end: entry.endTime.slice(0, 5) }
+      : null;
+  return joinAbsenceBesideShifts(entry.label, restOfDay, span, work);
 }
 
 export function resolvePublishedScheduleEntry(

@@ -40,11 +40,22 @@ import {
   subtractOneHour,
   addOneHour,
   orderSegmentsByStartTime,
-  withLastShiftEnd,
+  normalizeTime,
   withoutLastShiftTimes,
-  workedUntilProblem,
 } from "./shiftEditTime";
 import { PillTimeEditor, WorkedUntilField } from "./PillTimeEditor";
+import {
+  absenceBaseFromCell,
+  absenceSideOf,
+  clockSpanMinutes,
+  effectiveRange,
+  planAbsenceCell,
+  type AbsenceBase,
+  type AbsenceSide,
+  type ClockRange,
+} from "./absence-span";
+import { AbsenceDayBar } from "./AbsenceDayBar";
+import { SpanTabs } from "@/components/ui/span-tabs";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
@@ -220,6 +231,9 @@ interface ShiftEditPanelProps {
   currentAbsenceTypeId?: number | null;
   /** The absence a worked cell carries for the rest of the day (item 45). */
   currentRestOfDayAbsenceTypeId?: number | null;
+  /** The time that absence covers (item 50b); null when it was saved untimed. */
+  currentRestOfDayAbsenceStartTime?: string | null;
+  currentRestOfDayAbsenceEndTime?: string | null;
   /** Cross-date overlap warnings to display (non-blocking). */
   overlapWarnings?: string[];
   /** When true, overlap warnings block saving (admin can override). */
@@ -397,6 +411,8 @@ export default function ShiftEditPanel({
   absenceTypes = [],
   currentAbsenceTypeId,
   currentRestOfDayAbsenceTypeId = null,
+  currentRestOfDayAbsenceStartTime = null,
+  currentRestOfDayAbsenceEndTime = null,
   overlapWarnings = [],
   enforceConflicts = false,
   shiftDisplayMode = "code",
@@ -519,6 +535,9 @@ export default function ShiftEditPanel({
   const [initialSegments] = useState(() => currentSegments.map((segment) => ({ ...segment })));
   const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
   const [initialRestOfDayAbsenceTypeId] = useState(() => currentRestOfDayAbsenceTypeId ?? null);
+  const [initialRestOfDayAbsenceTimes] = useState(
+    () => `${currentRestOfDayAbsenceStartTime ?? ""}-${currentRestOfDayAbsenceEndTime ?? ""}`,
+  );
   const [initialCustomStartTime] = useState(() => customStartTime ?? null);
   const [initialCustomEndTime] = useState(() => customEndTime ?? null);
   // Notes are tracked per focus area and shift. A shift added while editing
@@ -665,7 +684,10 @@ export default function ShiftEditPanel({
   }
 
   // Derive whether any edits have been made since panel opened
-  const hasRestOfDayEdit = currentRestOfDayAbsenceTypeId !== initialRestOfDayAbsenceTypeId;
+  const hasRestOfDayEdit =
+    currentRestOfDayAbsenceTypeId !== initialRestOfDayAbsenceTypeId ||
+    `${currentRestOfDayAbsenceStartTime ?? ""}-${currentRestOfDayAbsenceEndTime ?? ""}` !==
+      initialRestOfDayAbsenceTimes;
   const hasShiftEdit =
     currentShift !== initialShift ||
     (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
@@ -779,6 +801,8 @@ export default function ShiftEditPanel({
     customEndTime: string | null;
     /** The rest-of-day absence to keep beside the shifts; the cell's current one by default. */
     restOfDayAbsenceTypeId?: number | null;
+    /** The time it covers (item 50c); the cell's current times by default. */
+    absenceTimes?: ClockRange | null;
   }): ScheduleCellInput | null {
     if (args.absenceTypeId != null) {
       return {
@@ -796,6 +820,20 @@ export default function ShiftEditPanel({
       return null;
     }
 
+    const restOfDayAbsenceTypeId =
+      args.restOfDayAbsenceTypeId !== undefined
+        ? args.restOfDayAbsenceTypeId
+        : currentRestOfDayAbsenceTypeId;
+    const storedTimes =
+      currentRestOfDayAbsenceStartTime && currentRestOfDayAbsenceEndTime
+        ? { start: currentRestOfDayAbsenceStartTime, end: currentRestOfDayAbsenceEndTime }
+        : null;
+    const absenceTimes =
+      restOfDayAbsenceTypeId == null
+        ? null
+        : args.absenceTimes !== undefined
+          ? args.absenceTimes
+          : storedTimes;
     return {
       kind: "worked",
       segments: args.segments.map((segment, index) => ({
@@ -804,10 +842,13 @@ export default function ShiftEditPanel({
         position: segment.position ?? index,
         isMentored: segment.isMentored ?? false,
       })),
-      absenceTypeId:
-        args.restOfDayAbsenceTypeId !== undefined
-          ? args.restOfDayAbsenceTypeId
-          : currentRestOfDayAbsenceTypeId,
+      absenceTypeId: restOfDayAbsenceTypeId,
+      ...(restOfDayAbsenceTypeId != null
+        ? {
+            absenceStartTime: absenceTimes?.start ?? null,
+            absenceEndTime: absenceTimes?.end ?? null,
+          }
+        : {}),
       customStartTime:
         args.segments.length === 1
           ? getFirstTimeSegment(args.customStartTime)
@@ -998,6 +1039,176 @@ export default function ShiftEditPanel({
     typeof currentShift === "string" && currentShift
       ? currentShift.split("/").filter((l) => l !== "OFF")
       : [];
+
+  // Item 50c: the absence beside the shifts records that someone left early or
+  // arrived late. The session keeps the shifts as they were before the absence
+  // cut them, so a shift taken off comes back when the time moves.
+  const storedAbsenceTimes: ClockRange | null =
+    currentRestOfDayAbsenceStartTime && currentRestOfDayAbsenceEndTime
+      ? { start: currentRestOfDayAbsenceStartTime, end: currentRestOfDayAbsenceEndTime }
+      : null;
+
+  function segmentsKey(segments: readonly Pick<ShiftJobSegment, "shiftId" | "jobId">[]): string {
+    return segments.map((segment) => `${segment.shiftId ?? "-"}:${segment.jobId}`).join(",");
+  }
+
+  function assignmentAt(index: number): AssignmentDefinition | undefined {
+    const id = currentAssignmentIds[index];
+    return id != null
+      ? assignments.find((candidate) => candidate.id === id)
+      : assignments.find((candidate) => candidate.label === currentLabels[index]);
+  }
+
+  /** The cell's shifts with their scheduled and custom times, or null when one has no times. */
+  function currentAbsenceBaseShifts() {
+    const count = currentSegments.length;
+    const starts = parseMultiTimes(customStartTime, count);
+    const ends = parseMultiTimes(customEndTime, count);
+    const shifts = currentSegments.map((_, index) => {
+      const { start, end } = resolveDefaultTimes(assignmentAt(index));
+      return start && end
+        ? {
+            scheduled: { start: normalizeTime(start), end: normalizeTime(end) },
+            customStart: starts[index] ? normalizeTime(starts[index]) : null,
+            customEnd: ends[index] ? normalizeTime(ends[index]) : null,
+          }
+        : null;
+    });
+    return count > 0 && shifts.every((shift) => shift != null) ? shifts : null;
+  }
+
+  interface AbsenceSession {
+    side: AbsenceSide;
+    at: string | null;
+    base: AbsenceBase;
+    segments: ShiftJobSegment[];
+    names: string[];
+    /** The shifts this session last wrote; any other change starts a new session. */
+    plannedKey: string;
+  }
+
+  function absenceSessionFromCell(
+    side?: AbsenceSide,
+    absence: ClockRange | null = storedAbsenceTimes,
+  ): AbsenceSession | null {
+    const shifts = currentAbsenceBaseShifts();
+    if (!shifts) return null;
+    const chosenSide =
+      side ??
+      absenceSideOf(absence, {
+        start: effectiveRange(shifts[0]).start,
+        end: effectiveRange(shifts[shifts.length - 1]).end,
+      });
+    const { base, at } = absenceBaseFromCell({ shifts, side: chosenSide, absence });
+    return {
+      side: chosenSide,
+      at,
+      base,
+      segments: currentSegments.map((segment) => ({ ...segment })),
+      names: currentSegments.map(
+        (segment, index) =>
+          assignmentAt(index)?.name || segment.shiftName || currentLabels[index] || "",
+      ),
+      plannedKey: segmentsKey(currentSegments),
+    };
+  }
+
+  const [absenceSessionState, setAbsenceSession] = useState<AbsenceSession | null>(() =>
+    currentRestOfDayAbsenceTypeId != null ? absenceSessionFromCell() : null,
+  );
+  const absenceSession =
+    currentRestOfDayAbsenceTypeId == null
+      ? null
+      : absenceSessionState && absenceSessionState.plannedKey === segmentsKey(currentSegments)
+        ? absenceSessionState
+        : absenceSessionFromCell(absenceSessionState?.side);
+  const absenceCell = absenceSession
+    ? planAbsenceCell(absenceSession.base, absenceSession.side, absenceSession.at)
+    : null;
+
+  /** Writes the session's plan to the draft: the shifts kept, the cut, and the absence's times. */
+  function applyAbsence(
+    session: AbsenceSession,
+    next: { side: AbsenceSide; at: string | null; base?: AbsenceBase; absenceTypeId?: number },
+  ) {
+    const base = next.base ?? session.base;
+    const cell = planAbsenceCell(base, next.side, next.at);
+    const kept = cell.kept ?? base.shifts.map((shift, index) => ({ index, ...shift }));
+    const segments = kept.map(({ index }, position) => ({ ...session.segments[index], position }));
+    setAbsenceSession({
+      ...session,
+      side: next.side,
+      at: next.at,
+      base,
+      plannedKey: segmentsKey(segments),
+    });
+    onSelect(
+      buildPanelInput({
+        segments,
+        absenceTypeId: null,
+        customStartTime: joinMultiTimes(kept.map((shift) => shift.customStart)),
+        customEndTime: joinMultiTimes(kept.map((shift) => shift.customEnd)),
+        restOfDayAbsenceTypeId: next.absenceTypeId ?? currentRestOfDayAbsenceTypeId,
+        absenceTimes: cell.plan.absence,
+      }),
+      seriesId ? seriesScope : undefined,
+    );
+  }
+
+  /** Adds an absence beside the shifts, left early at the last shift's recorded end if any. */
+  function startAbsence(absenceTypeId: number) {
+    const session = absenceSessionFromCell("left-early", null);
+    if (!session) {
+      onSelect(
+        buildPanelInput({
+          segments: currentSegments,
+          absenceTypeId: null,
+          customStartTime: customStartTime ?? null,
+          customEndTime: customEndTime ?? null,
+          restOfDayAbsenceTypeId: absenceTypeId,
+          absenceTimes: null,
+        }),
+        seriesId ? seriesScope : undefined,
+      );
+      return;
+    }
+    // A shift worked to its scheduled end leaves the absence nothing to cover,
+    // so the time starts unset unless an earlier one is recorded (item 50a).
+    const last = session.base.shifts[session.base.shifts.length - 1];
+    const at = session.at && session.at !== last.scheduled.end ? session.at : null;
+    applyAbsence(session, { side: "left-early", at, absenceTypeId });
+  }
+
+  /** A shift's own time editor, beside an absence: the cut edge moves the absence's time. */
+  function editShiftTimesBesideAbsence(
+    keptPosition: number,
+    start: string | null,
+    end: string | null,
+  ) {
+    if (!absenceSession || !absenceCell) return false;
+    const index = absenceCell.kept ? absenceCell.kept[keptPosition]?.index : keptPosition;
+    if (index == null) return false;
+    const shifts = absenceSession.base.shifts.map((shift) => ({ ...shift }));
+    const shift = shifts[index];
+    let at = absenceSession.at;
+    if (absenceCell.kept && index === absenceCell.plan.cutIndex) {
+      if (absenceSession.side === "left-early") {
+        at = end ?? shift.scheduled.end;
+        shifts[index] = { ...shift, customStart: start, customEnd: null };
+      } else {
+        at = start ?? shift.scheduled.start;
+        shifts[index] = { ...shift, customStart: null, customEnd: end };
+      }
+    } else {
+      shifts[index] = { ...shift, customStart: start, customEnd: end };
+    }
+    applyAbsence(absenceSession, {
+      side: absenceSession.side,
+      at,
+      base: { ...absenceSession.base, shifts },
+    });
+    return true;
+  }
 
   function getSegmentSortTime(segment: ShiftJobSegment): string {
     return segment.startTime ?? "99:99:99";
@@ -3191,6 +3402,7 @@ export default function ShiftEditPanel({
                         minTime={getTimeBounds(assignment).minTime}
                         maxTime={getTimeBounds(assignment).maxTime}
                         onSave={(start, end) => {
+                          if (editShiftTimesBesideAbsence(i, start, end)) return;
                           const newStarts = [...pillStarts];
                           const newEnds = [...pillEnds];
                           newStarts[i] = start;
@@ -3198,6 +3410,7 @@ export default function ShiftEditPanel({
                           onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
                         }}
                         onRemove={() => {
+                          if (editShiftTimesBesideAbsence(i, null, null)) return;
                           const newStarts = [...pillStarts];
                           const newEnds = [...pillEnds];
                           newStarts[i] = null;
@@ -3207,7 +3420,6 @@ export default function ShiftEditPanel({
                       />
                     );
                   })()}
-                {renderWorkedUntil(i, { start: defaultStart, end: defaultEnd })}
                 {/* Inline indicators for this shift's focus area */}
                 {renderInlineIndicators(shiftWingId, cardNoteShift)}
                 {allowShiftEdits && (
@@ -3348,114 +3560,155 @@ export default function ShiftEditPanel({
     return <div style={{ marginTop: 8 }}>{renderNoteToggles(focusAreaId, shift)}</div>;
   }
 
-  /**
-   * The last worked shift's "Worked until" beside an absence: its effective
-   * start, scheduled end, the custom end recorded as Worked until (null while
-   * none is chosen), and what is wrong with it, if anything (item 50a).
-   */
-  function lastShiftWorkedUntil() {
-    const count = currentSegments.length;
-    const lastIndex = count - 1;
-    const lastId = currentAssignmentIds[lastIndex];
-    const assignment =
-      lastId != null
-        ? assignments.find((candidate) => candidate.id === lastId)
-        : assignments.find((candidate) => candidate.label === currentLabels[lastIndex]);
-    const defaults = resolveDefaultTimes(assignment);
-    const start = parseMultiTimes(customStartTime, count)[lastIndex] ?? defaults.start;
-    const workedUntil = parseMultiTimes(customEndTime, count)[lastIndex] ?? null;
-    return {
-      assignment,
-      start,
-      scheduledEnd: defaults.end,
-      workedUntil,
-      problem: workedUntilProblem({ start, scheduledEnd: defaults.end, workedUntil }),
-    };
-  }
-
-  /** Names the scheduled times the last shift returns to when its absence is removed. */
+  /** Says how the shifts go back when the absence is removed. */
   function restoredShiftSentence(): string {
-    const count = currentSegments.length;
-    const hasCustomTimes =
-      !!parseMultiTimes(customStartTime, count)[count - 1] ||
-      !!parseMultiTimes(customEndTime, count)[count - 1];
-    const { assignment } = lastShiftWorkedUntil();
-    const { start, end } = resolveDefaultTimes(assignment);
-    if (!hasCustomTimes || !start || !end) return "";
-    const minutes = (time: string) => {
-      const [h, m] = time.split(":").map(Number);
-      return h * 60 + m;
-    };
-    const length = (minutes(end) - minutes(start) + 1440) % 1440 || 1440;
-    const shift = capitalize(theShift(assignment?.name || currentLabels[count - 1] || ""));
-    return ` ${shift} goes back to ${fmt12h(start)} - ${fmt12h(end)} (${formatShiftChangeHours(length)}).`;
+    if (!absenceSession || !absenceCell?.kept) return "";
+    const { base, names } = absenceSession;
+    const sentences: string[] = [];
+    const cut = absenceCell.plan.cutIndex;
+    if (cut != null) {
+      const range = effectiveRange(base.shifts[cut]);
+      sentences.push(
+        `${capitalize(theShift(names[cut]))} goes back to ${fmt12h(range.start)} - ${fmt12h(range.end)} (${formatShiftChangeHours(clockSpanMinutes(range))}).`,
+      );
+    }
+    for (const index of absenceCell.plan.removedIndexes) {
+      sentences.push(`${capitalize(theShift(names[index]))} comes back.`);
+    }
+    return sentences.length > 0 ? ` ${sentences.join(" ")}` : "";
   }
 
-  /** Save waits for a Worked until time inside the shift whenever an absence sits beside it. */
-  function workedUntilBlocksSave(): boolean {
+  /** Save waits for a time that leaves the absence some scheduled time to cover (items 50a, 50c). */
+  function absenceBlocksSave(): boolean {
     return (
-      hasActiveShift &&
-      hasRestOfDayAbsence &&
-      allowShiftEdits &&
-      !!onCustomTimeChange &&
-      lastShiftWorkedUntil().problem != null
+      hasActiveShift && hasRestOfDayAbsence && allowShiftEdits && absenceCell?.plan.problem != null
     );
   }
 
-  /** "Worked until" on the last shift, beside an absence for the rest of the day. */
-  function renderWorkedUntil(
-    index: number,
-    defaults: { start: string | null; end: string | null },
-  ) {
-    if (
-      !hasRestOfDayAbsence ||
-      !allowShiftEdits ||
-      !onCustomTimeChange ||
-      index !== currentSegments.length - 1
-    ) {
-      return null;
+  function removeAbsence() {
+    if (absenceSession) {
+      const { base, segments } = absenceSession;
+      setAbsenceSession(null);
+      onSelect(
+        buildPanelInput({
+          segments: segments.map((segment, position) => ({ ...segment, position })),
+          absenceTypeId: null,
+          customStartTime: joinMultiTimes(base.shifts.map((shift) => shift.customStart)),
+          customEndTime: joinMultiTimes(base.shifts.map((shift) => shift.customEnd)),
+          restOfDayAbsenceTypeId: null,
+        }),
+        seriesId ? seriesScope : undefined,
+      );
+      return;
     }
-    const count = currentSegments.length;
-    const {
-      assignment,
-      start,
-      scheduledEnd,
-      workedUntil: recorded,
-      problem,
-    } = lastShiftWorkedUntil();
-    const shift = theShift(assignment?.name || currentLabels[index] || "");
+    const restored = withoutLastShiftTimes(
+      customStartTime ?? null,
+      customEndTime ?? null,
+      currentSegments.length,
+    );
+    onSelect(
+      buildPanelInput({
+        segments: currentSegments,
+        absenceTypeId: null,
+        customStartTime: restored.customStartTime,
+        customEndTime: restored.customEndTime,
+        restOfDayAbsenceTypeId: null,
+      }),
+      seriesId ? seriesScope : undefined,
+    );
+  }
+
+  /** What the absence covers, or why its time can't stand. */
+  function absenceMessage(): { text: string; error: boolean; wholeDay?: boolean } | null {
+    if (!absenceSession || !absenceCell) return null;
+    const { side, base, names, at } = absenceSession;
+    const { plan } = absenceCell;
     const person = modal.empName.split(" ")[0] || modal.empName;
     const absence = absenceName(currentRestOfDayAbsenceTypeId) ?? "the absence";
-    const message =
-      problem === "unset"
-        ? { text: `When did ${person} leave ${shift}?`, error: false }
-        : problem === "no-time-covered"
-          ? {
-              text: `${capitalize(shift)} ends at ${fmt12h(scheduledEnd)}, so ${absence} would cover no time. Set when ${person} left, or remove ${absence}.`,
-              error: true,
-            }
-          : problem === "outside-shift"
-            ? {
-                text: `Pick a time after ${shift} starts at ${fmt12h(start)} and before it ends at ${fmt12h(scheduledEnd)}.`,
-                error: true,
-              }
-            : null;
-    return (
-      <WorkedUntilField
-        end={recorded}
-        message={message}
-        onChange={(workedUntil) => {
-          const next = withLastShiftEnd(
-            customStartTime ?? null,
-            customEndTime ?? null,
-            count,
-            defaults.start,
-            workedUntil,
-          );
-          onCustomTimeChange(next.customStartTime, next.customEndTime);
-        }}
-      />
-    );
+    const one = base.shifts.length === 1;
+    const first = base.shifts[0];
+    const last = base.shifts[base.shifts.length - 1];
+    const firstName = theShift(names[0]);
+    const lastName = theShift(names[names.length - 1]);
+    const leaving = side === "left-early";
+    switch (plan.problem) {
+      case "unset":
+        return {
+          text: leaving
+            ? `When did ${person} leave${one ? ` ${firstName}` : ""}?`
+            : `When does ${person} arrive${one ? ` for ${firstName}` : ""}?`,
+          error: false,
+        };
+      case "no-time-covered":
+        return {
+          text: leaving
+            ? `${capitalize(lastName)} ends at ${fmt12h(effectiveRange(last).end)}, so ${absence} would cover no time. Set when ${person} left, or remove ${absence}.`
+            : `${capitalize(firstName)} starts at ${fmt12h(effectiveRange(first).start)}, so ${absence} would cover no time. Set when ${person} arrives, or remove ${absence}.`,
+          error: true,
+        };
+      case "never-started":
+        return {
+          text: leaving
+            ? `${person} left when ${firstName} started, so none of it was worked.`
+            : `${person} arrives when ${lastName} ends, so none of it is worked.`,
+          error: true,
+          wholeDay: true,
+        };
+      case "outside-shift":
+        return {
+          text: one
+            ? `Pick a time after ${firstName} starts at ${fmt12h(effectiveRange(first).start)} and before it ends at ${fmt12h(effectiveRange(first).end)}.`
+            : `Pick a time between ${fmt12h(effectiveRange(first).start)}, when ${firstName} starts, and ${fmt12h(effectiveRange(last).end)}, when ${lastName} ends.`,
+          error: true,
+        };
+      default:
+        break;
+    }
+    if (!plan.absence || !at) return null;
+    const parts: string[] = [];
+    if (leaving) {
+      if (plan.cutIndex != null) parts.push(`the rest of ${theShift(names[plan.cutIndex])}`);
+      for (const index of plan.removedIndexes) parts.push(`all of ${theShift(names[index])}`);
+      if (base.extendTo && plan.removedIndexes.length === 0) parts.push("the time after it");
+    } else {
+      if (base.extendTo && plan.removedIndexes.length === 0) parts.push("the time before it");
+      for (const index of plan.removedIndexes) parts.push(`all of ${theShift(names[index])}`);
+      if (plan.cutIndex != null) parts.push(`the start of ${theShift(names[plan.cutIndex])}`);
+    }
+    const joined =
+      parts.length > 1
+        ? `: ${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`
+        : parts.length === 1
+          ? `, ${parts[0]}`
+          : "";
+    return {
+      text: `Covers ${fmt12h(plan.absence.start)} - ${fmt12h(plan.absence.end)}${joined}. No hours.`,
+      error: false,
+    };
+  }
+
+  /** Names each shift the absence takes off, and why. */
+  function removedShiftNotices(): string[] {
+    if (!absenceSession || !absenceCell?.kept) return [];
+    const person = modal.empName.split(" ")[0] || modal.empName;
+    const absence = absenceName(currentRestOfDayAbsenceTypeId) ?? "the absence";
+    return absenceCell.plan.removedIndexes.map((index) => {
+      const shift = capitalize(theShift(absenceSession.names[index]));
+      return absenceSession.side === "left-early"
+        ? `${shift} starts after ${person} left, so it comes off and ${absence} covers it.`
+        : `${shift} ends before ${person} arrives, so it comes off and ${absence} covers it.`;
+    });
+  }
+
+  /** The worked time and the absence in time order, for the day bar. */
+  function absenceDayBarParts() {
+    if (!absenceSession || !absenceCell?.kept || !absenceCell.plan.absence) return null;
+    const work = absenceCell.kept.map((shift) => ({
+      kind: "work" as const,
+      ...effectiveRange({ ...absenceSession.base.shifts[shift.index], ...shift }),
+    }));
+    const absence = { kind: "absence" as const, ...absenceCell.plan.absence };
+    return absenceSession.side === "left-early" ? [...work, absence] : [absence, ...work];
   }
 
   function renderRestOfDayAbsenceCard() {
@@ -3466,12 +3719,15 @@ export default function ShiftEditPanel({
     if (!absence) return null;
     const absenceLabel = absence.name || absence.label;
     const colors = absenceStripeFill(absence.color, isDarkTheme);
-    const lastShift = lastShiftWorkedUntil();
-    const from = lastShift.problem == null ? lastShift.workedUntil : null;
     const diff = panelDiff.restOfDayDiff ?? null;
+    const message = absenceMessage();
+    const leaving = absenceSession?.side !== "arrived-late";
+    const editable = allowShiftEdits && absenceSession != null;
+    const barParts = message?.error || !absenceSession ? null : absenceDayBarParts();
     return (
       <div
         data-rest-of-day-absence-card
+        data-absence-side={absenceSession?.side}
         data-shift-edit-card-diff={diff?.borderKind ?? undefined}
         style={{
           border: getPanelDiffBorder({
@@ -3480,7 +3736,7 @@ export default function ShiftEditPanel({
           }),
           borderRadius: shiftEditCardOuterRadius,
           position: "relative",
-          marginTop: currentLabels.length > 1 ? 10 : 0,
+          marginTop: leaving && currentLabels.length > 1 ? 10 : 0,
           marginBottom: 16,
           padding: SHIFT_EDIT_CARD_INSET,
           background: "var(--dg-color-surface)",
@@ -3520,29 +3776,99 @@ export default function ShiftEditPanel({
             padding: "10px 6px 4px",
             background: "var(--dg-color-surface)",
             borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-subtle)",
-            fontWeight: 500,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 8,
+            flexDirection: "column",
+            gap: 10,
           }}
         >
-          <span className="dg-tabular-nums">
-            {from ? `Rest of the day, from ${fmt12h(from)}` : "Rest of the day"}
-          </span>
-          {allowShiftEdits &&
-            renderCardRemoveButton(`Remove ${absenceLabel} for the rest of the day`, () =>
-              setPendingDelete({ type: "restOfDay" }),
-            )}
+          {editable && absenceSession && (
+            <SpanTabs<AbsenceSide>
+              aria-label={`When ${absenceLabel} was`}
+              className="w-full [&>button]:flex-1"
+              items={[
+                { value: "left-early", label: "Left early" },
+                { value: "arrived-late", label: "Arrived late" },
+              ]}
+              value={absenceSession.side}
+              onChange={(side) => applyAbsence(absenceSession, { side, at: absenceSession.at })}
+            />
+          )}
+          {editable && absenceSession && (
+            <WorkedUntilField
+              label={leaving ? "Left at" : "Arrives at"}
+              end={absenceSession.at}
+              message={message}
+              onChange={(at) => applyAbsence(absenceSession, { side: absenceSession.side, at })}
+            />
+          )}
+          {!editable && message && !message.error && (
+            <span
+              className="dg-tabular-nums"
+              style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-subtle)" }}
+            >
+              {message.text}
+            </span>
+          )}
+          {editable && message?.wholeDay && (
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary"
+              onClick={() =>
+                onSelect(
+                  buildPanelInput({
+                    segments: [],
+                    absenceTypeId: currentRestOfDayAbsenceTypeId,
+                    customStartTime: null,
+                    customEndTime: null,
+                  }),
+                  seriesId ? seriesScope : undefined,
+                )
+              }
+            >
+              Make it {absenceLabel} for the whole day
+            </Button>
+          )}
+          {removedShiftNotices().map((notice) => (
+            <span
+              key={notice}
+              data-absence-removed-shift
+              style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}
+            >
+              {notice}
+            </span>
+          ))}
+          {barParts && (
+            <AbsenceDayBar parts={barParts} absenceName={absenceLabel} absenceColors={colors} />
+          )}
+          {!absenceSession && (
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--dg-color-text-subtle)",
+                fontWeight: 500,
+              }}
+            >
+              Rest of the day
+            </span>
+          )}
+          {allowShiftEdits && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              {renderCardRemoveButton(`Remove ${absenceLabel}`, () =>
+                setPendingDelete({ type: "restOfDay" }),
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  const canAddShift = allowShiftEdits && !isAbsence && currentLabels.length < 2;
+  // Nobody works on after leaving early (item 50, owner 2026-10-24).
+  const canAddShift =
+    allowShiftEdits &&
+    !isAbsence &&
+    currentLabels.length < 2 &&
+    !(hasRestOfDayAbsence && absenceSession?.side !== "arrived-late");
   const canAddRestOfDayAbsence =
     allowShiftEdits &&
     hasActiveShift &&
@@ -4115,6 +4441,8 @@ export default function ShiftEditPanel({
             // ── Detail mode ──────────────────────────────────────────────────
             <>
               {seriesId && allowShiftEdits && chosenScopeOption && renderSeriesEditScope()}
+              {/* An arrived-late absence comes before the shifts (item 50c) */}
+              {absenceSession?.side === "arrived-late" && renderRestOfDayAbsenceCard()}
               {/* Current shift displayed prominently */}
               {renderCurrentShiftPill()}
 
@@ -4187,16 +4515,23 @@ export default function ShiftEditPanel({
                         defaultEnd={defaults.end}
                         minTime={getTimeBounds(matchedCode).minTime}
                         maxTime={getTimeBounds(matchedCode).maxTime}
-                        onSave={(start, end) => onCustomTimeChange(start, end)}
-                        onRemove={() => onCustomTimeChange(null, null)}
+                        onSave={(start, end) => {
+                          if (!editShiftTimesBesideAbsence(0, start, end)) {
+                            onCustomTimeChange(start, end);
+                          }
+                        }}
+                        onRemove={() => {
+                          if (!editShiftTimesBesideAbsence(0, null, null)) {
+                            onCustomTimeChange(null, null);
+                          }
+                        }}
                       />
-                      {renderWorkedUntil(0, defaults)}
                     </div>
                   );
                 })()}
 
-              {/* The absence for the rest of the day comes after the shifts (item 45) */}
-              {renderRestOfDayAbsenceCard()}
+              {/* A left-early absence comes after the shifts */}
+              {absenceSession?.side !== "arrived-late" && renderRestOfDayAbsenceCard()}
 
               {!hasActiveShift && !allowShiftEdits && (
                 <div
@@ -4555,30 +4890,7 @@ export default function ShiftEditPanel({
                     onSelect={selectPickerSegments}
                     onAbsenceSelect={(at) => {
                       if (pickingRestOfDayAbsence) {
-                        // A shift worked to its scheduled end leaves the absence nothing
-                        // to cover, so Worked until starts unset unless it already
-                        // records an earlier time (item 50a).
-                        const keptEnd =
-                          lastShiftWorkedUntil().problem == null
-                            ? (customEndTime ?? null)
-                            : withoutLastShiftTimes(
-                                null,
-                                customEndTime ?? null,
-                                currentSegments.length,
-                              ).customEndTime;
-                        onSelect(
-                          buildPanelInput({
-                            segments: currentSegments,
-                            absenceTypeId: null,
-                            customStartTime: customStartTime ?? null,
-                            customEndTime: keptEnd,
-                            restOfDayAbsenceTypeId: at.id,
-                          }),
-                          seriesId ? seriesScope : undefined,
-                        );
-                        if (onCustomTimeChange && keptEnd !== (customEndTime ?? null)) {
-                          onCustomTimeChange(customStartTime ?? null, keptEnd);
-                        }
+                        startAbsence(at.id);
                         setPickingRestOfDayAbsence(false);
                         setShowPicker(false);
                         return;
@@ -4751,7 +5063,7 @@ export default function ShiftEditPanel({
                 onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
                 className="dg-btn dg-btn-primary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-                disabled={confirmBlocked || workedUntilBlocksSave() || !hasEdits}
+                disabled={confirmBlocked || absenceBlocksSave() || !hasEdits}
               >
                 Save changes
               </Button>
@@ -4843,7 +5155,7 @@ export default function ShiftEditPanel({
             isAbsence
               ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
               : pendingDelete.type === "restOfDay"
-                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} for the rest of the day from ${modal.empName} on ${formatDate(modal.date)}? The shifts stay.${restoredShiftSentence()}`
+                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} from ${modal.empName} on ${formatDate(modal.date)}?${restoredShiftSentence()}`
                 : pendingDelete.type === "pill"
                   ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
                   : hasRestOfDayAbsence
@@ -4860,24 +5172,7 @@ export default function ShiftEditPanel({
               if (onCustomTimeChange) onCustomTimeChange(null, null);
               setPendingCommitScope(seriesScope);
             } else if (pendingDelete.type === "restOfDay") {
-              // Worked until set the last shift's times; without the absence it
-              // goes back to its scheduled times.
-              const restored = withoutLastShiftTimes(
-                customStartTime ?? null,
-                customEndTime ?? null,
-                currentSegments.length,
-              );
-              onSelect(
-                buildPanelInput({
-                  segments: currentSegments,
-                  absenceTypeId: null,
-                  customStartTime: restored.customStartTime,
-                  customEndTime: restored.customEndTime,
-                  restOfDayAbsenceTypeId: null,
-                }),
-                seriesId ? seriesScope : undefined,
-              );
-              onCustomTimeChange?.(restored.customStartTime, restored.customEndTime);
+              removeAbsence();
             } else {
               const removedIdx = pendingDelete.index;
               const remainingSegments = currentSegments.filter((_, j) => j !== removedIdx);

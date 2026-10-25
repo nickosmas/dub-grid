@@ -14,6 +14,8 @@ export interface PrintShiftPillProps {
   primaryLabel: string;
   secondaryLabel?: string | null;
   time?: { start: string; end: string } | null;
+  /** A time already written out, such as an absence's "Fri 3–7" (item 50d). */
+  timeLabel?: string | null;
   background: string;
   color: string;
   border: string;
@@ -49,6 +51,7 @@ export function PrintShiftPill({
   primaryLabel,
   secondaryLabel,
   time,
+  timeLabel,
   background,
   color,
   border,
@@ -60,7 +63,7 @@ export function PrintShiftPill({
   spacing,
 }: PrintShiftPillProps) {
   const isMulti = variant === "multi";
-  const hasTime = !!time && !!(time.start || time.end);
+  const hasTime = !!timeLabel || (!!time && !!(time.start || time.end));
   const hasSecondary = !!secondaryLabel;
   const primarySize = isNameMode ? (isMulti ? "0.8em" : "0.88em") : isMulti ? "0.92em" : "1em";
   const detailSize = isMulti ? "0.66em" : "0.72em";
@@ -160,7 +163,7 @@ export function PrintShiftPill({
                 letterSpacing: "0.01em",
               }}
             >
-              {fmt12hShort(time!.start)}–{fmt12hShort(time!.end)}
+              {timeLabel ?? `${fmt12hShort(time!.start)}–${fmt12hShort(time!.end)}`}
             </span>
           </span>
         )}

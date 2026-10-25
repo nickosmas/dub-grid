@@ -166,6 +166,11 @@ export const resolvedRestOfDayAbsenceSchema = z.object({
   color: z.string().nullable(),
   borderColor: z.string().nullable(),
   textColor: z.string().nullable(),
+  /** "HH:MM": the time it covers (item 50); absent or null when untimed. */
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  /** It comes before the shifts: they arrived late. */
+  arrivedLate: z.boolean().optional(),
 });
 
 export const resolvedSchedulePresentationSchema = z.object({

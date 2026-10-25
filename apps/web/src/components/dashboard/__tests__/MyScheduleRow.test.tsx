@@ -1355,6 +1355,25 @@ describe("MyScheduleRow absence for the rest of the day", () => {
     expect(text.indexOf("Vacation")).toBeGreaterThan(text.indexOf("Day shift"));
   });
 
+  it("lists an arrived-late absence first, with the time it covers (item 50d)", () => {
+    const { container } = renderRow({
+      "emp-1_2026-05-11": {
+        ...dayCell,
+        customStartTime: "11:00",
+        customEndTime: "17:00",
+        restOfDayAbsenceTypeId: absenceType.id,
+        restOfDayAbsenceStartTime: "09:00",
+        restOfDayAbsenceEndTime: "11:00",
+        publishedRestOfDayAbsenceTypeId: absenceType.id,
+      },
+    });
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Vacation")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Day shift")).toBeGreaterThan(text.indexOf("Vacation"));
+    expect(screen.getByText("9:00 AM - 11:00 AM")).toBeInTheDocument();
+  });
+
   it("keeps a deleted draft's published absence on show", () => {
     renderRow({
       "emp-1_2026-05-11": {

@@ -1,3 +1,4 @@
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
@@ -127,9 +128,10 @@ describe("MobileDayView absence for the rest of the day", () => {
     sortOrder: 1,
   };
 
-  function renderMixed() {
+  function renderMixed(layout: AbsencePillLayout | null = null) {
     return render(
       <MobileDayView
+        restOfDayAbsenceLayoutForKey={() => layout}
         filteredEmployees={[employee]}
         allEmployees={[employee]}
         dates={dates}
@@ -167,6 +169,19 @@ describe("MobileDayView absence for the rest of the day", () => {
     expect(absencePill.style.background).toContain("repeating-linear-gradient(135deg");
     expect(shiftPill.style.borderBottomStyle).toBe("none");
     expect(absencePill.style.borderTop).toContain("solid");
+  });
+
+  it("puts an arrived-late absence first, joined to the shift (item 50d)", () => {
+    renderMixed({ first: true, joinsShift: true, shortTime: "7–11", time: "7:00 AM - 11:00 AM" });
+
+    const day = screen.getByText("D").closest("button")!;
+    const pills = Array.from(day.querySelectorAll("span")).filter(
+      (span) =>
+        span.children.length === 0 && (span.textContent === "D" || span.textContent === "S"),
+    );
+    expect(pills.map((pill) => pill.textContent)).toEqual(["S", "D"]);
+    const [absencePill] = pills.map((pill) => pill.closest<HTMLElement>("button > *")!);
+    expect(absencePill.style.borderBottomStyle).toBe("none");
   });
 
   it("counts only the shift in the tally", () => {

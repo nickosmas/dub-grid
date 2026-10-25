@@ -88,6 +88,8 @@ import type {
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  absenceBlocksWork,
+  absenceSideOf,
   assembleDashboardCoverage,
   classifyOpenShiftUrgency,
   formatLocalDateKey,
@@ -1024,6 +1026,16 @@ export async function fetchMobileScheduleEntries(
         candidateState.kind === "worked" ? (candidateState.absenceTypeId ?? null) : null;
       const restOfDay =
         restOfDayAbsenceTypeId != null ? (absenceMap.get(restOfDayAbsenceTypeId) ?? null) : null;
+      // The time it covers and its side (item 50), for the app to place it.
+      const restOfDaySpan =
+        candidateState.kind === "worked" &&
+        candidateState.absenceStartTime &&
+        candidateState.absenceEndTime
+          ? {
+              start: candidateState.absenceStartTime.slice(0, 5),
+              end: candidateState.absenceEndTime.slice(0, 5),
+            }
+          : null;
       const primaryAssignmentDetails =
         jobIds.length > 0
           ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
@@ -1111,6 +1123,16 @@ export async function fetchMobileScheduleEntries(
                 color: restOfDay.color ?? null,
                 borderColor: restOfDay.borderColor ?? restOfDay.color ?? null,
                 textColor: restOfDay.textColor ?? null,
+                startTime: restOfDaySpan?.start ?? null,
+                endTime: restOfDaySpan?.end ?? null,
+                arrivedLate:
+                  !!restOfDaySpan &&
+                  !!startTime &&
+                  !!endTime &&
+                  absenceSideOf(restOfDaySpan, {
+                    start: startTime.slice(0, 5),
+                    end: endTime.slice(0, 5),
+                  }) === "arrived-late",
               }
             : null,
       };
@@ -1551,16 +1573,6 @@ function buildMobileOpenShiftsFromGaps(
       const employeeScheduleRow = rowByEmployeeDate.get(
         `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
       );
-      if (
-        employeeScheduleRow?.state.kind === "worked" &&
-        employeeScheduleRow.state.absenceTypeId != null
-      ) {
-        return {
-          canVolunteer: false,
-          volunteerBlockReason: "You are absent for the rest of this day.",
-        };
-      }
-
       const employeeTimeRanges = employeeScheduleRow
         ? getScheduleRowTimeRanges({
             row: employeeScheduleRow,
@@ -1570,6 +1582,34 @@ function buildMobileOpenShiftsFromGaps(
           })
         : [];
       const assignmentRanges = getAssignmentDefinitionTimeRanges(assignment);
+
+      // An absence beside their shifts: after leaving early they take no more
+      // work that day; after arriving late, only work it overlaps is out (item 50).
+      if (
+        employeeScheduleRow?.state.kind === "worked" &&
+        employeeScheduleRow.state.absenceTypeId != null
+      ) {
+        const { absenceStartTime: start, absenceEndTime: end } = employeeScheduleRow.state;
+        const blocked = absenceBlocksWork(
+          start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null,
+          employeeTimeRanges.length > 0
+            ? {
+                start: employeeTimeRanges[0].start.slice(0, 5),
+                end: employeeTimeRanges[employeeTimeRanges.length - 1].end.slice(0, 5),
+              }
+            : null,
+          assignmentRanges,
+        );
+        if (blocked) {
+          return {
+            canVolunteer: false,
+            volunteerBlockReason:
+              blocked === "overlap"
+                ? "You are absent during that time."
+                : "You are absent for the rest of this day.",
+          };
+        }
+      }
 
       if (
         employeeTimeRanges.length > 0 &&

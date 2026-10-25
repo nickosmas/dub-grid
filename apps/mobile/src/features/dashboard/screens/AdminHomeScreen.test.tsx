@@ -699,8 +699,8 @@ describe("AdminHomeScreen", () => {
       endDate: string;
     };
     const initialSpanDays =
-      (new Date(`${initialRange.endDate}T00:00:00`).getTime() -
-        new Date(`${initialRange.startDate}T00:00:00`).getTime()) /
+      (new Date(`${initialRange.endDate}T00:00:00Z`).getTime() -
+        new Date(`${initialRange.startDate}T00:00:00Z`).getTime()) /
       (24 * 60 * 60 * 1000);
     expect(initialSpanDays).toBe(6);
 
@@ -712,8 +712,8 @@ describe("AdminHomeScreen", () => {
       endDate: string;
     };
     const latestSpanDays =
-      (new Date(`${latestRange.endDate}T00:00:00`).getTime() -
-        new Date(`${latestRange.startDate}T00:00:00`).getTime()) /
+      (new Date(`${latestRange.endDate}T00:00:00Z`).getTime() -
+        new Date(`${latestRange.startDate}T00:00:00Z`).getTime()) /
       (24 * 60 * 60 * 1000);
     expect(latestSpanDays).toBe(13);
   });

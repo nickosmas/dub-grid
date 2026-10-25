@@ -1,5 +1,6 @@
 "use client";
 
+import type { AbsencePillLayout } from "@/lib/absence-pill";
 import React, {
   memo,
   useMemo,
@@ -257,6 +258,7 @@ interface LegacyScheduleGridProps {
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Returns true if the cell's custom times differ from published times. */
   publishDiffForKey?: (
@@ -377,6 +379,7 @@ interface SectionBlockProps {
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
   publishedRestOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   publishDiffForKey?: (
     empId: string,
@@ -965,6 +968,7 @@ const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
   "publishedAssignmentIdsForKey",
   "publishedAbsenceTypeIdForKey",
   "restOfDayAbsenceTypeIdForKey",
+  "restOfDayAbsenceLayoutForKey",
   "publishedRestOfDayAbsenceTypeIdForKey",
   "publishDiffForKey",
   "publishedMetadataForKey",
@@ -1015,6 +1019,7 @@ function readSectionCell(props: SectionBlockProps, empId: string, date: Date): u
     props.publishedAssignmentIdsForKey?.(empId, date),
     props.publishedAbsenceTypeIdForKey?.(empId, date),
     props.restOfDayAbsenceTypeIdForKey?.(empId, date),
+    JSON.stringify(props.restOfDayAbsenceLayoutForKey?.(empId, date) ?? null),
     props.publishedRestOfDayAbsenceTypeIdForKey?.(empId, date),
     publishDiff,
     publishedMetadata,
@@ -1101,6 +1106,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   restOfDayAbsenceTypeIdForKey,
+  restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
   publishDiffForKey,
   publishedMetadataForKey,
@@ -2307,6 +2313,11 @@ const SectionBlock = memo(function SectionBlock({
                         restOfDayAbsenceTypeId != null
                           ? restOfDayAbsenceType?.name || restOfDayAbsenceType?.label || "Absence"
                           : null;
+                      // Where it sits and the time it covers (item 50d): first when
+                      // they arrived late, joined to the shift whose time it meets.
+                      const absenceSpans = restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null;
+                      const absenceLayout = restOfDayAbsenceTypeId != null ? absenceSpans : null;
+                      const absenceFirst = !!absenceLayout?.first;
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
@@ -2368,6 +2379,7 @@ const SectionBlock = memo(function SectionBlock({
                                 segments: publishedSegments,
                                 absenceTypeId: publishedAbsenceTypeId,
                                 restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                restOfDayAbsenceTimes: absenceSpans?.publishedRange ?? null,
                                 customTimes: publishedCustomTimes,
                               }),
                               draftKind === "deleted"
@@ -2376,6 +2388,7 @@ const SectionBlock = memo(function SectionBlock({
                                     segments: cellSegments,
                                     absenceTypeId: currentAbsenceTypeId,
                                     restOfDayAbsenceTypeId,
+                                    restOfDayAbsenceTimes: absenceSpans?.range ?? null,
                                     customTimes,
                                   }),
                               dateKey,
@@ -2406,7 +2419,7 @@ const SectionBlock = memo(function SectionBlock({
                               label: restOfDayAbsenceName,
                               jobName: null,
                               focusAreaName: null,
-                              timeLabel: "Rest of the day",
+                              timeLabel: absenceLayout?.time ?? "Rest of the day",
                               isCustomTime: false,
                               isMentored: false,
                             },
@@ -2544,7 +2557,7 @@ const SectionBlock = memo(function SectionBlock({
                           role="gridcell"
                           aria-label={
                             shiftLabel && shiftLabel !== "OFF"
-                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}${restOfDayAbsenceName ? `, then ${restOfDayAbsenceName} for the rest of the day` : ""}${isBulkSelected ? ", selected for removal" : ""}`
+                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
                               : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                           }
                           aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
@@ -3493,16 +3506,24 @@ const SectionBlock = memo(function SectionBlock({
                                       end: own?.end || code?.defaultEndTime || category?.endTime,
                                     };
                                   });
-                                  const pillJoins = [
-                                    ...pillSpans
-                                      .slice(1)
-                                      .map((span, li) => timesMeet(pillSpans[li].end, span.start)),
-                                    ...(restOfDayAbsenceTypeId != null ? [true] : []),
-                                  ];
+                                  // An arrived-late absence comes first (item 50d); each
+                                  // pill takes its place in the cell by CSS order.
+                                  const shiftOrder = (li: number) => (absenceFirst ? li + 1 : li);
+                                  const absenceOrder = absenceFirst ? 0 : labels.length;
+                                  const shiftJoins = pillSpans
+                                    .slice(1)
+                                    .map((span, li) => timesMeet(pillSpans[li].end, span.start));
+                                  const absenceJoins =
+                                    restOfDayAbsenceTypeId != null
+                                      ? [absenceLayout?.joinsShift ?? true]
+                                      : [];
+                                  const pillJoins = absenceFirst
+                                    ? [...absenceJoins, ...shiftJoins]
+                                    : [...shiftJoins, ...absenceJoins];
                                   // Stacked, each pill's share of spare height follows its
                                   // line count, so a one-line shift stays short beside a
                                   // pill carrying a time or a job.
-                                  const pillLines = [
+                                  const shiftLines = [
                                     ...labels.map((label, li) => {
                                       const own =
                                         customTimes?.perPill?.[li] ??
@@ -3517,10 +3538,13 @@ const SectionBlock = memo(function SectionBlock({
                                         (secondary && isNameMode ? 1 : 0)
                                       );
                                     }),
-                                    ...(restOfDayAbsenceTypeId != null
+                                  ];
+                                  const absenceLines =
+                                    restOfDayAbsenceTypeId != null
                                       ? [
                                           1 +
-                                            ((
+                                            (absenceLayout?.shortTime ||
+                                            (
                                               customTimes?.perPill?.[labels.length - 1] ??
                                               (labels.length === 1 && !customTimes?.perPill
                                                 ? customTimes
@@ -3529,8 +3553,10 @@ const SectionBlock = memo(function SectionBlock({
                                               ? 1
                                               : 0),
                                         ]
-                                      : []),
-                                  ];
+                                      : [];
+                                  const pillLines = absenceFirst
+                                    ? [...absenceLines, ...shiftLines]
+                                    : [...shiftLines, ...absenceLines];
                                   const pillAxis = stackShifts ? "stacked" : "side-by-side";
                                   const pillSeams = attachedPillSeams(pillAxis, pillJoins);
                                   const multiTopInset = 4;
@@ -3687,7 +3713,7 @@ const SectionBlock = memo(function SectionBlock({
                                               const pillHasChip =
                                                 !!pillBadge ||
                                                 (li === 0 && !!(draftBadge || publishBadge));
-                                              const pillSeam = pillSeams[li];
+                                              const pillSeam = pillSeams[shiftOrder(li)];
                                               const pillBorder = draftPillBorderKind
                                                 ? getDraftBorder(
                                                     draftPillBorderKind,
@@ -3767,13 +3793,14 @@ const SectionBlock = memo(function SectionBlock({
                                                   key={li}
                                                   data-shift-pill="multi"
                                                   style={{
+                                                    order: shiftOrder(li),
                                                     flex: 1,
                                                     background: multiUsesShiftColor
                                                       ? effectiveColorLi
                                                       : "var(--dg-color-surface)",
                                                     ...seamBorders(pillBorder, pillSeam),
                                                     ...gapBefore(
-                                                      li,
+                                                      shiftOrder(li),
                                                       pillSeam,
                                                       pillAxis,
                                                       multiPillGap,
@@ -4056,7 +4083,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   stripes?.text ?? "var(--dg-color-text-primary)";
                                                 const absenceBorder =
                                                   stripes?.border ?? borderColor(absenceFg);
-                                                const absenceSeam = pillSeams[labels.length];
+                                                const absenceSeam = pillSeams[absenceOrder];
                                                 const lastShiftTime =
                                                   customTimes?.perPill?.[labels.length - 1] ??
                                                   (labels.length === 1 && !customTimes?.perPill
@@ -4070,7 +4097,9 @@ const SectionBlock = memo(function SectionBlock({
                                                   <div
                                                     key="rest-of-day-absence"
                                                     data-shift-pill="rest-of-day-absence"
+                                                    data-absence-first={absenceFirst || undefined}
                                                     style={{
+                                                      order: absenceOrder,
                                                       flex: 1,
                                                       background: absenceBg,
                                                       ...seamBorders(
@@ -4083,7 +4112,7 @@ const SectionBlock = memo(function SectionBlock({
                                                         absenceSeam,
                                                       ),
                                                       ...gapBefore(
-                                                        labels.length,
+                                                        absenceOrder,
                                                         absenceSeam,
                                                         pillAxis,
                                                         multiPillGap,
@@ -4148,7 +4177,8 @@ const SectionBlock = memo(function SectionBlock({
                                                     >
                                                       {absenceLabel}
                                                     </span>
-                                                    {lastShiftTime?.end && (
+                                                    {(absenceLayout?.shortTime ||
+                                                      lastShiftTime?.end) && (
                                                       <span
                                                         data-pill-fit=""
                                                         style={{
@@ -4158,7 +4188,8 @@ const SectionBlock = memo(function SectionBlock({
                                                           lineHeight: 1,
                                                         }}
                                                       >
-                                                        from {fmt12hShort(lastShiftTime.end)}
+                                                        {absenceLayout?.shortTime ??
+                                                          `from ${fmt12hShort(lastShiftTime!.end)}`}
                                                       </span>
                                                     )}
                                                   </div>
@@ -4688,6 +4719,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   restOfDayAbsenceTypeIdForKey,
+  restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
   publishDiffForKey,
   publishedMetadataForKey,
@@ -5127,6 +5159,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
                     restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+                    restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                     publishedRestOfDayAbsenceTypeIdForKey={publishedRestOfDayAbsenceTypeIdForKey}
                     publishDiffForKey={publishDiffForKey}
                     publishedMetadataForKey={publishedMetadataForKey}
@@ -5367,6 +5400,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
           publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
           restOfDayAbsenceTypeIdForKey={model.accessors.restOfDayAbsenceTypeIdForKey}
+          restOfDayAbsenceLayoutForKey={model.accessors.restOfDayAbsenceLayoutForKey}
           publishedRestOfDayAbsenceTypeIdForKey={
             model.accessors.publishedRestOfDayAbsenceTypeIdForKey
           }
