@@ -69,7 +69,8 @@ describe("usePrefetchOtherDashboardPeriod", () => {
     for (const key of keys) {
       const [startDate, endDate] = key.slice(-2) as [string, string];
       const days =
-        (new Date(`${endDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) /
+        (new Date(`${endDate}T00:00:00Z`).getTime() -
+          new Date(`${startDate}T00:00:00Z`).getTime()) /
           (24 * 60 * 60 * 1000) +
         1;
       expect(days).toBe(14);
@@ -103,7 +104,7 @@ describe("usePrefetchOtherDashboardPeriod", () => {
     expect(keys).toHaveLength(1);
     const [startDate, endDate] = keys[0]!.slice(-2) as [string, string];
     const days =
-      (new Date(`${endDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) /
+      (new Date(`${endDate}T00:00:00Z`).getTime() - new Date(`${startDate}T00:00:00Z`).getTime()) /
         (24 * 60 * 60 * 1000) +
       1;
     expect(days).toBe(7);
