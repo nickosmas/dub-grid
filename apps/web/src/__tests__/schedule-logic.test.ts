@@ -345,6 +345,14 @@ describe("timesOverlap", () => {
     const b = [{ start: "13:00", end: "18:00" }];
     expect(timesOverlap(a, b)).toBe(false);
   });
+
+  it("runs an overnight shift past midnight instead of onto that morning", () => {
+    const night = [{ start: "23:00", end: "07:00" }];
+    expect(timesOverlap(night, [{ start: "06:00", end: "14:00" }])).toBe(false);
+    expect(timesOverlap([{ start: "06:00", end: "14:00" }], night)).toBe(false);
+    expect(timesOverlap(night, [{ start: "15:00", end: "23:30" }])).toBe(true);
+    expect(timesOverlap(night, [{ start: "22:00", end: "06:00" }])).toBe(true);
+  });
 });
 
 // ── checkCrossDateOverlap ────────────────────────────────────────────────────

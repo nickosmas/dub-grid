@@ -7,6 +7,7 @@ import {
   getZonedDayRangeUtc,
   getZonedMidnightUtc,
   parseLocalDateKey,
+  timesOverlap,
 } from "./dates";
 
 const NEW_YORK = "America/New_York";
@@ -151,5 +152,18 @@ describe("getZonedDayRangeUtc", () => {
         date = next;
       }
     }
+  });
+});
+
+describe("timesOverlap", () => {
+  it("runs an overnight shift past midnight instead of onto that morning", () => {
+    const night = [{ start: "23:00", end: "07:00" }];
+    expect(timesOverlap(night, [{ start: "06:00", end: "14:00" }])).toBe(false);
+    expect(timesOverlap([{ start: "06:00", end: "14:00" }], night)).toBe(false);
+    expect(timesOverlap(night, [{ start: "15:00", end: "23:30" }])).toBe(true);
+    expect(timesOverlap(night, [{ start: "22:00", end: "06:00" }])).toBe(true);
+    expect(
+      timesOverlap([{ start: "07:00", end: "15:00" }], [{ start: "15:00", end: "23:00" }]),
+    ).toBe(false);
   });
 });

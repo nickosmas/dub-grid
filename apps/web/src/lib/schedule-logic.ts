@@ -196,9 +196,9 @@ export function sameDayRangesOverlap(a: TimeRange, b: TimeRange): boolean {
   return first.start < second.end && second.start < first.end;
 }
 
-/** True if any range in `a` overlaps with any range in `b`. */
+/** Whether any of one day's shifts overlaps any of another's on the same day, in real time. */
 export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
-  return a.some((r1) => b.some((r2) => rangesOverlap(r1, r2)));
+  return a.some((r1) => b.some((r2) => sameDayRangesOverlap(r1, r2)));
 }
 
 /**

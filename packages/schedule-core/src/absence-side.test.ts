@@ -61,6 +61,22 @@ describe("absenceBlocksWork", () => {
     const late = { start: "07:00", end: "11:00" };
     expect(absenceBlocksWork(late, day, [{ start: "15:00", end: "23:00" }])).toBeNull();
     expect(absenceBlocksWork(late, day, [{ start: "06:00", end: "08:00" }])).toBe("overlap");
-    expect(absenceBlocksWork(late, day, [{ start: "23:00", end: "07:30" }])).toBe("overlap");
+    expect(absenceBlocksWork(late, day, [{ start: "10:00", end: "18:00" }])).toBe("overlap");
+  });
+
+  it("runs overnight work past midnight instead of onto that morning", () => {
+    // Early 6 AM - 2 PM, arrived at 8 AM.
+    const late = { start: "06:00", end: "08:00" };
+    const worked = { start: "08:00", end: "14:00" };
+    expect(absenceBlocksWork(late, worked, [{ start: "23:00", end: "07:00" }])).toBeNull();
+    // Night 11 PM - 7 AM, arrived at 1 AM.
+    const lateToNight = { start: "23:00", end: "01:00" };
+    const workedNight = { start: "01:00", end: "07:00" };
+    expect(absenceBlocksWork(lateToNight, workedNight, [{ start: "22:00", end: "23:30" }])).toBe(
+      "overlap",
+    );
+    expect(
+      absenceBlocksWork(lateToNight, workedNight, [{ start: "06:00", end: "14:00" }]),
+    ).toBeNull();
   });
 });

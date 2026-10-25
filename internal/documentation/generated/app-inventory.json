@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:f7507f1bcf1277d2e616f1375598a4fe47a81311d8acd97eec3767c0ee1084a7",
+  "sourceDigest": "sha256:5d4eea32c203d2ab46e54298c2bd6cf801a7f61ee3da1b44f82c4185853fd468",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4725,6 +4725,16 @@
       "sha256": "0d7cefa2032a68c60546ce6e59b5e19d57a77367e4af4383aef14d51a2f04237",
       "source": {
         "path": "supabase/migrations/094_series_times_and_overnight_doubles.sql"
+      }
+    },
+    {
+      "id": "migration:095_overnight_request_overlaps.sql",
+      "version": "095",
+      "name": "overnight_request_overlaps",
+      "file": "095_overnight_request_overlaps.sql",
+      "sha256": "06118b24ed00bbec22cb7f5d342aaea09e2866b8634d626880ba2cd77f1ad82f",
+      "source": {
+        "path": "supabase/migrations/095_overnight_request_overlaps.sql"
       }
     }
   ],

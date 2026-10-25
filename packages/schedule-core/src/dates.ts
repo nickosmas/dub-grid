@@ -46,8 +46,30 @@ export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+function minutesOf(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+/**
+ * Whether two shifts that start on the same day overlap in real time: an
+ * overnight shift runs past midnight rather than wrapping onto that morning,
+ * so Early 5 AM - 1 PM and Night 11 PM - 7 AM are a valid double.
+ */
+export function sameDayRangesOverlap(a: TimeRange, b: TimeRange): boolean {
+  const span = (range: TimeRange) => {
+    const start = minutesOf(range.start);
+    const end = minutesOf(range.end);
+    return { start, end: end <= start ? end + 24 * 60 : end };
+  };
+  const first = span(a);
+  const second = span(b);
+  return first.start < second.end && second.start < first.end;
+}
+
+/** Whether any of one day's shifts overlaps any of another's on the same day, in real time. */
 export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
-  return a.some((r1) => b.some((r2) => rangesOverlap(r1, r2)));
+  return a.some((r1) => b.some((r2) => sameDayRangesOverlap(r1, r2)));
 }
 
 function formatIsoDateUtc(value: Date): string {
