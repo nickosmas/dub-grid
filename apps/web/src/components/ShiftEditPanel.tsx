@@ -683,13 +683,13 @@ export default function ShiftEditPanel({
     });
   }
 
-  // Derive whether any edits have been made since panel opened
+  // Compares what the cell holds, never its label: a loaded cell and the same
+  // cell rebuilt by an edit can label one shift differently ("D · M" and "DM").
   const hasRestOfDayEdit =
     currentRestOfDayAbsenceTypeId !== initialRestOfDayAbsenceTypeId ||
     `${currentRestOfDayAbsenceStartTime ?? ""}-${currentRestOfDayAbsenceEndTime ?? ""}` !==
       initialRestOfDayAbsenceTimes;
   const hasShiftEdit =
-    currentShift !== initialShift ||
     (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
     hasRestOfDayEdit ||
     !segmentsMatchInitial();
@@ -885,12 +885,7 @@ export default function ShiftEditPanel({
   }
 
   function handleUndo() {
-    // Revert absence type if it changed
-    if (
-      (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
-      currentShift !== initialShift ||
-      hasRestOfDayEdit
-    ) {
+    if (hasShiftEdit) {
       onSelect(
         buildPanelInput({
           segments: initialSegments,

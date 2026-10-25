@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0c7197ca6006b7e8594ec7372e9408c8c3096462ec4dc5be7c5b5ef0e95b1002"
+      "evidenceFingerprint": "sha256:1569373cfdedc2944b1fb89f03e99ccd02aee9f663f0970c4b3581c7524cdbff"
     },
     {
       "id": "draft-publish",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4f0f8c3568df7c09128fd3c3e8247c9e885059a9c2772cea503ff3c8c28ee19f"
+      "evidenceFingerprint": "sha256:43c456ca0d8b15b40ebe143139585912fb81bf8834f00c4575e04e2ad8be1536"
     },
     {
       "id": "realtime",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:41a40965349b6dc325c0fe05132070551318c0d6d36e1918069d7d7c1164f83a"
+      "evidenceFingerprint": "sha256:4ea0746d12d7da9a5d33a20f7ddee3c8940e03d46d2bae15ec98467e0c9376d1"
     },
     {
       "id": "dashboard",
