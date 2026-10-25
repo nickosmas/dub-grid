@@ -320,7 +320,9 @@ Item 50 is split:
   activity log, reports, CSV, export and the calendar name the time an absence
   covers ("Sick 11:00 AM - 3:00 PM, not worked"), in time order, and a change
   to that time alone is a change.
-- **50f - Mobile app:** Your Week, team list, shift detail and Home card.
+- **50f - Mobile app:** shipped; Your Week, the Home card and shift detail
+  show the time an absence covers, before the shift when they arrived late,
+  from a span and side the server adds to each entry.
 - **50g - Requests and availability:** the unavailable rule follows the
   absence's span; pasting a mixed cell copies only its shifts.
 

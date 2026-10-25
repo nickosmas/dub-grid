@@ -147,6 +147,8 @@ function createServiceClientForSchedule(
     absenceTypeId?: number | null;
     /** A worked cell's absence for the rest of the day (item 45). */
     restOfDayAbsenceTypeId?: number | null;
+    absenceStartTime?: string | null;
+    absenceEndTime?: string | null;
     customEndTime?: string | null;
     customStartTime?: string | null;
     jobIds?: number[];
@@ -314,6 +316,8 @@ function createServiceClientForSchedule(
             absence_type_id: options?.absenceTypeId ?? options?.restOfDayAbsenceTypeId ?? null,
             custom_start_time: options?.customStartTime ?? null,
             custom_end_time: options?.customEndTime ?? null,
+            absence_start_time: options?.absenceStartTime ?? null,
+            absence_end_time: options?.absenceEndTime ?? null,
             segments:
               options?.absenceTypeId != null
                 ? []
@@ -824,6 +828,9 @@ describe("fetchMobileScheduleEntries", () => {
       color: "#fef3c7",
       borderColor: "#f59e0b",
       textColor: "#92400e",
+      startTime: null,
+      endTime: null,
+      arrivedLate: false,
     });
     expect(mixed.presentation.segments).toEqual(plain.presentation.segments);
     expect(mixed.presentation).toMatchObject({
@@ -832,6 +839,56 @@ describe("fetchMobileScheduleEntries", () => {
       endTime: plain.presentation.endTime,
     });
     expect(plain.presentation.restOfDayAbsence).toBeNull();
+  });
+
+  it("sends the time a worked cell's absence covers and whether they arrived late (item 50)", async () => {
+    const employee = {
+      id: "196d610f-2283-486c-a9e0-197852969a31",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+    };
+    const fetch = (times: { start: string; end: string; customStart: string; customEnd: string }) =>
+      fetchMobileScheduleEntries(
+        createServiceClientForSchedule(employee, {
+          shiftIds: [101],
+          restOfDayAbsenceTypeId: 56,
+          absenceStartTime: times.start,
+          absenceEndTime: times.end,
+          customStartTime: times.customStart,
+          customEndTime: times.customEnd,
+        }) as never,
+        {
+          orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+          startDate: "2026-04-18",
+          endDate: "2026-04-24",
+          employeeId: employee.id,
+        },
+      );
+
+    const [leftEarly] = await fetch({
+      start: "11:00",
+      end: "15:00",
+      customStart: "07:00",
+      customEnd: "11:00",
+    });
+    const [arrivedLate] = await fetch({
+      start: "07:00",
+      end: "11:00",
+      customStart: "11:00",
+      customEnd: "15:00",
+    });
+
+    expect(leftEarly.presentation.restOfDayAbsence).toMatchObject({
+      startTime: "11:00",
+      endTime: "15:00",
+      arrivedLate: false,
+    });
+    expect(arrivedLate.presentation.restOfDayAbsence).toMatchObject({
+      startTime: "07:00",
+      endTime: "11:00",
+      arrivedLate: true,
+    });
   });
 
   it.each([

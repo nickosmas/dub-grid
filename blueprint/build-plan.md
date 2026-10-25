@@ -1054,7 +1054,7 @@
   - [x] 50e. **Change records** - Before and After, alerts, push, activity
         log, publish history, reports, CSV and calendar show the absence's
         time span.
-  - [ ] 50f. **Mobile app** - Your Week, team list, shift detail and Home
+  - [x] 50f. **Mobile app** - Your Week, team list, shift detail and Home
         card.
   - [ ] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.

@@ -179,6 +179,8 @@ import {
   getMeHeroSupplementalSplitSegments,
   getRequestDateLabel,
   buildRestOfDayAbsenceChip,
+  restOfDayAbsenceComesFirst,
+  restOfDayAbsenceTimeLabel,
   getScheduleEntrySegmentChange,
   summariseScheduleSegment,
   type MobileScheduleSegmentChange,
@@ -2954,6 +2956,33 @@ function UpcomingShiftsSection({
                   </View>
                 ) : (
                   <>
+                    {[...new Set(group.items.map((item) => item.entry))].map((entry) => {
+                      const restOfDayChip = restOfDayAbsenceComesFirst(entry)
+                        ? buildRestOfDayAbsenceChip(mobileColors, isDark, entry)
+                        : null;
+                      return restOfDayChip ? (
+                        <Fragment key={`${entry.employeeId}:${entry.date}:arrived-late`}>
+                          <PressableRow
+                            onPress={() => onPressEntry(entry)}
+                            style={styles.upcomingShiftRow}
+                          >
+                            <View
+                              style={styles.upcomingShiftCopy}
+                              testID={`upcoming-rest-of-day-row-${group.date}`}
+                            >
+                              <MeTypePill chip={restOfDayChip} compact />
+                              <Text
+                                maxFontSizeMultiplier={MAX_FONT_SCALE}
+                                style={styles.upcomingShiftArea}
+                              >
+                                {restOfDayAbsenceTimeLabel(entry)}
+                              </Text>
+                            </View>
+                          </PressableRow>
+                          <UpcomingShiftDashedDivider />
+                        </Fragment>
+                      ) : null;
+                    })}
                     {group.items.map((item, itemIndex) => {
                       const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
                       const change = getScheduleEntrySegmentChange(item.entry, item.segment);
@@ -3049,10 +3078,11 @@ function UpcomingShiftsSection({
                       );
                     })}
                     {[...new Set(group.items.map((item) => item.entry))].map((entry) => {
-                      // A worked cell's absence for the rest of the day (item
-                      // 45) is its own row after the cell's shifts.
+                      // A worked cell's absence beside its shifts (items 45
+                      // and 50) is its own row after them, or before them
+                      // when they arrived late, with the time it covers.
                       const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
-                      return restOfDayChip ? (
+                      return restOfDayChip && !restOfDayAbsenceComesFirst(entry) ? (
                         <Fragment key={`${entry.employeeId}:${entry.date}:rest-of-day`}>
                           <UpcomingShiftDashedDivider />
                           <PressableRow
@@ -3068,7 +3098,7 @@ function UpcomingShiftsSection({
                                 maxFontSizeMultiplier={MAX_FONT_SCALE}
                                 style={styles.upcomingShiftArea}
                               >
-                                Rest of the day
+                                {restOfDayAbsenceTimeLabel(entry) ?? "Rest of the day"}
                               </Text>
                             </View>
                           </PressableRow>

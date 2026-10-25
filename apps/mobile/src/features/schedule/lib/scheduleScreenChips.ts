@@ -354,6 +354,22 @@ export function buildRestOfDayAbsenceChip(
   });
 }
 
+type RestOfDayAbsenceEntry =
+  | { presentation?: Pick<MobileScheduleEntry["presentation"], "restOfDayAbsence"> | null }
+  | null
+  | undefined;
+
+/** The time a worked cell's absence covers (item 50), "11:00 AM - 3:00 PM"; null when untimed. */
+export function restOfDayAbsenceTimeLabel(entry: RestOfDayAbsenceEntry): string | null {
+  const absence = entry?.presentation?.restOfDayAbsence;
+  return formatScheduleTimeRange(absence?.startTime ?? null, absence?.endTime ?? null);
+}
+
+/** The absence comes before the cell's shifts: they arrived late. */
+export function restOfDayAbsenceComesFirst(entry: RestOfDayAbsenceEntry): boolean {
+  return entry?.presentation?.restOfDayAbsence?.arrivedLate === true;
+}
+
 export function hasMentoredSegments(
   segments: ReadonlyArray<{ isMentored?: boolean | null }> | null | undefined,
 ): boolean {

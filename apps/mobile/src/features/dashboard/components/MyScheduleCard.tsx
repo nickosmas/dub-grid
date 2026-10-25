@@ -30,6 +30,7 @@ import {
 import { formatUsTime } from "../../../shared/lib/dates";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
+import { restOfDayAbsenceTimeLabel } from "../../schedule/lib/scheduleScreenChips";
 import {
   scheduleNotesForRow,
   scheduleNotesForSegment,
@@ -179,16 +180,17 @@ function buildDaySegmentPills(
     };
   });
 
-  // A worked cell's absence for the rest of the day (item 45) follows its
-  // shifts, with no time, in the absence's own colours.
+  // A worked cell's absence beside its shifts (items 45 and 50), in the
+  // absence's own colours, with the time it covers: after the shifts, or
+  // first when they arrived late.
   const restOfDay = entry.state.kind === "worked" ? entry.presentation.restOfDayAbsence : null;
   if (restOfDay) {
     const color = readOptionalText(restOfDay.color);
-    pills.push({
+    const absencePill = {
       key: `${entry.date}-rest-of-day`,
       label: restOfDay.name || restOfDay.label,
       jobName: null,
-      timeRangeLabel: null,
+      timeRangeLabel: restOfDayAbsenceTimeLabel(entry),
       pill: color
         ? resolveShiftPillColors(
             {
@@ -200,7 +202,9 @@ function buildDaySegmentPills(
           )
         : null,
       noteCount: 0,
-    });
+    };
+    if (restOfDay.arrivedLate) pills.unshift(absencePill);
+    else pills.push(absencePill);
   }
   return pills;
 }
@@ -281,7 +285,11 @@ export function MyScheduleCard({
                 : null;
             const spokenParts = [
               spokenDate,
-              restOfDay ? `${restOfDay.name || restOfDay.label} for the rest of the day` : null,
+              restOfDay
+                ? restOfDayAbsenceTimeLabel(openableEntry)
+                  ? `${restOfDay.name || restOfDay.label} ${restOfDayAbsenceTimeLabel(openableEntry)}`
+                  : `${restOfDay.name || restOfDay.label} for the rest of the day`
+                : null,
               notes.length > 0 ? scheduleNotesSpokenLabel(notes) : null,
             ].filter(Boolean);
 

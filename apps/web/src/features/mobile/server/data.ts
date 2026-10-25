@@ -88,6 +88,7 @@ import type {
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  absenceSideOf,
   assembleDashboardCoverage,
   classifyOpenShiftUrgency,
   formatLocalDateKey,
@@ -1024,6 +1025,16 @@ export async function fetchMobileScheduleEntries(
         candidateState.kind === "worked" ? (candidateState.absenceTypeId ?? null) : null;
       const restOfDay =
         restOfDayAbsenceTypeId != null ? (absenceMap.get(restOfDayAbsenceTypeId) ?? null) : null;
+      // The time it covers and its side (item 50), for the app to place it.
+      const restOfDaySpan =
+        candidateState.kind === "worked" &&
+        candidateState.absenceStartTime &&
+        candidateState.absenceEndTime
+          ? {
+              start: candidateState.absenceStartTime.slice(0, 5),
+              end: candidateState.absenceEndTime.slice(0, 5),
+            }
+          : null;
       const primaryAssignmentDetails =
         jobIds.length > 0
           ? getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[0] ?? null, jobIds[0])
@@ -1111,6 +1122,16 @@ export async function fetchMobileScheduleEntries(
                 color: restOfDay.color ?? null,
                 borderColor: restOfDay.borderColor ?? restOfDay.color ?? null,
                 textColor: restOfDay.textColor ?? null,
+                startTime: restOfDaySpan?.start ?? null,
+                endTime: restOfDaySpan?.end ?? null,
+                arrivedLate:
+                  !!restOfDaySpan &&
+                  !!startTime &&
+                  !!endTime &&
+                  absenceSideOf(restOfDaySpan, {
+                    start: startTime.slice(0, 5),
+                    end: endTime.slice(0, 5),
+                  }) === "arrived-late",
               }
             : null,
       };

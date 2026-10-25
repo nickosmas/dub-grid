@@ -208,6 +208,44 @@ describe("MyScheduleCard", () => {
     expect(day.textContent!.indexOf("Sick")).toBeGreaterThan(day.textContent!.indexOf("Day Shift"));
   });
 
+  it("puts an arrived-late absence first with the time it covers (item 50)", () => {
+    const base = makeEntry({ date: "2026-05-11" });
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-11" },
+        entries: [
+          {
+            ...base,
+            state: { ...base.state, absenceTypeId: 8 },
+            presentation: {
+              ...base.presentation,
+              restOfDayAbsence: {
+                absenceTypeId: 8,
+                label: "S",
+                name: "Sick",
+                color: "#FEE2E2",
+                borderColor: "#FCA5A5",
+                textColor: "#991B1B",
+                startTime: "07:00",
+                endTime: "11:00",
+                arrivedLate: true,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" onOpenDay={vi.fn()} />);
+
+    const day = screen.getByRole("button", {
+      name: "Monday, May 11. Sick 7:00 AM - 11:00 AM",
+    });
+    expect(day.textContent!.indexOf("Sick")).toBeLessThan(day.textContent!.indexOf("Day Shift"));
+    expect(day.textContent).toContain("7:00 AM - 11:00 AM");
+  });
+
   it("shows the empty state when the query has no range at all", () => {
     useQuery.mockReturnValue({
       isLoading: false,
