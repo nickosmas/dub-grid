@@ -535,6 +535,10 @@ export default function ShiftEditPanel({
   const [initialSegments] = useState(() => currentSegments.map((segment) => ({ ...segment })));
   const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
   const [initialRestOfDayAbsenceTypeId] = useState(() => currentRestOfDayAbsenceTypeId ?? null);
+  const openedEmpty =
+    initialSegments.length === 0 &&
+    initialAbsenceTypeId == null &&
+    initialRestOfDayAbsenceTypeId == null;
   const [initialRestOfDayAbsenceTimes] = useState(
     () => `${currentRestOfDayAbsenceStartTime ?? ""}-${currentRestOfDayAbsenceEndTime ?? ""}`,
   );
@@ -5165,7 +5169,9 @@ export default function ShiftEditPanel({
             if (pendingDelete.type === "all") {
               onSelect(null, seriesId ? seriesScope : undefined);
               if (onCustomTimeChange) onCustomTimeChange(null, null);
-              setPendingCommitScope(seriesScope);
+              // A cell that opened empty is back as it was: there is nothing to
+              // save, and an armed save would fire on the next pick instead.
+              if (!openedEmpty) setPendingCommitScope(seriesScope);
             } else if (pendingDelete.type === "restOfDay") {
               removeAbsence();
             } else {

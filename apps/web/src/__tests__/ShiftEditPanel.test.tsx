@@ -3063,6 +3063,22 @@ describe("ShiftEditPanel", () => {
       expect(onConfirmDraft).toHaveBeenCalledWith(undefined);
     });
 
+    it("never saves on its own after removing a shift from a cell that opened empty", async () => {
+      const user = userEvent.setup();
+      const onConfirmDraft = vi.fn();
+
+      render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} />);
+
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
+      await user.click(screen.getByRole("button", { name: "Remove shift" }));
+      const dialog = await screen.findByRole("dialog", { name: /Remove/i });
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
+
+      expect(onConfirmDraft).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    });
+
     it("shows a stale warning and disables confirm when the cell changed externally", async () => {
       const user = userEvent.setup();
       const onConfirmDraft = vi.fn();

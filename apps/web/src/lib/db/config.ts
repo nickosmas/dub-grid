@@ -745,7 +745,7 @@ export async function saveCoverageRequirements(
   focusAreaId: number,
   jobId: number,
   preferredShiftId: number | null,
-  requirements: { dayOfWeek: number | null; minStaff: number }[],
+  requirements: { dayOfWeek: number | null; minStaff: number; maxStaff?: number | null }[],
 ): Promise<CoverageRequirement[]> {
   let deleteQuery = supabase
     .from("coverage_requirements")
@@ -770,6 +770,7 @@ export async function saveCoverageRequirements(
       preferred_shift_id: preferredShiftId,
       day_of_week: r.dayOfWeek,
       min_staff: r.minStaff,
+      max_staff: r.maxStaff ?? null,
     }));
 
   if (rows.length === 0) {

@@ -98,6 +98,7 @@ export interface DbCoverageRequirement {
   preferred_shift_id: number | null;
   day_of_week: number | null;
   min_staff: number;
+  max_staff: number | null;
 }
 
 export interface DbAssignmentDefinition {

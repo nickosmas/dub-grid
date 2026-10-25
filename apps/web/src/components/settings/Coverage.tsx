@@ -31,10 +31,50 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const FIELD_TITLE_STYLE: React.CSSProperties = {
+  fontSize: "var(--dg-type-field-title-size)",
+  fontWeight: "var(--dg-type-field-title-weight)",
+  color: "var(--dg-type-field-title-color)",
+  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+  lineHeight: "var(--dg-type-field-title-line-height)",
+};
+
+const CHECKBOX_LABEL_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  fontSize: "var(--dg-fs-label)",
+  color: "var(--dg-color-text-secondary)",
+};
+
+const FIELD_ROW_STYLE: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "112px 120px",
+  alignItems: "center",
+  gap: 10,
+};
+
 type CoverageDraft = {
   everyDay: boolean;
   values: number[];
+  /** The most Auto-build schedules on any day; null for no limit. */
+  maxStaff: number | null;
 };
+
+function largestMinimum(draft: CoverageDraft): number {
+  return Math.max(0, ...draft.values);
+}
+
+/**
+ * The maximum follows the minimum up, and goes when nothing is required,
+ * so a draft never holds a maximum below its minimum or one nothing saves.
+ */
+function withConsistentMaximum(draft: CoverageDraft): CoverageDraft {
+  if (draft.maxStaff == null) return draft;
+  const minimum = largestMinimum(draft);
+  if (minimum <= 0) return { ...draft, maxStaff: null };
+  return draft.maxStaff < minimum ? { ...draft, maxStaff: minimum } : draft;
+}
 
 type CoverageOptionSection = {
   key: string;
@@ -75,14 +115,18 @@ function buildDraft(
     return {
       everyDay: true,
       values: [0],
+      maxStaff: null,
     };
   }
 
+  // Every row of a requirement carries the same maximum.
+  const maxStaff = matching[0].maxStaff ?? null;
   const everyDay = matching.find((requirement) => requirement.dayOfWeek == null);
   if (everyDay) {
     return {
       everyDay: true,
       values: [everyDay.minStaff],
+      maxStaff,
     };
   }
 
@@ -92,6 +136,7 @@ function buildDraft(
       { length: 7 },
       (_, index) => matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0,
     ),
+    maxStaff,
   };
 }
 
@@ -99,6 +144,7 @@ function serializeDraft(draft: CoverageDraft): string {
   return JSON.stringify({
     everyDay: draft.everyDay,
     values: draft.values,
+    maxStaff: draft.maxStaff,
   });
 }
 
@@ -130,13 +176,31 @@ function CoveragePreview({ draft }: { draft: CoverageDraft }) {
     fontSize: "var(--dg-fs-caption)",
   };
 
+  const maximum =
+    draft.maxStaff != null ? (
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        <span style={labelStyle}>Max</span>
+        <span style={numberStyle}>{draft.maxStaff}</span>
+      </span>
+    ) : null;
+
   if (draft.everyDay) {
     const value = draft.values[0] ?? 0;
     if (value <= 0) return <span style={emptyStyle}>No requirement</span>;
     return (
-      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-        <span style={labelStyle}>Every day</span>
-        <span style={numberStyle}>{value}</span>
+      <span
+        style={{
+          display: "inline-flex",
+          flexWrap: "wrap",
+          gap: "4px 12px",
+          alignItems: "baseline",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+          <span style={labelStyle}>Every day</span>
+          <span style={numberStyle}>{value}</span>
+        </span>
+        {maximum}
       </span>
     );
   }
@@ -157,6 +221,7 @@ function CoveragePreview({ draft }: { draft: CoverageDraft }) {
           <span style={numberStyle}>{entry.value}</span>
         </span>
       ))}
+      {maximum}
     </span>
   );
 }
@@ -355,6 +420,8 @@ function CoverageOptionRow({
   const [expanded, setExpanded] = useState(false);
   const panelId = React.useId();
   const isMobile = useMediaQuery(MOBILE);
+  const minimum = largestMinimum(draft);
+  const change = (next: CoverageDraft) => onDraftChange(withConsistentMaximum(next));
 
   return (
     <div
@@ -420,58 +487,41 @@ function CoverageOptionRow({
             padding: "14px 16px",
             display: "flex",
             flexDirection: "column",
-            gap: 12,
+            gap: 14,
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: "var(--dg-fs-label)",
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={draft.everyDay}
-                onChange={(event) => {
-                  if (event.target.checked) {
-                    onDraftChange({
-                      everyDay: true,
-                      values: [
-                        draft.everyDay
-                          ? (draft.values[0] ?? 0)
-                          : (draft.values[1] ?? draft.values[0] ?? 0),
-                      ],
-                    });
-                    return;
-                  }
-                  onDraftChange({
-                    everyDay: false,
-                    values: Array.from({ length: 7 }, () => draft.values[0] ?? 0),
+          <label style={CHECKBOX_LABEL_STYLE}>
+            <input
+              type="checkbox"
+              checked={draft.everyDay}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  change({
+                    ...draft,
+                    everyDay: true,
+                    values: [
+                      draft.everyDay
+                        ? (draft.values[0] ?? 0)
+                        : (draft.values[1] ?? draft.values[0] ?? 0),
+                    ],
                   });
-                }}
-                disabled={!canEdit}
-              />
-              Same every day
-            </label>
-          </div>
+                  return;
+                }
+                change({
+                  ...draft,
+                  everyDay: false,
+                  values: Array.from({ length: 7 }, () => draft.values[0] ?? 0),
+                });
+              }}
+              disabled={!canEdit}
+            />
+            Same every day
+          </label>
 
           {draft.everyDay ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <label
-                htmlFor={`${panelId}-min-staff`}
-                style={{
-                  fontSize: "var(--dg-type-field-title-size)",
-                  fontWeight: "var(--dg-type-field-title-weight)",
-                  color: "var(--dg-type-field-title-color)",
-                  letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                  lineHeight: "var(--dg-type-field-title-line-height)",
-                }}
-              >
+            <div style={FIELD_ROW_STYLE}>
+              <label htmlFor={`${panelId}-min-staff`} style={FIELD_TITLE_STYLE}>
                 Minimum Staff
               </label>
               <NumberField
@@ -480,51 +530,96 @@ function CoverageOptionRow({
                 max={999}
                 emptyValue={0}
                 value={draft.values[0] ?? 0}
-                onChange={(value) => onDraftChange({ everyDay: true, values: [value] })}
-                style={{ width: 120 }}
+                onChange={(value) => change({ ...draft, values: [value] })}
                 disabled={!canEdit}
               />
             </div>
           ) : (
+            <fieldset style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
+              <legend style={{ ...FIELD_TITLE_STYLE, padding: 0, marginBottom: 8 }}>
+                Minimum Staff
+              </legend>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile
+                    ? "repeat(2, minmax(0, 1fr))"
+                    : "repeat(7, minmax(0, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {DAY_NAMES.map((day, index) => (
+                  <label
+                    key={`${option.id}-${day}`}
+                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                  >
+                    <span style={FIELD_TITLE_STYLE}>{day}</span>
+                    <NumberField
+                      min={0}
+                      max={999}
+                      emptyValue={0}
+                      value={draft.values[index] ?? 0}
+                      onChange={(value) => {
+                        const nextValues = [...draft.values];
+                        nextValues[index] = value;
+                        change({ ...draft, values: nextValues });
+                      }}
+                      disabled={!canEdit}
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {minimum > 0 && (
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: isMobile
-                  ? "repeat(2, minmax(0, 1fr))"
-                  : "repeat(7, minmax(0, 1fr))",
-                gap: 8,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
               }}
             >
-              {DAY_NAMES.map((day, index) => (
-                <label
-                  key={`${option.id}-${day}`}
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
-                  <span
-                    style={{
-                      fontSize: "var(--dg-type-field-title-size)",
-                      fontWeight: "var(--dg-type-field-title-weight)",
-                      color: "var(--dg-type-field-title-color)",
-                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                      lineHeight: "var(--dg-type-field-title-line-height)",
-                    }}
-                  >
-                    {day}
-                  </span>
-                  <NumberField
-                    min={0}
-                    max={999}
-                    emptyValue={0}
-                    value={draft.values[index] ?? 0}
-                    onChange={(value) => {
-                      const nextValues = [...draft.values];
-                      nextValues[index] = value;
-                      onDraftChange({ everyDay: false, values: nextValues });
-                    }}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={CHECKBOX_LABEL_STYLE}>
+                  <input
+                    type="checkbox"
+                    checked={draft.maxStaff != null}
+                    onChange={(event) =>
+                      change({ ...draft, maxStaff: event.target.checked ? minimum : null })
+                    }
+                    aria-describedby={`${panelId}-max-help`}
                     disabled={!canEdit}
                   />
+                  Set a maximum
                 </label>
-              ))}
+                <div
+                  id={`${panelId}-max-help`}
+                  style={{
+                    paddingLeft: 24,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--dg-color-text-secondary)",
+                  }}
+                >
+                  Auto-build never schedules more than this
+                  {draft.everyDay ? "" : " on any day"}. You can still add more by hand.
+                </div>
+              </div>
+              {draft.maxStaff != null && (
+                <div style={FIELD_ROW_STYLE}>
+                  <label htmlFor={`${panelId}-max-staff`} style={FIELD_TITLE_STYLE}>
+                    Maximum Staff
+                  </label>
+                  <NumberField
+                    id={`${panelId}-max-staff`}
+                    min={minimum}
+                    max={999}
+                    value={draft.maxStaff}
+                    onChange={(value) => change({ ...draft, maxStaff: value })}
+                    disabled={!canEdit}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -598,9 +693,10 @@ function FocusAreaCoverageCard({
       const results = await Promise.all(
         dirtyOptions.map(async (option) => {
           const draft = draftFor(option);
+          const { maxStaff } = draft;
           const rows = draft.everyDay
-            ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
-            : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
+            ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0, maxStaff }]
+            : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value, maxStaff }));
           const saved = await saveCoverageRequirements(
             orgId,
             focusArea.id,

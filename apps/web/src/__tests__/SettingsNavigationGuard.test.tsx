@@ -109,7 +109,7 @@ async function dirtyTheCoveragePanel(user: ReturnType<typeof userEvent.setup>) {
     .find((button) => button.getAttribute("aria-expanded") === "false");
   await user.click(toggle!);
 
-  const staffInput = await screen.findByRole("spinbutton");
+  const staffInput = await screen.findByRole("spinbutton", { name: "Minimum Staff" });
   await user.clear(staffInput);
   await user.type(staffInput, "3");
   // The Discard button only appears once the panel is genuinely dirty, so it
@@ -165,7 +165,7 @@ describe("settings panels guard navigation", () => {
     const user = userEvent.setup();
     renderCoverageWithSidebar();
     await dirtyTheCoveragePanel(user);
-    const staffInput = screen.getByRole("spinbutton");
+    const staffInput = screen.getByRole("spinbutton", { name: "Minimum Staff" });
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
@@ -186,7 +186,7 @@ describe("settings panels guard navigation", () => {
     await user.click(screen.getByRole("button", { name: "Keep editing" }));
 
     expect(navigate).not.toHaveBeenCalled();
-    expect(screen.getByRole("spinbutton")).toHaveValue("3");
+    expect(screen.getByRole("spinbutton", { name: "Minimum Staff" })).toHaveValue("3");
   });
 
   it("leaves once the discard is confirmed", async () => {

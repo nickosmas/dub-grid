@@ -3,7 +3,7 @@ title: "Coverage"
 description: "Set how many people each shift and job needs, and see where the schedule falls short."
 ---
 
-**Settings > Coverage** sets the minimum number of people you need, by focus area and by each shift and job that can be scheduled there. DubGrid then compares the schedule against it.
+**Settings > Coverage** sets how many people you need, by focus area and by each shift and job that can be scheduled there, and optionally the most [Auto-build](/features/coverage-and-open-shifts#auto-build) schedules. DubGrid then compares the schedule against it.
 
 ## Setting requirements
 
@@ -13,6 +13,12 @@ The section lists every focus area with its shift and job options, grouped by sh
 - enter a number for each day from Sunday to Saturday.
 
 Numbers go from 0 to 999. **0** means **No requirement**, so to remove a requirement, set it to 0 and save. Changing requirements doesn't change any shifts on the schedule.
+
+### Maximum
+
+Once a requirement needs someone, you can turn on **Set a maximum**, for example to keep a shift to one supervisor. **Maximum Staff** starts at the minimum and can't go below it: raise the minimum past it and the maximum rises too. With different numbers by day, it applies on every day. The row then shows **Max** after its numbers, and the Schedule Builder shows it after what the requirement needs.
+
+Auto-build and its suggestions never schedule more people than the maximum. You can still add more by hand. Turn **Set a maximum** off for no limit.
 
 How much a mentored person counts toward coverage is set in [Schedule Rules](/configuration/schedule-rules-and-display).
 

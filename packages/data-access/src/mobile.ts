@@ -37,7 +37,7 @@ const ORG_ROLE_COLS =
 const EMPLOYEE_COLS =
   "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
-  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
 const INVITATION_COLS =
   "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";

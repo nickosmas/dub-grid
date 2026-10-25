@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:0a0ad20854487308023fcf130aa39830afdd37bfcef7093e6449b7cf9488e9e6",
+  "sourceDigest": "sha256:e76990b8c5927246cd3cb9269eb61ca82382263f78d251f9de8a6aa50b7e4892",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4715,6 +4715,36 @@
       "sha256": "3bfa166a0238a16738d13d920cd6ba76e99029dfaafef86e7589e57ce1f59750",
       "source": {
         "path": "supabase/migrations/093_absence_blocks_overlapping_work.sql"
+      }
+    },
+    {
+      "id": "migration:094_series_times_and_overnight_doubles.sql",
+      "version": "094",
+      "name": "series_times_and_overnight_doubles",
+      "file": "094_series_times_and_overnight_doubles.sql",
+      "sha256": "0d7cefa2032a68c60546ce6e59b5e19d57a77367e4af4383aef14d51a2f04237",
+      "source": {
+        "path": "supabase/migrations/094_series_times_and_overnight_doubles.sql"
+      }
+    },
+    {
+      "id": "migration:095_overnight_request_overlaps.sql",
+      "version": "095",
+      "name": "overnight_request_overlaps",
+      "file": "095_overnight_request_overlaps.sql",
+      "sha256": "06118b24ed00bbec22cb7f5d342aaea09e2866b8634d626880ba2cd77f1ad82f",
+      "source": {
+        "path": "supabase/migrations/095_overnight_request_overlaps.sql"
+      }
+    },
+    {
+      "id": "migration:096_coverage_max_staff.sql",
+      "version": "096",
+      "name": "coverage_max_staff",
+      "file": "096_coverage_max_staff.sql",
+      "sha256": "556a45488ac21e9150c3dbd0a3f054826eed05319b30fd80fd6deca04d76fb29",
+      "source": {
+        "path": "supabase/migrations/096_coverage_max_staff.sql"
       }
     }
   ],

@@ -232,6 +232,7 @@ const WHY_ORDER = [
   "Fewest nights",
   "Fewest hours",
   "Even",
+  "Only one who could fill it",
   "Only one free",
   "Qualified and free",
 ];
@@ -245,6 +246,7 @@ const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   hours: "Fewest hours",
   tie: "Even",
   weekDays: "Up to 5 days a week",
+  moved: "Only one who could fill it",
 };
 
 /** Each person a build changed: shifts given and why, by name. */

@@ -63,12 +63,12 @@ export function absenceBlocksWork(
     const from = clock(range.start);
     return { from, to: from + ((clock(range.end) - from + DAY) % DAY || DAY) };
   };
+  // An arrived-late absence starts at the work's scheduled start, on that day,
+  // so it and the work taken both run forward from that day's midnight.
   const away = interval(absence);
   const overlaps = ranges.some((range) => {
     const taken = interval(range);
-    return [-DAY, 0, DAY].some(
-      (shift) => taken.from + shift < away.to && away.from < taken.to + shift,
-    );
+    return taken.from < away.to && away.from < taken.to;
   });
   return overlaps ? "overlap" : null;
 }

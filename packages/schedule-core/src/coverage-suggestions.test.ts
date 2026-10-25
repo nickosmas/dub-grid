@@ -1376,3 +1376,133 @@ describe("recurring fills left out", () => {
     expect(previewCoverageBuild(world).recurringSkipped).toEqual([]);
   });
 });
+
+describe("a requirement's most staff in a build", () => {
+  // Mondays need two Med Aides and one Charge Nurse, and both are staffed. Eve works Tuesday.
+  const staffed = Object.fromEntries(
+    [MON, NEXT_MON].flatMap((dateKey) => [
+      [`ana|${dateKey}`, { work: [DAY_MA] }],
+      [`ben|${dateKey}`, { work: [DAY_MA] }],
+      [`cat|${dateKey}`, { work: [DAY_CN] }],
+    ]),
+  );
+  const requirements = (maStaff: number | null, cnStaff: number | null) => [
+    { ...MA_ONLY[0], dayOfWeek: 1, maxStaff: maStaff },
+    { ...MA_ONLY[0], jobId: 6, dayOfWeek: 1, minStaff: 1, maxStaff: cnStaff },
+  ];
+  const topUpEve: CoverageTopUpRule = { employeeIds: ["eve"], target: () => 5, weekDays: () => 1 };
+  const eveTopUps = (cnStaff: number | null, maStaff: number | null = null) =>
+    previewCoverageBuild(
+      buildSuggestionWorld({
+        requirements: requirements(maStaff, cnStaff),
+        draft: { ...staffed, [`eve|${TUE}`]: { work: [DAY_MA] } },
+      }),
+      { topUp: topUpEve },
+    ).fixes.map((fix) => fix.subject.rowKey);
+
+  it("tops up into the shift the person adds least to, so a one-person shift is last", () => {
+    expect(eveTopUps(null)).toEqual([ROW_MA, ROW_MA]);
+  });
+
+  it("never tops up a requirement past its most", () => {
+    expect(eveTopUps(1)).toEqual([ROW_MA, ROW_MA]);
+    expect(eveTopUps(1, 2)).toEqual([]);
+  });
+});
+
+describe("a build moving its own shifts to a gap", () => {
+  // Monday needs one Med Aide and one Evening. Ana can do either, Ben only the Med Aide.
+  const requirements = [
+    { ...MA_ONLY[0], minStaff: 1 },
+    { ...MA_ONLY[0], focusAreaId: 2, preferredShiftId: 3, minStaff: 1 },
+  ];
+  const qualified = { ana: [DAY_MA, EVE_SC], ben: [DAY_MA] };
+  const placed = (preview: ReturnType<typeof previewCoverageBuild>) =>
+    preview.fixes.map((fix) => `${fix.employeeId} ${fix.subject.dateKey} ${fix.subject.rowKey}`);
+
+  it("moves someone it placed to a gap only they can fill, and gives their shift to someone free", () => {
+    const world = buildSuggestionWorld({
+      requirements,
+      people: ["ana", "ben"],
+      qualified,
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world, { dateKey: MON });
+
+    expect(placed(preview).sort()).toEqual([`ana ${MON} ${ROW_SC}`, `ben ${MON} ${ROW_MA}`]);
+    expect(preview.shortCells).toEqual([]);
+    expect(preview.choices.find((choice) => choice.employeeId === "ana")?.reason).toBe("moved");
+  });
+
+  it("moves a shift to another day when that frees the person for a gap", () => {
+    // Monday needs a Med Aide, Tuesday an Evening; each person works one day.
+    // Cat covers the next Monday from the draft.
+    const world = buildSuggestionWorld({
+      requirements: [
+        { ...requirements[0], dayOfWeek: 1 },
+        { ...requirements[1], dayOfWeek: 2 },
+      ],
+      people: ["ana", "ben", "cat"],
+      qualified: { ...qualified, cat: [] },
+      draft: { [`cat|${NEXT_MON}`]: { work: [DAY_MA] } },
+    });
+    const oneDay =
+      (planned: ReadonlyArray<CoverageDayOverride>) => (employeeId: string, dateKey: string) =>
+        planned.some(
+          (day) =>
+            day.employeeId === employeeId &&
+            day.dateKey !== dateKey &&
+            day.day.assignmentIds.length > 0,
+        )
+          ? { kind: "workWeek" as const, days: 2 }
+          : { kind: "free" as const };
+    const preview = previewCoverageBuild(world, { availabilityWith: oneDay });
+
+    expect(placed(preview).sort()).toEqual([`ana ${TUE} ${ROW_SC}`, `ben ${MON} ${ROW_MA}`]);
+    expect(preview.shortAfter).toBe(0);
+  });
+
+  it("leaves a recurring fill where it is", () => {
+    const world = buildSuggestionWorld({
+      requirements,
+      people: ["ana", "ben"],
+      qualified,
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      baseOverrides: [
+        {
+          employeeId: "ana",
+          dateKey: MON,
+          side: "draft",
+          day: {
+            assignmentIds: [DAY_MA],
+            mentoredAssignmentIds: [],
+            absenceTypeId: null,
+            restOfDayAbsenceTypeId: null,
+          },
+        },
+      ],
+    });
+
+    expect(placed(preview)).toEqual([]);
+    expect(preview.shortCells).toEqual([{ rowKey: ROW_SC, dateKey: MON, staffShort: 1 }]);
+  });
+
+  it("never takes the backfill from someone left out of the build", () => {
+    const world = buildSuggestionWorld({
+      requirements,
+      people: ["ana", "ben"],
+      qualified,
+      draft: {},
+    });
+    const preview = previewCoverageBuild(world, {
+      dateKey: MON,
+      excludedEmployeeIds: new Set(["ben"]),
+    });
+
+    expect(placed(preview)).toEqual([`ana ${MON} ${ROW_MA}`]);
+    expect(preview.shortCells).toEqual([{ rowKey: ROW_SC, dateKey: MON, staffShort: 1 }]);
+  });
+});

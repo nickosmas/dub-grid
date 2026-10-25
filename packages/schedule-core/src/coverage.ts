@@ -30,6 +30,8 @@ export type CoverageRequirementLike = {
   assignmentId?: number | null;
   dayOfWeek: number | null;
   minStaff: number;
+  /** The most staff a build or suggestion fills it to; null or absent for no limit. */
+  maxStaff?: number | null;
 };
 
 // ── Coverage result types ───────────────────────────────────────────────────
@@ -43,6 +45,8 @@ export interface CoverageStatus {
   isMet: boolean;
   /** True when there is a requirement defined (required > 0). */
   hasRequirement: boolean;
+  /** The most staff a build or suggestion fills it to; absent for no limit. */
+  maximum?: number;
 }
 
 export interface CoverageShortageDetail {
@@ -182,6 +186,8 @@ export function resolveDayOffAbsenceType<T extends DayOffAbsenceTypeLike>(
 
 // ── Coverage intelligence ───────────────────────────────────────────────────
 
+type ResolvedRequirement = { minStaff: number; maxStaff?: number | null };
+
 /**
  * Both resolvers check for a day-specific requirement row first, then fall back
  * to the "every day" row (`dayOfWeek === null`).
@@ -190,11 +196,14 @@ function pickRequirement(
   requirements: CoverageRequirementLike[],
   dayOfWeek: number,
   matches: (requirement: CoverageRequirementLike, dow: number | null) => boolean,
-): { minStaff: number } | null {
+): ResolvedRequirement | null {
   const found =
     requirements.find((requirement) => matches(requirement, dayOfWeek)) ??
     requirements.find((requirement) => matches(requirement, null));
-  return found ? { minStaff: found.minStaff } : null;
+  if (!found) return null;
+  return found.maxStaff != null
+    ? { minStaff: found.minStaff, maxStaff: found.maxStaff }
+    : { minStaff: found.minStaff };
 }
 
 /**
@@ -206,7 +215,7 @@ export function resolveRequirementByAssignment(
   focusAreaId: number,
   assignmentId: number,
   dayOfWeek: number,
-): { minStaff: number } | null {
+): ResolvedRequirement | null {
   return pickRequirement(
     requirements,
     dayOfWeek,
@@ -227,7 +236,7 @@ export function resolveRequirementByJobShift(
   jobId: number,
   preferredShiftId: number | null,
   dayOfWeek: number,
-): { minStaff: number } | null {
+): ResolvedRequirement | null {
   const shiftId = preferredShiftId ?? null;
   return pickRequirement(
     requirements,
@@ -285,7 +294,7 @@ export interface CoverageStatusInput {
   assignmentIdsForKey: (empId: string, date: Date) => number[];
   sectionCodeIds: Set<number>;
   eligibleAssignmentDefinitionIds: number[] | Set<number>;
-  requirement: { minStaff: number };
+  requirement: ResolvedRequirement;
   coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
   /** When given, each counted person is appended here as they are counted. */
   contributors?: CoverageContributor[];
@@ -347,6 +356,7 @@ export function computeCoverageStatus(input: CoverageStatusInput): CoverageStatu
     required: requirement.minStaff,
     isMet,
     hasRequirement,
+    ...(requirement.maxStaff != null ? { maximum: requirement.maxStaff } : {}),
   };
 }
 

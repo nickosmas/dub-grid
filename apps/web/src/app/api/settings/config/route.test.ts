@@ -207,3 +207,86 @@ describe("delete dependency checks", () => {
     });
   });
 });
+
+describe("saving coverage requirements", () => {
+  function recordingClient() {
+    const inserts: { table: string; rows: unknown }[] = [];
+    const client = {
+      from: (table: string) => {
+        const chain: Record<string, unknown> = {};
+        const passthrough = () => chain;
+        chain.delete = passthrough;
+        chain.select = passthrough;
+        chain.order = passthrough;
+        chain.eq = passthrough;
+        chain.is = passthrough;
+        chain.in = passthrough;
+        chain.maybeSingle = async () => ({ data: null, error: null });
+        chain.insert = (rows: unknown) => {
+          inserts.push({ table, rows });
+          return chain;
+        };
+        chain.then = (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
+          resolve({ data: [], error: null });
+        return chain;
+      },
+    };
+    return { client, inserts };
+  }
+
+  async function save(requirements: unknown[]) {
+    const { client, inserts } = recordingClient();
+    getServiceClient.mockReturnValue(client);
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: "actor-1" },
+      serviceClient: client,
+      orgId: REAL_ORG,
+    });
+    const { POST } = await import("./route");
+    const res = await POST(
+      new NextRequest("https://app.test/api/settings/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "saveCoverageRequirements",
+          orgId: REAL_ORG,
+          focusAreaId: 1,
+          jobId: 2,
+          preferredShiftId: 3,
+          requirements,
+        }),
+      }),
+    );
+    return {
+      status: res?.status,
+      rows: inserts.filter((insert) => insert.table === "coverage_requirements"),
+    };
+  }
+
+  it("stores the maximum with each row", async () => {
+    const { status, rows } = await save([{ dayOfWeek: null, minStaff: 1, maxStaff: 1 }]);
+    expect(status).toBe(200);
+    expect(rows).toEqual([
+      {
+        table: "coverage_requirements",
+        rows: [
+          {
+            org_id: REAL_ORG,
+            focus_area_id: 1,
+            job_id: 2,
+            preferred_shift_id: 3,
+            day_of_week: null,
+            min_staff: 1,
+            max_staff: 1,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("refuses a maximum below the minimum, and saves no limit when none is sent", async () => {
+    expect((await save([{ dayOfWeek: 1, minStaff: 3, maxStaff: 2 }])).status).toBe(400);
+    const { rows } = await save([{ dayOfWeek: 1, minStaff: 3 }]);
+    expect(rows[0].rows).toEqual([expect.objectContaining({ min_staff: 3, max_staff: null })]);
+  });
+});

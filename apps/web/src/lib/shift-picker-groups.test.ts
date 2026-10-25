@@ -36,6 +36,17 @@ describe("secondShiftClash", () => {
     ).toBeNull();
   });
 
+  it("lets a night shift follow an early shift, since its morning is the next day's", () => {
+    const early: WorkingShift = { name: "Early", shiftId: 5, start: "05:00", end: "13:00" };
+    expect(
+      secondShiftClash({ shiftId: 4, startTime: "23:00", endTime: "07:00" }, early, "2026-10-26"),
+    ).toBeNull();
+    const night: WorkingShift = { name: "Night", shiftId: 4, start: "23:00", end: "07:00" };
+    expect(
+      secondShiftClash({ shiftId: 5, startTime: "05:00", endTime: "13:00" }, night, "2026-10-26"),
+    ).toBeNull();
+  });
+
   it("catches an overnight shift reaching back into the day", () => {
     const evening: WorkingShift = { name: "Evening", shiftId: 3, start: "15:00", end: "23:00" };
     expect(
