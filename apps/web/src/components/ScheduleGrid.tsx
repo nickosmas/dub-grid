@@ -26,7 +26,7 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import type { ShiftChange } from "@dubgrid/schedule-core";
+import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
@@ -870,11 +870,23 @@ function ShiftDetailHoverCard({
                             color: "var(--dg-color-text-muted)",
                           }}
                         >
-                          Not published yet. Staff still see the published shift.
+                          {isNewShiftChange(view)
+                            ? "Not published yet. Staff don't see it until it's published."
+                            : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
                       {view.kind === "multi" ? (
                         <ShiftChangeCard change={view} layout="stacked" showDayBar />
+                      ) : isNewShiftChange(view) ? (
+                        // One item on a day that had nothing has no Before to show.
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-muted)",
+                          }}
+                        >
+                          {formatShiftChangeWasText(view)}
+                        </div>
                       ) : (
                         <ShiftChangeWas change={view} />
                       )}

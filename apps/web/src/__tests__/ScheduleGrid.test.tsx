@@ -4103,6 +4103,28 @@ describe("ScheduleGrid", () => {
     expect(screen.getByText("Was N.")).toBeInTheDocument();
   });
 
+  it("says what a new draft cell adds, without a published shift staff still see", async () => {
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
+      draftKindForKey: () => "new",
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Not published yet. Staff don't see it until it's published."),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText(/^Added: /)).toBeInTheDocument();
+    expect(screen.queryByText(/Staff still see the published shift/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Before")).not.toBeInTheDocument();
+  });
+
   it("keeps the indicator line on a deleted shift's hover card", async () => {
     observedWidth = 1600;
     renderGrid({
