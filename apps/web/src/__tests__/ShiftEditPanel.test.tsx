@@ -428,12 +428,14 @@ function derivePanelSelection(
   currentShift: string | null;
   currentAssignmentIds: number[];
   currentAbsenceTypeId: number | null;
+  currentSegments: ShiftJobSegment[];
 } {
   if (!input || input.kind === "deleted") {
     return {
       currentShift: null,
       currentAssignmentIds: [],
       currentAbsenceTypeId: null,
+      currentSegments: [],
     };
   }
 
@@ -444,6 +446,7 @@ function derivePanelSelection(
       currentShift: absenceType?.label ?? null,
       currentAssignmentIds: [],
       currentAbsenceTypeId: input.absenceTypeId ?? null,
+      currentSegments: [],
     };
   }
 
@@ -484,6 +487,13 @@ function derivePanelSelection(
     currentShift,
     currentAssignmentIds,
     currentAbsenceTypeId: null,
+    currentSegments: orderedSegments.map((segment, index) => ({
+      label: currentShift.split("/")[index] ?? "",
+      shiftId: segment.shiftId,
+      jobId: segment.jobId,
+      position: segment.position,
+      isMentored: segment.isMentored,
+    })),
   };
 }
 
@@ -581,12 +591,14 @@ function ConfirmDraftHarness({
 }) {
   const [currentShift, setCurrentShift] = useState<string | null>(null);
   const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([]);
+  const [currentSegments, setCurrentSegments] = useState<ShiftJobSegment[]>([]);
 
   return (
     <ShiftEditPanel
       modal={modal}
       currentShift={currentShift}
       currentAssignmentIds={currentAssignmentIds}
+      currentSegments={currentSegments}
       assignments={assignments}
       shiftCategories={shiftCategories}
       jobs={jobs}
@@ -597,6 +609,7 @@ function ConfirmDraftHarness({
         const next = derivePanelSelection(input);
         setCurrentShift(next.currentShift);
         setCurrentAssignmentIds(next.currentAssignmentIds);
+        setCurrentSegments(next.currentSegments);
       }}
       onClose={vi.fn()}
       onConfirmDraft={onConfirmDraft}
@@ -1014,6 +1027,68 @@ describe("ShiftEditPanel", () => {
           fromRecurring: false,
         },
         undefined,
+      );
+    });
+
+    it("has nothing to save once mentored is turned on and back off", () => {
+      const segment = (label: string, isMentored: boolean): ShiftJobSegment => ({
+        shiftId: 11,
+        jobId: 102,
+        position: 0,
+        label,
+        isMentored,
+      });
+      // A loaded cell and the same cell rebuilt by an edit label it differently.
+      const base = {
+        currentShift: "D · M",
+        currentAssignmentIds: [1],
+        currentSegments: [segment("D · M", false)],
+      };
+      const { rerender } = render(panelElement(base, vi.fn(), vi.fn()));
+      rerender(
+        panelElement(
+          { ...base, currentShift: "DM", currentSegments: [segment("DM", true)] },
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+
+      rerender(
+        panelElement(
+          { ...base, currentShift: "DM", currentSegments: [segment("DM", false)] },
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+      expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    });
+
+    it("Cancel turns mentored back off when the label did not change", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      const segment = (isMentored: boolean): ShiftJobSegment => ({
+        shiftId: 11,
+        jobId: 102,
+        position: 0,
+        label: "D",
+        isMentored,
+      });
+      const base = {
+        currentShift: "D",
+        currentAssignmentIds: [1],
+        currentSegments: [segment(false)],
+      };
+      const { rerender } = render(panelElement(base, onSelect, vi.fn()));
+      rerender(panelElement({ ...base, currentSegments: [segment(true)] }, onSelect, vi.fn()));
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: "worked",
+          segments: [{ shiftId: 11, jobId: 102, position: 0, isMentored: false }],
+        }),
       );
     });
 
