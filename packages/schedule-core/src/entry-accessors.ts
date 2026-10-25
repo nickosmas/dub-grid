@@ -35,6 +35,20 @@ export function getScheduleEntryRestOfDayAbsenceTypeId(entry: ScheduleEntryLike)
   return entry.state?.kind === "worked" ? (entry.state.absenceTypeId ?? null) : null;
 }
 
+/**
+ * The time that absence covers (item 50b), or null for a cell saved before
+ * the absence kept its own times, which reads as "rest of the day".
+ */
+export function getScheduleEntryRestOfDayAbsenceTimes(
+  entry: ScheduleEntryLike,
+): { start: string; end: string } | null {
+  const state = entry.state;
+  if (state?.kind !== "worked" || state.absenceTypeId == null) return null;
+  return state.absenceStartTime && state.absenceEndTime
+    ? { start: state.absenceStartTime, end: state.absenceEndTime }
+    : null;
+}
+
 export function getScheduleEntryTitle(entry: ScheduleEntryLike): string {
   return (
     entry.presentation?.shiftName ??

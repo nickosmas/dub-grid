@@ -366,6 +366,56 @@ describe.runIf(reachable)("shift requests on a cell with a rest-of-day absence (
       });
     }));
 
+  it("keeps the absence's own times on the half left behind (092)", () =>
+    inTransaction(async (fx) => {
+      // D/E/Sick where the Evening shift ended at 7:00 PM and Sick was given 8:00 to
+      // 11:00 PM, which no fill would produce, so only stored times survive.
+      await db.query(
+        `SELECT public.write_schedule_cell_snapshot_internal(
+           $1, $2, $3::date, 'published', 'worked', $4::bigint[], $5::bigint[], $6::bigint,
+           (SELECT '|' || to_char(r.start_time, 'HH24:MI')
+              FROM public.resolve_work_assignment_time_ranges($4::bigint[], $5::bigint[]) r
+              WHERE r.segment_position = 2),
+           '|19:00', NULL, FALSE, $7::bigint, NULL, $8, ARRAY[false, false],
+           p_absence_start_time => '20:00', p_absence_end_time => '23:00')`,
+        [
+          fx.orgId,
+          fx.peer.empId,
+          fx.date,
+          [fx.dayShiftId, fx.eveningShiftId],
+          [fx.jobId, fx.jobId],
+          fx.sickId,
+          fx.focusAreaId,
+          fx.superAdmin.userId,
+        ],
+      );
+      const timesOf = async () => {
+        const { rows } = await db.query<{ absence_start_time: string; absence_end_time: string }>(
+          `SELECT absence_start_time, absence_end_time
+             FROM public.get_schedule_cell_snapshot_payload($1, $2, $3::date, 'published')`,
+          [fx.orgId, fx.peer.empId, fx.date],
+        );
+        return rows[0];
+      };
+      const before = await timesOf();
+      expect(before).toEqual({ absence_start_time: "20:00", absence_end_time: "23:00" });
+
+      await publishCell(fx, fx.approver.empId, fx.date, [], fx.sickId);
+      const requestId = await createRequest(fx, fx.peer, {
+        type: "pickup",
+        shiftId: fx.dayShiftId,
+        targetEmpId: fx.approver.empId,
+      });
+      await respond(fx, fx.approver, requestId);
+      await approve(fx, requestId);
+
+      expect(await readCell(fx, fx.peer.empId, fx.date)).toMatchObject({
+        shiftIds: [fx.eveningShiftId],
+        absenceTypeId: fx.sickId,
+      });
+      expect(await timesOf()).toEqual(before);
+    }));
+
   it("lets nobody absent for the rest of the day be the target of a pickup", () =>
     inTransaction(async (fx) => {
       await publishCell(fx, fx.peer.empId, fx.date, [fx.eveningShiftId], null);

@@ -14,6 +14,36 @@ describe("scheduleCellStateSchema", () => {
     expect(parsed.data).toMatchObject({ kind: "worked", absenceTypeId: 7 });
   });
 
+  it("accepts the time an absence beside a shift covers (item 50b)", () => {
+    const parsed = scheduleCellStateSchema.safeParse({
+      kind: "worked",
+      segments: [segment],
+      absenceTypeId: 7,
+      absenceStartTime: "07:00",
+      absenceEndTime: "11:00",
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({ absenceStartTime: "07:00", absenceEndTime: "11:00" });
+  });
+
+  it("refuses absence times without an absence beside a shift, or only one of them", () => {
+    const times = { absenceStartTime: "07:00", absenceEndTime: "11:00" };
+    expect(
+      scheduleCellStateSchema.safeParse({ kind: "worked", segments: [segment], ...times }).success,
+    ).toBe(false);
+    expect(
+      scheduleCellStateSchema.safeParse({ kind: "absence", absenceTypeId: 7, ...times }).success,
+    ).toBe(false);
+    expect(
+      scheduleCellStateSchema.safeParse({
+        kind: "worked",
+        segments: [segment],
+        absenceTypeId: 7,
+        absenceStartTime: "07:00",
+      }).success,
+    ).toBe(false);
+  });
+
   it("still refuses a worked cell with no segments, even with an absence", () => {
     expect(
       scheduleCellStateSchema.safeParse({ kind: "worked", segments: [], absenceTypeId: 7 }).success,

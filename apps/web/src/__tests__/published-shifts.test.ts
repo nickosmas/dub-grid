@@ -61,6 +61,8 @@ describe("published shift helpers", () => {
       assignmentIds: [1, 2],
       absenceTypeId: null,
       restOfDayAbsenceTypeId: null,
+      restOfDayAbsenceStartTime: null,
+      restOfDayAbsenceEndTime: null,
       startTime: "06:30",
       endTime: "22:00",
       durationHours: 14,

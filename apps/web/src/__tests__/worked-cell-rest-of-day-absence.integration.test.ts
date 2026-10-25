@@ -92,9 +92,13 @@ async function writeDraft(
 ) {
   const segments = options.segments ?? stateKind === "worked";
   await db.query(
+    // A full-shift absence covers no time, which the editor's save refuses
+    // since 092; these cases are about storing the absence, so they save it
+    // untimed, as a cell from before 50a was.
     `SELECT public.write_schedule_cell_snapshot(
        $1::uuid, $2::uuid, $3::date, 'draft', $4,
-       $5::bigint[], $6::bigint[], $7::bigint
+       $5::bigint[], $6::bigint[], $7::bigint,
+       p_allow_untimed_absence => true
      )`,
     [
       fixture.org_id,
@@ -320,6 +324,8 @@ describe.skipIf(!reachable)("a worked cell can carry a rest-of-day absence (082)
 
   it("builds the cell state with the absence on a worked cell only", async () => {
     await asSuperAdmin(async (fixture) => {
+      // Only SQL functions call the builder since 092, so call it as the owner.
+      await db.query("RESET ROLE");
       const {
         rows: [row],
       } = await db.query<{ worked: number | null; deleted: number | null }>(

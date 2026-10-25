@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 3dadbdf675c6ed2dfcc12fc384e92d9ada3c2a81b368a7f7ace952bda7527f29 -->
+<!-- blueprint:source-hash e56a4b1521821810a24b0e4d2769571828400d76971b74999d0e426be2cd5d14 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -304,9 +304,10 @@ Item 50 is split:
 - **50a - Worked until limits:** shipped; times stay inside the shift (no
   23.75-hour shift from a time before the start), the absence must cover
   some time, and removing it puts the shift's times back.
-- **50b - Data model:** the absence stores its own start and end; existing
+- **50b - Data model:** shipped; the absence stores its own start and end; existing
   rows read as running from the last shift's end to its scheduled end.
-  Needs a migration.
+  Migration 092; the server fills times a save leaves out and refuses an
+  absence that covers no time or overlaps the work.
 - **50c - Web panel:** Left early or Arrived late, a Left at (or Arrives
   at) time, a later shift that wasn't worked comes off, a "never started"
   choice that becomes a whole-day absence, and the day bar.

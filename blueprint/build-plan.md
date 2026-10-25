@@ -1041,7 +1041,7 @@
   - [x] 50a. **Worked until limits** - times stay inside the shift (no
         23.75-hour shift from a time before the start), the absence must
         cover some time, and removing it puts the shift's times back.
-  - [ ] 50b. **Data model** - the absence stores its own start and end;
+  - [x] 50b. **Data model** - the absence stores its own start and end;
         existing rows read as running from the last shift's end to its
         scheduled end. Needs a migration.
   - [ ] 50c. **Web panel** - Left early or Arrived late, a Left at (or

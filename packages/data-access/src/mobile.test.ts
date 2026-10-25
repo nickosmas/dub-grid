@@ -600,6 +600,8 @@ describe("fetchPublishedMobileScheduleRows", () => {
           absence_type_id: 9,
           custom_start_time: "07:00",
           custom_end_time: "11:00",
+          absence_start_time: "11:00",
+          absence_end_time: "15:00",
           segments: [
             {
               id: "seg-1",
@@ -629,6 +631,8 @@ describe("fetchPublishedMobileScheduleRows", () => {
       kind: "worked",
       absenceTypeId: 9,
       customStartTime: "07:00",
+      absenceStartTime: "11:00",
+      absenceEndTime: "15:00",
       segments: [{ shiftId: 1, jobId: 10, position: 0 }],
     });
   });

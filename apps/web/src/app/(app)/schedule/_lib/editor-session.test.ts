@@ -107,6 +107,31 @@ describe("schedule editor session helpers", () => {
     ).toBeNull();
   });
 
+  it("classifies a change to the absence's times alone as a modified draft (50b)", () => {
+    const timed = (start: string, end: string, published: [string, string]) =>
+      makeShiftEntry({
+        restOfDayAbsenceTypeId: 7,
+        publishedRestOfDayAbsenceTypeId: 7,
+        restOfDayAbsenceStartTime: start,
+        restOfDayAbsenceEndTime: end,
+        publishedRestOfDayAbsenceStartTime: published[0],
+        publishedRestOfDayAbsenceEndTime: published[1],
+      });
+    expect(computeScheduleEntryDraftKind(timed("07:00", "09:00", ["13:00", "15:00"]))).toBe(
+      "modified",
+    );
+    expect(computeScheduleEntryDraftKind(timed("13:00", "15:00", ["13:00", "15:00"]))).toBeNull();
+  });
+
+  it("keeps the absence's times out of the editable identity, like other times (50b)", () => {
+    expect(
+      shiftEditableIdentityMatches(
+        makeShiftEntry({ restOfDayAbsenceTypeId: 7, restOfDayAbsenceStartTime: "07:00" }),
+        makeShiftEntry({ restOfDayAbsenceTypeId: 7, restOfDayAbsenceStartTime: "13:00" }),
+      ),
+    ).toBe(true);
+  });
+
   it("treats a rest-of-day absence as part of the editable identity", () => {
     expect(
       shiftEditableIdentityMatches(makeShiftEntry(), makeShiftEntry({ restOfDayAbsenceTypeId: 7 })),

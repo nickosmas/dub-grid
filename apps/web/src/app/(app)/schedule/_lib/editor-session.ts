@@ -320,7 +320,10 @@ export function computeScheduleEntryDraftKind(entry: ShiftMap[string]): DraftKin
     : numberArraysMatch(entry.assignmentIds, publishedAssignmentIds);
   const absMatch =
     (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null) &&
-    (entry.restOfDayAbsenceTypeId ?? null) === (entry.publishedRestOfDayAbsenceTypeId ?? null);
+    (entry.restOfDayAbsenceTypeId ?? null) === (entry.publishedRestOfDayAbsenceTypeId ?? null) &&
+    (entry.restOfDayAbsenceStartTime ?? null) ===
+      (entry.publishedRestOfDayAbsenceStartTime ?? null) &&
+    (entry.restOfDayAbsenceEndTime ?? null) === (entry.publishedRestOfDayAbsenceEndTime ?? null);
   const startMatch = (entry.customStartTime ?? null) === (entry.publishedCustomStartTime ?? null);
   const endMatch = (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
 
