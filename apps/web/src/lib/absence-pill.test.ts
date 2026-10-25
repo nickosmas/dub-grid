@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { layoutAbsencePill, layoutEntryAbsence, overnightShortRange } from "./absence-pill";
+import {
+  layoutAbsencePill,
+  layoutEntryAbsence,
+  overnightShortRange,
+  withoutAbsenceBesideShifts,
+} from "./absence-pill";
 
 const THURSDAY = new Date(2026, 9, 22);
 
@@ -114,5 +119,52 @@ describe("layoutEntryAbsence", () => {
         THURSDAY,
       ),
     ).toEqual({ first: false, joinsShift: true, shortTime: null, time: null });
+  });
+});
+
+describe("withoutAbsenceBesideShifts (item 50g)", () => {
+  const worked = {
+    kind: "worked" as const,
+    segments: [{ shiftId: 1, jobId: 2, position: 0, isMentored: false }],
+    seriesId: null,
+    fromRecurring: false,
+  };
+  const day = [{ startTime: "07:00:00", endTime: "15:00:00" }];
+
+  it("drops a left-early absence and puts the shift back to its scheduled end", () => {
+    expect(
+      withoutAbsenceBesideShifts(
+        {
+          ...worked,
+          absenceTypeId: 4,
+          customStartTime: "07:00",
+          customEndTime: "11:00",
+          absenceStartTime: "11:00",
+          absenceEndTime: "15:00",
+        },
+        day,
+      ),
+    ).toMatchObject({ absenceTypeId: null, customStartTime: null, customEndTime: null });
+  });
+
+  it("drops an arrived-late absence and puts the shift back to its scheduled start", () => {
+    expect(
+      withoutAbsenceBesideShifts(
+        {
+          ...worked,
+          absenceTypeId: 4,
+          customStartTime: "11:00",
+          customEndTime: "15:00",
+          absenceStartTime: "07:00",
+          absenceEndTime: "11:00",
+        },
+        day,
+      ),
+    ).toMatchObject({ absenceTypeId: null, customStartTime: null, customEndTime: null });
+  });
+
+  it("leaves a cell without an absence alone", () => {
+    const input = { ...worked, absenceTypeId: null, customStartTime: null, customEndTime: null };
+    expect(withoutAbsenceBesideShifts(input, day)).toBe(input);
   });
 });

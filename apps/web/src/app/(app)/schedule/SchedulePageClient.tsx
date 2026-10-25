@@ -1,6 +1,11 @@
 "use client";
 
-import { entryAbsenceSpan, layoutEntryAbsence, type AbsencePillLayout } from "@/lib/absence-pill";
+import {
+  entryAbsenceSpan,
+  layoutEntryAbsence,
+  withoutAbsenceBesideShifts,
+  type AbsencePillLayout,
+} from "@/lib/absence-pill";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -5734,7 +5739,15 @@ function SchedulerContent({
       ) {
         return;
       }
-      setClipboard(buildEntryPayload(shift));
+      const payload = buildEntryPayload(shift);
+      // An absence beside the shifts belongs to that day, so a copy takes only
+      // the shifts, with the edge the absence cut back at its scheduled time.
+      if (payload.kind === "worked" && payload.absenceTypeId != null) {
+        setClipboard(withoutAbsenceBesideShifts(payload, shift.segments ?? []));
+        toast.success("Shifts copied, without the absence");
+        return;
+      }
+      setClipboard(payload);
       toast.success("Entry copied");
     },
     [shifts, buildEntryPayload],

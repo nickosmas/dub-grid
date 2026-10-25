@@ -1,4 +1,10 @@
-import { absenceSideOf, clockSpanMinutes, type ClockRange } from "@/components/absence-span";
+import {
+  absenceBaseFromCell,
+  absenceSideOf,
+  clockSpanMinutes,
+  type ClockRange,
+} from "@/components/absence-span";
+import type { ScheduleCellInput } from "@/types";
 import { fmt12h } from "@/components/shiftEditTime";
 import { fmt12hShort } from "@/lib/utils";
 
@@ -141,4 +147,66 @@ export function layoutEntryAbsence(entry: AbsenceLayoutEntry, date: Date): Absen
       ? { start: entry.absenceStartTime.slice(0, 5), end: entry.absenceEndTime.slice(0, 5) }
       : null;
   return layoutAbsencePill({ date, shifts: timed ? shifts : [], absence: timed ? absence : null });
+}
+
+/**
+ * A worked cell's input without the absence beside its shifts (item 50g):
+ * the shift the absence cut goes back to its scheduled edge, and the others
+ * keep their own times. `segments` carry each shift's scheduled times.
+ */
+export function withoutAbsenceBesideShifts(
+  input: ScheduleCellInput,
+  segments: ReadonlyArray<{ startTime?: string | null; endTime?: string | null }>,
+): ScheduleCellInput {
+  if (input.kind !== "worked" || input.absenceTypeId == null) return input;
+  const count = input.segments.length;
+  const part = (time: string | null | undefined, index: number) =>
+    (time ?? "").split("|")[index]?.trim().slice(0, 5) || null;
+  const shifts = input.segments.map((_, index) => {
+    const segment = segments[index];
+    const scheduled =
+      segment?.startTime && segment.endTime
+        ? { start: segment.startTime.slice(0, 5), end: segment.endTime.slice(0, 5) }
+        : null;
+    return {
+      scheduled,
+      customStart: part(input.customStartTime, index),
+      customEnd: part(input.customEndTime, index),
+    };
+  });
+  const span =
+    input.absenceStartTime && input.absenceEndTime
+      ? { start: input.absenceStartTime.slice(0, 5), end: input.absenceEndTime.slice(0, 5) }
+      : null;
+  const timed = shifts.every((shift) => shift.scheduled != null);
+  let starts = shifts.map((shift) => shift.customStart);
+  let ends = shifts.map((shift) => shift.customEnd);
+  if (timed && count > 0) {
+    const baseShifts = shifts.map((shift) => ({
+      scheduled: shift.scheduled!,
+      customStart: shift.customStart,
+      customEnd: shift.customEnd,
+    }));
+    const work = {
+      start: baseShifts[0].customStart ?? baseShifts[0].scheduled.start,
+      end: baseShifts[count - 1].customEnd ?? baseShifts[count - 1].scheduled.end,
+    };
+    const { base } = absenceBaseFromCell({
+      shifts: baseShifts,
+      side: absenceSideOf(span, work),
+      absence: span,
+    });
+    starts = base.shifts.map((shift) => shift.customStart);
+    ends = base.shifts.map((shift) => shift.customEnd);
+  }
+  const join = (times: Array<string | null>) =>
+    times.every((time) => !time) ? null : times.map((time) => time ?? "").join("|");
+  return {
+    ...input,
+    absenceTypeId: null,
+    absenceStartTime: null,
+    absenceEndTime: null,
+    customStartTime: join(starts),
+    customEndTime: join(ends),
+  };
 }

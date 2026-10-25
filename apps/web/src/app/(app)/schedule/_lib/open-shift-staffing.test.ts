@@ -228,6 +228,30 @@ describe("buildOpenShiftStaffingCandidates", () => {
     expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["evening"]);
   });
 
+  it("leaves in someone who arrived late unless the absence overlaps the shift (item 50)", () => {
+    const lateEvening = (absenceStart: string): StaffingScheduleState => ({
+      kind: "worked",
+      segments: [{ shiftId: 2, jobId: 11, position: 0, isMentored: false }],
+      assignmentIds: [101],
+      absenceTypeId: null,
+      restOfDayAbsenceTypeId: 9,
+      restOfDayAbsenceStartTime: absenceStart,
+      restOfDayAbsenceEndTime: "17:00",
+      customStartTime: "17:00",
+      customEndTime: "23:00",
+    });
+    const candidates = buildOpenShiftStaffingCandidates({
+      ...baseContext,
+      openShift: gap({ eligibleAssignmentDefinitionIds: [100] }),
+      employees: [employee({ id: "late-clear" }), employee({ id: "late-overlap" })],
+      scheduleByEmployeeId: new Map([
+        ["late-clear", lateEvening("15:00")],
+        ["late-overlap", lateEvening("13:00")],
+      ]),
+    });
+    expect(candidates.map((candidate) => candidate.employee.id)).toEqual(["late-clear"]);
+  });
+
   it("excludes duration-only general work and checks general work that has times", () => {
     const office: AssignmentDefinition = {
       id: 102,

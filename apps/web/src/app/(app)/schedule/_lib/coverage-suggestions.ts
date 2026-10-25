@@ -1,4 +1,5 @@
 import {
+  absenceBlocksWork,
   MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_WEEK,
   computeShiftSegmentHours,
@@ -38,6 +39,7 @@ import { formatShortDate } from "@/components/coverage-check/coverage-check-text
 import {
   assignmentTimeRange,
   getStaffingStateAlignedTimeRanges,
+  getStaffingStateTimeRanges,
   staffingStateFromEntry,
 } from "./open-shift-staffing";
 
@@ -347,7 +349,29 @@ export function availabilityFromShifts(
   const stateOn = (key: string) => staffingStateFromEntry(input.shifts[`${employeeId}_${key}`]);
   const state = stateOn(dateKey);
   if (state?.restOfDayAbsenceTypeId != null) {
-    return { kind: "restOfDayAbsence", absenceTypeId: state.restOfDayAbsenceTypeId };
+    // After leaving early they take no more work that day; after arriving
+    // late, only work the absence overlaps is out (item 50).
+    const candidate = input.assignments.find((item) => item.id === assignmentId);
+    const candidateRange = candidate ? assignmentTimeRange(candidate, input.shiftCategories) : null;
+    const work = getStaffingStateTimeRanges(state, context);
+    const blocked = absenceBlocksWork(
+      state.restOfDayAbsenceStartTime && state.restOfDayAbsenceEndTime
+        ? {
+            start: state.restOfDayAbsenceStartTime.slice(0, 5),
+            end: state.restOfDayAbsenceEndTime.slice(0, 5),
+          }
+        : null,
+      work.length > 0
+        ? { start: work[0].start.slice(0, 5), end: work[work.length - 1].end.slice(0, 5) }
+        : null,
+      candidateRange ? [candidateRange] : [],
+    );
+    if (blocked === "rest-of-day") {
+      return { kind: "restOfDayAbsence", absenceTypeId: state.restOfDayAbsenceTypeId };
+    }
+    if (blocked === "overlap") {
+      return { kind: "absence", absenceTypeId: state.restOfDayAbsenceTypeId };
+    }
   }
   if (state?.kind === "absence" && state.absenceTypeId != null) {
     return { kind: "absence", absenceTypeId: state.absenceTypeId };

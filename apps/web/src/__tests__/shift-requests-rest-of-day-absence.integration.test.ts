@@ -181,6 +181,34 @@ async function publishCell(
   );
 }
 
+/** Publishes the Day shift started two hours late, with the absence covering those hours (item 50). */
+async function publishArrivedLate(fx: Fixture, empId: string, date: string): Promise<void> {
+  await db.query(
+    `WITH day AS (
+       SELECT r.start_time, r.end_time
+       FROM public.resolve_work_assignment_time_ranges($5::bigint[], $6::bigint[]) r
+       WHERE r.segment_position = 1
+     )
+     SELECT public.write_schedule_cell_snapshot_internal(
+       $1, $2, $3::date, 'published', 'worked', $5::bigint[], $6::bigint[], $4::bigint,
+       (SELECT to_char(start_time + interval '2 hours', 'HH24:MI') FROM day),
+       (SELECT to_char(end_time, 'HH24:MI') FROM day), NULL, FALSE,
+       $7::bigint, NULL, $8, ARRAY[false],
+       p_absence_start_time => (SELECT to_char(start_time, 'HH24:MI') FROM day),
+       p_absence_end_time => (SELECT to_char(start_time + interval '2 hours', 'HH24:MI') FROM day))`,
+    [
+      fx.orgId,
+      empId,
+      date,
+      fx.sickId,
+      [fx.dayShiftId],
+      [fx.jobId],
+      fx.focusAreaId,
+      fx.superAdmin.userId,
+    ],
+  );
+}
+
 async function readCell(fx: Fixture, empId: string, date: string): Promise<Cell | null> {
   const { rows } = await db.query<{
     state_kind: string | null;
@@ -483,7 +511,32 @@ describe.runIf(reachable)("shift requests on a cell with a rest-of-day absence (
       });
       await expectRaise(
         () => claim(fx, fx.approver, requestId),
-        /You are absent for the rest of this day/,
+        /You are absent for the rest of that day/,
+      );
+    }));
+
+  it("lets someone who arrived late claim a later shift that day (item 50)", () =>
+    inTransaction(async (fx) => {
+      await publishCell(fx, fx.peer.empId, fx.date, [fx.eveningShiftId], null);
+      await publishArrivedLate(fx, fx.approver.empId, fx.date);
+      const requestId = await createRequest(fx, fx.peer, {
+        type: "pickup",
+        shiftId: fx.eveningShiftId,
+      });
+      await claim(fx, fx.approver, requestId);
+    }));
+
+  it("refuses a claim the late arrival's absence overlaps (item 50)", () =>
+    inTransaction(async (fx) => {
+      await publishCell(fx, fx.peer.empId, fx.date, [fx.dayShiftId], null);
+      await publishArrivedLate(fx, fx.approver.empId, fx.date);
+      const requestId = await createRequest(fx, fx.peer, {
+        type: "pickup",
+        shiftId: fx.dayShiftId,
+      });
+      await expectRaise(
+        () => claim(fx, fx.approver, requestId),
+        /You are absent during that shift/,
       );
     }));
 
@@ -519,7 +572,7 @@ describe.runIf(reachable)("shift requests on a cell with a rest-of-day absence (
 
       await expectRaise(
         () => approve(fx, requestId),
-        /requester is absent for the rest of the target's date/,
+        /on the target's date, the requester is absent for the rest of that day/,
       );
     }));
 });

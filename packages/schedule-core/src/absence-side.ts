@@ -46,3 +46,29 @@ export function joinAbsenceBesideShifts(
     ? `${label} / ${shiftText}`
     : `${shiftText} / ${label}`;
 }
+
+/**
+ * Why a worked cell's absence keeps its person from taking work at `ranges`
+ * that day, if it does (owner decisions, 2026-10-24): after leaving early (or
+ * an absence saved without a time) they take no more work that day; an
+ * arrived-late absence blocks only work that overlaps it.
+ */
+export function absenceBlocksWork(
+  absence: { start: string; end: string } | null,
+  work: { start: string; end: string } | null,
+  ranges: ReadonlyArray<{ start: string; end: string }>,
+): "rest-of-day" | "overlap" | null {
+  if (!absence || absenceSideOf(absence, work) === "left-early") return "rest-of-day";
+  const interval = (range: { start: string; end: string }) => {
+    const from = clock(range.start);
+    return { from, to: from + ((clock(range.end) - from + DAY) % DAY || DAY) };
+  };
+  const away = interval(absence);
+  const overlaps = ranges.some((range) => {
+    const taken = interval(range);
+    return [-DAY, 0, DAY].some(
+      (shift) => taken.from + shift < away.to && away.from < taken.to + shift,
+    );
+  });
+  return overlaps ? "overlap" : null;
+}

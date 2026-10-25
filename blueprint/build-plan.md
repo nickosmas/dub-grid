@@ -1027,7 +1027,7 @@
   - [x] 49f. **Allow a sixth day** - an option chosen before generating
         lets a build give someone a sixth day in a row (never a seventh),
         with a warning, and the result names everyone given one.
-- [ ] 50. **An absence covers scheduled time that wasn't worked** - an
+- [x] 50. **An absence covers scheduled time that wasn't worked** - an
       absence beside a shift records the part of the shift someone missed,
       not "the rest of the day": they left early (Sick from 11:00 AM to the
       end of the Day shift) or arrived late (PTO until 11:00 AM, then work).
@@ -1056,5 +1056,5 @@
         time span.
   - [x] 50f. **Mobile app** - Your Week, team list, shift detail and Home
         card.
-  - [ ] 50g. **Requests and availability** - the unavailable rule follows
+  - [x] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.

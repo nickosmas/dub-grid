@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { absenceSideOf, joinAbsenceBesideShifts } from "./absence-side";
+import { absenceBlocksWork, absenceSideOf, joinAbsenceBesideShifts } from "./absence-side";
 
 describe("absenceSideOf", () => {
   const day = { start: "07:00", end: "15:00" };
@@ -42,5 +42,25 @@ describe("joinAbsenceBesideShifts", () => {
       ),
     ).toBe("PTO 7:00 AM - 11:00 AM / Day");
     expect(joinAbsenceBesideShifts("Day", "Sick", null, day)).toBe("Day / Sick");
+  });
+});
+
+describe("absenceBlocksWork", () => {
+  const day = { start: "11:00", end: "15:00" };
+
+  it("blocks any more work after leaving early, or for an untimed absence", () => {
+    expect(
+      absenceBlocksWork({ start: "11:00", end: "15:00" }, { start: "07:00", end: "11:00" }, [
+        { start: "18:00", end: "22:00" },
+      ]),
+    ).toBe("rest-of-day");
+    expect(absenceBlocksWork(null, day, [{ start: "18:00", end: "22:00" }])).toBe("rest-of-day");
+  });
+
+  it("blocks only overlapping work after arriving late", () => {
+    const late = { start: "07:00", end: "11:00" };
+    expect(absenceBlocksWork(late, day, [{ start: "15:00", end: "23:00" }])).toBeNull();
+    expect(absenceBlocksWork(late, day, [{ start: "06:00", end: "08:00" }])).toBe("overlap");
+    expect(absenceBlocksWork(late, day, [{ start: "23:00", end: "07:30" }])).toBe("overlap");
   });
 });

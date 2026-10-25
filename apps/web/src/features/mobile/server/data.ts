@@ -88,6 +88,7 @@ import type {
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  absenceBlocksWork,
   absenceSideOf,
   assembleDashboardCoverage,
   classifyOpenShiftUrgency,
@@ -1572,16 +1573,6 @@ function buildMobileOpenShiftsFromGaps(
       const employeeScheduleRow = rowByEmployeeDate.get(
         `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
       );
-      if (
-        employeeScheduleRow?.state.kind === "worked" &&
-        employeeScheduleRow.state.absenceTypeId != null
-      ) {
-        return {
-          canVolunteer: false,
-          volunteerBlockReason: "You are absent for the rest of this day.",
-        };
-      }
-
       const employeeTimeRanges = employeeScheduleRow
         ? getScheduleRowTimeRanges({
             row: employeeScheduleRow,
@@ -1591,6 +1582,34 @@ function buildMobileOpenShiftsFromGaps(
           })
         : [];
       const assignmentRanges = getAssignmentDefinitionTimeRanges(assignment);
+
+      // An absence beside their shifts: after leaving early they take no more
+      // work that day; after arriving late, only work it overlaps is out (item 50).
+      if (
+        employeeScheduleRow?.state.kind === "worked" &&
+        employeeScheduleRow.state.absenceTypeId != null
+      ) {
+        const { absenceStartTime: start, absenceEndTime: end } = employeeScheduleRow.state;
+        const blocked = absenceBlocksWork(
+          start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null,
+          employeeTimeRanges.length > 0
+            ? {
+                start: employeeTimeRanges[0].start.slice(0, 5),
+                end: employeeTimeRanges[employeeTimeRanges.length - 1].end.slice(0, 5),
+              }
+            : null,
+          assignmentRanges,
+        );
+        if (blocked) {
+          return {
+            canVolunteer: false,
+            volunteerBlockReason:
+              blocked === "overlap"
+                ? "You are absent during that time."
+                : "You are absent for the rest of this day.",
+          };
+        }
+      }
 
       if (
         employeeTimeRanges.length > 0 &&

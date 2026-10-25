@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 49 are
-shipped. Item 40 is in progress. Item 50 is in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,7 +84,7 @@ shipped. Item 40 is in progress. Item 50 is in progress.
 | 47   | Shipped     | The Coverage panel becomes a staffing check of the draft, with exact suggestions that fix gaps or explain why none can.         |
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
-| 50   | In progress | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
+| 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 
 Item 40 is split:
 
@@ -299,7 +299,7 @@ nobody else can fill a gap, has no rest rules yet, and never includes
 approvals (owner decisions, 2026-10-22). The Tools item that fills from
 recurring schedules is named Fill from Recurring Schedules (2026-10-22).
 
-Item 50 is split:
+Item 50 is split, and every part has shipped:
 
 - **50a - Worked until limits:** shipped; times stay inside the shift (no
   23.75-hour shift from a time before the start), the absence must cover
@@ -323,8 +323,10 @@ Item 50 is split:
 - **50f - Mobile app:** shipped; Your Week, the Home card and shift detail
   show the time an absence covers, before the shift when they arrived late,
   from a span and side the server adds to each entry.
-- **50g - Requests and availability:** the unavailable rule follows the
-  absence's span; pasting a mixed cell copies only its shifts.
+- **50g - Requests and availability:** shipped; after leaving early someone
+  takes no more work that day, after arriving late only overlapping shifts
+  are out, in requests, volunteering and staffing (migration 093), and
+  copying a cell with an absence copies only its shifts.
 
 An absence beside a shift records the part of a shift someone missed: they
 left early or arrived late. It shows the time it covers, sits in time order,
@@ -502,7 +504,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `089`.
+  checksum-locked through `093`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.
