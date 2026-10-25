@@ -1,3 +1,5 @@
+import { joinAbsenceBesideShifts } from "@dubgrid/schedule-core";
+import type { ClockRange } from "@/components/absence-span";
 interface ExportEmployee {
   id: string;
   firstName: string | null;
@@ -28,11 +30,16 @@ function escapeCSVField(value: string): string {
 }
 
 /**
- * A cell's text with its absence for the rest of the day after the shifts
- * (item 45), as "Day / Sick"; unchanged without one.
+ * A cell's text with its absence beside the shifts (items 45 and 50), as
+ * "Day / Sick 11:00 AM - 3:00 PM", or the absence first when they arrived
+ * late; unchanged without one.
  */
-export function withRestOfDayAbsence(text: string, absenceLabel: string | undefined): string {
-  return absenceLabel ? `${text} / ${absenceLabel}` : text;
+export function withRestOfDayAbsence(
+  text: string,
+  absenceLabel: string | undefined,
+  span: { absence: ClockRange | null; work: ClockRange | null } = { absence: null, work: null },
+): string {
+  return absenceLabel ? joinAbsenceBesideShifts(text, absenceLabel, span.absence, span.work) : text;
 }
 
 /**

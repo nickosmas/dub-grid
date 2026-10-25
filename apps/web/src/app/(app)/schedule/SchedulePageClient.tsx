@@ -1,6 +1,6 @@
 "use client";
 
-import { layoutEntryAbsence, type AbsencePillLayout } from "@/lib/absence-pill";
+import { entryAbsenceSpan, layoutEntryAbsence, type AbsencePillLayout } from "@/lib/absence-pill";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -3064,13 +3064,30 @@ function SchedulerContent({
       const text = shiftNameForKey(empId, date);
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!text || !entry) return text;
-      const restOfDayAbsenceTypeId =
-        (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0
-          ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
-          : (entry.restOfDayAbsenceTypeId ?? null);
+      const published = (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0;
+      const restOfDayAbsenceTypeId = published
+        ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
+        : (entry.restOfDayAbsenceTypeId ?? null);
       return withRestOfDayAbsence(
         text,
         restOfDayAbsenceTypeId != null ? absenceTypeMap.get(restOfDayAbsenceTypeId) : undefined,
+        entryAbsenceSpan(
+          published
+            ? {
+                segments: entry.publishedSegments ?? [],
+                customStartTime: entry.publishedCustomStartTime,
+                customEndTime: entry.publishedCustomEndTime,
+                absenceStartTime: entry.publishedRestOfDayAbsenceStartTime,
+                absenceEndTime: entry.publishedRestOfDayAbsenceEndTime,
+              }
+            : {
+                segments: entry.segments ?? [],
+                customStartTime: entry.customStartTime,
+                customEndTime: entry.customEndTime,
+                absenceStartTime: entry.restOfDayAbsenceStartTime,
+                absenceEndTime: entry.restOfDayAbsenceEndTime,
+              },
+        ),
       );
     },
     [absenceTypeMap, shiftNameForKey, shifts],
@@ -3170,17 +3187,28 @@ function SchedulerContent({
   const restOfDayAbsenceLayoutForKey = useCallback(
     (empId: string, date: Date): AbsencePillLayout | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (entry?.restOfDayAbsenceTypeId == null) return null;
-      return layoutEntryAbsence(
-        {
-          segments: entry.segments ?? [],
-          customStartTime: entry.customStartTime,
-          customEndTime: entry.customEndTime,
-          absenceStartTime: entry.restOfDayAbsenceStartTime,
-          absenceEndTime: entry.restOfDayAbsenceEndTime,
-        },
-        date,
-      );
+      if (entry?.restOfDayAbsenceTypeId == null && entry?.publishedRestOfDayAbsenceTypeId == null) {
+        return null;
+      }
+      const range = (start?: string | null, end?: string | null) =>
+        start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null;
+      return {
+        ...layoutEntryAbsence(
+          {
+            segments: entry.segments ?? [],
+            customStartTime: entry.customStartTime,
+            customEndTime: entry.customEndTime,
+            absenceStartTime: entry.restOfDayAbsenceStartTime,
+            absenceEndTime: entry.restOfDayAbsenceEndTime,
+          },
+          date,
+        ),
+        range: range(entry.restOfDayAbsenceStartTime, entry.restOfDayAbsenceEndTime),
+        publishedRange: range(
+          entry.publishedRestOfDayAbsenceStartTime,
+          entry.publishedRestOfDayAbsenceEndTime,
+        ),
+      };
     },
     [shifts],
   );

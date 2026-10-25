@@ -187,6 +187,8 @@ export interface CellStateParts {
   /** A whole-day absence. */
   absenceTypeId: number | null;
   restOfDayAbsenceTypeId: number | null;
+  /** The time that absence covers (item 50); null when untimed. */
+  restOfDayAbsenceTimes?: { start: string; end: string } | null;
   customTimes: { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
 }
 
@@ -224,6 +226,12 @@ export function cellStateFromParts(parts: CellStateParts): ScheduleCellState {
       isMentored: segment.isMentored ?? false,
     })),
     absenceTypeId: parts.restOfDayAbsenceTypeId,
+    ...(parts.restOfDayAbsenceTypeId != null && parts.restOfDayAbsenceTimes
+      ? {
+          absenceStartTime: parts.restOfDayAbsenceTimes.start,
+          absenceEndTime: parts.restOfDayAbsenceTimes.end,
+        }
+      : {}),
     customStartTime: perPill
       ? perPill.map((pill) => pill.start).join("|")
       : (parts.customTimes?.start ?? null),

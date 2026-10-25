@@ -185,6 +185,21 @@ describe("cellStateToChangeDay", () => {
   });
 });
 
+describe("cellStateToChangeDay, an absence's own time (item 50)", () => {
+  it("carries the time it covers", () => {
+    const day = cellStateToChangeDay(
+      worked({ absenceTypeId: 4, absenceStartTime: "11:00", absenceEndTime: "15:00" }),
+      resolvers,
+    );
+    expect(day.items.at(-1)).toMatchObject({ kind: "absence", start: "11:00", end: "15:00" });
+  });
+
+  it("leaves an untimed absence without times", () => {
+    const day = cellStateToChangeDay(worked({ absenceTypeId: 4 }), resolvers);
+    expect(day.items.at(-1)).not.toHaveProperty("start");
+  });
+});
+
 describe("isSameCellState", () => {
   it("ignores segment order, mentoring, and how empty times are stored", () => {
     const left = double({ customEndTime: "|" });
@@ -205,6 +220,12 @@ describe("isSameCellState", () => {
   it("notices a different time, absence or focus area", () => {
     expect(isSameCellState(worked(), worked({ customEndTime: "12:00" }))).toBe(false);
     expect(isSameCellState(worked(), worked({ absenceTypeId: 4 }))).toBe(false);
+    expect(
+      isSameCellState(
+        worked({ absenceTypeId: 4, absenceStartTime: "11:00", absenceEndTime: "15:00" }),
+        worked({ absenceTypeId: 4, absenceStartTime: "12:00", absenceEndTime: "15:00" }),
+      ),
+    ).toBe(false);
     expect(isSameCellState(worked(), worked({ focusAreaId: MEMORY_CARE }))).toBe(false);
   });
 });

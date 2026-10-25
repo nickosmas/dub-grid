@@ -1051,7 +1051,7 @@
   - [x] 50d. **Grid and other web surfaces** - pills in time order with the
         absence's times, joined by time, weekdays on overnight times; print,
         phone Day view, Month, dashboards and person page.
-  - [ ] 50e. **Change records** - Before and After, alerts, push, activity
+  - [x] 50e. **Change records** - Before and After, alerts, push, activity
         log, publish history, reports, CSV and calendar show the absence's
         time span.
   - [ ] 50f. **Mobile app** - Your Week, team list, shift detail and Home

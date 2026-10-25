@@ -5,7 +5,9 @@
  * they missed entirely comes off for the absence to cover.
  */
 
-export type AbsenceSide = "left-early" | "arrived-late";
+import { absenceSideOf, type AbsenceSide } from "@dubgrid/schedule-core";
+
+export { absenceSideOf, type AbsenceSide };
 
 export type AbsenceSpanProblem = "unset" | "no-time-covered" | "never-started" | "outside-shift";
 
@@ -132,22 +134,6 @@ export function planAbsenceSpan(args: {
       end: cutIndex >= 0 ? at : clockTime(base + ranges[lastMissed].end),
     },
   };
-}
-
-/**
- * Which side a stored absence is on, from the work's span (the first shift's
- * start to the last one's end): left early when it starts within that span or
- * nearer its end, arrived late when it ends nearer its start. An untimed
- * absence is left early.
- */
-export function absenceSideOf(absence: ClockRange | null, work: ClockRange | null): AbsenceSide {
-  if (!absence || !work) return "left-early";
-  const start = clockMinutes(work.start);
-  const workMinutes = clockSpanMinutes(work);
-  const startsAfter = (clockMinutes(absence.start) - start + DAY) % DAY;
-  if (startsAfter <= workMinutes) return "left-early";
-  const endsBefore = (start - clockMinutes(absence.end) + DAY) % DAY;
-  return endsBefore < startsAfter - workMinutes ? "arrived-late" : "left-early";
 }
 
 /** Minutes between two clock times, overnight aware. */

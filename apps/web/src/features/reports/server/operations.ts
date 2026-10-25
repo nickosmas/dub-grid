@@ -1,3 +1,4 @@
+import { absenceSideOf } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -861,9 +862,24 @@ export function buildOperationsReportPayload(
   // A worked cell's absence for the rest of the day (item 45) counts as an
   // absence at no hours. Like a whole-day absence it ignores the shift
   // filters, so it is read from every report entry, not the filtered ones.
+  // Its time (item 50) reads in the schedule matrix, first when they arrived late.
+  const absenceMatrixText = new Map<string, { text: string; first: boolean }>();
   const restOfDayAbsenceEntries: ResolvedEntry[] = allReportEntries.flatMap((item) => {
     const absenceTypeId = item.entry.kind === "shift" ? item.entry.restOfDayAbsenceTypeId : null;
     if (absenceTypeId == null) return [];
+    const name = absenceTypeById.get(absenceTypeId) ?? "";
+    const { restOfDayAbsenceStartTime: start, restOfDayAbsenceEndTime: end } = item.entry;
+    const span = start && end ? { start: start.slice(0, 5), end: end.slice(0, 5) } : null;
+    const work =
+      item.entry.startTime && item.entry.endTime
+        ? { start: item.entry.startTime.slice(0, 5), end: item.entry.endTime.slice(0, 5) }
+        : null;
+    absenceMatrixText.set(`${item.entry.empId}_${item.entry.date}`, {
+      text: span
+        ? `${name} ${formatScheduleTimeValue(span.start)} - ${formatScheduleTimeValue(span.end)}`
+        : name,
+      first: !!span && absenceSideOf(span, work) === "arrived-late",
+    });
     return [
       {
         source: item.source,
@@ -1499,9 +1515,15 @@ export function buildOperationsReportPayload(
     rows: reportEmployees.map((employee) => {
       const cells: Record<string, string> = {};
       for (const date of reportDates) {
-        const labels = [...entries, ...restOfDayAbsenceEntries]
+        const shiftLabels = entries
           .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
           .map((item) => item.entry.label);
+        const absence = absenceMatrixText.get(`${employee.id}_${date}`);
+        const labels = absence
+          ? absence.first
+            ? [absence.text, ...shiftLabels]
+            : [...shiftLabels, absence.text]
+          : shiftLabels;
         // Shift labels lead so a cell stays readable when it carries no notes.
         const noteLabels = noteLabelsByEmployeeDate.get(`${employee.id}_${date}`) ?? [];
         cells[date] = [...labels, ...noteLabels].join(" / ");

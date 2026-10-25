@@ -6,6 +6,7 @@ import {
   subtractBreakMinutes,
   toHoursValue,
 } from "./schedule-time";
+import { absenceSideOf } from "./absence-side";
 import { alignSegmentsToBefore, unclaimedBeforeIndices } from "./segment-alignment";
 
 export interface ShiftChangeShiftInput {
@@ -30,6 +31,14 @@ export interface ShiftChangeAbsenceInput {
   name: string;
   archived?: boolean;
   scope: "allDay" | "restOfDay";
+  /**
+   * "HH:MM": the scheduled time an absence beside a shift covers (item 50).
+   * Null for a whole-day absence and one saved untimed before 50b.
+   */
+  start?: string | null;
+  end?: string | null;
+  /** Set when laid out on a day: the absence starts after midnight. */
+  nextDay?: boolean;
 }
 
 export type ShiftChangeItemInput = ShiftChangeShiftInput | ShiftChangeAbsenceInput;
@@ -57,9 +66,9 @@ export interface ShiftChangeItem {
   kind: "shift" | "absence";
   label: ShiftChangeItemLabel | null;
   status: ShiftChangeItemStatus;
-  /** "Day Shift · Registered Nurse", or "Sick (rest of day)". */
+  /** "Day Shift · Registered Nurse", "Sick", or "Sick (all day)". */
   title: ShiftChangeTextPart[];
-  /** "7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing"; empty for an absence. */
+  /** "7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing", or an absence's "11:00 AM - 3:00 PM, not worked". */
   detail: ShiftChangeTextPart[];
   plain: string;
   /** Worked minutes after the break; null for an absence or unknown times. */
@@ -210,8 +219,40 @@ function describeShift(
 
 function describeAbsence(
   item: ShiftChangeAbsenceInput,
+  date: string,
   marks: ShiftChangeMarks,
 ): DescribedShiftChangeItem {
+  if (item.start && item.end) {
+    // An absence beside a shift names the time it covers (item 50), which the
+    // day is assumed to begin at or before; a span past midnight names both days.
+    const title = [part(withArchived(item.name, item.archived), marks.all || marks.absence)];
+    const startMinutes = getMinutesSinceMidnight(item.start);
+    const endMinutes = getMinutesSinceMidnight(item.end);
+    const overnight = startMinutes != null && endMinutes != null && endMinutes <= startMinutes;
+    const startText = formatScheduleTimeValue(item.start);
+    const endText = formatScheduleTimeValue(item.end);
+    const detail = markSeparators(
+      [
+        part(
+          overnight || item.nextDay
+            ? `${weekdayOf(date, item.nextDay ? 1 : 0)} ${startText}`
+            : startText,
+          marks.all || marks.start,
+        ),
+        { text: " - " },
+        part(overnight ? `${weekdayOf(date, 1)} ${endText}` : endText, marks.all || marks.end),
+        { text: ", not worked" },
+      ],
+      new Set([1]),
+    );
+    return {
+      kind: "absence",
+      title,
+      detail,
+      plain: `${joinText(title)} ${joinText(detail)}`,
+      minutes: null,
+    };
+  }
   const scopeText = item.scope === "restOfDay" ? "(rest of day)" : "(all day)";
   const title = markSeparators(
     [
@@ -232,7 +273,7 @@ export function describeShiftChangeItem(
   const marks = options.marks ?? {};
   return item.kind === "shift"
     ? describeShift(item, options.date, marks)
-    : describeAbsence(item, marks);
+    : describeAbsence(item, options.date, marks);
 }
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -251,6 +292,8 @@ export function shiftChangeMarks(
   if (a.kind === "absence" && b.kind === "absence") {
     if (a.name !== b.name || Boolean(a.archived) !== Boolean(b.archived)) marks.absence = true;
     if (a.scope !== b.scope) marks.scope = true;
+    if ((a.start ?? null) !== (b.start ?? null)) marks.start = true;
+    if ((a.end ?? null) !== (b.end ?? null)) marks.end = true;
     return marks;
   }
   if (a.kind !== "shift" || b.kind !== "shift") return marks;
@@ -270,9 +313,13 @@ function startMinutesOf(item: ShiftChangeItemInput): number | null {
   return item.kind === "shift" && item.start ? getMinutesSinceMidnight(item.start) : null;
 }
 
-/** Shifts by start time (unknown times keep their order, after timed ones), then the absence. */
+/**
+ * Shifts by start time (unknown times keep their order, after timed ones),
+ * with the absence beside them where it happened: first when they arrived
+ * late, otherwise last (item 50).
+ */
 function inTimeOrder(items: ShiftChangeItemInput[]): ShiftChangeItemInput[] {
-  return items
+  const ordered = items
     .map((item, index) => ({ item, index }))
     .sort((left, right) => {
       const kindOrder =
@@ -284,6 +331,23 @@ function inTimeOrder(items: ShiftChangeItemInput[]): ShiftChangeItemInput[] {
       return left.index - right.index;
     })
     .map(({ item }) => item);
+  const absence = ordered.at(-1);
+  const shifts = ordered.filter(
+    (item): item is ShiftChangeShiftInput => item.kind === "shift" && !!item.start && !!item.end,
+  );
+  if (
+    absence?.kind === "absence" &&
+    absence.start &&
+    absence.end &&
+    shifts.length > 0 &&
+    absenceSideOf(
+      { start: absence.start, end: absence.end },
+      { start: shifts[0].start!, end: shifts[shifts.length - 1].end! },
+    ) === "arrived-late"
+  ) {
+    return [absence, ...ordered.slice(0, -1)];
+  }
+  return ordered;
 }
 
 interface PairedItem {
@@ -357,11 +421,14 @@ interface Interval {
   to: number;
 }
 
-/** Each timed shift's interval in minutes from the day's midnight, with overnight ends past 24:00. */
+/**
+ * Each timed item's interval in minutes from the day's midnight, with
+ * overnight ends past 24:00: the shifts and a timed absence beside them.
+ */
 function shiftIntervals(items: ShiftChangeItemInput[]): Array<Interval | null> {
   let previousStart: number | null = null;
   return items.map((item) => {
-    if (item.kind !== "shift" || !item.start || !item.end) return null;
+    if (!item.start || !item.end) return null;
     let from = getMinutesSinceMidnight(item.start);
     const endMinutes = getMinutesSinceMidnight(item.end);
     if (from == null || endMinutes == null) return null;
@@ -369,6 +436,16 @@ function shiftIntervals(items: ShiftChangeItemInput[]): Array<Interval | null> {
     previousStart = from;
     const length = getRangeDurationMinutes(item.start, item.end);
     return { from, to: from + length };
+  });
+}
+
+/** Names the next day on an absence that starts after midnight, such as after a Night shift. */
+function markNextDay(items: ShiftChangeItemInput[], intervals: Array<Interval | null>) {
+  items.forEach((item, index) => {
+    const interval = intervals[index];
+    if (item.kind === "absence" && interval && interval.from >= MINUTES_PER_DAY) {
+      items[index] = { ...item, nextDay: true };
+    }
   });
 }
 
@@ -448,7 +525,10 @@ function applyBar(
   };
   for (const { side, intervals } of sides) {
     const from = absenceFrom(intervals);
-    const hasRestOfDay = side.items.some((item) => item.kind === "absence");
+    // Only an untimed absence runs to the end of the day; a timed one has its own interval.
+    const hasRestOfDay = side.items.some(
+      (item, index) => item.kind === "absence" && intervals[index] == null,
+    );
     if (hasRestOfDay && from != null && from >= scaleEnd) {
       scaleEnd = (Math.floor(from / MINUTES_PER_DAY) + 1) * MINUTES_PER_DAY;
     }
@@ -476,8 +556,8 @@ export function describeShiftChange(
   afterDay: ShiftChangeDayInput,
   options: { date: string },
 ): ShiftChange {
-  const before = inTimeOrder(beforeDay.items);
-  const after = inTimeOrder(afterDay.items);
+  const before = [...inTimeOrder(beforeDay.items)];
+  const after = [...inTimeOrder(afterDay.items)];
   const { date } = options;
   if (sameDay(before, after)) {
     return {
@@ -499,9 +579,11 @@ export function describeShiftChange(
     };
   }
   const multi = before.length > 1 || after.length > 1;
-  const paired = multi ? pairDay(before, after) : pairSingle(before, after);
   const beforeIntervals = shiftIntervals(before);
   const afterIntervals = shiftIntervals(after);
+  markNextDay(before, beforeIntervals);
+  markNextDay(after, afterIntervals);
+  const paired = multi ? pairDay(before, after) : pairSingle(before, after);
   const beforeSide = buildSide(paired.before, date, multi, breaksFor(before, beforeIntervals));
   const afterSide = buildSide(paired.after, date, multi, breaksFor(after, afterIntervals));
   const barScale = multi

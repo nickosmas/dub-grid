@@ -20,6 +20,10 @@ export interface AbsencePillLayout {
   shortTime: string | null;
   /** The 12-hour span, "11:00 AM - 3:00 PM", with the weekday past midnight. */
   time: string | null;
+  /** The stored span itself, for change records (item 50e). */
+  range?: ClockRange | null;
+  /** The published cell's span, for comparing a draft with it. */
+  publishedRange?: ClockRange | null;
 }
 
 /**
@@ -100,6 +104,29 @@ export interface AbsenceLayoutEntry {
  * or default, and the absence's stored span. A shift without a time (a
  * general shift) leaves the absence untimed and last, as before item 50.
  */
+/** A worked entry's absence span and its work's span, first start to last end; null when unknown. */
+export function entryAbsenceSpan(entry: AbsenceLayoutEntry): {
+  absence: ClockRange | null;
+  work: ClockRange | null;
+} {
+  const count = entry.segments.length;
+  const part = (time: string | null | undefined, index: number) =>
+    (time ?? "").split("|")[index]?.trim().slice(0, 5) || null;
+  const shifts = entry.segments.map((segment, index) => ({
+    start: part(entry.customStartTime, count === 1 ? 0 : index) ?? segment.startTime?.slice(0, 5),
+    end: part(entry.customEndTime, count === 1 ? 0 : index) ?? segment.endTime?.slice(0, 5),
+  }));
+  const timed =
+    count > 0 && shifts.every((shift): shift is ClockRange => !!shift.start && !!shift.end);
+  return {
+    absence:
+      entry.absenceStartTime && entry.absenceEndTime
+        ? { start: entry.absenceStartTime.slice(0, 5), end: entry.absenceEndTime.slice(0, 5) }
+        : null,
+    work: timed ? { start: shifts[0].start!, end: shifts[count - 1].end! } : null,
+  };
+}
+
 export function layoutEntryAbsence(entry: AbsenceLayoutEntry, date: Date): AbsencePillLayout {
   const count = entry.segments.length;
   const part = (time: string | null | undefined, index: number) =>

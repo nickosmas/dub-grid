@@ -157,9 +157,17 @@ function describeScheduleCell(d: AuditDetails): string | null {
     segments.length > 1 ? `Working, ${pluralize(segments.length, "assignment")}` : "Working",
   );
   if (start && end) parts.push(`${formatClockTime(start)} – ${formatClockTime(end)}`);
-  // A worked cell's absence type is its absence for the rest of the day (item 45).
-  if (typeof input.absenceTypeId === "number")
-    parts.push("then an absence for the rest of the day");
+  // A worked cell's absence type is the absence beside its shifts (items 45
+  // and 50), with the time it covers once that is stored.
+  if (typeof input.absenceTypeId === "number") {
+    const absenceStart = typeof input.absenceStartTime === "string" ? input.absenceStartTime : null;
+    const absenceEnd = typeof input.absenceEndTime === "string" ? input.absenceEndTime : null;
+    parts.push(
+      absenceStart && absenceEnd
+        ? `with an absence, ${formatClockTime(absenceStart)} – ${formatClockTime(absenceEnd)}`
+        : "then an absence for the rest of the day",
+    );
+  }
   return parts.join(", ");
 }
 

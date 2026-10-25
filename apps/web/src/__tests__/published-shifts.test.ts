@@ -5,6 +5,7 @@ import {
   fetchPublishedShiftRows,
   mapNormalizedScheduleCellToPublishedShiftRow,
   hasPublishedScheduleContent,
+  publishedCellText,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -374,5 +375,44 @@ describe("fetchPublishedShiftRows reads past the API row cap", () => {
 
     expect(rows).toHaveLength(5);
     expect(ranges).toEqual([[0, 4]]);
+  });
+});
+
+describe("publishedCellText, an absence beside a shift (item 50)", () => {
+  const entry = {
+    kind: "shift" as const,
+    label: "D",
+    restOfDayAbsenceTypeId: 4,
+    startTime: "07:00",
+    endTime: "11:00",
+  };
+  const names = new Map([[4, "Sick"]]);
+
+  it("names the time it covers after the shift", () => {
+    expect(
+      publishedCellText(
+        { ...entry, restOfDayAbsenceStartTime: "11:00", restOfDayAbsenceEndTime: "15:00" },
+        names,
+      ),
+    ).toBe("D / Sick 11:00 AM - 3:00 PM");
+  });
+
+  it("leads with it when they arrived late", () => {
+    expect(
+      publishedCellText(
+        {
+          ...entry,
+          startTime: "11:00",
+          endTime: "15:00",
+          restOfDayAbsenceStartTime: "07:00",
+          restOfDayAbsenceEndTime: "11:00",
+        },
+        names,
+      ),
+    ).toBe("Sick 7:00 AM - 11:00 AM / D");
+  });
+
+  it("reads an untimed one as before", () => {
+    expect(publishedCellText(entry, names)).toBe("D / Sick");
   });
 });

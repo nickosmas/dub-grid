@@ -365,6 +365,32 @@ describe("operations reports", () => {
       );
     });
 
+    it("names its time in the schedule matrix, first when they arrived late (item 50)", () => {
+      const source = buildSource();
+      const withSick = (start: string, end: string, customStart: string | null) =>
+        buildOperationsReportPayload(
+          buildSource({
+            jobs: [...source.jobs, { id: 71, name: "Med Tech" }],
+            publishedRows: [
+              {
+                ...source.publishedRows[0],
+                published_custom_start_time: customStart,
+                published_custom_end_time: customStart ? "15:30" : null,
+                published_rest_of_day_absence_type_id: 50,
+                published_rest_of_day_absence_start_time: start,
+                published_rest_of_day_absence_end_time: end,
+              },
+              source.publishedRows[1],
+            ],
+          }),
+          { startDate: "2026-05-03", endDate: "2026-05-04" },
+        ).reports.scheduleMatrix.rows[0].cells["2026-05-03"];
+
+      expect(withSick("07:00", "11:00", "11:00")).toBe(
+        "Sick 7:00 AM - 11:00 AM / DAY Caregiver / Late / Training",
+      );
+    });
+
     it("keeps it when a job filter leaves the shift out, as for a whole-day absence", () => {
       const payload = buildOperationsReportPayload(
         sourceWithRestOfDaySick(),

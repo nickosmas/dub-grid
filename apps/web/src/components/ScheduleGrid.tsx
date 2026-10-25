@@ -2315,10 +2315,8 @@ const SectionBlock = memo(function SectionBlock({
                           : null;
                       // Where it sits and the time it covers (item 50d): first when
                       // they arrived late, joined to the shift whose time it meets.
-                      const absenceLayout =
-                        restOfDayAbsenceTypeId != null
-                          ? (restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null)
-                          : null;
+                      const absenceSpans = restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null;
+                      const absenceLayout = restOfDayAbsenceTypeId != null ? absenceSpans : null;
                       const absenceFirst = !!absenceLayout?.first;
                       const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                       const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
@@ -2381,6 +2379,7 @@ const SectionBlock = memo(function SectionBlock({
                                 segments: publishedSegments,
                                 absenceTypeId: publishedAbsenceTypeId,
                                 restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                restOfDayAbsenceTimes: absenceSpans?.publishedRange ?? null,
                                 customTimes: publishedCustomTimes,
                               }),
                               draftKind === "deleted"
@@ -2389,6 +2388,7 @@ const SectionBlock = memo(function SectionBlock({
                                     segments: cellSegments,
                                     absenceTypeId: currentAbsenceTypeId,
                                     restOfDayAbsenceTypeId,
+                                    restOfDayAbsenceTimes: absenceSpans?.range ?? null,
                                     customTimes,
                                   }),
                               dateKey,

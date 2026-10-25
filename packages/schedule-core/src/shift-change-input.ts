@@ -43,6 +43,7 @@ function absenceItem(
   absenceTypeId: number,
   scope: "allDay" | "restOfDay",
   resolvers: ShiftChangeResolvers,
+  times: { start: string | null; end: string | null } = { start: null, end: null },
 ): ShiftChangeItemInput {
   const absence = resolvers.absenceType(absenceTypeId);
   return {
@@ -51,6 +52,7 @@ function absenceItem(
     name: absence?.name ?? UNKNOWN_ABSENCE_NAME,
     archived: absence?.archived,
     scope,
+    ...(times.start && times.end ? { start: times.start, end: times.end } : {}),
   };
 }
 
@@ -93,7 +95,12 @@ export function cellStateToChangeDay(
     };
   });
   if (state.absenceTypeId != null)
-    items.push(absenceItem(state.absenceTypeId, "restOfDay", resolvers));
+    items.push(
+      absenceItem(state.absenceTypeId, "restOfDay", resolvers, {
+        start: normalizeTimeValue(state.absenceStartTime ?? null),
+        end: normalizeTimeValue(state.absenceEndTime ?? null),
+      }),
+    );
   return { items };
 }
 
@@ -130,6 +137,8 @@ export function isSameCellState(
     (a.absenceTypeId ?? null) === (b.absenceTypeId ?? null) &&
     timesKey(a.customStartTime) === timesKey(b.customStartTime) &&
     timesKey(a.customEndTime) === timesKey(b.customEndTime) &&
+    timesKey(a.absenceStartTime) === timesKey(b.absenceStartTime) &&
+    timesKey(a.absenceEndTime) === timesKey(b.absenceEndTime) &&
     (a.focusAreaId ?? null) === (b.focusAreaId ?? null)
   );
 }

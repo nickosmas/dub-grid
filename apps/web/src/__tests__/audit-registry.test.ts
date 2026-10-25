@@ -279,6 +279,30 @@ describe("audit copy never leaks implementation detail", () => {
     expect(shift(null)).toEqual([{ label: "Shift", value: "Working" }]);
   });
 
+  it("names the time an absence beside a shift covers (item 50)", () => {
+    expect(
+      formatDetails({
+        action: "shift.updated",
+        details: {
+          input: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 2, position: 0 }],
+            absenceTypeId: 4,
+            customStartTime: "07:00",
+            customEndTime: "11:00",
+            absenceStartTime: "11:00",
+            absenceEndTime: "15:00",
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        label: "Shift",
+        value: "Working, 7:00 AM – 11:00 AM, with an absence, 11:00 AM – 3:00 PM",
+      },
+    ]);
+  });
+
   it("renders a change list as before/after rows using its own labels", () => {
     const rows = formatDetails({
       action: "org.updated",
