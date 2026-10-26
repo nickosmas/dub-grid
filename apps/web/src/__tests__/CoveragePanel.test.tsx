@@ -712,6 +712,7 @@ describe("CoveragePanel", () => {
         onPreview: vi.fn(),
         onBuild: vi.fn(),
         onCancel: vi.fn(),
+        onDone: vi.fn(),
         skippedWords: { ...skippedWords, ...words },
         allowSixthDay,
         onAllowSixthDayChange: vi.fn(),
@@ -741,6 +742,20 @@ describe("CoveragePanel", () => {
         "Nothing changes until you apply it.",
       ]);
       fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
+      expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
+    });
+
+    it("offers to fill what's still empty once the dates are built", () => {
+      const build = withBuild({ status: "idle", built: true });
+      expect(
+        section().queryByRole("list", { name: "How Auto-build works" }),
+      ).not.toBeInTheDocument();
+      expect(
+        section().queryByRole("button", { name: "Generate schedule" }),
+      ).not.toBeInTheDocument();
+      const again = section().getByRole("button", { name: "Fill what's still empty" });
+      expect(again).toHaveClass("dg-btn-secondary");
+      fireEvent.click(again);
       expect(build.onPreview).toHaveBeenCalledWith(["1:5:1"]);
     });
 
@@ -1073,12 +1088,13 @@ describe("CoveragePanel", () => {
         expect(list().getAllByRole("listitem")).toHaveLength(6);
       });
 
-      it("leaves out empty lists and closes with Done", () => {
+      it("leaves out empty lists and ends Auto-build with Done", () => {
         const build = built();
         expect(section().queryByText(/Still short/)).not.toBeInTheDocument();
         expect(section().queryByText("Over 40 hours a week")).not.toBeInTheDocument();
         fireEvent.click(section().getByRole("button", { name: "Done" }));
-        expect(build.onCancel).toHaveBeenCalled();
+        expect(build.onDone).toHaveBeenCalled();
+        expect(build.onCancel).not.toHaveBeenCalled();
       });
     });
 

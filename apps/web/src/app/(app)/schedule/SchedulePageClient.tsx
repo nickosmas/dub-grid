@@ -7120,7 +7120,12 @@ function SchedulerContent({
       ? buildPreview.state
       : buildReport && buildReport.periodKey === coveragePeriodKey
         ? { status: "built", preview: buildReport.preview }
-        : { status: "idle" };
+        : {
+            status: "idle",
+            built: appliedSuggestions.some(
+              (entry) => entry.id.startsWith("build@") && entry.periodKey === coveragePeriodKey,
+            ),
+          };
 
   // A build plans from fresh recurring schedules: each empty cell one fills
   // in scope becomes a fixed draft day, converted exactly as a save would be,
@@ -9384,6 +9389,11 @@ function SchedulerContent({
                       onCancel: () => {
                         setBuildPreview(null);
                         setBuildReport(null);
+                      },
+                      onDone: () => {
+                        setBuildPreview(null);
+                        setBuildReport(null);
+                        setShowCoveragePanel(false);
                       },
                       skippedWords: buildSkippedWords,
                       allowSixthDay,

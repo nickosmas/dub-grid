@@ -5,6 +5,11 @@ import { CloseButton } from "@/components/ui/CloseButton";
 import { Button } from "@/components/Button";
 import { Switch } from "@/components/ui/switch";
 import { getCookieDomain, isSecure } from "@/lib/cookies";
+import {
+  needsConsentRecord,
+  parseConsentRecordMark,
+  type ConsentRecordMark,
+} from "@dubgrid/domain";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
@@ -61,17 +66,72 @@ function writeStoredConsent(prefs: CookiePreferences) {
   document.cookie = `${STORAGE_KEY}=${value}; expires=${expires.toUTCString()}; path=/${getCookieDomain()}; SameSite=Lax${isSecure() ? "; Secure" : ""}`;
 }
 
-/** Sync consent to the server for GDPR audit trail. Best-effort, non-blocking. */
-function syncConsentToServer(prefs: CookiePreferences) {
-  fetch("/api/consent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      consent: { essential: prefs.essential, analytics: prefs.analytics },
+/** Who the server last recorded this browser's choice for. Per origin, like the choice's fallback. */
+const RECORD_KEY = "dubgrid-cookie-consent-recorded";
+
+function readRecordMark(): ConsentRecordMark | null {
+  try {
+    return parseConsentRecordMark(localStorage.getItem(RECORD_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function writeRecordMark(mark: ConsentRecordMark) {
+  try {
+    localStorage.setItem(RECORD_KEY, JSON.stringify(mark));
+  } catch {
+    // Without the mark the next check simply records again.
+  }
+}
+
+/**
+ * Sync consent to the server for the GDPR audit trail. Best-effort and never
+ * awaited by the UI; a save that fails leaves no mark, so the next check
+ * records it again.
+ */
+async function syncConsentToServer(prefs: CookiePreferences): Promise<void> {
+  try {
+    const response = await fetch("/api/consent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        consent: { essential: prefs.essential, analytics: prefs.analytics },
+        version: CONSENT_VERSION,
+      }),
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as { userId?: unknown };
+    writeRecordMark({
       version: CONSENT_VERSION,
-    }),
-  }).catch(() => {
-    // Best-effort — do not block UI
+      analytics: prefs.analytics,
+      userId: typeof body.userId === "string" ? body.userId : null,
+    });
+  } catch {
+    // Best-effort: do not block UI
+  }
+}
+
+// One send at a time, so a check that starts while a save is in flight sees
+// its mark instead of recording the same choice twice.
+let recordQueue: Promise<void> = Promise.resolve();
+
+function enqueueRecord(task: () => Promise<void>): Promise<void> {
+  recordQueue = recordQueue.then(task, task);
+  return recordQueue;
+}
+
+/**
+ * Record the current choice again when the server holds no record of it for
+ * `userId` (null when signed out): after a failed save, or after signing in.
+ */
+export function ensureConsentRecorded(userId: string | null): Promise<void> {
+  return enqueueRecord(async () => {
+    const consent = getCookieConsent();
+    if (!consent || consent.version !== CONSENT_VERSION) return;
+    const current = { version: CONSENT_VERSION, analytics: consent.analytics === true, userId };
+    if (!needsConsentRecord(readRecordMark(), current)) return;
+    await syncConsentToServer({ essential: true, analytics: current.analytics });
   });
 }
 
@@ -84,7 +144,7 @@ function syncConsentToServer(prefs: CookiePreferences) {
 export function setCookieConsent(analytics: boolean) {
   const prefs: CookiePreferences = { essential: true, analytics };
   writeStoredConsent(prefs);
-  syncConsentToServer(prefs);
+  void enqueueRecord(() => syncConsentToServer(prefs));
   window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
 }
 
@@ -142,6 +202,12 @@ export default function CookieConsent() {
   const [baseline, setBaseline] = useState<boolean | null>(readBaseline);
   // Draft toggle state for the customize view; seeded from the baseline.
   const [analyticsDraft, setAnalyticsDraft] = useState(() => baseline ?? false);
+
+  // Retry a save that never reached the server. Signed in, the server names
+  // the person anyway; ConsentRecordSync re-checks once the user is known.
+  useEffect(() => {
+    void ensureConsentRecorded(null);
+  }, []);
 
   // Footers and settings dispatch this to re-open the banner straight into
   // the granular customize view, even after a prior choice was saved.

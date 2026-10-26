@@ -46,7 +46,7 @@ export function readThemeCookie(): ThemePreference | null {
   return isThemePreference(raw) ? raw : null;
 }
 
-/** Mirror the live preference into the cross-subdomain cookie. Best-effort. */
+/** Share a chosen preference across subdomains. Call only on a real choice. Best-effort. */
 export function writeThemeCookie(preference: ThemePreference): void {
   writeCookie(THEME_COOKIE_NAME, preference, ONE_YEAR_SECONDS);
 }

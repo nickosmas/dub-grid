@@ -22,7 +22,8 @@ import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelec
 import { formatCoverageNumber, pluralize } from "./coverage-check-text";
 
 export type ScheduleBuildState =
-  | { status: "idle" }
+  /** `built`: a build applied to these dates is still in the draft. */
+  | { status: "idle"; built?: boolean }
   /** `progress` is null while the build's data is still loading. */
   | { status: "previewing"; progress: CoverageBuildProgress | null }
   | { status: "failed" }
@@ -437,6 +438,8 @@ interface ScheduleBuildSectionProps {
   onPreview: () => void;
   onBuild: () => void;
   onCancel: () => void;
+  /** Ends Auto-build once its result has been read; Cancel's behavior without it. */
+  onDone?: () => void;
   /** Words for the people a build names; without them those lists are left out. */
   skippedWords?: SkippedWords;
   /** Selects a still-short shift's cell in the matrix. */
@@ -596,6 +599,7 @@ export function ScheduleBuildSection({
   onPreview,
   onBuild,
   onCancel,
+  onDone = onCancel,
   skippedWords,
   onSelectCell,
   allowSixthDay = false,
@@ -617,7 +621,7 @@ export function ScheduleBuildSection({
           preview={state.preview}
           words={skippedWords}
           onSelectCell={onSelectCell}
-          onDone={onCancel}
+          onDone={onDone}
         />
       ) : state.status === "applying" ? (
         <>
@@ -674,20 +678,22 @@ export function ScheduleBuildSection({
             {skippedWords && (
               <SkippedList people={groupSkipped(state.preview.skipped, skippedWords)} />
             )}
-            <Button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
+            <Button type="button" className="dg-btn dg-btn-secondary" onClick={onDone}>
               Done
             </Button>
           </>
         )
       ) : (
         <>
-          <ul className="dg-cc-changes" aria-label="How Auto-build works">
-            {BUILD_POINTS.map((point) => (
-              <li key={point} className="dg-cc-change dg-cc-detail-line dg-cc-detail-line--muted">
-                {point}
-              </li>
-            ))}
-          </ul>
+          {!(state.status === "idle" && state.built) && (
+            <ul className="dg-cc-changes" aria-label="How Auto-build works">
+              {BUILD_POINTS.map((point) => (
+                <li key={point} className="dg-cc-change dg-cc-detail-line dg-cc-detail-line--muted">
+                  {point}
+                </li>
+              ))}
+            </ul>
+          )}
           {onAllowSixthDayChange && (
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-3">
@@ -743,12 +749,14 @@ export function ScheduleBuildSection({
           )}
           <Button
             type="button"
-            className="dg-btn dg-btn-primary"
+            className={`dg-btn ${state.status === "idle" && state.built ? "dg-btn-secondary" : "dg-btn-primary"}`}
             onClick={onPreview}
             disabled={busy || previewing}
           >
             <ButtonLoading loading={previewing} spinnerSize={14}>
-              Generate schedule
+              {state.status === "idle" && state.built
+                ? "Fill what's still empty"
+                : "Generate schedule"}
             </ButtonLoading>
           </Button>
         </>

@@ -57,6 +57,10 @@ vi.mock("../../features/consent/components/ConsentGate", async () => {
   };
 });
 
+vi.mock("../../features/consent/components/ConsentRecordSync", () => ({
+  ConsentRecordSync: () => null,
+}));
+
 vi.mock("../../features/consent/components/TermsGate", async () => {
   const React = await import("react");
 

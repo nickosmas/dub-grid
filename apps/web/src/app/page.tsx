@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
+import { INVITATION_LIFETIME_HOURS, SERVICE_STATUS_URL } from "@dubgrid/domain";
 // @/features/account/client is imported dynamically inside the session effect —
 // see the comment there. A static import here pulls the Supabase auth SDK into
 // the landing page's initial bundle for visitors who are not signed in.
@@ -600,6 +600,14 @@ export default function RootPage() {
             >
               Terms of Service
             </Link>
+            <a
+              href={SERVICE_STATUS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"
+            >
+              Service status
+            </a>
             <Button
               type="button"
               onClick={openConsentPreferences}

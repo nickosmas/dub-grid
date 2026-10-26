@@ -22,7 +22,7 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 
 | Method | Path                         | Purpose                                                                                 | Rate Limit                                                                                           |
 | ------ | ---------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| GET    | `/api/health`                | Health check (DB reachability)                                                          | None                                                                                                 |
+| GET    | `/api/health`                | Health check: DB and Redis reachability, 503 if either fails (Redis ping capped at 3 s) | None                                                                                                 |
 | GET    | `/api/validate-domain`       | Check whether an org subdomain slug exists (Redis-cached)                               | IP-based (`apiLimiter`)                                                                              |
 | POST   | `/api/request-demo`          | Demo request form submission (landing page)                                             | `demoLimiter` (3/hr per IP)                                                                          |
 | POST   | `/api/auth/login`            | Email/password login; consolidates the org switch and trial start server-side           | `loginLimiter` per email hash + `loginIpLimiter` per IP + `loginSurgeLimiter` global                 |

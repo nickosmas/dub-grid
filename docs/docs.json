@@ -6,6 +6,14 @@
   "colors": {
     "primary": "#2663EB"
   },
+  "navbar": {
+    "links": [
+      {
+        "label": "Service status",
+        "href": "https://status.dubgrid.com"
+      }
+    ]
+  },
   "navigation": {
     "tabs": [
       {
