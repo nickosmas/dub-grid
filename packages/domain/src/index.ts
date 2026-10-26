@@ -4,6 +4,7 @@ export * from "./audience";
 export * from "./billing";
 export * from "./billing-policy";
 export * from "./calendar-links";
+export * from "./consent-record";
 export * from "./credential-requirements";
 export * from "./dashboard-activity";
 export * from "./employment-status";

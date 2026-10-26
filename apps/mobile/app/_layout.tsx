@@ -19,6 +19,7 @@ import { getMobileNavigationTheme } from "@dubgrid/design-tokens";
 import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRealtimeProvider";
 import { markMobileAuthRuntimeStarted } from "../src/features/auth/lib/auth-entry-measurement";
 import { ConsentGate } from "../src/features/consent/components/ConsentGate";
+import { ConsentRecordSync } from "../src/features/consent/components/ConsentRecordSync";
 import { TermsGate } from "../src/features/consent/components/TermsGate";
 import { TwoFactorReenrollGate } from "../src/features/auth/components/TwoFactorReenrollGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
@@ -107,6 +108,7 @@ function RootLayoutContent({
             <ToastProvider>
               <QueryClientProvider client={queryClient}>
                 <AuthSessionProvider>
+                  <ConsentRecordSync />
                   <AppLockProvider>
                     <MobileRealtimeProvider>
                       <ConsentGate>

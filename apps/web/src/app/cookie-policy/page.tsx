@@ -175,8 +175,9 @@ export default function CookiePolicyPage() {
                     <code>dg-theme</code>
                   </td>
                   <td style={tableCell}>
-                    Remembers your appearance preference (light, dark, or follow your device) so it
-                    stays consistent across your organization&apos;s domain and the main site.
+                    Remembers the appearance you choose (light, dark, or follow your device) so it
+                    stays consistent across your organization&apos;s domain and the main site. Set
+                    only once you choose an appearance.
                   </td>
                   <td style={tableCell}>1 year</td>
                 </tr>

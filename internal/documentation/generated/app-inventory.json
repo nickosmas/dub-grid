@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:e76990b8c5927246cd3cb9269eb61ca82382263f78d251f9de8a6aa50b7e4892",
+  "sourceDigest": "sha256:4d641fe6723735aa940fe266a9a7ccdcae128a5f588312fca2369c1a17b27ed9",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4746,6 +4746,16 @@
       "source": {
         "path": "supabase/migrations/096_coverage_max_staff.sql"
       }
+    },
+    {
+      "id": "migration:097_cookie_consents_add_only.sql",
+      "version": "097",
+      "name": "cookie_consents_add_only",
+      "file": "097_cookie_consents_add_only.sql",
+      "sha256": "7a270eb8322b02af3a12bb29e7c84b26c3618c67ee9c745b94e8dbc5ea51d3e5",
+      "source": {
+        "path": "supabase/migrations/097_cookie_consents_add_only.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -5460,6 +5470,22 @@
       "exampleFiles": []
     },
     {
+      "id": "env:CONSENT_IP_HASH_SECRET",
+      "name": "CONSENT_IP_HASH_SECRET",
+      "scopes": [
+        "web-server"
+      ],
+      "declaration": "conditional",
+      "exposure": "secret",
+      "declarations": [
+        {
+          "path": "apps/web/src/lib/env.server.ts"
+        }
+      ],
+      "usages": [],
+      "exampleFiles": []
+    },
+    {
       "id": "env:CRON_SECRET",
       "name": "CRON_SECRET",
       "scopes": [
@@ -5992,6 +6018,9 @@
           "path": "e2e/stat-cards.spec.ts"
         },
         {
+          "path": "e2e/theme-cookie.spec.ts"
+        },
+        {
           "path": "e2e/typography.spec.ts"
         },
         {
@@ -6439,6 +6468,9 @@
         },
         {
           "path": "e2e/stat-cards.spec.ts"
+        },
+        {
+          "path": "e2e/theme-cookie.spec.ts"
         },
         {
           "path": "e2e/typography.spec.ts"

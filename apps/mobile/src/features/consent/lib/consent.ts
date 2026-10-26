@@ -1,7 +1,15 @@
+import {
+  needsConsentRecord,
+  parseConsentRecordMark,
+  type ConsentRecordMark,
+} from "@dubgrid/domain";
 import { secureStoreAdapter } from "../../../shared/lib/session";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
+import { getSupabaseClient } from "../../../shared/lib/supabase";
 
 const CONSENT_KEY = "dubgrid-cookie-consent";
+/** Who the server last recorded the device's choice for. */
+const RECORD_KEY = "dubgrid-cookie-consent-recorded";
 
 // Mirror the web banner's version (apps/web/src/components/CookieConsent.tsx).
 // Bump in lockstep with web so a policy change re-prompts on both platforms.
@@ -61,6 +69,7 @@ export async function getStoredConsent(): Promise<ConsentPreferences | null> {
  */
 export async function clearStoredConsent(): Promise<void> {
   await secureStoreAdapter.removeItem(CONSENT_KEY);
+  await secureStoreAdapter.removeItem(RECORD_KEY);
 }
 
 /** True when there is no stored choice, or it predates the current version. */
@@ -80,16 +89,27 @@ export async function setStoredConsent(analytics: boolean): Promise<ConsentPrefe
     version: CONSENT_VERSION,
   };
   await secureStoreAdapter.setItem(CONSENT_KEY, JSON.stringify(prefs));
-  void syncConsentToServer(prefs);
+  void enqueueRecord(() => syncConsentToServer(prefs));
   return prefs;
 }
 
+/** The signed-in session's access token, or null when signed out or unreadable. */
+async function readAccessToken(): Promise<string | null> {
+  try {
+    const { data } = await getSupabaseClient().auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Best-effort POST to the shared web audit endpoint. The route is CSRF-origin
- * protected and reads its session from cookies, so a native request records an
- * anonymous row (user_id null) tagged with the mobile user-agent. We declare
- * the exact API origin so the no-cookie request passes the same-origin check.
- * Never throws — consent UX must not depend on the network.
+ * Best-effort POST to the shared web audit endpoint. A native request carries
+ * no cookies, so a signed-in person is named by their Bearer token; signed out,
+ * the row is anonymous (user_id null) and tagged with the mobile user-agent. We
+ * declare the exact API origin so the no-cookie request passes the same-origin
+ * check. Never throws: consent UX must not depend on the network. A save that
+ * fails leaves no record mark, so the next check sends it again.
  */
 export async function syncConsentToServer(prefs: ConsentPreferences): Promise<void> {
   let apiBaseUrl: string;
@@ -99,19 +119,55 @@ export async function syncConsentToServer(prefs: ConsentPreferences): Promise<vo
     return;
   }
 
+  const accessToken = await readAccessToken();
   try {
-    await fetch(`${apiBaseUrl}/api/consent`, {
+    const response = await fetch(`${apiBaseUrl}/api/consent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Origin: apiBaseUrl,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({
         consent: { essential: prefs.essential, analytics: prefs.analytics },
         version: prefs.version,
       }),
     });
+    if (!response.ok) return;
+    const body = (await response.json()) as { userId?: unknown };
+    await secureStoreAdapter.setItem(
+      RECORD_KEY,
+      JSON.stringify({
+        version: prefs.version,
+        analytics: prefs.analytics,
+        userId: typeof body.userId === "string" ? body.userId : null,
+      } satisfies ConsentRecordMark),
+    );
   } catch {
     // Best-effort — ignore network failures.
   }
+}
+
+// One send at a time, so a check that starts while a save is in flight sees
+// its mark instead of recording the same choice twice.
+let recordQueue: Promise<void> = Promise.resolve();
+
+function enqueueRecord(task: () => Promise<void>): Promise<void> {
+  recordQueue = recordQueue.then(task, task);
+  return recordQueue;
+}
+
+/**
+ * Record the stored choice again when the server holds no record of it for
+ * `userId` (null when signed out): after a failed save, or after signing in.
+ */
+export function ensureConsentRecorded(userId: string | null): Promise<void> {
+  return enqueueRecord(async () => {
+    const stored = await getStoredConsent();
+    if (!stored || stored.version !== CONSENT_VERSION) return;
+    const recorded = parseConsentRecordMark(await secureStoreAdapter.getItem(RECORD_KEY));
+    const current = { version: stored.version, analytics: stored.analytics, userId };
+    if (!needsConsentRecord(recorded, current)) return;
+    await syncConsentToServer(stored);
+  }).catch(() => undefined);
 }

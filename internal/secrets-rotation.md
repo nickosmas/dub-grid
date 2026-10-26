@@ -29,6 +29,10 @@ at runtime:
   schema because local dev never runs them, but **required on the Vercel production
   project and in GitHub Actions secrets**: without it Vercel sends no `Authorization`
   header, every cron route answers 503, and each run is reported as a failed job.
+- `CONSENT_IP_HASH_SECRET` - Key for the HMAC that `POST /api/consent` stores as a
+  cookie consent record's `ip_hash`. Optional in the schema, but **set it on the
+  Vercel production project**: without it each record stores `unavailable` instead
+  of a hash, and the route logs an error.
 - `LOGIN_EMAIL_LIMIT_PER_15_MIN` / `LOGIN_IP_LIMIT_PER_MINUTE` /
   `LOGIN_GLOBAL_LIMIT_PER_10_SECONDS` - Optional overrides for the three login
   limiters (defaults 15, 120, 500)
@@ -112,6 +116,18 @@ at runtime:
 > nothing to revoke upstream. If it is missing entirely, the two crons in
 > `apps/web/vercel.json` and the GitHub Action all get 503 and every run is reported
 > as a failure.
+
+### CONSENT_IP_HASH_SECRET
+
+1. Generate a new value: `openssl rand -hex 32`
+2. Update `CONSENT_IP_HASH_SECRET` in the Vercel project env vars (Production scope)
+3. Redeploy
+4. Verify: choose in the cookie banner on production and confirm the new
+   `cookie_consents` row's `ip_hash` is a 64-character hex value, not `unavailable`
+
+> Rows written before a rotation keep hashes made with the old key, so a hash
+> can only be compared with rows written under the same key. Nothing compares
+> them today.
 
 ### STRIPE_SECRET_KEY
 

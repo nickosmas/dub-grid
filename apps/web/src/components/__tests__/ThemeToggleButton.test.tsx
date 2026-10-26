@@ -14,11 +14,17 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ theme, setTheme }),
 }));
 
+const writeThemeCookie = vi.fn();
+vi.mock("@/lib/theme-preference", () => ({
+  writeThemeCookie: (preference: string) => writeThemeCookie(preference),
+}));
+
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 describe("ThemeToggleButton", () => {
   beforeEach(() => {
     setTheme.mockReset();
+    writeThemeCookie.mockReset();
     theme = "light";
   });
 
@@ -55,5 +61,15 @@ describe("ThemeToggleButton", () => {
     render(<ThemeToggleButton />);
     fireEvent.click(screen.getByRole("button"));
     expect(setTheme).toHaveBeenCalledWith("dark");
+  });
+
+  // The cookie is consent-exempt only as a record of a choice someone made, so
+  // a click is the one thing that writes it.
+  it("writes the shared theme cookie only when someone picks a theme", () => {
+    render(<ThemeToggleButton />);
+    expect(writeThemeCookie).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button"));
+    expect(writeThemeCookie).toHaveBeenCalledWith("dark");
   });
 });

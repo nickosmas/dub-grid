@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/Button";
+import { writeThemeCookie } from "@/lib/theme-preference";
 
 /**
  * Cycles light → dark → system. The third stop matters: a two-state toggle
@@ -64,7 +65,12 @@ export default function ThemeToggleButton({
   return (
     <Button
       type="button"
-      onClick={() => setTheme(next.value)}
+      onClick={() => {
+        setTheme(next.value);
+        // The only place the cookie is written: on a real choice. The pre-paint
+        // seed script only reads it.
+        writeThemeCookie(next.value);
+      }}
       className={`${appearanceClass} ${className}`}
       aria-label={current.label}
     >

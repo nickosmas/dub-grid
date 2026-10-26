@@ -1,4 +1,5 @@
 import AuthProvider from "@/components/AuthProvider";
+import ConsentRecordSync from "@/components/ConsentRecordSync";
 import QueryProvider from "@/components/QueryProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
@@ -94,6 +95,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AuthProvider>
+      <ConsentRecordSync />
       <PostHogProvider enabled={posthogEnabled}>
         <QueryProvider initialFeatureFlags={initialFeatureFlags}>
           {/* No Suspense boundary here on purpose. It used to wrap this whole

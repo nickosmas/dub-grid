@@ -3,7 +3,7 @@
 ## Cookie consent records that hold up as proof
 
 **Type:** Fix
-**Status:** not started
+**Status:** verified
 
 ## The problem
 
@@ -64,7 +64,7 @@ be backfilled.
 
 ## Build steps
 
-1. **Identify mobile users.**
+1. [x] **Identify mobile users.**
    - The route takes a Bearer token (`extractBearerToken`, then
      `verifyAccessToken`) before it falls back to the cookie session.
    - The mobile `syncConsentToServer` sends `Authorization: Bearer <access token>`
@@ -74,7 +74,7 @@ be backfilled.
    invalid one records an anonymous row, and no token keeps today's behavior. A
    mobile test shows the header is sent only when signed in.
 
-2. **Record again after sign-in, and retry failed saves.**
+2. [x] **Record again after sign-in, and retry failed saves.**
    - A shared helper in a `packages/*` module decides whether the current choice
      still needs recording. It compares what was last recorded (policy version,
      plus the user id or anonymous) with the current version and current user.
@@ -89,7 +89,7 @@ be backfilled.
    already recorded (no re-send). The web and mobile tests show that a failed
    save is re-sent on the next check.
 
-3. **Key the IP hash and rate-limit the route.**
+3. [x] **Key the IP hash and rate-limit the route.**
    - `ip_hash` becomes an HMAC-SHA256 keyed by a new `CONSENT_IP_HASH_SECRET`,
      declared in `lib/env.server.ts`, classified in
      `internal/documentation/source-policy.json` (with the inventory
@@ -102,9 +102,10 @@ be backfilled.
    **Done when:** route tests show the keyed hash, the `unavailable` fallback and
    the 429. `npm run docs:check` passes.
 
-4. **Make the table add-only (migration 094).**
-   - Revoke `INSERT`, `UPDATE` and `DELETE` on `cookie_consents` from `anon`
-     and `authenticated`.
+4. [x] **Make the table add-only (migration 097).**
+   - Revoke `INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` on `cookie_consents`
+     from `anon` and `authenticated`. `TRUNCATE` skips row-level security and
+     came from Supabase's default grants.
    - Drop `anon_insert_cookie_consent` and `authenticated_insert_cookie_consent`.
    - Replace `gridmaster_all_cookie_consents` with a `FOR SELECT` policy.
    - Add a `BEFORE UPDATE` trigger that refuses every update, the service role
@@ -112,16 +113,17 @@ be backfilled.
    - `users_read_own_cookie_consent` stays. Deletion stays service-role only,
      through account deletion.
    - Lock the file's hash in `checksums.sha256`.
-   - Update `anon-holds-nothing.integration.test.ts` and
-     `ledger-cleanup-sql.test.ts`, which assert today's `anon` insert grant.
-     After this change, `anon` holds nothing at all.
+   - Update `anon-holds-nothing.integration.test.ts`, which asserts today's
+     `anon` insert grant. After this change, `anon` holds nothing at all.
+     (`ledger-cleanup-sql.test.ts` reads migration 040's own text, which
+     doesn't change, so it stays as it is.)
 
    **Done when:** `npm run db:migrations:check` passes. A live test shows that
    `anon` and `authenticated` can't insert, a Gridmaster can read but not update
    or delete, any update is refused, and the route and account deletion still
    work.
 
-5. **Write `dg-theme` only on a real choice.**
+5. [x] **Write `dg-theme` only on a real choice.**
    - Remove the write in `ThemeCookieSync`'s effect. `ThemeToggleButton`
      calls `writeThemeCookie` when it sets a theme, the only place the app
      sets one.
