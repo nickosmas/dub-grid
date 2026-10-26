@@ -43,3 +43,23 @@ export function parseConsentRecordMark(raw: string | null | undefined): ConsentR
     return null;
   }
 }
+
+/** How long to wait when a refusal names no Retry-After. */
+const DEFAULT_CONSENT_RETRY_SECONDS = 600;
+
+/**
+ * When a record the server refused for load (429 or 503) may be sent again,
+ * or null for any other answer. Until then a client keeps the choice but sends
+ * nothing, rather than asking again on every page load.
+ */
+export function consentRetryAt(
+  status: number,
+  retryAfter: string | null,
+  now: number,
+): number | null {
+  if (status !== 429 && status !== 503) return null;
+  const seconds = Number(retryAfter);
+  const wait =
+    retryAfter && Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_CONSENT_RETRY_SECONDS;
+  return now + wait * 1000;
+}
