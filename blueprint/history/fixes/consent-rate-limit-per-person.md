@@ -34,6 +34,14 @@ Two things made it worse, and both would reach production:
   `ensureConsentRecorded` sends nothing until it passes. A new choice from
   the banner is still sent at once, and a success clears the wait.
 
+- **Theme cookie spec:** on #186, Playwright (webkit, shard 4/4) timed out on
+  the landing page's load event in `e2e/theme-cookie.spec.ts`, and the
+  typography matrix that followed timed out on the same page. The spec from
+  #182 sent the landing screenshots through the image optimizer. It now
+  serves them from disk as `landing.spec.ts` does, waits for the DOM rather
+  than every image, and waits for the theme toggle to mount before it checks
+  or clicks.
+
 ### Verification
 
 - **Tests:** domain `consentRetryAt` (waits out `Retry-After` on 429 and 503,
@@ -42,6 +50,9 @@ Two things made it worse, and both would reach production:
   limiter and key. Web and mobile: after a 429 with `Retry-After: 60`, checks
   send nothing until the minute passes. The backoff tests fail against the
   code before this fix.
+- **Theme spec:** 6 of 6 passed in Chromium against a production build
+  (3 repeats). Against the provider from before #182, the no-choice test
+  fails on `dg-theme=light`, so it still catches the original bug.
 - **Checks:** `npm run type-check`, ESLint, Prettier, `npm run docs:check`
   (the `privacy-controls` fingerprint was refreshed; nothing the page says
   changed), `npm run test:mobile` and `npm run test:web`.
