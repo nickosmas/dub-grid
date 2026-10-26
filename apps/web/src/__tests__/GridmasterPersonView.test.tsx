@@ -421,7 +421,7 @@ describe("GridmasterPersonView", () => {
     expect(card.getByText("Charge")).toBeInTheDocument();
     expect(card.getByText("Skill Levels")).toBeInTheDocument();
     expect(card.getByText("RN")).toBeInTheDocument();
-    expect(card.getByText(/^Inactive since/)).toBeInTheDocument();
+    expect(card.getByText(/^Away since/)).toBeInTheDocument();
     expect(card.getByText("On leave")).toBeInTheDocument();
     expect(card.getByText("Part-time")).toBeInTheDocument();
     expect(card.getByText("Prefers text")).toBeInTheDocument();

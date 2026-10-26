@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
@@ -15,11 +16,7 @@ import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from ".
 import { formatActor, formatDay, formatMoment } from "./person-format";
 import { PersonScheduleSection } from "./PersonScheduleSection";
 
-const STAFF_STATUS: Record<GridmasterStaffRecord["status"], string> = {
-  active: "Active",
-  inactive: "Inactive",
-  removed: "Removed",
-};
+const STAFF_STATUS: Record<GridmasterStaffRecord["status"], string> = EMPLOYMENT_STATUS_LABELS;
 
 function namesOf(ids: number[], names: Record<number, string>): string {
   return ids.map((id) => names[id] ?? `#${id}`).join(", ");
@@ -188,7 +185,7 @@ function StaffFacts({
         value={stamp(record, employee.updatedAt, employee.updatedBy)}
       />
       <PersonField
-        label="Archived"
+        label="Record archived"
         value={employee.archivedAt ? formatDay(employee.archivedAt) : null}
         empty="No"
       />

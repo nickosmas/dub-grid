@@ -411,7 +411,7 @@ describe("StaffDetailPage", () => {
     // Once in the banner, once as the Record card's account state.
     expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
 
@@ -526,7 +526,7 @@ describe("StaffDetailPage", () => {
     await screen.findByText("Work details");
     expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
     // Management settings always open in a popup, never inline in the card.
@@ -740,8 +740,8 @@ describe("StaffDetailPage", () => {
   });
 
   it.each([
-    ["Mark inactive", deactivateEmployee],
-    ["Remove", removeEmployee],
+    ["Mark away", deactivateEmployee],
+    ["Archive", removeEmployee],
   ] as const)(
     "%s asks a Gridmaster for fresh proof and retries with the assured token",
     async (confirmLabel, statusCall) => {
@@ -755,10 +755,10 @@ describe("StaffDetailPage", () => {
         .mockResolvedValueOnce({ ...mockEmployee, status: "inactive", version: 2 });
 
       render(<StaffDetailPage employeeId="emp-1" />);
-      fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
-      if (confirmLabel === "Remove")
-        fireEvent.click(screen.getByRole("radio", { name: /Remove from staff/ }));
-      fireEvent.click(screen.getByRole("button", { name: confirmLabel }));
+      fireEvent.click(await screen.findByRole("button", { name: confirmLabel }));
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: confirmLabel }),
+      );
 
       await waitFor(() => expect(statusCall).toHaveBeenCalledTimes(2));
       expect(stepUpPrompt).toHaveBeenCalledOnce();

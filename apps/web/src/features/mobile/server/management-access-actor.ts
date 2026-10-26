@@ -52,7 +52,7 @@ export async function requireManagementAccessActor(
   if (loaded.person.status === "removed") {
     return {
       response: NextResponse.json(
-        { error: "Removed staff can't be given management access." },
+        { error: "Archived people can't be given management access." },
         { status: 400 },
       ),
     };

@@ -41,7 +41,8 @@ import { describeAction, formatDetails, formatRelativeTime } from "@/lib/activit
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
-import type { BillingOperationSummary, FullAuditLogEntry } from "@/types";
+import type { BillingOperationSummary, FullAuditLogEntry, SeatBreakdown } from "@/types";
+import { describeSeatBreakdown, type SeatBreakdownLine } from "@/features/billing/seats";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function formatDate(value: string | null): string {
@@ -92,6 +93,77 @@ function NoticeBanner({ tone, children }: { tone: BillingTone; children: ReactNo
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function SeatLines({ title, lines }: { title: string; lines: SeatBreakdownLine[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-type-metadata-size)",
+          color: "var(--dg-type-metadata-color)",
+          fontWeight: 500,
+        }}
+      >
+        {title}
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {lines.map((line) => (
+          <li
+            key={line.key}
+            style={{
+              padding: "8px 0",
+              borderTop: "1px solid var(--dg-color-border-light)",
+              fontSize: "var(--dg-fs-label)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 500 }}>
+                {line.label}
+              </span>
+              <span
+                className="dg-tabular-nums"
+                style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}
+              >
+                {line.count}
+              </span>
+            </div>
+            {line.detail && (
+              <div
+                style={{
+                  marginTop: 2,
+                  color: "var(--dg-color-text-muted)",
+                  fontSize: "var(--dg-fs-caption)",
+                }}
+              >
+                {line.detail}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SeatBreakdownSection({ breakdown }: { breakdown: SeatBreakdown }) {
+  const { billed, notBilled } = describeSeatBreakdown(breakdown);
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+        gap: 18,
+        border: "1px solid var(--dg-color-border-light)",
+        borderRadius: "var(--dg-radius-lg)",
+        padding: "12px 14px",
+      }}
+    >
+      <SeatLines title="Who takes a seat" lines={billed} />
+      <SeatLines title="Not billed" lines={notBilled} />
     </div>
   );
 }
@@ -689,6 +761,8 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   />
                 ))}
               </div>
+
+              {billing.seatBreakdown && <SeatBreakdownSection breakdown={billing.seatBreakdown} />}
 
               {billing.cancelAt && (
                 <NoticeBanner tone="warning">

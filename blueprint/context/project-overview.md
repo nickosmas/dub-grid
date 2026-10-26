@@ -344,10 +344,11 @@ Item 51 is split:
   sign-in, role and management powers on web, mobile and in the database,
   isn't signed out, and takes a seat only as an Admin or Super Admin; only
   someone on the schedule can be marked inactive (migration 098).
-- **51b - Status names everywhere:** Away and Archived replace Inactive and
-  Removed in pills, tabs and filters on web, mobile and Gridmaster; a calm
-  Away banner replaces the read-only bar; billing breaks down who takes a
-  seat.
+- **51b - Status names everywhere:** shipped; Away and Archived replace
+  Inactive and Removed on web, mobile, Gridmaster, reports, alerts and the
+  activity log, with Mark away, Archive, Mark active and Restore as separate
+  actions; a calm "You're away." bar replaces the warning bar; Settings >
+  Billing lists who takes a seat and who isn't billed. No migration.
 - **51c - Suspended: access:** can't sign in (signed out everywhere, push
   off), an "Access suspended" message on web and mobile, and Reinstate.
   Needs a migration.
@@ -387,7 +388,9 @@ alerts still accrue) and closes their open requests. A last day archives
 automatically. Schedule changes from a status go through the draft and
 publish with the period. Staff copy names only their state and its date and
 calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
-A "requests only" state waits for a real need. Design reference: the "Staff
+A "requests only" state waits for a real need. Marking someone away offers
+an absence type in the same confirmation (51f), so 51e and 51f come next,
+before 51c (owner, 2026-10-26). Design reference: the "Staff
 status across surfaces" canvas and the "Fine-grained removal in DubGrid"
 doc.
 

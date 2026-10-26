@@ -2,11 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchInternalUserIds } from "@dubgrid/data-access";
 import { isLiveSubscriptionStatus } from "@dubgrid/domain";
 import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
-import type { BillingOperationSummary, OrganizationBillingSummary } from "@/types";
+import type { BillingOperationSummary, OrganizationBillingSummary, SeatBreakdown } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
-import { countBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
+import { breakdownBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
 
 type QueryClient = Pick<SupabaseClient, "from">;
 
@@ -256,16 +256,19 @@ async function loadRecentBillingOperations(
   }
 }
 
-export async function countBillableAppUsers(
+export async function loadSeatBreakdown(
   serviceClient: QueryClient,
   orgId: string,
-): Promise<number> {
+): Promise<SeatBreakdown> {
   const [
     { data: employees, error: employeesError },
     { data: memberships, error: membershipsError },
     internalUserIds,
   ] = await Promise.all([
-    serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
+    serviceClient
+      .from("employees")
+      .select("status, archived_at, user_id, first_name, last_name")
+      .eq("org_id", orgId),
     serviceClient
       .from("organization_memberships")
       .select("user_id, org_role")
@@ -276,11 +279,18 @@ export async function countBillableAppUsers(
   if (employeesError) throw employeesError;
   if (membershipsError) throw membershipsError;
 
-  return countBillableSeats(
+  return breakdownBillableSeats(
     (employees ?? []) as SeatEmployee[],
     (memberships ?? []) as SeatMembership[],
     new Set(internalUserIds),
   );
+}
+
+export async function countBillableAppUsers(
+  serviceClient: QueryClient,
+  orgId: string,
+): Promise<number> {
+  return (await loadSeatBreakdown(serviceClient, orgId)).total;
 }
 
 export async function loadOrganizationBillingSummary(
@@ -288,7 +298,7 @@ export async function loadOrganizationBillingSummary(
   orgId: string,
   options: { canManageBilling: boolean; actor?: BillingActorContext },
 ): Promise<OrganizationBillingSummary> {
-  const [{ data: org, error: orgError }, { data: subscription }, appUserCount, recentOperations] =
+  const [{ data: org, error: orgError }, { data: subscription }, seatBreakdown, recentOperations] =
     await Promise.all([
       serviceClient
         .from("organizations")
@@ -304,7 +314,7 @@ export async function loadOrganizationBillingSummary(
         )
         .eq("org_id", orgId)
         .maybeSingle(),
-      countBillableAppUsers(serviceClient, orgId),
+      loadSeatBreakdown(serviceClient, orgId),
       loadRecentBillingOperations(serviceClient, orgId, options.actor ?? null),
     ]);
 
@@ -314,6 +324,7 @@ export async function loadOrganizationBillingSummary(
 
   const orgRow = org as OrganizationBillingRow;
   const subscriptionRow = subscription as SubscriptionBillingRow | null;
+  const appUserCount = seatBreakdown.total;
   const subscriptionSeats = orgRow.subscription_seats ?? subscriptionRow?.quantity ?? null;
   const seatDelta = subscriptionSeats == null ? null : subscriptionSeats - appUserCount;
 
@@ -328,6 +339,7 @@ export async function loadOrganizationBillingSummary(
     canceledAt: subscriptionRow?.canceled_at ?? null,
     subscriptionSeats,
     appUserCount,
+    seatBreakdown,
     seatDelta,
     hasStripeCustomer: Boolean(orgRow.stripe_customer_id ?? subscriptionRow?.stripe_customer_id),
     // Only a live subscription can be managed; an ended one means subscribing again.

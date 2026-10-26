@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countBillableSeats } from "./seats";
+import { breakdownBillableSeats, countBillableSeats, describeSeatBreakdown } from "./seats";
 
 const active = (user_id: string | null = null) => ({
   status: "active",
@@ -75,5 +75,134 @@ describe("countBillableSeats", () => {
 
   it("still bills staff with no account when internal accounts are listed", () => {
     expect(countBillableSeats([active(), active()], [], new Set(["qa-staff"]))).toBe(2);
+  });
+});
+
+describe("breakdownBillableSeats", () => {
+  const employees = [
+    { status: "active", archived_at: null, user_id: "u-active" },
+    { status: "active", archived_at: null, user_id: null },
+    {
+      status: "inactive",
+      archived_at: null,
+      user_id: "u-lee",
+      first_name: "Lee",
+      last_name: "Wong",
+    },
+    {
+      status: "inactive",
+      archived_at: null,
+      user_id: "u-amy",
+      first_name: "Amy",
+      last_name: "Diaz",
+    },
+    { status: "inactive", archived_at: null, user_id: "u-away" },
+    { status: "inactive", archived_at: null, user_id: null },
+    { status: "removed", archived_at: "2026-09-01T00:00:00Z", user_id: "u-gone" },
+    { status: "removed", archived_at: null, user_id: null },
+  ];
+  const memberships = [
+    { user_id: "u-active", org_role: "user" },
+    { user_id: "u-lee", org_role: "admin" },
+    { user_id: "u-amy", org_role: "super_admin" },
+    { user_id: "u-away", org_role: "user" },
+    { user_id: "m-1", org_role: "admin" },
+  ];
+
+  it("splits billed and unbilled people by status", () => {
+    expect(breakdownBillableSeats(employees, memberships)).toEqual({
+      activeStaff: 2,
+      awayManaging: 2,
+      awayManagingNames: ["Amy Diaz", "Lee Wong"],
+      managementOnly: 1,
+      awayNotBilled: 2,
+      archived: 2,
+      total: 5,
+    });
+  });
+
+  it("totals the same as countBillableSeats", () => {
+    expect(breakdownBillableSeats(employees, memberships).total).toBe(
+      countBillableSeats(employees, memberships),
+    );
+  });
+
+  it("leaves internal accounts off every line", () => {
+    const internal = new Set(["u-lee", "u-away", "u-gone", "m-1"]);
+    expect(breakdownBillableSeats(employees, memberships, internal)).toMatchObject({
+      awayManaging: 1,
+      awayManagingNames: ["Amy Diaz"],
+      managementOnly: 0,
+      awayNotBilled: 1,
+      archived: 1,
+      total: 3,
+    });
+  });
+
+  it("counts an Away manager with no name without listing a blank", () => {
+    const result = breakdownBillableSeats(
+      [{ status: "inactive", archived_at: null, user_id: "u-x" }],
+      [{ user_id: "u-x", org_role: "admin" }],
+    );
+    expect(result.awayManaging).toBe(1);
+    expect(result.awayManagingNames).toEqual([]);
+  });
+});
+
+describe("describeSeatBreakdown", () => {
+  const base = {
+    activeStaff: 42,
+    awayManaging: 0,
+    awayManagingNames: [],
+    managementOnly: 0,
+    awayNotBilled: 0,
+    archived: 0,
+    total: 42,
+  };
+
+  it("always lists active staff and leaves empty lines out", () => {
+    expect(describeSeatBreakdown(base)).toEqual({
+      billed: [{ key: "active", label: "Active staff", count: 42 }],
+      notBilled: [],
+    });
+  });
+
+  it("names the Away people who take a seat and says why", () => {
+    const { billed } = describeSeatBreakdown({
+      ...base,
+      awayManaging: 1,
+      awayManagingNames: ["Lee Wong"],
+      total: 43,
+    });
+    expect(billed[1]).toEqual({
+      key: "away-managing",
+      label: "Away, can manage",
+      count: 1,
+      detail: "Lee Wong. Away people take a seat only while they keep management access.",
+    });
+  });
+
+  it("joins two or three names with and, and shortens a longer list", () => {
+    const detail = (names: string[]) =>
+      describeSeatBreakdown({ ...base, awayManaging: names.length, awayManagingNames: names })
+        .billed[1].detail;
+    expect(detail(["A B", "C D"])).toMatch(/^A B and C D\. /);
+    expect(detail(["A B", "C D", "E F"])).toMatch(/^A B, C D and E F\. /);
+    expect(detail(["A B", "C D", "E F", "G H"])).toMatch(/^A B, C D and 2 others\. /);
+  });
+
+  it("lists managers without a staff record, then Away and Archived as not billed", () => {
+    expect(
+      describeSeatBreakdown({ ...base, managementOnly: 2, awayNotBilled: 2, archived: 12 }),
+    ).toEqual({
+      billed: [
+        { key: "active", label: "Active staff", count: 42 },
+        { key: "management-only", label: "Managers without a staff record", count: 2 },
+      ],
+      notBilled: [
+        { key: "away", label: "Away", count: 2 },
+        { key: "archived", label: "Archived", count: 12 },
+      ],
+    });
   });
 });

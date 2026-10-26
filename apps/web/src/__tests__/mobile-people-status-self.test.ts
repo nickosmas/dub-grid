@@ -139,7 +139,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
     expect(result).toMatchObject({
       kind: "not_on_schedule",
       status: 400,
-      error: "Only someone on the schedule can be marked inactive.",
+      error: "Only someone on the schedule can be marked away.",
     });
     expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });

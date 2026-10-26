@@ -282,8 +282,8 @@ describe("PersonDetailScreen", () => {
   });
 
   // The avatar's corner used to carry a status dot. The tier's insignia sits
-  // beside the name now, and an inactive person reads as inactive from the
-  // Activate button rather than from a chip.
+  // beside the name now, and an Away person reads as away from the Mark active
+  // button rather than from a chip.
   it("stars a super admin beside their name", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson({ status: "inactive" }) },
@@ -296,7 +296,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -1186,105 +1186,84 @@ describe("PersonDetailScreen", () => {
       return mutate;
     }
 
-    it("spends one button on deactivating an active person, not two", () => {
+    it("offers Mark away and Archive for an active person on the schedule", () => {
       renderWithStatusMutation();
 
-      expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
     });
 
-    it("marks inactive when the sheet's default outcome is confirmed", () => {
+    it("marks someone away from its own sheet", () => {
       const mutate = renderWithStatusMutation();
 
-      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
+      fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
+      expect(screen.getByText("Mark Mina Diaz away?")).toBeInTheDocument();
+      expect(screen.getByText(/can still sign in and keep their role/)).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
+        fromStatus: "active",
         note: undefined,
       });
     });
 
-    it("removes from staff when that outcome is picked instead", () => {
+    it("archives from its own sheet", () => {
       const mutate = renderWithStatusMutation();
 
-      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      expect(screen.queryByRole("alert")).toBeNull();
-      const sheet = screen;
-      fireEvent.click(sheet.getByRole("button", { name: /Remove from staff/ }));
-
-      // The primary action's verb follows the outcome, so the confirm always
-      // says what it is about to do.
-      expect(sheet.queryByRole("button", { name: "Mark inactive" })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+      expect(screen.getByText("Archive Mina Diaz?")).toBeInTheDocument();
+      expect(screen.getByText(/can't sign in and won't be scheduled/)).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole("button", { name: "Archive" }).at(-1)!);
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "remove",
         expectedVersion: 7,
+        fromStatus: "active",
         note: undefined,
       });
     });
 
-    it("offers only removal for someone who isn't on the schedule", () => {
-      const mutate = renderWithStatusMutation({ focusAreaIds: [] });
+    it("offers only Archive for someone who isn't on the schedule", () => {
+      renderWithStatusMutation({ focusAreaIds: [] });
 
-      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      expect(screen.getByRole("button", { name: /Remove from staff/ })).toBeInTheDocument();
-      expect(screen.queryByText(/keep their access/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/management access/)).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-
-      expect(mutate.mock.calls[0]?.[0]).toEqual({
-        action: "remove",
-        expectedVersion: 7,
-        note: undefined,
-      });
+      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
     });
 
-    it("tells the manager an inactive person keeps their access", () => {
-      renderWithStatusMutation();
-
-      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
-      expect(
-        screen.getByText(
-          "They'll be off the schedule and keep their access. You can reactivate them anytime.",
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it("carries the reason through with the chosen outcome", () => {
+    it("carries the reason through", () => {
       const mutate = renderWithStatusMutation();
 
-      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
       fireEvent.change(screen.getByPlaceholderText(/Reason \(optional\)/), {
-        target: { value: "  On leave until June  " },
+        target: { value: "  Family leave  " },
       });
-      fireEvent.click(screen.getByRole("button", { name: "Mark inactive" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
         action: "deactivate",
         expectedVersion: 7,
-        note: "On leave until June",
+        fromStatus: "active",
+        note: "Family leave",
       });
     });
 
-    it("keeps Remove reachable once someone is already inactive", () => {
+    it("brings an Away person back with Mark active and keeps Archive", () => {
       renderWithStatusMutation({ status: "inactive" });
 
-      expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
     });
 
-    it("offers no way back out of removed but reactivating", () => {
+    it("brings an Archived person back with Restore and nothing else", () => {
       renderWithStatusMutation({ status: "removed" });
 
-      expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark active" })).not.toBeInTheDocument();
     });
   });
 
@@ -1344,7 +1323,7 @@ describe("PersonDetailScreen", () => {
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     });
 
     // Under the hero: Call and Email, always both, the one without a number or
@@ -1375,7 +1354,7 @@ describe("PersonDetailScreen", () => {
         "Revoke invite",
         "Add to schedule",
         "Add to management",
-        "Deactivate",
+        "Archive",
       ]);
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
@@ -1423,7 +1402,7 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.getByRole("button", { name: "Call" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Email" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
     });

@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  describeEmploymentStatus,
+  describeStatusAction,
+  type StatusAction,
+} from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -109,7 +115,14 @@ const REORDER_SETTLE_MS = 220;
 
 const getEmployeeId = (employee: Employee) => employee.id;
 
-type BulkStaffAction = "deactivate" | "activate" | "remove";
+type BulkStaffAction = "deactivate" | "activate" | "restore" | "remove";
+
+const BULK_STATUS_ACTIONS: Record<BulkStaffAction, StatusAction> = {
+  deactivate: "markAway",
+  activate: "markActive",
+  restore: "restore",
+  remove: "archive",
+};
 
 const BULK_STATUS_CONCURRENCY = 3;
 
@@ -653,7 +666,9 @@ export function MembersSection({
     try {
       const change = (employeeId: string): unknown => {
         if (pendingAction.action === "deactivate") return onDeactivate(employeeId, trimmedNote);
-        if (pendingAction.action === "activate") return onActivate(employeeId);
+        if (pendingAction.action === "activate" || pendingAction.action === "restore") {
+          return onActivate(employeeId);
+        }
         return onRemove(employeeId, trimmedNote);
       };
       // Three at a time keeps a large bulk inside the status route's rate limit (F-103).
@@ -798,8 +813,12 @@ export function MembersSection({
           count: employees.length + inactiveEmployees.length + removedEmployees.length,
         },
         { key: "active", label: "Active", count: employees.length },
-        { key: "inactive", label: "Inactive", count: inactiveEmployees.length },
-        { key: "removed", label: "Removed", count: removedEmployees.length },
+        {
+          key: "inactive",
+          label: EMPLOYMENT_STATUS_LABELS.inactive,
+          count: inactiveEmployees.length,
+        },
+        { key: "removed", label: EMPLOYMENT_STATUS_LABELS.removed, count: removedEmployees.length },
       ]
     : [{ key: "active", label: "Active", count: employees.length }];
 
@@ -1505,6 +1524,10 @@ export function MembersSection({
                 setBulkNote("");
                 setBulkConfirm({ action: "deactivate", employeeIds });
               }}
+              onBulkRestore={(employeeIds) => {
+                setBulkNote("");
+                setBulkConfirm({ action: "restore", employeeIds });
+              }}
               onBulkActivate={(employeeIds) => {
                 setBulkNote("");
                 setBulkConfirm({ action: "activate", employeeIds });
@@ -1846,11 +1869,7 @@ export function MembersSection({
                         ? person.invitationStatus === "expired"
                           ? "Expired"
                           : "Pending"
-                        : person.employeeStatus === "removed"
-                          ? "Removed"
-                          : person.employeeStatus === "inactive"
-                            ? "Inactive"
-                            : "Active";
+                        : describeEmploymentStatus(person.employeeStatus);
                       const statusTone: StatusPillTone = isPending
                         ? "warning"
                         : person.employeeStatus === "removed"
@@ -2477,23 +2496,16 @@ export function MembersSection({
       {bulkConfirm && !statusStepUpOpen
         ? (() => {
             const count = bulkConfirm.employeeIds.length;
-            const plural = count === 1 ? "" : "s";
-            const showReason = bulkConfirm.action !== "activate";
-            const summary =
-              bulkConfirm.action === "deactivate"
-                ? `Deactivate ${count} selected staff member${plural}? They'll be hidden from active scheduling and can be reactivated anytime.`
-                : bulkConfirm.action === "activate"
-                  ? `Activate ${count} selected staff member${plural}? They'll return to active scheduling.`
-                  : `Remove ${count} selected staff member${plural}? They'll lose access and won't appear in active staff lists.`;
+            const showReason =
+              bulkConfirm.action === "deactivate" || bulkConfirm.action === "remove";
+            const copy = describeStatusAction(
+              BULK_STATUS_ACTIONS[bulkConfirm.action],
+              count === 1 ? "1 person" : `${count} people`,
+            );
+            const summary = copy.body;
             return (
               <ConfirmDialog
-                title={
-                  bulkConfirm.action === "deactivate"
-                    ? "Deactivate Selected Staff?"
-                    : bulkConfirm.action === "activate"
-                      ? "Activate Selected Staff?"
-                      : "Remove Selected Staff?"
-                }
+                title={copy.title}
                 message={
                   showReason ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -2511,13 +2523,7 @@ export function MembersSection({
                     summary
                   )
                 }
-                confirmLabel={
-                  bulkConfirm.action === "deactivate"
-                    ? "Deactivate"
-                    : bulkConfirm.action === "activate"
-                      ? "Activate"
-                      : "Remove"
-                }
+                confirmLabel={copy.label}
                 variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
                 isLoading={isBulkActionRunning}
                 onConfirm={handleConfirmBulkAction}

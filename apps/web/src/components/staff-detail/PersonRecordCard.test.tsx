@@ -39,7 +39,7 @@ describe("PersonRecordCard", () => {
 
     expect(fieldValue("Date added")).toBe(day(ADDED));
     expect(fieldValue("Date joined")).toBe(day(JOINED));
-    expect(fieldValue("Status")).toBe("Inactive");
+    expect(fieldValue("Status")).toBe("Away");
     expect(fieldValue("Status changed")).toBe(day(CHANGED));
     expect(fieldValue("Status note")).toBe("On leave until May");
     expect(fieldValue("Account")).toBe("Linked account");

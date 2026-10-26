@@ -330,7 +330,7 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({
-        error: "Only someone on the schedule can be marked inactive.",
+        error: "Only someone on the schedule can be marked away.",
         code: "NOT_ON_SCHEDULE",
       });
       expect(employeeUpdate).not.toHaveBeenCalled();

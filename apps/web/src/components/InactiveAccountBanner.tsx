@@ -9,39 +9,24 @@ export default function InactiveAccountBanner() {
 
   if (!isInactive) return null;
 
+  // A calm notice, not a warning: being away isn't something to fix.
   return (
     <div
+      role="status"
       style={{
         height: BANNER_HEIGHT,
-        background:
-          "linear-gradient(135deg, var(--dg-color-warning), var(--dg-color-warning-dark))",
-        color: "var(--dg-color-text-inverse)",
+        background: "var(--dg-color-info-bg)",
+        borderBottom: "1px solid var(--dg-color-info-border)",
+        color: "var(--dg-color-info-text)",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
         fontSize: "var(--dg-fs-label, 13px)",
         fontWeight: 600,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
         textAlign: "center",
       }}
     >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ flexShrink: 0 }}
-      >
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
       You&apos;re away.
     </div>
   );

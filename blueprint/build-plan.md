@@ -1078,11 +1078,13 @@
       someone loses a focus area, no push or schedule email to anyone who
       can't sign in, and one Archive; "requests only" waits for a real need.
       Design reference: the "Staff status across surfaces" canvas and the
-      "Fine-grained removal in DubGrid" doc.
+      "Fine-grained removal in DubGrid" doc. Owner, 2026-10-26: marking
+      someone away offers an absence type in the same confirmation (51f),
+      so build 51e and 51f next, before 51c.
   - [x] 51a. **Away keeps access** - an Away person keeps sign-in, role and
         management powers on web, mobile and in the database, isn't signed
         out, and takes a seat only while they can manage.
-  - [ ] 51b. **Status names everywhere** - Away and Archived replace
+  - [x] 51b. **Status names everywhere** - Away and Archived replace
         Inactive and Removed in pills, tabs and filters on web, mobile and
         Gridmaster; a calm Away banner replaces the read-only bar; billing
         breaks down who takes a seat.

@@ -89,7 +89,7 @@ describe("All Users opens the person view", () => {
 
     await waitFor(() => expect(searchGridmasterStaff).toHaveBeenCalledWith("grace"));
     expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
-    expect(screen.getByText("Inactive")).toBeInTheDocument();
+    expect(screen.getByText("Away")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Grace Hopper"));
     expect(

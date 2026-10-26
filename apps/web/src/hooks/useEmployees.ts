@@ -276,7 +276,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee removed");
+        toast.success("Archived");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -291,7 +291,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't remove them. Try again.");
+        toast.error("We couldn't archive them. Try again.");
         Sentry.captureException(err);
         return false;
       }
@@ -326,7 +326,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee marked inactive");
+        toast.success("Marked away");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -366,7 +366,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       try {
         const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee activated");
+        toast.success(targetEmployee.status === "removed" ? "Restored" : "Marked active");
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -379,7 +379,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("We couldn't reactivate them. Try again.");
+        toast.error("We couldn't change their status. Try again.");
         Sentry.captureException(err);
       }
     },

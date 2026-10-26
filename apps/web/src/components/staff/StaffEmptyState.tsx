@@ -16,16 +16,16 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
     : activeTab === "active"
       ? "No active employees"
       : activeTab === "inactive"
-        ? "No inactive employees"
-        : "No removed employees";
+        ? "No one is away"
+        : "No one is archived";
 
   const description = hasFilters
     ? "Try adjusting your search or filters."
     : activeTab === "active"
       ? "Get started by adding your first staff member."
       : activeTab === "inactive"
-        ? "Employees you mark inactive will appear here."
-        : "Removed employees will appear here.";
+        ? "People you mark away will appear here."
+        : "People you archive will appear here.";
 
   return (
     <EmptyState

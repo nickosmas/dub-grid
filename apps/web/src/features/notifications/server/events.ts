@@ -1,3 +1,4 @@
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
 import { summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -1053,7 +1054,7 @@ async function dispatchNotificationEventInternal(
       const recipients = new Set<string>(superAdmins);
       if (empUserId) recipients.add(empUserId);
       recipients.delete(actorUserId);
-      const transition = `${titleCaseWords(event.fromStatus)} to ${titleCaseWords(event.toStatus)}`;
+      const transition = `${describeEmploymentStatus(event.fromStatus)} to ${describeEmploymentStatus(event.toStatus)}`;
       await Promise.all(
         [...recipients].map((userId) =>
           sendNotification(

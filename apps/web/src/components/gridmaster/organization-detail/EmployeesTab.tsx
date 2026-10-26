@@ -1,3 +1,4 @@
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import { StatusDot } from "@/components/gridmaster/organization-detail/shared";
 import { sectionStyle } from "@/lib/styles";
 import { Button } from "@/components/Button";
@@ -12,6 +13,12 @@ import {
 } from "@/components/gridmaster/table-styles";
 
 // Employees tab for the gridmaster OrganizationDetail view.
+
+const EMPTY_STATUS_TEXT: Record<"active" | "inactive" | "removed", string> = {
+  active: "No active staff",
+  inactive: "No one is away",
+  removed: "No one is archived",
+};
 
 export function EmployeesTab({
   active,
@@ -39,13 +46,13 @@ export function EmployeesTab({
           },
           {
             key: "inactive" as const,
-            label: "Inactive",
+            label: EMPLOYMENT_STATUS_LABELS.inactive,
             count: inactive.length,
             color: "var(--dg-color-warning)",
           },
           {
             key: "removed" as const,
-            label: "Removed",
+            label: EMPLOYMENT_STATUS_LABELS.removed,
             count: removed.length,
             color: "var(--dg-color-danger)",
           },
@@ -116,7 +123,7 @@ export function EmployeesTab({
                       padding: 32,
                     }}
                   >
-                    No {showStatus} employees
+                    {EMPTY_STATUS_TEXT[showStatus]}
                   </td>
                 </tr>
               ) : (

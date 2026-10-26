@@ -512,7 +512,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           accessToken,
         );
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Employee marked inactive");
+        toast.success("Marked away");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -553,7 +553,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       try {
         const updatedEmployee = await activateEmployee(empId, orgId, employee.version);
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Employee activated");
+        toast.success(prevStatus === "removed" ? "Restored" : "Marked active");
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
@@ -565,7 +565,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("We couldn't reactivate them. Try again.");
+        toast.error("We couldn't change their status. Try again.");
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -589,7 +589,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           accessToken,
         );
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Employee removed");
+        toast.success("Archived");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -603,7 +603,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't remove them. Try again.");
+        toast.error("We couldn't archive them. Try again.");
         return false;
       }
     },

@@ -478,19 +478,22 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
+      return `Marked ${who(d, ctx, "a team member")} away${note ? `: ${note}` : ""}`;
     },
     suppressKeys: ["note"],
   },
   "employee.activated": {
     category: "people",
     severity: "create",
-    headline: (d, ctx) => `Marked ${who(d, ctx, "a team member")} active`,
+    headline: (d, ctx) =>
+      d.text("fromStatus") === "removed"
+        ? `Restored ${who(d, ctx, "a team member")}`
+        : `Marked ${who(d, ctx, "a team member")} active`,
   },
   "employee.removed": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Removed ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
   },
   // Historical keys from before the bench→deactivate / terminate→remove rename.
   // Old rows still carry them, so they render with the current copy.
@@ -499,14 +502,14 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
+      return `Marked ${who(d, ctx, "a team member")} away${note ? `: ${note}` : ""}`;
     },
     suppressKeys: ["note"],
   },
   "employee.archived": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Removed ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
   },
 
   // ── Schedule ───────────────────────────────────────────────────────────────

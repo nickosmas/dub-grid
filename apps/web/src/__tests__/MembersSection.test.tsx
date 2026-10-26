@@ -1224,8 +1224,8 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
     await settleInvitations();
     // The header checkbox selects every row on the page (the rows' own are unlabeled).
     await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: "Deactivate" }));
-    await screen.findByText("Deactivate Selected Staff?");
+    await user.click(screen.getByRole("button", { name: /^Mark away/ }));
+    await screen.findByText(/^Mark \d+ people away\?$/);
     return { user, view };
   }
 
@@ -1247,18 +1247,16 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
       );
 
     rerender(true);
-    expect(screen.queryByText("Deactivate Selected Staff?")).toBeNull();
+    expect(screen.queryByText(/^Mark \d+ people away\?$/)).toBeNull();
     rerender(false);
-    expect(screen.getByText("Deactivate Selected Staff?")).toBeInTheDocument();
+    expect(screen.getByText(/^Mark \d+ people away\?$/)).toBeInTheDocument();
   });
 
   it("does not count a change that did not go through as updated", async () => {
     const onDeactivate = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const { user } = await openBulkDeactivate({ onDeactivate });
 
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Deactivate" }),
-    );
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark away" }));
 
     await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(2));
     await waitFor(() =>
@@ -1294,11 +1292,9 @@ describe("MembersSection - bulk status change pacing (F-103)", () => {
     });
     await settleInvitations();
     await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: "Deactivate" }));
-    await screen.findByText("Deactivate Selected Staff?");
-    await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Deactivate" }),
-    );
+    await user.click(screen.getByRole("button", { name: /^Mark away/ }));
+    await screen.findByText(/^Mark \d+ people away\?$/);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark away" }));
 
     await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(5));
     await waitFor(() => expect(vi.mocked(toast.success)).toHaveBeenCalledWith("5 people updated"));

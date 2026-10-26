@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -21,11 +22,7 @@ const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
   "no-email": "No email",
 };
 
-const STATUS_LABELS: Record<Employee["status"], string> = {
-  active: "Active",
-  inactive: "Inactive",
-  removed: "Removed",
-};
+const STATUS_LABELS: Record<Employee["status"], string> = EMPLOYMENT_STATUS_LABELS;
 
 function formatDay(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {

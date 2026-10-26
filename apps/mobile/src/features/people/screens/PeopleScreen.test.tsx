@@ -791,7 +791,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
     expect(screen.queryByText("Owen Lee")).not.toBeInTheDocument();
     expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Inactive/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^(Away|Archived)$/)).not.toBeInTheDocument();
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
   });
@@ -1147,6 +1147,37 @@ describe("PeopleScreen", () => {
 
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
     expect(screen.getByText("June Patel")).toBeInTheDocument();
+  });
+
+  it("filters the staff directory by Active, Away or Archived", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz" }),
+          buildPerson({ id: "emp-2", firstName: "June", lastName: "Patel", status: "inactive" }),
+          buildPerson({ id: "emp-3", firstName: "Owen", lastName: "Lee", status: "removed" }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
+    fireEvent.click(screen.getByText("Away"));
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+    expect(screen.queryByText("Owen Lee")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
+    fireEvent.click(screen.getByText("Archived"));
+    expect(screen.getByText("Owen Lee")).toBeInTheDocument();
+    expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
   });
 
   it("filters admins out of the staff directory by access level", () => {
