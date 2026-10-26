@@ -172,7 +172,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   time away); Suspended can't sign in but keeps their shifts; a last day
   archives them after it. Schedule changes from a status go through the
   draft and publish with the period, and staff are told only their state
-  and its date.
+  and its date. Recurring schedules pause while someone is away until a
+  date, losing a focus area asks what to do with upcoming shifts there,
+  nobody who can't sign in gets push or schedule email, and archiving
+  leaves the same record whoever does it.
 - Absence runs in the grid: a whole-day absence on days in a row reads as
   one bar per week, labeled with its name and a count of days ("Vacation
   ×4"), while each day stays its own cell to click, change or remove.

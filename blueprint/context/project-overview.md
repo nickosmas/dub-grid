@@ -356,8 +356,9 @@ Item 51 is split:
   notice email and the Super Admin alert, and their open requests close.
 - **51e - Away until a date:** an optional return date, schedulable again
   from that date, and a daily job that sets them back to Active in the
-  organization's timezone; the "Away until Jan 4" pill and the grid's Away
-  bar, drawn like item 52's absence runs.
+  organization's timezone; their recurring schedules are paused while away,
+  not archived, and fill again from the return date; the "Away until Jan 4"
+  pill and the grid's Away bar, drawn like item 52's absence runs.
 - **51f - An absence while away:** with a return date, an optional absence
   type fills every day of the away range in the draft, replacing shifts,
   published with the period; those days are locked in the grid with an
@@ -367,6 +368,14 @@ Item 51 is split:
   day after; the Suspend dialog can set one.
 - **51h - Bulk status changes:** the People list bulk bar: Mark away,
   Suspend, Archive and Mark active.
+- **51i - Losing a focus area:** taking someone off a focus area asks
+  whether to clear their upcoming shifts there, in the draft, or keep them.
+- **51j - No contact without sign-in:** push and schedule emails go only to
+  people who can still sign in (Suspended keeps its one notice email), and
+  restoring access restores delivery; settles whether in-app alerts are
+  still created for them.
+- **51k - One Archive:** archiving ends the membership whoever does it, and
+  Restore works the same after either.
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
 `inactive` and `removed`, and suspension, the return date and the last day
@@ -378,7 +387,9 @@ alerts still accrue) and closes their open requests. A last day archives
 automatically. Schedule changes from a status go through the draft and
 publish with the period. Staff copy names only their state and its date and
 calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
-Design reference: the "Staff status across surfaces" canvas.
+A "requests only" state waits for a real need. Design reference: the "Staff
+status across surfaces" canvas and the "Fine-grained removal in DubGrid"
+doc.
 
 Item 52, absence runs in the grid, is planned and comes before 51e, whose
 Away bar is drawn the same way. A whole-day absence on days in a row, the

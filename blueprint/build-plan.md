@@ -1073,8 +1073,12 @@
       their open requests; a last day archives automatically; schedule
       changes from a status go through the draft and publish with the
       period; staff copy names only their state and its date and says "the
-      app", not DubGrid. Design reference: the "Staff status across
-      surfaces" canvas.
+      app", not DubGrid. Owner, 2026-10-26: also a paused recurring
+      schedule while away until a date, a choice for upcoming shifts when
+      someone loses a focus area, no push or schedule email to anyone who
+      can't sign in, and one Archive; "requests only" waits for a real need.
+      Design reference: the "Staff status across surfaces" canvas and the
+      "Fine-grained removal in DubGrid" doc.
   - [x] 51a. **Away keeps access** - an Away person keeps sign-in, role and
         management powers on web, mobile and in the database, isn't signed
         out, and takes a seat only while they can manage.
@@ -1091,8 +1095,10 @@
         requests close.
   - [ ] 51e. **Away until a date** - an optional return date, schedulable
         again from that date, and a daily job that sets them back to Active
-        in the organization's timezone; the "Away until Jan 4" pill and the
-        grid's Away bar, drawn like item 52's absence runs.
+        in the organization's timezone; their recurring schedules are paused
+        while away, not archived, and fill again from the return date; the
+        "Away until Jan 4" pill and the grid's Away bar, drawn like item
+        52's absence runs.
   - [ ] 51f. **An absence while away** - with a return date, an optional
         absence type fills every day of the away range in the draft,
         replacing shifts, published with the period; those days are locked
@@ -1103,6 +1109,18 @@
         archives them the day after; the Suspend dialog can set one.
   - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
+  - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks
+        whether to clear their upcoming shifts there, in the draft, or keep
+        them; today nothing acts on them.
+  - [ ] 51j. **No contact without sign-in** - push and schedule emails go
+        only to people who can still sign in, so Suspended, Archived,
+        Gridmaster's Remove access and a deactivated or terminated account
+        stop them (Suspended keeps its one notice email); restoring access
+        restores delivery. Settles whether in-app alerts are still created
+        for them.
+  - [ ] 51k. **One Archive** - archiving ends the membership whoever does
+        it, so an Admin's and a Super Admin's archive leave the same record,
+        and Restore works the same after either.
 - [ ] 52. **Absence runs in the grid** - a whole-day absence on days in a
       row draws as one bar per week in the Week and 2 Weeks grid, with no
       lines between its days, labeled with the name and a count ("Vacation
