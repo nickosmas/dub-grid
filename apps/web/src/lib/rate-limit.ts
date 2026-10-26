@@ -137,10 +137,14 @@ export const loginSurgeLimiter = createSlidingWindowLimiter(
 );
 
 /**
- * Cookie consent records, per IP. Generous because a facility's staff often
- * share one office address and all choose on their first day.
+ * Cookie consent records from signed-out visitors, per IP. Generous because a
+ * facility's staff often share one office address and all choose on their
+ * first day.
  */
-export const consentLimiter = createSlidingWindowLimiter(60, "10 m");
+export const consentIpLimiter = createSlidingWindowLimiter(300, "10 m");
+
+/** Cookie consent records from a signed-in person, per person. */
+export const consentUserLimiter = createSlidingWindowLimiter(20, "10 m");
 
 /** Global circuit breaker for recovery-email abuse and provider protection. */
 export const recoverySurgeLimiter = createSlidingWindowLimiter(100, "10 s");

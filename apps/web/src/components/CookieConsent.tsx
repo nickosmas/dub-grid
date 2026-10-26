@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { Switch } from "@/components/ui/switch";
 import { getCookieDomain, isSecure } from "@/lib/cookies";
 import {
+  consentRetryAt,
   needsConsentRecord,
   parseConsentRecordMark,
   type ConsentRecordMark,
@@ -77,6 +78,26 @@ function readRecordMark(): ConsentRecordMark | null {
   }
 }
 
+/** Until when the server asked this browser not to send a record. */
+const RETRY_AT_KEY = "dubgrid-cookie-consent-retry-at";
+
+function readRetryAt(): number {
+  try {
+    return Number(localStorage.getItem(RETRY_AT_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeRetryAt(retryAt: number | null) {
+  try {
+    if (retryAt === null) localStorage.removeItem(RETRY_AT_KEY);
+    else localStorage.setItem(RETRY_AT_KEY, String(retryAt));
+  } catch {
+    // Without it the next check simply asks again.
+  }
+}
+
 function writeRecordMark(mark: ConsentRecordMark) {
   try {
     localStorage.setItem(RECORD_KEY, JSON.stringify(mark));
@@ -100,7 +121,13 @@ async function syncConsentToServer(prefs: CookiePreferences): Promise<void> {
         version: CONSENT_VERSION,
       }),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      writeRetryAt(
+        consentRetryAt(response.status, response.headers.get("Retry-After"), Date.now()),
+      );
+      return;
+    }
+    writeRetryAt(null);
     const body = (await response.json()) as { userId?: unknown };
     writeRecordMark({
       version: CONSENT_VERSION,
@@ -129,6 +156,7 @@ export function ensureConsentRecorded(userId: string | null): Promise<void> {
   return enqueueRecord(async () => {
     const consent = getCookieConsent();
     if (!consent || consent.version !== CONSENT_VERSION) return;
+    if (Date.now() < readRetryAt()) return;
     const current = { version: CONSENT_VERSION, analytics: consent.analytics === true, userId };
     if (!needsConsentRecord(readRecordMark(), current)) return;
     await syncConsentToServer({ essential: true, analytics: current.analytics });

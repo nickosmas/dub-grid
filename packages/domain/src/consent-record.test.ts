@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsConsentRecord, parseConsentRecordMark } from "./consent-record";
+import { consentRetryAt, needsConsentRecord, parseConsentRecordMark } from "./consent-record";
 
 const current = { version: "1.2", analytics: true, userId: null };
 
@@ -54,5 +54,24 @@ describe("parseConsentRecordMark", () => {
     expect(parseConsentRecordMark("not json")).toBeNull();
     expect(parseConsentRecordMark('{"version":"1.2"}')).toBeNull();
     expect(parseConsentRecordMark('{"version":"1.2","analytics":true,"userId":4}')).toBeNull();
+  });
+});
+
+describe("consentRetryAt", () => {
+  const now = 1_000_000;
+
+  it("waits out Retry-After on a 429 or 503", () => {
+    expect(consentRetryAt(429, "30", now)).toBe(now + 30_000);
+    expect(consentRetryAt(503, "5", now)).toBe(now + 5_000);
+  });
+
+  it("waits ten minutes when the refusal names no usable Retry-After", () => {
+    expect(consentRetryAt(429, null, now)).toBe(now + 600_000);
+    expect(consentRetryAt(503, "soon", now)).toBe(now + 600_000);
+  });
+
+  it("does not hold back after any other answer", () => {
+    expect(consentRetryAt(500, "30", now)).toBeNull();
+    expect(consentRetryAt(400, null, now)).toBeNull();
   });
 });
