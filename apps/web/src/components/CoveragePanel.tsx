@@ -82,6 +82,8 @@ interface CoveragePanelProps {
     onPreview: (rowKeys: string[]) => void;
     onBuild: () => void;
     onCancel: () => void;
+    /** Done after reading a build's result. */
+    onDone?: () => void;
     skippedWords?: SkippedWords;
     allowSixthDay?: boolean;
     onAllowSixthDayChange?: (allow: boolean) => void;
@@ -465,6 +467,7 @@ export default function CoveragePanel({
                           onPreview={() => build.onPreview(rows.map((row) => row.rowKey))}
                           onBuild={build.onBuild}
                           onCancel={build.onCancel}
+                          onDone={build.onDone}
                           skippedWords={build.skippedWords}
                           allowSixthDay={build.allowSixthDay}
                           onAllowSixthDayChange={build.onAllowSixthDayChange}
