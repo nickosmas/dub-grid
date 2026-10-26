@@ -2,8 +2,13 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 import { serverEnv } from "@/lib/env.server";
+import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
 
 export const dynamic = "force-dynamic";
+
+// Well inside the uptime monitor's 10s request timeout, so a hung Upstash call
+// is reported as a degraded 503 rather than a probe that never answers.
+const REDIS_PING_TIMEOUT_MS = 3_000;
 
 /**
  * GET /api/health
@@ -36,17 +41,19 @@ export async function GET() {
         ? { status: "unconfigured" }
         : { status: "error", error: rateLimitConfig.message ?? "Redis env vars are missing" };
     } else {
-      const res = await fetch(`${redisUrl}/ping`, {
-        headers: { Authorization: `Bearer ${redisToken}` },
-      });
+      const res = await fetchWithTimeout(
+        `${redisUrl}/ping`,
+        { headers: { Authorization: `Bearer ${redisToken}` } },
+        REDIS_PING_TIMEOUT_MS,
+      );
       checks.redis = res.ok
         ? { status: "ok", latencyMs: Date.now() - redisStart }
         : { status: "error", error: `HTTP ${res.status}`, latencyMs: Date.now() - redisStart };
     }
-  } catch {
+  } catch (err) {
     checks.redis = {
       status: "error",
-      error: "connection failed",
+      error: isRequestTimeout(err) ? "timed out" : "connection failed",
       latencyMs: Date.now() - redisStart,
     };
   }
