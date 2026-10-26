@@ -10,7 +10,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { extractBearerToken, verifyAccessToken } from "@/lib/auth/verify-token";
 import { serverEnv } from "@/lib/env.server";
-import { checkRateLimit, consentLimiter } from "@/lib/rate-limit";
+import { checkRateLimit, consentIpLimiter, consentUserLimiter } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 
 export const dynamic = "force-dynamic";
@@ -81,19 +81,6 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    consentLimiter,
-    `consent:ip:${ip}`,
-  );
-  if (misconfigured) {
-    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
-  }
-  if (limited) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
-    );
-  }
 
   try {
     let body: unknown;
@@ -109,6 +96,21 @@ export async function POST(req: NextRequest) {
     }
 
     const authedUser = await resolveConsentUser(req);
+
+    // A signed-in person is limited on their own, so a shared office address
+    // never runs out for the people behind it.
+    const { limited, reset, misconfigured } = authedUser
+      ? await checkRateLimit(consentUserLimiter, `consent:user:${authedUser.id}`)
+      : await checkRateLimit(consentIpLimiter, `consent:ip:${ip}`);
+    if (misconfigured) {
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
+      );
+    }
 
     const ipHash = hashConsentIp(ip);
 

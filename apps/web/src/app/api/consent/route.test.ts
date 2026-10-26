@@ -29,7 +29,8 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ serverEnv: env }));
 vi.mock("@/lib/rate-limit", () => ({
-  consentLimiter: "consent-limiter",
+  consentIpLimiter: "consent-ip-limiter",
+  consentUserLimiter: "consent-user-limiter",
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
 }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
@@ -127,15 +128,27 @@ describe("POST /api/consent", () => {
     expect(recordedRow().ip_hash).toBe("unavailable");
   });
 
-  it("rate-limits by IP before recording anything", async () => {
+  it("rate-limits a signed-out visitor by IP before recording anything", async () => {
     checkRateLimit.mockResolvedValue({ limited: true, reset: Date.now() + 30_000 });
 
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBeTruthy();
-    expect(checkRateLimit).toHaveBeenCalledWith("consent-limiter", "consent:ip:203.0.113.7");
+    expect(checkRateLimit).toHaveBeenCalledWith("consent-ip-limiter", "consent:ip:203.0.113.7");
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  // Staff behind one office address must not use up each other's budget.
+  it("rate-limits a signed-in person on their own, not by IP", async () => {
+    extractBearerToken.mockReturnValue("mobile-token");
+    verifyAccessToken.mockResolvedValue({ userId: "mobile-user" });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith("consent-user-limiter", "consent:user:mobile-user");
   });
 
   it("answers 503 when the limiter is misconfigured", async () => {

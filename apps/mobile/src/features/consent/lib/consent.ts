@@ -1,4 +1,5 @@
 import {
+  consentRetryAt,
   needsConsentRecord,
   parseConsentRecordMark,
   type ConsentRecordMark,
@@ -10,6 +11,8 @@ import { getSupabaseClient } from "../../../shared/lib/supabase";
 const CONSENT_KEY = "dubgrid-cookie-consent";
 /** Who the server last recorded the device's choice for. */
 const RECORD_KEY = "dubgrid-cookie-consent-recorded";
+/** Until when the server asked the device not to send a record. */
+const RETRY_AT_KEY = "dubgrid-cookie-consent-retry-at";
 
 // Mirror the web banner's version (apps/web/src/components/CookieConsent.tsx).
 // Bump in lockstep with web so a policy change re-prompts on both platforms.
@@ -70,6 +73,7 @@ export async function getStoredConsent(): Promise<ConsentPreferences | null> {
 export async function clearStoredConsent(): Promise<void> {
   await secureStoreAdapter.removeItem(CONSENT_KEY);
   await secureStoreAdapter.removeItem(RECORD_KEY);
+  await secureStoreAdapter.removeItem(RETRY_AT_KEY);
 }
 
 /** True when there is no stored choice, or it predates the current version. */
@@ -133,7 +137,16 @@ export async function syncConsentToServer(prefs: ConsentPreferences): Promise<vo
         version: prefs.version,
       }),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      const retryAt = consentRetryAt(
+        response.status,
+        response.headers.get("Retry-After"),
+        Date.now(),
+      );
+      if (retryAt !== null) await secureStoreAdapter.setItem(RETRY_AT_KEY, String(retryAt));
+      return;
+    }
+    await secureStoreAdapter.removeItem(RETRY_AT_KEY);
     const body = (await response.json()) as { userId?: unknown };
     await secureStoreAdapter.setItem(
       RECORD_KEY,
@@ -165,6 +178,8 @@ export function ensureConsentRecorded(userId: string | null): Promise<void> {
   return enqueueRecord(async () => {
     const stored = await getStoredConsent();
     if (!stored || stored.version !== CONSENT_VERSION) return;
+    const retryAt = Number(await secureStoreAdapter.getItem(RETRY_AT_KEY)) || 0;
+    if (Date.now() < retryAt) return;
     const recorded = parseConsentRecordMark(await secureStoreAdapter.getItem(RECORD_KEY));
     const current = { version: stored.version, analytics: stored.analytics, userId };
     if (!needsConsentRecord(recorded, current)) return;

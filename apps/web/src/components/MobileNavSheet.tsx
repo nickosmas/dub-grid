@@ -1,8 +1,7 @@
 "use client";
 
 import { getAvatarTypography } from "@dubgrid/design-tokens";
-import { SERVICE_STATUS_URL } from "@dubgrid/domain";
-import { Activity, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -254,16 +253,6 @@ export default function MobileNavSheet({
                     {isUserViewActive ? "Exit User View" : "View as User"}
                   </Button>
                 )}
-                <a
-                  href={SERVICE_STATUS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={close}
-                  className="dg-bottom-sheet-footer-btn"
-                >
-                  <Activity size={16} />
-                  Service status
-                </a>
                 <Button
                   onClick={() => {
                     close();

@@ -6,11 +6,16 @@
   "colors": {
     "primary": "#2663EB"
   },
-  "navbar": {
+  "footer": {
     "links": [
       {
-        "label": "Service status",
-        "href": "https://status.dubgrid.com"
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Status",
+            "href": "https://status.dubgrid.com"
+          }
+        ]
       }
     ]
   },

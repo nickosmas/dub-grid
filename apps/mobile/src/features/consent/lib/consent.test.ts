@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getSession = vi.fn();
 const fetchMock = vi.fn();
@@ -28,7 +28,12 @@ import {
 const prefs = { essential: true as const, analytics: true, version: CONSENT_VERSION };
 
 function respond(userId: string | null) {
-  return { ok: true, json: async () => ({ success: true, userId }) };
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers(),
+    json: async () => ({ success: true, userId }),
+  };
 }
 
 function sentHeaders(): Record<string, string> {
@@ -42,6 +47,10 @@ beforeEach(() => {
   fetchMock.mockResolvedValue(respond(null));
   getSession.mockResolvedValue({ data: { session: null } });
   vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("syncConsentToServer", () => {
@@ -101,5 +110,25 @@ describe("ensureConsentRecorded", () => {
     await ensureConsentRecorded("user-1");
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("waits out Retry-After after a 429 instead of asking on every launch", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-26T03:00:00Z"));
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ "Retry-After": "60" }),
+      json: async () => ({}),
+    });
+    await setStoredConsent(true);
+
+    await ensureConsentRecorded(null);
+    await ensureConsentRecorded(null);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(new Date("2026-10-26T03:01:01Z"));
+    await ensureConsentRecorded(null);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
