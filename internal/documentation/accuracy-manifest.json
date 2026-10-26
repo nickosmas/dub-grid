@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f5aa9aeb7c974406791d06d6ea4567a975e237e2ab222685cc41d373f8f56b6f"
+      "evidenceFingerprint": "sha256:e0ddf3ae6a5d434bfafc80f7fcf864880493ba19115902092d1d19973d0cfe04"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0e6d2f9a669076bdb8f8b84e86dbd7301cf7885b7115b3a065c3198ff986dd06"
+      "evidenceFingerprint": "sha256:81924907023c010bca35edc6315ddae9442a7fbda0854f0f1056a8c6bf98b669"
     },
     {
       "id": "quickstart",
@@ -309,7 +309,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e6ba775f4c57d756fbd30673274f1cadcbdf4219acee316c9201dd39eab3c17e"
+      "evidenceFingerprint": "sha256:89439949b58d64f1cfd3dafedae3bbd335d247af9d43434a2b04303f409e97d4"
     },
     {
       "id": "schedule-grid",
@@ -683,7 +683,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1a8ba18bff3435901845822e8a3b66652c00c09fbd82c7309e1a36169d1e2a55"
+      "evidenceFingerprint": "sha256:1afebf5216681d262742fbf1fd9f332292e97d40f459eb0e758c91ac177dd880"
     },
     {
       "id": "roster",
@@ -937,7 +937,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:799c21d6c593ca50a9f8a6d6fdcc21395e516675a0a42b17595e3ed5f48b3741"
+      "evidenceFingerprint": "sha256:3e911d5438f69f2b97f26498286c8d858ac14f0d537dde58897fb8d888472f17"
     },
     {
       "id": "coverage",
@@ -1390,7 +1390,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4f7040d4a73dbfdfbfb2f6afaf5f2d0fbc424aa5761f3863012f3fad10aefa9d"
+      "evidenceFingerprint": "sha256:b5dfb58d3f4570568aadd6f34a6bf55353f37966dac253f01bffc001734e8dcc"
     },
     {
       "id": "profile",
@@ -1461,7 +1461,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:15ba558f07cb7b24037e38194b607e2a969ab119e143ffa3259282618efdc477"
+      "evidenceFingerprint": "sha256:130e3fc83d50aae06007f27c386d9e8d0f64f33abed3d837cccfe6e474cba480"
     },
     {
       "id": "security-sessions",
@@ -1603,7 +1603,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:8cedf149efb2fad0d28b49a9851295b2f551b59495cb0f77639d81c615e6571a"
+      "evidenceFingerprint": "sha256:57d7b6539eba01d59b857374346bbb3e18af2f218013120721e7d6a9efb0affc"
     },
     {
       "id": "schedule-rules-display",

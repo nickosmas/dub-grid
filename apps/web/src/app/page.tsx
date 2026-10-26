@@ -606,7 +606,7 @@ export default function RootPage() {
               rel="noopener noreferrer"
               className="text-xs font-medium text-[var(--dg-color-text-label)] hover:text-[var(--dg-color-text-primary)] transition-colors"
             >
-              Service status
+              Status
             </a>
             <Button
               type="button"
