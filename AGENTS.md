@@ -68,6 +68,13 @@ contributions merge into `dev` through a pull request instead: Claude Code
 cloud sessions push `claude/*` branches, Dependabot pushes its own, and
 `CONTRIBUTING.md` documents the naming for anyone working in their own clone.
 
+A pull request into `dev` that an agent opened, or was asked to drive, merges
+without a further ask once every GitHub check on its current head is green and
+it has no conflict (owner, 2026-10-26): squash-merge it as one conventional
+commit. The release-PR rules above still bind it: never past a red or
+still-running check, never `--admin`, never `--auto`. A release PR into `main`
+still needs its own explicit authorization.
+
 ### Several agents share this checkout
 
 Claude Code, Codex and others frequently run against this working tree at the
