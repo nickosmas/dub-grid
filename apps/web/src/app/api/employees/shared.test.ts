@@ -47,7 +47,7 @@ const ACTOR_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 
 describe("canManageEmployees", () => {
-  it("denies an inactive admin even though admin_permissions grants canManageEmployees", async () => {
+  it("allows an inactive admin whose admin_permissions grant canManageEmployees", async () => {
     const serviceClient = makeServiceClient({
       membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
       profile: { platform_role: "none" },
@@ -55,10 +55,10 @@ describe("canManageEmployees", () => {
       employee: { status: "inactive" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
-  it("does not deny an inactive super_admin (bypass, matches account/permissions/route.ts)", async () => {
+  it("allows an inactive super_admin", async () => {
     const serviceClient = makeServiceClient({
       membership: { org_role: "super_admin", admin_permissions: null },
       profile: { platform_role: "none" },
@@ -69,7 +69,7 @@ describe("canManageEmployees", () => {
     await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
-  it("does not deny an inactive gridmaster (bypass, matches account/permissions/route.ts)", async () => {
+  it("allows a gridmaster", async () => {
     const serviceClient = makeServiceClient({
       membership: null,
       profile: { platform_role: "gridmaster" },

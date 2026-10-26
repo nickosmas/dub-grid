@@ -166,6 +166,13 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   customer behavior only in public guides; Gridmaster tooling, Test Sandbox,
   feature flags, migrations, environment variables, and internal HTTP
   endpoints stay internal, and future drift fails verification.
+- Staff statuses: every person is Active, Away, Suspended or Archived, with
+  an optional last day and return date. Away keeps sign-in and role but
+  takes them off the schedule (optionally under an absence for the whole
+  time away); Suspended can't sign in but keeps their shifts; a last day
+  archives them after it. Schedule changes from a status go through the
+  draft and publish with the period, and staff are told only their state
+  and its date.
 
 Items 1 through 39 and 41 through 43 are shipped. Item 40, documentation truth
 and drift prevention, is in progress: the source inventory and contract (40a),
@@ -184,7 +191,7 @@ runtime evidence.
 - Organization memberships (per-tenant role assignment)
 - Per-membership onboarding completion and onboarding-tour state
 - Employees / staff records, focus areas, certifications, employment
-  status
+  status (Active, Away, Archived), suspended access, return date, last day
 - Schedules: recurring shifts, published schedule entries, draft state,
   shift snapshots for audit history. A cell holds worked shifts, an
   absence, or up to two worked shifts plus one absence covering scheduled
@@ -231,7 +238,9 @@ intentional, not legacy.
 
 Per-seat subscription pricing via Stripe: price scales with the number of
 staff/users in an organization. New organizations get a 14-day free trial
-before conversion is required.
+before conversion is required. An Away person takes a seat only while they
+can manage; a Suspended person always takes one, and an Archived one never
+does.
 
 > TODO (confirm): exact per-seat price points and any tier breaks weren't
 > captured during adoption.

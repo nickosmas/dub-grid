@@ -30,6 +30,31 @@ describe("countBillableSeats", () => {
     expect(countBillableSeats(employees, memberships)).toBe(0);
   });
 
+  it("bills an inactive person while their role can manage, and only then", () => {
+    const employees = [
+      { status: "inactive", archived_at: null, user_id: "u-admin" },
+      { status: "inactive", archived_at: null, user_id: "u-owner" },
+      { status: "inactive", archived_at: null, user_id: "u-user" },
+      { status: "inactive", archived_at: null, user_id: null },
+    ];
+    const memberships = [
+      { user_id: "u-admin", org_role: "admin" },
+      { user_id: "u-owner", org_role: "super_admin" },
+      { user_id: "u-user", org_role: "user" },
+    ];
+    expect(countBillableSeats(employees, memberships)).toBe(2);
+  });
+
+  it("bills an active Admin once, not again for their role", () => {
+    expect(countBillableSeats([active("u1")], [{ user_id: "u1", org_role: "admin" }])).toBe(1);
+  });
+
+  it("never bills an inactive internal Admin", () => {
+    const employees = [{ status: "inactive", archived_at: null, user_id: "qa-admin" }];
+    const memberships = [{ user_id: "qa-admin", org_role: "admin" }];
+    expect(countBillableSeats(employees, memberships, new Set(["qa-admin"]))).toBe(0);
+  });
+
   it("bills a management-only member once", () => {
     expect(
       countBillableSeats([active("u1")], [{ user_id: "u1" }, { user_id: "m1" }, { user_id: "m1" }]),

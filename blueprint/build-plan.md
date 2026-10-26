@@ -1058,3 +1058,48 @@
         card.
   - [x] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.
+- [ ] 51. **Staff statuses** - every person is Active, Away, Suspended or
+      Archived, with an optional last day and return date. Away keeps
+      sign-in, role and management access but takes them off the schedule;
+      Suspended can't sign in but keeps their shifts and can still be
+      scheduled; a last day archives them after it. Managers see who takes a
+      seat and why. Owner decisions, 2026-10-26: names Active, Away,
+      Suspended, Archived (code keeps `inactive` and `removed`; suspension,
+      return date and last day are new columns, so a Suspended person stays
+      `active`); an Away person takes a seat only while they can manage, a
+      Suspended one always does; anyone who can change a status today can
+      suspend, with the self and tier guards; suspension stops push and
+      schedule emails (one notice email, alerts still accrue) and closes
+      their open requests; a last day archives automatically; schedule
+      changes from a status go through the draft and publish with the
+      period; staff copy names only their state and its date and says "the
+      app", not DubGrid. Design reference: the "Staff status across
+      surfaces" canvas.
+  - [x] 51a. **Away keeps access** - an Away person keeps sign-in, role and
+        management powers on web, mobile and in the database, isn't signed
+        out, and takes a seat only while they can manage.
+  - [ ] 51b. **Status names everywhere** - Away and Archived replace
+        Inactive and Removed in pills, tabs and filters on web, mobile and
+        Gridmaster; a calm Away banner replaces the read-only bar; billing
+        breaks down who takes a seat.
+  - [ ] 51c. **Suspended: access** - can't sign in (signed out everywhere,
+        push off), an "Access suspended" message on web and mobile, and
+        Reinstate. Needs a migration.
+  - [ ] 51d. **Suspended: managing it** - the Suspend dialog and Reinstate,
+        a lock on the grid row, "won't see this in the app" in the shift
+        picker, the notice email and the Super Admin alert, and their open
+        requests close.
+  - [ ] 51e. **Away until a date** - an optional return date, schedulable
+        again from that date, and a daily job that sets them back to Active
+        in the organization's timezone; the "Away until Jan 4" pill and the
+        grid's "away all week" line.
+  - [ ] 51f. **An absence while away** - with a return date, an optional
+        absence type fills every day of the away range in the draft,
+        replacing shifts, published with the period; those days are locked
+        in the grid with an explanation, and changing the dates rewrites
+        them.
+  - [ ] 51g. **Last day** - "Leaving Nov 8", shifts after it come off in
+        the draft, nobody can schedule them past it, and a daily job
+        archives them the day after; the Suspend dialog can set one.
+  - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
+        Suspend, Archive and Mark active.

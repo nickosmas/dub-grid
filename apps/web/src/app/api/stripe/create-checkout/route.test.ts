@@ -98,7 +98,7 @@ describe("POST /api/stripe/create-checkout", () => {
       error: null,
     });
     organizationMembershipSelect.mockImplementation((columns: string) => {
-      if (columns === "user_id") {
+      if (columns === "user_id" || columns === "user_id, org_role") {
         const is = vi.fn(() => ({
           limit: vi.fn(() => ({
             maybeSingle: superAdminMaybeSingle,

@@ -31,7 +31,7 @@ export function membershipUpdateMayChangePermissions(
     return true;
   }
   if (row.archived_at !== null) return true;
-  if (cached.isGridmaster || cached.isImpersonating || cached.isInactive) return true;
+  if (cached.isGridmaster || cached.isImpersonating) return true;
   if (!cached.orgId || row.org_id !== cached.orgId) return true;
   if (typeof row.org_role !== "string") return true;
   const adminPerms = row.admin_permissions;

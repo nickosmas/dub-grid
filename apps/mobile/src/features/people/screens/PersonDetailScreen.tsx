@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { canMarkInactive } from "@dubgrid/domain";
 import {
   Linking,
   StyleSheet,
@@ -818,10 +819,10 @@ export default function PersonDetailScreen() {
       : "None";
   const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
   const fullName = getFullName(person);
-  // Management-only people have a staff row but no focus areas, so they were
-  // never on the grid — telling them they'll come "off the schedule" would be
-  // describing something that never happened. Same split web makes.
   const isOnSchedule = person.focusAreaIds.length > 0;
+  // Inactive only takes someone off the schedule, so a management-only person
+  // can only be removed. Same rule web and the server apply.
+  const canBeInactive = canMarkInactive(person.focusAreaIds);
   // Through the shared resolver so the hero, the editor's row and the picker
   // inside the sheet can't disagree: an invitation's `roleToAssign` is the
   // role until it is accepted, and reading `orgRole` alone showed a pending
@@ -1364,7 +1365,7 @@ export default function PersonDetailScreen() {
                   onPress={() => {
                     setInactiveNote("");
                     setConfirmationError(null);
-                    setDeactivateOutcome("inactive");
+                    setDeactivateOutcome(canBeInactive ? "inactive" : "remove");
                     setConfirmAction("deactivate");
                   }}
                   tone="warning"
@@ -1455,17 +1456,15 @@ export default function PersonDetailScreen() {
       >
         {confirmAction === "deactivate" ? (
           <SelectionSection label="What should happen">
-            <SelectionRow
-              detail={
-                isOnSchedule
-                  ? "They'll be temporarily off the schedule. You can reactivate them anytime."
-                  : "They'll temporarily lose management access. You can reactivate them anytime."
-              }
-              label="Mark inactive"
-              disabled={statusMutation.isPending}
-              onPress={() => setDeactivateOutcome("inactive")}
-              selected={!deactivateRemoves}
-            />
+            {canBeInactive ? (
+              <SelectionRow
+                detail="They'll be off the schedule and keep their access. You can reactivate them anytime."
+                label="Mark inactive"
+                disabled={statusMutation.isPending}
+                onPress={() => setDeactivateOutcome("inactive")}
+                selected={!deactivateRemoves}
+              />
+            ) : null}
             <SelectionRow
               detail="They'll lose access and won't appear in active staff. You can reactivate them later."
               label="Remove from staff"

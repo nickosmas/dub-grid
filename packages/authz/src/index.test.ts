@@ -103,18 +103,34 @@ describe("buildPerms", () => {
     expect(perms.canViewSchedule).toBe(true);
   });
 
-  it("strips inactive users to read-only regardless of underlying role", () => {
-    const perms = buildPerms(
-      "admin",
-      "org-1",
-      false,
-      { ...READ_ONLY_PERMS, canManageEmployees: true },
-      false,
-      true,
-    );
+  it("keeps an inactive person's role and permissions, and reports the flag", () => {
+    const adminPerms = { ...READ_ONLY_PERMS, canManageEmployees: true };
+    const active = buildPerms("admin", "org-1", false, adminPerms);
+    const inactive = buildPerms("admin", "org-1", false, adminPerms, false, true);
+    expect(inactive.isInactive).toBe(true);
+    expect(inactive.canManageEmployees).toBe(true);
+    expect(inactive.role).toBe("admin");
+    expect(inactive.level).toBe(active.level);
+    expect({ ...inactive, isInactive: false, atLeast: null }).toEqual({
+      ...active,
+      atLeast: null,
+    });
+  });
+
+  it("keeps an inactive super admin's user management", () => {
+    const perms = buildPerms("super_admin", "org-1", false, null, false, true);
     expect(perms.isInactive).toBe(true);
-    expect(perms.canManageEmployees).toBe(false);
-    expect(perms.role).toBe("user");
+    expect(perms.canManageUsers).toBe(true);
+    expect(perms.isSuperAdmin).toBe(true);
+  });
+
+  it("gives an inactive user exactly what an active user has", () => {
+    const active = buildPerms("user", "org-1", false, null);
+    const inactive = buildPerms("user", "org-1", false, null, false, true);
+    expect({ ...inactive, isInactive: false, atLeast: null }).toEqual({
+      ...active,
+      atLeast: null,
+    });
   });
 
   it("strips manage permissions while impersonating", () => {

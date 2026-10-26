@@ -120,25 +120,32 @@ describe("EmployeeStatusActions", () => {
     expect(onActivate).toHaveBeenCalledWith("emp-1");
   });
 
-  it("only mentions the schedule when the employee has a focus area (management-only employees don't)", async () => {
+  it("offers only Remove for a management-only employee", async () => {
     const user = userEvent.setup();
+    const onRemove = vi.fn();
 
-    const { rerender } = render(
+    render(
       <EmployeeStatusActions
         employee={makeEmployee({ focusAreaIds: [] })}
         canEdit
         onDeactivate={vi.fn()}
         onActivate={vi.fn()}
-        onRemove={vi.fn()}
+        onRemove={onRemove}
         variant="panel"
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Deactivate" }));
-    expect(screen.getByText(/lose management access/i)).toBeInTheDocument();
-    expect(screen.queryByText(/off the schedule/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /mark inactive/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/management access/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(onRemove).toHaveBeenCalled();
+  });
 
-    rerender(
+  it("offers Mark inactive for someone on the schedule, who keeps their access", async () => {
+    const user = userEvent.setup();
+
+    render(
       <EmployeeStatusActions
         employee={makeEmployee({ focusAreaIds: [1] })}
         canEdit
@@ -149,7 +156,9 @@ describe("EmployeeStatusActions", () => {
       />,
     );
 
-    expect(screen.getByText(/temporarily off the schedule/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    expect(screen.getByRole("radio", { name: /mark inactive/i })).toBeChecked();
+    expect(screen.getByText(/off the schedule and keep their access/i)).toBeInTheDocument();
   });
 
   it("uses the shared filled warning treatment for the Deactivate entry point", () => {

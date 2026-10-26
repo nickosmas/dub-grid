@@ -25,3 +25,15 @@ export function isManagementOnly(
 ): boolean {
   return isManagementUser(departmentIds) && !isOnSchedule(focusAreaIds);
 }
+
+export const NOT_ON_SCHEDULE_CODE = "NOT_ON_SCHEDULE";
+
+export const NOT_ON_SCHEDULE_MESSAGE = "Only someone on the schedule can be marked inactive.";
+
+/**
+ * Inactive (Away) only takes someone off the schedule, so it means nothing for
+ * a person who isn't on it.
+ */
+export function canMarkInactive(focusAreaIds: readonly number[]): boolean {
+  return isOnSchedule(focusAreaIds);
+}

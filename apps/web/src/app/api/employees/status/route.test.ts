@@ -18,6 +18,11 @@ const targetMembershipMaybeSingle = vi.fn();
 const superAdminCountIs = vi.fn();
 const auditInsert = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
+const revokeAllUserSessions = vi.fn();
+
+vi.mock("@/lib/auth/revocation", () => ({
+  revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
+}));
 
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
@@ -184,7 +189,7 @@ describe("POST /api/employees/status", () => {
     canManageEmployees.mockResolvedValue(true);
   });
 
-  it("denies an inactive admin from changing another employee's status even with canManageEmployees", async () => {
+  it("denies a caller canManageEmployees refuses", async () => {
     canManageEmployees.mockResolvedValue(false);
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
@@ -198,7 +203,7 @@ describe("POST /api/employees/status", () => {
     await expect(response.json()).resolves.toEqual({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES });
   });
 
-  it("does not deny an inactive super_admin (bypass, matches account/permissions/route.ts)", async () => {
+  it("lets a super_admin past the permission gate", async () => {
     membershipMaybeSingle.mockResolvedValue({
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
@@ -207,14 +212,13 @@ describe("POST /api/employees/status", () => {
 
     const response = await POST(makeRequest());
 
-    // The permission gate lets a super_admin through regardless of `inactive`;
-    // the employees row-fetch mock isn't configured with a resolved value in
+    // The employees row-fetch mock isn't configured with a resolved value in
     // this test, so getting past the 403 surfaces as a 500 rather than a
     // successful update. That's enough to prove the gate itself did not block them.
     expect(response.status).not.toBe(403);
   });
 
-  it("does not deny an inactive gridmaster (bypass, matches account/permissions/route.ts)", async () => {
+  it("lets a gridmaster past the permission gate", async () => {
     membershipMaybeSingle.mockResolvedValue({ data: null, error: null });
     profileSingle.mockResolvedValue({ data: { platform_role: "gridmaster" }, error: null });
 
@@ -282,6 +286,76 @@ describe("POST /api/employees/status", () => {
     await POST(makeRequest());
 
     expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
+  });
+
+  describe("marking inactive", () => {
+    const EMPLOYEE_USER_ID = "66666666-6666-4666-8666-666666666666";
+
+    function arrange(focusAreaIds: number[]) {
+      membershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "super_admin", admin_permissions: null },
+        error: null,
+      });
+      profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
+      const row = {
+        id: EMP_ID,
+        org_id: ORG_ID,
+        status: "active",
+        version: 1,
+        user_id: EMPLOYEE_USER_ID,
+        focus_area_ids: focusAreaIds,
+      };
+      employeeCurrentSingle.mockResolvedValue({ data: row, error: null });
+      employeeUpdateMaybeSingle.mockResolvedValue({
+        data: { ...row, status: "inactive", version: 2 },
+        error: null,
+      });
+      auditInsert.mockResolvedValue({ error: null });
+    }
+
+    it("keeps the person signed in", async () => {
+      arrange([7]);
+
+      const response = await POST(makeRequest("deactivate"));
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "inactive" }));
+      expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    });
+
+    it("refuses someone who isn't on the schedule, and changes nothing", async () => {
+      arrange([]);
+
+      const response = await POST(makeRequest("deactivate"));
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone on the schedule can be marked inactive.",
+        code: "NOT_ON_SCHEDULE",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("still signs a removed person out everywhere", async () => {
+      arrange([]);
+      employeeUpdateMaybeSingle.mockResolvedValue({
+        data: {
+          id: EMP_ID,
+          org_id: ORG_ID,
+          status: "removed",
+          version: 2,
+          user_id: EMPLOYEE_USER_ID,
+        },
+        error: null,
+      });
+      targetMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
+      membershipArchiveUpdate.mockResolvedValue({ error: null });
+
+      const response = await POST(makeRequest("remove"));
+
+      expect(response.status).toBe(200);
+      expect(revokeAllUserSessions).toHaveBeenCalledWith(EMPLOYEE_USER_ID);
+    });
   });
 
   it("restores an archived organization membership when reactivating a removed employee", async () => {

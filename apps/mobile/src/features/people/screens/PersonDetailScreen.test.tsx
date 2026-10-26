@@ -1228,6 +1228,33 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("offers only removal for someone who isn't on the schedule", () => {
+      const mutate = renderWithStatusMutation({ focusAreaIds: [] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      expect(screen.getByRole("button", { name: /Remove from staff/ })).toBeInTheDocument();
+      expect(screen.queryByText(/keep their access/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/management access/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+      expect(mutate.mock.calls[0]?.[0]).toEqual({
+        action: "remove",
+        expectedVersion: 7,
+        note: undefined,
+      });
+    });
+
+    it("tells the manager an inactive person keeps their access", () => {
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      expect(
+        screen.getByText(
+          "They'll be off the schedule and keep their access. You can reactivate them anytime.",
+        ),
+      ).toBeInTheDocument();
+    });
+
     it("carries the reason through with the chosen outcome", () => {
       const mutate = renderWithStatusMutation();
 

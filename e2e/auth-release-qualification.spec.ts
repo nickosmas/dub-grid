@@ -75,7 +75,9 @@ test.describe("authentication release qualification", () => {
     expect(failures).toEqual([]);
   });
 
-  test("keeps an inactive account read-only without replaying onboarding", async ({ page }) => {
+  test("keeps an inactive (away) account signed in, onboarding like anyone else", async ({
+    page,
+  }) => {
     const failures = collectUnexpectedRuntimeFailures(page);
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/login`);
     await waitForClientHydration(page);
@@ -84,18 +86,32 @@ test.describe("authentication release qualification", () => {
     await page.getByRole("button", { name: "Sign In" }).click();
 
     const termsHeading = page.getByRole("heading", { name: "Updated Terms of Service" });
-    const inactiveBanner = page.getByText(
-      "Your account is inactive. Ask an admin to reactivate you to regain full access.",
-    );
+    const inactiveBanner = page.getByText("You're away.", { exact: true });
+    // Away keeps the app as it is, so someone who never finished the
+    // orientation gets it now, like anyone else.
+    const orientation = page.getByRole("button", { name: "Continue", exact: true });
     await Promise.race([
       termsHeading.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
       inactiveBanner.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+      orientation.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
     ]);
     if (await termsHeading.isVisible()) {
       await page.getByLabel("Terms of Service content").evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
       await page.getByRole("button", { name: "Accept & Continue" }).click();
+    }
+
+    await Promise.race([
+      orientation.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+      inactiveBanner.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    ]);
+    if (await orientation.isVisible()) {
+      // The cookie banner sits over the wizard's buttons until it's answered.
+      const essentialOnly = page.getByRole("button", { name: "Essential only" });
+      if (await essentialOnly.isVisible()) await essentialOnly.click();
+      await orientation.click();
+      await page.getByRole("button", { name: "Go to Dashboard" }).click();
     }
 
     await expect(inactiveBanner).toBeVisible({ timeout: 15_000 });

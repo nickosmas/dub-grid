@@ -122,15 +122,14 @@ async function handleGET(req: NextRequest, timer: Timer) {
       });
     }
 
-    // Super_admins bypass the inactive check (they're the ones who'd be doing
-    // the deactivating, and the people page UI already prevents deactivating
-    // admin/super_admin roles) but still need employment flags — a super_admin
-    // can have a management-only employees row, and dashboard widgets like
-    // MyScheduleRow need isOnSchedule/isManagementUser to gate accordingly.
     if (effectiveRole === "super_admin") {
+      const [inactive, employmentFlags] = await Promise.all([
+        orgId ? isCallerInactive(serviceClient, auth.user.id, orgId) : Promise.resolve(false),
+        getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
+      ]);
       return NextResponse.json({
-        permissions: buildPerms(effectiveRole, orgId, false),
-        ...(await getSelfEmploymentFlags(serviceClient, auth.user.id, orgId)),
+        permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
+        ...employmentFlags,
       });
     }
 
@@ -168,10 +167,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
           false,
           (data?.admin_permissions as AdminPermissions | null) ?? null,
           false,
-          // Super_admins bypass the inactive check (they're the ones who'd be
-          // doing the deactivating, and the people page UI already prevents
-          // deactivating admin/super_admin roles).
-          dbRole === "super_admin" ? false : inactive,
+          inactive,
         ),
         ...employmentFlags,
       });

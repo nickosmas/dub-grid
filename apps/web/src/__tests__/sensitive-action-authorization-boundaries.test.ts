@@ -79,7 +79,8 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /\brequireAuthenticatedUser\s*\(/,
       /\bcanManageEmployees\s*\(/,
-      /action === "remove" \|\| action === "deactivate"[\s\S]*?revokeAllUserSessions/,
+      // Removal signs the person out everywhere; marking inactive (Away) doesn't (51a).
+      /if \(action === "remove" && currentEmployee\.userId\) \{\s*try \{\s*await revokeAllUserSessions\(/,
       // A Gridmaster taking a staff record out needs fresh proof before any read or write (F-96).
       /if \(isGridmaster && \(action === "deactivate" \|\| action === "remove"\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
     ],

@@ -1,7 +1,9 @@
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
 import type { Employee } from "@dubgrid/domain";
 import {
+  canMarkInactive,
   isSelfAction,
+  NOT_ON_SCHEDULE_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
@@ -109,6 +111,11 @@ type PeopleStatusResult =
       status: 400;
     }
   | {
+      kind: "not_on_schedule";
+      error: string;
+      status: 400;
+    }
+  | {
       kind: "latest_unavailable";
       error: string;
       status: 500;
@@ -175,6 +182,10 @@ export async function updateMobilePersonStatus(
       person: deps.mapEmployeeToMobilePerson(currentEmployee),
       status: 409,
     };
+  }
+
+  if (input.body.action === "deactivate" && !canMarkInactive(currentEmployee.focusAreaIds)) {
+    return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
   }
 
   // Removing staff already fully blocks login at the JWT hook regardless of

@@ -81,10 +81,25 @@ function makeServiceClient() {
   );
   return {
     from: vi.fn((table: string) =>
-      table === "organization_memberships" ? makeMembershipChain() : chain,
+      table === "organization_memberships"
+        ? makeMembershipChain()
+        : table === "focus_areas"
+          ? makeFocusAreaChain()
+          : chain,
     ),
     auth: { admin: { updateUserById } },
   };
+}
+
+/** The organization's live focus areas, as the staff validation reads them. */
+function makeFocusAreaChain() {
+  const chain: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "in", "is"]) {
+    chain[method] = vi.fn(() => chain);
+  }
+  chain.then = (resolve: (value: unknown) => unknown) =>
+    Promise.resolve({ data: [{ id: 3 }], error: null }).then(resolve);
+  return chain;
 }
 
 function makeMembershipChain() {
@@ -373,6 +388,31 @@ describe("POST /api/employees/manage", () => {
       ]);
 
       const response = await POST(updateEmployeeRequest());
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+    });
+
+    it("refuses to make someone with no focus area inactive", async () => {
+      mockAuth({ canManageEmployees: true });
+      fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+        { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
+      ]);
+
+      const response = await POST(updateEmployeeRequest({ status: "inactive" }));
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone on the schedule can be marked inactive.",
+        code: "NOT_ON_SCHEDULE",
+      });
+      expect(employeeUpdatePayloads).toHaveLength(0);
+    });
+
+    it("lets someone on the schedule be made inactive", async () => {
+      mockAuth({ canManageEmployees: true });
+
+      const response = await POST(updateEmployeeRequest({ status: "inactive", focusAreaIds: [3] }));
 
       expect(response.status).toBe(200);
       expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));

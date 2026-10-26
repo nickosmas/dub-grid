@@ -531,9 +531,7 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(403, getIncompleteSetupMessage(orgRole));
   }
 
-  // Inactive employees keep their session but lose every manage capability —
-  // mirror the web behavior. Gridmaster mobile login is blocked earlier, so the
-  // only callers with no employees row are unlinked super_admins (kept as-is).
+  // Reported only: an inactive (Away) person keeps their role's permissions.
   const { data: employeeRow } = await orgReads.employee;
   const isInactive = (employeeRow?.status as string | null) === "inactive";
 

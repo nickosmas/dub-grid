@@ -177,7 +177,7 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.orgId).toBe(ORG_ID);
   });
 
-  it("keeps a promoted-but-inactive member read-only", async () => {
+  it("gives a promoted-but-inactive member their new role's permissions", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "user" }),
     );
@@ -190,7 +190,8 @@ describe("GET /api/account/permissions", () => {
 
     const body = await response.json();
     expect(body.permissions.isInactive).toBe(true);
-    expect(body.permissions.canManageEmployees).toBe(false);
+    expect(body.permissions.role).toBe("admin");
+    expect(body.permissions.canManageEmployees).toBe(true);
   });
 
   it("fails closed to user permissions when the membership for the claimed org is gone", async () => {
@@ -207,7 +208,7 @@ describe("GET /api/account/permissions", () => {
     expect(serviceFrom).not.toHaveBeenCalledWith("profiles");
   });
 
-  it("drops an inactive admin to read-only permissions", async () => {
+  it("keeps an inactive admin's role and permissions, flagged inactive", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "admin" }),
     );
@@ -228,12 +229,12 @@ describe("GET /api/account/permissions", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.permissions.isInactive).toBe(true);
-    expect(body.permissions.role).toBe("user");
-    expect(body.permissions.level).toBe(0);
+    expect(body.permissions.role).toBe("admin");
+    expect(body.permissions.level).toBe(2);
     expect(body.permissions.actualLevel).toBe(2);
-    expect(body.permissions.canManageEmployees).toBe(false);
-    expect(body.permissions.canPublishSchedule).toBe(false);
-    expect(body.permissions.canEditShifts).toBe(false);
+    expect(body.permissions.canManageEmployees).toBe(true);
+    expect(body.permissions.canPublishSchedule).toBe(true);
+    expect(body.permissions.canEditShifts).toBe(true);
     expect(body.permissions.canViewSchedule).toBe(true);
     expect(body.permissions.orgId).toBe(ORG_ID);
   });
@@ -256,7 +257,11 @@ describe("GET /api/account/permissions", () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
     );
-    enqueue("employees", { data: { focus_area_ids: [], department_ids: [9] } });
+    enqueue(
+      "employees",
+      { data: { status: "active" } },
+      { data: { focus_area_ids: [], department_ids: [9] } },
+    );
 
     const response = await request();
 
@@ -268,11 +273,33 @@ describe("GET /api/account/permissions", () => {
     expect(body.isManagementUser).toBe(true);
   });
 
+  it("flags an inactive super_admin without reducing their permissions", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
+    enqueue(
+      "employees",
+      { data: { status: "inactive" } },
+      { data: { focus_area_ids: [5], department_ids: [] } },
+    );
+
+    const response = await request();
+
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(true);
+    expect(body.permissions.isSuperAdmin).toBe(true);
+    expect(body.permissions.canManageUsers).toBe(true);
+  });
+
   it("reports isOnSchedule for a super_admin who is also scheduled", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
     );
-    enqueue("employees", { data: { focus_area_ids: [5], department_ids: [9] } });
+    enqueue(
+      "employees",
+      { data: { status: "active" } },
+      { data: { focus_area_ids: [5], department_ids: [9] } },
+    );
 
     const response = await request();
 

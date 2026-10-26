@@ -42,7 +42,7 @@ export default function InactiveAccountBanner() {
         <line x1="12" y1="8" x2="12" y2="12" />
         <line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
-      Your account is inactive. Ask an admin to reactivate you to regain full access.
+      You&apos;re away.
     </div>
   );
 }

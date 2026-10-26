@@ -392,7 +392,7 @@ describe("mobile auth server boundaries", () => {
     });
   });
 
-  it("keeps inactive employees authenticated without management capabilities", async () => {
+  it("keeps inactive employees authenticated with their role's permissions", async () => {
     getServiceClient.mockReturnValue(
       createServiceClient({ setupComplete: true, employeeStatus: "inactive" }),
     );
@@ -406,8 +406,9 @@ describe("mobile auth server boundaries", () => {
 
     expect("response" in result).toBe(false);
     if ("response" in result) return;
-    expect(result.permissions.canManageEmployees).toBe(false);
-    expect(result.permissions.canEditShifts).toBe(false);
+    expect(result.permissions.isInactive).toBe(true);
+    expect(result.permissions.role).toBe("admin");
+    expect(result.permissions.level).toBe(2);
   });
 
   it("allows an aal1 mobile session when no verified TOTP factor exists", async () => {
