@@ -322,9 +322,13 @@ describe("resolveMobileAuthContext decisions", () => {
     });
   });
 
-  it("keeps an inactive employee signed in without manage capabilities", async () => {
-    const { input } = buildInput({ employeeStatus: "inactive" });
-    const context = await resolveMobileAuthContext(input);
+  it("keeps an inactive employee signed in with their role's permissions", async () => {
+    const active = await resolveMobileAuthContext(buildInput({}).input);
+    const context = await resolveMobileAuthContext(
+      buildInput({ employeeStatus: "inactive" }).input,
+    );
     expect(context.permissions.isInactive).toBe(true);
+    expect(context.permissions.role).toBe("admin");
+    expect({ ...context.permissions, isInactive: false }).toEqual(active.permissions);
   });
 });

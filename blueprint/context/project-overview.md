@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash e56a4b1521821810a24b0e4d2769571828400d76971b74999d0e426be2cd5d14 -->
+<!-- blueprint:source-hash bc95f5fb9f1e6d117a8125b625426bcd5a28f73cc166cf1522da5288be4ba0ca -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped. Item 40 is in progress.
+shipped. Items 40 and 51 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -85,6 +85,7 @@ shipped. Item 40 is in progress.
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
+| 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
 
 Item 40 is split:
 
@@ -336,6 +337,48 @@ a left-early absence the person takes no more work that day, and an
 arrived-late one blocks only shifts that overlap it (owner decisions,
 2026-10-24). Design reference: the "Absence beside a shift" canvas.
 
+Item 51 is split:
+
+- **51a - Away keeps access:** shipped; an inactive (Away) person keeps
+  sign-in, role and management powers on web, mobile and in the database,
+  isn't signed out, and takes a seat only as an Admin or Super Admin; only
+  someone on the schedule can be marked inactive (migration 098).
+- **51b - Status names everywhere:** Away and Archived replace Inactive and
+  Removed in pills, tabs and filters on web, mobile and Gridmaster; a calm
+  Away banner replaces the read-only bar; billing breaks down who takes a
+  seat.
+- **51c - Suspended: access:** can't sign in (signed out everywhere, push
+  off), an "Access suspended" message on web and mobile, and Reinstate.
+  Needs a migration.
+- **51d - Suspended: managing it:** the Suspend dialog and Reinstate, a lock
+  on the grid row, "won't see this in the app" in the shift picker, the
+  notice email and the Super Admin alert, and their open requests close.
+- **51e - Away until a date:** an optional return date, schedulable again
+  from that date, and a daily job that sets them back to Active in the
+  organization's timezone; the "Away until Jan 4" pill and the grid's "away
+  all week" line.
+- **51f - An absence while away:** with a return date, an optional absence
+  type fills every day of the away range in the draft, replacing shifts,
+  published with the period; those days are locked in the grid with an
+  explanation, and changing the dates rewrites them.
+- **51g - Last day:** "Leaving Nov 8", shifts after it come off in the
+  draft, nobody can schedule them past it, and a daily job archives them the
+  day after; the Suspend dialog can set one.
+- **51h - Bulk status changes:** the People list bulk bar: Mark away,
+  Suspend, Archive and Mark active.
+
+Statuses are named Active, Away, Suspended and Archived; code keeps
+`inactive` and `removed`, and suspension, the return date and the last day
+are new columns, so a Suspended person stays `active` and schedulable. An
+Away person takes a seat only while they can manage; a Suspended one always
+does. Anyone who can change a status today can suspend, with the self and
+tier guards. Suspension stops push and schedule emails (one notice email,
+alerts still accrue) and closes their open requests. A last day archives
+automatically. Schedule changes from a status go through the draft and
+publish with the period. Staff copy names only their state and its date and
+calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
+Design reference: the "Staff status across surfaces" canvas.
+
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
 endpoints remain internal.
@@ -377,7 +420,10 @@ endpoints remain internal.
 - `org_id` and linked user identity where present
 - department or focus-area assignment, role, and certifications
 - `employment_status` - active, inactive, or removed; only active staff can be
-  scheduled and count toward billing
+  scheduled and count toward billing. Item 51 names them Active, Away and
+  Archived and adds suspended access, a return date and a last day; an Away
+  person keeps sign-in and counts toward billing only while they can manage,
+  and a Suspended one stays active and schedulable but can't sign in
 - scheduling and management access are independent capabilities
 - belongs to one organization and participates in schedules and requests
 
@@ -457,7 +503,9 @@ endpoints remain internal.
 DubGrid uses Stripe per-seat subscriptions, billed monthly. New organizations
 receive a trial beginning on the first Super Admin login, then grace days
 before the organization locks: 14 and 3 days by default, set by the platform
-billing policy with per-organization overrides.
+billing policy with per-organization overrides. An Away person takes a seat
+only while they can manage; a Suspended person always takes one, and an
+Archived one never does (item 51).
 
 > TODO: exact per-seat prices and tier breaks remain unconfirmed.
 

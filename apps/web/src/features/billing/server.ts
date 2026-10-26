@@ -268,7 +268,7 @@ export async function countBillableAppUsers(
     serviceClient.from("employees").select("status, archived_at, user_id").eq("org_id", orgId),
     serviceClient
       .from("organization_memberships")
-      .select("user_id")
+      .select("user_id, org_role")
       .eq("org_id", orgId)
       .is("archived_at", null),
     fetchInternalUserIds(serviceClient),

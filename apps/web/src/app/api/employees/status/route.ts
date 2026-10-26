@@ -13,7 +13,13 @@ import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS, cacheDel, CacheKey } from "@/lib/db/shared";
-import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
+import {
+  canMarkInactive,
+  NOT_ON_SCHEDULE_CODE,
+  NOT_ON_SCHEDULE_MESSAGE,
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
@@ -145,6 +151,13 @@ export async function POST(req: NextRequest) {
       return buildConflictResponse(currentEmployee);
     }
 
+    if (action === "deactivate" && !canMarkInactive(currentEmployee.focusAreaIds)) {
+      return NextResponse.json(
+        { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
+        { status: 400 },
+      );
+    }
+
     // Removing staff already fully blocks login at the JWT hook regardless of
     // org_role (see 002_functions_triggers.sql), so removing the org's only
     // super_admin here would lock the org out just as surely as deleting their
@@ -257,7 +270,7 @@ export async function POST(req: NextRequest) {
     // locally now. Org-scoped routes would still reject them on the
     // per-request membership check; this covers the routes that only
     // authenticate. Non-fatal: never fail the status change over it.
-    if ((action === "remove" || action === "deactivate") && currentEmployee.userId) {
+    if (action === "remove" && currentEmployee.userId) {
       try {
         await revokeAllUserSessions(currentEmployee.userId);
       } catch (err) {

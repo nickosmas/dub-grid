@@ -15,10 +15,8 @@ import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie"
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
-// True when the caller's employees row in the effective org has status='inactive'.
-// Gridmaster + unlinked super_admin users have no employees row → returns false.
-// Removed users would normally have status='removed', but the JWT hook refuses
-// them at sign-in/refresh — they can't reach any authenticated endpoint.
+// True when the caller's employees row in the effective org is inactive (Away).
+// Reported to the client for the Away banner; it grants and removes nothing.
 export async function isCallerInactive(
   serviceClient: SupabaseClient,
   userId: string,
@@ -456,29 +454,27 @@ export async function requireOrgPermissions(
   }
 
   const userClient = createRequestSupabaseClient(req);
-  const [{ data: membership }, { data: profile }, { data: organization }, inactive] =
-    await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", auth.user.id)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role, deactivated_at, terminated_at")
-        .eq("id", auth.user.id)
-        .maybeSingle(),
-      serviceClient
-        .from("organizations")
-        .select(
-          `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
-        )
-        .eq("id", orgId)
-        .maybeSingle(),
-      isCallerInactive(serviceClient, auth.user.id, orgId),
-    ]);
+  const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_role, admin_permissions")
+      .eq("user_id", auth.user.id)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle(),
+    serviceClient
+      .from("profiles")
+      .select("platform_role, deactivated_at, terminated_at")
+      .eq("id", auth.user.id)
+      .maybeSingle(),
+    serviceClient
+      .from("organizations")
+      .select(
+        `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
+      )
+      .eq("id", orgId)
+      .maybeSingle(),
+  ]);
 
   // The JWT hook refuses these accounts at the next token issue; this covers
   // the token they already hold. Without it a deactivated user kept every
@@ -530,17 +526,10 @@ export async function requireOrgPermissions(
   const role = isGridmaster
     ? "gridmaster"
     : ((membership?.org_role as OrganizationRole | null) ?? "user");
-  const isSuperAdmin = role === "super_admin";
-
-  // Inactive employees keep their session but lose every manage capability —
-  // mirrors the mobile API's resolveMobileAuthContext (packages/mobile-api-core).
-  // Gridmaster/super_admin bypass, matching account/permissions/route.ts: those
-  // tiers aren't meant to be sidelined by a stale/incidental employees.status row.
   const permissions = buildPermissionContext(
     role,
     orgId,
     (membership?.admin_permissions as AdminPermissions | null) ?? null,
-    { isInactive: inactive && !isGridmaster && !isSuperAdmin },
   );
 
   const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization);

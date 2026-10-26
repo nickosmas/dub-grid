@@ -5,6 +5,7 @@ import type { Employee } from "@/types";
 import { Button } from "@/components/Button";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { canMarkInactive } from "@dubgrid/domain";
 
 export interface EmployeeStatusActionsProps {
   employee: Employee;
@@ -34,8 +35,12 @@ export function EmployeeStatusActions({
   fillWidth = false,
   stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
+  // Inactive only takes someone off the schedule, so a management-only person
+  // can only be removed.
+  const canBeInactive = canMarkInactive(employee.focusAreaIds);
+  const defaultOutcome: DeactivateOutcome = canBeInactive ? "inactive" : "remove";
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
-  const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
+  const [outcome, setOutcome] = useState<DeactivateOutcome>(defaultOutcome);
   const [note, setNote] = useState(employee.statusNote || "");
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   // The confirmation unmounts while a step-up prompt shows, which drops its
@@ -44,9 +49,6 @@ export function EmployeeStatusActions({
 
   const isActive = employee.status === "active";
   const displayName = getEmployeeDisplayName(employee);
-  // Management-only employees have an `employees` row but no focus areas —
-  // they're not on the schedule grid (see ProfilePage's isOnSchedule).
-  const isScheduled = employee.focusAreaIds.length > 0;
 
   async function runPending(action: () => unknown) {
     setPending(true);
@@ -59,7 +61,7 @@ export function EmployeeStatusActions({
 
   function resetDeactivateForm() {
     setShowDeactivateConfirm(false);
-    setOutcome("inactive");
+    setOutcome(defaultOutcome);
   }
 
   // Self-action guard: you can't deactivate / remove / activate your own
@@ -79,37 +81,38 @@ export function EmployeeStatusActions({
         title={`Deactivate ${displayName}?`}
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <label
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="radio"
-                name="deactivate-outcome"
-                value="inactive"
-                checked={!isRemove}
-                onChange={() => setOutcome("inactive")}
-                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--dg-color-border)] box-border cursor-pointer relative checked:border-[var(--dg-color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-warning)]"
-              />
-              <span>
-                <span style={{ display: "block", fontWeight: 600 }}>Mark inactive</span>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  {isScheduled
-                    ? "They'll be temporarily off the schedule. You can reactivate them anytime."
-                    : "They'll temporarily lose management access. You can reactivate them anytime."}
+            {canBeInactive && (
+              <label
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="deactivate-outcome"
+                  value="inactive"
+                  checked={!isRemove}
+                  onChange={() => setOutcome("inactive")}
+                  className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--dg-color-border)] box-border cursor-pointer relative checked:border-[var(--dg-color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-warning)]"
+                />
+                <span>
+                  <span style={{ display: "block", fontWeight: 600 }}>Mark inactive</span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
+                  >
+                    They&apos;ll be off the schedule and keep their access. You can reactivate them
+                    anytime.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            )}
             <label
               style={{
                 display: "flex",

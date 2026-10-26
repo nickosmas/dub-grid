@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canMarkInactive, NOT_ON_SCHEDULE_CODE, NOT_ON_SCHEDULE_MESSAGE } from "@dubgrid/domain";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbEmployee, DbInvitation, DbScheduleCell } from "@dubgrid/db-types";
@@ -706,6 +707,17 @@ export async function POST(req: NextRequest) {
         const changedProfileFields = previousRow
           ? diffEmployeeProfileFields(previousRow, nextEmployee)
           : [];
+
+        if (
+          nextEmployee.status === "inactive" &&
+          previousRow?.status !== "inactive" &&
+          !canMarkInactive(nextEmployee.focusAreaIds)
+        ) {
+          return NextResponse.json(
+            { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
+            { status: 400 },
+          );
+        }
 
         // The staff email is the login email. Changing it for a linked
         // account is a sensitive action: step-up first, never from a sandbox

@@ -732,7 +732,7 @@ describe("requireOrgPermissions", () => {
     expect("response" in result).toBe(false);
   });
 
-  it("strips an inactive admin's manage capability even though admin_permissions grants it", async () => {
+  it("keeps an inactive admin's manage capability that admin_permissions grants", async () => {
     getServiceClient.mockReturnValue(
       createServiceClientMock({
         membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
@@ -753,9 +753,9 @@ describe("requireOrgPermissions", () => {
       (permissions) => permissions.canManageEmployees,
     );
 
-    expect("response" in result).toBe(true);
-    if ("response" in result) {
-      expect(result.response.status).toBe(403);
+    expect("response" in result).toBe(false);
+    if (!("response" in result)) {
+      expect(result.permissions.canManageEmployees).toBe(true);
     }
   });
 

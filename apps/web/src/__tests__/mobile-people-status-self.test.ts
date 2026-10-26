@@ -98,7 +98,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
   });
 
   it("allows deactivate on another user", async () => {
-    const employee = makeEmployee({ userId: "user-other" });
+    const employee = makeEmployee({ userId: "user-other", focusAreaIds: [1] });
     const deps = makeDeps(employee);
     deps.updateEmployeeStatus.mockResolvedValue({
       ...employee,
@@ -119,6 +119,29 @@ describe("updateMobilePersonStatus self-action guard", () => {
 
     expect(result.kind).toBe("updated");
     expect(deps.updateEmployeeStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to make someone with no focus area inactive", async () => {
+    const employee = makeEmployee({ userId: "user-other", focusAreaIds: [] });
+    const deps = makeDeps(employee);
+
+    const result = await updateMobilePersonStatus(
+      makeAuth("user-self"),
+      {
+        employeeId: "emp-1",
+        body: { action: "deactivate", expectedVersion: 0, note: "" },
+        requestIp: null,
+        userAgent: null,
+      },
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      kind: "not_on_schedule",
+      status: 400,
+      error: "Only someone on the schedule can be marked inactive.",
+    });
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });
 
   it("rejects activate on self with self_action_forbidden", async () => {
