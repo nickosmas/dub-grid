@@ -173,6 +173,9 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   archives them after it. Schedule changes from a status go through the
   draft and publish with the period, and staff are told only their state
   and its date.
+- Absence runs in the grid: a whole-day absence on days in a row reads as
+  one bar per week, labeled with its name and a count of days ("Vacation
+  ×4"), while each day stays its own cell to click, change or remove.
 
 Items 1 through 39 and 41 through 43 are shipped. Item 40, documentation truth
 and drift prevention, is in progress: the source inventory and contract (40a),

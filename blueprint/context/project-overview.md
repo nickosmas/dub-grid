@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped. Items 40 and 51 are in progress.
+shipped. Items 40 and 51 are in progress. Item 52 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -86,6 +86,7 @@ shipped. Items 40 and 51 are in progress.
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 | 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
+| 52   | Planned     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 
 Item 40 is split:
 
@@ -355,8 +356,8 @@ Item 51 is split:
   notice email and the Super Admin alert, and their open requests close.
 - **51e - Away until a date:** an optional return date, schedulable again
   from that date, and a daily job that sets them back to Active in the
-  organization's timezone; the "Away until Jan 4" pill and the grid's "away
-  all week" line.
+  organization's timezone; the "Away until Jan 4" pill and the grid's Away
+  bar, drawn like item 52's absence runs.
 - **51f - An absence while away:** with a return date, an optional absence
   type fills every day of the away range in the draft, replacing shifts,
   published with the period; those days are locked in the grid with an
@@ -378,6 +379,18 @@ automatically. Schedule changes from a status go through the draft and
 publish with the period. Staff copy names only their state and its date and
 calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
 Design reference: the "Staff status across surfaces" canvas.
+
+Item 52, absence runs in the grid, is planned and comes before 51e, whose
+Away bar is drawn the same way. A whole-day absence on days in a row, the
+day off absence included, draws as one bar per week in the Week and 2 Weeks
+grid with no lines inside, labeled "Vacation ×4" (one day shows just the
+name; names are never pluralized). A bar breaks at a different absence, a
+day with a shift, the end of the week, and a day changed in the draft. Each
+day stays its own cell: hovering draws dashed edges around it, hides the
+label and lights its column header, and its panel offers Remove this day or
+Remove all 4 days in the draft with one Undo (owner decisions, 2026-10-26).
+Design reference: the "Absence runs in the grid" board on the "Staff status
+across surfaces" canvas.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
