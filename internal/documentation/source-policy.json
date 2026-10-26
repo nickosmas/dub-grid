@@ -76,6 +76,7 @@
     "CI": { "declaration": "usage-only", "exposure": "provider-injected" },
     "CONFIRM_AUTH_CONFIG": { "declaration": "conditional", "exposure": "server-config" },
     "CONFIRM_RESET": { "declaration": "conditional", "exposure": "server-config" },
+    "CONSENT_IP_HASH_SECRET": { "declaration": "conditional", "exposure": "secret" },
     "CRON_SECRET": { "declaration": "conditional", "exposure": "secret" },
     "DATABASE_URL": { "declaration": "conditional", "exposure": "secret" },
     "DEMO_RECIPIENT_EMAIL": { "declaration": "optional", "exposure": "server-config" },

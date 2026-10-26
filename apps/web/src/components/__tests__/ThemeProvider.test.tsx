@@ -12,4 +12,8 @@ describe("ThemeProvider", () => {
     expect(source).toContain('defaultTheme="light"');
     expect(source).toContain("enableSystem");
   });
+
+  it("never writes the shared theme cookie for a visitor who hasn't chosen", () => {
+    expect(source).not.toContain("writeThemeCookie");
+  });
 });

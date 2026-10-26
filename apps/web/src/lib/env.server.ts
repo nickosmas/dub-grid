@@ -34,6 +34,9 @@ const serverSchema = z
     // so an unset value makes every cron run return 503 and get reported as a
     // failed job. Optional here because local dev never runs the crons.
     CRON_SECRET: z.string().optional(),
+    // Keys the IP hash on cookie consent records, so a stored hash can't be
+    // reversed by hashing every IPv4 address. Unset, records store no hash.
+    CONSENT_IP_HASH_SECRET: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     EXPO_ACCESS_TOKEN: z.string().optional(),
     STRIPE_SECRET_KEY: z.string().optional(),

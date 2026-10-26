@@ -2,8 +2,9 @@
 
 /**
  * Migration 040: `anon` holds no table privilege except the cookie banner's
- * write. Row-level security already refused it every row, so this is the
- * grant behind the policy catching up with the policy.
+ * write, and 097 takes that one too, since consent records are written only
+ * through the service role. Row-level security already refused it every row,
+ * so this is the grant behind the policy catching up with the policy.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
  */
@@ -45,14 +46,14 @@ afterAll(async () => {
 });
 
 describe.runIf(reachable)("anon holds nothing (live DB)", () => {
-  it("leaves exactly one grant, the cookie banner's write", async () => {
+  it("leaves anon no table grant at all", async () => {
     const { rows } = await db.query<{ table_name: string; privilege_type: string }>(
       `SELECT DISTINCT table_name, privilege_type
          FROM information_schema.table_privileges
         WHERE table_schema = 'public' AND grantee = 'anon'
         ORDER BY table_name, privilege_type`,
     );
-    expect(rows).toEqual([{ table_name: "cookie_consents", privilege_type: "INSERT" }]);
+    expect(rows).toEqual([]);
   });
 
   it("refuses anon a read of an ordinary table", async () => {

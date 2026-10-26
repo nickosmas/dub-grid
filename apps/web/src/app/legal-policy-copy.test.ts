@@ -24,6 +24,10 @@ describe("public legal-policy copy", () => {
     expect(cookiePolicy).toContain("Sentry receives the user ID and email address");
   });
 
+  it("says the theme cookie waits for a choice", () => {
+    expect(cookiePolicy.replace(/\s+/g, " ")).toContain("Set only once you choose an appearance.");
+  });
+
   it("does not promise unverified retention, infrastructure, or historical practices", () => {
     expect(privacyPolicy).not.toContain("encrypted in transit and at rest");
     expect(privacyPolicy).not.toContain("before being purged");
