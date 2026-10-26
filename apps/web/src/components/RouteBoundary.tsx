@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { SERVICE_STATUS_URL } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { DubGridLogo } from "@/components/Logo";
@@ -23,6 +24,12 @@ const titleStyle = {
   fontWeight: 700,
   color: "var(--dg-color-text-primary)",
   margin: 0,
+};
+
+const statusLinkStyle = {
+  fontSize: "var(--dg-fs-body)",
+  color: "var(--dg-color-link)",
+  textDecoration: "underline",
 };
 
 const bodyStyle = {
@@ -57,6 +64,14 @@ export function ErrorBoundary({
           Try again
         </Button>
       </div>
+      <a
+        href={SERVICE_STATUS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={statusLinkStyle}
+      >
+        Check service status
+      </a>
     </div>
   );
 }

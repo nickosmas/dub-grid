@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { NotFoundBoundary } from "./RouteBoundary";
+import { SERVICE_STATUS_URL } from "@dubgrid/domain";
+import { ErrorBoundary, NotFoundBoundary } from "./RouteBoundary";
 
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 vi.mock("next/link", () => ({
@@ -26,5 +27,15 @@ describe("NotFoundBoundary navigation", () => {
       "data-client-link",
       "true",
     );
+  });
+});
+
+describe("ErrorBoundary", () => {
+  it("links to the status page in a new tab, which still loads when DubGrid is down", () => {
+    render(<ErrorBoundary error={new Error("boom")} reset={vi.fn()} />);
+    const link = screen.getByRole("link", { name: "Check service status" });
+    expect(link).toHaveAttribute("href", SERVICE_STATUS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 });

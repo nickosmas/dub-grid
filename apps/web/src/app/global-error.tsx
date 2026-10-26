@@ -1,5 +1,6 @@
 "use client";
 
+import { SERVICE_STATUS_URL } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { useEffect } from "react";
@@ -25,6 +26,9 @@ export default function GlobalError({
             We couldn&apos;t load DubGrid. Try again, and refresh the page if it keeps happening.
           </p>
           <Button onClick={reset}>Try Again</Button>
+          <a href={SERVICE_STATUS_URL} target="_blank" rel="noopener noreferrer">
+            Check service status
+          </a>
         </div>
       </body>
     </html>

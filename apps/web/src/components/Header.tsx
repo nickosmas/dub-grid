@@ -1,5 +1,5 @@
 "use client";
-import { ChevronDown, User } from "lucide-react";
+import { Activity, ChevronDown, User } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -34,6 +34,7 @@ import MobileNavSheet from "@/components/MobileNavSheet";
 import { queryKeys } from "@/lib/query-keys";
 import { getAvatarInitials } from "@/lib/utils";
 import { getAvatarTypography, getAvatarTone } from "@dubgrid/design-tokens";
+import { SERVICE_STATUS_URL } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
@@ -764,6 +765,16 @@ export default function Header({ orgName }: HeaderProps) {
                 </>
               )}
               <div className="dg-menu-divider" />
+              <a
+                className="dg-menu-item"
+                href={SERVICE_STATUS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Activity size={13} />
+                Service status
+              </a>
               <Button
                 className="dg-menu-item dg-menu-item--danger"
                 onClick={() => {
