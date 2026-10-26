@@ -89,7 +89,7 @@ test.describe("authentication release qualification", () => {
     const inactiveBanner = page.getByText("You're away.", { exact: true });
     // Away keeps the app as it is, so someone who never finished the
     // orientation gets it now, like anyone else.
-    const orientation = page.getByRole("button", { name: "Continue" });
+    const orientation = page.getByRole("button", { name: "Continue", exact: true });
     await Promise.race([
       termsHeading.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
       inactiveBanner.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
@@ -107,6 +107,9 @@ test.describe("authentication release qualification", () => {
       inactiveBanner.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
     ]);
     if (await orientation.isVisible()) {
+      // The cookie banner sits over the wizard's buttons until it's answered.
+      const essentialOnly = page.getByRole("button", { name: "Essential only" });
+      if (await essentialOnly.isVisible()) await essentialOnly.click();
       await orientation.click();
       await page.getByRole("button", { name: "Go to Dashboard" }).click();
     }
