@@ -167,6 +167,10 @@ describe("PersonDetailScreen", () => {
         roles: [{ id: 3, name: "Charge Nurse" }],
         certifications: [],
         departments: [{ id: 4, name: "North Wing" }],
+        absenceTypes: [
+          { id: 134, label: "V", name: "Vacation" },
+          { id: 135, label: "S", name: "Sick" },
+        ],
         permissions: {
           canManageEmployees: true,
           // `packages/authz` normalizes view from manage, so a real manager
@@ -1351,6 +1355,48 @@ describe("PersonDetailScreen", () => {
         expect(mutate.mock.calls[0]?.[0]).toMatchObject({
           action: "setReturnDate",
           returnDate: null,
+        });
+      });
+
+      it("fills the away days with an absence picked under the date", () => {
+        const mutate = renderWithStatusMutation();
+
+        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
+        // The absence needs a return date first.
+        expect(screen.queryByText("No absence")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+        choose(day(1));
+        fireEvent.click(screen.getByText("Vacation"));
+        expect(
+          screen.getByText(
+            `Every day until ${formatReturnDate(day(1))} shows Vacation in the draft, in place of any shift.`,
+          ),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
+
+        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+          action: "deactivate",
+          returnDate: day(1),
+          absenceTypeId: 134,
+        });
+      });
+
+      it("changes only the absence on an Away person's days", () => {
+        const mutate = renderWithStatusMutation({
+          status: "inactive",
+          awayUntil: day(2),
+          awayAbsenceTypeId: 134,
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
+        expect(screen.getAllByRole("button", { name: "Change return date" }).at(-1)).toBeDisabled();
+        fireEvent.click(screen.getByText("Sick"));
+        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
+
+        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+          action: "setReturnDate",
+          returnDate: day(2),
+          absenceTypeId: 135,
         });
       });
 

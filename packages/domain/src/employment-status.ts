@@ -48,6 +48,19 @@ export const NOT_AWAY_CODE = "NOT_AWAY";
 
 export const NOT_AWAY_MESSAGE = "Only someone who is away can have a return date.";
 
+export const AWAY_ABSENCE_INVALID_CODE = "AWAY_ABSENCE_INVALID";
+
+export const AWAY_ABSENCE_NEEDS_DATE_MESSAGE =
+  "Set a return date to fill their days with an absence.";
+
+export const AWAY_ABSENCE_UNKNOWN_MESSAGE = "Choose an absence your organization uses.";
+
+/** Whether a database error is migration 100 refusing an absence from elsewhere. */
+export function isAwayAbsenceRefusal(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && message.includes("Absence type not found");
+}
+
 /**
  * A return date is the first day back, so it must be a real day after the
  * organization's `today` (both YYYY-MM-DD).
@@ -147,13 +160,22 @@ export interface StatusActionOptions {
   returnDate?: string | null;
   /** Set return date: the person's current one, if any. */
   currentReturnDate?: string | null;
+  /** With a return date: the absence their away days hold (51f), by name. */
+  absenceName?: string | null;
+}
+
+/** The absence filling the away days, as one full sentence. */
+function awayAbsenceSentence(returnDate: string, absenceName: string): string {
+  return `Every day until ${formatReturnDate(returnDate)} shows ${absenceName} in the draft, in place of any shift.`;
 }
 
 /** What a return date changes before and after it, one full sentence each. */
-function returnDatePoints(returnDate: string): string[] {
+function returnDatePoints(returnDate: string, absenceName: string | null = null): string[] {
   const day = formatReturnDate(returnDate);
   return [
-    `Shifts before ${day} come off the schedule in the draft.`,
+    absenceName
+      ? awayAbsenceSentence(returnDate, absenceName)
+      : `Shifts before ${day} come off the schedule in the draft.`,
     `Recurring schedules pause and fill again from ${day}.`,
   ];
 }
@@ -162,6 +184,7 @@ function describeSetReturnDate(
   name: string,
   returnDate: string | null,
   currentReturnDate: string | null,
+  absenceName: string | null,
 ): StatusActionCopy {
   const changing = currentReturnDate !== null;
   const base = {
@@ -188,12 +211,14 @@ function describeSetReturnDate(
     ? {
         ...base,
         message: `They're back to Active on ${day}.`,
-        points: returnDatePoints(returnDate),
+        points: returnDatePoints(returnDate, absenceName),
         done: "Return date changed",
       }
     : {
         ...base,
-        message: `They're back to Active on ${day}, and can be scheduled from then.`,
+        message: absenceName
+          ? `They're back to Active on ${day}, and can be scheduled from then. ${awayAbsenceSentence(returnDate, absenceName)}`
+          : `They're back to Active on ${day}, and can be scheduled from then.`,
         points: [],
         done: "Return date set",
       };
@@ -207,7 +232,12 @@ function describeSetReturnDate(
 export function describeStatusAction(
   action: StatusAction,
   name: string,
-  { group = false, returnDate = null, currentReturnDate = null }: StatusActionOptions = {},
+  {
+    group = false,
+    returnDate = null,
+    currentReturnDate = null,
+    absenceName = null,
+  }: StatusActionOptions = {},
 ): StatusActionCopy {
   const leavingSchedule = [
     "Any upcoming shifts come off the schedule in the draft.",
@@ -226,7 +256,7 @@ export function describeStatusAction(
           message: `They won't be scheduled before ${formatReturnDate(returnDate, { weekday: true })}, when they're back to Active.`,
           points: [
             keepsAccess,
-            ...returnDatePoints(returnDate),
+            ...returnDatePoints(returnDate, absenceName),
             `Open requests for days before ${formatReturnDate(returnDate)} are closed.`,
           ],
           done: "Marked away",
@@ -240,7 +270,7 @@ export function describeStatusAction(
         done: "Marked away",
       };
     case "setReturnDate":
-      return describeSetReturnDate(name, returnDate, currentReturnDate);
+      return describeSetReturnDate(name, returnDate, currentReturnDate, absenceName);
     case "archive":
       return {
         label: "Archive",

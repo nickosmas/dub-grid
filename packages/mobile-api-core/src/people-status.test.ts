@@ -39,12 +39,30 @@ function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expect
     updateEmployeeStatus: vi.fn(
       async (
         _client: SupabaseClient,
-        input: { status: Employee["status"]; awayUntil: string | null },
-      ) => employee({ status: input.status, awayUntil: input.awayUntil, version: 2 }),
+        input: {
+          status: Employee["status"];
+          awayUntil: string | null;
+          awayAbsenceTypeId: number | null;
+        },
+      ) =>
+        employee({
+          status: input.status,
+          awayUntil: input.awayUntil,
+          awayAbsenceTypeId: input.awayAbsenceTypeId,
+          version: 2,
+        }),
     ),
     updateEmployeeReturnDate: vi.fn(
-      async (_client: SupabaseClient, input: { awayUntil: string | null }) =>
-        employee({ ...current, awayUntil: input.awayUntil, version: 2 }),
+      async (
+        _client: SupabaseClient,
+        input: { awayUntil: string | null; awayAbsenceTypeId: number | null },
+      ) =>
+        employee({
+          ...current,
+          awayUntil: input.awayUntil,
+          awayAbsenceTypeId: input.awayAbsenceTypeId,
+          version: 2,
+        }),
     ),
     insertAuditLog: vi.fn(async () => undefined),
     mapEmployeeToMobilePerson: vi.fn(
@@ -144,6 +162,82 @@ describe("updateMobilePersonStatus with a return date", () => {
 
     await expect(result).resolves.toMatchObject({ kind: "invalid_return_date", code: "NOT_AWAY" });
     expect(deps.updateEmployeeReturnDate).not.toHaveBeenCalled();
+  });
+
+  it("marks someone away with an absence for their away days", async () => {
+    const { deps, result } = run(employee(), {
+      action: "deactivate",
+      returnDate: "2026-11-02",
+      absenceTypeId: 134,
+    });
+
+    await expect(result).resolves.toMatchObject({ kind: "updated" });
+    expect(deps.updateEmployeeStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ awayUntil: "2026-11-02", awayAbsenceTypeId: 134 }),
+    );
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ details: expect.objectContaining({ awayAbsenceTypeId: 134 }) }),
+    );
+  });
+
+  it("refuses an absence without a return date", async () => {
+    const { deps, result } = run(employee(), {
+      action: "deactivate",
+      returnDate: null,
+      absenceTypeId: 134,
+    });
+
+    await expect(result).resolves.toEqual({
+      kind: "invalid_return_date",
+      error: "Set a return date to fill their days with an absence.",
+      code: "AWAY_ABSENCE_INVALID",
+      status: 400,
+    });
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
+  });
+
+  it("keeps the absence when only the date moves, and records a change of absence", async () => {
+    const away = employee({ status: "inactive", awayUntil: "2026-11-02", awayAbsenceTypeId: 134 });
+
+    const moved = run(away, { action: "setReturnDate", returnDate: "2026-11-09" });
+    await expect(moved.result).resolves.toMatchObject({ kind: "updated" });
+    expect(moved.deps.updateEmployeeReturnDate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ awayAbsenceTypeId: 134 }),
+    );
+
+    const changed = run(away, {
+      action: "setReturnDate",
+      returnDate: "2026-11-02",
+      absenceTypeId: 135,
+    });
+    await expect(changed.result).resolves.toMatchObject({ kind: "updated" });
+    expect(changed.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        details: expect.objectContaining({ fromAwayAbsenceTypeId: 134, toAwayAbsenceTypeId: 135 }),
+      }),
+    );
+  });
+
+  it("answers 400 when the database refuses an absence from elsewhere", async () => {
+    const { deps, result } = run(employee(), {
+      action: "deactivate",
+      returnDate: "2026-11-02",
+      absenceTypeId: 999,
+    });
+    deps.updateEmployeeStatus.mockRejectedValueOnce({
+      code: "23514",
+      message: "Absence type not found in this organization",
+    });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "invalid_return_date",
+      code: "AWAY_ABSENCE_INVALID",
+      error: "Choose an absence your organization uses.",
+    });
   });
 
   it("clears the return date on Mark active", async () => {

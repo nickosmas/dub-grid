@@ -1101,7 +1101,7 @@
         while away, not archived, and fill again from the return date; the
         "Away until Jan 4" pill and the grid's Away bar, drawn like item
         52's absence runs.
-  - [ ] 51f. **An absence while away** - with a return date, an optional
+  - [x] 51f. **An absence while away** - with a return date, an optional
         absence type fills every day of the away range in the draft,
         replacing shifts, published with the period; those days are locked
         in the grid with an explanation, and changing the dates rewrites

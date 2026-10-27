@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { Employee } from "@/types";
+import type { AbsenceType, Employee } from "@/types";
 import { Button } from "@/components/Button";
 import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
+import CustomSelect from "@/components/CustomSelect";
 import {
   canMarkInactive,
   describeStatusAction,
@@ -18,10 +19,24 @@ export interface EmployeeStatusActionsProps {
   canEdit: boolean;
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
-  onDeactivate: (empId: string, note?: string, returnDate?: string) => void | Promise<unknown>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
   onActivate: (empId: string) => void | Promise<unknown>;
-  /** Sets, moves or clears (null) an Away person's return date; hidden when absent. */
-  onSetReturnDate?: (empId: string, returnDate: string | null) => void | Promise<unknown>;
+  /**
+   * Sets, moves or clears (null) an Away person's return date and the absence
+   * their days hold; hidden when absent.
+   */
+  onSetReturnDate?: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
+  /** Live absence types; with a return date, one can fill the away days (51f). */
+  absenceTypes?: readonly AbsenceType[];
   onRemove: (empId: string, note?: string) => void | Promise<unknown>;
   variant: "panel" | "page";
   /** Stretches the active button to fill its container, for an equal-width row of actions. */
@@ -68,6 +83,50 @@ function ReturnDateField({
   );
 }
 
+const NO_ABSENCE = 0;
+
+const AWAY_ABSENCE_HINT =
+  "Every day until they're back shows this absence in the draft. Leave it as No absence to keep those days empty.";
+
+function AwayAbsenceField({
+  value,
+  absenceTypes,
+  onChange,
+}: {
+  value: number;
+  absenceTypes: readonly AbsenceType[];
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 600,
+          color: "var(--dg-color-text-primary)",
+        }}
+      >
+        Absence
+      </span>
+      <CustomSelect
+        ariaLabel="Absence"
+        value={value}
+        options={[
+          { value: NO_ABSENCE, label: "No absence" },
+          ...absenceTypes.map((absenceType) => ({
+            value: absenceType.id,
+            label: absenceType.name,
+          })),
+        ]}
+        onChange={onChange}
+      />
+      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+        {AWAY_ABSENCE_HINT}
+      </span>
+    </div>
+  );
+}
+
 const NOTE_PLACEHOLDERS: Record<"markAway" | "archive", string> = {
   markAway: "Reason (optional) - e.g. Family leave",
   archive: "Reason (optional) - e.g. Left the company",
@@ -81,6 +140,7 @@ export function EmployeeStatusActions({
   onActivate,
   onRemove,
   onSetReturnDate,
+  absenceTypes = [],
   variant,
   fillWidth = false,
   stepUpOpen = false,
@@ -91,6 +151,7 @@ export function EmployeeStatusActions({
   const [confirming, setConfirming] = useState<ConfirmingAction | null>(null);
   const [note, setNote] = useState(employee.statusNote || "");
   const [returnDate, setReturnDate] = useState(employee.awayUntil ?? "");
+  const [absenceTypeId, setAbsenceTypeId] = useState(employee.awayAbsenceTypeId ?? NO_ABSENCE);
   // The confirmation unmounts while a step-up prompt shows, which drops its
   // own latch, so the pending state lives here to survive the round trip.
   const [pending, setPending] = useState(false);
@@ -111,12 +172,27 @@ export function EmployeeStatusActions({
     setConfirming(null);
     setNote(employee.statusNote || "");
     setReturnDate(employee.awayUntil ?? "");
+    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
   }
 
   function openConfirm(action: ConfirmingAction) {
     setReturnDate(employee.awayUntil ?? "");
+    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
     setConfirming(action);
   }
+
+  // The absence only applies with a return date, so it goes when the date does.
+  const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
+  const chosenAbsenceName =
+    absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId)?.name ?? null;
+  const absenceField =
+    returnDate && absenceTypes.length > 0 ? (
+      <AwayAbsenceField
+        value={chosenAbsenceTypeId ?? NO_ABSENCE}
+        absenceTypes={absenceTypes}
+        onChange={setAbsenceTypeId}
+      />
+    ) : null;
 
   // Self-action guard: you can't change your own status, so callers hide this
   // whole section rather than show it with nothing actionable inside.
@@ -145,9 +221,11 @@ export function EmployeeStatusActions({
     }
     if (confirming === "setReturnDate") {
       const currentReturnDate = employee.awayUntil ?? null;
+      const currentAbsenceTypeId = employee.awayAbsenceTypeId ?? null;
       const copy = describeStatusAction("setReturnDate", displayName, {
         returnDate: returnDate || null,
         currentReturnDate,
+        absenceName: chosenAbsenceName,
       });
       return (
         <ConfirmDialog
@@ -157,14 +235,20 @@ export function EmployeeStatusActions({
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {copy.message ? <span>{copy.message}</span> : null}
               <ReturnDateField value={returnDate} onChange={setReturnDate} />
+              {absenceField}
             </div>
           }
           summary={{ points: copy.points }}
           confirmLabel={copy.label}
-          confirmDisabled={(returnDate || null) === currentReturnDate}
+          confirmDisabled={
+            (returnDate || null) === currentReturnDate &&
+            chosenAbsenceTypeId === currentAbsenceTypeId
+          }
           variant="warning"
           onConfirm={async () => {
-            await runPending(() => onSetReturnDate?.(employee.id, returnDate || null));
+            await runPending(() =>
+              onSetReturnDate?.(employee.id, returnDate || null, chosenAbsenceTypeId),
+            );
             closeConfirm();
           }}
           onCancel={closeConfirm}
@@ -174,6 +258,7 @@ export function EmployeeStatusActions({
     const isArchive = confirming === "archive";
     const copy = describeStatusAction(confirming, displayName, {
       returnDate: isArchive ? null : returnDate || null,
+      absenceName: isArchive ? null : chosenAbsenceName,
     });
     return (
       <ConfirmDialog
@@ -191,6 +276,7 @@ export function EmployeeStatusActions({
               style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
             />
             {isArchive ? null : <ReturnDateField value={returnDate} onChange={setReturnDate} />}
+            {isArchive ? null : absenceField}
           </div>
         }
         summary={{ points: copy.points }}
@@ -205,7 +291,7 @@ export function EmployeeStatusActions({
             isArchive
               ? onRemove(employee.id, trimmedNote)
               : returnDate
-                ? onDeactivate(employee.id, trimmedNote, returnDate)
+                ? onDeactivate(employee.id, trimmedNote, returnDate, chosenAbsenceTypeId)
                 : onDeactivate(employee.id, trimmedNote),
           );
           closeConfirm();

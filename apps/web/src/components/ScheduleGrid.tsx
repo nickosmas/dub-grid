@@ -139,7 +139,7 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
-import { awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
+import { awayLockedHint, awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -2120,12 +2120,18 @@ const SectionBlock = memo(function SectionBlock({
               // cells below reuse them by index.
               // Someone away until a date (51e) has an Away bar on those days
               // from today on, and nothing else there.
+              const rowAwayUntil = awayReturnDate(emp);
               const rowAwayDays = buildRowAwayDays(
-                awayReturnDate(emp),
+                rowAwayUntil,
                 weekDates.map((date) => formatDateKey(date)),
                 todayKey,
                 splitAtIndex,
               );
+              const rowAwayHint = rowAwayUntil ? awayLockedHint(rowAwayUntil) : undefined;
+              const rowAwayAbsence =
+                emp.awayAbsenceTypeId != null
+                  ? (absenceTypeMap?.get(emp.awayAbsenceTypeId) ?? null)
+                  : null;
               const rowShiftLabels = weekDates.map((date, index) =>
                 rowAwayDays?.runs[index] ? null : shiftForKey(emp.id, date),
               );
@@ -2627,6 +2633,8 @@ const SectionBlock = memo(function SectionBlock({
                           data-absence-run-index={absenceRunDay?.runIndex}
                           data-away-run={awayRunDay?.position}
                           data-away-locked={isAwayLocked ? "true" : undefined}
+                          title={isAwayLocked ? rowAwayHint : undefined}
+                          aria-description={isAwayLocked ? rowAwayHint : undefined}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2711,6 +2719,11 @@ const SectionBlock = memo(function SectionBlock({
                             {awayRunDay?.position === "start" && (
                               <AwayRunBar
                                 runIndex={awayRunDay.runIndex}
+                                absenceName={
+                                  rowAwayAbsence
+                                    ? rowAwayAbsence.name || rowAwayAbsence.label
+                                    : null
+                                }
                                 length={awayRunDay.length}
                                 top={insetFromVisibleCellTop(4)}
                                 left={insetFromVisibleCellLeft(4)}

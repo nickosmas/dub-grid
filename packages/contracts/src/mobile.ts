@@ -989,6 +989,8 @@ export const mobilePersonSchema = z.object({
   statusNote: z.string().default(""),
   /** An Away person's first day back (YYYY-MM-DD), or null. */
   awayUntil: z.string().date().nullable().default(null),
+  /** The absence their away days hold, or null. */
+  awayAbsenceTypeId: z.number().int().nullable().default(null),
   userId: z.string().uuid().nullable().default(null),
   version: z.number().int().nonnegative().default(0),
   /**
@@ -1084,6 +1086,8 @@ export const mobilePersonStatusUpdateBodySchema = z.object({
   note: z.string().trim().max(500).optional(),
   /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
   returnDate: z.string().date().nullable().optional(),
+  /** The absence their away days hold, or null; left out of setReturnDate, it stays. */
+  absenceTypeId: z.number().int().positive().nullable().optional(),
 });
 
 export const mobilePersonStatusUpdateResponseSchema = z.object({

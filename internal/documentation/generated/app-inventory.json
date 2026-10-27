@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:15911ce8bc87764e3bafaf0e4709fa443cee91dba8a37adcb9e370a291f0e0fc",
+  "sourceDigest": "sha256:7bc38cbc17ace34420009af51ffbc398a0408cb46bcf95af257bd999fb23b6da",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4784,6 +4784,16 @@
       "sha256": "a870eba8c046887cdca0d158a47a60847486f3e51c2a08b1c8f0c7361a4e8c16",
       "source": {
         "path": "supabase/migrations/099_away_until.sql"
+      }
+    },
+    {
+      "id": "migration:100_away_absence.sql",
+      "version": "100",
+      "name": "away_absence",
+      "file": "100_away_absence.sql",
+      "sha256": "0bdc2d44dd8526cc033bdd53596a06692957f06751b5bc2815a8430b78bdb313",
+      "source": {
+        "path": "supabase/migrations/100_away_absence.sql"
       }
     }
   ],

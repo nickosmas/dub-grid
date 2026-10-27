@@ -1,7 +1,18 @@
+import { formatReturnDate } from "@dubgrid/domain";
 import { buildAbsenceRuns, type AbsenceRunDay } from "@dubgrid/schedule-core";
 import type { Employee } from "@/types";
 
 export const AWAY_RUN_LABEL = "Away";
+
+/** The away bar's label, naming the absence their days hold (51f) when there is one. */
+export function awayRunLabel(absenceName: string | null): string {
+  return absenceName ? `${AWAY_RUN_LABEL} · ${absenceName}` : AWAY_RUN_LABEL;
+}
+
+/** Why a locked away day can't be selected, and where to change it. */
+export function awayLockedHint(awayUntil: string): string {
+  return `Away until ${formatReturnDate(awayUntil, { weekday: true })}. Change the return date on their record to change these days.`;
+}
 
 type AwayFields = Pick<Employee, "status" | "awayUntil" | "archivedAt">;
 

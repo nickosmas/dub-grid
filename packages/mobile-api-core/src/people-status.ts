@@ -1,7 +1,11 @@
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
 import type { Employee } from "@dubgrid/domain";
 import {
+  AWAY_ABSENCE_INVALID_CODE,
+  AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
+  AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
+  isAwayAbsenceRefusal,
   isSelfAction,
   isValidReturnDate,
   NOT_AWAY_CODE,
@@ -58,6 +62,7 @@ type UpdateEmployeeStatus = (
     statusChangedAt: string;
     archivedAt?: string | null;
     awayUntil: string | null;
+    awayAbsenceTypeId: number | null;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -69,6 +74,7 @@ type UpdateEmployeeReturnDate = (
     employeeId: string;
     expectedVersion: number;
     awayUntil: string | null;
+    awayAbsenceTypeId: number | null;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -140,7 +146,8 @@ type PeopleStatusResult =
   | {
       kind: "invalid_return_date";
       error: string;
-      code: typeof RETURN_DATE_INVALID_CODE | typeof NOT_AWAY_CODE;
+      code:
+        typeof RETURN_DATE_INVALID_CODE | typeof NOT_AWAY_CODE | typeof AWAY_ABSENCE_INVALID_CODE;
       status: 400;
     }
   | {
@@ -234,10 +241,42 @@ export async function updateMobilePersonStatus(
     };
   }
 
-  if (input.body.action === "setReturnDate") {
-    return setReturnDate(auth, input, currentEmployee, returnDate, deps);
+  const absenceTypeId = input.body.absenceTypeId;
+  if (
+    absenceTypeId != null &&
+    (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
+    returnDate === null
+  ) {
+    return awayAbsenceInvalid(AWAY_ABSENCE_NEEDS_DATE_MESSAGE);
   }
 
+  try {
+    if (input.body.action === "setReturnDate") {
+      return await setReturnDate(auth, input, currentEmployee, returnDate, deps);
+    }
+    return await changeStatus(auth, input, currentEmployee, returnDate, deps);
+  } catch (error) {
+    if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
+    throw error;
+  }
+}
+
+function awayAbsenceInvalid(error: string): PeopleStatusResult {
+  return { kind: "invalid_return_date", error, code: AWAY_ABSENCE_INVALID_CODE, status: 400 };
+}
+
+async function changeStatus(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  returnDate: string | null,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
   // Removing staff already fully blocks login at the JWT hook regardless of
   // org_role, so removing the org's only super_admin here would lock the org
   // out just as surely as deleting their membership would — same guard as
@@ -290,6 +329,8 @@ export async function updateMobilePersonStatus(
     archivedAt:
       input.body.action === "activate" ? null : input.body.action === "remove" ? now : undefined,
     awayUntil: input.body.action === "deactivate" ? returnDate : null,
+    awayAbsenceTypeId:
+      input.body.action === "deactivate" ? (input.body.absenceTypeId ?? null) : null,
     updatedBy: auth.user.id,
   });
 
@@ -355,6 +396,9 @@ export async function updateMobilePersonStatus(
       toStatus: updatedEmployee.status,
       note: input.body.note ?? "",
       ...(updatedEmployee.awayUntil ? { awayUntil: updatedEmployee.awayUntil } : {}),
+      ...(updatedEmployee.awayAbsenceTypeId
+        ? { awayAbsenceTypeId: updatedEmployee.awayAbsenceTypeId }
+        : {}),
       changedFields: ["status"],
     },
     ip_address: input.requestIp,
@@ -400,6 +444,10 @@ async function setReturnDate(
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
     awayUntil: returnDate,
+    awayAbsenceTypeId:
+      input.body.absenceTypeId === undefined
+        ? (currentEmployee.awayAbsenceTypeId ?? null)
+        : input.body.absenceTypeId,
     updatedBy: auth.user.id,
   });
 
@@ -435,6 +483,13 @@ async function setReturnDate(
     details: {
       fromAwayUntil: currentEmployee.awayUntil ?? null,
       toAwayUntil: returnDate,
+      ...((updatedEmployee.awayAbsenceTypeId ?? null) !==
+      (currentEmployee.awayAbsenceTypeId ?? null)
+        ? {
+            fromAwayAbsenceTypeId: currentEmployee.awayAbsenceTypeId ?? null,
+            toAwayAbsenceTypeId: updatedEmployee.awayAbsenceTypeId ?? null,
+          }
+        : {}),
       changedFields: ["away_until"],
     },
     ip_address: input.requestIp,

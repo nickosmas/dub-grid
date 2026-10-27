@@ -2508,6 +2508,34 @@ describe("ScheduleGrid", () => {
       expect(cells[3].getAttribute("aria-label")).toBe("Jamie Fox, Away on Wed, Jan 10");
     });
 
+    it("names the absence their away days hold, and explains a locked day (51f)", () => {
+      observedWidth = 1600;
+      const sick: AbsenceType = {
+        id: 9,
+        orgId: "org-1",
+        label: "S",
+        name: "Sick",
+        color: "#FECACA",
+        border: "#DC2626",
+        text: "#7F1D1D",
+        sortOrder: 2,
+      };
+      const withAbsence = people.map((person) =>
+        person.id === "emp-away" ? { ...person, awayAbsenceTypeId: sick.id } : person,
+      );
+      renderAway({
+        filteredEmployees: withAbsence,
+        allEmployees: withAbsence,
+        absenceTypeMap: new Map([[sick.id, sick]]),
+      });
+
+      expect(screen.getAllByText("Away · Sick")).toHaveLength(2);
+      expect(cellsOf("emp-away")[3].getAttribute("title")).toBe(
+        "Away until Wed, Jan 17. Change the return date on their record to change these days.",
+      );
+      expect(cellsOf("emp-away")[10].getAttribute("title")).toBeNull();
+    });
+
     it("keeps away days out of editing and the return date on", () => {
       observedWidth = 1600;
       const onActivateCell = vi.fn();

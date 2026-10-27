@@ -492,7 +492,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     });
 
   const handleDeactivate = useCallback(
-    async (empId: string, note?: string, accessToken?: string, returnDate?: string) => {
+    async (
+      empId: string,
+      note?: string,
+      accessToken?: string,
+      returnDate?: string,
+      absenceTypeId?: number | null,
+    ) => {
       if (!orgId || !employee) return false;
       setEmployee((prev) =>
         prev
@@ -501,13 +507,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               status: "inactive" as const,
               statusNote: note ?? "",
               awayUntil: returnDate ?? null,
+              awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
               statusChangedAt: new Date().toISOString(),
             }
           : prev,
       );
       try {
         const updatedEmployee = await (returnDate
-          ? deactivateEmployee(empId, note, orgId, employee.version, accessToken, returnDate)
+          ? deactivateEmployee(
+              empId,
+              note,
+              orgId,
+              employee.version,
+              accessToken,
+              returnDate,
+              absenceTypeId,
+            )
           : deactivateEmployee(empId, note, orgId, employee.version, accessToken));
         syncEmployeeCaches(updatedEmployee);
         toast.success("Marked away");
@@ -520,14 +535,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         // Revert on failure
         setEmployee((prev) =>
-          prev ? { ...prev, status: "active" as const, statusNote: "", awayUntil: null } : prev,
+          prev
+            ? {
+                ...prev,
+                status: "active" as const,
+                statusNote: "",
+                awayUntil: null,
+                awayAbsenceTypeId: null,
+              }
+            : prev,
         );
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't update their status. Try again.");
+        toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
         return false;
       }
     },
@@ -571,7 +594,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleSetReturnDate = useCallback(
-    async (empId: string, returnDate: string | null) => {
+    async (empId: string, returnDate: string | null, absenceTypeId?: number | null) => {
       if (!orgId || !employee) return;
       try {
         const updatedEmployee = await setEmployeeReturnDate(
@@ -579,6 +602,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           orgId,
           employee.version,
           returnDate,
+          absenceTypeId ?? null,
         );
         syncEmployeeCaches(updatedEmployee);
         toast.success(returnDate ? "Return date saved" : "Return date cleared");
@@ -1085,15 +1109,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     employee={employee}
                     canEdit={perms.canManageEmployees}
                     isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                    onDeactivate={(empId, note, returnDate) =>
+                    onDeactivate={(empId, note, returnDate, absenceTypeId) =>
                       runStatusChange((token) =>
                         returnDate
-                          ? handleDeactivate(empId, note, token, returnDate)
+                          ? handleDeactivate(empId, note, token, returnDate, absenceTypeId)
                           : handleDeactivate(empId, note, token),
                       )
                     }
                     onActivate={handleActivate}
                     onSetReturnDate={handleSetReturnDate}
+                    absenceTypes={absenceTypes}
                     onRemove={(empId, note) =>
                       runStatusChange((token) => handleRemove(empId, note, token))
                     }

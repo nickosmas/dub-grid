@@ -316,6 +316,7 @@ async function updateEmployeeStatus(
     expectedVersion: number;
     note?: string;
     returnDate?: string | null;
+    absenceTypeId?: number | null;
   },
   accessToken?: string,
 ): Promise<Employee> {
@@ -382,6 +383,7 @@ export function deactivateEmployee(
   expectedVersion: number,
   accessToken?: string,
   returnDate?: string | null,
+  absenceTypeId?: number | null,
 ): Promise<Employee> {
   return updateEmployeeStatus(
     {
@@ -391,17 +393,22 @@ export function deactivateEmployee(
       note,
       expectedVersion,
       ...(returnDate ? { returnDate } : {}),
+      ...(returnDate && absenceTypeId ? { absenceTypeId } : {}),
     },
     accessToken,
   );
 }
 
-/** Sets, moves or clears (null) an Away person's return date. */
+/**
+ * Sets, moves or clears (null) an Away person's return date, and the absence
+ * their away days hold (null for none).
+ */
 export function setEmployeeReturnDate(
   empId: string,
   orgId: string,
   expectedVersion: number,
   returnDate: string | null,
+  absenceTypeId: number | null = null,
 ): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
@@ -409,6 +416,7 @@ export function setEmployeeReturnDate(
     action: "setReturnDate",
     expectedVersion,
     returnDate,
+    absenceTypeId: returnDate ? absenceTypeId : null,
   });
 }
 

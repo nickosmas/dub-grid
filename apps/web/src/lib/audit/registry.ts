@@ -481,18 +481,21 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const until = d.date("awayUntil");
       return `Marked ${who(d, ctx, "a team member")} away${until ? ` until ${until}` : ""}${note ? `: ${note}` : ""}`;
     },
-    suppressKeys: ["note", "awayUntil"],
+    suppressKeys: ["note", "awayUntil", "awayAbsenceTypeId"],
   },
   "employee.return_date_changed": {
     category: "people",
     severity: "update",
     headline: (d, ctx) => {
       const until = d.date("toAwayUntil");
+      if (until && until === d.date("fromAwayUntil")) {
+        return `Changed the absence on ${who(d, ctx, "a team member")}'s away days`;
+      }
       return until
         ? `Set ${who(d, ctx, "a team member")} to return ${until}`
         : `Cleared ${who(d, ctx, "a team member")}'s return date`;
     },
-    suppressKeys: ["fromAwayUntil", "toAwayUntil"],
+    suppressKeys: ["fromAwayUntil", "toAwayUntil", "fromAwayAbsenceTypeId", "toAwayAbsenceTypeId"],
   },
   "employee.activated": {
     category: "people",

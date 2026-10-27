@@ -46,6 +46,7 @@ import {
   mergeEmployeeIntoDirectoryPerson,
 } from "@/lib/staff-directory";
 import type {
+  AbsenceType,
   AdminPermissions,
   Department,
   DirectoryPerson,
@@ -152,9 +153,16 @@ export interface MembersSectionProps {
     empId: string,
     note?: string,
     returnDate?: string | null,
+    absenceTypeId?: number | null,
   ) => void | Promise<boolean>;
-  /** Sets, moves or clears (null) an Away person's return date. */
-  onSetReturnDate?: (empId: string, returnDate: string | null) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  onSetReturnDate?: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
+  /** Live absence types, offered for an Away person's days. */
+  absenceTypes?: readonly AbsenceType[];
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
@@ -188,6 +196,7 @@ export function MembersSection({
   onRemove,
   onDeactivate,
   onSetReturnDate,
+  absenceTypes,
   statusStepUpOpen = false,
   onActivate,
   onAdd,
@@ -2185,10 +2194,11 @@ export function MembersSection({
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}
-          onDeactivate={(employeeId, note, returnDate) =>
-            onDeactivate(employeeId, note, returnDate)
+          onDeactivate={(employeeId, note, returnDate, absenceTypeId) =>
+            onDeactivate(employeeId, note, returnDate, absenceTypeId)
           }
           onSetReturnDate={onSetReturnDate}
+          absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}

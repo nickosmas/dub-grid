@@ -268,6 +268,7 @@ describe("mobile people route", () => {
         statusChangedAt: "2026-04-20T12:00:00.000Z",
         statusNote: "",
         awayUntil: null,
+        awayAbsenceTypeId: null,
         userId: null,
         version: 7,
         membershipUpdatedAt: null,

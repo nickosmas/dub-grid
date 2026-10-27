@@ -272,6 +272,8 @@ export default function PersonDetailScreen() {
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
   const [returnDate, setReturnDate] = useState<string | null>(null);
+  // The absence a return date's away days hold (51f); it goes when the date does.
+  const [awayAbsenceTypeId, setAwayAbsenceTypeId] = useState<number | null>(null);
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
   const [showOrgRole, setShowOrgRole] = useState(false);
@@ -468,6 +470,7 @@ export default function PersonDetailScreen() {
       action: "deactivate" | "activate" | "remove" | "setReturnDate";
       note?: string;
       returnDate?: string | null;
+      absenceTypeId?: number | null;
       expectedVersion: number;
       /** Only names the done toast: Restored rather than Marked active. */
       fromStatus: MobilePerson["status"];
@@ -478,6 +481,7 @@ export default function PersonDetailScreen() {
         expectedVersion: input.expectedVersion,
         note: input.note,
         ...(input.returnDate !== undefined ? { returnDate: input.returnDate } : {}),
+        ...(input.absenceTypeId !== undefined ? { absenceTypeId: input.absenceTypeId } : {}),
       }),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
@@ -490,6 +494,7 @@ export default function PersonDetailScreen() {
       setConfirmAction(null);
       setInactiveNote("");
       setReturnDate(null);
+      setAwayAbsenceTypeId(null);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
@@ -896,6 +901,10 @@ export default function PersonDetailScreen() {
           : confirmAction === "deactivate" && returnDate
             ? returnDate
             : undefined,
+      absenceTypeId:
+        confirmAction === "setReturnDate" || (confirmAction === "deactivate" && returnDate)
+          ? chosenAbsenceTypeId
+          : undefined,
     };
     return new Promise<void>((resolve) => {
       statusMutation.mutate(input, { onSettled: () => resolve() });
@@ -909,6 +918,7 @@ export default function PersonDetailScreen() {
     // here stops the next status change opening with the last one's reason.
     setInactiveNote("");
     setReturnDate(null);
+    setAwayAbsenceTypeId(null);
   }
 
   function confirmInvitationAction(): Promise<void> | undefined {
@@ -921,6 +931,26 @@ export default function PersonDetailScreen() {
     });
   }
 
+  const absenceTypes = bootstrapQuery.data?.absenceTypes ?? [];
+  const chosenAbsenceTypeId = returnDate ? awayAbsenceTypeId : null;
+  const chosenAbsence = absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId);
+  const chosenAbsenceName = chosenAbsence ? (chosenAbsence.name ?? chosenAbsence.label) : null;
+  const awayAbsenceChoices =
+    returnDate && absenceTypes.length > 0 ? (
+      <ProfileChoiceGroup
+        items={[
+          { id: -1, name: "No absence" },
+          ...absenceTypes.map((absenceType) => ({
+            id: absenceType.id,
+            name: absenceType.name ?? absenceType.label,
+          })),
+        ]}
+        label="Absence"
+        selection="single"
+        selectedIds={[chosenAbsenceTypeId ?? -1]}
+        onToggle={(id) => setAwayAbsenceTypeId(id === -1 ? null : id)}
+      />
+    ) : null;
   const statusCopy = confirmAction
     ? describeStatusAction(
         confirmAction === "activate"
@@ -932,7 +962,11 @@ export default function PersonDetailScreen() {
               : "archive",
         getFullName(person),
         confirmAction === "deactivate" || confirmAction === "setReturnDate"
-          ? { returnDate, currentReturnDate: person.awayUntil }
+          ? {
+              returnDate,
+              currentReturnDate: person.awayUntil,
+              absenceName: chosenAbsenceName,
+            }
           : {},
       )
     : null;
@@ -1379,6 +1413,7 @@ export default function PersonDetailScreen() {
                   }
                   onPress={() => {
                     setReturnDate(person.awayUntil);
+                    setAwayAbsenceTypeId(person.awayAbsenceTypeId ?? null);
                     setConfirmationError(null);
                     setConfirmAction("setReturnDate");
                   }}
@@ -1507,6 +1542,7 @@ export default function PersonDetailScreen() {
             value={returnDate}
           />
         ) : null}
+        {confirmAction === "deactivate" ? awayAbsenceChoices : null}
         {statusCopy && confirmAction !== "activate" ? (
           <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}
@@ -1531,7 +1567,10 @@ export default function PersonDetailScreen() {
             <SheetActions
               primaryAction={
                 <Button
-                  disabled={returnDate === person.awayUntil}
+                  disabled={
+                    returnDate === person.awayUntil &&
+                    chosenAbsenceTypeId === (person.awayAbsenceTypeId ?? null)
+                  }
                   label={statusCopy?.label ?? ""}
                   loading={statusMutation.isPending}
                   onPress={confirmStatusAction}
@@ -1558,6 +1597,7 @@ export default function PersonDetailScreen() {
             value={returnDate}
           />
         ) : null}
+        {confirmAction === "setReturnDate" ? awayAbsenceChoices : null}
         {confirmAction === "setReturnDate" && statusCopy && statusCopy.points.length > 0 ? (
           <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}

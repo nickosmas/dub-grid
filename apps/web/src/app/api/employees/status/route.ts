@@ -14,7 +14,11 @@ import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS, cacheDel, CacheKey } from "@/lib/db/shared";
 import {
+  AWAY_ABSENCE_INVALID_CODE,
+  AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
+  AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
+  isAwayAbsenceRefusal,
   isValidReturnDate,
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
@@ -39,6 +43,11 @@ const bodySchema = z.object({
   note: z.string().optional(),
   /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
   returnDate: z.string().date().nullable().optional(),
+  /**
+   * Mark away and setReturnDate: the absence their away days hold (51f), or
+   * null for none. Left out of setReturnDate, the current one stays.
+   */
+  absenceTypeId: z.number().int().positive().nullable().optional(),
 });
 
 async function fetchOrgToday(serviceClient: SupabaseClient, orgId: string): Promise<string> {
@@ -109,6 +118,7 @@ export async function POST(req: NextRequest) {
 
   const { empId, action, expectedVersion, note } = parsed.data;
   const returnDate = parsed.data.returnDate ?? null;
+  const absenceTypeId = parsed.data.absenceTypeId;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -196,6 +206,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      absenceTypeId != null &&
+      (action === "deactivate" || action === "setReturnDate") &&
+      returnDate === null
+    ) {
+      return NextResponse.json(
+        { error: AWAY_ABSENCE_NEEDS_DATE_MESSAGE, code: AWAY_ABSENCE_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
     // Removing staff already fully blocks login at the JWT hook regardless of
     // org_role (see 002_functions_triggers.sql), so removing the org's only
     // super_admin here would lock the org out just as surely as deleting their
@@ -246,20 +267,30 @@ export async function POST(req: NextRequest) {
         update.status = "inactive";
         update.status_note = note ?? "";
         update.away_until = returnDate;
+        update.away_absence_type_id = absenceTypeId ?? null;
         auditAction = "employee.deactivated";
         auditDetails = {
           ...auditDetails,
           toStatus: "inactive",
           note: note ?? "",
           ...(returnDate ? { awayUntil: returnDate } : {}),
+          ...(absenceTypeId ? { awayAbsenceTypeId: absenceTypeId } : {}),
         };
         break;
       case "setReturnDate":
         update.away_until = returnDate;
+        if (absenceTypeId !== undefined) update.away_absence_type_id = absenceTypeId;
         auditAction = "employee.return_date_changed";
         auditDetails = {
           fromAwayUntil: currentEmployee.awayUntil ?? null,
           toAwayUntil: returnDate,
+          ...(absenceTypeId !== undefined &&
+          absenceTypeId !== (currentEmployee.awayAbsenceTypeId ?? null)
+            ? {
+                fromAwayAbsenceTypeId: currentEmployee.awayAbsenceTypeId ?? null,
+                toAwayAbsenceTypeId: absenceTypeId,
+              }
+            : {}),
         };
         break;
       case "activate":
@@ -295,7 +326,15 @@ export async function POST(req: NextRequest) {
       .select(EMPLOYEE_COLS)
       .maybeSingle();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      if (isAwayAbsenceRefusal(updateError)) {
+        return NextResponse.json(
+          { error: AWAY_ABSENCE_UNKNOWN_MESSAGE, code: AWAY_ABSENCE_INVALID_CODE },
+          { status: 400 },
+        );
+      }
+      throw updateError;
+    }
 
     if (!updatedRow) {
       const { data: latestRow, error: latestError } = await serviceClient

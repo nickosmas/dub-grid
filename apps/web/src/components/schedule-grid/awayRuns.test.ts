@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { awayReturnDate, buildRowAwayDays, isOnScheduleGrid } from "./awayRuns";
+import {
+  awayLockedHint,
+  awayReturnDate,
+  awayRunLabel,
+  buildRowAwayDays,
+  isOnScheduleGrid,
+} from "./awayRuns";
 
 const period = { lastDateKey: "2026-11-07", todayKey: "2026-11-02" };
 const week = [
@@ -89,5 +95,20 @@ describe("buildRowAwayDays", () => {
     expect(away?.runs[7]).toMatchObject({ runIndex: 1, start: 7, length: 2, position: "start" });
     expect(away?.runs[8]).toMatchObject({ runIndex: 1, position: "end" });
     expect(away?.runs[9]).toBeNull();
+  });
+});
+
+describe("awayRunLabel", () => {
+  it("names the absence the away days hold, or just Away", () => {
+    expect(awayRunLabel("Vacation")).toBe("Away · Vacation");
+    expect(awayRunLabel(null)).toBe("Away");
+  });
+});
+
+describe("awayLockedHint", () => {
+  it("names the return date and where to change it", () => {
+    expect(awayLockedHint("2026-11-06")).toBe(
+      "Away until Fri, Nov 6. Change the return date on their record to change these days.",
+    );
   });
 });

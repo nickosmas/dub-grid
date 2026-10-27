@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
-import type { Employee } from "@/types";
+import type { AbsenceType, Employee } from "@/types";
 
 const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
@@ -47,14 +47,49 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-function renderActions(employee: Employee, variant: "panel" | "page" = "panel") {
+const ABSENCE_TYPES: AbsenceType[] = [
+  {
+    id: 134,
+    orgId: "org-1",
+    label: "V",
+    name: "Vacation",
+    color: "",
+    border: "",
+    text: "",
+    sortOrder: 0,
+  },
+  {
+    id: 135,
+    orgId: "org-1",
+    label: "S",
+    name: "Sick",
+    color: "",
+    border: "",
+    text: "",
+    sortOrder: 1,
+  },
+];
+
+function renderActions(
+  employee: Employee,
+  variant: "panel" | "page" = "panel",
+  absenceTypes: AbsenceType[] = [],
+) {
   const handlers = {
     onDeactivate: vi.fn(),
     onActivate: vi.fn(),
     onRemove: vi.fn(),
     onSetReturnDate: vi.fn(),
   };
-  render(<EmployeeStatusActions employee={employee} canEdit variant={variant} {...handlers} />);
+  render(
+    <EmployeeStatusActions
+      employee={employee}
+      canEdit
+      variant={variant}
+      absenceTypes={absenceTypes}
+      {...handlers}
+    />,
+  );
   return handlers;
 }
 
@@ -173,7 +208,7 @@ describe("EmployeeStatusActions", () => {
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Mark away" }));
 
-    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, day.key);
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, day.key, null);
   });
 
   it("changes an Away person's return date next to Mark active", async () => {
@@ -195,7 +230,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: day.label }));
     await user.click(within(dialog).getByRole("button", { name: "Change return date" }));
 
-    expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", day.key);
+    expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", day.key, null);
     expect(onActivate).not.toHaveBeenCalled();
   });
 
@@ -215,7 +250,50 @@ describe("EmployeeStatusActions", () => {
       within(dialog).getByText("They stay away until someone marks them active."),
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Change return date" }));
-    expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", null);
+    expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", null, null);
+  });
+
+  it("fills the away days with an absence chosen beside the return date", async () => {
+    const user = userEvent.setup();
+    const { onDeactivate } = renderActions(makeEmployee(), "panel", ABSENCE_TYPES);
+    const day = dayFromToday(1);
+
+    await user.click(screen.getByRole("button", { name: "Mark away" }));
+    const dialog = screen.getByRole("dialog", { name: "Mark Alice Smith away?" });
+    // The absence needs a return date first.
+    expect(within(dialog).queryByRole("button", { name: "Absence" })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Return date" }));
+    await user.click(screen.getByRole("button", { name: day.label }));
+    await user.click(within(dialog).getByRole("button", { name: "Absence" }));
+    await user.click(screen.getByRole("option", { name: "Vacation" }));
+
+    expect(
+      within(dialog).getByText(
+        /^Every day until .* shows Vacation in the draft, in place of any shift\.$/,
+      ),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Mark away" }));
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, day.key, 134);
+  });
+
+  it("changes only the absence on an Away person's days", async () => {
+    const user = userEvent.setup();
+    const { onSetReturnDate } = renderActions(
+      makeEmployee({ status: "inactive", awayUntil: "2099-01-05", awayAbsenceTypeId: 134 }),
+      "page",
+      ABSENCE_TYPES,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Change return date" }));
+    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's return date?" });
+    expect(within(dialog).getByRole("button", { name: "Change return date" })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Absence" }));
+    await user.click(screen.getByRole("option", { name: "Sick" }));
+    await user.click(within(dialog).getByRole("button", { name: "Change return date" }));
+
+    expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", "2099-01-05", 135);
   });
 
   it("offers Set return date to someone away without one", () => {

@@ -361,10 +361,12 @@ Item 51 is split:
   recurring schedules pause while away and fill again from the return date;
   "Away until Jan 4" shows on pills and the record, and the grid draws their
   away days as one Away bar per week (migration 099).
-- **51f - An absence while away:** with a return date, an optional absence
-  type fills every day of the away range in the draft, replacing shifts,
-  published with the period; those days are locked in the grid with an
-  explanation, and changing the dates rewrites them.
+- **51f - An absence while away:** shipped; with a return date, Mark away
+  and Change return date offer an absence (web and mobile) that fills every
+  day from today to the return date in the draft, over any shift, and
+  publishes with the period. The grid's bar reads "Away · Vacation" and a
+  locked day says why; moving the date, changing or clearing the absence, or
+  marking them active early rewrites the days (migration 100).
 - **51g - Last day:** "Leaving Nov 8", shifts after it come off in the
   draft, nobody can schedule them past it, and a daily job archives them the
   day after; the Suspend dialog can set one.
@@ -580,7 +582,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `099`.
+  checksum-locked through `100`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

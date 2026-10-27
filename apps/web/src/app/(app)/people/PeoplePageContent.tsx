@@ -135,10 +135,10 @@ function PeopleContent() {
             onRemove={(empId, note) =>
               runStatusChange((token) => handleRemoveEmployee(empId, note, token))
             }
-            onDeactivate={(empId, note, returnDate) =>
+            onDeactivate={(empId, note, returnDate, absenceTypeId) =>
               runStatusChange((token) =>
                 returnDate
-                  ? handleDeactivateEmployee(empId, note, token, returnDate)
+                  ? handleDeactivateEmployee(empId, note, token, returnDate, absenceTypeId)
                   : handleDeactivateEmployee(empId, note, token),
               )
             }

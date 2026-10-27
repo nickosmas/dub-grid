@@ -51,10 +51,15 @@ export interface EmployeesData {
     note?: string,
     accessToken?: string,
     returnDate?: string | null,
+    absenceTypeId?: number | null,
   ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
-  /** Sets, moves or clears (null) an Away person's return date. */
-  handleSetEmployeeReturnDate: (empId: string, returnDate: string | null) => Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  handleSetEmployeeReturnDate: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => Promise<boolean>;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -304,7 +309,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleDeactivateEmployee = useCallback(
-    async (empId: string, note?: string, accessToken?: string, returnDate?: string | null) => {
+    async (
+      empId: string,
+      note?: string,
+      accessToken?: string,
+      returnDate?: string | null,
+      absenceTypeId?: number | null,
+    ) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
 
@@ -317,6 +328,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
                 status: "inactive" as const,
                 statusNote: note ?? "",
                 awayUntil: returnDate ?? null,
+                awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
                 statusChangedAt: new Date().toISOString(),
               }
             : e,
@@ -324,7 +336,15 @@ export function useEmployees(orgId: string | null): EmployeesData {
       );
       try {
         const updatedEmployee = await (returnDate
-          ? deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken, returnDate)
+          ? deactivateEmployee(
+              empId,
+              note,
+              orgId,
+              targetEmployee.version,
+              accessToken,
+              returnDate,
+              absenceTypeId,
+            )
           : deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken));
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Marked away");
@@ -342,7 +362,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't update their status. Try again.");
+        toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -394,7 +414,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleSetEmployeeReturnDate = useCallback(
-    async (empId: string, returnDate: string | null) => {
+    async (empId: string, returnDate: string | null, absenceTypeId?: number | null) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
       try {
@@ -403,6 +423,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           orgId,
           targetEmployee.version,
           returnDate,
+          absenceTypeId ?? null,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success(returnDate ? "Return date saved" : "Return date cleared");

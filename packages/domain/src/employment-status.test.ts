@@ -215,8 +215,36 @@ describe("describeStatusAction with a return date", () => {
     expect(copy.done).toBe("Return date cleared");
   });
 
+  it("names the absence that fills the away days", () => {
+    const options = { returnDate: RETURN, absenceName: "Vacation" };
+
+    expect(describeStatusAction("markAway", "Ana Torres", options).points).toEqual([
+      "They can still sign in and keep their role.",
+      "Every day until Jan 4 shows Vacation in the draft, in place of any shift.",
+      "Recurring schedules pause and fill again from Jan 4.",
+      "Open requests for days before Jan 4 are closed.",
+    ]);
+    expect(describeStatusAction("setReturnDate", "Ana Torres", options)).toMatchObject({
+      message:
+        "They're back to Active on Mon, Jan 4, and can be scheduled from then. Every day until Jan 4 shows Vacation in the draft, in place of any shift.",
+      points: [],
+    });
+    expect(
+      describeStatusAction("setReturnDate", "Ana Torres", {
+        ...options,
+        currentReturnDate: RETURN,
+      }).points[0],
+    ).toBe("Every day until Jan 4 shows Vacation in the draft, in place of any shift.");
+  });
+
   it("follows the dialog rules for every return-date form", () => {
     const forms = [
+      describeStatusAction("markAway", "Ana Torres", { returnDate: RETURN, absenceName: "Sick" }),
+      describeStatusAction("setReturnDate", "Ana Torres", {
+        returnDate: "2027-01-11",
+        currentReturnDate: RETURN,
+        absenceName: "Sick",
+      }),
       describeStatusAction("markAway", "Ana Torres", { returnDate: RETURN }),
       describeStatusAction("setReturnDate", "Ana Torres", { returnDate: RETURN }),
       describeStatusAction("setReturnDate", "Ana Torres", {

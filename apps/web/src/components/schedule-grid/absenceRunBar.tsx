@@ -1,7 +1,7 @@
 import { absenceStripeCss, type AbsenceStripeColors } from "@dubgrid/design-tokens";
 import { formatAbsenceRunLabel } from "@dubgrid/schedule-core";
 import type { CSSProperties } from "react";
-import { AWAY_RUN_LABEL } from "./awayRuns";
+import { awayRunLabel } from "./awayRuns";
 import { gridFitLine } from "./gridFit";
 import { SINGLE_SHIFT_PILL_RADIUS } from "./gridHelpers";
 
@@ -84,10 +84,10 @@ function RunBarLabel({ children }: { children: string }) {
 /**
  * The days someone is away until their return date (51e), drawn like an
  * absence run but in neutral colors, since nothing is wrong. It is one label
- * across the stretch, with no count. The days can't be scheduled, so their
+ * across the stretch, with no count, naming the absence the days hold (51f). The days can't be scheduled, so their
  * cells hold nothing else.
  */
-export function AwayRunBar(props: RunBarFrame & { runIndex: number }) {
+export function AwayRunBar(props: RunBarFrame & { runIndex: number; absenceName?: string | null }) {
   return (
     <div
       className="dg-away-run"
@@ -100,7 +100,7 @@ export function AwayRunBar(props: RunBarFrame & { runIndex: number }) {
         color: "var(--dg-color-text-secondary)",
       }}
     >
-      <RunBarLabel>{AWAY_RUN_LABEL}</RunBarLabel>
+      <RunBarLabel>{awayRunLabel(props.absenceName ?? null)}</RunBarLabel>
     </div>
   );
 }
