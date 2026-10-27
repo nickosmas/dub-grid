@@ -1,4 +1,4 @@
-import { useMemo, type ComponentProps } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
@@ -14,7 +14,9 @@ import {
   type StatusState,
   type StatusTone,
 } from "@dubgrid/domain";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { Text } from "../../../shared/components/Text";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -166,6 +168,8 @@ export function StatusCards({
 }: StatusCardsProps) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const handoff = useModalHandoff();
   const absenceId =
     person.status === "inactive" ? person.awayAbsenceTypeId : person.plannedAbsenceTypeId;
   const absence = absenceTypes.find((absenceType) => absenceType.id === absenceId);
@@ -176,27 +180,35 @@ export function StatusCards({
   const colors = statusToneColors(mobileColors, current.tone);
   const warning = statusToneColors(mobileColors, "warning");
   // The change most people want next gets its own button (Reinstate, Mark
-  // active, Restore); the other button lists the rest, or names a lone one.
+  // active, Restore); a menu names each other change, and for someone Away
+  // their return date. Every one opens a confirmation for that change alone.
   const suggested = plain ? null : suggestedStatusChoice(person);
-  const rest = suggested
-    ? statusChoices(person).filter((choice) => choice.action !== suggested.action)
+  const away = person.status === "inactive" && !person.archivedAt;
+  const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested
+    ? [
+        ...(away
+          ? [
+              {
+                key: "details",
+                label: describeStatusAction("setReturnDate", "", {
+                  currentReturnDate: person.awayUntil ?? null,
+                  returnDate: person.awayUntil ?? null,
+                }).label,
+                opening: { focus: "plan" as const },
+              },
+            ]
+          : []),
+        ...statusChoices(person)
+          .filter((choice) => choice.action !== suggested.action)
+          .map((choice) => ({
+            key: choice.action,
+            label: describeStatusAction(choice.action, "").label,
+            opening: { only: choice.action },
+          })),
+      ]
     : [];
-  // Someone Away keeps Change status: it also edits their return date.
-  const nameLone = rest.length === 1 && person.status !== "inactive";
   const actions = !onChangeStatus ? null : suggested ? (
     <View style={styles.actions}>
-      {rest.length > 0 ? (
-        <View style={styles.action}>
-          <Button
-            disabled={disabled}
-            label={nameLone ? describeStatusAction(rest[0].action, "").label : "Change status"}
-            onPress={() =>
-              onChangeStatus(nameLone ? { only: rest[0].action } : { exclude: suggested.action })
-            }
-            tone="plain"
-          />
-        </View>
-      ) : null}
       <View style={styles.action}>
         <Button
           disabled={disabled}
@@ -205,6 +217,17 @@ export function StatusCards({
           tone="secondary"
         />
       </View>
+      {moreItems.length > 0 ? (
+        <Button
+          accessibilityLabel="More status changes"
+          disabled={disabled}
+          expanded={moreOpen}
+          icon="ellipsis-horizontal"
+          iconOnly
+          onPress={() => setMoreOpen(true)}
+          tone="secondary"
+        />
+      ) : null}
     </View>
   ) : (
     <Button
@@ -272,6 +295,29 @@ export function StatusCards({
             />
           ) : null}
         </View>
+      ) : null}
+      {onChangeStatus && moreItems.length > 0 ? (
+        <BottomSheetModal
+          debugName="More status changes"
+          header={<SheetHeader title="More status changes" />}
+          onDismiss={() => setMoreOpen(false)}
+          visible={moreOpen}
+        >
+          <View style={styles.stack}>
+            {moreItems.map((item) => (
+              <Button
+                key={item.key}
+                label={item.label}
+                onPress={() => {
+                  setMoreOpen(false);
+                  // The status sheet waits for this one to finish leaving.
+                  handoff(() => onChangeStatus(item.opening));
+                }}
+                tone="secondary"
+              />
+            ))}
+          </View>
+        </BottomSheetModal>
       ) : null}
     </View>
   );

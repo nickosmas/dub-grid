@@ -1601,7 +1601,9 @@ export default function PersonDetailScreen() {
             title={
               statusCopy?.title ??
               (statusOpening.focus === "plan"
-                ? `Change ${getFullName(person)}'s planned away?`
+                ? isAway
+                  ? `Change ${getFullName(person)}'s return date?`
+                  : `Change ${getFullName(person)}'s planned away?`
                 : `Change ${getFullName(person)}'s status?`)
             }
           />

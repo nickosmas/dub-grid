@@ -304,7 +304,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -1216,12 +1216,18 @@ describe("PersonDetailScreen", () => {
     const pick = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
     const confirm = (label: string) =>
       fireEvent.click(screen.getAllByRole("button", { name: label }).at(-1)!);
+    // The card's menu hands over to the status sheet once its own sheet has left.
+    const fromMore = async (label: string, sheetTitle: string) => {
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      await waitFor(() => expect(screen.getByText(sheetTitle)).toBeInTheDocument());
+    };
 
-    it("offers the likely change first, and Change status for the rest", () => {
+    it("offers the likely change first, and a menu for the rest", () => {
       for (const [person, buttons] of [
         [{}, ["Change status"]],
-        [{ status: "inactive" }, ["Change status", "Mark active"]],
-        [{ suspendedAt: "2026-10-26T12:00:00Z" }, ["Change status", "Reinstate"]],
+        [{ status: "inactive" }, ["Mark active", "More status changes"]],
+        [{ suspendedAt: "2026-10-26T12:00:00Z" }, ["Reinstate", "More status changes"]],
         [{ status: "removed" }, ["Restore"]],
       ] as const) {
         renderWithStatusMutation(person);
@@ -1248,17 +1254,17 @@ describe("PersonDetailScreen", () => {
       );
     });
 
-    it("lists only the other statuses behind a suspended person's Change status", () => {
-      renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+    it("names each other change in a suspended person's menu, each with its own sheet", async () => {
+      const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+      await waitFor(() => expect(screen.getByText("Archive Mina Diaz?")).toBeInTheDocument());
+      expect(screen.queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
+      confirm("Archive");
 
-      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
-        [
-          "Away. Keeps sign-in. Not scheduled while away.",
-          "Archived. Off staff. Can't sign in or be scheduled.",
-        ],
-      );
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ copyAction: "archive" });
     });
 
     it("says where they stand and lists only where they can go", () => {
@@ -1512,10 +1518,11 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("changes an Away person's return date with nothing picked, as Save changes", () => {
+    it("changes an Away person's return date from the menu, as Save changes", async () => {
       const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      await fromMore("Change return date", "Change Mina Diaz's return date?");
+      expect(screen.queryByRole("radio", { name: /^Archived/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
       choose(day(2));
@@ -1528,14 +1535,14 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("changes only the absence on an Away person's days", () => {
+    it("changes only the absence on an Away person's days", async () => {
       const mutate = renderWithStatusMutation({
         status: "inactive",
         awayUntil: day(2),
         awayAbsenceTypeId: 134,
       });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      await fromMore("Change return date", "Change Mina Diaz's return date?");
       fireEvent.click(screen.getByRole("radio", { name: "Sick" }));
       confirm("Save changes");
 

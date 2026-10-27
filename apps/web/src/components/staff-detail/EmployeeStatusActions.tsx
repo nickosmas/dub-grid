@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AbsenceType, Employee } from "@/types";
 import { Button } from "@/components/Button";
 import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import ConfirmDialog, { ConfirmSummaryBox } from "@/components/ConfirmDialog";
+import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedAway } from "@/features/employees/client";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Ellipsis } from "lucide-react";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
@@ -65,6 +66,12 @@ export interface EmployeeStatusActionsProps {
    * Change status the list alone, so the two never offer the same thing.
    */
   focus?: "plan" | "status";
+  /**
+   * Opens the dialog at once with no button of its own, for a menu item that
+   * names its change; `onClosed` lets the menu's owner unmount it.
+   */
+  startOpen?: boolean;
+  onClosed?: () => void;
   /** Stretches the button to fill its container, for an equal-width row of actions. */
   fillWidth?: boolean;
   /** Hides the confirmation while a step-up prompt asks for fresh proof. */
@@ -312,6 +319,8 @@ export function EmployeeStatusActions({
   initialChoice,
   excludeChoice,
   focus,
+  startOpen = false,
+  onClosed,
   fillWidth = false,
   stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
@@ -323,8 +332,10 @@ export function EmployeeStatusActions({
   const initialAbsenceTypeId =
     (hasPlan ? employee.plannedAbsenceTypeId : employee.awayAbsenceTypeId) ?? NO_ABSENCE;
   const initialStartDate = hasPlan ? (employee.plannedFrom ?? "") : "";
-  const [open, setOpen] = useState(false);
-  const [choice, setChoice] = useState<StatusAction | null>(null);
+  const [open, setOpen] = useState(startOpen);
+  const [choice, setChoice] = useState<StatusAction | null>(
+    startOpen ? (initialChoice ?? null) : null,
+  );
   const [note, setNote] = useState("");
   const [returnDate, setReturnDate] = useState(initialReturnDate);
   const [absenceTypeId, setAbsenceTypeId] = useState(initialAbsenceTypeId);
@@ -417,6 +428,7 @@ export function EmployeeStatusActions({
   function close() {
     setOpen(false);
     reset();
+    onClosed?.();
   }
 
   async function confirm() {
@@ -550,7 +562,9 @@ export function EmployeeStatusActions({
         title={
           copy?.title ??
           (focus === "plan"
-            ? `Change ${displayName}'s planned away?`
+            ? isAway
+              ? `Change ${displayName}'s return date?`
+              : `Change ${displayName}'s planned away?`
             : `Change ${displayName}'s status?`)
         }
         message={
@@ -639,6 +653,8 @@ export function EmployeeStatusActions({
       />
     ) : null;
 
+  if (startOpen) return dialog;
+
   return (
     <>
       <Button
@@ -666,16 +682,19 @@ export function EmployeeStatusActions({
 
 /**
  * The status card's buttons: the change most people want next (Reinstate,
- * Mark active, Restore) opens a confirmation for it alone, beside a quieter
- * Change status that lists the other statuses they can move to. Active people
- * get Change status alone.
+ * Mark active, Restore) as a button, and a menu naming each other change
+ * (Mark away, Archive, and for someone Away, Change return date). Every one
+ * opens a confirmation for that change alone. Active people get Change status.
  */
 export function StatusCardActions(
   props: Omit<
     EmployeeStatusActionsProps,
-    "variant" | "label" | "initialChoice" | "excludeChoice" | "focus"
+    "variant" | "label" | "initialChoice" | "excludeChoice" | "focus" | "startOpen" | "onClosed"
   >,
 ) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [opening, setOpening] = useState<MenuOpening | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   // Only changes this surface can make: one without a Reinstate handler offers no Reinstate.
   const offered = (action: StatusAction) =>
     (action !== "reinstate" || Boolean(props.onReinstate)) &&
@@ -683,31 +702,99 @@ export function StatusCardActions(
   const likely = suggestedStatusChoice(props.employee);
   const suggested = likely && offered(likely.action) ? likely : null;
   if (!suggested) return <EmployeeStatusActions {...props} variant="card" focus="status" />;
-  // Change status lists only what the suggested button doesn't. A lone
-  // remaining change is named on its button instead, except for someone Away,
-  // whose Change status also edits the return date and absence.
   const rest = statusChoices(props.employee).filter(
     (option) => option.action !== suggested.action && offered(option.action),
   );
   const away = props.employee.status === "inactive" && !props.employee.archivedAt;
+  const items: { key: string; label: string; open: MenuOpening }[] = [
+    ...(away && props.onSetReturnDate
+      ? [
+          {
+            key: "details",
+            label: describeStatusAction("setReturnDate", "", {
+              currentReturnDate: props.employee.awayUntil ?? null,
+              returnDate: props.employee.awayUntil ?? null,
+            }).label,
+            open: { details: true },
+          },
+        ]
+      : []),
+    ...rest.map((option) => ({
+      key: option.action,
+      label: describeStatusAction(option.action, "").label,
+      open: { choice: option.action },
+    })),
+  ];
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
-      {rest.length === 1 && !away ? (
-        <EmployeeStatusActions
-          {...props}
-          variant="card-quiet"
-          label={describeStatusAction(rest[0].action, "").label}
-          initialChoice={rest[0].action}
-        />
-      ) : rest.length > 0 ? (
-        <EmployeeStatusActions {...props} variant="card-quiet" excludeChoice={suggested.action} />
-      ) : null}
+    <div className="flex items-center justify-end gap-1">
       <EmployeeStatusActions
         {...props}
         variant="card"
         label={describeStatusAction(suggested.action, "").label}
         initialChoice={suggested.action}
       />
+      {items.length > 0 ? (
+        <>
+          <Button
+            ref={triggerRef}
+            aria-label="More status changes"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            <Ellipsis aria-hidden="true" size={16} />
+          </Button>
+          {menuOpen ? (
+            <Menu
+              open
+              onOpenChange={(next) => {
+                if (!next) setMenuOpen(false);
+              }}
+            >
+              <MenuContent
+                anchor={triggerRef}
+                side="bottom"
+                align="end"
+                sideOffset={6}
+                positionMethod="fixed"
+                collisionPadding={8}
+                finalFocus={triggerRef}
+                style={{ minWidth: 180 }}
+              >
+                {items.map((item) => (
+                  <MenuItem
+                    key={item.key}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setOpening(item.open);
+                    }}
+                  >
+                    {item.label}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </Menu>
+          ) : null}
+        </>
+      ) : null}
+      {opening ? (
+        // Mounted outside the menu, which unmounts as soon as an item is picked.
+        <EmployeeStatusActions
+          {...props}
+          variant="card"
+          startOpen
+          initialChoice={opening.choice}
+          focus={opening.details ? "plan" : undefined}
+          onClosed={() => setOpening(null)}
+        />
+      ) : null}
     </div>
   );
+}
+
+/** What a card menu item opens: one change, or an Away person's return date. */
+interface MenuOpening {
+  choice?: StatusAction;
+  details?: boolean;
 }

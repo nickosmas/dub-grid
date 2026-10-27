@@ -446,7 +446,12 @@ describe("EmployeeStatusActions", () => {
     expect(choices(dialog)).toHaveLength(2);
   });
 
-  it("offers Reinstate first on a suspended person's card, beside Change status", async () => {
+  const cardButtons = () =>
+    screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+
+  it("offers Reinstate first on a suspended person's card, with the rest in a menu", async () => {
     const user = userEvent.setup();
     const handlers = {
       onDeactivate: vi.fn(),
@@ -463,10 +468,7 @@ describe("EmployeeStatusActions", () => {
       />,
     );
 
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Change status",
-      "Reinstate",
-    ]);
+    expect(cardButtons()).toEqual(["Reinstate", "More status changes"]);
     await user.click(screen.getByRole("button", { name: "Reinstate" }));
     // Its own confirmation: no list, a sentence saying what it does.
     const dialog = screen.getByRole("dialog", { name: "Reinstate Alice Smith?" });
@@ -480,66 +482,56 @@ describe("EmployeeStatusActions", () => {
     expect(handlers.onReinstate).toHaveBeenCalledWith("emp-1");
   });
 
-  it("keeps the other statuses behind the card's Change status", async () => {
+  it("names each other change in the card's menu, and gives each its own confirmation", async () => {
     const user = userEvent.setup();
+    const onRemove = vi.fn();
     render(
       <StatusCardActions
         employee={makeEmployee({ suspendedAt: "2026-10-26T12:00:00Z" })}
         canEdit
         onDeactivate={vi.fn()}
         onActivate={vi.fn()}
-        onRemove={vi.fn()}
+        onRemove={onRemove}
         onReinstate={vi.fn()}
         onSuspend={vi.fn()}
       />,
     );
 
-    const dialog = await openDialog(user);
-    // Archiving a suspended person instead is still offered; Reinstate has its own button.
-    expect(choices(dialog)).toEqual([
-      "AwayKeeps sign-in. Not scheduled while away.",
-      "ArchivedOff staff. Can't sign in or be scheduled.",
+    await user.click(screen.getByRole("button", { name: "More status changes" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Mark away",
+      "Archive",
     ]);
+    await user.click(screen.getByRole("menuitem", { name: "Archive" }));
+    const dialog = screen.getByRole("dialog", { name: "Archive Alice Smith?" });
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+    expect(onRemove).toHaveBeenCalledWith("emp-1", undefined);
   });
 
-  it("names the one other change on the card, except for someone Away", async () => {
+  it("puts an Away person's return date in the menu, on its own", async () => {
     const user = userEvent.setup();
-    const base = {
-      onDeactivate: vi.fn(),
-      onActivate: vi.fn(),
-      onRemove: vi.fn(),
-      onReinstate: vi.fn(),
-    };
-    // A suspended management-only person can't be Away, so Archive is the only other change.
-    const { unmount } = render(
-      <StatusCardActions
-        employee={makeEmployee({ suspendedAt: "2026-10-26T12:00:00Z", focusAreaIds: [] })}
-        canEdit
-        {...base}
-      />,
-    );
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Archive",
-      "Reinstate",
-    ]);
-    unmount();
-
-    // Someone Away keeps Change status: it also edits their return date.
     render(
       <StatusCardActions
         employee={makeEmployee({ status: "inactive", awayUntil: dayFromToday(3).key })}
         canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
         onSetReturnDate={vi.fn()}
-        {...base}
       />,
     );
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Change status",
-      "Mark active",
+
+    expect(cardButtons()).toEqual(["Mark active", "More status changes"]);
+    await user.click(screen.getByRole("button", { name: "More status changes" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Change return date",
+      "Archive",
     ]);
-    const dialog = await openDialog(user);
+    await user.click(screen.getByRole("menuitem", { name: "Change return date" }));
+    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's return date?" });
     expect(within(dialog).getByRole("button", { name: "Return date" })).toBeInTheDocument();
-    expect(choices(dialog)).toEqual(["ArchivedOff staff. Can't sign in or be scheduled."]);
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
   it("gives an archived person's card Restore alone, and an Active one Change status", () => {
@@ -551,7 +543,7 @@ describe("EmployeeStatusActions", () => {
         {...base}
       />,
     );
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Restore"]);
+    expect(cardButtons()).toEqual(["Restore"]);
     unmount();
     render(<StatusCardActions employee={makeEmployee()} canEdit {...base} />);
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
