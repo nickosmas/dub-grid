@@ -14,8 +14,11 @@ import type {
 import {
   ACCOUNT_DISABLED_CODE,
   ACCOUNT_DISABLED_MESSAGE,
+  ACCOUNT_SUSPENDED_CODE,
+  ACCOUNT_SUSPENDED_MESSAGE,
   evaluateBillingAccessWithPolicy,
   isAccountDisabledMessage,
+  isAccountSuspendedMessage,
 } from "@dubgrid/domain";
 import { createClient, type Factor, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { findMobileOrganizationBySlug, type MobileOrganizationLookup } from "./organization";
@@ -172,6 +175,9 @@ async function signInMobileUser(
   // authError.status / authError.message.
   if (authError && isAccountDisabledMessage(authError.message)) {
     throw new MobileApiRequestError(403, ACCOUNT_DISABLED_MESSAGE, ACCOUNT_DISABLED_CODE);
+  }
+  if (authError && isAccountSuspendedMessage(authError.message)) {
+    throw new MobileApiRequestError(403, ACCOUNT_SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
   }
 
   if (

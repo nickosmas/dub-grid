@@ -15,6 +15,8 @@ export interface Employee {
   awayUntil?: string | null;
   /** The absence an Away person's days before their return date hold, or null. */
   awayAbsenceTypeId?: number | null;
+  /** When their access was suspended (51c); they stay active and schedulable. */
+  suspendedAt?: string | null;
   certificationId: number | null;
   roleIds: number[];
   seniority: number;

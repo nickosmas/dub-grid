@@ -125,6 +125,8 @@ interface StaffViewProps {
   /** A status change is waiting on the step-up prompt, so bulk confirmations stay hidden. */
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
+  /** Gives a suspended person their access back (51c). */
+  onReinstate?: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];
@@ -165,6 +167,7 @@ export default function StaffView({
   onSetReturnDate,
   statusStepUpOpen = false,
   onActivate,
+  onReinstate,
   onAdd,
   orgId,
   assignments,
@@ -360,6 +363,7 @@ export default function StaffView({
             absenceTypes={absenceTypes}
             statusStepUpOpen={statusStepUpOpen}
             onActivate={onActivate}
+            onReinstate={onReinstate}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
             canManageEmployees={canManageEmployees ?? false}

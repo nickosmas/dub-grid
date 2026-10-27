@@ -69,6 +69,11 @@ describe("describeEmploymentStatus", () => {
     expect(describeEmploymentStatus("active", "2027-01-04")).toBe("Active");
   });
 
+  it("names a suspended person Suspended, though they are stored active", () => {
+    expect(describeEmploymentStatus("active", null, "2026-10-27T05:00:00Z")).toBe("Suspended");
+    expect(describeEmploymentStatus("removed", null, "2026-10-27T05:00:00Z")).toBe("Archived");
+  });
+
   it("formats a return date as a short day, with the weekday on request", () => {
     expect(formatReturnDate("2027-01-04")).toBe("Jan 4");
     expect(formatReturnDate("2027-01-04", { weekday: true })).toBe("Mon, Jan 4");
@@ -260,5 +265,17 @@ describe("describeStatusAction with a return date", () => {
       const firstWords = copy.points.map((point) => point.split(" ")[0]);
       expect(new Set(firstWords).size).toBe(firstWords.length);
     }
+  });
+});
+
+describe("describeStatusAction reinstate", () => {
+  it("gives a suspended person's access back, with the name in the title only", () => {
+    expect(describeStatusAction("reinstate", "Ana Torres")).toEqual({
+      label: "Reinstate",
+      title: "Reinstate Ana Torres?",
+      message: "They can sign in again on the web and in the app.",
+      points: [],
+      done: "Reinstated",
+    });
   });
 });

@@ -165,6 +165,8 @@ export interface MembersSectionProps {
   absenceTypes?: readonly AbsenceType[];
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
+  /** Gives a suspended person their access back (51c). */
+  onReinstate?: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -199,6 +201,7 @@ export function MembersSection({
   absenceTypes,
   statusStepUpOpen = false,
   onActivate,
+  onReinstate,
   onAdd,
   canViewEmployeeDetails,
   canManageEmployees,
@@ -253,6 +256,16 @@ export function MembersSection({
   const awayUntilByEmployeeId = useMemo(
     () => new Map(inactiveEmployees.map((employee) => [employee.id, employee.awayUntil ?? null])),
     [inactiveEmployees],
+  );
+  // A suspended person (51c) is stored active, so the directory row's status alone misses it.
+  const suspendedAtByEmployeeId = useMemo(
+    () =>
+      new Map(
+        employees
+          .filter((employee) => employee.suspendedAt)
+          .map((employee) => [employee.id, employee.suspendedAt ?? null]),
+      ),
+    [employees],
   );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
@@ -1897,10 +1910,15 @@ export function MembersSection({
                         : describeEmploymentStatus(
                             person.employeeStatus,
                             person.employeeId ? awayUntilByEmployeeId.get(person.employeeId) : null,
+                            person.employeeId
+                              ? suspendedAtByEmployeeId.get(person.employeeId)
+                              : null,
                           );
+                      const isSuspended =
+                        !!person.employeeId && suspendedAtByEmployeeId.has(person.employeeId);
                       const statusTone: StatusPillTone = isPending
                         ? "warning"
-                        : person.employeeStatus === "removed"
+                        : person.employeeStatus === "removed" || isSuspended
                           ? "danger"
                           : person.employeeStatus === "inactive"
                             ? "warning"
@@ -2200,6 +2218,7 @@ export function MembersSection({
           onSetReturnDate={onSetReturnDate}
           absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
+          onReinstate={onReinstate}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
           onInvite={

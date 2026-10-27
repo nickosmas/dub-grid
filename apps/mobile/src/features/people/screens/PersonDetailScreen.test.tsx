@@ -1407,6 +1407,21 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("reinstates a suspended person instead of offering Mark away", () => {
+      const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-27T05:00:00Z" });
+
+      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
+      expect(screen.getByText("Reinstate Mina Diaz?")).toBeInTheDocument();
+      expect(
+        screen.getByText("They can sign in again on the web and in the app."),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole("button", { name: "Reinstate" }).at(-1)!);
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "reinstate", expectedVersion: 7 });
+    });
+
     it("brings an Archived person back with Restore and nothing else", () => {
       renderWithStatusMutation({ status: "removed" });
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
+import {
+  ACCESS_SUSPENDED_BODY,
+  ACCOUNT_DISABLED_MESSAGE,
+  ACCOUNT_SUSPENDED_MESSAGE,
+} from "@dubgrid/domain";
 import { describeSignInFailure, EXISTING_ACCOUNT_MESSAGE } from "./signInFailure";
 
 describe("describeSignInFailure", () => {
@@ -28,6 +32,12 @@ describe("describeSignInFailure", () => {
   it("passes the disabled-account sentinel straight through", () => {
     expect(describeSignInFailure({ message: ACCOUNT_DISABLED_MESSAGE }, "created")).toBe(
       ACCOUNT_DISABLED_MESSAGE,
+    );
+  });
+
+  it("says access is suspended for a suspended employee", () => {
+    expect(describeSignInFailure({ message: ACCOUNT_SUSPENDED_MESSAGE }, "existing")).toBe(
+      ACCESS_SUSPENDED_BODY,
     );
   });
 

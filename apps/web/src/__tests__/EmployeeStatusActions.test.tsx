@@ -80,6 +80,7 @@ function renderActions(
     onActivate: vi.fn(),
     onRemove: vi.fn(),
     onSetReturnDate: vi.fn(),
+    onReinstate: vi.fn(),
   };
   render(
     <EmployeeStatusActions
@@ -294,6 +295,26 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("button", { name: "Change return date" }));
 
     expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", "2099-01-05", 135);
+  });
+
+  it("reinstates a suspended person in place of Mark away, and keeps Archive", async () => {
+    const user = userEvent.setup();
+    const { onReinstate, onDeactivate } = renderActions(
+      makeEmployee({ suspendedAt: "2026-10-27T05:00:00Z" }),
+      "page",
+    );
+
+    expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reinstate" }));
+    const dialog = screen.getByRole("dialog", { name: "Reinstate Alice Smith?" });
+    expect(
+      within(dialog).getByText("They can sign in again on the web and in the app."),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Reinstate" }));
+
+    expect(onReinstate).toHaveBeenCalledWith("emp-1");
+    expect(onDeactivate).not.toHaveBeenCalled();
   });
 
   it("offers Set return date to someone away without one", () => {

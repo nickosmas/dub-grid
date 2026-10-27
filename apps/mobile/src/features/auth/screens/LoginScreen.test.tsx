@@ -1,6 +1,7 @@
 import { onlineManager } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiResponseError } from "@dubgrid/api-client";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -927,6 +928,42 @@ describe("LoginScreen", () => {
 
     expect(
       await screen.findByText("Check your email and password and try again."),
+    ).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("tells a suspended person their access is suspended", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockRejectedValue(
+      new ApiResponseError(
+        "Your access has been suspended. Contact your organization admin.",
+        403,
+        {
+          code: "ACCOUNT_SUSPENDED",
+        },
+      ),
+    );
+
+    await renderLogin();
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "right-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByText(
+        "Your organization has suspended your access to the app. Contact an administrator there if you have questions.",
+      ),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });

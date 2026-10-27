@@ -59,6 +59,7 @@ function PeopleContent() {
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,
+    handleReinstateEmployee,
     handleSetEmployeeReturnDate,
   } = useEmployees(orgId ?? org?.id ?? null);
 
@@ -145,6 +146,7 @@ function PeopleContent() {
             onSetReturnDate={handleSetEmployeeReturnDate}
             statusStepUpOpen={Boolean(statusStepUp.dialog)}
             onActivate={handleActivateEmployee}
+            onReinstate={handleReinstateEmployee}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}
             assignments={assignments}

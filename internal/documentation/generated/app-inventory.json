@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:7bc38cbc17ace34420009af51ffbc398a0408cb46bcf95af257bd999fb23b6da",
+  "sourceDigest": "sha256:ebea92d63caa7de62ce8cbbdd76141b6d526d4461495336ae9dbb35cb6ab98af",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4794,6 +4794,16 @@
       "sha256": "0bdc2d44dd8526cc033bdd53596a06692957f06751b5bc2815a8430b78bdb313",
       "source": {
         "path": "supabase/migrations/100_away_absence.sql"
+      }
+    },
+    {
+      "id": "migration:101_suspended_access.sql",
+      "version": "101",
+      "name": "suspended_access",
+      "file": "101_suspended_access.sql",
+      "sha256": "4f6394d21ba5f0d0049a1d9a78bb54ea915e15aa131c14a42f509e89bb2d85cc",
+      "source": {
+        "path": "supabase/migrations/101_suspended_access.sql"
       }
     }
   ],

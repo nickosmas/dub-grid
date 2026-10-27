@@ -119,7 +119,7 @@ import {
   type OrgRole,
 } from "../components/OrgRoleSheet";
 
-type ConfirmAction = "deactivate" | "activate" | "remove" | "setReturnDate" | null;
+type ConfirmAction = "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
@@ -467,7 +467,7 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "deactivate" | "activate" | "remove" | "setReturnDate";
+      action: "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate";
       note?: string;
       returnDate?: string | null;
       absenceTypeId?: number | null;
@@ -501,11 +501,13 @@ export default function PersonDetailScreen() {
         title: describeStatusAction(
           variables.action === "activate"
             ? (statusUndoAction(variables.fromStatus) ?? "markActive")
-            : variables.action === "deactivate"
-              ? "markAway"
-              : variables.action === "setReturnDate"
-                ? "setReturnDate"
-                : "archive",
+            : variables.action === "reinstate"
+              ? "reinstate"
+              : variables.action === "deactivate"
+                ? "markAway"
+                : variables.action === "setReturnDate"
+                  ? "setReturnDate"
+                  : "archive",
           getFullName(result.person),
           {
             returnDate: variables.returnDate ?? null,
@@ -955,11 +957,13 @@ export default function PersonDetailScreen() {
     ? describeStatusAction(
         confirmAction === "activate"
           ? (statusUndoAction(person.status) ?? "markActive")
-          : confirmAction === "deactivate"
-            ? "markAway"
-            : confirmAction === "setReturnDate"
-              ? "setReturnDate"
-              : "archive",
+          : confirmAction === "reinstate"
+            ? "reinstate"
+            : confirmAction === "deactivate"
+              ? "markAway"
+              : confirmAction === "setReturnDate"
+                ? "setReturnDate"
+                : "archive",
         getFullName(person),
         confirmAction === "deactivate" || confirmAction === "setReturnDate"
           ? {
@@ -1420,7 +1424,19 @@ export default function PersonDetailScreen() {
                   tone="secondary"
                 />
               ) : null}
-              {person.status === "active" && canBeInactive ? (
+              {person.suspendedAt ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label={describeStatusAction("reinstate", getFullName(person)).label}
+                  loading={statusMutation.isPending}
+                  onPress={() => {
+                    setConfirmationError(null);
+                    setConfirmAction("reinstate");
+                  }}
+                  tone="success"
+                />
+              ) : null}
+              {person.status === "active" && canBeInactive && !person.suspendedAt ? (
                 <Button
                   disabled={statusMutation.isPending || isSelf}
                   label={describeStatusAction("markAway", getFullName(person)).label}
@@ -1478,7 +1494,7 @@ export default function PersonDetailScreen() {
         onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
         title={statusCopy?.title ?? ""}
-        visible={confirmAction === "activate"}
+        visible={confirmAction === "activate" || confirmAction === "reinstate"}
       />
       <BottomSheetModal
         debugName="Change staff status"
@@ -1543,7 +1559,7 @@ export default function PersonDetailScreen() {
           />
         ) : null}
         {confirmAction === "deactivate" ? awayAbsenceChoices : null}
-        {statusCopy && confirmAction !== "activate" ? (
+        {statusCopy && confirmAction !== "activate" && confirmAction !== "reinstate" ? (
           <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}
       </BottomSheetModal>

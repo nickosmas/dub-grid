@@ -7,13 +7,17 @@ import { MobileApiAuthorizationError, updateMobilePersonStatus } from "@dubgrid/
 import {
   archiveMobileOrganizationMembership,
   countMobileActiveSuperAdmins,
+  disableMobilePushTokensForOrg,
   fetchMobileActiveMembershipOrgRole,
   fetchMobileEmployeeRowById,
   insertMobileAuditLogEntry,
   restoreMobileOrganizationMembership,
   updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
+  updateMobileEmployeeSuspensionRow,
 } from "@dubgrid/data-access";
+import logger from "@/lib/logger";
+import { endUserSessions } from "@/lib/auth/revocation";
 import { requireMobileAuth } from "@/features/mobile/server";
 import { mapEmployeeToMobilePerson } from "./people";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -74,6 +78,23 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           const row = await updateMobileEmployeeReturnDateRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
         },
+        updateEmployeeSuspension: async (serviceClient, input) => {
+          const row = await updateMobileEmployeeSuspensionRow(serviceClient, input);
+          return row ? rowToEmployee(row) : null;
+        },
+        // Never fail the suspension over tidying up: the hook already
+        // refuses their next sign-in and refresh (101).
+        endAccess: async (serviceClient, { userId, orgId }) => {
+          try {
+            await endUserSessions(userId);
+            await disableMobilePushTokensForOrg(serviceClient, { userId, orgId });
+          } catch (error) {
+            logger.error(
+              { error, orgId, userId },
+              "Failed to end sessions or push after suspending",
+            );
+          }
+        },
         insertAuditLog: insertMobileAuditLogEntry,
         mapEmployeeToMobilePerson,
         fetchActiveMembershipOrgRole: fetchMobileActiveMembershipOrgRole,
@@ -103,7 +124,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       );
     }
 
-    if (result.kind === "self_action_forbidden" || result.kind === "invalid_return_date") {
+    if (
+      result.kind === "self_action_forbidden" ||
+      result.kind === "invalid_return_date" ||
+      result.kind === "invalid_status_change"
+    ) {
       return NextResponse.json(
         { error: result.error, code: result.code },
         { status: result.status },

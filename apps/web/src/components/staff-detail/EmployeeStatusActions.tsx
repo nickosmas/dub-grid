@@ -35,6 +35,8 @@ export interface EmployeeStatusActionsProps {
     returnDate: string | null,
     absenceTypeId?: number | null,
   ) => void | Promise<unknown>;
+  /** Gives a suspended person their access back (51c); hidden when absent. */
+  onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Live absence types; with a return date, one can fill the away days (51f). */
   absenceTypes?: readonly AbsenceType[];
   onRemove: (empId: string, note?: string) => void | Promise<unknown>;
@@ -45,7 +47,8 @@ export interface EmployeeStatusActionsProps {
   stepUpOpen?: boolean;
 }
 
-type ConfirmingAction = Exclude<StatusAction, "restore" | "markActive"> | "undo";
+type ConfirmingAction =
+  Exclude<StatusAction, "restore" | "markActive" | "reinstate"> | "undo" | "reinstate";
 
 const RETURN_DATE_HINT =
   "They're back to Active on this day. Leave it empty to mark them active yourself.";
@@ -140,6 +143,7 @@ export function EmployeeStatusActions({
   onActivate,
   onRemove,
   onSetReturnDate,
+  onReinstate,
   absenceTypes = [],
   variant,
   fillWidth = false,
@@ -200,6 +204,24 @@ export function EmployeeStatusActions({
 
   const confirmation = (() => {
     if (!confirming || stepUpOpen) return null;
+    if (confirming === "reinstate") {
+      const copy = describeStatusAction("reinstate", displayName);
+      return (
+        <ConfirmDialog
+          isLoading={pending}
+          title={copy.title}
+          message={copy.message}
+          summary={{ points: copy.points }}
+          confirmLabel={copy.label}
+          variant="warning"
+          onConfirm={async () => {
+            await runPending(() => onReinstate?.(employee.id));
+            closeConfirm();
+          }}
+          onCancel={closeConfirm}
+        />
+      );
+    }
     if (confirming === "undo") {
       if (!undoAction) return null;
       const copy = describeStatusAction(undoAction, displayName);
@@ -373,10 +395,22 @@ export function EmployeeStatusActions({
     );
   }
 
+  // Suspended (51c) people are stored active; Reinstate takes Mark away's place.
+  const canReinstate = Boolean(onReinstate) && Boolean(employee.suspendedAt);
+
   return (
     <>
       <div style={groupStyle}>
-        {canBeAway && (
+        {canReinstate && (
+          <Button
+            onClick={() => openConfirm("reinstate")}
+            className="dg-btn dg-btn-success"
+            style={buttonStyle}
+          >
+            {describeStatusAction("reinstate", displayName).label}
+          </Button>
+        )}
+        {canBeAway && !employee.suspendedAt && (
           <Button
             onClick={() => openConfirm("markAway")}
             className="dg-btn dg-btn-warning-filled"
@@ -391,7 +425,7 @@ export function EmployeeStatusActions({
           style={{
             ...buttonStyle,
             // Alone, Archive spans both columns rather than sitting half-width.
-            ...(fillWidth && !canBeAway ? { gridColumn: "1 / -1" } : null),
+            ...(fillWidth && !canBeAway && !canReinstate ? { gridColumn: "1 / -1" } : null),
           }}
         >
           {describeStatusAction("archive", displayName).label}

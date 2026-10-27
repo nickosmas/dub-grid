@@ -20,9 +20,16 @@ const auditInsert = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
 const revokeAllUserSessions = vi.fn();
 const orgTimezoneSingle = vi.fn();
+const endUserSessions = vi.fn();
+const disableMobilePushTokensForOrg = vi.fn();
 
 vi.mock("@/lib/auth/revocation", () => ({
   revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
+  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
+}));
+
+vi.mock("@dubgrid/data-access", () => ({
+  disableMobilePushTokensForOrg: (...args: unknown[]) => disableMobilePushTokensForOrg(...args),
 }));
 
 vi.mock("@/lib/api-auth", () => ({
@@ -897,5 +904,152 @@ describe("POST /api/employees/status", () => {
     // with canManageEmployees can't use Activate as a side door to restore it.
     expect(membershipRestoreUpdate).not.toHaveBeenCalled();
     expect(membershipArchiveUpdate).not.toHaveBeenCalled();
+  });
+
+  describe("suspension", () => {
+    const LINKED_USER_ID = "88888888-8888-4888-8888-888888888888";
+
+    function arrange(
+      row: Record<string, unknown>,
+      actor: "super_admin" | "gridmaster" = "super_admin",
+    ) {
+      membershipMaybeSingle.mockResolvedValue({
+        data: actor === "super_admin" ? { org_role: "super_admin", admin_permissions: null } : null,
+        error: null,
+      });
+      profileSingle.mockResolvedValue({
+        data: { platform_role: actor === "gridmaster" ? "gridmaster" : "none" },
+        error: null,
+      });
+      const current = {
+        id: EMP_ID,
+        org_id: ORG_ID,
+        status: "active",
+        version: 1,
+        user_id: LINKED_USER_ID,
+        focus_area_ids: [7],
+        ...row,
+      };
+      employeeCurrentSingle.mockResolvedValue({ data: current, error: null });
+      employeeUpdateMaybeSingle.mockImplementation(async () => ({
+        data: { ...current, ...(employeeUpdate.mock.calls.at(-1)?.[0] as Record<string, unknown>) },
+        error: null,
+      }));
+      targetMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
+      auditInsert.mockResolvedValue({ error: null });
+      endUserSessions.mockResolvedValue(undefined);
+      disableMobilePushTokensForOrg.mockResolvedValue(undefined);
+    }
+
+    function post(action: string) {
+      return POST(
+        new NextRequest("http://localhost/api/employees/status", {
+          method: "POST",
+          body: JSON.stringify({ empId: EMP_ID, orgId: ORG_ID, action, expectedVersion: 1 }),
+        }),
+      );
+    }
+
+    it("suspends someone, signs them out everywhere and stops their push", async () => {
+      arrange({});
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(200);
+      const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+      expect(update).toMatchObject({ suspended_by: USER_ID, updated_by: USER_ID });
+      expect(update.suspended_at).toEqual(expect.any(String));
+      expect(update).not.toHaveProperty("status");
+      expect(endUserSessions).toHaveBeenCalledWith(LINKED_USER_ID);
+      expect(disableMobilePushTokensForOrg).toHaveBeenCalledWith(expect.anything(), {
+        userId: LINKED_USER_ID,
+        orgId: ORG_ID,
+      });
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.suspended",
+          details: { changedFields: ["suspended_at"] },
+        }),
+      );
+      expect((await response.json()).employee.suspendedAt).toEqual(expect.any(String));
+    });
+
+    it("still suspends when signing out fails, which the hook backs up", async () => {
+      arrange({});
+      endUserSessions.mockRejectedValueOnce(new Error("redis down"));
+
+      expect((await post("suspend")).status).toBe(200);
+    });
+
+    it.each([
+      ["someone away", { status: "inactive" }],
+      ["someone archived", { status: "removed", archived_at: "2026-10-01T00:00:00Z" }],
+      ["someone already suspended", { suspended_at: "2026-10-26T00:00:00Z" }],
+    ])("refuses to suspend %s", async (_label, row) => {
+      arrange(row);
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone who is active can be suspended.",
+        code: "NOT_SUSPENDABLE",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+      expect(endUserSessions).not.toHaveBeenCalled();
+    });
+
+    it("refuses to suspend the only super admin", async () => {
+      arrange({}, "gridmaster");
+      targetMembershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "super_admin" },
+        error: null,
+      });
+      superAdminCountIs.mockResolvedValue({ count: 1, error: null });
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(400);
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("asks a Gridmaster for fresh proof before suspending", async () => {
+      arrange({}, "gridmaster");
+      requireSensitiveActionAuth.mockResolvedValue({
+        response: new Response(null, { status: 403 }),
+      });
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(403);
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("reinstates a suspended person without touching their sessions", async () => {
+      arrange({ suspended_at: "2026-10-26T00:00:00Z" });
+
+      const response = await post("reinstate");
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ suspended_at: null, suspended_by: null }),
+      );
+      expect(endUserSessions).not.toHaveBeenCalled();
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "employee.reinstated" }),
+      );
+    });
+
+    it("refuses to reinstate someone who isn't suspended", async () => {
+      arrange({});
+
+      const response = await post("reinstate");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "They aren't suspended.",
+        code: "NOT_SUSPENDED",
+      });
+    });
   });
 });

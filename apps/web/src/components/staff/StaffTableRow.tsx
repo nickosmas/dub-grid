@@ -24,7 +24,8 @@ import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 
-function statusTone(status: Employee["status"]): StatusPillTone {
+function statusTone(status: Employee["status"], suspendedAt?: string | null): StatusPillTone {
+  if (suspendedAt && status === "active") return "danger";
   if (status === "inactive") return "warning";
   if (status === "removed") return "danger";
   return "success";
@@ -174,7 +175,7 @@ function StaffRowCells({
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil);
+  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil, emp.suspendedAt);
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",
@@ -307,7 +308,7 @@ function StaffRowCells({
           gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
         >
           <StatusPill
-            tone={statusTone(emp.status)}
+            tone={statusTone(emp.status, emp.suspendedAt)}
             variant="category"
             bordered={false}
             dot

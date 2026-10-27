@@ -48,6 +48,14 @@ export const NOT_AWAY_CODE = "NOT_AWAY";
 
 export const NOT_AWAY_MESSAGE = "Only someone who is away can have a return date.";
 
+export const NOT_SUSPENDABLE_CODE = "NOT_SUSPENDABLE";
+
+export const NOT_SUSPENDABLE_MESSAGE = "Only someone who is active can be suspended.";
+
+export const NOT_SUSPENDED_CODE = "NOT_SUSPENDED";
+
+export const NOT_SUSPENDED_MESSAGE = "They aren't suspended.";
+
 export const AWAY_ABSENCE_INVALID_CODE = "AWAY_ABSENCE_INVALID";
 
 export const AWAY_ABSENCE_NEEDS_DATE_MESSAGE =
@@ -118,10 +126,18 @@ export function formatReturnDate(isoDate: string, { weekday = false } = {}): str
 }
 
 /** The status as people see it, with an Away person's return date: "Away until Jan 4". */
+export const SUSPENDED_LABEL = "Suspended";
+
+/**
+ * A suspended person (51c) is stored `active`, so suspension wins over the
+ * stored status when it is set.
+ */
 export function describeEmploymentStatus(
   status: string | null | undefined,
   awayUntil?: string | null,
+  suspendedAt?: string | null,
 ): string {
+  if (suspendedAt && (status === "active" || status == null)) return SUSPENDED_LABEL;
   const label =
     EMPLOYMENT_STATUS_LABELS[status as EmployeeStatus] ?? EMPLOYMENT_STATUS_LABELS.active;
   return status === "inactive" && awayUntil
@@ -129,7 +145,8 @@ export function describeEmploymentStatus(
     : label;
 }
 
-export type StatusAction = "markAway" | "archive" | "markActive" | "restore" | "setReturnDate";
+export type StatusAction =
+  "markAway" | "archive" | "markActive" | "restore" | "setReturnDate" | "reinstate";
 
 export interface StatusActionCopy {
   /** The button, and the confirmation's primary action. */
@@ -290,6 +307,14 @@ export function describeStatusAction(
         message: "Shifts that came off when they were marked away don't come back.",
         points: [],
         done: "Marked active",
+      };
+    case "reinstate":
+      return {
+        label: "Reinstate",
+        title: `Reinstate ${name}?`,
+        message: "They can sign in again on the web and in the app.",
+        points: [],
+        done: "Reinstated",
       };
     case "restore":
       return {

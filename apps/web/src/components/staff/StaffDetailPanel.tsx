@@ -66,6 +66,8 @@ interface StaffDetailPanelProps {
   /** Live absence types, offered for an Away person's days. */
   absenceTypes?: readonly AbsenceType[];
   onActivate: (empId: string) => void | Promise<unknown>;
+  /** Gives a suspended person their access back (51c). */
+  onReinstate?: (empId: string) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -103,6 +105,7 @@ export function StaffDetailPanel({
   onSetReturnDate,
   absenceTypes,
   onActivate,
+  onReinstate,
   statusStepUpOpen = false,
   onClose,
   onInvite,
@@ -457,6 +460,7 @@ export function StaffDetailPanel({
                           onSetReturnDate={onSetReturnDate}
                           absenceTypes={absenceTypes}
                           onActivate={onActivate}
+                          onReinstate={onReinstate}
                           onRemove={onRemove}
                           stepUpOpen={statusStepUpOpen}
                           variant="page"

@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
+  reinstateEmployee,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -593,6 +594,24 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
+  const handleReinstate = useCallback(
+    async (empId: string) => {
+      if (!orgId || !employee) return;
+      try {
+        syncEmployeeCaches(await reinstateEmployee(empId, orgId, employee.version));
+        toast.success("Reinstated");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't reinstate them. Try again."));
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
   const handleSetReturnDate = useCallback(
     async (empId: string, returnDate: string | null, absenceTypeId?: number | null) => {
       if (!orgId || !employee) return;
@@ -1118,6 +1137,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     }
                     onActivate={handleActivate}
                     onSetReturnDate={handleSetReturnDate}
+                    onReinstate={handleReinstate}
                     absenceTypes={absenceTypes}
                     onRemove={(empId, note) =>
                       runStatusChange((token) => handleRemove(empId, note, token))
