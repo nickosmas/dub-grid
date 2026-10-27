@@ -242,6 +242,10 @@ interface ShiftEditPanelProps {
   defaultShiftEnabled?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+  /** The days in a row this whole-day absence runs across in the grid (item 52). */
+  absenceRun?: { dateKeys: string[] } | null;
+  /** Removes every day of `absenceRun` as one draft change. */
+  onRemoveAbsenceRun?: () => void;
 }
 
 function formatTimeRangeLabel(range: TimeRange): string {
@@ -287,6 +291,15 @@ function differenceInDaysIso(leftIso: string, rightIso: string): number {
 function getCalendarWeekStart(dateIso: string): string {
   const date = new Date(`${dateIso}T00:00:00`);
   return addDaysIso(dateIso, -date.getUTCDay());
+}
+
+function formatRunRange(dateKeys: string[]): string {
+  return `${formatDisplayDate(dateKeys[0])} - ${formatDisplayDate(dateKeys[dateKeys.length - 1])}`;
+}
+
+/** "Part of 4 days, Mon, Nov 9 - Thu, Nov 12". */
+function absenceRunSummary(dateKeys: string[]): string {
+  return `Part of ${dateKeys.length} days, ${formatRunRange(dateKeys)}`;
 }
 
 function getAbsenceTypeDisplayName(absenceType: AbsenceType | null): string {
@@ -417,6 +430,8 @@ export default function ShiftEditPanel({
   enforceConflicts = false,
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
+  absenceRun = null,
+  onRemoveAbsenceRun,
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { resolvedTheme } = useTheme();
@@ -442,6 +457,12 @@ export default function ShiftEditPanel({
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const isAbsence = currentAbsenceTypeId != null;
   const hasRestOfDayAbsence = currentRestOfDayAbsenceTypeId != null;
+  // A repeating absence keeps its own choice of days to remove.
+  const runDateKeys =
+    isAbsence && !seriesId && absenceRun && absenceRun.dateKeys.length >= 2
+      ? absenceRun.dateKeys
+      : null;
+  const [runRemoveScope, setRunRemoveScope] = useState<"this" | "all">("this");
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   // The picker is open to choose the absence for the rest of the day, not a shift.
   const [pickingRestOfDayAbsence, setPickingRestOfDayAbsence] = useState(false);
@@ -3128,6 +3149,20 @@ export default function ShiftEditPanel({
               {absenceLabel}
             </span>
           </MaybeHint>
+          {runDateKeys && (
+            <span
+              data-absence-run-summary=""
+              className="dg-tabular-nums"
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 500,
+                color: atResolved.text,
+                textAlign: "center",
+              }}
+            >
+              {absenceRunSummary(runDateKeys)}
+            </span>
+          )}
         </div>
       );
     }
@@ -3875,6 +3910,14 @@ export default function ShiftEditPanel({
     !hasRestOfDayAbsence &&
     absenceTypes.length > 0 &&
     (!seriesId || seriesScope === "this");
+
+  function removeWholeCell() {
+    onSelect(null, seriesId ? seriesScope : undefined);
+    if (onCustomTimeChange) onCustomTimeChange(null, null);
+    // A cell that opened empty is back as it was: there is nothing to
+    // save, and an armed save would fire on the next pick instead.
+    if (!openedEmpty) setPendingCommitScope(seriesScope);
+  }
 
   // Names what the whole-cell remove takes away: "all shifts" read as if it
   // kept the absence beside them.
@@ -4651,7 +4694,10 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && !seriesId && (
                 <div style={{ marginTop: 16 }}>
                   <Button
-                    onClick={() => setPendingDelete({ type: "all" })}
+                    onClick={() => {
+                      setRunRemoveScope("this");
+                      setPendingDelete({ type: "all" });
+                    }}
                     className="dg-btn dg-btn-danger"
                     style={{
                       width: "100%",
@@ -5138,7 +5184,52 @@ export default function ShiftEditPanel({
         />
       )}
 
-      {pendingDelete && !(pendingDelete.type === "all" && seriesId) && (
+      {pendingDelete?.type === "all" && runDateKeys && (
+        <ConfirmDialog
+          title={
+            runRemoveScope === "all"
+              ? `Remove all ${runDateKeys.length} days of "${absenceName(currentAbsenceTypeId ?? null)}"?`
+              : `Remove the absence "${absenceName(currentAbsenceTypeId ?? null)}" on ${formatDisplayDate(formatDateKey(modal.date))}?`
+          }
+          message={
+            <SeriesScopeChoices
+              label="Days to remove"
+              options={[
+                {
+                  scope: "this",
+                  label: "This day",
+                  detail: formatDisplayDate(formatDateKey(modal.date)),
+                  count: 1,
+                },
+                {
+                  scope: "all",
+                  label: `All ${runDateKeys.length} days`,
+                  detail: formatRunRange(runDateKeys),
+                  count: runDateKeys.length,
+                },
+              ]}
+              value={runRemoveScope}
+              onChange={(scope) => setRunRemoveScope(scope === "all" ? "all" : "this")}
+            />
+          }
+          confirmLabel={
+            runRemoveScope === "all" ? `Remove all ${runDateKeys.length} days` : "Remove this day"
+          }
+          variant="danger"
+          onConfirm={() => {
+            setPendingDelete(null);
+            if (runRemoveScope === "all") {
+              onRemoveAbsenceRun?.();
+              close();
+              return;
+            }
+            removeWholeCell();
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingDelete && !(pendingDelete.type === "all" && (seriesId || runDateKeys)) && (
         <ConfirmDialog
           title={`Remove ${
             isAbsence
@@ -5161,11 +5252,7 @@ export default function ShiftEditPanel({
           variant="danger"
           onConfirm={() => {
             if (pendingDelete.type === "all") {
-              onSelect(null, seriesId ? seriesScope : undefined);
-              if (onCustomTimeChange) onCustomTimeChange(null, null);
-              // A cell that opened empty is back as it was: there is nothing to
-              // save, and an armed save would fire on the next pick instead.
-              if (!openedEmpty) setPendingCommitScope(seriesScope);
+              removeWholeCell();
             } else if (pendingDelete.type === "restOfDay") {
               removeAbsence();
             } else {

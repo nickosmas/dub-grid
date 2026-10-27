@@ -1123,7 +1123,7 @@
   - [ ] 51k. **One Archive** - archiving ends the membership whoever does
         it, so an Admin's and a Super Admin's archive leave the same record,
         and Restore works the same after either.
-- [ ] 52. **Absence runs in the grid** - a whole-day absence on days in a
+- [x] 52. **Absence runs in the grid** - a whole-day absence on days in a
       row draws as one bar per week in the Week and 2 Weeks grid, with no
       lines between its days, labeled with the name and a count ("Vacation
       ×4", "Off Day ×2"; one day shows just the name). Every whole-day

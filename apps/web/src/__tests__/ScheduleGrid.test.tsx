@@ -125,6 +125,7 @@ const extendedEmployees: Employee[] = [
 
 const week1 = Array.from({ length: 7 }, (_, index) => new Date(2024, 0, 7 + index));
 const week2 = Array.from({ length: 7 }, (_, index) => new Date(2024, 0, 14 + index));
+const isFirstDay = (date: Date) => formatDateKey(date) === formatDateKey(week1[0]);
 function getShiftStyleFromCodes(codes: AssignmentDefinition[]) {
   return (type: string) =>
     codes.find((code) => code.label === type || code.name === type) ?? codes[0];
@@ -1977,9 +1978,10 @@ describe("ScheduleGrid", () => {
           },
         ],
       ]),
-      shiftForKey: () => "PTO/Flex",
+      // One day: days in a row would draw as a run (item 52).
+      shiftForKey: (_empId: string, date: Date) => (isFirstDay(date) ? "PTO/Flex" : null),
       assignmentIdsForKey: () => [],
-      absenceTypeIdForKey: () => 7,
+      absenceTypeIdForKey: (_empId: string, date: Date) => (isFirstDay(date) ? 7 : null),
     });
     const cell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pills = cell.querySelectorAll("[data-shift-pill]");
@@ -2280,6 +2282,154 @@ describe("ScheduleGrid", () => {
     expect(pills[0].parentElement?.style.gridTemplateColumns).toBe("repeat(2, minmax(0, 1fr))");
     // One pill tall, so the row keeps the grid's height unless a pill's lines need more.
     expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toContain(" 1 * (");
+  });
+
+  describe("absence runs (item 52)", () => {
+    const vacation: AbsenceType = {
+      id: 7,
+      orgId: "org-1",
+      label: "VAC",
+      name: "Vacation",
+      color: "#FDE68A",
+      border: "#D97706",
+      text: "#92400E",
+      sortOrder: 1,
+    };
+    const absenceTypeMap = new Map([[vacation.id, vacation]]);
+
+    // Alex's whole-day vacation on the given dates; everyone else works a D.
+    function renderVacation(dateKeys: string[], options: RenderGridOptions = {}) {
+      const isAway = (empId: string, date: Date) =>
+        empId === "emp-1" && dateKeys.includes(formatDateKey(date));
+      return renderGrid({
+        absenceTypeMap,
+        shiftForKey: (empId, date) => (isAway(empId, date) ? "VAC" : null),
+        assignmentIdsForKey: () => [],
+        absenceTypeIdForKey: (empId, date) => (isAway(empId, date) ? vacation.id : null),
+        ...options,
+      });
+    }
+
+    function alexCells(): HTMLElement[] {
+      return (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === "emp-1",
+      );
+    }
+
+    const monToThu = ["2024-01-08", "2024-01-09", "2024-01-10", "2024-01-11"];
+
+    it("draws days in a row as one bar with one label, each day still its own cell", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      renderVacation(monToThu, { onActivateCell });
+
+      expect(screen.getAllByText("Vacation \u00d74")).toHaveLength(1);
+      const cells = alexCells().slice(1, 5);
+      expect(cells.map((cell) => cell.dataset.absenceRun)).toEqual([
+        "start",
+        "middle",
+        "middle",
+        "end",
+      ]);
+      expect(cells.map((cell) => cell.dataset.leadingDivider)).toEqual([
+        "light",
+        "none",
+        "none",
+        "none",
+      ]);
+      for (const cell of cells) {
+        expect(cell.getAttribute("aria-label")).toMatch(/^Alex .*: VAC$/);
+        const pill = cell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+        expect(pill.textContent).toBe("");
+        expect(pill.style.background).toBe("transparent");
+      }
+      expect(cells[0].querySelector("[data-absence-run-bar]")).not.toBeNull();
+      expect(cells[1].querySelector("[data-absence-run-bar]")).toBeNull();
+      // The day after the run keeps its divider.
+      expect(alexCells()[5].dataset.leadingDivider).toBe("light");
+
+      fireEvent.click(cells[2]);
+      expect(onActivateCell).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cellId: { empId: "emp-1", dateKey: "2024-01-10", sectionId: 1 },
+          trigger: "click",
+        }),
+      );
+    });
+
+    it("keeps a single day as its own pill with no count", () => {
+      observedWidth = 1600;
+      renderVacation(["2024-01-08"]);
+
+      const cell = alexCells()[1];
+      expect(cell.dataset.absenceRun).toBeUndefined();
+      expect(cell.querySelector('[data-shift-pill="single"]')?.textContent).toBe("VAC");
+      expect(screen.queryByText(/\u00d7/)).not.toBeInTheDocument();
+    });
+
+    it("breaks the bar at the week split", () => {
+      observedWidth = 1600;
+      renderVacation([...week1, ...week2].map(formatDateKey));
+
+      expect(screen.getAllByText("Vacation \u00d77")).toHaveLength(2);
+      const cells = alexCells();
+      expect(cells[6].dataset.absenceRun).toBe("end");
+      expect(cells[7].dataset.absenceRun).toBe("start");
+      expect(cells[7].dataset.leadingDivider).toBe("split");
+    });
+
+    it("breaks the bar at a day changed in the draft", () => {
+      observedWidth = 1600;
+      renderVacation(monToThu, {
+        draftKindForKey: (empId, date) =>
+          empId === "emp-1" && formatDateKey(date) === "2024-01-10" ? "modified" : null,
+      });
+
+      expect(screen.getAllByText("Vacation \u00d72")).toHaveLength(1);
+      const cells = alexCells();
+      expect(cells[3].dataset.absenceRun).toBeUndefined();
+      expect(cells[3].dataset.leadingDivider).toBe("light");
+      expect(cells[4].dataset.absenceRun).toBeUndefined();
+    });
+
+    it("keeps pills while selecting days for removal", () => {
+      observedWidth = 1600;
+      renderVacation(monToThu, { bulkDeleteMode: true });
+
+      expect(screen.queryByText("Vacation \u00d74")).not.toBeInTheDocument();
+      expect(alexCells()[2].dataset.absenceRun).toBeUndefined();
+    });
+
+    it("marks a hovered day, hides the label and lights its header, then clears them", () => {
+      observedWidth = 1600;
+      renderVacation(monToThu);
+
+      const cells = alexCells();
+      const bar = cells[1].querySelector("[data-absence-run-bar]") as HTMLElement;
+      const header = screen
+        .getAllByRole("columnheader")
+        .find((element) => element.dataset.dateKey === "2024-01-10") as HTMLElement;
+
+      fireEvent.mouseEnter(cells[3]);
+      expect(cells[3].dataset.runHover).toBe("true");
+      expect(bar.dataset.runHover).toBe("true");
+      expect(header.dataset.runHover).toBe("true");
+      expect(cells[2].dataset.runHover).toBeUndefined();
+
+      fireEvent.mouseLeave(cells[3]);
+      expect(cells[3].dataset.runHover).toBeUndefined();
+      expect(bar.dataset.runHover).toBeUndefined();
+      expect(header.dataset.runHover).toBeUndefined();
+    });
+
+    it("leaves a day outside a run without hover marks", () => {
+      observedWidth = 1600;
+      renderVacation(monToThu);
+
+      const cell = alexCells()[6];
+      fireEvent.mouseEnter(cell);
+      expect(cell.dataset.runHover).toBeUndefined();
+    });
   });
 
   describe("a rest-of-day absence (item 45)", () => {
@@ -3520,8 +3670,8 @@ describe("ScheduleGrid", () => {
           },
         ],
       ]),
-      absenceTypeIdForKey: () => 7,
-      shiftForKey: () => "VAC",
+      absenceTypeIdForKey: (_empId: string, date: Date) => (isFirstDay(date) ? 7 : null),
+      shiftForKey: (_empId: string, date: Date) => (isFirstDay(date) ? "VAC" : null),
       assignmentIdsForKey: () => [],
     });
 

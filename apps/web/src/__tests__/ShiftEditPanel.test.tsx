@@ -288,6 +288,8 @@ function renderPanel(
     ) => number[];
     onNoteToggle?: ReturnType<typeof vi.fn>;
     seriesId?: string | null;
+    absenceRun?: { dateKeys: string[] } | null;
+    onRemoveAbsenceRun?: ReturnType<typeof vi.fn>;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -343,6 +345,8 @@ function panelElement(
       getActiveIndicatorIds={overrides.getActiveIndicatorIds}
       onNoteToggle={overrides.onNoteToggle}
       seriesId={overrides.seriesId}
+      absenceRun={overrides.absenceRun}
+      onRemoveAbsenceRun={overrides.onRemoveAbsenceRun}
     />
   );
 }
@@ -1760,6 +1764,72 @@ describe("ShiftEditPanel", () => {
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
       expect(dialog).toHaveTextContent("Some of these days may already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("an absence in a run (item 52)", () => {
+    const run = { dateKeys: ["2024-01-15", "2024-01-16", "2024-01-17", "2024-01-18"] };
+
+    function renderRunPanel(overrides: Parameters<typeof renderPanel>[0] = {}) {
+      const onRemoveAbsenceRun = vi.fn();
+      const rendered = renderPanel({
+        currentShift: "VAC",
+        currentAbsenceTypeId: 7,
+        absenceTypesOverride: absenceTypes,
+        allowShiftEdits: true,
+        absenceRun: run,
+        onRemoveAbsenceRun,
+        ...overrides,
+      });
+      return { ...rendered, onRemoveAbsenceRun };
+    }
+
+    it("says which days the run covers", () => {
+      renderRunPanel();
+
+      expect(screen.getByText("Part of 4 days, Mon, Jan 15 - Thu, Jan 18")).toBeInTheDocument();
+    });
+
+    it("says nothing of a run for a single day or a repeating absence", () => {
+      renderRunPanel({ absenceRun: null });
+      expect(screen.queryByText(/^Part of /)).not.toBeInTheDocument();
+    });
+
+    it("removes this day only, through the draft", async () => {
+      const user = userEvent.setup();
+      const { onSelect, onRemoveAbsenceRun } = renderRunPanel();
+
+      await user.click(screen.getByRole("button", { name: "Remove absence" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: 'Remove the absence "Vacation" on Mon, Jan 15?',
+      });
+      const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
+      expect(
+        within(choices)
+          .getAllByRole("radio")
+          .map((radio) => radio.textContent),
+      ).toEqual(["This dayMon, Jan 15", "All 4 daysMon, Jan 15 - Thu, Jan 18"]);
+      await user.click(within(dialog).getByRole("button", { name: "Remove this day" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(null, undefined);
+      expect(onRemoveAbsenceRun).not.toHaveBeenCalled();
+    });
+
+    it("removes all the days at once", async () => {
+      const user = userEvent.setup();
+      const { onSelect, onRemoveAbsenceRun, onClose } = renderRunPanel();
+
+      await user.click(screen.getByRole("button", { name: "Remove absence" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.click(within(dialog).getByRole("radio", { name: /All 4 days/ }));
+      expect(
+        await screen.findByRole("dialog", { name: 'Remove all 4 days of "Vacation"?' }),
+      ).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Remove all 4 days" }));
+
+      expect(onRemoveAbsenceRun).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
   });
 

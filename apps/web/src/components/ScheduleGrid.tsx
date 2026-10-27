@@ -136,6 +136,8 @@ import {
 } from "./schedule-grid/badges";
 import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
+import { AbsenceRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
+import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -1770,6 +1772,7 @@ const SectionBlock = memo(function SectionBlock({
                       key={key}
                       role="columnheader"
                       className="dg-grid-slot dg-grid-slot--header"
+                      data-date-key={key}
                       data-leading-divider={
                         index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
                       }
@@ -2117,6 +2120,24 @@ const SectionBlock = memo(function SectionBlock({
               const rowAbsenceTypeIds = weekDates.map(
                 (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
               );
+              // Whole-day absences on days in a row draw as one bar per week
+              // (item 52). Bulk removal selects day by day, so it keeps pills.
+              const rowAbsenceRuns = bulkDeleteMode
+                ? null
+                : buildRowAbsenceRuns(
+                    emp.id,
+                    weekDates,
+                    {
+                      shiftForKey,
+                      segmentsForKey,
+                      draftKindForKey,
+                      publishDiffForKey,
+                      showPublishDiffOverlay,
+                      hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
+                    },
+                    splitAtIndex,
+                    { labels: rowShiftLabels, absenceTypeIds: rowAbsenceTypeIds },
+                  );
               const grownCellHeights = new Set<string>();
               const rowCellGrows = weekDates.map(() => false);
               for (const [index, date] of weekDates.entries()) {
@@ -2535,6 +2556,9 @@ const SectionBlock = memo(function SectionBlock({
                         ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
                         : null;
                       const leadingDividerInset = index === 0 ? 0 : 1;
+                      const absenceRunDay = rowAbsenceRuns?.days[index] ?? null;
+                      const absenceRunInside =
+                        absenceRunDay != null && absenceRunDay.position !== "start";
                       // Only the cell's own top divider eats into its box. The
                       // header/open-shifts stroke above row 0 lives in that
                       // row's box, so row 0 needs no inset and its pills line up
@@ -2570,11 +2594,17 @@ const SectionBlock = memo(function SectionBlock({
                           data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
                           data-slot="cell"
                           data-leading-divider={
-                            index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
+                            index === 0 || absenceRunInside
+                              ? "none"
+                              : isSplitDayDivider(index)
+                                ? "split"
+                                : "light"
                           }
                           data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
                           data-today={isToday ? "true" : undefined}
                           data-top-divider={topDivider}
+                          data-absence-run={absenceRunDay?.position}
+                          data-absence-run-index={absenceRunDay?.runIndex}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2585,10 +2615,24 @@ const SectionBlock = memo(function SectionBlock({
                               : showDiffCellTint
                                 ? rowBg
                                 : undefined,
-                            zIndex: showDiffCellTint ? 8 : ri === 0 ? 5 : undefined,
+                            // A run's bar crosses into the next cells, so none of
+                            // them may stack its own background above it.
+                            zIndex: showDiffCellTint
+                              ? 8
+                              : ri === 0 && !absenceRunDay
+                                ? 5
+                                : undefined,
                           }}
                           onFocus={() => onCellFocus?.(cellId)}
-                          onMouseEnter={() => onCellHover?.(cellId)}
+                          onMouseEnter={(event) => {
+                            onCellHover?.(cellId);
+                            if (absenceRunDay) setAbsenceRunHover(event.currentTarget, true);
+                          }}
+                          onMouseLeave={
+                            absenceRunDay
+                              ? (event) => setAbsenceRunHover(event.currentTarget, false)
+                              : undefined
+                          }
                           onClick={() => triggerCellActivation(emp, date, "click")}
                           onContextMenu={(event) =>
                             triggerCellContextMenu(event, event.currentTarget, cellId, emp, date)
@@ -2624,6 +2668,20 @@ const SectionBlock = memo(function SectionBlock({
                                 -
                               </span>
                             )}
+                            {absenceRunDay?.position === "start" &&
+                              cellAbsenceType &&
+                              dragAbsenceStripes && (
+                                <AbsenceRunBar
+                                  runIndex={absenceRunDay.runIndex}
+                                  name={cellAbsenceType.name || cellAbsenceType.label}
+                                  length={absenceRunDay.length}
+                                  stripes={dragAbsenceStripes}
+                                  top={insetFromVisibleCellTop(4)}
+                                  left={insetFromVisibleCellLeft(4)}
+                                  sideInset={4}
+                                  bottom={4}
+                                />
+                              )}
                             {shiftLabel && shiftLabel !== "OFF" ? (
                               <DraggableShift
                                 id={`drag_${emp.id}_${dateKey}_${sectionName}`}
@@ -3127,6 +3185,13 @@ const SectionBlock = memo(function SectionBlock({
                                     // Notes always take a row of their own, below every line of text.
                                     const singleHasNotes = noteMarks.length > 0;
                                     const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
+                                    // A day in a run is a clear segment over the run's
+                                    // bar: open on the sides it shares with the run.
+                                    const runSegment = isAbsence ? absenceRunDay : null;
+                                    const runOpenLeft =
+                                      !!runSegment && runSegment.position !== "start";
+                                    const runOpenRight =
+                                      !!runSegment && runSegment.position !== "end";
                                     return (
                                       <>
                                         {isBulkSelected && (
@@ -3159,23 +3224,39 @@ const SectionBlock = memo(function SectionBlock({
                                         >
                                           <div
                                             data-shift-pill="single"
+                                            data-absence-run-segment={runSegment?.position}
+                                            className={
+                                              runSegment ? "dg-absence-run-segment" : undefined
+                                            }
                                             style={{
                                               position: "absolute",
                                               top: insetFromVisibleCellTop(singleTopInset),
-                                              right: `${singleSideInset}px`,
+                                              right: runOpenRight ? 0 : `${singleSideInset}px`,
                                               bottom: `${singleBottomInset}px`,
-                                              left: insetFromVisibleCellLeft(singleSideInset),
-                                              background: !singleUsesShiftColor
-                                                ? "var(--dg-color-surface)"
-                                                : absenceStripes
-                                                  ? absenceStripeCss(
-                                                      absenceStripes.stripeA,
-                                                      absenceStripes.stripeB,
-                                                    )
-                                                  : effectiveColor,
+                                              left: runOpenLeft
+                                                ? 0
+                                                : insetFromVisibleCellLeft(singleSideInset),
+                                              ...(runSegment && absenceStripes
+                                                ? {
+                                                    ["--dg-absence-run-edge" as string]:
+                                                      absenceStripes.border,
+                                                  }
+                                                : null),
+                                              background: runSegment
+                                                ? "transparent"
+                                                : !singleUsesShiftColor
+                                                  ? "var(--dg-color-surface)"
+                                                  : absenceStripes
+                                                    ? absenceStripeCss(
+                                                        absenceStripes.stripeA,
+                                                        absenceStripes.stripeB,
+                                                      )
+                                                    : effectiveColor,
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
-                                              border: effectiveBorder,
-                                              borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                              border: runSegment ? undefined : effectiveBorder,
+                                              borderRadius: runSegment
+                                                ? `${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px`
+                                                : SINGLE_SHIFT_PILL_RADIUS,
                                               color: singleForegroundColor,
                                               zIndex: singleHasChangeBadge ? 2 : 1,
                                               boxShadow:
@@ -3301,7 +3382,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     isNameMode && singleIsThreeRow ? 1.15 : 1.2,
                                                 }}
                                               >
-                                                {singleDisplayLabel}
+                                                {runSegment ? null : singleDisplayLabel}
                                                 {!customTimes && isOvernight && (
                                                   <sup
                                                     style={{

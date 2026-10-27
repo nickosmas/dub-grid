@@ -25,6 +25,7 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { buildRowAbsenceRuns } from "@/components/schedule-grid/absenceRuns";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
@@ -146,6 +147,7 @@ import {
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
+import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
   appliedSuggestionText,
@@ -7558,6 +7560,78 @@ function SchedulerContent({
     [activeFocusArea],
   );
 
+  // The run of whole-day absences the open cell sits in, read the way the
+  // Week and 2 Weeks grid draws it (item 52).
+  const panelAbsenceRun = useMemo(() => {
+    if (!editPanel || !canEditShifts || spanWeeks === "month" || isMobile) return null;
+    const dateKey = formatDateKey(editPanel.date);
+    const week = [week1, week2].find((days) =>
+      days.some((date) => formatDateKey(date) === dateKey),
+    );
+    if (!week) return null;
+    const runs = buildRowAbsenceRuns(editPanel.empId, week, {
+      shiftForKey,
+      absenceTypeIdForKey,
+      segmentsForKey,
+      draftKindForKey,
+      publishDiffForKey: publishDiffKindForKey,
+      showPublishDiffOverlay: showPublishDiff,
+      hasAbsenceType: (absenceTypeId) => absenceTypeObjectMap.has(absenceTypeId),
+    });
+    const day = runs.days[week.findIndex((date) => formatDateKey(date) === dateKey)];
+    if (!day) return null;
+    return {
+      dateKeys: week.slice(day.start, day.start + day.length).map((date) => formatDateKey(date)),
+    };
+  }, [
+    absenceTypeIdForKey,
+    absenceTypeObjectMap,
+    canEditShifts,
+    draftKindForKey,
+    editPanel,
+    isMobile,
+    publishDiffKindForKey,
+    segmentsForKey,
+    shiftForKey,
+    showPublishDiff,
+    spanWeeks,
+    week1,
+    week2,
+  ]);
+
+  // Removes a whole run as one batch, with one Undo that puts back the days
+  // nobody has changed since.
+  const removeAbsenceRun = useCallback(
+    async (empId: string, dateKeys: string[], absenceName: string) => {
+      const applied = planAbsenceRunRemoval(empId, dateKeys, shiftsRef.current);
+      const updates = dateKeys
+        .map((dateKey) => buildShiftDeleteUpdate(empId, dateKey))
+        .filter((update): update is ShiftDeleteUpdate => update != null);
+      const { deleted } = await applyShiftDeleteUpdates(updates, {
+        broadcast: true,
+        failureMessage: `We couldn't remove "${absenceName}". Try again.`,
+      });
+      if (deleted === 0) return;
+      toast.success(`Removed ${deleted} ${deleted === 1 ? "day" : "days"} of "${absenceName}"`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const { restore, kept } = planUndo(applied, shiftsRef.current);
+            for (const write of restore) {
+              setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+            }
+            if (kept > 0) {
+              toast.info(
+                `${kept === 1 ? "1 day" : `${kept} days`} changed since ${kept === 1 ? "keeps its" : "keep their"} change.`,
+              );
+            }
+          },
+        },
+      });
+    },
+    [applyShiftDeleteUpdates, buildShiftDeleteUpdate, setShift],
+  );
+
   const scheduleGridModel = useMemo(
     () =>
       buildScheduleGridModel({
@@ -9148,6 +9222,22 @@ function SchedulerContent({
               getActiveIndicatorIds={panelActiveIndicatorIds}
               onNoteToggle={handleNoteToggle}
               onClose={closeEditPanel}
+              absenceRun={panelAbsenceRun}
+              onRemoveAbsenceRun={
+                panelAbsenceRun
+                  ? () => {
+                      const absenceType =
+                        panelCurrentAbsenceTypeId != null
+                          ? absenceTypeObjectMap.get(panelCurrentAbsenceTypeId)
+                          : undefined;
+                      void removeAbsenceRun(
+                        editPanel.empId,
+                        panelAbsenceRun.dateKeys,
+                        absenceType?.name || absenceType?.label || "Absence",
+                      );
+                    }
+                  : undefined
+              }
               seriesId={
                 panelShiftEntry?.seriesId ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId ??

@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped. Items 40 and 51 are in progress. Item 52 is planned.
+shipped, and so is 52. Items 40 and 51 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -86,7 +86,7 @@ shipped. Items 40 and 51 are in progress. Item 52 is planned.
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 | 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
-| 52   | Planned     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
+| 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 
 Item 40 is split:
 
@@ -394,7 +394,7 @@ before 51c (owner, 2026-10-26). Design reference: the "Staff
 status across surfaces" canvas and the "Fine-grained removal in DubGrid"
 doc.
 
-Item 52, absence runs in the grid, is planned and comes before 51e, whose
+Item 52, absence runs in the grid, has shipped; 51e's
 Away bar is drawn the same way. A whole-day absence on days in a row, the
 day off absence included, draws as one bar per week in the Week and 2 Weeks
 grid with no lines inside, labeled "Vacation ×4" (one day shows just the
