@@ -2828,6 +2828,30 @@ button.dg-cc-sg-main {
 .dg-draggable-shift.dg-snap-back {
   animation: dg-snap-back 200ms ease-out;
 }
+/* Absence runs (item 52): one bar per week, drawn from the run's first cell.
+   Each day keeps a clear segment above it; a hovered day shows its edges where
+   it meets the rest of the run, the run's label hides and its header lights. */
+.dg-absence-run-segment {
+  border: 1px solid transparent;
+}
+.dg-grid-cell[data-run-hover="true"] .dg-absence-run-segment[data-absence-run-segment="start"],
+.dg-grid-cell[data-run-hover="true"] .dg-absence-run-segment[data-absence-run-segment="middle"] {
+  border-right: 1px dashed var(--dg-absence-run-edge);
+}
+.dg-grid-cell[data-run-hover="true"] .dg-absence-run-segment[data-absence-run-segment="middle"],
+.dg-grid-cell[data-run-hover="true"] .dg-absence-run-segment[data-absence-run-segment="end"] {
+  border-left: 1px dashed var(--dg-absence-run-edge);
+}
+.dg-absence-run[data-run-hover="true"] .dg-absence-run__label {
+  visibility: hidden;
+}
+.dg-grid-slot--header[data-run-hover="true"] {
+  background-color: var(--dg-color-bg-secondary);
+}
+/* A focused day must not lift its own background over the run's bar. */
+.dg-grid-cell[data-absence-run]:focus-visible {
+  z-index: auto;
+}
 .dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
   content: "+";
   position: absolute;

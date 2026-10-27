@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { canMarkInactive } from "@dubgrid/domain";
+import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox";
+import { canMarkInactive, describeStatusAction, statusUndoAction } from "@dubgrid/domain";
 import {
   Linking,
   StyleSheet,
@@ -60,6 +61,8 @@ import {
   type MobileStaffField,
 } from "../../../shared/lib/api";
 import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import { ReturnDateField } from "../components/ReturnDatePicker";
 import {
   getDepartmentNames,
   getScheduledDepartmentNames,
@@ -116,15 +119,8 @@ import {
   type OrgRole,
 } from "../components/OrgRoleSheet";
 
-type ConfirmAction = "deactivate" | "activate" | "remove" | null;
+type ConfirmAction = "deactivate" | "activate" | "remove" | "setReturnDate" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
-/**
- * Which way the one Deactivate button ends up going. Web asks the same question
- * in the same place (EmployeeStatusActions' unified confirm) rather than
- * spending two peer buttons on it, and the primary action's verb and tone
- * follow the answer.
- */
-type DeactivateOutcome = "inactive" | "remove";
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
 const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -266,7 +262,6 @@ export default function PersonDetailScreen() {
   /** The person the draft was last built from, so the sync below runs once. */
   const [draftSource, setDraftSource] = useState<MobilePerson | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [deactivateOutcome, setDeactivateOutcome] = useState<DeactivateOutcome>("inactive");
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -276,6 +271,9 @@ export default function PersonDetailScreen() {
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
+  const [returnDate, setReturnDate] = useState<string | null>(null);
+  // The absence a return date's away days hold (51f); it goes when the date does.
+  const [awayAbsenceTypeId, setAwayAbsenceTypeId] = useState<number | null>(null);
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
   const [showOrgRole, setShowOrgRole] = useState(false);
@@ -469,14 +467,21 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "deactivate" | "activate" | "remove";
+      action: "deactivate" | "activate" | "remove" | "setReturnDate";
       note?: string;
+      returnDate?: string | null;
+      absenceTypeId?: number | null;
       expectedVersion: number;
+      /** Only names the done toast: Restored rather than Marked active. */
+      fromStatus: MobilePerson["status"];
+      fromReturnDate: string | null;
     }) =>
       updateMobilePersonStatus(accessToken!, personId!, {
         action: input.action,
         expectedVersion: input.expectedVersion,
         note: input.note,
+        ...(input.returnDate !== undefined ? { returnDate: input.returnDate } : {}),
+        ...(input.absenceTypeId !== undefined ? { absenceTypeId: input.absenceTypeId } : {}),
       }),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
@@ -487,17 +492,26 @@ export default function PersonDetailScreen() {
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
       setConfirmAction(null);
-      setDeactivateOutcome("inactive");
       setInactiveNote("");
+      setReturnDate(null);
+      setAwayAbsenceTypeId(null);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
-        title:
+        title: describeStatusAction(
           variables.action === "activate"
-            ? "Person activated"
+            ? (statusUndoAction(variables.fromStatus) ?? "markActive")
             : variables.action === "deactivate"
-              ? "Person marked inactive"
-              : "Person removed",
+              ? "markAway"
+              : variables.action === "setReturnDate"
+                ? "setReturnDate"
+                : "archive",
+          getFullName(result.person),
+          {
+            returnDate: variables.returnDate ?? null,
+            currentReturnDate: variables.fromReturnDate,
+          },
+        ).done,
         message: "Staff status was updated.",
       });
     },
@@ -615,8 +629,9 @@ export default function PersonDetailScreen() {
   useNavigationDiscardGuard(guard);
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
-      (confirmAction === "deactivate" || confirmAction === "remove") &&
-      (Boolean(inactiveNote.trim()) || deactivateOutcome === "remove"),
+      ((confirmAction === "deactivate" || confirmAction === "remove") &&
+        Boolean(inactiveNote.trim())) ||
+      (confirmAction === "deactivate" && returnDate !== null),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
   });
@@ -868,21 +883,27 @@ export default function PersonDetailScreen() {
   const showStaffingSection = canViewEmployeeDetails || showCertificationRow;
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
-  // The Deactivate sheet carries both outcomes, so what the confirm actually
-  // does comes from the selected option, not from which button opened it.
-  const deactivateRemoves = confirmAction === "deactivate" && deactivateOutcome === "remove";
-  const resolvedStatusAction =
-    confirmAction === "deactivate" && deactivateRemoves ? "remove" : confirmAction;
-
   function confirmStatusAction(): Promise<void> | undefined {
-    if (!resolvedStatusAction || !person) return;
+    if (!confirmAction || !person) return;
 
     const input = {
-      action: resolvedStatusAction,
+      action: confirmAction,
       expectedVersion: person.version,
+      fromStatus: person.status,
+      fromReturnDate: person.awayUntil,
       note:
-        resolvedStatusAction === "deactivate" || resolvedStatusAction === "remove"
+        confirmAction === "deactivate" || confirmAction === "remove"
           ? inactiveNote.trim() || undefined
+          : undefined,
+      returnDate:
+        confirmAction === "setReturnDate"
+          ? returnDate
+          : confirmAction === "deactivate" && returnDate
+            ? returnDate
+            : undefined,
+      absenceTypeId:
+        confirmAction === "setReturnDate" || (confirmAction === "deactivate" && returnDate)
+          ? chosenAbsenceTypeId
           : undefined,
     };
     return new Promise<void>((resolve) => {
@@ -892,11 +913,12 @@ export default function PersonDetailScreen() {
 
   function closeStatusConfirmation() {
     setConfirmAction(null);
-    setDeactivateOutcome("inactive");
     setConfirmationError(null);
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
     setInactiveNote("");
+    setReturnDate(null);
+    setAwayAbsenceTypeId(null);
   }
 
   function confirmInvitationAction(): Promise<void> | undefined {
@@ -909,40 +931,63 @@ export default function PersonDetailScreen() {
     });
   }
 
-  const statusConfirmationTitle =
-    confirmAction === "deactivate"
-      ? `Deactivate ${getFullName(person)}?`
-      : confirmAction === "activate"
-        ? `Activate ${getFullName(person)}?`
-        : `Remove ${getFullName(person)}?`;
-  // The Deactivate sheet has no body of its own: the two options below carry
-  // the copy, and a paragraph above them would only say it a third time.
-  const statusConfirmationBody =
-    confirmAction === "deactivate"
-      ? undefined
-      : confirmAction === "activate"
-        ? "They'll return to active staff lists and scheduling."
-        : "They'll lose access and be removed from active staff lists. Their history stays intact.";
-  const statusConfirmationLabel =
-    confirmAction === "deactivate"
-      ? deactivateRemoves
-        ? "Remove"
-        : "Mark inactive"
-      : confirmAction === "activate"
-        ? "Activate"
-        : "Remove";
+  const absenceTypes = bootstrapQuery.data?.absenceTypes ?? [];
+  const chosenAbsenceTypeId = returnDate ? awayAbsenceTypeId : null;
+  const chosenAbsence = absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId);
+  const chosenAbsenceName = chosenAbsence ? (chosenAbsence.name ?? chosenAbsence.label) : null;
+  const awayAbsenceChoices =
+    returnDate && absenceTypes.length > 0 ? (
+      <ProfileChoiceGroup
+        items={[
+          { id: -1, name: "No absence" },
+          ...absenceTypes.map((absenceType) => ({
+            id: absenceType.id,
+            name: absenceType.name ?? absenceType.label,
+          })),
+        ]}
+        label="Absence"
+        selection="single"
+        selectedIds={[chosenAbsenceTypeId ?? -1]}
+        onToggle={(id) => setAwayAbsenceTypeId(id === -1 ? null : id)}
+      />
+    ) : null;
+  const statusCopy = confirmAction
+    ? describeStatusAction(
+        confirmAction === "activate"
+          ? (statusUndoAction(person.status) ?? "markActive")
+          : confirmAction === "deactivate"
+            ? "markAway"
+            : confirmAction === "setReturnDate"
+              ? "setReturnDate"
+              : "archive",
+        getFullName(person),
+        confirmAction === "deactivate" || confirmAction === "setReturnDate"
+          ? {
+              returnDate,
+              currentReturnDate: person.awayUntil,
+              absenceName: chosenAbsenceName,
+            }
+          : {},
+      )
+    : null;
+  // A return date is the first day back, so the organization's tomorrow at the earliest.
+  const firstReturnDate = addDaysToIsoDate(
+    getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null),
+    1,
+  );
+  const undoAction = statusUndoAction(person.status);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
-      ? "Send invitation?"
+      ? `Send an invitation to ${person.email}?`
       : invitationConfirmAction === "resend"
-        ? "Reissue invitation?"
-        : "Revoke invitation?";
-  const invitationConfirmationBody =
+        ? `Reissue the invitation to ${person.email}?`
+        : `Revoke the invitation to ${person.email}?`;
+  const invitationConfirmationLead =
     invitationConfirmAction === "create"
-      ? `An app invitation will be sent to ${person.email}.`
+      ? undefined
       : invitationConfirmAction === "resend"
-        ? `The current invitation for ${person.email} will be canceled and a new one will be sent.`
-        : `The current invite link for ${person.email} will stop working.`;
+        ? "The current invitation will be canceled."
+        : "The invite link stops working.";
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
       ? "Send invitation"
@@ -1349,41 +1394,55 @@ export default function PersonDetailScreen() {
                   tone="secondary"
                 />
               ) : null}
-              {person.status !== "active" ? (
+              {undoAction ? (
                 <Button
                   disabled={statusMutation.isPending || isSelf}
-                  label="Activate"
+                  label={describeStatusAction(undoAction, getFullName(person)).label}
                   loading={statusMutation.isPending}
                   onPress={() => setConfirmAction("activate")}
                   tone="success"
                 />
               ) : null}
-              {person.status === "active" ? (
+              {person.status === "inactive" ? (
                 <Button
                   disabled={statusMutation.isPending || isSelf}
-                  label="Deactivate"
+                  label={
+                    describeStatusAction("setReturnDate", getFullName(person), {
+                      currentReturnDate: person.awayUntil,
+                    }).label
+                  }
+                  onPress={() => {
+                    setReturnDate(person.awayUntil);
+                    setAwayAbsenceTypeId(person.awayAbsenceTypeId ?? null);
+                    setConfirmationError(null);
+                    setConfirmAction("setReturnDate");
+                  }}
+                  tone="secondary"
+                />
+              ) : null}
+              {person.status === "active" && canBeInactive ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label={describeStatusAction("markAway", getFullName(person)).label}
                   onPress={() => {
                     setInactiveNote("");
+                    setReturnDate(null);
                     setConfirmationError(null);
-                    setDeactivateOutcome(canBeInactive ? "inactive" : "remove");
                     setConfirmAction("deactivate");
                   }}
                   tone="warning"
                 />
               ) : null}
-              {/* Only reachable once someone is already inactive. While
-                  they're active, Remove is the second option inside
-                  Deactivate. */}
-              {person.status === "inactive" ? (
+              {person.status !== "removed" ? (
                 <Button
                   disabled={statusMutation.isPending || isSelf}
-                  label="Remove"
+                  label={describeStatusAction("archive", getFullName(person)).label}
                   onPress={() => {
                     setInactiveNote("");
                     setConfirmationError(null);
                     setConfirmAction("remove");
                   }}
-                  tone="danger"
+                  tone="secondary"
                 />
               ) : null}
             </ProfileActionStack>
@@ -1392,11 +1451,7 @@ export default function PersonDetailScreen() {
       )}
 
       <ConfirmationModal
-        body={
-          draft
-            ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
-            : ""
-        }
+        body="Check the address before saving."
         confirmLabel="Save"
         error={confirmationError}
         loading={updateMutation.isPending}
@@ -1405,25 +1460,35 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title="Change the staff email?"
+        title={
+          draft?.email.trim()
+            ? `Change the staff email to ${draft.email.trim()}?`
+            : "Change the staff email?"
+        }
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
       <ConfirmationModal
-        body={statusConfirmationBody}
-        confirmLabel="Activate"
+        body={statusCopy?.message || undefined}
+        summary={statusCopy ? { points: statusCopy.points } : undefined}
+        confirmLabel={statusCopy?.label ?? ""}
         error={confirmationError}
         loading={statusMutation.isPending}
         onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
-        title={statusConfirmationTitle}
+        title={statusCopy?.title ?? ""}
         visible={confirmAction === "activate"}
       />
       <BottomSheetModal
         debugName="Change staff status"
         dismissDisabled={statusMutation.isPending}
-        header={<SheetHeader title={statusConfirmationTitle} subtitle={statusConfirmationBody} />}
+        header={
+          <SheetHeader
+            title={statusCopy?.title ?? ""}
+            subtitle={statusCopy?.message || undefined}
+          />
+        }
         // The discard prompt rides inside the sheet: iOS refuses a second
         // Modal while this one is up, so as a sibling it never appeared and a
         // dismissal with a reason typed or Remove picked went nowhere.
@@ -1437,10 +1502,10 @@ export default function PersonDetailScreen() {
             <SheetActions
               primaryAction={
                 <Button
-                  label={statusConfirmationLabel}
+                  label={statusCopy?.label ?? ""}
                   loading={statusMutation.isPending}
                   onPress={confirmStatusAction}
-                  tone={resolvedStatusAction === "remove" ? "danger" : "warning"}
+                  tone={confirmAction === "remove" ? "danger" : "warning"}
                 />
               }
             >
@@ -1454,26 +1519,6 @@ export default function PersonDetailScreen() {
           </>
         }
       >
-        {confirmAction === "deactivate" ? (
-          <SelectionSection label="What should happen">
-            {canBeInactive ? (
-              <SelectionRow
-                detail="They'll be off the schedule and keep their access. You can reactivate them anytime."
-                label="Mark inactive"
-                disabled={statusMutation.isPending}
-                onPress={() => setDeactivateOutcome("inactive")}
-                selected={!deactivateRemoves}
-              />
-            ) : null}
-            <SelectionRow
-              detail="They'll lose access and won't appear in active staff. You can reactivate them later."
-              label="Remove from staff"
-              disabled={statusMutation.isPending}
-              onPress={() => setDeactivateOutcome("remove")}
-              selected={deactivateRemoves}
-            />
-          </SelectionSection>
-        ) : null}
         {confirmAction === "deactivate" || confirmAction === "remove" ? (
           <ProfileTextInput
             editable={!statusMutation.isPending}
@@ -1481,13 +1526,80 @@ export default function PersonDetailScreen() {
             autoCapitalize="sentences"
             label="Reason"
             placeholder={
-              resolvedStatusAction === "remove"
+              confirmAction === "remove"
                 ? "Reason (optional) - e.g. Left the company"
-                : "Reason (optional) - e.g. On leave until June"
+                : "Reason (optional) - e.g. Family leave"
             }
             value={inactiveNote}
             onChangeText={setInactiveNote}
           />
+        ) : null}
+        {confirmAction === "deactivate" ? (
+          <ReturnDateField
+            disabled={statusMutation.isPending}
+            minDate={firstReturnDate}
+            onChange={setReturnDate}
+            value={returnDate}
+          />
+        ) : null}
+        {confirmAction === "deactivate" ? awayAbsenceChoices : null}
+        {statusCopy && confirmAction !== "activate" ? (
+          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
+        ) : null}
+      </BottomSheetModal>
+      <BottomSheetModal
+        debugName="Set return date"
+        dismissDisabled={statusMutation.isPending}
+        header={
+          <SheetHeader
+            title={confirmAction === "setReturnDate" ? (statusCopy?.title ?? "") : ""}
+            subtitle={
+              confirmAction === "setReturnDate" ? statusCopy?.message || undefined : undefined
+            }
+          />
+        }
+        scrollable
+        visible={confirmAction === "setReturnDate"}
+        onDismiss={closeStatusConfirmation}
+        footer={
+          <>
+            {confirmationError ? <InlineError message={confirmationError} /> : null}
+            <SheetActions
+              primaryAction={
+                <Button
+                  disabled={
+                    returnDate === person.awayUntil &&
+                    chosenAbsenceTypeId === (person.awayAbsenceTypeId ?? null)
+                  }
+                  label={statusCopy?.label ?? ""}
+                  loading={statusMutation.isPending}
+                  onPress={confirmStatusAction}
+                  tone="primary"
+                />
+              }
+            >
+              <Button
+                label="Cancel"
+                disabled={statusMutation.isPending}
+                onPress={closeStatusConfirmation}
+                tone="plain"
+              />
+            </SheetActions>
+          </>
+        }
+      >
+        {confirmAction === "setReturnDate" ? (
+          <ReturnDateField
+            disabled={statusMutation.isPending}
+            initiallyOpen
+            minDate={firstReturnDate}
+            onChange={setReturnDate}
+            value={returnDate}
+          />
+        ) : null}
+        {confirmAction === "setReturnDate" ? awayAbsenceChoices : null}
+        {confirmAction === "setReturnDate" && statusCopy && statusCopy.points.length > 0 ? (
+          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}
       </BottomSheetModal>
       <ManagementAccessSheet
@@ -1512,7 +1624,7 @@ export default function PersonDetailScreen() {
         visible={showOrgRole}
       />
       <ConfirmationModal
-        body={invitationConfirmationBody}
+        body={invitationConfirmationLead}
         confirmLabel={invitationConfirmationLabel}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         error={invitationError}
@@ -1577,8 +1689,8 @@ function AccountLinkChallengeModal({
         </Text>
         <Text style={styles.modalInfoText}>
           {isMismatch
-            ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
-            : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
+            ? "The existing account is under a different name. Linking it updates the staff profile to match the account name."
+            : "An existing app account matches this staff profile. You can link it instead of sending a new invitation."}
         </Text>
       </View>
 

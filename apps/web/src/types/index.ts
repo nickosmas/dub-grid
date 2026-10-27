@@ -633,6 +633,21 @@ export interface BillingOperationSummary {
   createdAt: string;
 }
 
+/** Who takes a seat and who doesn't, line by line. `total` is the billed count. */
+export interface SeatBreakdown {
+  activeStaff: number;
+  /** Away staff whose live membership can still manage (Admin or Super Admin). */
+  awayManaging: number;
+  awayManagingNames: string[];
+  /** Live members linked to no staff record. */
+  managementOnly: number;
+  /** Not billed. */
+  awayNotBilled: number;
+  /** Not billed. */
+  archived: number;
+  total: number;
+}
+
 export interface OrganizationBillingSummary {
   orgId: string;
   orgName: string;
@@ -644,6 +659,8 @@ export interface OrganizationBillingSummary {
   canceledAt: string | null;
   subscriptionSeats: number | null;
   appUserCount: number;
+  /** Who takes a seat and who doesn't; its total is `appUserCount`. */
+  seatBreakdown?: SeatBreakdown;
   seatDelta: number | null;
   hasStripeCustomer: boolean;
   hasStripeSubscription: boolean;

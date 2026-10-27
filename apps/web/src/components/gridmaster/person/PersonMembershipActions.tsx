@@ -144,12 +144,12 @@ export function PersonMembershipActions({
 
       {roleConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Change role"
+          title={`Change this person's role in ${organization.org.name}?`}
           message={
             <div className="flex flex-col gap-3">
               <span>
-                {name} is {formatOrganizationRoleLabel(membership.orgRole)} in{" "}
-                {organization.org.name}. Their new role applies at their next sign-in.
+                They&apos;re {formatOrganizationRoleLabel(membership.orgRole)} now. The new role
+                applies at their next sign-in.
               </span>
               <CustomSelect
                 ariaLabel="New role"
@@ -169,8 +169,8 @@ export function PersonMembershipActions({
 
       {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Remove from organization"
-          message={`Remove ${name} from ${organization.org.name}? They lose access to it now. Their staff record stays.`}
+          title={`Remove this person from ${organization.org.name}?`}
+          message="They lose access to it now, and their staff record stays."
           confirmLabel="Remove"
           variant="danger"
           isLoading={busy}

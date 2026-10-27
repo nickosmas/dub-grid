@@ -1134,7 +1134,7 @@ describe("operations reports", () => {
     );
     expect(employeeDirectoryCsv).not.toContain("full_time");
     expect(buildOperationsReportCsv(payload, "account-access")).toContain(
-      "#1002,Blake Diaz,Inactive,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
+      "#1002,Blake Diaz,Away,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
     );
     expect(buildOperationsReportCsv(payload, "schedule-matrix")).toContain(
       'Employee,"May 3, 2026","May 4, 2026"',

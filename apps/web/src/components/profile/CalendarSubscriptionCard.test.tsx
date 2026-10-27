@@ -95,7 +95,11 @@ describe("CalendarSubscriptionCard", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Replace link" }));
     const replaceDialog = screen.getByRole("dialog", { name: "Replace private link?" });
-    expect(within(replaceDialog).getByText(/previous URL stops working/i)).toBeInTheDocument();
+    expect(
+      within(within(replaceDialog).getByRole("region", { name: "Keep in mind" })).getByText(
+        "The previous URL stops working immediately.",
+      ),
+    ).toBeInTheDocument();
     expect(rotateSubscription).not.toHaveBeenCalled();
     fireEvent.click(within(replaceDialog).getByRole("button", { name: "Replace link" }));
     expect(await screen.findByText(`${PRIVATE_URL}-new`)).toBeInTheDocument();
@@ -103,7 +107,11 @@ describe("CalendarSubscriptionCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Disable subscription" }));
     const disableDialog = screen.getByRole("dialog", { name: "Disable calendar subscription?" });
-    expect(within(disableDialog).getByText(/stop receiving updates/i)).toBeInTheDocument();
+    expect(
+      within(disableDialog).getByText(
+        "Calendar apps stop receiving updates until you create a new link.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(within(disableDialog).getByRole("button", { name: "Disable subscription" }));
     await waitFor(() => expect(revokeSubscription).toHaveBeenCalled());
     expect(await screen.findByRole("button", { name: "Create private link" })).toBeInTheDocument();

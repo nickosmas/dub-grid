@@ -256,7 +256,7 @@ export function buildNavGroups(
           label: "Subscription",
           Icon: BillingIcon,
           helpHint:
-            "Seats are active staff plus management-only users. Inactive and removed staff are not billed.",
+            "Seats are active staff, Away staff who can manage, and managers without a staff record. Archived staff are not billed.",
           description: "Review subscription status, seats, and Stripe billing access.",
         },
       ],

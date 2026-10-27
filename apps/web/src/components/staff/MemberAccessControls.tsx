@@ -116,11 +116,21 @@ export function MemberAccessControls({
           </div>
           {pendingRole && !stepUp.dialog && (
             <ConfirmDialog
-              title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
-              message={
+              title={
                 pendingInvitationEmail
-                  ? `Change access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their current invite link stops working immediately, and a new one is sent to ${pendingInvitationEmail}.`
-                  : `Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`
+                  ? `Change invitation access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
+                  : `Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
+              }
+              message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
+              summary={
+                pendingInvitationEmail
+                  ? {
+                      points: [
+                        "The current invite link stops working immediately.",
+                        `A new invite link is sent to ${pendingInvitationEmail}.`,
+                      ],
+                    }
+                  : undefined
               }
               confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
               variant="warning"

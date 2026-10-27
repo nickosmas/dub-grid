@@ -517,12 +517,14 @@ export default function GridmasterAccountsView({
       {activationConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={
-            activationConfirm.deactivatedAt ? "Reactivate Gridmaster" : "Deactivate Gridmaster"
+            activationConfirm.deactivatedAt
+              ? `Reactivate ${activationConfirm.email}?`
+              : `Deactivate ${activationConfirm.email}?`
           }
           message={
             activationConfirm.deactivatedAt
-              ? `Reactivate "${activationConfirm.email}"? They will regain gridmaster access.`
-              : `Deactivate "${activationConfirm.email}"? They will be blocked from gridmaster access.`
+              ? "They regain Gridmaster access."
+              : "They're blocked from Gridmaster access."
           }
           confirmLabel={activationConfirm.deactivatedAt ? "Reactivate" : "Deactivate"}
           variant={activationConfirm.deactivatedAt ? "info" : "danger"}
@@ -534,8 +536,8 @@ export default function GridmasterAccountsView({
 
       {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Force logout"
-          message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
+          title={`End every session for ${forceLogoutConfirm.email}?`}
+          message="They need to sign in again."
           confirmLabel="Force logout"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
@@ -547,8 +549,7 @@ export default function GridmasterAccountsView({
 
       {resetConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Send Password Reset"
-          message={`Send a password reset email to "${resetConfirm.email}"?`}
+          title={`Send a password reset email to ${resetConfirm.email}?`}
           confirmLabel="Send reset email"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
@@ -559,8 +560,8 @@ export default function GridmasterAccountsView({
 
       {promoteConfirmEmail && !stepUp.dialog && (
         <ConfirmDialog
-          title="Promote Gridmaster"
-          message={`Promote "${promoteConfirmEmail}" to platform gridmaster? This grants access to gridmaster oversight tools.`}
+          title={`Promote ${promoteConfirmEmail} to platform Gridmaster?`}
+          message="They get access to Gridmaster oversight tools."
           confirmLabel="Promote"
           variant="warning"
           isLoading={promoteLoading}

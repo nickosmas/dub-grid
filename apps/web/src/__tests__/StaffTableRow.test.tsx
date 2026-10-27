@@ -132,7 +132,11 @@ describe("StaffReorderListRow", () => {
 });
 
 describe("StaffTableRow column gating", () => {
-  function renderRow(canViewEmployeeDetails: boolean, showStatusColumn = true) {
+  function renderRow(
+    canViewEmployeeDetails: boolean,
+    showStatusColumn = true,
+    status: Partial<Employee> = { status: "active" },
+  ) {
     return render(
       <table>
         <tbody>
@@ -141,7 +145,7 @@ describe("StaffTableRow column gating", () => {
               id: "emp-1",
               firstName: "Alice",
               lastName: "Smith",
-              status: "active",
+              ...status,
               email: "alice@example.com",
               employmentType: "full_time",
               employeeNumber: 1001,
@@ -187,6 +191,12 @@ describe("StaffTableRow column gating", () => {
       "text-[var(--dg-color-text-primary)]",
     );
     expect(getByText("Full-time").className).toContain("text-[var(--dg-color-text-primary)]");
+  });
+
+  it("names an Away person's return date in the status pill", () => {
+    const { getByText } = renderRow(true, true, { status: "inactive", awayUntil: "2027-01-04" });
+
+    expect(getByText("Away until Jan 4")).toBeInTheDocument();
   });
 
   it("shows status only when the selected tab combines employee statuses", () => {

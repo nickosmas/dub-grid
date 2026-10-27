@@ -357,8 +357,7 @@ export default function GridmasterComplianceView({
       {stepUp.dialog}
       {exportConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Export High-Risk Audit"
-          message="Export up to 1,000 high-risk activity records?"
+          title="Export up to 1,000 high-risk activity records?"
           confirmLabel="Export"
           variant="warning"
           isLoading={exporting}

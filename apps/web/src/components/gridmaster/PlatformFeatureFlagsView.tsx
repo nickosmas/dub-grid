@@ -70,6 +70,11 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
     description:
       "A background job that automatically closes old, unanswered shift requests. Turning this off means unanswered requests stay open instead of expiring automatically.",
   },
+  cron_return_from_away: {
+    label: "Return From Away",
+    description:
+      "A daily background job that sets people back to Active on their return date. Turning this off leaves them Away until someone marks them active; they can still be scheduled from that date.",
+  },
   cron_sandbox_cleanup: {
     label: "Sandbox Cleanup",
     description:
@@ -295,11 +300,15 @@ export default function PlatformFeatureFlagsView() {
               ? `Turn Off "${pendingInfo.label}"?`
               : `Turn On "${pendingInfo.label}"?`
           }
-          message={
-            pendingFlag.enabled
-              ? `This affects every organization on the platform immediately. ${pendingInfo.description}`
-              : `This restores it for every organization on the platform immediately. ${pendingInfo.description}`
-          }
+          message={pendingInfo.description}
+          summary={{
+            points: [
+              pendingFlag.enabled
+                ? "Every organization on the platform is affected."
+                : "Every organization on the platform gets it back.",
+              "The change takes effect immediately.",
+            ],
+          }}
           confirmLabel={pendingFlag.enabled ? "Turn it off" : "Turn it on"}
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}

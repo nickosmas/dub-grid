@@ -451,18 +451,17 @@ export default function NotificationsScreen() {
         />
       ) : null}
       <ConfirmationModal
-        body={
-          unreadCount === 1
-            ? "Mark your one unread alert as read?"
-            : `Mark all ${unreadCount} unread alerts as read?`
-        }
         cancelLabel="Cancel"
         confirmLabel="Mark all read"
         confirmTone="primary"
         loading={busy}
         onCancel={() => setConfirmingMarkAllRead(false)}
         onConfirm={() => handleMarkAllRead()}
-        title="Mark all read"
+        title={
+          unreadCount === 1
+            ? "Mark your one unread alert as read?"
+            : `Mark all ${unreadCount} alerts as read?`
+        }
         visible={confirmingMarkAllRead}
       />
     </Screen>

@@ -15,8 +15,10 @@ import type {
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
 import {
+  EMPLOYMENT_STATUS_LABELS,
   ORG_ROLE_PRIVILEGE_ORDER,
   getEffectiveOrgRole,
+  type EmployeeStatus,
   getOrgRolePrivilegeRank,
 } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
@@ -76,11 +78,14 @@ import { ManagementUserActionsSheet } from "../components/ManagementUserActionsS
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
+import { getMobileStatusPill } from "../lib/statusPill";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-type StatusFilter = "active" | "inactive";
+const EMPLOYEE_STATUSES: readonly EmployeeStatus[] = ["active", "inactive", "removed"];
+
+type StatusFilter = EmployeeStatus;
 /** Which half of the directory the list is showing, mirroring web's toggle. */
 type RosterTab = "schedule" | "management";
 type SortMode = "seniority" | "alphabetical" | "access";
@@ -410,11 +415,7 @@ export default function PeopleScreen() {
             person.email.toLowerCase().includes(normalizedSearch) ||
             person.phone.toLowerCase().includes(normalizedSearch);
 
-        const matchesStatus = !canManageEmployees
-          ? true
-          : staffFilters.status === "active"
-            ? person.status === "active"
-            : person.status !== "active";
+        const matchesStatus = !canManageEmployees ? true : person.status === staffFilters.status;
 
         const matchesFocus =
           staffFilters.focusAreaId === "all"
@@ -488,8 +489,8 @@ export default function PeopleScreen() {
     staffFilters,
     visiblePeople,
   ]);
-  const activeCount = visiblePeople.filter((person) => person.status === "active").length;
-  const inactiveCount = visiblePeople.length - activeCount;
+  const countWithStatus = (status: EmployeeStatus) =>
+    visiblePeople.filter((person) => person.status === status).length;
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
   const filteredManagementUsers = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
@@ -638,6 +639,7 @@ export default function PeopleScreen() {
           name={getFullName(person)}
           navigable={navigable}
           orgRole={person.orgRole}
+          staffStatus={person}
           onPress={() => {
             if (isSelf) {
               router.push("/(tabs)/profile");
@@ -885,18 +887,15 @@ export default function PeopleScreen() {
 
             {canManageEmployees ? (
               <SelectionSection label="Status">
-                <SelectionRow
-                  detail={`${activeCount} people`}
-                  label="Active staff"
-                  onPress={() => setStaffFilter("status", "active")}
-                  selected={staffFilters.status === "active"}
-                />
-                <SelectionRow
-                  detail={`${inactiveCount} people`}
-                  label="Inactive staff"
-                  onPress={() => setStaffFilter("status", "inactive")}
-                  selected={staffFilters.status === "inactive"}
-                />
+                {EMPLOYEE_STATUSES.map((status) => (
+                  <SelectionRow
+                    detail={`${countWithStatus(status)} people`}
+                    key={status}
+                    label={EMPLOYMENT_STATUS_LABELS[status]}
+                    onPress={() => setStaffFilter("status", status)}
+                    selected={staffFilters.status === status}
+                  />
+                ))}
               </SelectionSection>
             ) : null}
 
@@ -1092,7 +1091,7 @@ export default function PeopleScreen() {
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "Safeguards will run before this account loses access."
+            ? "This teammate's account will lose access. Safeguards run before it does."
             : profileRequestConfirmation?.action === "approve"
               ? "The change will be applied to this teammate's profile."
               : "The teammate's profile will stay as it is."
@@ -1172,6 +1171,7 @@ function PersonRow({
   name,
   navigable,
   orgRole,
+  staffStatus,
   subtitle,
   isLast,
   onPress,
@@ -1182,6 +1182,8 @@ function PersonRow({
   name: string;
   navigable: boolean;
   orgRole: MobileOrgRole;
+  /** A staff record's status; a pill names it unless they're Active. */
+  staffStatus?: Pick<MobilePerson, "status" | "awayUntil">;
   subtitle: string;
   isLast: boolean;
   onPress: () => void;
@@ -1192,6 +1194,7 @@ function PersonRow({
   const { resolvedTheme } = useThemeMode();
   const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
+  const statusPill = staffStatus ? getMobileStatusPill(mobileColors, staffStatus) : null;
   const initials =
     name
       .split(" ")
@@ -1235,6 +1238,13 @@ function PersonRow({
                 />
                 <Text fit="compact" style={orgRoleBadge.textStyle}>
                   {orgRoleBadge.label}
+                </Text>
+              </View>
+            ) : null}
+            {statusPill ? (
+              <View style={statusPill.containerStyle}>
+                <Text fit="compact" style={statusPill.textStyle}>
+                  {statusPill.label}
                 </Text>
               </View>
             ) : null}

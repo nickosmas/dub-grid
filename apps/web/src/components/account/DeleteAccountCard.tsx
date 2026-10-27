@@ -121,7 +121,7 @@ export default function DeleteAccountCard() {
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
-                Your account, profile and sessions are removed everywhere. This cannot be undone.
+                Your account, profile and sessions are removed everywhere. This can't be undone.
               </span>
               <label className="dg-label" htmlFor="delete-account-confirm-input">
                 Type <strong>{CONFIRM_PHRASE}</strong> to confirm

@@ -147,6 +147,7 @@
     "schedule:github:cron-expire-requests:1": { "category": "product" },
     "schedule:github:dependency-audit:1": { "category": "repository-maintenance" },
     "schedule:github:e2e:1": { "category": "repository-maintenance" },
+    "schedule:vercel:/api/cron/return-from-away": { "category": "product" },
     "schedule:vercel:/api/cron/sandbox-cleanup": { "category": "product" },
     "schedule:vercel:/api/cron/trial-expiry": { "category": "product" }
   }

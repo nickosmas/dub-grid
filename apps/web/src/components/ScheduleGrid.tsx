@@ -27,6 +27,7 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { formatReturnDate } from "@dubgrid/domain";
 import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
@@ -136,6 +137,9 @@ import {
 } from "./schedule-grid/badges";
 import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
+import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
+import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
+import { awayLockedHint, awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -1770,6 +1774,7 @@ const SectionBlock = memo(function SectionBlock({
                       key={key}
                       role="columnheader"
                       className="dg-grid-slot dg-grid-slot--header"
+                      data-date-key={key}
                       data-leading-divider={
                         index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
                       }
@@ -2113,14 +2118,48 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              const rowShiftLabels = weekDates.map((date) => shiftForKey(emp.id, date));
-              const rowAbsenceTypeIds = weekDates.map(
-                (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
+              // Someone away until a date (51e) has an Away bar on those days
+              // from today on, and nothing else there.
+              const rowAwayUntil = awayReturnDate(emp);
+              const rowAwayDays = buildRowAwayDays(
+                rowAwayUntil,
+                weekDates.map((date) => formatDateKey(date)),
+                todayKey,
+                splitAtIndex,
               );
+              const rowAwayHint = rowAwayUntil ? awayLockedHint(rowAwayUntil) : undefined;
+              const rowAwayAbsence =
+                emp.awayAbsenceTypeId != null
+                  ? (absenceTypeMap?.get(emp.awayAbsenceTypeId) ?? null)
+                  : null;
+              const rowShiftLabels = weekDates.map((date, index) =>
+                rowAwayDays?.runs[index] ? null : shiftForKey(emp.id, date),
+              );
+              const rowAbsenceTypeIds = weekDates.map((date, index) =>
+                rowAwayDays?.runs[index] ? null : (absenceTypeIdForKey?.(emp.id, date) ?? null),
+              );
+              // Whole-day absences on days in a row draw as one bar per week
+              // (item 52). Bulk removal selects day by day, so it keeps pills.
+              const rowAbsenceRuns = bulkDeleteMode
+                ? null
+                : buildRowAbsenceRuns(
+                    emp.id,
+                    weekDates,
+                    {
+                      shiftForKey,
+                      segmentsForKey,
+                      draftKindForKey,
+                      publishDiffForKey,
+                      showPublishDiffOverlay,
+                      hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
+                    },
+                    splitAtIndex,
+                    { labels: rowShiftLabels, absenceTypeIds: rowAbsenceTypeIds },
+                  );
               const grownCellHeights = new Set<string>();
               const rowCellGrows = weekDates.map(() => false);
               for (const [index, date] of weekDates.entries()) {
-                if (rowAbsenceTypeIds[index] != null) continue;
+                if (rowAbsenceTypeIds[index] != null || rowAwayDays?.runs[index]) continue;
                 const labels = rowShiftLabels[index]?.split("/") ?? [];
                 // A rest-of-day absence (item 45) is one more pill, after the shifts.
                 const pillCount =
@@ -2509,7 +2548,11 @@ const SectionBlock = memo(function SectionBlock({
                       // not open. Everything else there starts past it.
                       const cornerLockClearance = hasPeerEditor ? LOCK_CORNER_CLEARANCE : 0;
 
-                      const showDiffCellTint = !!draftKind || showsPublishDiff;
+                      const awayRunDay = rowAwayDays?.runs[index] ?? null;
+                      // Before the return date nothing can be scheduled for them.
+                      const isAwayLocked = !!rowAwayDays?.locked[index];
+                      const isDayInteractive = isCellInteractive && !isAwayLocked;
+                      const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                       // The row above paints its own bottom stroke inside its
                       // own box — the header cells and the open-shifts row both
                       // do it with a background-image at their bottom edge. Row
@@ -2525,6 +2568,7 @@ const SectionBlock = memo(function SectionBlock({
                       const hasDraggableEntry =
                         canDragShifts &&
                         !bulkDeleteMode &&
+                        !isAwayLocked &&
                         !!shiftLabel &&
                         shiftLabel !== "OFF" &&
                         draftKind !== "deleted";
@@ -2535,6 +2579,10 @@ const SectionBlock = memo(function SectionBlock({
                         ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
                         : null;
                       const leadingDividerInset = index === 0 ? 0 : 1;
+                      const absenceRunDay = rowAbsenceRuns?.days[index] ?? null;
+                      const absenceRunInside =
+                        (absenceRunDay != null && absenceRunDay.position !== "start") ||
+                        (awayRunDay != null && awayRunDay.position !== "start");
                       // Only the cell's own top divider eats into its box. The
                       // header/open-shifts stroke above row 0 lives in that
                       // row's box, so row 0 needs no inset and its pills line up
@@ -2552,29 +2600,41 @@ const SectionBlock = memo(function SectionBlock({
                           data={{
                             cellId,
                           }}
-                          disabled={!isCellInteractive || bulkDeleteMode}
+                          disabled={!isDayInteractive || bulkDeleteMode}
                           className="dg-grid-cell"
                           role="gridcell"
                           aria-label={
-                            shiftLabel && shiftLabel !== "OFF"
-                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
-                              : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
+                            awayRunDay
+                              ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
+                              : shiftLabel && shiftLabel !== "OFF"
+                                ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
+                                : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                           }
                           aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
-                          tabIndex={isCellInteractive || isBulkSelectable ? 0 : -1}
+                          tabIndex={isDayInteractive || isBulkSelectable ? 0 : -1}
                           data-emp-id={emp.id}
                           data-date-key={dateKey}
                           data-section-id={sectionId}
-                          data-interactive={isCellInteractive ? "true" : "false"}
+                          data-interactive={isDayInteractive ? "true" : "false"}
                           data-peer-editing={hasPeerEditor ? "true" : "false"}
                           data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
                           data-slot="cell"
                           data-leading-divider={
-                            index === 0 ? "none" : isSplitDayDivider(index) ? "split" : "light"
+                            index === 0 || absenceRunInside
+                              ? "none"
+                              : isSplitDayDivider(index)
+                                ? "split"
+                                : "light"
                           }
                           data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
                           data-today={isToday ? "true" : undefined}
                           data-top-divider={topDivider}
+                          data-absence-run={absenceRunDay?.position}
+                          data-absence-run-index={absenceRunDay?.runIndex}
+                          data-away-run={awayRunDay?.position}
+                          data-away-locked={isAwayLocked ? "true" : undefined}
+                          title={isAwayLocked ? rowAwayHint : undefined}
+                          aria-description={isAwayLocked ? rowAwayHint : undefined}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2585,15 +2645,33 @@ const SectionBlock = memo(function SectionBlock({
                               : showDiffCellTint
                                 ? rowBg
                                 : undefined,
-                            zIndex: showDiffCellTint ? 8 : ri === 0 ? 5 : undefined,
+                            // A run's bar crosses into the next cells, so none of
+                            // them may stack its own background above it.
+                            zIndex: showDiffCellTint
+                              ? 8
+                              : ri === 0 && !absenceRunDay && !awayRunDay
+                                ? 5
+                                : undefined,
                           }}
                           onFocus={() => onCellFocus?.(cellId)}
-                          onMouseEnter={() => onCellHover?.(cellId)}
-                          onClick={() => triggerCellActivation(emp, date, "click")}
-                          onContextMenu={(event) =>
-                            triggerCellContextMenu(event, event.currentTarget, cellId, emp, date)
+                          onMouseEnter={(event) => {
+                            onCellHover?.(cellId);
+                            if (absenceRunDay) setAbsenceRunHover(event.currentTarget, true);
+                          }}
+                          onMouseLeave={
+                            absenceRunDay
+                              ? (event) => setAbsenceRunHover(event.currentTarget, false)
+                              : undefined
                           }
+                          onClick={() => {
+                            if (!isAwayLocked) triggerCellActivation(emp, date, "click");
+                          }}
+                          onContextMenu={(event) => {
+                            if (isAwayLocked) return;
+                            triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
+                          }}
                           onKeyDown={(event) => {
+                            if (isAwayLocked) return;
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               triggerCellActivation(emp, date, "keyboard");
@@ -2624,7 +2702,36 @@ const SectionBlock = memo(function SectionBlock({
                                 -
                               </span>
                             )}
-                            {shiftLabel && shiftLabel !== "OFF" ? (
+                            {absenceRunDay?.position === "start" &&
+                              cellAbsenceType &&
+                              dragAbsenceStripes && (
+                                <AbsenceRunBar
+                                  runIndex={absenceRunDay.runIndex}
+                                  name={cellAbsenceType.name || cellAbsenceType.label}
+                                  length={absenceRunDay.length}
+                                  stripes={dragAbsenceStripes}
+                                  top={insetFromVisibleCellTop(4)}
+                                  left={insetFromVisibleCellLeft(4)}
+                                  sideInset={4}
+                                  bottom={4}
+                                />
+                              )}
+                            {awayRunDay?.position === "start" && (
+                              <AwayRunBar
+                                runIndex={awayRunDay.runIndex}
+                                absenceName={
+                                  rowAwayAbsence
+                                    ? rowAwayAbsence.name || rowAwayAbsence.label
+                                    : null
+                                }
+                                length={awayRunDay.length}
+                                top={insetFromVisibleCellTop(4)}
+                                left={insetFromVisibleCellLeft(4)}
+                                sideInset={4}
+                                bottom={4}
+                              />
+                            )}
+                            {awayRunDay ? null : shiftLabel && shiftLabel !== "OFF" ? (
                               <DraggableShift
                                 id={`drag_${emp.id}_${dateKey}_${sectionName}`}
                                 data={{
@@ -3127,6 +3234,13 @@ const SectionBlock = memo(function SectionBlock({
                                     // Notes always take a row of their own, below every line of text.
                                     const singleHasNotes = noteMarks.length > 0;
                                     const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
+                                    // A day in a run is a clear segment over the run's
+                                    // bar: open on the sides it shares with the run.
+                                    const runSegment = isAbsence ? absenceRunDay : null;
+                                    const runOpenLeft =
+                                      !!runSegment && runSegment.position !== "start";
+                                    const runOpenRight =
+                                      !!runSegment && runSegment.position !== "end";
                                     return (
                                       <>
                                         {isBulkSelected && (
@@ -3159,23 +3273,39 @@ const SectionBlock = memo(function SectionBlock({
                                         >
                                           <div
                                             data-shift-pill="single"
+                                            data-absence-run-segment={runSegment?.position}
+                                            className={
+                                              runSegment ? "dg-absence-run-segment" : undefined
+                                            }
                                             style={{
                                               position: "absolute",
                                               top: insetFromVisibleCellTop(singleTopInset),
-                                              right: `${singleSideInset}px`,
+                                              right: runOpenRight ? 0 : `${singleSideInset}px`,
                                               bottom: `${singleBottomInset}px`,
-                                              left: insetFromVisibleCellLeft(singleSideInset),
-                                              background: !singleUsesShiftColor
-                                                ? "var(--dg-color-surface)"
-                                                : absenceStripes
-                                                  ? absenceStripeCss(
-                                                      absenceStripes.stripeA,
-                                                      absenceStripes.stripeB,
-                                                    )
-                                                  : effectiveColor,
+                                              left: runOpenLeft
+                                                ? 0
+                                                : insetFromVisibleCellLeft(singleSideInset),
+                                              ...(runSegment && absenceStripes
+                                                ? {
+                                                    ["--dg-absence-run-edge" as string]:
+                                                      absenceStripes.border,
+                                                  }
+                                                : null),
+                                              background: runSegment
+                                                ? "transparent"
+                                                : !singleUsesShiftColor
+                                                  ? "var(--dg-color-surface)"
+                                                  : absenceStripes
+                                                    ? absenceStripeCss(
+                                                        absenceStripes.stripeA,
+                                                        absenceStripes.stripeB,
+                                                      )
+                                                    : effectiveColor,
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
-                                              border: effectiveBorder,
-                                              borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                              border: runSegment ? undefined : effectiveBorder,
+                                              borderRadius: runSegment
+                                                ? `${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px`
+                                                : SINGLE_SHIFT_PILL_RADIUS,
                                               color: singleForegroundColor,
                                               zIndex: singleHasChangeBadge ? 2 : 1,
                                               boxShadow:
@@ -3301,7 +3431,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     isNameMode && singleIsThreeRow ? 1.15 : 1.2,
                                                 }}
                                               >
-                                                {singleDisplayLabel}
+                                                {runSegment ? null : singleDisplayLabel}
                                                 {!customTimes && isOvernight && (
                                                   <sup
                                                     style={{

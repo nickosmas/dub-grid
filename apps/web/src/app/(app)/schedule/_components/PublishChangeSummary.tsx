@@ -22,12 +22,6 @@ function editorLabel(row: PublishEditorRow): string {
   return row.name ?? "Another editor";
 }
 
-function joinNames(names: string[]): string {
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-}
-
 /**
  * Body of the publish confirmation.
  *
@@ -57,40 +51,67 @@ export function publishCoverageChangeText(change: PublishCoverageChange): string
   return `This publish ${opens} and ${closes}${where}.`;
 }
 
-export function PublishChangeSummary({
+/**
+ * What publishing does. Two or more go in the dialog's summary box; a single
+ * one reads as a sentence in the summary's message instead.
+ */
+export function publishSummaryPoints({
   editorRows,
   activeEditors = [],
-  windowLabel,
-  totalChanges,
   coverageGapCount,
   coverageChange = null,
 }: {
   editorRows: PublishEditorRow[];
   /** Other people on the schedule right now, drafts or not. */
   activeEditors?: PublishActiveEditor[];
-  windowLabel: string;
-  totalChanges: number;
   coverageGapCount: number;
   /** Null when the organization has no coverage requirements. */
   coverageChange?: PublishCoverageChange | null;
-}) {
-  const otherEditors = editorRows.filter((row) => !row.isCurrentUser);
+}): string[] {
+  const points: string[] = [];
+  if (editorRows.some((row) => !row.isCurrentUser)) {
+    points.push("Drafts from other editors are included, not just your own.");
+  }
+  if (activeEditors.length > 0) {
+    points.push(
+      activeEditors.length === 1
+        ? "Anything the other editor on the schedule hasn't saved yet won't be published."
+        : `Anything the ${activeEditors.length} other editors on the schedule haven't saved yet won't be published.`,
+    );
+  }
+  if (coverageChange) points.push(publishCoverageChangeText(coverageChange));
+  if (coverageGapCount > 0) {
+    points.push(
+      `${coverageGapCount} coverage gap${coverageGapCount === 1 ? "" : "s"} remain${
+        coverageGapCount === 1 ? "s" : ""
+      } in this period.`,
+    );
+  }
+  return points;
+}
 
+export function PublishChangeSummary({
+  editorRows,
+  points = [],
+}: {
+  editorRows: PublishEditorRow[];
+  /** From `publishSummaryPoints`; only a lone point is written into the message. */
+  points?: string[];
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <p
-        style={{
-          margin: 0,
-          fontSize: "var(--dg-fs-body-sm)",
-          lineHeight: 1.5,
-          color: "var(--dg-color-text-secondary)",
-        }}
-      >
-        {`Publish ${totalChanges} unpublished change${totalChanges === 1 ? "" : "s"} for ${windowLabel}?`}
-        {otherEditors.length > 0
-          ? " This includes drafts from other editors, not just your own."
-          : ""}
-      </p>
+      {points.length === 1 ? (
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-body-sm)",
+            lineHeight: 1.5,
+            color: "var(--dg-color-text-secondary)",
+          }}
+        >
+          {points[0]}
+        </p>
+      ) : null}
 
       {editorRows.length > 0 && (
         <div
@@ -111,53 +132,6 @@ export function PublishChangeSummary({
             />
           ))}
         </div>
-      )}
-
-      {activeEditors.length > 0 && (
-        <p
-          style={{
-            margin: 0,
-            borderRadius: "var(--dg-radius-lg)",
-            padding: "10px 12px",
-            fontSize: "var(--dg-fs-footnote)",
-            lineHeight: 1.5,
-            background: "var(--dg-color-warning-bg)",
-            color: "var(--dg-color-warning-text)",
-          }}
-        >
-          {joinNames(activeEditors.map((editor) => editor.name))}{" "}
-          {activeEditors.length === 1 ? "is" : "are"} on the schedule right now. Anything they have
-          not saved yet will not be published.
-        </p>
-      )}
-
-      {coverageChange && (
-        <p
-          className="dg-tabular-nums"
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-footnote)",
-            lineHeight: 1.5,
-            color: "var(--dg-color-text-secondary)",
-          }}
-        >
-          {publishCoverageChangeText(coverageChange)}
-        </p>
-      )}
-
-      {coverageGapCount > 0 && (
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-footnote)",
-            lineHeight: 1.5,
-            color: "var(--dg-color-text-secondary)",
-          }}
-        >
-          {`${coverageGapCount} coverage gap${coverageGapCount === 1 ? "" : "s"} remain${
-            coverageGapCount === 1 ? "s" : ""
-          } in this period.`}
-        </p>
       )}
     </div>
   );

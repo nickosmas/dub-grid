@@ -242,6 +242,10 @@ interface ShiftEditPanelProps {
   defaultShiftEnabled?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
+  /** The days in a row this whole-day absence runs across in the grid (item 52). */
+  absenceRun?: { dateKeys: string[] } | null;
+  /** Removes every day of `absenceRun` as one draft change. */
+  onRemoveAbsenceRun?: () => void;
 }
 
 function formatTimeRangeLabel(range: TimeRange): string {
@@ -287,6 +291,15 @@ function differenceInDaysIso(leftIso: string, rightIso: string): number {
 function getCalendarWeekStart(dateIso: string): string {
   const date = new Date(`${dateIso}T00:00:00`);
   return addDaysIso(dateIso, -date.getUTCDay());
+}
+
+function formatRunRange(dateKeys: string[]): string {
+  return `${formatDisplayDate(dateKeys[0])} - ${formatDisplayDate(dateKeys[dateKeys.length - 1])}`;
+}
+
+/** "Part of 4 days, Mon, Nov 9 - Thu, Nov 12". */
+function absenceRunSummary(dateKeys: string[]): string {
+  return `Part of ${dateKeys.length} days, ${formatRunRange(dateKeys)}`;
 }
 
 function getAbsenceTypeDisplayName(absenceType: AbsenceType | null): string {
@@ -417,6 +430,8 @@ export default function ShiftEditPanel({
   enforceConflicts = false,
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
+  absenceRun = null,
+  onRemoveAbsenceRun,
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { resolvedTheme } = useTheme();
@@ -442,6 +457,12 @@ export default function ShiftEditPanel({
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const isAbsence = currentAbsenceTypeId != null;
   const hasRestOfDayAbsence = currentRestOfDayAbsenceTypeId != null;
+  // A repeating absence keeps its own choice of days to remove.
+  const runDateKeys =
+    isAbsence && !seriesId && absenceRun && absenceRun.dateKeys.length >= 2
+      ? absenceRun.dateKeys
+      : null;
+  const [runRemoveScope, setRunRemoveScope] = useState<"this" | "all">("this");
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   // The picker is open to choose the absence for the rest of the day, not a shift.
   const [pickingRestOfDayAbsence, setPickingRestOfDayAbsence] = useState(false);
@@ -1855,21 +1876,21 @@ export default function ShiftEditPanel({
       <ConfirmDialog
         title={
           pendingRequestConfirmation.kind === "pickup"
-            ? "Offer shift for pickup?"
+            ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
             : pendingRequestConfirmation.kind === "targeted_pickup"
-              ? "Request pickup?"
+              ? `Request pickup of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
               : pendingRequestConfirmation.kind === "calloff"
-                ? "Submit call off request?"
-                : "Submit swap request?"
+                ? `Submit a call off for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+                : `Request a swap of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
         }
         message={
           pendingRequestConfirmation.kind === "pickup"
-            ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
+            ? undefined
             : pendingRequestConfirmation.kind === "targeted_pickup"
-              ? `Ask ${pendingRequestConfirmation.targetName} to pick up your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} while you use ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}?`
+              ? `The person you chose is asked to pick it up. Your absence for that shift is ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}.`
               : pendingRequestConfirmation.kind === "calloff"
-                ? `Submit ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
-                : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
+                ? `It's requested as ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence.`
+                : `In return you'd get the other person's ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}.`
         }
         confirmLabel={
           pendingRequestConfirmation.kind === "pickup"
@@ -3128,6 +3149,20 @@ export default function ShiftEditPanel({
               {absenceLabel}
             </span>
           </MaybeHint>
+          {runDateKeys && (
+            <span
+              data-absence-run-summary=""
+              className="dg-tabular-nums"
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 500,
+                color: atResolved.text,
+                textAlign: "center",
+              }}
+            >
+              {absenceRunSummary(runDateKeys)}
+            </span>
+          )}
         </div>
       );
     }
@@ -3560,21 +3595,21 @@ export default function ShiftEditPanel({
   }
 
   /** Says how the shifts go back when the absence is removed. */
-  function restoredShiftSentence(): string {
-    if (!absenceSession || !absenceCell?.kept) return "";
+  function restoredShiftPoints(): string[] {
+    if (!absenceSession || !absenceCell?.kept) return [];
     const { base, names } = absenceSession;
-    const sentences: string[] = [];
+    const points: string[] = [];
     const cut = absenceCell.plan.cutIndex;
     if (cut != null) {
       const range = effectiveRange(base.shifts[cut]);
-      sentences.push(
+      points.push(
         `${capitalize(theShift(names[cut]))} goes back to ${fmt12h(range.start)} - ${fmt12h(range.end)} (${formatShiftChangeHours(clockSpanMinutes(range))}).`,
       );
     }
     for (const index of absenceCell.plan.removedIndexes) {
-      sentences.push(`${capitalize(theShift(names[index]))} comes back.`);
+      points.push(`Removing it brings back ${theShift(names[index])}.`);
     }
-    return sentences.length > 0 ? ` ${sentences.join(" ")}` : "";
+    return points;
   }
 
   /** Save waits for a time that leaves the absence some scheduled time to cover (items 50a, 50c). */
@@ -3876,21 +3911,27 @@ export default function ShiftEditPanel({
     absenceTypes.length > 0 &&
     (!seriesId || seriesScope === "this");
 
+  function removeWholeCell() {
+    onSelect(null, seriesId ? seriesScope : undefined);
+    if (onCustomTimeChange) onCustomTimeChange(null, null);
+    // A cell that opened empty is back as it was: there is nothing to
+    // save, and an armed save would fire on the next pick instead.
+    if (!openedEmpty) setPendingCommitScope(seriesScope);
+  }
+
   // Names what the whole-cell remove takes away: "all shifts" read as if it
   // kept the absence beside them.
-  function removeAllCopy(): { label: string; title: string } {
-    if (isAbsence) return { label: "Remove absence", title: "Remove Absence?" };
+  function removeAllCopy(): { label: string } {
+    if (isAbsence) return { label: "Remove absence" };
     const many = currentLabels.length > 1;
     if (hasRestOfDayAbsence) {
-      return many
-        ? { label: "Remove shifts and absence", title: "Remove Shifts and Absence?" }
-        : { label: "Remove shift and absence", title: "Remove Shift and Absence?" };
+      return { label: many ? "Remove shifts and absence" : "Remove shift and absence" };
     }
-    return many
-      ? { label: "Remove both shifts", title: "Remove Both Shifts?" }
-      : { label: "Remove shift", title: "Remove Shift?" };
+    return { label: many ? "Remove both shifts" : "Remove shift" };
   }
   const quotedShiftLabels = currentLabels.map((label) => `"${label}"`).join(" and ");
+  const removedAbsenceRestores =
+    !isAbsence && pendingDelete?.type === "restOfDay" ? restoredShiftPoints() : [];
 
   function renderCardRemoveButton(ariaLabel: string, onClick: () => void) {
     return (
@@ -4653,7 +4694,10 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && !seriesId && (
                 <div style={{ marginTop: 16 }}>
                   <Button
-                    onClick={() => setPendingDelete({ type: "all" })}
+                    onClick={() => {
+                      setRunRemoveScope("this");
+                      setPendingDelete({ type: "all" });
+                    }}
                     className="dg-btn dg-btn-danger"
                     style={{
                       width: "100%",
@@ -5077,17 +5121,19 @@ export default function ShiftEditPanel({
       {/* Confirm delete dialog */}
       {pendingDelete && pendingDelete.type === "all" && seriesId && (
         <ConfirmDialog
-          title={`Remove ${repeatingNoun}?`}
+          title={`Remove the ${repeatingNoun} "${
+            isAbsence
+              ? absenceName(currentAbsenceTypeId ?? null)
+              : formatPreviewLabel(
+                  resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name")
+                    .displayParts,
+                )
+          }"?`}
           message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
-                {isAbsence
-                  ? absenceName(currentAbsenceTypeId ?? null)
-                  : formatPreviewLabel(
-                      resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name")
-                        .displayParts,
-                    )}{" "}
-                for {modal.empName}. Choose which days to remove.
+                Choose the days to remove. Published days are removed in the draft and leave the
+                schedule when you publish.
               </span>
               <SeriesScopeChoices
                 label="Days to remove"
@@ -5095,9 +5141,6 @@ export default function ShiftEditPanel({
                 value={seriesScope}
                 onChange={setSeriesScope}
               />
-              <span style={{ fontSize: "var(--dg-fs-footnote)" }}>
-                Published days are removed in the draft and leave the schedule when you publish.
-              </span>
             </div>
           }
           confirmLabel={
@@ -5120,8 +5163,8 @@ export default function ShiftEditPanel({
         <ConfirmDialog
           title={`Edit ${repeatingNoun}`}
           message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <span>Which days should this change?</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <span>Choose which days this change applies to.</span>
               <SeriesScopeChoices
                 label="Days to edit"
                 options={scopeOptions}
@@ -5141,37 +5184,75 @@ export default function ShiftEditPanel({
         />
       )}
 
-      {pendingDelete && !(pendingDelete.type === "all" && seriesId) && (
+      {pendingDelete?.type === "all" && runDateKeys && (
         <ConfirmDialog
           title={
-            pendingDelete.type === "restOfDay"
-              ? "Remove Absence?"
-              : pendingDelete.type === "all"
-                ? removeAllCopy().title
-                : "Remove Shift?"
+            runRemoveScope === "all"
+              ? `Remove all ${runDateKeys.length} days of "${absenceName(currentAbsenceTypeId ?? null)}"?`
+              : `Remove the absence "${absenceName(currentAbsenceTypeId ?? null)}" on ${formatDisplayDate(formatDateKey(modal.date))}?`
           }
           message={
+            <SeriesScopeChoices
+              label="Days to remove"
+              options={[
+                {
+                  scope: "this",
+                  label: "This day",
+                  detail: formatDisplayDate(formatDateKey(modal.date)),
+                  count: 1,
+                },
+                {
+                  scope: "all",
+                  label: `All ${runDateKeys.length} days`,
+                  detail: formatRunRange(runDateKeys),
+                  count: runDateKeys.length,
+                },
+              ]}
+              value={runRemoveScope}
+              onChange={(scope) => setRunRemoveScope(scope === "all" ? "all" : "this")}
+            />
+          }
+          confirmLabel={
+            runRemoveScope === "all" ? `Remove all ${runDateKeys.length} days` : "Remove this day"
+          }
+          variant="danger"
+          onConfirm={() => {
+            setPendingDelete(null);
+            if (runRemoveScope === "all") {
+              onRemoveAbsenceRun?.();
+              close();
+              return;
+            }
+            removeWholeCell();
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingDelete && !(pendingDelete.type === "all" && (seriesId || runDateKeys)) && (
+        <ConfirmDialog
+          title={`Remove ${
             isAbsence
-              ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+              ? `the absence "${currentLabels[0]}"`
               : pendingDelete.type === "restOfDay"
-                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} from ${modal.empName} on ${formatDate(modal.date)}?${restoredShiftSentence()}`
+                ? absenceName(currentRestOfDayAbsenceTypeId)
                 : pendingDelete.type === "pill"
-                  ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                  ? `"${currentLabels[pendingDelete.index]}"`
                   : hasRestOfDayAbsence
-                    ? `Remove the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                    ? `the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}"`
                     : currentLabels.length > 1
-                      ? `Remove both shifts, ${quotedShiftLabels}, from ${modal.empName} on ${formatDate(modal.date)}?`
-                      : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                      ? `both shifts, ${quotedShiftLabels},`
+                      : `"${currentLabels[0]}"`
+          } on ${formatDate(modal.date)}?`}
+          message={removedAbsenceRestores.length === 1 ? removedAbsenceRestores[0] : undefined}
+          summary={
+            removedAbsenceRestores.length > 1 ? { points: removedAbsenceRestores } : undefined
           }
           confirmLabel="Remove"
           variant="danger"
           onConfirm={() => {
             if (pendingDelete.type === "all") {
-              onSelect(null, seriesId ? seriesScope : undefined);
-              if (onCustomTimeChange) onCustomTimeChange(null, null);
-              // A cell that opened empty is back as it was: there is nothing to
-              // save, and an armed save would fire on the next pick instead.
-              if (!openedEmpty) setPendingCommitScope(seriesScope);
+              removeWholeCell();
             } else if (pendingDelete.type === "restOfDay") {
               removeAbsence();
             } else {

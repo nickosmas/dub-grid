@@ -30,6 +30,7 @@ function makeDeps(currentEmployee: Employee) {
   return {
     fetchEmployeeById: vi.fn().mockResolvedValue(currentEmployee),
     updateEmployeeStatus: vi.fn(),
+    updateEmployeeReturnDate: vi.fn(),
     insertAuditLog: vi.fn(),
     mapEmployeeToMobilePerson: vi.fn((emp: Employee) => ({
       id: emp.id,
@@ -139,7 +140,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
     expect(result).toMatchObject({
       kind: "not_on_schedule",
       status: 400,
-      error: "Only someone on the schedule can be marked inactive.",
+      error: "Only someone on the schedule can be marked away.",
     });
     expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });

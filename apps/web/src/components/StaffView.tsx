@@ -110,7 +110,18 @@ interface StaffViewProps {
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  onSetReturnDate?: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
   /** A status change is waiting on the step-up prompt, so bulk confirmations stay hidden. */
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
@@ -151,6 +162,7 @@ export default function StaffView({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  onSetReturnDate,
   statusStepUpOpen = false,
   onActivate,
   onAdd,
@@ -344,6 +356,8 @@ export default function StaffView({
             onSaveWithReinvite={onSaveWithReinvite}
             onRemove={onRemove}
             onDeactivate={onDeactivate}
+            onSetReturnDate={onSetReturnDate}
+            absenceTypes={absenceTypes}
             statusStepUpOpen={statusStepUpOpen}
             onActivate={onActivate}
             onAdd={onAdd}

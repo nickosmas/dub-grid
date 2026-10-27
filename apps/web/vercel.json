@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/sandbox-cleanup",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/return-from-away",
+      "schedule": "0 8 * * *"
     }
   ]
 }

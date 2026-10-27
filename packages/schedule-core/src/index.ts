@@ -90,6 +90,7 @@ export * from "./team-schedule";
 export * from "./open-shifts";
 export * from "./segment-alignment";
 export * from "./absence-side";
+export * from "./absence-runs";
 export * from "./shift-change";
 export * from "./shift-change-input";
 export * from "./shift-change-text";

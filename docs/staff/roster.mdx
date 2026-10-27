@@ -1,6 +1,6 @@
 ---
 title: "People"
-description: "Find your colleagues, add and import staff, change someone's access, and move people between active, inactive, and removed."
+description: "Find your colleagues, add and import staff, change someone's access, and mark people away, archive them, and bring them back."
 ---
 
 The **People** tab lists everyone in your organization. What you see and can change depends on your role: everyone sees the directory, and managers see more details and actions.
@@ -13,7 +13,7 @@ If you manage staff, the directory also shows each person's employment type, acc
 
 Managers also get:
 
-- **Status tabs**: **All**, **Active**, **Inactive**, and **Removed**, each with a count. Everyone else sees active staff only.
+- **Status tabs**: **All**, **Active**, **Away**, and **Archived**, each with a count. Everyone else sees active staff only.
 - **On Schedule** and **Management**, to switch between people on the schedule and people who manage a department but aren't scheduled, when your organization has management departments.
 - **Filters**: qualifications, employment type, department, whether the person has an account, contact details, and access level.
 - **Sort**: by seniority, name, or access level.
@@ -47,23 +47,33 @@ A Super Admin sets each person's access in the **Access** column: **User**, **Ad
 
 Changing the access of someone whose invitation is still pending sends them a new invitation, and their old link stops working.
 
-## Active, inactive, and removed
+## Active, Away, and Archived
 
-| Status       | What it means                                                             |
-| ------------ | ------------------------------------------------------------------------- |
-| **Active**   | On the schedule and able to sign in. Only active staff can be scheduled.  |
-| **Inactive** | Temporarily off the schedule. They keep their role and can still sign in. |
-| **Removed**  | Off the schedule and unable to sign in.                                   |
+| Status       | What it means                                                            |
+| ------------ | ------------------------------------------------------------------------ |
+| **Active**   | On the schedule and able to sign in. Only active staff can be scheduled. |
+| **Away**     | Off the schedule for now. They keep their role and can still sign in.    |
+| **Archived** | No longer on staff: off the schedule and unable to sign in.              |
 
-To change someone's status, select **Deactivate** and choose **Mark inactive** or **Remove from staff**, with an optional reason. Only someone on the schedule can be marked inactive; someone with no focus area can only be removed. **Activate** brings them back. You can also select several people and use **Activate**, **Deactivate**, or **Remove** together.
+To change someone's status, select **Mark away** or **Archive**, with an optional reason. Only someone on the schedule can be marked away; someone with no focus area can only be archived. **Mark active** brings an Away person back, and **Restore** brings back someone archived. You can also select several people and use **Mark away**, **Mark active**, **Restore**, or **Archive** together.
 
-When someone becomes inactive or is removed:
+When someone is marked away or archived:
 
-- A removed person is signed out everywhere. An inactive person stays signed in.
+- An archived person is signed out everywhere. An Away person stays signed in.
 - From today on, their draft shifts are cleared and their published shifts are marked for removal at the next publish. Their recurring schedules and repeating shifts stop, and their open requests expire.
-- Their past schedule is kept. Reactivating them doesn't bring back what was cleared.
+- Their past schedule is kept. Bringing them back doesn't restore what was cleared.
 
-You can't change your own status, and an organization's only Super Admin can't be removed.
+### Away until a date
+
+When you mark someone away, you can give a **Return date**: the first day they're back. Until then they show as **Away until** that date. You can change or clear it later with **Change return date**.
+
+- Only the days before the return date are cleared, and they can be scheduled again from that date, even while still Away.
+- Their recurring schedules pause instead of stopping, and fill again from the return date.
+- On the return date they're set back to **Active** automatically, in your organization's time zone.
+
+With a return date, you can also pick an **Absence**, such as Vacation. Every day from today until they're back then shows that absence in the draft, in place of any shift, and it's published with the rest of the period. Moving the return date, changing or clearing the absence, or marking them active early updates those days to match.
+
+You can't change your own status, and an organization's only Super Admin can't be archived.
 
 ## Who can do what
 

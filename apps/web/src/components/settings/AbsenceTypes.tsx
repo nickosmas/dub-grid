@@ -472,10 +472,8 @@ function AbsenceTypeRow({
                 message={
                   <>
                     <strong>{form.name}</strong> is currently{" "}
-                    {dependencyInfo!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving keeps history intact but removes the type from future scheduling.
+                    {dependencyInfo!.summary.toLowerCase()}. Archiving removes it from future
+                    scheduling and keeps its history.
                   </>
                 }
                 confirmLabel="Archive"
@@ -490,12 +488,7 @@ function AbsenceTypeRow({
             return (
               <ConfirmDialog
                 title={`Archive "${form.name}"?`}
-                message={
-                  <>
-                    This will archive <strong>{form.name}</strong>. Historical records will stay
-                    intact.
-                  </>
-                }
+                message="Archiving removes it from future scheduling and keeps its historical records intact."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting}
@@ -507,11 +500,7 @@ function AbsenceTypeRow({
           return (
             <ConfirmDialog
               title={`Delete "${form.name}"?`}
-              message={
-                <>
-                  This will permanently delete <strong>{form.name}</strong>. Nothing references it.
-                </>
-              }
+              message={`Nothing uses ${form.name}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               isLoading={deleting}

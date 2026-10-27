@@ -316,7 +316,7 @@ export default function Header({ orgName }: HeaderProps) {
       <ConfirmDialog
         returnFocus={accountTriggerRef}
         title="Exit sandbox to sign out"
-        message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
+        message="Signing out permanently discards your sandbox and all its changes."
         confirmLabel="Exit & sign out"
         cancelLabel="Cancel"
         variant="danger"
@@ -328,7 +328,7 @@ export default function Header({ orgName }: HeaderProps) {
       <ConfirmDialog
         returnFocus={accountTriggerRef}
         title="Sign out"
-        message="Are you sure you want to sign out?"
+        message="You'll be signed out on this device."
         confirmLabel="Sign out"
         cancelLabel="Cancel"
         variant="info"

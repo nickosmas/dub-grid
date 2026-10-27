@@ -1203,11 +1203,8 @@ function DepartmentSection({
                 message={
                   <>
                     <strong>{deleteConfirm.dept.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving will preserve historical records but remove it from active use.
-                    Consider renaming instead if this department is still needed.
+                    {deps!.summary.toLowerCase()}. Archiving removes it from active use and keeps
+                    its historical records.
                   </>
                 }
                 confirmLabel="Archive"
@@ -1232,13 +1229,7 @@ function DepartmentSection({
             return (
               <ConfirmDialog
                 title={`Archive "${deleteConfirm.dept.name}"?`}
-                message={
-                  <>
-                    This will archive{" "}
-                    <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical
-                    records will be preserved.
-                  </>
-                }
+                message="Archiving removes it from active use and keeps its historical records."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {
@@ -1252,13 +1243,7 @@ function DepartmentSection({
           return (
             <ConfirmDialog
               title={`Delete "${deleteConfirm.dept.name}"?`}
-              message={
-                <>
-                  This will permanently delete{" "}
-                  <strong>{deleteConfirm.dept.name || "this department"}</strong>. Nothing
-                  references it, so no history will be lost.
-                </>
-              }
+              message={`Nothing uses ${deleteConfirm.dept.name || "this department"}, so it's deleted permanently and no history is lost.`}
               confirmLabel="Delete"
               variant="danger"
               onConfirm={() => {
@@ -1282,10 +1267,8 @@ function DepartmentSection({
                 message={
                   <>
                     <strong>{faDeleteConfirm.fa.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving will preserve historical records but remove it from active use.
+                    {deps!.summary.toLowerCase()}. Archiving removes it from active use and keeps
+                    its historical records.
                   </>
                 }
                 confirmLabel="Archive"
@@ -1302,13 +1285,7 @@ function DepartmentSection({
             return (
               <ConfirmDialog
                 title={`Archive "${faDeleteConfirm.fa.name}"?`}
-                message={
-                  <>
-                    This will archive{" "}
-                    <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Historical
-                    records will be preserved.
-                  </>
-                }
+                message="Archiving removes it from active use and keeps its historical records."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {
@@ -1322,13 +1299,7 @@ function DepartmentSection({
           return (
             <ConfirmDialog
               title={`Delete "${faDeleteConfirm.fa.name}"?`}
-              message={
-                <>
-                  This will permanently delete{" "}
-                  <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Nothing
-                  references it.
-                </>
-              }
+              message={`Nothing uses ${faDeleteConfirm.fa.name || "this focus area"}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               onConfirm={() => {

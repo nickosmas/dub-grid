@@ -9,7 +9,7 @@ import type {
   ScheduleCellStateEntry,
   ShiftCategory,
 } from "@/types";
-import type { Employee } from "@dubgrid/domain";
+import { isSchedulableOn, type Employee } from "@dubgrid/domain";
 import { isEmployeeQualifiedForAssignmentDefinition } from "@/lib/assignable-shifts";
 import { checkCrossDateOverlap, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 import { orderSegmentsByStartTime } from "@/components/shiftEditTime";
@@ -257,7 +257,11 @@ export function buildOpenShiftStaffingCandidates({
 
   return employees
     .flatMap((employee): OpenShiftStaffingCandidate[] => {
-      if (employee.status !== "active" || !employee.focusAreaIds.includes(openShift.focusAreaId)) {
+      // Someone away until a date can be staffed from that date (51e).
+      if (
+        !isSchedulableOn(employee, openShift.date) ||
+        !employee.focusAreaIds.includes(openShift.focusAreaId)
+      ) {
         return [];
       }
       const existingState = scheduleByEmployeeId.get(employee.id) ?? null;

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
@@ -658,9 +658,15 @@ describe("EditEmployeePanel", () => {
       await changeEmail(user);
       await user.click(screen.getByRole("button", { name: "Save" }));
 
+      const dialog = screen.getByRole("dialog", {
+        name: "Send a new invitation to new.address@example.com?",
+      });
+      expect(dialog).toHaveTextContent(
+        /The new email is saved, and the pending invitation to .* is revoked\./,
+      );
       expect(
-        screen.getByText(/changing the email will revoke the pending invitation/i),
-      ).toBeInTheDocument();
+        within(dialog).queryByRole("region", { name: "Keep in mind" }),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save & send" })).toBeInTheDocument();
       expect(onSave).not.toHaveBeenCalled();
     });
@@ -675,9 +681,7 @@ describe("EditEmployeePanel", () => {
       await user.click(screen.getByRole("button", { name: "Save" }));
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-      expect(
-        screen.queryByText(/changing the email will revoke the pending invitation/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/the pending invitation to/i)).not.toBeInTheDocument();
       expect(onSave).not.toHaveBeenCalled();
       expect(onSaveWithReinvite).not.toHaveBeenCalled();
       // The edit is not discarded — the admin can still adjust and retry.
@@ -779,9 +783,7 @@ describe("EditEmployeePanel", () => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({ email: "new.address@example.com" }),
       );
-      expect(
-        screen.queryByText(/changing the email will revoke the pending invitation/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/the pending invitation to/i)).not.toBeInTheDocument();
     });
 
     it("falls back to a plain save when onSaveWithReinvite is not provided", async () => {

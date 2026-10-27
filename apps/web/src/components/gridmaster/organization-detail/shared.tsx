@@ -1,3 +1,4 @@
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import type { ReactNode } from "react";
 
 // Shared presentational helpers for the OrganizationDetail tabs.
@@ -22,8 +23,8 @@ export function StatusDot({ status }: { status: string }) {
       <span
         style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }}
       />
-      <span style={{ textTransform: "capitalize", color: "var(--dg-color-text-secondary)" }}>
-        {status}
+      <span style={{ color: "var(--dg-color-text-secondary)" }}>
+        {describeEmploymentStatus(status)}
       </span>
     </span>
   );

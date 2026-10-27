@@ -8,18 +8,35 @@ describe("getMobileRequestActionFeedback", () => {
   it("promises a queue to a member and the schedule to an approver", () => {
     const body = { action: "claim" };
     expect(getMobileRequestActionFeedback({ requestId: "r1", body }).message).toBe(
-      "Claim this open shift? We'll send it to your admin for approval.",
+      "It's sent to your admin for approval.",
     );
     expect(
       getMobileRequestActionFeedback({ requestId: "r1", body, viewerCanApprove: true }).message,
-    ).toBe("Claim this open shift? As an admin, this goes on the schedule right away.");
+    ).toBe("As an admin, it goes on the schedule right away.");
     expect(
       getMobileRequestActionFeedback({
         requestId: "r1",
         body: { action: "volunteer_open_shift" },
         viewerCanApprove: true,
       }).message,
-    ).toBe("Claim this open shift? As an admin, this goes on the schedule right away.");
+    ).toBe("As an admin, it goes on the schedule right away.");
+  });
+
+  it("cautions that the other person hasn't answered when a cancel goes over their head", () => {
+    const feedback = getMobileRequestActionFeedback({
+      requestId: "r1",
+      body: { action: "cancel" },
+      request: {
+        type: "swap",
+        status: "open",
+        targetEmpId: "emp-2",
+        targetName: "Laura Marshall",
+      },
+    });
+
+    expect(feedback.message).toBe(
+      "The other person hasn't responded to this swap yet. Cancelling withdraws it for both people and the schedule stays as it is.",
+    );
   });
 
   describe("approving over unpublished changes", () => {

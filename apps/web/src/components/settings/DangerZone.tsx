@@ -125,7 +125,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
 
       {confirmOpen && !stepUp.dialog && (
         <ConfirmDialog
-          title="Delete organization"
+          title={`Delete ${organization.name}?`}
           variant="danger"
           confirmLabel="Delete organization"
           isLoading={isDeleting}
@@ -133,11 +133,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           onCancel={closeDialog}
           onConfirm={handleDelete}
           message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <span>
-                This cancels billing and removes access for everyone in {organization.name}. This
-                cannot be undone from here.
-              </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <label className="dg-label" htmlFor="danger-confirm-input">
                 Type <strong>{confirmPhrase}</strong> to confirm
               </label>
@@ -153,6 +149,13 @@ export default function DangerZone({ organization }: DangerZoneProps) {
               />
             </div>
           }
+          summary={{
+            points: [
+              "Billing for the organization is canceled.",
+              `Everyone in ${organization.name} loses access.`,
+              "This can't be undone from here.",
+            ],
+          }}
         />
       )}
       {stepUp.dialog}

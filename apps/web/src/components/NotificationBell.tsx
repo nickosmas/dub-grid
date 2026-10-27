@@ -531,11 +531,10 @@ export default function NotificationBell({
       )}
       {confirmingMarkAllRead && (
         <ConfirmDialog
-          title="Mark all read?"
-          message={
+          title={
             unreadCount === 1
-              ? "This marks your one unread alert as read."
-              : `This marks all ${unreadCount} unread alerts as read.`
+              ? "Mark your unread alert as read?"
+              : `Mark all ${unreadCount} unread alerts as read?`
           }
           confirmLabel="Mark all read"
           variant="info"

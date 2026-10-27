@@ -9,7 +9,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import type { AdminPermissions, OrganizationRole } from "@/types";
-import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { AbsenceType, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
@@ -51,7 +51,20 @@ interface StaffDetailPanelProps {
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  onSetReturnDate?: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
+  /** Live absence types, offered for an Away person's days. */
+  absenceTypes?: readonly AbsenceType[];
   onActivate: (empId: string) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
@@ -87,6 +100,8 @@ export function StaffDetailPanel({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  onSetReturnDate,
+  absenceTypes,
   onActivate,
   statusStepUpOpen = false,
   onClose,
@@ -439,6 +454,8 @@ export function StaffDetailPanel({
                           canEdit={canManageEmployees}
                           isSelf={false}
                           onDeactivate={onDeactivate}
+                          onSetReturnDate={onSetReturnDate}
+                          absenceTypes={absenceTypes}
                           onActivate={onActivate}
                           onRemove={onRemove}
                           stepUpOpen={statusStepUpOpen}

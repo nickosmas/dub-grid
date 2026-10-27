@@ -52,14 +52,15 @@ describe("BulkDeleteReviewContent", () => {
     expect(people[1]?.targets).toHaveLength(1);
   });
 
-  it("renders the review copy, counts, and selected entries", () => {
+  it("renders the message, counts, and selected entries", () => {
     render(<BulkDeleteReviewContent targets={targets} />);
 
     expect(
       screen.getByText(
-        "Remove 3 selected entries? Entries already on the published schedule will be removed from the live schedule when you publish these changes.",
+        "Entries already on the published schedule are removed from the live schedule when you publish.",
       ),
     ).toBeInTheDocument();
+
     expect(screen.getByText("1 already published")).toBeInTheDocument();
     expect(screen.getByText("2 unpublished changes")).toBeInTheDocument();
 

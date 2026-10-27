@@ -26,7 +26,7 @@ apps/web/
     app/                            # Next.js App Router
       api/                          # Route Handlers (see internal/api-reference.md)
         auth/                       # login, recovery-request, sign-out, start-trial, etc.
-        cron/                       # expire-requests, trial-expiry, sandbox-cleanup (CRON_SECRET)
+        cron/                       # expire-requests, trial-expiry, sandbox-cleanup, return-from-away (CRON_SECRET)
         mobile/v1/                  # Mobile API (auth, bootstrap, dashboard, org-status, me, org,
                                     #   people, management-users, profile, notifications,
                                     #   shift-requests, push-tokens, session-presence)

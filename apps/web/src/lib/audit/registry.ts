@@ -478,19 +478,42 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
+      const until = d.date("awayUntil");
+      return `Marked ${who(d, ctx, "a team member")} away${until ? ` until ${until}` : ""}${note ? `: ${note}` : ""}`;
     },
-    suppressKeys: ["note"],
+    suppressKeys: ["note", "awayUntil", "awayAbsenceTypeId"],
+  },
+  "employee.return_date_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const until = d.date("toAwayUntil");
+      if (until && until === d.date("fromAwayUntil")) {
+        return `Changed the absence on ${who(d, ctx, "a team member")}'s away days`;
+      }
+      return until
+        ? `Set ${who(d, ctx, "a team member")} to return ${until}`
+        : `Cleared ${who(d, ctx, "a team member")}'s return date`;
+    },
+    suppressKeys: ["fromAwayUntil", "toAwayUntil", "fromAwayAbsenceTypeId", "toAwayAbsenceTypeId"],
   },
   "employee.activated": {
     category: "people",
     severity: "create",
-    headline: (d, ctx) => `Marked ${who(d, ctx, "a team member")} active`,
+    headline: (d, ctx) => {
+      if (d.text("fromStatus") === "removed") return `Restored ${who(d, ctx, "a team member")}`;
+      // The return-from-away job writes the date they came back on, and no actor.
+      const back = d.date("awayUntil");
+      return back
+        ? `${who(d, ctx, "A team member")} came back from away on ${back}`
+        : `Marked ${who(d, ctx, "a team member")} active`;
+    },
+    suppressKeys: ["awayUntil"],
   },
   "employee.removed": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Removed ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
   },
   // Historical keys from before the bench→deactivate / terminate→remove rename.
   // Old rows still carry them, so they render with the current copy.
@@ -499,14 +522,14 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} inactive${note ? `: ${note}` : ""}`;
+      return `Marked ${who(d, ctx, "a team member")} away${note ? `: ${note}` : ""}`;
     },
     suppressKeys: ["note"],
   },
   "employee.archived": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Removed ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
   },
 
   // ── Schedule ───────────────────────────────────────────────────────────────

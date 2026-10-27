@@ -1,5 +1,6 @@
 "use client";
 
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
@@ -14,12 +15,6 @@ import type { Invitation } from "@/types";
 import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from "./PersonField";
 import { formatActor, formatDay, formatMoment } from "./person-format";
 import { PersonScheduleSection } from "./PersonScheduleSection";
-
-const STAFF_STATUS: Record<GridmasterStaffRecord["status"], string> = {
-  active: "Active",
-  inactive: "Inactive",
-  removed: "Removed",
-};
 
 function namesOf(ids: number[], names: Record<number, string>): string {
   return ids.map((id) => names[id] ?? `#${id}`).join(", ");
@@ -133,8 +128,8 @@ function StaffFacts({
         label="Status"
         value={
           employee.statusChangedAt
-            ? `${STAFF_STATUS[employee.status]} since ${formatDay(employee.statusChangedAt)}`
-            : STAFF_STATUS[employee.status]
+            ? `${describeEmploymentStatus(employee.status, employee.awayUntil)} since ${formatDay(employee.statusChangedAt)}`
+            : describeEmploymentStatus(employee.status, employee.awayUntil)
         }
       />
       <PersonField
@@ -188,7 +183,7 @@ function StaffFacts({
         value={stamp(record, employee.updatedAt, employee.updatedBy)}
       />
       <PersonField
-        label="Archived"
+        label="Record archived"
         value={employee.archivedAt ? formatDay(employee.archivedAt) : null}
         empty="No"
       />

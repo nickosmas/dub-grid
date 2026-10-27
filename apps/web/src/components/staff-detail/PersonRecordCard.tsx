@@ -1,5 +1,6 @@
 "use client";
 
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -19,12 +20,6 @@ const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
   expired: "Invitation expired",
   "not-invited": "Not invited",
   "no-email": "No email",
-};
-
-const STATUS_LABELS: Record<Employee["status"], string> = {
-  active: "Active",
-  inactive: "Inactive",
-  removed: "Removed",
 };
 
 function formatDay(value: string): string {
@@ -60,7 +55,10 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             tabular={Boolean(employee.joinedAt)}
           />
         ) : null}
-        <RecordField label="Status" value={STATUS_LABELS[employee.status]} />
+        <RecordField
+          label="Status"
+          value={describeEmploymentStatus(employee.status, employee.awayUntil)}
+        />
         <RecordField
           label="Status changed"
           value={employee.statusChangedAt ? formatDay(employee.statusChangedAt) : "Not recorded"}

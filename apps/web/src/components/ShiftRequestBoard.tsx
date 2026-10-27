@@ -32,7 +32,6 @@ import { fetchShiftRequests } from "@/features/schedule/client/api";
 import { queryKeys } from "@/lib/query-keys";
 import {
   describeAwaitingRecipient,
-  describeCancelAwaitingRecipientCaution,
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
@@ -98,13 +97,19 @@ function formatResolvedAt(value: string): string {
 type PendingConfirmation = {
   confirmLabel: string;
   key: string;
-  message: ReactNode;
+  message?: ReactNode;
+  points?: ReactNode[];
   onConfirm: () => void | Promise<unknown>;
   title: string;
   variant?: "danger" | "warning" | "info";
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** The lead for cancelling a request its recipient has not answered. */
+function describeUnansweredRequest(request: Pick<ShiftRequest, "type">): string {
+  return `The other person hasn't responded to this ${request.type === "swap" ? "swap" : "pickup"} yet.`;
+}
 
 function formatShiftDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -657,6 +662,7 @@ export default function ShiftRequestBoard({
       joinAssignmentNames(req.requesterAssignmentDefinitionIds, assignmentNameMap) ||
       req.requesterShiftLabel;
     const requestLabel = `${requesterFullLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
+    const requestTitle = (verb: string) => `${verb} the request for ${requestLabel}?`;
 
     // Claim button: open pickup that isn't mine
     if (
@@ -675,17 +681,11 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Claim",
               key: `claim:${req.id}`,
-              message: (
-                <>
-                  Claim <strong>{requesterFullLabel}</strong> on{" "}
-                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>?{" "}
-                  {canApprove
-                    ? "As an admin, this goes on the schedule right away."
-                    : "This will be sent for manager approval."}
-                </>
-              ),
+              message: canApprove
+                ? "As an admin, it goes on the schedule right away."
+                : "It's sent for manager approval.",
               onConfirm: () => onClaim(req.id),
-              title: "Claim this shift?",
+              title: `Claim ${requestLabel}?`,
               variant: "info",
             })
           }
@@ -707,13 +707,8 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Accept",
               key: `accept:${req.id}`,
-              message: (
-                <>
-                  Accept {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
-                </>
-              ),
               onConfirm: () => onRespond(req.id, true),
-              title: "Accept request?",
+              title: requestTitle("Accept"),
               variant: "info",
             })
           }
@@ -731,13 +726,8 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Decline",
               key: `decline:${req.id}`,
-              message: (
-                <>
-                  Decline {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
-                </>
-              ),
               onConfirm: () => onRespond(req.id, false),
-              title: "Decline request?",
+              title: requestTitle("Decline"),
               variant: "warning",
             })
           }
@@ -766,13 +756,11 @@ export default function ShiftRequestBoard({
               key: `reject:${req.id}`,
               message: (
                 <>
-                  Reject {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? The
-                  original schedule will stay in place.
+                  <div>The original schedule stays in place.</div>
                   {note ? (
-                    <>
-                      {" "}
+                    <div>
                       Your note: <em>{note}</em>
-                    </>
+                    </div>
                   ) : null}
                 </>
               ),
@@ -781,7 +769,7 @@ export default function ShiftRequestBoard({
                 if (done !== false) clearNote(req.id);
                 return done;
               },
-              title: "Reject request?",
+              title: requestTitle("Reject"),
               variant: "warning",
             })
           }
@@ -800,25 +788,23 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Approve",
               key: `approve:${req.id}`,
-              message: (
-                <>
-                  Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
-                  This will finalize the staffing change.
-                  {note ? (
-                    <>
-                      {" "}
-                      Your note: <em>{note}</em>
-                    </>
-                  ) : null}
-                  <ApprovalDraftWarning lines={warning} />
-                </>
-              ),
+              message:
+                note || warning.length ? (
+                  <>
+                    {note ? (
+                      <div>
+                        Your note: <em>{note}</em>
+                      </div>
+                    ) : null}
+                    <ApprovalDraftWarning lines={warning} />
+                  </>
+                ) : undefined,
               onConfirm: async () => {
                 const done = await onResolve(req.id, true, note);
                 if (done !== false) clearNote(req.id);
                 return done;
               },
-              title: "Approve request?",
+              title: requestTitle("Approve"),
               variant: warning.length ? "warning" : "info",
             });
           }}
@@ -849,20 +835,16 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Cancel request",
               key: `cancel:${req.id}`,
-              message: awaitingRecipient ? (
-                describeCancelAwaitingRecipientCaution(req)
-              ) : (
-                <>
-                  Cancel {isOwnRequest ? "your" : "this"} request for{" "}
-                  <strong>{requestLabel}</strong>? It will no longer be available for review.
-                </>
-              ),
+              message: awaitingRecipient ? describeUnansweredRequest(req) : undefined,
+              points: awaitingRecipient
+                ? ["The request is withdrawn for both people.", "Nothing on the schedule changes."]
+                : undefined,
               onConfirm: async () => {
                 const done = await onCancel(req.id, req.requesterEmpId, cancelNote);
                 if (cancelNote && done !== false) clearNote(req.id);
                 return done;
               },
-              title: "Cancel request?",
+              title: `Cancel ${isOwnRequest ? "your" : "this"} request for ${requestLabel}?`,
               variant: "warning",
             })
           }
@@ -912,6 +894,9 @@ export default function ShiftRequestBoard({
           confirmLabel={pendingConfirmation.confirmLabel}
           isLoading={runningConfirmationKey === pendingConfirmation.key}
           message={pendingConfirmation.message}
+          summary={
+            pendingConfirmation.points?.length ? { points: pendingConfirmation.points } : undefined
+          }
           title={pendingConfirmation.title}
           variant={pendingConfirmation.variant}
           onCancel={() => {

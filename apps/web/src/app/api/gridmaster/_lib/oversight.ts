@@ -79,6 +79,7 @@ const NORMAL_OPERATION_ACTIONS = new Set([
   "employee.created",
   "employee.deactivated",
   "employee.removed",
+  "employee.return_date_changed",
   "employee.updated",
   "org_roles.saved",
 ]);

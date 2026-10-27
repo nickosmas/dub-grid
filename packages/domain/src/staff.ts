@@ -11,6 +11,10 @@ export interface Employee {
   status: EmployeeStatus;
   statusChangedAt: string | null;
   statusNote: string;
+  /** An Away person's first day back (YYYY-MM-DD), or null. Optional where it isn't read. */
+  awayUntil?: string | null;
+  /** The absence an Away person's days before their return date hold, or null. */
+  awayAbsenceTypeId?: number | null;
   certificationId: number | null;
   roleIds: number[];
   seniority: number;

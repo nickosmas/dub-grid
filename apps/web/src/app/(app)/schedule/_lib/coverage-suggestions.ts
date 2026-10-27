@@ -79,6 +79,11 @@ export interface CoverageSuggestionAdapterInput {
   maxDaysInAWeek?: number;
   /** Planning a build or Apply all: never a second shift on a day already worked. */
   noDoubleShifts?: boolean;
+  /**
+   * Away people's first day back, by employee id (51e). They are planned only
+   * from that day; anyone else in `employees` who isn't active is not planned.
+   */
+  awayUntil?: ReadonlyMap<string, string>;
 }
 
 /** The shift an assignment belongs to, for matching a preference. */
@@ -340,11 +345,14 @@ export function availabilityFromShifts(
     | "preferences"
     | "jobPreferences"
     | "maxDaysInARow"
+    | "awayUntil"
   >,
   employeeId: string,
   dateKey: string,
   assignmentId: number,
 ): CoverageAvailability {
+  const until = input.awayUntil?.get(employeeId);
+  if (until && dateKey < until) return { kind: "away", until };
   const context = { assignments: input.assignments, shiftCategories: input.shiftCategories };
   const stateOn = (key: string) => staffingStateFromEntry(input.shifts[`${employeeId}_${key}`]);
   const state = stateOn(dateKey);
@@ -445,6 +453,7 @@ export function availabilityWithPlanned(
     | "preferences"
     | "jobPreferences"
     | "maxDaysInARow"
+    | "awayUntil"
   >,
   planned: ReadonlyArray<CoverageDayOverride>,
 ): (employeeId: string, dateKey: string, assignmentId: number) => CoverageAvailability {
@@ -820,7 +829,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     people: input.employees.map((employee) => ({
       id: employee.id,
       name: getEmployeeDisplayName(employee),
-      active: employee.status === "active",
+      active: employee.status === "active" || !!input.awayUntil?.has(employee.id),
       focusAreaIds: employee.focusAreaIds,
     })),
     qualifiedFor: (employeeId, assignmentId) => {

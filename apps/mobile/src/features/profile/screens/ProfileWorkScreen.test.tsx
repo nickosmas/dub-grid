@@ -417,7 +417,7 @@ describe("ProfileWorkScreen", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     const confirmation = screen.getByRole("alert");
-    expect(confirmation).toHaveTextContent("Change your sign-in email?");
+    expect(confirmation).toHaveTextContent("Change your sign-in email to new@example.com?");
     expect(confirmation).toHaveTextContent("new@example.com");
     expect(updateMobilePerson).not.toHaveBeenCalled();
     expect(updateProfileAccount).not.toHaveBeenCalled();
@@ -431,7 +431,7 @@ describe("ProfileWorkScreen", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This changes it for every organization you belong to",
+      "This change applies to every organization you belong to, not just this one.",
     );
   });
 

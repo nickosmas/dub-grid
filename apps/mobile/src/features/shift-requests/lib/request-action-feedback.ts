@@ -1,6 +1,5 @@
 import {
   describeApprovalDraftWarning,
-  describeCancelAwaitingRecipientCaution,
   describeShiftRequestSubmitted,
   isAwaitingRecipient,
   type ShiftRequestDraftCell,
@@ -28,7 +27,8 @@ export type MobileRequestActionFeedback = {
   confirmLabel: string;
   confirmStyle?: "default" | "destructive";
   key: string;
-  message: string;
+  /** One to three sentences under the title: what confirming does. */
+  message?: string;
   title: string;
   /** What approving would replace: shown before an approval, never after. */
   warning?: string[];
@@ -85,8 +85,8 @@ export function getMobileRequestActionFeedback({
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
   const claimMessage = viewerCanApprove
-    ? "Claim this open shift? As an admin, this goes on the schedule right away."
-    : "Claim this open shift? We'll send it to your admin for approval.";
+    ? "As an admin, it goes on the schedule right away."
+    : "It's sent to your admin for approval.";
 
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
@@ -107,8 +107,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Accept",
         key,
-        message:
-          "Accept this coverage request? The request will move forward for manager review if approval is required.",
+        message: "It moves on to manager review if approval is required.",
         title: "Accept request?",
       };
     case "decline":
@@ -116,15 +115,14 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Decline",
         confirmStyle: "destructive",
         key,
-        message:
-          "Decline this coverage request? The requester will keep their current shift unless another response is submitted.",
+        message: "The requester keeps their current shift unless someone else responds.",
         title: "Decline request?",
       };
     case "approve":
       return {
         confirmLabel: "Approve",
         key,
-        message: "Approve this request? This will finalize the staffing change.",
+        message: "This finalizes the staffing change.",
         title: "Approve request?",
         warning: approvalWarning(request),
       };
@@ -133,7 +131,7 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Reject",
         confirmStyle: "destructive",
         key,
-        message: "Reject this request? The original schedule will stay in place.",
+        message: "The original schedule will stay in place.",
         title: "Reject request?",
       };
     case "cancel":
@@ -145,15 +143,14 @@ export function getMobileRequestActionFeedback({
         // caution: they were asked and have not answered yet.
         message:
           request && isAwaitingRecipient(request)
-            ? describeCancelAwaitingRecipientCaution(request)
-            : "Cancel this request? It will no longer be available for review.",
+            ? `The other person hasn't responded to this ${request.type === "swap" ? "swap" : "pickup"} yet. Cancelling withdraws it for both people and the schedule stays as it is.`
+            : "It will no longer be available for review.",
         title: "Cancel request?",
       };
     default:
       return {
         confirmLabel: "Confirm",
         key,
-        message: "Confirm this request action?",
         title: "Confirm action?",
       };
   }

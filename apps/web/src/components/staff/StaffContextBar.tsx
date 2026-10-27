@@ -1,5 +1,6 @@
 "use client";
 
+import { canMarkInactive } from "@dubgrid/domain";
 import { GripVertical } from "lucide-react";
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
@@ -54,6 +55,7 @@ interface StaffContextBarProps {
   onBulkInvite: (employees: Employee[]) => void;
   onBulkDeactivate: (ids: string[]) => void;
   onBulkActivate: (ids: string[]) => void;
+  onBulkRestore: (ids: string[]) => void;
   onBulkRemove: (ids: string[]) => void;
   onClearSelection: () => void;
   // Reorder
@@ -107,6 +109,7 @@ export function StaffContextBar({
   onBulkInvite,
   onBulkDeactivate,
   onBulkActivate,
+  onBulkRestore,
   onBulkRemove,
   onClearSelection,
   isReordering,
@@ -168,10 +171,12 @@ export function StaffContextBar({
   const invitableEmployees = selectedEmployees.filter(
     (e) => e.status === "active" && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id),
   );
-  const deactivatableIds = selectedEmployees.filter((e) => e.status === "active").map((e) => e.id);
-  const activatableIds = selectedEmployees
-    .filter((e) => e.status === "inactive" || e.status === "removed")
+  // Away only takes someone off the schedule, so it skips management-only people.
+  const deactivatableIds = selectedEmployees
+    .filter((e) => e.status === "active" && canMarkInactive(e.focusAreaIds))
     .map((e) => e.id);
+  const activatableIds = selectedEmployees.filter((e) => e.status === "inactive").map((e) => e.id);
+  const restorableIds = selectedEmployees.filter((e) => e.status === "removed").map((e) => e.id);
   const removableIds = selectedEmployees
     .filter((e) => e.status === "active" || e.status === "inactive")
     .map((e) => e.id);
@@ -259,8 +264,17 @@ export function StaffContextBar({
                 onClick={() => onBulkActivate(activatableIds)}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                Activate
+                Mark active
                 {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
+              </Button>
+            )}
+            {restorableIds.length > 0 && (
+              <Button
+                onClick={() => onBulkRestore(restorableIds)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                Restore
+                {restorableIds.length !== selectionCount ? ` (${restorableIds.length})` : ""}
               </Button>
             )}
             {deactivatableIds.length > 0 && (
@@ -268,16 +282,16 @@ export function StaffContextBar({
                 onClick={() => onBulkDeactivate(deactivatableIds)}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                Deactivate
+                Mark away
                 {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
               </Button>
             )}
             {removableIds.length > 0 && (
               <Button
                 onClick={() => onBulkRemove(removableIds)}
-                className="dg-btn dg-btn-danger dg-btn-sm"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
+                Archive{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
               </Button>
             )}
             <Button onClick={onClearSelection} className="dg-btn dg-btn-ghost dg-btn-sm">

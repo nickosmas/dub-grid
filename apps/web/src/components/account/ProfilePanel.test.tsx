@@ -230,7 +230,9 @@ describe("ProfilePanel", () => {
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
     expect(screen.getByLabelText("First name")).toHaveValue("Draft");
     expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
-    expect(screen.getByRole("dialog", { name: "Save changes?" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Save your account and contact changes?" }),
+    ).toBeInTheDocument();
     expect(requireCredentialAssurance).not.toHaveBeenCalled();
     expect(updateEmployee).not.toHaveBeenCalled();
     expect(updateBrowserUserEmail).not.toHaveBeenCalled();

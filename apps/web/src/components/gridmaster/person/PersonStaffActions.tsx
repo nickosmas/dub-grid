@@ -1,5 +1,6 @@
 "use client";
 
+import { canMarkInactive, describeStatusAction, statusUndoAction } from "@dubgrid/domain";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
@@ -20,24 +21,6 @@ import { useStepUpAction } from "@/hooks/useStepUpAction";
 import type { Employee } from "@/types";
 
 type StatusChange = "activate" | "deactivate" | "remove";
-
-const STATUS_COPY: Record<StatusChange, { title: string; label: string; message: string }> = {
-  activate: {
-    title: "Activate staff record",
-    label: "Activate",
-    message: "They return to schedules and staff lists in this organization.",
-  },
-  deactivate: {
-    title: "Deactivate staff record",
-    label: "Deactivate",
-    message: "They leave schedules and staff lists here until they are activated again.",
-  },
-  remove: {
-    title: "Remove staff record",
-    label: "Remove",
-    message: "They are removed from this organization's staff. The record is kept for history.",
-  },
-};
 
 const CONFLICT_MESSAGE =
   "Their staff record changed elsewhere. Review the latest values and try again.";
@@ -162,8 +145,21 @@ export function PersonStaffActions({
   const statusOptions: StatusChange[] =
     employee.status === "active" ? ["deactivate", "remove"] : ["activate", "remove"];
   const available = statusOptions.filter(
-    (option) => !(option === "remove" && employee.status === "removed"),
+    (option) =>
+      !(option === "remove" && employee.status === "removed") &&
+      // Away only takes someone off the schedule, so it skips management-only people.
+      !(option === "deactivate" && !canMarkInactive(employee.focusAreaIds)),
   );
+  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+  const copyFor = (change: StatusChange) =>
+    describeStatusAction(
+      change === "deactivate"
+        ? "markAway"
+        : change === "remove"
+          ? "archive"
+          : (statusUndoAction(employee.status) ?? "markActive"),
+      fullName,
+    );
 
   return (
     <>
@@ -190,19 +186,19 @@ export function PersonStaffActions({
           onClick={() => setStatusChange(option)}
           disabled={busy}
         >
-          {STATUS_COPY[option].label}
+          {copyFor(option).label}
         </Button>
       ))}
 
       {statusChange && !stepUp.dialog && (
         <ConfirmDialog
-          title={STATUS_COPY[statusChange].title}
+          title={copyFor(statusChange).title}
           message={
             <div className="flex flex-col gap-3">
-              <span>{STATUS_COPY[statusChange].message}</span>
+              {copyFor(statusChange).message ? <span>{copyFor(statusChange).message}</span> : null}
               {statusChange !== "activate" ? (
                 <textarea
-                  className="dg-input resize-y"
+                  className="dg-input w-full resize-y"
                   aria-label="Status note"
                   placeholder="Note (optional)"
                   value={statusNote}
@@ -212,7 +208,8 @@ export function PersonStaffActions({
               ) : null}
             </div>
           }
-          confirmLabel={STATUS_COPY[statusChange].label}
+          summary={{ points: copyFor(statusChange).points }}
+          confirmLabel={copyFor(statusChange).label}
           variant={statusChange === "activate" ? "info" : "danger"}
           isLoading={busy}
           onConfirm={handleStatus}

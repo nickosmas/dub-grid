@@ -1,4 +1,5 @@
 "use client";
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import { ChevronRight } from "lucide-react";
 
 import { useId, type CSSProperties, type ReactNode } from "react";
@@ -173,8 +174,7 @@ function StaffRowCells({
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const statusLabel =
-    emp.status === "inactive" ? "Inactive" : emp.status === "removed" ? "Removed" : "Active";
+  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil);
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",

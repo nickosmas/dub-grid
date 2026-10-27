@@ -630,16 +630,16 @@ export function ProfilePanel({
   const confirmation =
     pendingConfirm === "account-details"
       ? {
-          title: "Save changes?",
-          message: "Confirm that you want to save these account and contact changes.",
+          title: "Save your account and contact changes?",
+          message: undefined,
           confirmLabel: "Confirm save",
           variant: "info" as const,
           loading: saving,
         }
       : pendingConfirm === "name-change-request"
         ? {
-            title: "Send request?",
-            message: "Confirm that you want to send this name change request.",
+            title: "Send your name change request?",
+            message: undefined,
             confirmLabel: "Confirm request",
             variant: "info" as const,
             loading: submittingRequest,
@@ -647,8 +647,7 @@ export function ProfilePanel({
         : pendingConfirm === "account-deletion"
           ? {
               title: "Request account deletion?",
-              message:
-                "Confirm that you want to request account deletion. An admin will review and approve before your account is removed.",
+              message: "An admin reviews and approves the request before your account is removed.",
               confirmLabel: "Request deletion",
               variant: "danger" as const,
               loading: requestingDeletion,

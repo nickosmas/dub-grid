@@ -212,7 +212,9 @@ export type CoverageAvailability =
   /** The person works only the jobs they chose, and this is not one. */
   | { kind: "onlyJobs" }
   /** The scheduler left the person out of this build. */
-  | { kind: "excluded" };
+  | { kind: "excluded" }
+  /** The person is away until `until`, their first day back (YYYY-MM-DD). */
+  | { kind: "away"; until: string };
 
 /** A person's shift preference: flexible ("prefers") or strict ("only"). */
 export interface CoverageShiftPreference {

@@ -11,7 +11,7 @@ export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChange
   return (
     <ConfirmDialog
       title="Unsaved changes"
-      message="You have unsaved changes. Are you sure you want to discard them?"
+      message="Your changes won't be saved."
       cancelLabel="Keep editing"
       confirmLabel="Discard"
       variant="danger"

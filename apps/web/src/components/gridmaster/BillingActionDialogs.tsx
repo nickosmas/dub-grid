@@ -1,7 +1,7 @@
 "use client";
 
 import { BILLING_POLICY_LIMITS, TRIAL_GRACE_DAYS } from "@dubgrid/domain";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmDialog, { type ConfirmSummary } from "@/components/ConfirmDialog";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import type { GridmasterBillingOrgSummary } from "@/types";
 import { NumberField } from "@/components/ui/number-field";
@@ -24,52 +24,58 @@ function formatDay(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/**
+ * A box earns its place with two or more consequences; a lone one reads
+ * better as a sentence in the message.
+ */
+function splitOutcome(points: string[]): {
+  sentence: string | null;
+  summary: ConfirmSummary | undefined;
+} {
+  if (points.length >= 2) return { sentence: null, summary: { points } };
+  return { sentence: points[0] ?? null, summary: undefined };
+}
+
 function getConfirmDialogCopy(action: Exclude<BillingConfirmAction, { kind: "override_status" }>) {
+  const { orgName, appUsers } = action.org;
   switch (action.kind) {
     case "sync_billing":
       return {
-        title: "Sync Stripe",
-        message: `Sync Stripe billing state for ${action.org.orgName}? This updates the local billing snapshot from Stripe.`,
+        title: `Sync ${orgName}'s billing from Stripe?`,
         confirmLabel: "Sync Stripe",
         variant: "warning" as const,
       };
     case "sync_seats":
       return {
-        title: "True Up Seats",
-        message: `True up ${action.org.orgName} billing seats to ${action.org.appUsers} app users? Stripe may prorate the subscription.`,
+        title: `True up ${orgName}'s seats?`,
+        message: `Billing seats are set to ${appUsers} app ${appUsers === 1 ? "user" : "users"}, and Stripe may prorate the subscription.`,
         confirmLabel: "True Up Seats",
         variant: "warning" as const,
       };
     case "cancel_at_period_end":
       return {
-        title: "Cancel at period end",
-        message: `Schedule ${action.org.orgName}'s subscription to cancel at the end of the current billing period? Access stays open until then.`,
+        title: `Cancel ${orgName}'s subscription at period end?`,
+        message: "The organization stays open until the end of the current billing period.",
         confirmLabel: "Cancel at period end",
         variant: "warning" as const,
       };
     case "cancel":
       return {
-        title: "Cancel Billing",
-        message: `Cancel the Stripe subscription for ${action.org.orgName} now? The organization locks immediately.`,
+        title: `Cancel ${orgName}'s billing?`,
+        message: "The Stripe subscription is canceled now, and the organization locks right away.",
         confirmLabel: "Cancel Billing",
         variant: "danger" as const,
       };
-    case "resume_billing":
+    case "resume_billing": {
+      const { sentence, summary } = splitOutcome(describeResumeOutcome(action.org));
       return {
-        title: "Resume billing",
-        message: (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <span>Resume billing for {action.org.orgName}?</span>
-            {describeResumeOutcome(action.org).map((line) => (
-              <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
-                {line}
-              </span>
-            ))}
-          </div>
-        ),
+        title: `Resume billing for ${orgName}?`,
+        message: sentence ?? undefined,
+        summary,
         confirmLabel: "Resume billing",
         variant: "warning" as const,
       };
+    }
   }
 }
 
@@ -93,6 +99,7 @@ export function BillingConfirmDialog({
     <ConfirmDialog
       title={copy.title}
       message={copy.message}
+      summary={"summary" in copy ? copy.summary : undefined}
       confirmLabel={copy.confirmLabel}
       variant={copy.variant}
       isLoading={isLoading}
@@ -121,22 +128,15 @@ export function OverrideStatusDialog({
 }) {
   if (!org) return null;
 
-  const outcome = describeOverrideOutcome(org, status);
+  const outcome = splitOutcome(describeOverrideOutcome(org, status));
   const reasonFieldId = `override-reason-${org.orgId}`;
 
   return (
     <ConfirmDialog
-      title="Override billing status"
+      title={`Set ${org.orgName}'s billing status to ${formatBillingStatusLabel(status)}?`}
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <span>
-            Set {org.orgName} to {formatBillingStatusLabel(status)}?
-          </span>
-          {outcome.map((line) => (
-            <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
-              {line}
-            </span>
-          ))}
+          {outcome.sentence ? <span>{outcome.sentence}</span> : null}
           <label htmlFor={reasonFieldId} style={{ fontWeight: 600 }}>
             Reason <span style={{ color: "var(--dg-color-danger-text)" }}>*</span>
           </label>
@@ -152,6 +152,7 @@ export function OverrideStatusDialog({
           />
         </div>
       }
+      summary={outcome.summary}
       confirmLabel="Override status"
       variant="warning"
       isLoading={isLoading}
@@ -195,14 +196,17 @@ export function EndTrialDialog({
   const options: Array<{
     value: EndTrialChoice;
     title: string;
-    detail: string;
+    points: string[];
     reason: string | null;
     checkedClass: string;
   }> = [
     {
       value: "grace",
       title: `Give the usual ${graceDays} ${graceDays === 1 ? "day" : "days"} to add billing`,
-      detail: `The organization stays open until ${accessEnds}, then locks unless it subscribes.`,
+      points: [
+        `The organization stays open until ${accessEnds}.`,
+        "After that, it locks unless it subscribes.",
+      ],
       reason: graceReason,
       checkedClass:
         "checked:border-[var(--dg-color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-warning)]",
@@ -210,23 +214,25 @@ export function EndTrialDialog({
     {
       value: "lock",
       title: "Lock now, with no grace period",
-      detail: "Members can't use DubGrid until billing is added. Asks for your password.",
+      points: [
+        "Members can't use DubGrid until billing is added.",
+        "Your password is needed to confirm.",
+      ],
       reason: lockReason,
       checkedClass:
         "checked:border-[var(--dg-color-danger)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-danger)]",
     },
   ];
+  const chosen = options.find((option) => option.value === choice);
 
   return (
     <ConfirmDialog
-      title="End trial"
+      title={`End ${org.orgName}'s trial?`}
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <span>
-            {graceReason && !lockReason
-              ? `${org.orgName}'s trial has already ended. Lock it now?`
-              : `End the trial for ${org.orgName} today?`}
-          </span>
+          {graceReason && !lockReason ? (
+            <span>The trial has already ended, so it can only be locked now.</span>
+          ) : null}
           {options.map((option) => (
             <label
               key={option.value}
@@ -248,20 +254,23 @@ export function EndTrialDialog({
               />
               <span>
                 <span style={{ display: "block", fontWeight: 600 }}>{option.title}</span>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  {option.reason ?? option.detail}
-                </span>
+                {option.reason ? (
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
+                  >
+                    {option.reason}
+                  </span>
+                ) : null}
               </span>
             </label>
           ))}
         </div>
       }
+      summary={chosen && !chosen.reason ? { points: chosen.points } : undefined}
       confirmLabel={choice === "lock" ? "Lock now" : "End trial"}
       variant={choice === "lock" ? "danger" : "warning"}
       isLoading={isLoading}
@@ -302,11 +311,11 @@ export function TrialDaysDialog({
 
   return (
     <ConfirmDialog
-      title="Change trial"
+      title={`Change ${org.orgName}'s trial?`}
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <span>
-            How many days should {org.orgName} have left?
+            How many days should the trial have left?
             {restarts ? " This puts the organization back on its trial." : ""}
           </span>
           <NumberField
@@ -323,7 +332,7 @@ export function TrialDaysDialog({
           </span>
           {longerThanAYear && (
             <span style={{ color: "var(--dg-color-warning-text)", fontWeight: 600 }}>
-              That's more than a year of free access.
+              That&apos;s more than a year of free access.
             </span>
           )}
         </div>
@@ -385,17 +394,14 @@ export function PauseBillingDialog({
 }) {
   if (!org) return null;
 
+  const outcome = splitOutcome(describePauseOutcome(org));
+
   return (
     <ConfirmDialog
-      title="Pause billing"
+      title={`Pause billing for ${org.orgName}?`}
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <span>Pause billing for {org.orgName}?</span>
-          {describePauseOutcome(org).map((line) => (
-            <span key={line} style={{ color: "var(--dg-color-text-secondary)" }}>
-              {line}
-            </span>
-          ))}
+          {outcome.sentence ? <span>{outcome.sentence}</span> : null}
           <ReasonField
             id={`pause-reason-${org.orgId}`}
             value={reason}
@@ -404,6 +410,7 @@ export function PauseBillingDialog({
           />
         </div>
       }
+      summary={outcome.summary}
       confirmLabel="Pause billing"
       variant="warning"
       isLoading={isLoading}
@@ -445,12 +452,10 @@ export function ExtendGraceDialog({
 
   return (
     <ConfirmDialog
-      title="Extend grace"
+      title={`Extend ${org.orgName}'s grace?`}
       message={
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <span>
-            How many days should {org.orgName} get on top of its {current}-day grace period?
-          </span>
+          <span>How many days should be added to the {current}-day grace period?</span>
           <NumberField
             nullable
             min={1}
@@ -459,13 +464,13 @@ export function ExtendGraceDialog({
             onChange={onDaysChange}
             aria-label="Grace days to add"
           />
-          <span className="dg-tabular-nums" style={{ color: "var(--dg-color-text-muted)" }}>
-            {maxDays < 1
-              ? "Grace is already at its limit. Change the trial instead."
-              : opensUntil
-                ? `The organization stays open until ${opensUntil}. This sets its grace override.`
+          {opensUntil ? null : (
+            <span className="dg-tabular-nums" style={{ color: "var(--dg-color-text-muted)" }}>
+              {maxDays < 1
+                ? "Grace is already at its limit. Change the trial instead."
                 : `Enter 1 to ${maxDays} days.`}
-          </span>
+            </span>
+          )}
           <ReasonField
             id={`grace-reason-${org.orgId}`}
             value={reason}
@@ -473,6 +478,18 @@ export function ExtendGraceDialog({
             onChange={onReasonChange}
           />
         </div>
+      }
+      summary={
+        opensUntil
+          ? {
+              points: [
+                <span key="open" className="dg-tabular-nums">
+                  The organization stays open until {opensUntil}.
+                </span>,
+                "This sets the organization's grace override.",
+              ],
+            }
+          : undefined
       }
       confirmLabel="Extend grace"
       variant="warning"

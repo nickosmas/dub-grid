@@ -34,13 +34,13 @@ describe("useInvitationActionConfirm", () => {
 
     await user.click(screen.getByRole("button", { name: "revoke" }));
 
-    expect(screen.getByText("Revoke Invitation?")).toBeInTheDocument();
+    expect(screen.getByText(/^Revoke the invitation for /)).toBeInTheDocument();
     expect(onAnswer).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /cancel|keep/i }));
 
     expect(onAnswer).toHaveBeenCalledWith(false);
-    expect(screen.queryByText("Revoke Invitation?")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Revoke the invitation for /)).not.toBeInTheDocument();
   });
 
   it("resolves true only once the revoke is confirmed", async () => {
@@ -60,9 +60,11 @@ describe("useInvitationActionConfirm", () => {
 
     await user.click(screen.getByRole("button", { name: "revoke" }));
 
-    expect(screen.getByText(/mina@example.com/)).toBeInTheDocument();
-    expect(screen.getByText(/invite link stops working right away/i)).toBeInTheDocument();
-    expect(screen.getByText(/you can send them a new invitation/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Their invite link stops working right away, but you can send them a new invitation if you change your mind.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("tells the invitee's holder that reissuing kills the link they already have", async () => {
@@ -71,7 +73,12 @@ describe("useInvitationActionConfirm", () => {
 
     await user.click(screen.getByRole("button", { name: "resend" }));
 
-    expect(screen.getByText("Reissue Invitation?")).toBeInTheDocument();
-    expect(screen.getByText(/current link stops working immediately/i)).toBeInTheDocument();
+    expect(screen.getByText("Reissue the invitation for mina@example.com?")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "A new invitation link is sent, and the current one stops working immediately.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Keep in mind" })).not.toBeInTheDocument();
   });
 });

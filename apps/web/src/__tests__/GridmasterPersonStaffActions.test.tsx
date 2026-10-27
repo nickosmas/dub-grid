@@ -102,7 +102,7 @@ function invitation(overrides: Partial<Invitation> = {}): Invitation {
   };
 }
 
-function confirm(dialogName: string, buttonName: string) {
+function confirm(dialogName: string | RegExp, buttonName: string) {
   fireEvent.click(
     within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
       name: buttonName,
@@ -125,13 +125,13 @@ beforeEach(() => {
 });
 
 describe("PersonStaffActions", () => {
-  it("deactivates with a note and the record's version", async () => {
+  it("marks someone on the schedule away with a note and the record's version", async () => {
     const onChanged = vi.fn();
-    render(<PersonStaffActions employee={staff()} onChanged={onChanged} />);
+    render(<PersonStaffActions employee={staff({ focusAreaIds: [1] })} onChanged={onChanged} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
     fireEvent.change(screen.getByLabelText("Status note"), { target: { value: " Leave " } });
-    confirm("Deactivate staff record", "Deactivate");
+    confirm("Mark Ada Lovelace away?", "Mark away");
 
     // Through step-up after the credential check, with the assured token (F-96).
     await waitFor(() =>
@@ -141,12 +141,28 @@ describe("PersonStaffActions", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
-  it("activates an inactive record", async () => {
+  it("offers no Mark away for someone off the schedule", () => {
+    render(<PersonStaffActions employee={staff()} onChanged={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+  });
+
+  it("restores an archived record", async () => {
+    render(<PersonStaffActions employee={staff({ status: "removed" })} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    confirm("Restore Ada Lovelace?", "Restore");
+
+    await waitFor(() => expect(activateEmployee).toHaveBeenCalledWith(STAFF, ORG, 4));
+  });
+
+  it("marks an away record active", async () => {
     render(<PersonStaffActions employee={staff({ status: "inactive" })} onChanged={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Activate" }));
-    confirm("Activate staff record", "Activate");
+    expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mark active" }));
+    confirm("Mark Ada Lovelace active?", "Mark active");
 
     await waitFor(() => expect(activateEmployee).toHaveBeenCalledWith(STAFF, ORG, 4));
   });
@@ -156,8 +172,8 @@ describe("PersonStaffActions", () => {
     const onChanged = vi.fn();
     render(<PersonStaffActions employee={staff()} onChanged={onChanged} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    confirm("Remove staff record", "Remove");
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    confirm("Archive Ada Lovelace?", "Archive");
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
@@ -209,7 +225,7 @@ describe("PersonInvitationActions", () => {
     render(<PersonInvitationActions invitation={invitation()} onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Resend" }));
-    confirm("Resend invitation", "Resend");
+    confirm(/^Resend the invitation to /, "Resend");
 
     await waitFor(() =>
       expect(resendOrganizationInvitationGuarded).toHaveBeenCalledWith({
@@ -225,7 +241,7 @@ describe("PersonInvitationActions", () => {
     render(<PersonInvitationActions invitation={invitation()} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
-    confirm("Revoke invitation", "Revoke");
+    confirm(/^Revoke the invitation to /, "Revoke");
 
     await waitFor(() => expect(revokeOrganizationInvitationGuarded).toHaveBeenCalled());
   });

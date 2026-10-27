@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_BILLING_POLICY, resolveBillingPolicy } from "@dubgrid/domain";
@@ -81,6 +81,11 @@ function renderHarness(org: GridmasterBillingOrgSummary) {
   );
 }
 
+function whatHappens(dialogName: string | RegExp) {
+  const dialog = screen.getByRole("dialog", { name: dialogName });
+  return within(within(dialog).getByRole("region", { name: "Keep in mind" }));
+}
+
 describe("billing hold actions", () => {
   beforeEach(() => {
     updateSubscription.mockReset();
@@ -92,17 +97,14 @@ describe("billing hold actions", () => {
     renderHarness(makeOrg({ stripeSubscriptionId: "sub_123" }));
 
     await user.click(screen.getByRole("button", { name: "open pause" }));
+    const summary = whatHappens(/^Pause billing for /);
     expect(
-      screen.getByText("The organization keeps full access while billing is paused."),
+      summary.getByText("The organization keeps full access while billing is paused."),
     ).toBeTruthy();
-    expect(
-      screen.getByText("The trial stops counting down. Resuming gives back the paused days."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Stripe stops collecting payment, and invoices made while paused are voided.",
-      ),
-    ).toBeTruthy();
+    expect(summary.getByText("The trial stops counting down.")).toBeTruthy();
+    expect(summary.getByText("Resuming gives back the paused days.")).toBeTruthy();
+    expect(summary.getByText("Stripe stops collecting payment.")).toBeTruthy();
+    expect(summary.getByText("Invoices made while paused are voided.")).toBeTruthy();
     const confirm = screen.getByRole("button", { name: "Pause billing" });
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
 
@@ -128,7 +130,9 @@ describe("billing hold actions", () => {
 
     await user.click(screen.getByRole("button", { name: "open resume" }));
     expect(
-      screen.getByText(/The trial end moves 4 days later, to .*, giving back the paused time\./),
+      within(screen.getByRole("dialog", { name: /^Resume billing for / })).getByText(
+        /^The trial end moves 4 days later, to .*, giving back the paused time\.$/,
+      ),
     ).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Resume billing" }));
 
@@ -146,14 +150,14 @@ describe("billing hold actions", () => {
 
     await user.click(screen.getByRole("button", { name: "open grace" }));
     expect(
-      screen.getByText("How many days should Calm Haven get on top of its 3-day grace period?"),
+      screen.getByText("How many days should be added to the 3-day grace period?"),
     ).toBeTruthy();
     expect(screen.getByText("Enter 1 to 87 days.")).toBeTruthy();
 
     await user.type(screen.getByRole("spinbutton", { name: "Grace days to add" }), "4");
-    expect(
-      screen.getByText(/The organization stays open until .*\. This sets its grace override\./),
-    ).toBeTruthy();
+    const summary = whatHappens(/^Extend .*'s grace\?$/);
+    expect(summary.getByText(/^The organization stays open until /)).toBeTruthy();
+    expect(summary.getByText("This sets the organization's grace override.")).toBeTruthy();
     const confirm = screen.getByRole("button", { name: "Extend grace" });
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
 

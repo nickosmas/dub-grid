@@ -795,8 +795,7 @@ export default function EnhancedImpersonation({
       {stepUp.dialog}
       {startConfirm && !stepUp.dialog && selectedUser && selectedOrg && (
         <ConfirmDialog
-          title="Start impersonation"
-          message={`Start impersonating "${selectedUser.email}" in ${selectedOrg.name} as ${roleOverride || selectedUser.orgRole || "user"}?`}
+          title={`Impersonate ${selectedUser.email} in ${selectedOrg.name} as ${roleOverride || selectedUser.orgRole || "user"}?`}
           confirmLabel="Start impersonation"
           variant="warning"
           isLoading={loading}
@@ -807,8 +806,8 @@ export default function EnhancedImpersonation({
 
       {endConfirm && (
         <ConfirmDialog
-          title="End Impersonation"
-          message="End the active impersonation session and return to your gridmaster session?"
+          title="End this impersonation session?"
+          message="You return to your Gridmaster session."
           confirmLabel="End session"
           variant="danger"
           isLoading={loading}

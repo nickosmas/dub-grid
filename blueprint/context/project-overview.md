@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped. Items 40 and 51 are in progress.
+shipped, and so is 52. Items 40 and 51 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -86,6 +86,7 @@ shipped. Items 40 and 51 are in progress.
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 | 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
+| 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 
 Item 40 is split:
 
@@ -343,29 +344,42 @@ Item 51 is split:
   sign-in, role and management powers on web, mobile and in the database,
   isn't signed out, and takes a seat only as an Admin or Super Admin; only
   someone on the schedule can be marked inactive (migration 098).
-- **51b - Status names everywhere:** Away and Archived replace Inactive and
-  Removed in pills, tabs and filters on web, mobile and Gridmaster; a calm
-  Away banner replaces the read-only bar; billing breaks down who takes a
-  seat.
+- **51b - Status names everywhere:** shipped; Away and Archived replace
+  Inactive and Removed on web, mobile, Gridmaster, reports, alerts and the
+  activity log, with Mark away, Archive, Mark active and Restore as separate
+  actions; a calm "You're away." bar replaces the warning bar; Settings >
+  Billing lists who takes a seat and who isn't billed. No migration.
 - **51c - Suspended: access:** can't sign in (signed out everywhere, push
   off), an "Access suspended" message on web and mobile, and Reinstate.
   Needs a migration.
 - **51d - Suspended: managing it:** the Suspend dialog and Reinstate, a lock
   on the grid row, "won't see this in the app" in the shift picker, the
   notice email and the Super Admin alert, and their open requests close.
-- **51e - Away until a date:** an optional return date, schedulable again
-  from that date, and a daily job that sets them back to Active in the
-  organization's timezone; the "Away until Jan 4" pill and the grid's "away
-  all week" line.
-- **51f - An absence while away:** with a return date, an optional absence
-  type fills every day of the away range in the draft, replacing shifts,
-  published with the period; those days are locked in the grid with an
-  explanation, and changing the dates rewrites them.
+- **51e - Away until a date:** shipped; Mark away takes an optional return
+  date (web and mobile), the person is schedulable again from that date, and
+  a daily job sets them back to Active in the organization's timezone. Their
+  recurring schedules pause while away and fill again from the return date;
+  "Away until Jan 4" shows on pills and the record, and the grid draws their
+  away days as one Away bar per week (migration 099).
+- **51f - An absence while away:** shipped; with a return date, Mark away
+  and Change return date offer an absence (web and mobile) that fills every
+  day from today to the return date in the draft, over any shift, and
+  publishes with the period. The grid's bar reads "Away · Vacation" and a
+  locked day says why; moving the date, changing or clearing the absence, or
+  marking them active early rewrites the days (migration 100).
 - **51g - Last day:** "Leaving Nov 8", shifts after it come off in the
   draft, nobody can schedule them past it, and a daily job archives them the
   day after; the Suspend dialog can set one.
 - **51h - Bulk status changes:** the People list bulk bar: Mark away,
   Suspend, Archive and Mark active.
+- **51i - Losing a focus area:** taking someone off a focus area asks
+  whether to clear their upcoming shifts there, in the draft, or keep them.
+- **51j - No contact without sign-in:** push and schedule emails go only to
+  people who can still sign in (Suspended keeps its one notice email), and
+  restoring access restores delivery; settles whether in-app alerts are
+  still created for them.
+- **51k - One Archive:** archiving ends the membership whoever does it, and
+  Restore works the same after either.
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
 `inactive` and `removed`, and suspension, the return date and the last day
@@ -377,7 +391,23 @@ alerts still accrue) and closes their open requests. A last day archives
 automatically. Schedule changes from a status go through the draft and
 publish with the period. Staff copy names only their state and its date and
 calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
-Design reference: the "Staff status across surfaces" canvas.
+A "requests only" state waits for a real need. Marking someone away offers
+an absence type in the same confirmation (51f), so 51e and 51f come next,
+before 51c (owner, 2026-10-26). Design reference: the "Staff
+status across surfaces" canvas and the "Fine-grained removal in DubGrid"
+doc.
+
+Item 52, absence runs in the grid, has shipped; 51e's
+Away bar is drawn the same way. A whole-day absence on days in a row, the
+day off absence included, draws as one bar per week in the Week and 2 Weeks
+grid with no lines inside, labeled "Vacation ×4" (one day shows just the
+name; names are never pluralized). A bar breaks at a different absence, a
+day with a shift, the end of the week, and a day changed in the draft. Each
+day stays its own cell: hovering draws dashed edges around it, hides the
+label and lights its column header, and its panel offers Remove this day or
+Remove all 4 days in the draft with one Undo (owner decisions, 2026-10-26).
+Design reference: the "Absence runs in the grid" board on the "Staff status
+across surfaces" canvas.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -552,7 +582,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `096`.
+  checksum-locked through `100`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

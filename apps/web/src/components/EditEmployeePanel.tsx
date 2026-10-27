@@ -930,12 +930,11 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         {stepUp.dialog}
         {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && !stepUp.dialog && (
           <ConfirmDialog
-            title="Send a new invitation?"
+            title={`Send a new invitation to ${pendingReinviteSave.email}?`}
             message={
               <>
-                Changing the email will revoke the pending invitation to{" "}
-                <strong>{pendingInvitation.email}</strong>. Save and send a new invitation to{" "}
-                <strong>{pendingReinviteSave.email}</strong>?
+                The new email is saved, and the pending invitation to{" "}
+                <strong>{pendingInvitation.email}</strong> is revoked.
               </>
             }
             confirmLabel="Save & send"

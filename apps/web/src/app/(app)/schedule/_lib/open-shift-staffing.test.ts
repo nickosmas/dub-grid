@@ -152,6 +152,19 @@ describe("buildOpenShiftStaffingCandidates", () => {
     ).toEqual([]);
   });
 
+  it("keeps someone away until a date only from that date (51e)", () => {
+    const away = employee({ id: "away", status: "inactive", awayUntil: "2026-09-15" });
+    const staff = (date: string) =>
+      buildOpenShiftStaffingCandidates({
+        ...baseContext,
+        openShift: gap({ date }),
+        employees: [away],
+        scheduleByEmployeeId: new Map(),
+      }).map((candidate) => candidate.employee.id);
+    expect(staff("2026-09-14")).toEqual([]);
+    expect(staff("2026-09-15")).toEqual(["away"]);
+  });
+
   it("honors OR eligibility when either the role or certification matches", () => {
     const candidates = buildOpenShiftStaffingCandidates({
       ...baseContext,

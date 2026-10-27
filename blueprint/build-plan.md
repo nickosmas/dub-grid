@@ -1073,12 +1073,18 @@
       their open requests; a last day archives automatically; schedule
       changes from a status go through the draft and publish with the
       period; staff copy names only their state and its date and says "the
-      app", not DubGrid. Design reference: the "Staff status across
-      surfaces" canvas.
+      app", not DubGrid. Owner, 2026-10-26: also a paused recurring
+      schedule while away until a date, a choice for upcoming shifts when
+      someone loses a focus area, no push or schedule email to anyone who
+      can't sign in, and one Archive; "requests only" waits for a real need.
+      Design reference: the "Staff status across surfaces" canvas and the
+      "Fine-grained removal in DubGrid" doc. Owner, 2026-10-26: marking
+      someone away offers an absence type in the same confirmation (51f),
+      so build 51e and 51f next, before 51c.
   - [x] 51a. **Away keeps access** - an Away person keeps sign-in, role and
         management powers on web, mobile and in the database, isn't signed
         out, and takes a seat only while they can manage.
-  - [ ] 51b. **Status names everywhere** - Away and Archived replace
+  - [x] 51b. **Status names everywhere** - Away and Archived replace
         Inactive and Removed in pills, tabs and filters on web, mobile and
         Gridmaster; a calm Away banner replaces the read-only bar; billing
         breaks down who takes a seat.
@@ -1089,11 +1095,13 @@
         a lock on the grid row, "won't see this in the app" in the shift
         picker, the notice email and the Super Admin alert, and their open
         requests close.
-  - [ ] 51e. **Away until a date** - an optional return date, schedulable
+  - [x] 51e. **Away until a date** - an optional return date, schedulable
         again from that date, and a daily job that sets them back to Active
-        in the organization's timezone; the "Away until Jan 4" pill and the
-        grid's "away all week" line.
-  - [ ] 51f. **An absence while away** - with a return date, an optional
+        in the organization's timezone; their recurring schedules are paused
+        while away, not archived, and fill again from the return date; the
+        "Away until Jan 4" pill and the grid's Away bar, drawn like item
+        52's absence runs.
+  - [x] 51f. **An absence while away** - with a return date, an optional
         absence type fills every day of the away range in the draft,
         replacing shifts, published with the period; those days are locked
         in the grid with an explanation, and changing the dates rewrites
@@ -1103,3 +1111,33 @@
         archives them the day after; the Suspend dialog can set one.
   - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
+  - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks
+        whether to clear their upcoming shifts there, in the draft, or keep
+        them; today nothing acts on them.
+  - [ ] 51j. **No contact without sign-in** - push and schedule emails go
+        only to people who can still sign in, so Suspended, Archived,
+        Gridmaster's Remove access and a deactivated or terminated account
+        stop them (Suspended keeps its one notice email); restoring access
+        restores delivery. Settles whether in-app alerts are still created
+        for them.
+  - [ ] 51k. **One Archive** - archiving ends the membership whoever does
+        it, so an Admin's and a Super Admin's archive leave the same record,
+        and Restore works the same after either.
+- [x] 52. **Absence runs in the grid** - a whole-day absence on days in a
+      row draws as one bar per week in the Week and 2 Weeks grid, with no
+      lines between its days, labeled with the name and a count ("Vacation
+      ×4", "Off Day ×2"; one day shows just the name). Every whole-day
+      absence runs, the day off absence included. A bar breaks at a
+      different absence, a day with a shift, the end of the week, and a day
+      changed in the draft and not yet published. Each day stays its own
+      cell: hovering one draws dashed left and right edges around it, hides
+      the label and lights its column header; clicking, dragging and pasting
+      act on the day under the pointer, and screen readers read each day. A
+      day's panel names its run ("Part of 4 days, Mon, Nov 9 - Thu, Nov 12")
+      and offers Remove this day or Remove all 4 days, and the same choice
+      for changing the absence, in the draft with one Undo; removing a day
+      splits the bar. 51e's Away bar is drawn the same way, so build this
+      before 51e. Owner decisions, 2026-10-26: no grid lines inside a run, no
+      tint over the label, names never pluralized. Design reference: the
+      "Absence runs in the grid" board on the "Staff status across surfaces"
+      canvas.

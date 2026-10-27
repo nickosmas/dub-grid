@@ -25,6 +25,7 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { buildRowAbsenceRuns } from "@/components/schedule-grid/absenceRuns";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
@@ -129,6 +130,7 @@ import {
   type CoverageMatrixRow,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
+import { isSchedulableOn } from "@dubgrid/domain";
 import {
   availabilityFromShifts,
   availabilityWithPlanned,
@@ -146,6 +148,8 @@ import {
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
+import { awayUntilById, withoutAwayDays } from "./_lib/away-coverage";
+import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
   appliedSuggestionText,
@@ -311,6 +315,7 @@ import {
 } from "./_lib/operations";
 import {
   PublishChangeSummary,
+  publishSummaryPoints,
   type PublishCoverageChange,
   type PublishActiveEditor,
   type PublishEditorRow,
@@ -534,6 +539,13 @@ function SchedulerContent({
     () => [...employees, ...inactiveEmployees, ...removedEmployees],
     [employees, inactiveEmployees, removedEmployees],
   );
+  // Away people with a return date are scheduled again from it (51e), so the
+  // grid, coverage and Auto-build count them from that day on.
+  const awayUntil = useMemo(() => awayUntilById(inactiveEmployees), [inactiveEmployees]);
+  const scheduleEmployees = useMemo(
+    () => [...employees, ...inactiveEmployees.filter((employee) => awayUntil.has(employee.id))],
+    [employees, inactiveEmployees, awayUntil],
+  );
   // Who a peer's draft broadcast may touch on this grid; see readDraftChangedBroadcast.
   const visibleEmployeeIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
   visibleEmployeeIdsRef.current = empLoading
@@ -543,6 +555,14 @@ function SchedulerContent({
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
   );
+  // Recurring fills follow the database: someone Away until a date only from that date.
+  const schedulableOn = useMemo(() => {
+    const byId = new Map(employeeDirectory.map((employee) => [employee.id, employee]));
+    return (employeeId: string, dateKey: string) => {
+      const employee = byId.get(employeeId);
+      return !!employee && isSchedulableOn(employee, dateKey);
+    };
+  }, [employeeDirectory]);
   const [presenceProfiles, setPresenceProfiles] = useState<Map<string, PresenceProfile>>(
     () => new Map(),
   );
@@ -2831,17 +2851,23 @@ function SchedulerContent({
     () => filterAndSortEmployees(employees, activeFocusArea, scheduleSortBy),
     [employees, activeFocusArea, scheduleSortBy],
   );
+  // The Week and 2 Weeks grid also shows Away people with a return date; its
+  // model decides for which periods.
+  const filteredGridEmployees = useMemo(
+    () => filterAndSortEmployees(scheduleEmployees, activeFocusArea, scheduleSortBy),
+    [scheduleEmployees, activeFocusArea, scheduleSortBy],
+  );
   const normalizedStaffSearch = staffSearch.trim().toLowerCase();
   const searchMatchedEmployeeIds = useMemo(() => {
     if (!normalizedStaffSearch) return undefined;
     return new Set(
-      employees
+      scheduleEmployees
         .filter((employee) =>
           getEmployeeDisplayName(employee).toLowerCase().includes(normalizedStaffSearch),
         )
         .map((employee) => employee.id),
     );
-  }, [employees, normalizedStaffSearch]);
+  }, [scheduleEmployees, normalizedStaffSearch]);
   const refetchPublishedRanges = useCallback(async () => {
     if (!org) {
       setPublicationRangeState(beginPublicationRangeLoad());
@@ -3112,6 +3138,13 @@ function SchedulerContent({
       shifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
     [shifts],
   );
+  // What coverage counts: someone away until a date only from that date.
+  const coverageShifts = useMemo(() => withoutAwayDays(shifts, awayUntil), [shifts, awayUntil]);
+  const coverageAssignmentIdsForKey = useCallback(
+    (empId: string, date: Date): number[] =>
+      coverageShifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
+    [coverageShifts],
+  );
 
   const segmentsForKey = useCallback(
     (empId: string, date: Date) => {
@@ -3130,8 +3163,8 @@ function SchedulerContent({
   );
 
   const coverageCreditForKey = useMemo(
-    () => createCoverageCreditResolver(shifts, org?.coverageRuleConfig),
-    [org?.coverageRuleConfig, shifts],
+    () => createCoverageCreditResolver(coverageShifts, org?.coverageRuleConfig),
+    [org?.coverageRuleConfig, coverageShifts],
   );
 
   const editSessionCellKey = editPanel
@@ -3480,11 +3513,11 @@ function SchedulerContent({
     for (const fa of focusAreas) {
       next.set(
         fa.id,
-        employees.filter((employee) => employee.focusAreaIds.includes(fa.id)),
+        scheduleEmployees.filter((employee) => employee.focusAreaIds.includes(fa.id)),
       );
     }
     return next;
-  }, [employees, focusAreas]);
+  }, [scheduleEmployees, focusAreas]);
 
   const assignmentIdsByFocusArea = useMemo(
     () => buildAssignmentIdsByFocusArea(focusAreas, assignments),
@@ -3501,7 +3534,7 @@ function SchedulerContent({
       requirements: coverageRequirements,
       dates,
       employeesByFocusArea,
-      assignmentIdsForKey,
+      assignmentIdsForKey: coverageAssignmentIdsForKey,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       assignmentNameMap,
@@ -3514,7 +3547,7 @@ function SchedulerContent({
     assignments,
     dates,
     employeesByFocusArea,
-    assignmentIdsForKey,
+    coverageAssignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     assignmentNameMap,
@@ -3533,7 +3566,7 @@ function SchedulerContent({
       requirements: coverageRequirements,
       dates: publishedVisibleDates,
       employeesByFocusArea,
-      assignmentIdsForKey,
+      assignmentIdsForKey: coverageAssignmentIdsForKey,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       assignmentNameMap,
@@ -3546,7 +3579,7 @@ function SchedulerContent({
     assignments,
     publishedVisibleDates,
     employeesByFocusArea,
-    assignmentIdsForKey,
+    coverageAssignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     assignmentNameMap,
@@ -3572,8 +3605,12 @@ function SchedulerContent({
   );
 
   const publishedCoverageCreditForKey = useMemo(
-    () => createPublishedCoverageCreditResolver(shifts, org?.coverageRuleConfig),
-    [org?.coverageRuleConfig, shifts],
+    () => createPublishedCoverageCreditResolver(coverageShifts, org?.coverageRuleConfig),
+    [org?.coverageRuleConfig, coverageShifts],
+  );
+  const coveragePublishedAssignmentIdsForKey = useMemo(
+    () => createPublishedAssignmentIdsResolver(coverageShifts),
+    [coverageShifts],
   );
 
   // Started means every shift that could fill the requirement has begun: the
@@ -3620,7 +3657,7 @@ function SchedulerContent({
       const published = computeCoverageCategorySnapshots({
         ...base,
         dates: publishedVisibleDates,
-        assignmentIdsForKey,
+        assignmentIdsForKey: coverageAssignmentIdsForKey,
         coverageCreditForKey,
       });
       return buildCoverageMatrix({
@@ -3635,14 +3672,14 @@ function SchedulerContent({
       draft: computeCoverageCategorySnapshots({
         ...base,
         dates,
-        assignmentIdsForKey,
+        assignmentIdsForKey: coverageAssignmentIdsForKey,
         coverageCreditForKey,
         includeContributors: true,
       }),
       published: computeCoverageCategorySnapshots({
         ...base,
         dates: publishedVisibleDates,
-        assignmentIdsForKey: publishedAssignmentIdsForKey,
+        assignmentIdsForKey: coveragePublishedAssignmentIdsForKey,
         coverageCreditForKey: publishedCoverageCreditForKey,
         includeContributors: true,
       }),
@@ -3658,9 +3695,9 @@ function SchedulerContent({
     canEditShifts,
     dates,
     publishedVisibleDates,
-    assignmentIdsForKey,
+    coverageAssignmentIdsForKey,
     coverageCreditForKey,
-    publishedAssignmentIdsForKey,
+    coveragePublishedAssignmentIdsForKey,
     publishedCoverageCreditForKey,
     publishedDateSet,
     isCoverageSnapshotStarted,
@@ -3730,7 +3767,10 @@ function SchedulerContent({
     return [...resolvedCalloffOpenShifts, ...gapShifts].reduce<GridOpenShift[]>(
       (visible, openShift) => {
         if (isOpenShiftStarted(openShift)) return visible;
-        if (canEditShifts && isCalloffOpenShiftStaffedByDraft({ openShift, employees, shifts })) {
+        if (
+          canEditShifts &&
+          isCalloffOpenShiftStaffedByDraft({ openShift, employees: scheduleEmployees, shifts })
+        ) {
           return visible;
         }
 
@@ -3803,7 +3843,7 @@ function SchedulerContent({
     shiftCategories,
     shiftRequests.requests,
     shifts,
-    employees,
+    scheduleEmployees,
     visibleCoverageGaps,
   ]);
 
@@ -5430,7 +5470,7 @@ function SchedulerContent({
   /** Returns null if qualified, or an error message string if not. */
   const checkQualification = useCallback(
     (empId: string, assignmentIds: number[]): string | null => {
-      const emp = employees.find((e) => e.id === empId);
+      const emp = scheduleEmployees.find((e) => e.id === empId);
       if (!emp) return null; // shouldn't happen, but don't block
 
       for (const codeId of assignmentIds) {
@@ -5479,7 +5519,7 @@ function SchedulerContent({
     },
     [
       certificationNameMap,
-      employees,
+      scheduleEmployees,
       focusAreaNameMap,
       jobs,
       roleNameMap,
@@ -5707,6 +5747,8 @@ function SchedulerContent({
   const handlePasteShift = useCallback(
     (empId: string, date: Date) => {
       if (!clipboard) return;
+      // A keyboard paste lands on the hovered cell, which may be an Away day.
+      if (!schedulableOn(empId, formatDateKey(date))) return;
       if (!guardActiveSession()) return;
       const cellKey = `${empId}_${formatDateKey(date)}`;
 
@@ -5746,6 +5788,7 @@ function SchedulerContent({
       guardActiveSession,
       getInputAssignmentDefinitionIds,
       checkQualification,
+      schedulableOn,
       shifts,
     ],
   );
@@ -5753,12 +5796,12 @@ function SchedulerContent({
   const handleClearShift = useCallback(
     (empId: string, date: Date) => {
       if (!guardActiveSession()) return;
-      const emp = employees.find((e) => e.id === empId);
+      const emp = scheduleEmployees.find((e) => e.id === empId);
       const empName = emp ? getEmployeeDisplayName(emp) : "";
       const label = shiftForKey(empId, date) ?? "";
       setPendingClearShift({ empId, date, empName, shiftLabel: label });
     },
-    [guardActiveSession, employees, shiftForKey],
+    [guardActiveSession, scheduleEmployees, shiftForKey],
   );
 
   const getDateFromCellId = useCallback(
@@ -5871,6 +5914,7 @@ function SchedulerContent({
         activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
         activeJobIds: new Set(jobs.map((job) => job.id)),
         activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
+        schedulableOn,
       });
       const count = fills.length;
       const cellKeys = fills.map((fill) => `${fill.employeeId}_${fill.dateKey}`);
@@ -5886,7 +5930,7 @@ function SchedulerContent({
     } finally {
       setIsApplyingRecurring(false);
     }
-  }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs]);
+  }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs, schedulableOn]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
@@ -6326,7 +6370,7 @@ function SchedulerContent({
       staffingStateFromEntry(shifts[`${employeeId}_${targetDateKey}`]);
     const previousDateKey = formatDateKey(addDays(date, -1));
     const nextDateKey = formatDateKey(addDays(date, 1));
-    for (const employee of employees) {
+    for (const employee of scheduleEmployees) {
       scheduleByEmployeeId.set(employee.id, staffingStateFor(employee.id, dateKey));
       adjacentScheduleByEmployeeId.set(employee.id, {
         previous: staffingStateFor(employee.id, previousDateKey),
@@ -6342,7 +6386,7 @@ function SchedulerContent({
       key >= loadedShiftWindow.start && key <= loadedShiftWindow.end;
     return buildOpenShiftStaffingCandidates({
       openShift: staffingOpenShift,
-      employees,
+      employees: scheduleEmployees,
       scheduleByEmployeeId,
       adjacentScheduleByEmployeeId,
       adjacentDaysLoaded: { previous: isLoaded(previousDateKey), next: isLoaded(nextDateKey) },
@@ -6355,7 +6399,7 @@ function SchedulerContent({
   }, [
     assignments,
     canEditShifts,
-    employees,
+    scheduleEmployees,
     jobs,
     loadedShiftWindow,
     orgRoles,
@@ -6587,7 +6631,7 @@ function SchedulerContent({
   // A deleted draft counts for nothing in coverage, so it reads as an empty day here too.
   const describeCoverageCell = useCallback(
     (row: CoverageMatrixRow, cell: CoverageMatrixCell): string[] => {
-      const employeeName = new Map(employees.map((employee) => [employee.id, employee]));
+      const employeeName = new Map(scheduleEmployees.map((employee) => [employee.id, employee]));
       const focusAreaNames = new Map(focusAreas.map((area) => [area.id, area.name]));
       const draftDay = (employeeId: string, dateKey: string): CoverageDaySide => {
         const entry = shifts[`${employeeId}_${dateKey}`];
@@ -6629,7 +6673,7 @@ function SchedulerContent({
       assignmentById,
       assignmentNameMap,
       availableSwapDates,
-      employees,
+      scheduleEmployees,
       focusAreas,
       shifts,
     ],
@@ -6647,13 +6691,13 @@ function SchedulerContent({
       draft: computeCoverageCategorySnapshots({
         ...coverageBase,
         dates: windowDates,
-        assignmentIdsForKey,
+        assignmentIdsForKey: coverageAssignmentIdsForKey,
         coverageCreditForKey,
       }),
       published: computeCoverageCategorySnapshots({
         ...coverageBase,
         dates: publishedDates,
-        assignmentIdsForKey: publishedAssignmentIdsForKey,
+        assignmentIdsForKey: coveragePublishedAssignmentIdsForKey,
         coverageCreditForKey: publishedCoverageCreditForKey,
       }),
       dates: windowDates,
@@ -6666,7 +6710,7 @@ function SchedulerContent({
       partial: publishedDates.length < windowDates.length,
     };
   }, [
-    assignmentIdsForKey,
+    coverageAssignmentIdsForKey,
     canEditShifts,
     coverageBase,
     coverageCreditForKey,
@@ -6674,11 +6718,17 @@ function SchedulerContent({
     currentPublishWindow.endDate,
     currentPublishWindow.startDate,
     isCoverageSnapshotStarted,
-    publishedAssignmentIdsForKey,
+    coveragePublishedAssignmentIdsForKey,
     publishedCoverageCreditForKey,
     publishedDateSet,
     showPublishConfirm,
   ]);
+  const publishPoints = publishSummaryPoints({
+    editorRows: publishEditorRows,
+    activeEditors: publishActiveEditors,
+    coverageGapCount: allCoverageGaps.length,
+    coverageChange: publishCoverageChange,
+  });
 
   // Editors only, while the panel is open: every suggestion is measured on a
   // copy of the schedule by the engine, so this reruns as the draft changes.
@@ -6720,8 +6770,10 @@ function SchedulerContent({
       coverage: coverageBase,
       mentoredCredit:
         normalizeCoverageRuleConfig(org?.coverageRuleConfig).mentoredCoverageCreditPercent / 100,
-      shifts,
-      employees,
+      // Counted as the matrix counts; an Away person is planned only from their return date.
+      shifts: coverageShifts,
+      employees: scheduleEmployees,
+      awayUntil,
       assignments: Array.from(assignmentById.values()),
       shiftCategories,
       jobs,
@@ -6762,16 +6814,17 @@ function SchedulerContent({
     shiftPreferences,
     jobPreferences,
     canEditShifts,
+    awayUntil,
     coverageBase,
     coverageMatrix,
-    employees,
+    coverageShifts,
     focusAreas,
     jobs,
     org?.coverageRuleConfig,
     orgRoles,
+    scheduleEmployees,
     shiftCategories,
     shiftRequests.requests,
-    shifts,
   ]);
 
   // What was built and applied belongs to its period; another period shows its own.
@@ -6796,12 +6849,15 @@ function SchedulerContent({
     suggestion: CoverageSuggestion;
     title: string;
     message: string;
+    points: string[];
   } | null>(null);
 
   // Fill a spot's own builder, so a suggestion never writes what the dialog could not.
   const buildSuggestedAssignInput = useCallback(
     (suggestion: CoverageSuggestion): ScheduleCellInput | null => {
-      const employee = employees.find((candidate) => candidate.id === suggestion.employeeId);
+      const employee = scheduleEmployees.find(
+        (candidate) => candidate.id === suggestion.employeeId,
+      );
       if (!employee) return null;
       const { dateKey, focusAreaId, assignmentId } = suggestion.subject;
       const date = parseLocalDateKey(dateKey);
@@ -6844,7 +6900,7 @@ function SchedulerContent({
         orgRoles,
       });
     },
-    [assignments, employees, jobs, loadedShiftWindow, orgRoles, shiftCategories, shifts],
+    [assignments, scheduleEmployees, jobs, loadedShiftWindow, orgRoles, shiftCategories, shifts],
   );
 
   const applyCoverageSuggestion = useCallback(
@@ -6858,11 +6914,14 @@ function SchedulerContent({
         setPendingApproval({
           suggestion,
           title: `Approve ${name}'s pickup request?`,
-          message: `${name} gets the ${lookups.assignmentName(suggestion.subject.assignmentId)} on ${lookups.formatDate(
+          message: `They get the ${lookups.assignmentName(suggestion.subject.assignmentId)} on ${lookups.formatDate(
             suggestion.subject.dateKey,
-          )} right away. Staff see it without a publish, and it can't be undone here.${
-            entry?.draftKind ? " Their draft change for that day is replaced." : ""
-          }`,
+          )} right away.`,
+          points: [
+            "Staff see the change without a publish.",
+            "You can't undo the approval here.",
+            ...(entry?.draftKind ? ["Any draft change they had for that day is replaced."] : []),
+          ],
         });
         return;
       }
@@ -7098,11 +7157,11 @@ function SchedulerContent({
           .map((row) => row.focusAreaId),
       );
       const allAreas = coverageMatrix.rows.every((row) => rowKeys.includes(row.rowKey));
-      return employees.filter(
+      return scheduleEmployees.filter(
         (employee) => allAreas || employee.focusAreaIds.some((areaId) => scopedAreas.has(areaId)),
       );
     },
-    [coverageMatrix, employees],
+    [coverageMatrix, scheduleEmployees],
   );
   // What the last build did, kept until Done, a new preview or its Undo.
   const [buildReport, setBuildReport] = useState<{
@@ -7173,6 +7232,7 @@ function SchedulerContent({
         activeJobIds: new Set(jobs.map((job) => job.id)),
         activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
         employeeIds: allAreas ? undefined : new Set(scopedEmployeeIds),
+        schedulableOn,
       });
       const fixedWrites: SuggestionWrite[] = [];
       const baseOverrides: CoverageDayOverride[] = [];
@@ -7265,6 +7325,7 @@ function SchedulerContent({
       excludedFromBuild,
       planOptions,
       resolveInputSnapshot,
+      schedulableOn,
       segmentCompatibility,
       shiftCategories,
     ],
@@ -7547,11 +7608,83 @@ function SchedulerContent({
     [activeFocusArea],
   );
 
+  // The run of whole-day absences the open cell sits in, read the way the
+  // Week and 2 Weeks grid draws it (item 52).
+  const panelAbsenceRun = useMemo(() => {
+    if (!editPanel || !canEditShifts || spanWeeks === "month" || isMobile) return null;
+    const dateKey = formatDateKey(editPanel.date);
+    const week = [week1, week2].find((days) =>
+      days.some((date) => formatDateKey(date) === dateKey),
+    );
+    if (!week) return null;
+    const runs = buildRowAbsenceRuns(editPanel.empId, week, {
+      shiftForKey,
+      absenceTypeIdForKey,
+      segmentsForKey,
+      draftKindForKey,
+      publishDiffForKey: publishDiffKindForKey,
+      showPublishDiffOverlay: showPublishDiff,
+      hasAbsenceType: (absenceTypeId) => absenceTypeObjectMap.has(absenceTypeId),
+    });
+    const day = runs.days[week.findIndex((date) => formatDateKey(date) === dateKey)];
+    if (!day) return null;
+    return {
+      dateKeys: week.slice(day.start, day.start + day.length).map((date) => formatDateKey(date)),
+    };
+  }, [
+    absenceTypeIdForKey,
+    absenceTypeObjectMap,
+    canEditShifts,
+    draftKindForKey,
+    editPanel,
+    isMobile,
+    publishDiffKindForKey,
+    segmentsForKey,
+    shiftForKey,
+    showPublishDiff,
+    spanWeeks,
+    week1,
+    week2,
+  ]);
+
+  // Removes a whole run as one batch, with one Undo that puts back the days
+  // nobody has changed since.
+  const removeAbsenceRun = useCallback(
+    async (empId: string, dateKeys: string[], absenceName: string) => {
+      const applied = planAbsenceRunRemoval(empId, dateKeys, shiftsRef.current);
+      const updates = dateKeys
+        .map((dateKey) => buildShiftDeleteUpdate(empId, dateKey))
+        .filter((update): update is ShiftDeleteUpdate => update != null);
+      const { deleted } = await applyShiftDeleteUpdates(updates, {
+        broadcast: true,
+        failureMessage: `We couldn't remove "${absenceName}". Try again.`,
+      });
+      if (deleted === 0) return;
+      toast.success(`Removed ${deleted} ${deleted === 1 ? "day" : "days"} of "${absenceName}"`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const { restore, kept } = planUndo(applied, shiftsRef.current);
+            for (const write of restore) {
+              setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+            }
+            if (kept > 0) {
+              toast.info(
+                `${kept === 1 ? "1 day" : `${kept} days`} changed since ${kept === 1 ? "keeps its" : "keep their"} change.`,
+              );
+            }
+          },
+        },
+      });
+    },
+    [applyShiftDeleteUpdates, buildShiftDeleteUpdate, setShift],
+  );
+
   const scheduleGridModel = useMemo(
     () =>
       buildScheduleGridModel({
-        filteredEmployees,
-        allEmployees: employees,
+        filteredEmployees: filteredGridEmployees,
+        allEmployees: scheduleEmployees,
         week1,
         week2,
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
@@ -7606,8 +7739,8 @@ function SchedulerContent({
         },
       }),
     [
-      filteredEmployees,
-      employees,
+      filteredGridEmployees,
+      scheduleEmployees,
       week1,
       week2,
       spanWeeks,
@@ -8709,7 +8842,7 @@ function SchedulerContent({
                   onPaste={() => handlePasteGridCell(contextMenu.cellId)}
                   onClear={() => handleClearShift(contextMenu.cellId.empId, contextMenuDate)}
                   onNeedCoverage={() => {
-                    const emp = employees.find((e) => e.id === contextMenu.cellId.empId);
+                    const emp = scheduleEmployees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
                     const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
                     if (!guardActiveSession()) return;
@@ -8726,7 +8859,7 @@ function SchedulerContent({
                     });
                   }}
                   onProposeSwap={() => {
-                    const emp = employees.find((e) => e.id === contextMenu.cellId.empId);
+                    const emp = scheduleEmployees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
                     startEditSession({
                       empId: emp.id,
@@ -8748,6 +8881,7 @@ function SchedulerContent({
               <ConfirmDialog
                 title={pendingApproval.title}
                 message={pendingApproval.message}
+                summary={{ points: pendingApproval.points }}
                 confirmLabel="Approve"
                 variant="info"
                 isLoading={busySuggestionId === pendingApproval.suggestion.id}
@@ -8759,8 +8893,7 @@ function SchedulerContent({
             {/* Confirm dialog for context-menu shift removal */}
             {pendingClearShift && (
               <ConfirmDialog
-                title="Remove Entry?"
-                message={`Remove "${pendingClearShift.shiftLabel}" from ${pendingClearShift.empName} on ${formatDate(pendingClearShift.date)}?`}
+                title={`Remove "${pendingClearShift.shiftLabel}" on ${formatDate(pendingClearShift.date)}?`}
                 confirmLabel="Remove"
                 variant="danger"
                 onConfirm={() => {
@@ -8774,7 +8907,9 @@ function SchedulerContent({
 
             {showBulkDeleteReview && (
               <ConfirmDialog
-                title="Review Bulk Removal"
+                title={`Remove ${bulkDeleteSelectedTargets.length} selected entr${
+                  bulkDeleteSelectedTargets.length === 1 ? "y" : "ies"
+                }?`}
                 message={<BulkDeleteReviewContent targets={bulkDeleteSelectedTargets} />}
                 confirmLabel="Remove"
                 cancelLabel="Back"
@@ -8942,15 +9077,11 @@ function SchedulerContent({
                 confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
-                  <>
-                    Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
-                    <strong>{pendingCoverageGapVolunteer.date}</strong>?{" "}
-                    {canApproveShiftRequests
-                      ? "As an admin, this goes on the schedule right away."
-                      : "This will be sent to your admin for approval."}
-                  </>
+                  canApproveShiftRequests
+                    ? "As an admin, it goes on the schedule right away."
+                    : "It's sent to your admin for approval."
                 }
-                title="Claim this shift?"
+                title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${pendingCoverageGapVolunteer.date}?`}
                 variant="info"
                 onCancel={() => {
                   if (!isCoverageGapVolunteerPending) {
@@ -8982,23 +9113,15 @@ function SchedulerContent({
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
-                title="Claim this shift?"
-                message={
-                  <>
-                    <strong>
-                      {spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
-                        pendingClaimShift.assignmentLabel}
-                    </strong>{" "}
-                    on <strong>{pendingClaimShift.date}</strong>
-                    {pendingClaimShift.calledOffBy && (
-                      <> (called off by {pendingClaimShift.calledOffBy})</>
-                    )}
-                    <br />
-                    {canApproveShiftRequests
-                      ? "As an admin, this goes on the schedule right away."
-                      : "We'll send this to your admin for approval."}
-                  </>
-                }
+                title={`Claim ${
+                  spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
+                  pendingClaimShift.assignmentLabel
+                } on ${pendingClaimShift.date}?`}
+                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${
+                  canApproveShiftRequests
+                    ? "As an admin, it goes on the schedule right away."
+                    : "It's sent to your admin for approval."
+                }`}
                 confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
@@ -9083,8 +9206,7 @@ function SchedulerContent({
             {/* Confirm dialog for pasting over an existing shift */}
             {pendingPasteOver && (
               <ConfirmDialog
-                title="Replace Entry?"
-                message={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
+                title={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
                 confirmLabel="Replace"
                 variant="warning"
                 onConfirm={() => {
@@ -9148,6 +9270,22 @@ function SchedulerContent({
               getActiveIndicatorIds={panelActiveIndicatorIds}
               onNoteToggle={handleNoteToggle}
               onClose={closeEditPanel}
+              absenceRun={panelAbsenceRun}
+              onRemoveAbsenceRun={
+                panelAbsenceRun
+                  ? () => {
+                      const absenceType =
+                        panelCurrentAbsenceTypeId != null
+                          ? absenceTypeObjectMap.get(panelCurrentAbsenceTypeId)
+                          : undefined;
+                      void removeAbsenceRun(
+                        editPanel.empId,
+                        panelAbsenceRun.dateKeys,
+                        absenceType?.name || absenceType?.label || "Absence",
+                      );
+                    }
+                  : undefined
+              }
               seriesId={
                 panelShiftEntry?.seriesId ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId ??
@@ -9475,27 +9613,27 @@ function SchedulerContent({
 
           {showDiscardConfirm && (
             <ConfirmDialog
-              title="Discard drafts?"
+              title={`Discard drafts for ${currentPublishWindow.label}?`}
               message={
                 <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: 10,
+                    gap: 14,
                   }}
                 >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "var(--dg-fs-body-sm)",
-                      lineHeight: 1.5,
-                      color: "var(--dg-color-text-secondary)",
-                    }}
-                  >
-                    {showOrganizationDiscardScope
-                      ? `Published schedule stays live. Choose which drafts to discard for ${currentPublishWindow.label}. Drafts in other periods are left alone.`
-                      : `Published schedule stays live. These drafts for ${currentPublishWindow.label} will be removed. Drafts in other periods are left alone.`}
-                  </p>
+                  {showOrganizationDiscardScope ? (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "var(--dg-fs-body-sm)",
+                        lineHeight: 1.5,
+                        color: "var(--dg-color-text-secondary)",
+                      }}
+                    >
+                      Choose which drafts to discard.
+                    </p>
+                  ) : null}
                   <div
                     style={{
                       display: "grid",
@@ -9520,6 +9658,12 @@ function SchedulerContent({
                   </div>
                 </div>
               }
+              summary={{
+                points: [
+                  "The published schedule stays live.",
+                  "Drafts in other periods are left alone.",
+                ],
+              }}
               confirmLabel="Discard my drafts"
               cancelLabel="Keep drafts"
               variant="danger"
@@ -9546,17 +9690,13 @@ function SchedulerContent({
 
           {showPublishConfirm && (
             <ConfirmDialog
-              title="Publish Schedule?"
+              title={`Publish ${draftBreakdown.totalChanges} change${
+                draftBreakdown.totalChanges === 1 ? "" : "s"
+              } for ${currentPublishWindow.label}?`}
               message={
-                <PublishChangeSummary
-                  editorRows={publishEditorRows}
-                  activeEditors={publishActiveEditors}
-                  windowLabel={currentPublishWindow.label}
-                  totalChanges={draftBreakdown.totalChanges}
-                  coverageGapCount={allCoverageGaps.length}
-                  coverageChange={publishCoverageChange}
-                />
+                <PublishChangeSummary editorRows={publishEditorRows} points={publishPoints} />
               }
+              summary={publishPoints.length > 1 ? { points: publishPoints } : undefined}
               maxWidth={560}
               wrapActions
               confirmLabel="Publish"
@@ -9572,8 +9712,8 @@ function SchedulerContent({
 
           {showAutoFillConfirm && autoFillPreview && (
             <ConfirmDialog
-              title="Fill from Recurring Schedules?"
-              message={`This fills ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} from recurring schedules. Shifts already on the schedule are not overwritten.`}
+              title={`Fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} from recurring schedules?`}
+              message={`This covers ${autoFillPreview.dateRange}. Shifts already on the schedule are not overwritten.`}
               confirmLabel="Fill"
               variant="info"
               isLoading={isApplyingRecurring}
@@ -9587,19 +9727,21 @@ function SchedulerContent({
 
           {showImportConfirm && importPreview && (
             <ConfirmDialog
-              title="Import Previous Schedule?"
+              title={`Import ${importPreview.breakdown.imported} shift${
+                importPreview.breakdown.imported === 1 ? "" : "s"
+              } from ${importPreview.sourceRange}?`}
               message={(() => {
-                const { breakdown, sourceRange, targetRange, outcomes } = importPreview;
-                const copyLine = `This will copy ${breakdown.imported} shift${
-                  breakdown.imported === 1 ? "" : "s"
-                } from ${sourceRange} into ${targetRange}.`;
+                const { breakdown, targetRange, outcomes } = importPreview;
+                const copyLine = `They're copied into ${targetRange}.`;
                 if (breakdown.totalSkipped === 0) return copyLine;
                 const description = formatImportPreviousSkipDescription(
                   outcomes,
                   breakdown,
                   employeeNameById,
                 );
-                return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
+                return `${copyLine} ${breakdown.totalSkipped} shift${
+                  breakdown.totalSkipped === 1 ? "" : "s"
+                } will be skipped: ${description}.`;
               })()}
               confirmLabel="Import"
               variant="info"

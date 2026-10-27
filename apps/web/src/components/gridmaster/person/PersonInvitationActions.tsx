@@ -78,11 +78,13 @@ export function PersonInvitationActions({
       </Button>
       {confirm && (
         <ConfirmDialog
-          title={confirm === "resend" ? "Resend invitation" : "Revoke invitation"}
-          message={
+          title={
             confirm === "resend"
-              ? `Send a new invitation link to ${invitation.email}? The old link stops working.`
-              : `Revoke the invitation to ${invitation.email}? The link stops working.`
+              ? `Resend the invitation to ${invitation.email}?`
+              : `Revoke the invitation to ${invitation.email}?`
+          }
+          message={
+            confirm === "resend" ? "A new link is sent, and the old one stops working." : undefined
           }
           confirmLabel={confirm === "resend" ? "Resend" : "Revoke"}
           variant={confirm === "resend" ? "info" : "danger"}

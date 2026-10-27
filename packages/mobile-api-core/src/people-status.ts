@@ -1,18 +1,32 @@
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
 import type { Employee } from "@dubgrid/domain";
 import {
+  AWAY_ABSENCE_INVALID_CODE,
+  AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
+  AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
+  isAwayAbsenceRefusal,
   isSelfAction,
+  isValidReturnDate,
+  NOT_AWAY_CODE,
+  NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
+  RETURN_DATE_INVALID_CODE,
+  RETURN_DATE_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
+import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
+
+const STATUS_CONFLICT_MESSAGE =
+  "Employee status changed elsewhere. Review the latest values before saving again.";
 
 type PeopleStatusContext = {
   currentOrg: {
     id: string;
+    timezone?: string | null;
   };
   permissions: {
     canManageEmployees: boolean;
@@ -47,6 +61,20 @@ type UpdateEmployeeStatus = (
     statusNote: string;
     statusChangedAt: string;
     archivedAt?: string | null;
+    awayUntil: string | null;
+    awayAbsenceTypeId: number | null;
+    updatedBy: string;
+  },
+) => Promise<Employee | null>;
+
+type UpdateEmployeeReturnDate = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    awayUntil: string | null;
+    awayAbsenceTypeId: number | null;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -116,6 +144,13 @@ type PeopleStatusResult =
       status: 400;
     }
   | {
+      kind: "invalid_return_date";
+      error: string;
+      code:
+        typeof RETURN_DATE_INVALID_CODE | typeof NOT_AWAY_CODE | typeof AWAY_ABSENCE_INVALID_CODE;
+      status: 400;
+    }
+  | {
       kind: "latest_unavailable";
       error: string;
       status: 500;
@@ -137,6 +172,7 @@ export async function updateMobilePersonStatus(
   deps: {
     fetchEmployeeById: FetchEmployeeById;
     updateEmployeeStatus: UpdateEmployeeStatus;
+    updateEmployeeReturnDate: UpdateEmployeeReturnDate;
     insertAuditLog: InsertAuditLog;
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
     fetchActiveMembershipOrgRole: FetchActiveMembershipOrgRole;
@@ -177,7 +213,7 @@ export async function updateMobilePersonStatus(
   if (currentEmployee.version !== input.body.expectedVersion) {
     return {
       kind: "conflict",
-      error: "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: STATUS_CONFLICT_MESSAGE,
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(currentEmployee),
       status: 409,
@@ -188,6 +224,59 @@ export async function updateMobilePersonStatus(
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
   }
 
+  const returnDate = input.body.returnDate ?? null;
+  if (
+    returnDate !== null &&
+    (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
+    !isValidReturnDate(
+      returnDate,
+      getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null),
+    )
+  ) {
+    return {
+      kind: "invalid_return_date",
+      error: RETURN_DATE_INVALID_MESSAGE,
+      code: RETURN_DATE_INVALID_CODE,
+      status: 400,
+    };
+  }
+
+  const absenceTypeId = input.body.absenceTypeId;
+  if (
+    absenceTypeId != null &&
+    (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
+    returnDate === null
+  ) {
+    return awayAbsenceInvalid(AWAY_ABSENCE_NEEDS_DATE_MESSAGE);
+  }
+
+  try {
+    if (input.body.action === "setReturnDate") {
+      return await setReturnDate(auth, input, currentEmployee, returnDate, deps);
+    }
+    return await changeStatus(auth, input, currentEmployee, returnDate, deps);
+  } catch (error) {
+    if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
+    throw error;
+  }
+}
+
+function awayAbsenceInvalid(error: string): PeopleStatusResult {
+  return { kind: "invalid_return_date", error, code: AWAY_ABSENCE_INVALID_CODE, status: 400 };
+}
+
+async function changeStatus(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  returnDate: string | null,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
   // Removing staff already fully blocks login at the JWT hook regardless of
   // org_role, so removing the org's only super_admin here would lock the org
   // out just as surely as deleting their membership would — same guard as
@@ -239,6 +328,9 @@ export async function updateMobilePersonStatus(
     statusChangedAt: now,
     archivedAt:
       input.body.action === "activate" ? null : input.body.action === "remove" ? now : undefined,
+    awayUntil: input.body.action === "deactivate" ? returnDate : null,
+    awayAbsenceTypeId:
+      input.body.action === "deactivate" ? (input.body.absenceTypeId ?? null) : null,
     updatedBy: auth.user.id,
   });
 
@@ -259,7 +351,7 @@ export async function updateMobilePersonStatus(
 
     return {
       kind: "conflict",
-      error: "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: STATUS_CONFLICT_MESSAGE,
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(latestEmployee),
       status: 409,
@@ -303,7 +395,102 @@ export async function updateMobilePersonStatus(
       fromStatus: currentEmployee.status,
       toStatus: updatedEmployee.status,
       note: input.body.note ?? "",
+      ...(updatedEmployee.awayUntil ? { awayUntil: updatedEmployee.awayUntil } : {}),
+      ...(updatedEmployee.awayAbsenceTypeId
+        ? { awayAbsenceTypeId: updatedEmployee.awayAbsenceTypeId }
+        : {}),
       changedFields: ["status"],
+    },
+    ip_address: input.requestIp,
+    user_agent: input.userAgent,
+  });
+
+  return {
+    kind: "updated",
+    person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+    status: 200,
+  };
+}
+
+/** Sets, moves or clears an Away person's return date; their status stays Away. */
+async function setReturnDate(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  returnDate: string | null,
+  deps: {
+    fetchEmployeeById: FetchEmployeeById;
+    updateEmployeeReturnDate: UpdateEmployeeReturnDate;
+    insertAuditLog: InsertAuditLog;
+    mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
+  },
+): Promise<PeopleStatusResult> {
+  if (currentEmployee.status !== "inactive" || currentEmployee.archivedAt) {
+    return {
+      kind: "invalid_return_date",
+      error: NOT_AWAY_MESSAGE,
+      code: NOT_AWAY_CODE,
+      status: 400,
+    };
+  }
+
+  const updatedEmployee = await deps.updateEmployeeReturnDate(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: input.employeeId,
+    expectedVersion: input.body.expectedVersion,
+    awayUntil: returnDate,
+    awayAbsenceTypeId:
+      input.body.absenceTypeId === undefined
+        ? (currentEmployee.awayAbsenceTypeId ?? null)
+        : input.body.absenceTypeId,
+    updatedBy: auth.user.id,
+  });
+
+  if (!updatedEmployee) {
+    const latestEmployee = await deps.fetchEmployeeById(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      input.employeeId,
+    );
+    if (!latestEmployee) {
+      return {
+        kind: "latest_unavailable",
+        error: "We couldn't load the latest employee state.",
+        status: 500,
+      };
+    }
+    return {
+      kind: "conflict",
+      error: STATUS_CONFLICT_MESSAGE,
+      code: "EMPLOYEE_STATUS_CONFLICT",
+      person: deps.mapEmployeeToMobilePerson(latestEmployee),
+      status: 409,
+    };
+  }
+
+  await deps.insertAuditLog(auth.serviceClient, {
+    org_id: auth.currentOrg.id,
+    actor_id: auth.user.id,
+    actor_email: auth.user.email ?? null,
+    action: "employee.return_date_changed",
+    resource_type: "employee",
+    resource_id: input.employeeId,
+    details: {
+      fromAwayUntil: currentEmployee.awayUntil ?? null,
+      toAwayUntil: returnDate,
+      ...((updatedEmployee.awayAbsenceTypeId ?? null) !==
+      (currentEmployee.awayAbsenceTypeId ?? null)
+        ? {
+            fromAwayAbsenceTypeId: currentEmployee.awayAbsenceTypeId ?? null,
+            toAwayAbsenceTypeId: updatedEmployee.awayAbsenceTypeId ?? null,
+          }
+        : {}),
+      changedFields: ["away_until"],
     },
     ip_address: input.requestIp,
     user_agent: input.userAgent,

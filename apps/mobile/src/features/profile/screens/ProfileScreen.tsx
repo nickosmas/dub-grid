@@ -351,15 +351,16 @@ export default function ProfileScreen() {
 
   const isSwitchConfirmation = pendingConfirmation?.kind === "switch-org";
   const confirmationTitle = isSwitchConfirmation
-    ? "Switch organization?"
+    ? pendingConfirmation.membership.name
+      ? `Switch to ${pendingConfirmation.membership.name}?`
+      : "Switch organization?"
     : pendingConfirmation?.force
       ? "Force sign out?"
       : "Sign out?";
-  const confirmationBody = isSwitchConfirmation
-    ? `You'll switch to ${pendingConfirmation.membership.name ?? "this organization"}.`
-    : pendingConfirmation?.force
-      ? "You'll be signed out immediately, even if data hasn't synced."
-      : "You'll be signed out on this device.";
+  const confirmationBody =
+    !isSwitchConfirmation && pendingConfirmation?.force
+      ? "The app won't wait for your data to sync."
+      : undefined;
   const confirmationLabel = isSwitchConfirmation ? "Switch" : "Sign out";
 
   function handleProfileScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {

@@ -1,3 +1,4 @@
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import type {
   OperationsReportPayload,
   OperationsReportType,
@@ -45,10 +46,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   active: "Active",
   approved: "Approved",
   absence: "Scheduled absence",
-  inactive: "Inactive",
+  inactive: EMPLOYMENT_STATUS_LABELS.inactive,
   // Historical key from the old enum — kept so reports against archived data
   // still render with the current label.
-  benched: "Inactive",
+  benched: EMPLOYMENT_STATUS_LABELS.inactive,
   calloff: "Call-off",
   cancelled: "Cancelled",
   expired: "Expired",
@@ -61,10 +62,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   published: "Published",
   rejected: "Rejected",
   swap: "Swap",
-  removed: "Removed",
+  removed: EMPLOYMENT_STATUS_LABELS.removed,
   // Historical key from the old enum — kept so reports against archived data
   // still render with the current label.
-  terminated: "Removed",
+  terminated: EMPLOYMENT_STATUS_LABELS.removed,
   unknown: "Unknown",
 };
 

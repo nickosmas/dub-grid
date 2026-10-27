@@ -439,6 +439,15 @@ export default function ProfileWorkScreen() {
   // it. `hasChanges` alone is a tight enough flag on a screen that is only ever
   // the editor: on iOS the whole surface is a back-swipe target, so a guard
   // keyed on anything looser would interrupt an ordinary swipe back.
+  const saveConfirmationPoints = hasEmailChange
+    ? [
+        ...(isNameRequest ? ["An admin reviews your new name."] : []),
+        ...(isNameRequest && hasOtherChanges ? ["Other edits you made are saved."] : []),
+        "This change applies to every organization you belong to, not just this one.",
+        "You'll confirm it's you first.",
+        "To finish, check your email.",
+      ]
+    : [];
   const guard = useUnsavedChangesGuard({
     isDirty: hasChanges,
     disabled: saveMutation.isPending,
@@ -639,18 +648,14 @@ export default function ProfileWorkScreen() {
         </>
       )}
       <ConfirmationModal
-        body={[
-          isNameRequest
-            ? hasOtherChanges
-              ? "Your new name will be sent to an admin for review. Your other edits will be saved."
-              : "Your new name will be sent to an admin for review."
-            : null,
+        body={
           hasEmailChange
-            ? `Change the email you use to sign in to DubGrid to ${draft?.email.trim()}. This changes it for every organization you belong to, not just this one. You'll confirm it's you first, then check your email to finish.`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" ")}
+            ? undefined
+            : hasOtherChanges
+              ? "An admin will review your new name. Your other edits will be saved."
+              : "An admin will review your new name."
+        }
+        summary={saveConfirmationPoints.length > 0 ? { points: saveConfirmationPoints } : undefined}
         error={saveError}
         confirmLabel={hasEmailChange ? "Request changes" : "Send request"}
         loading={saveMutation.isPending}
@@ -663,7 +668,11 @@ export default function ProfileWorkScreen() {
             ? stepUp.run((actionAccessToken) => saveMutation.mutateAsync(actionAccessToken))
             : saveMutation.mutateAsync(null)
         }
-        title={hasEmailChange ? "Change your sign-in email?" : "Send name change request?"}
+        title={
+          hasEmailChange
+            ? `Change your sign-in email to ${draft?.email.trim()}?`
+            : "Send name change request?"
+        }
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}

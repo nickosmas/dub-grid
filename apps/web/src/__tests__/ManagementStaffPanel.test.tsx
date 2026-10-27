@@ -282,7 +282,7 @@ describe("ManagementStaffPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
 
-      const dialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+      const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
       expect(onRevokeInvitation).not.toHaveBeenCalled();
       expect(screen.queryByText(/Revoke this invitation\?/)).not.toBeInTheDocument();
 
@@ -298,7 +298,7 @@ describe("ManagementStaffPanel", () => {
       const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
 
       await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
-      const dialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+      const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
       expect(onRevokeInvitation).not.toHaveBeenCalled();
@@ -312,7 +312,7 @@ describe("ManagementStaffPanel", () => {
       renderPanel(pending, undefined, null, { onResendInvitation });
 
       await user.click(screen.getByRole("button", { name: "Resend Invitation" }));
-      const dialog = await screen.findByRole("dialog", { name: "Reissue Invitation?" });
+      const dialog = await screen.findByRole("dialog", { name: /^Reissue the invitation for / });
       expect(onResendInvitation).not.toHaveBeenCalled();
 
       await user.click(within(dialog).getByRole("button", { name: "Reissue" }));

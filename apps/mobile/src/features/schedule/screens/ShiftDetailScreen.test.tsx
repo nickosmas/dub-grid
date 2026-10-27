@@ -2861,7 +2861,7 @@ describe("ShiftDetailScreen", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(screen.getByText(/A Sick absence will be submitted/)).toBeInTheDocument();
+    expect(screen.getByText(/A Sick absence will be submitted for your/)).toBeInTheDocument();
 
     confirmDialog("Submit Call-off");
 
@@ -2937,7 +2937,9 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Submit"));
 
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(screen.getByText(/A Paid time off absence will be submitted/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/A Paid time off absence will be submitted for your/),
+    ).toBeInTheDocument();
   });
 
   it("submits a swap request from the full-page sheet without a second popup", () => {

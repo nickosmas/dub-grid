@@ -725,11 +725,10 @@ export function InboxView({
 
       {confirmingMarkAllRead && (
         <ConfirmDialog
-          title="Mark all read?"
-          message={
+          title={
             (facets?.totalUnread ?? 0) === 1
-              ? "This marks your one unread alert as read."
-              : `This marks all ${facets?.totalUnread ?? 0} unread alerts as read.`
+              ? "Mark your unread alert as read?"
+              : `Mark all ${facets?.totalUnread ?? 0} unread alerts as read?`
           }
           confirmLabel="Mark all read"
           variant="info"

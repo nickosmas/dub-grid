@@ -8,6 +8,7 @@ import {
   fetchEmployees,
   insertEmployee,
   removeEmployee,
+  setEmployeeReturnDate,
   updateEmployee,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
@@ -49,8 +50,16 @@ export interface EmployeesData {
     empId: string,
     note?: string,
     accessToken?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
   ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  handleSetEmployeeReturnDate: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => Promise<boolean>;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -276,7 +285,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee removed");
+        toast.success("Archived");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -291,7 +300,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't remove them. Try again.");
+        toast.error("We couldn't archive them. Try again.");
         Sentry.captureException(err);
         return false;
       }
@@ -300,7 +309,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleDeactivateEmployee = useCallback(
-    async (empId: string, note?: string, accessToken?: string) => {
+    async (
+      empId: string,
+      note?: string,
+      accessToken?: string,
+      returnDate?: string | null,
+      absenceTypeId?: number | null,
+    ) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
 
@@ -312,21 +327,27 @@ export function useEmployees(orgId: string | null): EmployeesData {
                 ...e,
                 status: "inactive" as const,
                 statusNote: note ?? "",
+                awayUntil: returnDate ?? null,
+                awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
                 statusChangedAt: new Date().toISOString(),
               }
             : e,
         ),
       );
       try {
-        const updatedEmployee = await deactivateEmployee(
-          empId,
-          note,
-          orgId,
-          targetEmployee.version,
-          accessToken,
-        );
+        const updatedEmployee = await (returnDate
+          ? deactivateEmployee(
+              empId,
+              note,
+              orgId,
+              targetEmployee.version,
+              accessToken,
+              returnDate,
+              absenceTypeId,
+            )
+          : deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken));
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee marked inactive");
+        toast.success("Marked away");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -341,7 +362,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't update their status. Try again.");
+        toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -359,14 +380,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
       setAllLocal((prev) =>
         prev.map((e) =>
           e.id === empId
-            ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
+            ? {
+                ...e,
+                status: "active" as const,
+                statusNote: "",
+                awayUntil: null,
+                statusChangedAt: now,
+              }
             : e,
         ),
       );
       try {
         const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Employee activated");
+        toast.success(targetEmployee.status === "removed" ? "Restored" : "Marked active");
         invalidateEmployees();
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -379,8 +406,38 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("We couldn't reactivate them. Try again.");
+        toast.error("We couldn't change their status. Try again.");
         Sentry.captureException(err);
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleSetEmployeeReturnDate = useCallback(
+    async (empId: string, returnDate: string | null, absenceTypeId?: number | null) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return false;
+      try {
+        const updatedEmployee = await setEmployeeReturnDate(
+          empId,
+          orgId,
+          targetEmployee.version,
+          returnDate,
+          absenceTypeId ?? null,
+        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+        toast.success(returnDate ? "Return date saved" : "Return date cleared");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the return date. Try again."));
+        Sentry.captureException(err);
+        return false;
       }
     },
     [orgId, invalidateEmployees],
@@ -397,5 +454,6 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,
+    handleSetEmployeeReturnDate,
   };
 }

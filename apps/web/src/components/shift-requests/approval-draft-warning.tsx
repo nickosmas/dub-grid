@@ -24,7 +24,7 @@ export async function loadApprovalDraftWarning(
 export function ApprovalDraftWarning({ lines }: { lines: string[] }) {
   if (lines.length === 0) return null;
   return (
-    <div className="mt-3">
+    <div className="mt-3 first:mt-0">
       <SectionNotice messages={lines} tone="warning" />
     </div>
   );

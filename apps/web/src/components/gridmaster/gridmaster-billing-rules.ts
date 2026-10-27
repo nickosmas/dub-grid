@@ -28,19 +28,19 @@ export function describeOverrideOutcome(
   });
   const lines: string[] = [];
   if (access.isLocked) {
-    lines.push("The organization locks. Members can't use it until billing changes again.");
+    lines.push("The organization locks.", "Members can't use it until billing changes again.");
   } else if (access.state === "active") {
-    lines.push("The organization stays open with full access, without a payment.");
+    lines.push("The organization stays open with full access.", "No payment is needed.");
   } else if (access.state === "payment_attention_required") {
-    lines.push("The organization stays open, and its Super Admins are asked to update payment.");
+    lines.push("The organization stays open.", "Its Super Admins are asked to update payment.");
   } else if (access.state === "trial_pending") {
-    lines.push("The trial hasn't started. It starts the next time a Super Admin signs in.");
+    lines.push("The trial hasn't started, so it starts the next time a Super Admin signs in.");
   } else if (access.state === "trial_grace") {
     lines.push(
       "The trial has already ended, so the organization stays open only until its grace period runs out.",
     );
   } else {
-    lines.push("The organization stays open on its trial. The trial end date doesn't change.");
+    lines.push("The organization stays open on its trial.", "The trial end date doesn't change.");
   }
   if (org.stripeSubscriptionId) {
     lines.push("Stripe's next update for this subscription replaces this override.");
@@ -187,12 +187,13 @@ export function describePauseOutcome(
   if ((org.status === "trialing" || !org.status) && org.trialEndsAt) {
     lines.push(
       Date.parse(org.trialEndsAt) > now.getTime()
-        ? "The trial stops counting down. Resuming gives back the paused days."
-        : "The grace period stops counting down. Resuming gives back the paused days.",
+        ? "The trial stops counting down."
+        : "The grace period stops counting down.",
+      "Resuming gives back the paused days.",
     );
   }
   if (org.stripeSubscriptionId) {
-    lines.push("Stripe stops collecting payment, and invoices made while paused are voided.");
+    lines.push("Stripe stops collecting payment.", "Invoices made while paused are voided.");
   }
   return lines;
 }
@@ -223,7 +224,6 @@ export function describeResumeOutcome(
     );
   }
   if (org.stripeSubscriptionId) lines.push("Stripe starts collecting payment again.");
-  if (lines.length === 0) lines.push("Billing picks up where it left off.");
   return lines;
 }
 

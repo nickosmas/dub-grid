@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  describeEmploymentStatus,
+  describeStatusAction,
+  type StatusAction,
+} from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -40,6 +46,7 @@ import {
   mergeEmployeeIntoDirectoryPerson,
 } from "@/lib/staff-directory";
 import type {
+  AbsenceType,
   AdminPermissions,
   Department,
   DirectoryPerson,
@@ -66,7 +73,11 @@ import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
-import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
+import {
+  getAvatarInitials,
+  getDirectoryPersonAvatarSeed,
+  getEmployeeDisplayName,
+} from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -109,7 +120,14 @@ const REORDER_SETTLE_MS = 220;
 
 const getEmployeeId = (employee: Employee) => employee.id;
 
-type BulkStaffAction = "deactivate" | "activate" | "remove";
+type BulkStaffAction = "deactivate" | "activate" | "restore" | "remove";
+
+const BULK_STATUS_ACTIONS: Record<BulkStaffAction, StatusAction> = {
+  deactivate: "markAway",
+  activate: "markActive",
+  restore: "restore",
+  remove: "archive",
+};
 
 const BULK_STATUS_CONCURRENCY = 3;
 
@@ -131,7 +149,20 @@ export interface MembersSectionProps {
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
+  onSetReturnDate?: (
+    empId: string,
+    returnDate: string | null,
+    absenceTypeId?: number | null,
+  ) => void | Promise<unknown>;
+  /** Live absence types, offered for an Away person's days. */
+  absenceTypes?: readonly AbsenceType[];
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
@@ -164,6 +195,8 @@ export function MembersSection({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  onSetReturnDate,
+  absenceTypes,
   statusStepUpOpen = false,
   onActivate,
   onAdd,
@@ -215,6 +248,11 @@ export function MembersSection({
           )
         : suppliedRemovedEmployees,
     [currentUserId, regularUserMode, suppliedRemovedEmployees],
+  );
+  // The directory rows carry the status alone; an Away person's return date is on their record.
+  const awayUntilByEmployeeId = useMemo(
+    () => new Map(inactiveEmployees.map((employee) => [employee.id, employee.awayUntil ?? null])),
+    [inactiveEmployees],
   );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
@@ -653,7 +691,9 @@ export function MembersSection({
     try {
       const change = (employeeId: string): unknown => {
         if (pendingAction.action === "deactivate") return onDeactivate(employeeId, trimmedNote);
-        if (pendingAction.action === "activate") return onActivate(employeeId);
+        if (pendingAction.action === "activate" || pendingAction.action === "restore") {
+          return onActivate(employeeId);
+        }
         return onRemove(employeeId, trimmedNote);
       };
       // Three at a time keeps a large bulk inside the status route's rate limit (F-103).
@@ -798,8 +838,12 @@ export function MembersSection({
           count: employees.length + inactiveEmployees.length + removedEmployees.length,
         },
         { key: "active", label: "Active", count: employees.length },
-        { key: "inactive", label: "Inactive", count: inactiveEmployees.length },
-        { key: "removed", label: "Removed", count: removedEmployees.length },
+        {
+          key: "inactive",
+          label: EMPLOYMENT_STATUS_LABELS.inactive,
+          count: inactiveEmployees.length,
+        },
+        { key: "removed", label: EMPLOYMENT_STATUS_LABELS.removed, count: removedEmployees.length },
       ]
     : [{ key: "active", label: "Active", count: employees.length }];
 
@@ -1505,6 +1549,10 @@ export function MembersSection({
                 setBulkNote("");
                 setBulkConfirm({ action: "deactivate", employeeIds });
               }}
+              onBulkRestore={(employeeIds) => {
+                setBulkNote("");
+                setBulkConfirm({ action: "restore", employeeIds });
+              }}
               onBulkActivate={(employeeIds) => {
                 setBulkNote("");
                 setBulkConfirm({ action: "activate", employeeIds });
@@ -1846,11 +1894,10 @@ export function MembersSection({
                         ? person.invitationStatus === "expired"
                           ? "Expired"
                           : "Pending"
-                        : person.employeeStatus === "removed"
-                          ? "Removed"
-                          : person.employeeStatus === "inactive"
-                            ? "Inactive"
-                            : "Active";
+                        : describeEmploymentStatus(
+                            person.employeeStatus,
+                            person.employeeId ? awayUntilByEmployeeId.get(person.employeeId) : null,
+                          );
                       const statusTone: StatusPillTone = isPending
                         ? "warning"
                         : person.employeeStatus === "removed"
@@ -2147,7 +2194,11 @@ export function MembersSection({
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}
-          onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
+          onDeactivate={(employeeId, note, returnDate, absenceTypeId) =>
+            onDeactivate(employeeId, note, returnDate, absenceTypeId)
+          }
+          onSetReturnDate={onSetReturnDate}
+          absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
@@ -2477,47 +2528,49 @@ export function MembersSection({
       {bulkConfirm && !statusStepUpOpen
         ? (() => {
             const count = bulkConfirm.employeeIds.length;
-            const plural = count === 1 ? "" : "s";
-            const showReason = bulkConfirm.action !== "activate";
-            const summary =
-              bulkConfirm.action === "deactivate"
-                ? `Deactivate ${count} selected staff member${plural}? They'll be hidden from active scheduling and can be reactivated anytime.`
-                : bulkConfirm.action === "activate"
-                  ? `Activate ${count} selected staff member${plural}? They'll return to active scheduling.`
-                  : `Remove ${count} selected staff member${plural}? They'll lose access and won't appear in active staff lists.`;
+            const showReason =
+              bulkConfirm.action === "deactivate" || bulkConfirm.action === "remove";
+            const only =
+              count === 1
+                ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
+                    (employee) => employee.id === bulkConfirm.employeeIds[0],
+                  )
+                : undefined;
+            const copy = only
+              ? describeStatusAction(
+                  BULK_STATUS_ACTIONS[bulkConfirm.action],
+                  getEmployeeDisplayName(only),
+                )
+              : describeStatusAction(
+                  BULK_STATUS_ACTIONS[bulkConfirm.action],
+                  count === 1 ? "1 person" : `${count} people`,
+                  {
+                    group: count !== 1,
+                  },
+                );
             return (
               <ConfirmDialog
-                title={
-                  bulkConfirm.action === "deactivate"
-                    ? "Deactivate Selected Staff?"
-                    : bulkConfirm.action === "activate"
-                      ? "Activate Selected Staff?"
-                      : "Remove Selected Staff?"
-                }
+                title={copy.title}
                 message={
                   showReason ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <span>{summary}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {copy.message ? <span>{copy.message}</span> : null}
                       <input
                         className="dg-input"
                         value={bulkNote}
                         onChange={(e) => setBulkNote(e.target.value)}
                         disabled={isBulkActionRunning}
                         placeholder="Reason (optional, applies to all selected)"
-                        style={{ fontSize: "var(--dg-fs-label)" }}
+                        aria-label="Reason (optional)"
+                        style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
                       />
                     </div>
                   ) : (
-                    summary
+                    copy.message || undefined
                   )
                 }
-                confirmLabel={
-                  bulkConfirm.action === "deactivate"
-                    ? "Deactivate"
-                    : bulkConfirm.action === "activate"
-                      ? "Activate"
-                      : "Remove"
-                }
+                summary={{ points: copy.points }}
+                confirmLabel={copy.label}
                 variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
                 isLoading={isBulkActionRunning}
                 onConfirm={handleConfirmBulkAction}

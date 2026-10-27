@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const requireAuthenticatedUser = vi.fn();
@@ -19,6 +19,7 @@ const superAdminCountIs = vi.fn();
 const auditInsert = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
 const revokeAllUserSessions = vi.fn();
+const orgTimezoneSingle = vi.fn();
 
 vi.mock("@/lib/auth/revocation", () => ({
   revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
@@ -152,6 +153,14 @@ vi.mock("@/lib/supabase-service", () => ({
 
       if (table === "audit_log") {
         return { insert: auditInsert };
+      }
+
+      if (table === "organizations") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({ single: orgTimezoneSingle })),
+          })),
+        };
       }
 
       throw new Error(`Unexpected table: ${table}`);
@@ -330,7 +339,7 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({
-        error: "Only someone on the schedule can be marked inactive.",
+        error: "Only someone on the schedule can be marked away.",
         code: "NOT_ON_SCHEDULE",
       });
       expect(employeeUpdate).not.toHaveBeenCalled();
@@ -355,6 +364,260 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(200);
       expect(revokeAllUserSessions).toHaveBeenCalledWith(EMPLOYEE_USER_ID);
+    });
+  });
+
+  describe("a return date", () => {
+    const TODAY = "2026-10-26";
+
+    function arrange(
+      status: "active" | "inactive",
+      awayUntil: string | null = null,
+      awayAbsenceTypeId: number | null = null,
+    ) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+      vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+      membershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "super_admin", admin_permissions: null },
+        error: null,
+      });
+      profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
+      orgTimezoneSingle.mockResolvedValue({
+        data: { timezone: "America/Los_Angeles" },
+        error: null,
+      });
+      const row = {
+        id: EMP_ID,
+        org_id: ORG_ID,
+        status,
+        away_until: awayUntil,
+        away_absence_type_id: awayAbsenceTypeId,
+        version: 1,
+        user_id: null,
+        focus_area_ids: [7],
+      };
+      employeeCurrentSingle.mockResolvedValue({ data: row, error: null });
+      employeeUpdateMaybeSingle.mockImplementation(async () => ({
+        data: {
+          ...row,
+          ...(employeeUpdate.mock.calls.at(-1)?.[0] as Record<string, unknown>),
+        },
+        error: null,
+      }));
+      auditInsert.mockResolvedValue({ error: null });
+    }
+
+    function post(body: Record<string, unknown>) {
+      return POST(
+        new NextRequest("http://localhost/api/employees/status", {
+          method: "POST",
+          body: JSON.stringify({ empId: EMP_ID, orgId: ORG_ID, expectedVersion: 1, ...body }),
+        }),
+      );
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("marks someone away until a day after the organization's today", async () => {
+      arrange("active");
+
+      const response = await post({ action: "deactivate", returnDate: "2026-10-27" });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "inactive", away_until: "2026-10-27" }),
+      );
+      expect((await response.json()).employee.awayUntil).toBe("2026-10-27");
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.deactivated",
+          details: expect.objectContaining({ awayUntil: "2026-10-27" }),
+        }),
+      );
+    });
+
+    it("marks someone away with no return date as before", async () => {
+      arrange("active");
+
+      const response = await post({ action: "deactivate" });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "inactive", away_until: null }),
+      );
+      expect(orgTimezoneSingle).not.toHaveBeenCalled();
+    });
+
+    it.each([TODAY, "2026-10-01"])(
+      "refuses %s as a return date, and changes nothing",
+      async (date) => {
+        arrange("active");
+
+        const response = await post({ action: "deactivate", returnDate: date });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({
+          error: "Choose a return date after today.",
+          code: "RETURN_DATE_INVALID",
+        });
+        expect(employeeUpdate).not.toHaveBeenCalled();
+      },
+    );
+
+    it("refuses a malformed return date", async () => {
+      arrange("active");
+
+      const response = await post({ action: "deactivate", returnDate: "Jan 4" });
+
+      expect(response.status).toBe(400);
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("moves an Away person's return date without touching their status", async () => {
+      arrange("inactive", "2026-11-02");
+
+      const response = await post({ action: "setReturnDate", returnDate: "2026-11-09" });
+
+      expect(response.status).toBe(200);
+      const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+      expect(update).toMatchObject({ away_until: "2026-11-09", updated_by: USER_ID, version: 2 });
+      expect(update).not.toHaveProperty("status");
+      expect(update).not.toHaveProperty("status_changed_at");
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.return_date_changed",
+          details: {
+            fromAwayUntil: "2026-11-02",
+            toAwayUntil: "2026-11-09",
+            changedFields: ["away_until"],
+          },
+        }),
+      );
+    });
+
+    it("clears an Away person's return date", async () => {
+      arrange("inactive", "2026-11-02");
+
+      const response = await post({ action: "setReturnDate", returnDate: null });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(expect.objectContaining({ away_until: null }));
+      expect(orgTimezoneSingle).not.toHaveBeenCalled();
+    });
+
+    it("refuses a return date for someone who isn't away", async () => {
+      arrange("active");
+
+      const response = await post({ action: "setReturnDate", returnDate: "2026-11-09" });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone who is away can have a return date.",
+        code: "NOT_AWAY",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("marks someone away with an absence for their away days", async () => {
+      arrange("active");
+
+      const response = await post({
+        action: "deactivate",
+        returnDate: "2026-11-02",
+        absenceTypeId: 134,
+      });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ away_until: "2026-11-02", away_absence_type_id: 134 }),
+      );
+      expect((await response.json()).employee.awayAbsenceTypeId).toBe(134);
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({ awayAbsenceTypeId: 134 }),
+        }),
+      );
+    });
+
+    it.each(["deactivate", "setReturnDate"])(
+      "refuses an absence without a return date on %s",
+      async (action) => {
+        arrange(action === "deactivate" ? "active" : "inactive", "2026-11-02");
+
+        const response = await post({ action, returnDate: null, absenceTypeId: 134 });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({
+          error: "Set a return date to fill their days with an absence.",
+          code: "AWAY_ABSENCE_INVALID",
+        });
+        expect(employeeUpdate).not.toHaveBeenCalled();
+      },
+    );
+
+    it("keeps the absence when only the return date moves", async () => {
+      arrange("inactive", "2026-11-02", 134);
+
+      await post({ action: "setReturnDate", returnDate: "2026-11-09" });
+
+      expect(employeeUpdate.mock.calls[0][0]).not.toHaveProperty("away_absence_type_id");
+    });
+
+    it("changes the absence and records both sides", async () => {
+      arrange("inactive", "2026-11-02", 134);
+
+      const response = await post({
+        action: "setReturnDate",
+        returnDate: "2026-11-02",
+        absenceTypeId: 135,
+      });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ away_absence_type_id: 135 }),
+      );
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({
+            fromAwayAbsenceTypeId: 134,
+            toAwayAbsenceTypeId: 135,
+          }),
+        }),
+      );
+    });
+
+    it("answers 400 when the database refuses an absence from elsewhere", async () => {
+      arrange("active");
+      employeeUpdateMaybeSingle.mockResolvedValueOnce({
+        data: null,
+        error: { code: "23514", message: "Absence type not found in this organization" },
+      });
+
+      const response = await post({
+        action: "deactivate",
+        returnDate: "2026-11-02",
+        absenceTypeId: 999,
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Choose an absence your organization uses.",
+        code: "AWAY_ABSENCE_INVALID",
+      });
+    });
+
+    it("clears the return date on Mark active", async () => {
+      arrange("inactive", "2026-11-02");
+
+      const response = await post({ action: "activate" });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "active", away_until: null }),
+      );
     });
   });
 

@@ -146,9 +146,7 @@ describe("ProfilePasswordScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Update password" }));
 
     expect(screen.getByText("Update password?")).toBeInTheDocument();
-    expect(
-      screen.getByText("You'll be signed out of every device after the password is updated."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("You'll be signed out of every device.")).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(
@@ -402,7 +400,7 @@ describe("ProfilePasswordScreen", () => {
     expect(await screen.findByText("Leave without signing out?")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Your password already changed, but your other sessions are still signed in. Stay to finish signing out.",
+        "Your password has already changed, but your other sessions are still signed in.",
       ),
     ).toBeInTheDocument();
   });

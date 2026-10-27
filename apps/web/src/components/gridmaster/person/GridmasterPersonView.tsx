@@ -373,11 +373,11 @@ export default function GridmasterPersonView({
 
       {deactivateConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title={deactivated ? "Reactivate user" : "Deactivate user"}
+          title={deactivated ? "Reactivate this account?" : "Deactivate this account?"}
           message={
             deactivated
-              ? `Reactivate "${name}"? They will regain platform access.`
-              : `Deactivate "${name}"? They will be blocked from signing in to every organization.`
+              ? "They regain platform access."
+              : "They're blocked from signing in to every organization."
           }
           confirmLabel={deactivated ? "Reactivate" : "Deactivate"}
           variant={deactivated ? "info" : "danger"}
@@ -390,14 +390,9 @@ export default function GridmasterPersonView({
       {/* The reason is recorded on the account and in the audit log. */}
       {terminateConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Terminate account"
+          title="Terminate this account?"
           message={
             <div className="flex flex-col gap-3">
-              <span>
-                Terminate &quot;{name}&quot;? They lose every organization membership and every
-                session now, and no organization admin can invite, reactivate, or re-add them. Only
-                a Gridmaster can reinstate the account.
-              </span>
               <textarea
                 className="dg-input resize-y"
                 aria-label="Termination reason"
@@ -408,6 +403,14 @@ export default function GridmasterPersonView({
               />
             </div>
           }
+          summary={{
+            points: [
+              "Every organization membership ends now.",
+              "All sessions are signed out now.",
+              "No organization admin can invite, reactivate, or re-add this person.",
+              "Only a Gridmaster can reinstate the account.",
+            ],
+          }}
           confirmLabel="Terminate account"
           variant="danger"
           isLoading={busy}
@@ -418,8 +421,8 @@ export default function GridmasterPersonView({
 
       {reinstateConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Reinstate account"
-          message={`Reinstate "${name}"? This lifts the platform block only. Their memberships stay archived until you grant organization access again.`}
+          title="Reinstate this account?"
+          message="This lifts the platform block only, and their memberships stay archived until you grant organization access again."
           confirmLabel="Reinstate"
           variant="info"
           isLoading={busy}
@@ -436,8 +439,8 @@ export default function GridmasterPersonView({
 
       {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Force logout"
-          message={`End every session for "${name}"? They will need to sign in again.`}
+          title="End every session for this person?"
+          message="They need to sign in again."
           confirmLabel="Force logout"
           variant="danger"
           isLoading={busy}
@@ -454,8 +457,7 @@ export default function GridmasterPersonView({
 
       {resetConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Send password reset"
-          message={`Send a password reset email to "${signInEmail}"?`}
+          title={`Send a password reset email to ${signInEmail}?`}
           confirmLabel="Send reset email"
           variant="info"
           isLoading={busy}
@@ -471,10 +473,10 @@ export default function GridmasterPersonView({
       )}
       {editNameConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Edit name"
+          title="Edit the name on this account?"
           message={
             <div className="flex flex-col gap-3">
-              <span>The name on their account. Staff records keep their own names.</span>
+              <span>Their staff records keep their own names.</span>
               <input
                 className="dg-input"
                 aria-label="First name"
@@ -518,13 +520,10 @@ export default function GridmasterPersonView({
 
       {changeEmailConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Change sign-in email"
+          title="Change this account's sign-in email?"
           message={
             <div className="flex flex-col gap-3">
-              <span>
-                They sign in with the new address from now on. Every session ends, both addresses
-                are told, and their staff records take the new address too.
-              </span>
+              <span>They sign in with the new address from now on.</span>
               <input
                 className="dg-input"
                 type="email"
@@ -535,6 +534,13 @@ export default function GridmasterPersonView({
               />
             </div>
           }
+          summary={{
+            points: [
+              "Every session ends.",
+              "Both addresses are told about the change.",
+              "Staff records take the new address too.",
+            ],
+          }}
           confirmLabel="Change email"
           variant="warning"
           isLoading={busy}
@@ -554,13 +560,11 @@ export default function GridmasterPersonView({
       )}
       {mfaResetConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Reset two-factor"
+          title="Reset this account's two-factor?"
           message={
             <div className="flex flex-col gap-3">
               <span>
-                Remove {name}&apos;s authenticator app and sign them out everywhere? They are
-                emailed now and set up two-factor again the next time they sign in. Use this only
-                after confirming who they are.
+                The authenticator app is removed. Use this only after confirming who they are.
               </span>
               <textarea
                 className="dg-input resize-y"
@@ -572,6 +576,13 @@ export default function GridmasterPersonView({
               />
             </div>
           }
+          summary={{
+            points: [
+              "Every session is signed out.",
+              "An email tells them about the reset now.",
+              "Two-factor is set up again at their next sign-in.",
+            ],
+          }}
           confirmLabel="Reset two-factor"
           variant="danger"
           isLoading={busy}
@@ -592,14 +603,11 @@ export default function GridmasterPersonView({
       )}
       {internalConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title={markingInternal ? "Hide from clients" : "Show to clients"}
+          title={
+            markingInternal ? "Mark this account as internal?" : "Make this a client account again?"
+          }
           message={
             <div className="flex flex-col gap-3">
-              <span>
-                {markingInternal
-                  ? `Mark ${name} as an internal account? Their staff record, shifts, requests and access stop showing to everyone in their organizations except other internal accounts and Gridmasters, and they stop counting as a billed seat.`
-                  : `Make ${name} a client account again? Their staff record, shifts and requests show to their organizations again, and they count as a billed seat.`}
-              </span>
               <textarea
                 className="dg-input resize-y"
                 aria-label="Reason for the change"
@@ -610,6 +618,18 @@ export default function GridmasterPersonView({
               />
             </div>
           }
+          summary={{
+            points: markingInternal
+              ? [
+                  "Their staff record, shifts, requests and access are hidden from their organizations.",
+                  "Other internal accounts and Gridmasters still see them.",
+                  "This person stops counting as a billed seat.",
+                ]
+              : [
+                  "Their staff record, shifts and requests show to their organizations again.",
+                  "This person counts as a billed seat.",
+                ],
+          }}
           confirmLabel={markingInternal ? "Hide from clients" : "Show to clients"}
           variant="warning"
           isLoading={busy}

@@ -133,6 +133,22 @@ describe("availabilityFromShifts", () => {
     expect(availability({})).toEqual({ kind: "free" });
   });
 
+  it("is away before an Away person's return date and free from it (51e)", () => {
+    const input = {
+      shifts: {},
+      assignments,
+      shiftCategories,
+      loadedDateKeys: LOADED,
+      awayUntil: new Map([["ana", "2026-10-27"]]),
+    };
+    expect(availabilityFromShifts(input, "ana", "2026-10-26", DAY)).toEqual({
+      kind: "away",
+      until: "2026-10-27",
+    });
+    expect(availabilityFromShifts(input, "ana", "2026-10-27", DAY)).toEqual({ kind: "free" });
+    expect(availabilityWithPlanned(input, [])("ana", "2026-10-26", DAY).kind).toBe("away");
+  });
+
   it("is free beside work that does not overlap", () => {
     expect(availability({ "ana_2026-10-26": worked([EVENING]) })).toEqual({ kind: "free" });
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
@@ -11,7 +12,10 @@ import { PersonSection } from "./PersonField";
 
 const MIN_LENGTH = 2;
 
-const STATUS_LABELS: Record<string, string> = { inactive: "Inactive", removed: "Removed" };
+const STATUS_LABELS: Record<string, string> = {
+  inactive: EMPLOYMENT_STATUS_LABELS.inactive,
+  removed: EMPLOYMENT_STATUS_LABELS.removed,
+};
 
 /** Finds staff who never got an account, in any organization. */
 export function StaffWithoutAccountSearch({ onOpen }: { onOpen: (employeeId: string) => void }) {

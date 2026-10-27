@@ -213,7 +213,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
   );
   const [isRunning, setIsRunning] = useState(false);
   const confirmationTitle = pendingAction
-    ? `${pendingAction.label} request?`
+    ? `${pendingAction.label} the request for ${item.subtitle}?`
     : "Confirm request action?";
   const confirmationVariant =
     pendingAction?.label === "Reject" || pendingAction?.label === "Decline"
@@ -245,10 +245,9 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           confirmLabel={pendingAction.label}
           isLoading={isRunning}
           message={
-            <>
-              {pendingAction.label} <strong>{item.title}</strong>?
-              <ApprovalDraftWarning lines={pendingAction.warning ?? []} />
-            </>
+            pendingAction.warning?.length ? (
+              <ApprovalDraftWarning lines={pendingAction.warning} />
+            ) : undefined
           }
           title={confirmationTitle}
           variant={confirmationVariant}

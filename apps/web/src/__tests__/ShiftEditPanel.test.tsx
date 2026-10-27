@@ -288,6 +288,8 @@ function renderPanel(
     ) => number[];
     onNoteToggle?: ReturnType<typeof vi.fn>;
     seriesId?: string | null;
+    absenceRun?: { dateKeys: string[] } | null;
+    onRemoveAbsenceRun?: ReturnType<typeof vi.fn>;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -343,6 +345,8 @@ function panelElement(
       getActiveIndicatorIds={overrides.getActiveIndicatorIds}
       onNoteToggle={overrides.onNoteToggle}
       seriesId={overrides.seriesId}
+      absenceRun={overrides.absenceRun}
+      onRemoveAbsenceRun={overrides.onRemoveAbsenceRun}
     />
   );
 }
@@ -1741,7 +1745,9 @@ describe("ShiftEditPanel", () => {
       const user = await submitRepeat(onRepeatConfirm);
 
       const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
-      expect(dialog).toHaveTextContent("2 of these days already have a shift or absence.");
+      expect(dialog).toHaveTextContent(
+        "2 of these days already have a shift or absence. Replace puts the repeating shift in their place. Keep existing leaves them as they are and skips those days.",
+      );
       expect(onRepeatConfirm).not.toHaveBeenCalled();
 
       await user.click(within(dialog).getByRole("button", { name: choice }));
@@ -1761,6 +1767,72 @@ describe("ShiftEditPanel", () => {
     });
   });
 
+  describe("an absence in a run (item 52)", () => {
+    const run = { dateKeys: ["2024-01-15", "2024-01-16", "2024-01-17", "2024-01-18"] };
+
+    function renderRunPanel(overrides: Parameters<typeof renderPanel>[0] = {}) {
+      const onRemoveAbsenceRun = vi.fn();
+      const rendered = renderPanel({
+        currentShift: "VAC",
+        currentAbsenceTypeId: 7,
+        absenceTypesOverride: absenceTypes,
+        allowShiftEdits: true,
+        absenceRun: run,
+        onRemoveAbsenceRun,
+        ...overrides,
+      });
+      return { ...rendered, onRemoveAbsenceRun };
+    }
+
+    it("says which days the run covers", () => {
+      renderRunPanel();
+
+      expect(screen.getByText("Part of 4 days, Mon, Jan 15 - Thu, Jan 18")).toBeInTheDocument();
+    });
+
+    it("says nothing of a run for a single day or a repeating absence", () => {
+      renderRunPanel({ absenceRun: null });
+      expect(screen.queryByText(/^Part of /)).not.toBeInTheDocument();
+    });
+
+    it("removes this day only, through the draft", async () => {
+      const user = userEvent.setup();
+      const { onSelect, onRemoveAbsenceRun } = renderRunPanel();
+
+      await user.click(screen.getByRole("button", { name: "Remove absence" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: 'Remove the absence "Vacation" on Mon, Jan 15?',
+      });
+      const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
+      expect(
+        within(choices)
+          .getAllByRole("radio")
+          .map((radio) => radio.textContent),
+      ).toEqual(["This dayMon, Jan 15", "All 4 daysMon, Jan 15 - Thu, Jan 18"]);
+      await user.click(within(dialog).getByRole("button", { name: "Remove this day" }));
+
+      expect(onSelect).toHaveBeenLastCalledWith(null, undefined);
+      expect(onRemoveAbsenceRun).not.toHaveBeenCalled();
+    });
+
+    it("removes all the days at once", async () => {
+      const user = userEvent.setup();
+      const { onSelect, onRemoveAbsenceRun, onClose } = renderRunPanel();
+
+      await user.click(screen.getByRole("button", { name: "Remove absence" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.click(within(dialog).getByRole("radio", { name: /All 4 days/ }));
+      expect(
+        await screen.findByRole("dialog", { name: 'Remove all 4 days of "Vacation"?' }),
+      ).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Remove all 4 days" }));
+
+      expect(onRemoveAbsenceRun).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
+  });
+
   describe("Repeating shift scope", () => {
     it("opens on the view and removes with the days chosen", async () => {
       const user = userEvent.setup();
@@ -1773,7 +1845,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.queryByRole("group", { name: "Apply changes to" })).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Remove" }));
-      const dialog = await screen.findByRole("dialog", { name: /Remove repeating shift/ });
+      const dialog = await screen.findByRole("dialog", { name: /^Remove the repeating shift / });
       const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
       expect(
         within(choices)
@@ -1802,7 +1874,7 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove" }));
-      const dialog = await screen.findByRole("dialog", { name: /Remove repeating shift/ });
+      const dialog = await screen.findByRole("dialog", { name: /^Remove the repeating shift / });
       await user.click(within(dialog).getByRole("radio", { name: /This and earlier days/ }));
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
@@ -1957,7 +2029,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Remove Sick" }));
       const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent("Remove Sick from Alice Smith on");
+      expect(dialog).toHaveTextContent(/Remove Sick on .*\?/);
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
@@ -2002,8 +2074,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Remove shift and absence" }));
       const dialog = await screen.findByRole("dialog");
-      expect(dialog).toHaveTextContent("Remove Shift and Absence?");
-      expect(dialog).toHaveTextContent('the absence "Sick"');
+      expect(dialog).toHaveTextContent(/Remove the shift ".*" and the absence "Sick" on .*\?/);
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(null, undefined);
@@ -2030,7 +2101,9 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove both shifts" }));
-      expect(await screen.findByRole("dialog")).toHaveTextContent("Remove Both Shifts?");
+      expect(await screen.findByRole("dialog")).toHaveTextContent(
+        /Remove both shifts, ".*" and ".*", on .*\?/,
+      );
     });
 
     it("spells out Remove on each shift and on the absence", () => {
@@ -2353,9 +2426,14 @@ describe("ShiftEditPanel", () => {
 
         await user.click(screen.getByRole("button", { name: "Remove Sick" }));
         const dialog = await screen.findByRole("dialog");
-        expect(dialog).toHaveTextContent(
-          "Remove Sick from Alice Smith on 1/15? The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs). The Evening Shift comes back.",
-        );
+        const summary = within(dialog).getByRole("region", { name: "Keep in mind" });
+        expect(within(dialog).getByText("Remove Sick on 1/15?")).toBeInTheDocument();
+        expect(
+          within(summary).getByText("The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs)."),
+        ).toBeInTheDocument();
+        expect(
+          within(summary).getByText("Removing it brings back the Evening Shift."),
+        ).toBeInTheDocument();
         await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
         expect(onSelect).toHaveBeenLastCalledWith(
@@ -2507,9 +2585,13 @@ describe("ShiftEditPanel", () => {
         });
 
         await user.click(screen.getByRole("button", { name: "Remove Sick" }));
-        expect(screen.getByRole("dialog")).toHaveTextContent(
-          "The Day Shift goes back to 7:00 AM - 3:00 PM (8 hrs).",
+        const dialog = screen.getByRole("dialog");
+        expect(dialog).toHaveTextContent(
+          /Remove Sick on .*\?\s*The Day Shift goes back to 7:00 AM - 3:00 PM \(8 hrs\)\./,
         );
+        expect(
+          within(dialog).queryByRole("region", { name: "Keep in mind" }),
+        ).not.toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Remove" }));
 
         expect(onSelect).toHaveBeenLastCalledWith(
@@ -2620,7 +2702,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: "Offer shift for pickup?",
+        name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
@@ -2641,7 +2723,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
       const dialog = screen.getByRole("dialog", {
-        name: "Offer shift for pickup?",
+        name: /^Offer your .* for pickup\?$/,
       });
       const confirmButton = within(dialog).getByRole("button", {
         name: "Offer for pickup",
@@ -2658,7 +2740,7 @@ describe("ShiftEditPanel", () => {
       resolveRequest("request-1");
       await waitFor(() => {
         expect(
-          screen.queryByRole("dialog", { name: "Offer shift for pickup?" }),
+          screen.queryByRole("dialog", { name: /^Offer your .* for pickup\?$/ }),
         ).not.toBeInTheDocument();
       });
     });
@@ -2699,7 +2781,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
       const dialog = screen.getByRole("dialog", {
-        name: "Offer shift for pickup?",
+        name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
@@ -2791,7 +2873,7 @@ describe("ShiftEditPanel", () => {
       await user.click(
         within(
           screen.getByRole("dialog", {
-            name: "Offer shift for pickup?",
+            name: /^Offer your .* for pickup\?$/,
           }),
         ).getByRole("button", { name: "Offer for pickup" }),
       );
@@ -2819,7 +2901,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: "Request pickup?",
+        name: /^Request pickup of your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Request pickup" }));
 
@@ -2840,7 +2922,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onCallOff).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: "Submit call off request?",
+        name: /^Submit a call off for your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Submit call off" }));
 
@@ -2867,7 +2949,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: "Offer shift for pickup?",
+        name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
@@ -2931,7 +3013,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onSubmitSwap).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: "Submit swap request?",
+        name: /^Request a swap of your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Submit swap" }));
 
