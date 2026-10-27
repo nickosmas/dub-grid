@@ -16,6 +16,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { AppText } from "./AppText";
 import { InsideSheetContext } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
+import { ConfirmSummaryBox, type ConfirmSummary } from "./ConfirmSummaryBox";
 import { InlineError } from "./InlineError";
 import { Pressable } from "./Pressable";
 import { registerModalPresentation } from "../lib/modal-presentation";
@@ -93,6 +94,7 @@ export function ConfirmationModal({
   title,
   body,
   children,
+  summary,
   confirmLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
@@ -105,8 +107,11 @@ export function ConfirmationModal({
 }: {
   visible: boolean;
   title: string;
+  /** A short lead. Consequences go in `summary`. */
   body?: string;
   children?: ReactNode;
+  /** What the confirm does, as points in a box above the actions. */
+  summary?: ConfirmSummary;
   confirmLabel: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
@@ -244,6 +249,7 @@ export function ConfirmationModal({
                 </AppText>
               ) : null}
               {children}
+              {summary ? <ConfirmSummaryBox summary={summary} /> : null}
               {error ? <InlineError message={error} /> : null}
             </ScrollView>
             {/* Keep actions visible while the body scrolls. */}

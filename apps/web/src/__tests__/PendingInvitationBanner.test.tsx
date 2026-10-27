@@ -69,7 +69,7 @@ describe("PendingInvitationBanner", () => {
     await user.click(screen.getByRole("button", { name: "Reinvite" }));
     expect(onReinvite).not.toHaveBeenCalled();
 
-    expect(screen.getByText("Reissue Invitation?")).toBeInTheDocument();
+    expect(screen.getByText(/^Reissue the invitation for /)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reissue" }));
     expect(onReinvite).toHaveBeenCalledOnce();
   });
@@ -85,7 +85,9 @@ describe("PendingInvitationBanner", () => {
 
     // The banner's trigger and the dialog's confirm are both "Revoke" now, so
     // scope to the dialog rather than matching whichever comes first.
-    const confirmDialog = await screen.findByRole("dialog", { name: "Revoke Invitation?" });
+    const confirmDialog = await screen.findByRole("dialog", {
+      name: /^Revoke the invitation for /,
+    });
     await user.click(within(confirmDialog).getByRole("button", { name: "Revoke" }));
     expect(onRevoke).toHaveBeenCalledWith("inv-1");
   });
@@ -100,7 +102,7 @@ describe("PendingInvitationBanner", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onRevoke).not.toHaveBeenCalled();
-    expect(screen.queryByText("Revoke Invitation?")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Revoke the invitation for /)).not.toBeInTheDocument();
   });
 
   it("disables both actions with a tooltip in sandbox mode", () => {

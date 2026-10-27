@@ -4,6 +4,7 @@ import { UNATTRIBUTED_EDITOR_ID } from "@/lib/publish-attribution";
 import {
   PublishChangeSummary,
   publishCoverageChangeText,
+  publishSummaryPoints,
   type PublishActiveEditor,
   type PublishEditorRow,
 } from "./PublishChangeSummary";
@@ -28,29 +29,39 @@ const active = (overrides: Partial<PublishActiveEditor> = {}): PublishActiveEdit
   ...overrides,
 });
 
-function renderSummary(
+function renderSummary(rows: PublishEditorRow[]) {
+  return render(<PublishChangeSummary editorRows={rows} />);
+}
+
+function points(
   rows: PublishEditorRow[],
   coverageGapCount = 0,
-  totalChanges = 5,
   activeEditors: PublishActiveEditor[] = [],
 ) {
-  return render(
-    <PublishChangeSummary
-      editorRows={rows}
-      activeEditors={activeEditors}
-      windowLabel="Mar 1 - Mar 7, 2026"
-      totalChanges={totalChanges}
-      coverageGapCount={coverageGapCount}
-    />,
-  );
+  return publishSummaryPoints({ editorRows: rows, activeEditors, coverageGapCount });
 }
 
 describe("PublishChangeSummary", () => {
-  it("states the total and the window", () => {
-    renderSummary([row({ isCurrentUser: true, newShifts: 5, totalChanges: 5 })]);
+  it("writes a lone point into the message, and leaves several to the box", () => {
+    const rows = [row({ isCurrentUser: true, newShifts: 5, totalChanges: 5 })];
+    const { rerender } = render(
+      <PublishChangeSummary
+        editorRows={rows}
+        points={["2 coverage gaps remain in this period."]}
+      />,
+    );
+    expect(screen.getByText("2 coverage gaps remain in this period.")).toBeInTheDocument();
 
-    expect(screen.getByText(/5 unpublished changes/)).toBeInTheDocument();
-    expect(screen.getByText(/Mar 1 - Mar 7, 2026/)).toBeInTheDocument();
+    rerender(
+      <PublishChangeSummary
+        editorRows={rows}
+        points={[
+          "This publish opens 1 gap and closes none.",
+          "2 coverage gaps remain in this period.",
+        ]}
+      />,
+    );
+    expect(screen.queryByText(/coverage gaps remain/)).not.toBeInTheDocument();
   });
 
   it("gives the current user their own card with itemised counts", () => {
@@ -64,12 +75,13 @@ describe("PublishChangeSummary", () => {
 
   // The whole point: the publisher must see whose work is going live.
   it("gives each other editor their own named card", () => {
-    renderSummary([
+    const rows = [
       row({ editorId: "user-1", isCurrentUser: true, newShifts: 1, totalChanges: 1 }),
       row({ editorId: "user-2", name: "Casey Diaz", newShifts: 4, totalChanges: 4 }),
-    ]);
+    ];
+    renderSummary(rows);
 
-    expect(screen.getByText(/not just your own/i)).toBeInTheDocument();
+    expect(points(rows)).toContain("Drafts from other editors are included, not just your own.");
     expect(screen.getByRole("region", { name: /Casey Diaz summary/i })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /Your drafts summary/i })).toBeInTheDocument();
   });
@@ -98,52 +110,48 @@ describe("PublishChangeSummary", () => {
     // Publish no longer blocks on cell locks, so presence is the only thing
     // left that can tell the publisher someone is mid-change.
     it("warns about someone present even when they have no drafts yet", () => {
-      renderSummary([row({ isCurrentUser: true, newShifts: 2, totalChanges: 2 })], 0, 2, [
-        active(),
-      ]);
-
-      expect(screen.getByText(/Casey Diaz is on the schedule right now/i)).toBeInTheDocument();
-      expect(screen.getByText(/not saved yet will not be/i)).toBeInTheDocument();
+      expect(
+        points([row({ isCurrentUser: true, newShifts: 2, totalChanges: 2 })], 0, [active()]),
+      ).toEqual(["Anything the other editor on the schedule hasn't saved yet won't be published."]);
     });
 
-    it("states presence once, without repeating the name", () => {
-      renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0, 1, [
+    it("never names the people on the schedule", () => {
+      const lines = points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0, [
         active({ name: "Nick Kosmas" }),
       ]);
 
-      const warning = screen.getByText(/Nick Kosmas is on the schedule right now/i);
-      expect(warning).toBeInTheDocument();
-      expect(warning.textContent?.match(/Nick Kosmas/g)).toHaveLength(1);
+      expect(lines.join(" ")).not.toMatch(/Nick Kosmas/);
       // The rows above already say whose drafts are included and how many, so
       // the warning does not restate it.
-      expect(warning).not.toHaveTextContent(/their drafts will be published/i);
+      expect(lines.join(" ")).not.toMatch(/their drafts will be published/i);
     });
 
     it("reads correctly with several people present", () => {
-      renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0, 1, [
-        active({ userId: "user-2", name: "Casey Diaz" }),
-        active({ userId: "user-3", name: "Erin Fox" }),
-      ]);
-
       expect(
-        screen.getByText(/Casey Diaz and Erin Fox are on the schedule right now/i),
-      ).toBeInTheDocument();
+        points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0, [
+          active({ userId: "user-2", name: "Casey Diaz" }),
+          active({ userId: "user-3", name: "Erin Fox" }),
+        ]),
+      ).toContain(
+        "Anything the 2 other editors on the schedule haven't saved yet won't be published.",
+      );
     });
 
     it("says nothing when nobody else is present", () => {
-      renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0, 1, []);
-
-      expect(screen.queryByText(/on the schedule right now/i)).not.toBeInTheDocument();
+      expect(points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })])).toEqual([]);
     });
   });
 
   it("still itemises when the publisher is the only editor", () => {
-    renderSummary([row({ isCurrentUser: true, newShifts: 3, deletedNotes: 1, totalChanges: 4 })]);
+    const rows = [row({ isCurrentUser: true, newShifts: 3, deletedNotes: 1, totalChanges: 4 })];
+    renderSummary(rows);
 
     const card = screen.getByRole("region", { name: /Your drafts summary/i });
     expect(within(card).getByText("New shifts")).toBeInTheDocument();
     expect(within(card).getByText("Removed notes")).toBeInTheDocument();
-    expect(screen.queryByText(/not just your own/i)).not.toBeInTheDocument();
+    expect(points(rows)).not.toContain(
+      "Drafts from other editors are included, not just your own.",
+    );
   });
 
   it("falls back to a generic label when a name never resolved", () => {
@@ -162,15 +170,16 @@ describe("PublishChangeSummary", () => {
   });
 
   it("keeps the coverage gap warning", () => {
-    renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 3);
-
-    expect(screen.getByText(/3 coverage gaps remain/i)).toBeInTheDocument();
+    expect(points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 3)).toEqual([
+      "3 coverage gaps remain in this period.",
+    ]);
+    expect(points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 1)).toEqual([
+      "1 coverage gap remains in this period.",
+    ]);
   });
 
   it("omits the coverage line when there are no gaps", () => {
-    renderSummary([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0);
-
-    expect(screen.queryByText(/coverage gap/i)).not.toBeInTheDocument();
+    expect(points([row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })], 0)).toEqual([]);
   });
 });
 
@@ -188,27 +197,17 @@ describe("publishCoverageChangeText", () => {
     expect(publishCoverageChangeText(change)).toBe(line);
   });
 
-  it("shows the line in the dialog, and nothing without coverage requirements", () => {
-    const { rerender } = render(
-      <PublishChangeSummary
-        editorRows={[row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })]}
-        windowLabel="Mar 1 - Mar 7, 2026"
-        totalChanges={1}
-        coverageGapCount={0}
-        coverageChange={{ opened: 1, closed: 2, partial: false }}
-      />,
-    );
-    expect(screen.getByText("This publish opens 1 gap and closes 2.")).toBeInTheDocument();
-
-    rerender(
-      <PublishChangeSummary
-        editorRows={[row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })]}
-        windowLabel="Mar 1 - Mar 7, 2026"
-        totalChanges={1}
-        coverageGapCount={0}
-        coverageChange={null}
-      />,
-    );
-    expect(screen.queryByText(/This publish/)).not.toBeInTheDocument();
+  it("adds the line to the points, and nothing without coverage requirements", () => {
+    const rows = [row({ isCurrentUser: true, newShifts: 1, totalChanges: 1 })];
+    expect(
+      publishSummaryPoints({
+        editorRows: rows,
+        coverageGapCount: 0,
+        coverageChange: { opened: 1, closed: 2, partial: false },
+      }),
+    ).toEqual(["This publish opens 1 gap and closes 2."]);
+    expect(
+      publishSummaryPoints({ editorRows: rows, coverageGapCount: 0, coverageChange: null }),
+    ).toEqual([]);
   });
 });

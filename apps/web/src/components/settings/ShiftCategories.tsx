@@ -863,12 +863,14 @@ function ShiftCategoriesSettings({
                 message={
                   <>
                     <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving will preserve historical records. Any derived compatibility labels
-                    tied to this shift will become uncategorized.
                   </>
                 }
+                summary={{
+                  points: [
+                    "Historical records are kept.",
+                    "Any compatibility labels derived from this shift become uncategorized.",
+                  ],
+                }}
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting === confirmDeleteId}
@@ -881,12 +883,7 @@ function ShiftCategoriesSettings({
             return (
               <ConfirmDialog
                 title={`Archive "${cat.name}"?`}
-                message={
-                  <>
-                    This will archive <strong>{cat.name || "this category"}</strong>. Historical
-                    records will be preserved.
-                  </>
-                }
+                message="Archiving keeps its historical records."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting === confirmDeleteId}
@@ -898,12 +895,7 @@ function ShiftCategoriesSettings({
           return (
             <ConfirmDialog
               title={`Delete "${cat.name}"?`}
-              message={
-                <>
-                  This will permanently delete <strong>{cat.name || "this category"}</strong>.
-                  Nothing references it.
-                </>
-              }
+              message={`Nothing uses ${cat.name || "this category"}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               isLoading={deleting === confirmDeleteId}

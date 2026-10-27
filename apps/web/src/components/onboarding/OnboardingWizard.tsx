@@ -155,7 +155,7 @@ export default function OnboardingWizard({
       {showSkipConfirm && (
         <ConfirmDialog
           title="Skip Setup?"
-          message="Are you sure you want to skip? You can configure your preferences later in Settings."
+          message="You can configure your preferences later in Settings."
           confirmLabel="Skip"
           cancelLabel="Go back"
           variant="warning"

@@ -429,7 +429,7 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     // This viewer can approve, so the claim lands on the schedule at once.
     expect(
-      screen.getByText("Claim this open shift? As an admin, this goes on the schedule right away."),
+      screen.getByText("As an admin, it goes on the schedule right away."),
     ).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(
@@ -964,7 +964,9 @@ describe("RequestsScreen", () => {
     // the note sheet rather than a bare confirmation.
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Laura hasn't responded to this swap yet\. Cancelling withdraws it/),
+      screen.getByText(
+        /The other person hasn't responded to this swap yet\. Cancelling withdraws it/,
+      ),
     ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Note to Jane and Laura? (Optional)"), {
       target: { value: " Covered another way " },

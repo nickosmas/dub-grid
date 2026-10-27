@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InlineRoleSelect } from "@/components/staff/InlineRoleSelect";
 
@@ -43,8 +43,10 @@ describe("InlineRoleSelect self-guard", () => {
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByRole("option", { name: "Admin" }));
 
-    expect(screen.getByText("Change invitation access?")).toBeTruthy();
-    expect(screen.getByText(/current invite link stops working immediately/i)).toBeTruthy();
+    expect(screen.getByText(/^Change invitation access from /)).toBeTruthy();
+    const summary = within(screen.getByRole("region", { name: "Keep in mind" }));
+    expect(summary.getByText("The current invite link stops working immediately.")).toBeTruthy();
+    expect(summary.getByText("A new invite link is sent to mina@example.com.")).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Change and resend" }));

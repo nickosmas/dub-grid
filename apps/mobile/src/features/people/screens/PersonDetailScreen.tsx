@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox";
 import { canMarkInactive, describeStatusAction, statusUndoAction } from "@dubgrid/domain";
 import {
   Linking,
@@ -911,16 +912,16 @@ export default function PersonDetailScreen() {
   const undoAction = statusUndoAction(person.status);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
-      ? "Send invitation?"
+      ? `Send an invitation to ${person.email}?`
       : invitationConfirmAction === "resend"
-        ? "Reissue invitation?"
-        : "Revoke invitation?";
-  const invitationConfirmationBody =
+        ? `Reissue the invitation to ${person.email}?`
+        : `Revoke the invitation to ${person.email}?`;
+  const invitationConfirmationLead =
     invitationConfirmAction === "create"
-      ? `An app invitation will be sent to ${person.email}.`
+      ? undefined
       : invitationConfirmAction === "resend"
-        ? `The current invitation for ${person.email} will be canceled and a new one will be sent.`
-        : `The current invite link for ${person.email} will stop working.`;
+        ? "The current invitation will be canceled."
+        : "The invite link stops working.";
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
       ? "Send invitation"
@@ -1366,11 +1367,7 @@ export default function PersonDetailScreen() {
       )}
 
       <ConfirmationModal
-        body={
-          draft
-            ? `The staff email will change to ${draft.email.trim() || "no email address"}. Check the address before saving.`
-            : ""
-        }
+        body="Check the address before saving."
         confirmLabel="Save"
         error={confirmationError}
         loading={updateMutation.isPending}
@@ -1379,13 +1376,18 @@ export default function PersonDetailScreen() {
           setShowSaveConfirmation(false);
         }}
         onConfirm={confirmSave}
-        title="Change the staff email?"
+        title={
+          draft?.email.trim()
+            ? `Change the staff email to ${draft.email.trim()}?`
+            : "Change the staff email?"
+        }
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
       <ConfirmationModal
-        body={statusCopy?.body}
+        body={statusCopy?.message || undefined}
+        summary={statusCopy ? { points: statusCopy.points } : undefined}
         confirmLabel={statusCopy?.label ?? ""}
         error={confirmationError}
         loading={statusMutation.isPending}
@@ -1397,7 +1399,12 @@ export default function PersonDetailScreen() {
       <BottomSheetModal
         debugName="Change staff status"
         dismissDisabled={statusMutation.isPending}
-        header={<SheetHeader title={statusCopy?.title ?? ""} subtitle={statusCopy?.body} />}
+        header={
+          <SheetHeader
+            title={statusCopy?.title ?? ""}
+            subtitle={statusCopy?.message || undefined}
+          />
+        }
         // The discard prompt rides inside the sheet: iOS refuses a second
         // Modal while this one is up, so as a sibling it never appeared and a
         // dismissal with a reason typed or Remove picked went nowhere.
@@ -1443,6 +1450,9 @@ export default function PersonDetailScreen() {
             onChangeText={setInactiveNote}
           />
         ) : null}
+        {statusCopy && confirmAction !== "activate" ? (
+          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
+        ) : null}
       </BottomSheetModal>
       <ManagementAccessSheet
         managementDepartments={managementDepartments}
@@ -1466,7 +1476,7 @@ export default function PersonDetailScreen() {
         visible={showOrgRole}
       />
       <ConfirmationModal
-        body={invitationConfirmationBody}
+        body={invitationConfirmationLead}
         confirmLabel={invitationConfirmationLabel}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         error={invitationError}
@@ -1531,8 +1541,8 @@ function AccountLinkChallengeModal({
         </Text>
         <Text style={styles.modalInfoText}>
           {isMismatch
-            ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
-            : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
+            ? "The existing account is under a different name. Linking it updates the staff profile to match the account name."
+            : "An existing app account matches this staff profile. You can link it instead of sending a new invitation."}
         </Text>
       </View>
 

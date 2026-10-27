@@ -896,8 +896,8 @@ function overwritePromptMessage(count: number | null, isAbsence: boolean): strin
     count == null
       ? "Some of these days may already have a shift or absence."
       : overwriteCountText(count);
-  const them = count === 1 ? "it" : "them";
-  return `${days} Replace ${them} with the repeating ${isAbsence ? "absence" : "shift"}, or keep ${them} and skip ${count === 1 ? "that day" : "those days"}?`;
+  const one = count === 1;
+  return `${days} Replace puts the repeating ${isAbsence ? "absence" : "shift"} in ${one ? "its" : "their"} place. Keep existing leaves ${one ? "it as it is" : "them as they are"} and skips ${one ? "that day" : "those days"}.`;
 }
 
 const formLayoutStyle: React.CSSProperties = {

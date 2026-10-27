@@ -1855,21 +1855,21 @@ export default function ShiftEditPanel({
       <ConfirmDialog
         title={
           pendingRequestConfirmation.kind === "pickup"
-            ? "Offer shift for pickup?"
+            ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
             : pendingRequestConfirmation.kind === "targeted_pickup"
-              ? "Request pickup?"
+              ? `Request pickup of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
               : pendingRequestConfirmation.kind === "calloff"
-                ? "Submit call off request?"
-                : "Submit swap request?"
+                ? `Submit a call off for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+                : `Request a swap of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
         }
         message={
           pendingRequestConfirmation.kind === "pickup"
-            ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
+            ? undefined
             : pendingRequestConfirmation.kind === "targeted_pickup"
-              ? `Ask ${pendingRequestConfirmation.targetName} to pick up your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} while you use ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}?`
+              ? `The person you chose is asked to pick it up. Your absence for that shift is ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}.`
               : pendingRequestConfirmation.kind === "calloff"
-                ? `Submit ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
-                : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
+                ? `It's requested as ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence.`
+                : `In return you'd get the other person's ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}.`
         }
         confirmLabel={
           pendingRequestConfirmation.kind === "pickup"
@@ -3560,21 +3560,21 @@ export default function ShiftEditPanel({
   }
 
   /** Says how the shifts go back when the absence is removed. */
-  function restoredShiftSentence(): string {
-    if (!absenceSession || !absenceCell?.kept) return "";
+  function restoredShiftPoints(): string[] {
+    if (!absenceSession || !absenceCell?.kept) return [];
     const { base, names } = absenceSession;
-    const sentences: string[] = [];
+    const points: string[] = [];
     const cut = absenceCell.plan.cutIndex;
     if (cut != null) {
       const range = effectiveRange(base.shifts[cut]);
-      sentences.push(
+      points.push(
         `${capitalize(theShift(names[cut]))} goes back to ${fmt12h(range.start)} - ${fmt12h(range.end)} (${formatShiftChangeHours(clockSpanMinutes(range))}).`,
       );
     }
     for (const index of absenceCell.plan.removedIndexes) {
-      sentences.push(`${capitalize(theShift(names[index]))} comes back.`);
+      points.push(`Removing it brings back ${theShift(names[index])}.`);
     }
-    return sentences.length > 0 ? ` ${sentences.join(" ")}` : "";
+    return points;
   }
 
   /** Save waits for a time that leaves the absence some scheduled time to cover (items 50a, 50c). */
@@ -3878,19 +3878,17 @@ export default function ShiftEditPanel({
 
   // Names what the whole-cell remove takes away: "all shifts" read as if it
   // kept the absence beside them.
-  function removeAllCopy(): { label: string; title: string } {
-    if (isAbsence) return { label: "Remove absence", title: "Remove Absence?" };
+  function removeAllCopy(): { label: string } {
+    if (isAbsence) return { label: "Remove absence" };
     const many = currentLabels.length > 1;
     if (hasRestOfDayAbsence) {
-      return many
-        ? { label: "Remove shifts and absence", title: "Remove Shifts and Absence?" }
-        : { label: "Remove shift and absence", title: "Remove Shift and Absence?" };
+      return { label: many ? "Remove shifts and absence" : "Remove shift and absence" };
     }
-    return many
-      ? { label: "Remove both shifts", title: "Remove Both Shifts?" }
-      : { label: "Remove shift", title: "Remove Shift?" };
+    return { label: many ? "Remove both shifts" : "Remove shift" };
   }
   const quotedShiftLabels = currentLabels.map((label) => `"${label}"`).join(" and ");
+  const removedAbsenceRestores =
+    !isAbsence && pendingDelete?.type === "restOfDay" ? restoredShiftPoints() : [];
 
   function renderCardRemoveButton(ariaLabel: string, onClick: () => void) {
     return (
@@ -5077,17 +5075,19 @@ export default function ShiftEditPanel({
       {/* Confirm delete dialog */}
       {pendingDelete && pendingDelete.type === "all" && seriesId && (
         <ConfirmDialog
-          title={`Remove ${repeatingNoun}?`}
+          title={`Remove the ${repeatingNoun} "${
+            isAbsence
+              ? absenceName(currentAbsenceTypeId ?? null)
+              : formatPreviewLabel(
+                  resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name")
+                    .displayParts,
+                )
+          }"?`}
           message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
-                {isAbsence
-                  ? absenceName(currentAbsenceTypeId ?? null)
-                  : formatPreviewLabel(
-                      resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name")
-                        .displayParts,
-                    )}{" "}
-                for {modal.empName}. Choose which days to remove.
+                Choose the days to remove. Published days are removed in the draft and leave the
+                schedule when you publish.
               </span>
               <SeriesScopeChoices
                 label="Days to remove"
@@ -5095,9 +5095,6 @@ export default function ShiftEditPanel({
                 value={seriesScope}
                 onChange={setSeriesScope}
               />
-              <span style={{ fontSize: "var(--dg-fs-footnote)" }}>
-                Published days are removed in the draft and leave the schedule when you publish.
-              </span>
             </div>
           }
           confirmLabel={
@@ -5120,8 +5117,8 @@ export default function ShiftEditPanel({
         <ConfirmDialog
           title={`Edit ${repeatingNoun}`}
           message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <span>Which days should this change?</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <span>Choose which days this change applies to.</span>
               <SeriesScopeChoices
                 label="Days to edit"
                 options={scopeOptions}
@@ -5143,25 +5140,22 @@ export default function ShiftEditPanel({
 
       {pendingDelete && !(pendingDelete.type === "all" && seriesId) && (
         <ConfirmDialog
-          title={
-            pendingDelete.type === "restOfDay"
-              ? "Remove Absence?"
-              : pendingDelete.type === "all"
-                ? removeAllCopy().title
-                : "Remove Shift?"
-          }
-          message={
+          title={`Remove ${
             isAbsence
-              ? `Remove absence "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+              ? `the absence "${currentLabels[0]}"`
               : pendingDelete.type === "restOfDay"
-                ? `Remove ${absenceName(currentRestOfDayAbsenceTypeId)} from ${modal.empName} on ${formatDate(modal.date)}?${restoredShiftSentence()}`
+                ? absenceName(currentRestOfDayAbsenceTypeId)
                 : pendingDelete.type === "pill"
-                  ? `Remove "${currentLabels[pendingDelete.index]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                  ? `"${currentLabels[pendingDelete.index]}"`
                   : hasRestOfDayAbsence
-                    ? `Remove the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                    ? `the ${currentLabels.length > 1 ? "shifts" : "shift"} ${quotedShiftLabels} and the absence "${absenceName(currentRestOfDayAbsenceTypeId)}"`
                     : currentLabels.length > 1
-                      ? `Remove both shifts, ${quotedShiftLabels}, from ${modal.empName} on ${formatDate(modal.date)}?`
-                      : `Remove "${currentLabels[0]}" from ${modal.empName} on ${formatDate(modal.date)}?`
+                      ? `both shifts, ${quotedShiftLabels},`
+                      : `"${currentLabels[0]}"`
+          } on ${formatDate(modal.date)}?`}
+          message={removedAbsenceRestores.length === 1 ? removedAbsenceRestores[0] : undefined}
+          summary={
+            removedAbsenceRestores.length > 1 ? { points: removedAbsenceRestores } : undefined
           }
           confirmLabel="Remove"
           variant="danger"

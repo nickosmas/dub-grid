@@ -2001,29 +2001,29 @@ export default function OrganizationSetupWizard({
   const setupConfirmCopy =
     setupConfirmAction === "create-organization"
       ? {
-          title: "Create Organization",
-          message: `Create "${name.trim()}" and assign "${superAdminEmail.trim()}" as the initial super admin?`,
+          title: `Create ${name.trim()}?`,
+          message: `${superAdminEmail.trim()} becomes its initial Super Admin.`,
           confirmLabel: "Create Organization",
           variant: "warning" as const,
         }
       : setupConfirmAction === "save-configuration"
         ? {
-            title: "Save Configuration",
-            message: `Save configuration items for ${createdOrg?.name ?? "this organization"} and continue to employees?`,
+            title: `Save the configuration for ${createdOrg?.name ?? "this organization"}?`,
+            message: "Setup then continues to employees.",
             confirmLabel: "Save Configuration",
             variant: "warning" as const,
           }
         : setupConfirmAction === "create-employees"
           ? {
-              title: "Create Employees",
-              message: `Create ${readyEmployeeCount} employee${readyEmployeeCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+              title: `Create ${readyEmployeeCount} employee${readyEmployeeCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+              message: undefined,
               confirmLabel: "Create Employees",
               variant: "warning" as const,
             }
           : setupConfirmAction === "send-invitations"
             ? {
-                title: "Send Invitations",
-                message: `Send ${selectedInvitationCount} invitation${selectedInvitationCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+                title: `Send ${selectedInvitationCount} invitation${selectedInvitationCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+                message: undefined,
                 confirmLabel: "Send Invitations",
                 variant: "warning" as const,
               }

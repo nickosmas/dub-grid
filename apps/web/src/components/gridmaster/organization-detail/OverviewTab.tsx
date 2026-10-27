@@ -570,11 +570,22 @@ export function OverviewTab({
 
       {archiveConfirm && (
         <ConfirmDialog
-          title={organization.archivedAt ? "Restore Organization" : "Archive Organization"}
-          message={
+          title={
             organization.archivedAt
-              ? `Are you sure you want to restore "${organization.name}"?`
-              : `Archive "${organization.name}"? Members lose access, the Stripe subscription is canceled, and the data is preserved. Restoring later does not reactivate billing.`
+              ? `Restore ${organization.name}?`
+              : `Archive ${organization.name}?`
+          }
+          summary={
+            organization.archivedAt
+              ? undefined
+              : {
+                  points: [
+                    "Members lose access.",
+                    "Billing through Stripe is canceled.",
+                    "All data is kept.",
+                    "Restoring later doesn't reactivate billing.",
+                  ],
+                }
           }
           confirmLabel={organization.archivedAt ? "Restore" : "Archive"}
           variant={organization.archivedAt ? "info" : "danger"}
@@ -676,13 +687,10 @@ export function OverviewTab({
 
       {suspendConfirm && (
         <ConfirmDialog
-          title="Suspend Organization"
+          title={`Suspend ${organization.name}?`}
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <span>
-                Are you sure you want to suspend &quot;{organization.name}&quot;? All members will
-                be blocked from accessing the app.
-              </span>
+              <span>All its members are blocked from using the app.</span>
               <textarea
                 className="dg-input"
                 placeholder="Reason for suspension (required)"
@@ -727,8 +735,8 @@ export function OverviewTab({
 
       {unsuspendConfirm && (
         <ConfirmDialog
-          title="Unsuspend Organization"
-          message={`Unsuspend "${organization.name}"? Members will regain access to the app.`}
+          title={`Unsuspend ${organization.name}?`}
+          message="Its members regain access to the app."
           confirmLabel="Unsuspend"
           variant="warning"
           isLoading={suspending}

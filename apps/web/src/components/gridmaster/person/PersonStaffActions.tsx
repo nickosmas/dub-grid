@@ -195,10 +195,10 @@ export function PersonStaffActions({
           title={copyFor(statusChange).title}
           message={
             <div className="flex flex-col gap-3">
-              <span>{copyFor(statusChange).body}</span>
+              {copyFor(statusChange).message ? <span>{copyFor(statusChange).message}</span> : null}
               {statusChange !== "activate" ? (
                 <textarea
-                  className="dg-input resize-y"
+                  className="dg-input w-full resize-y"
                   aria-label="Status note"
                   placeholder="Note (optional)"
                   value={statusNote}
@@ -208,6 +208,7 @@ export function PersonStaffActions({
               ) : null}
             </div>
           }
+          summary={{ points: copyFor(statusChange).points }}
           confirmLabel={copyFor(statusChange).label}
           variant={statusChange === "activate" ? "info" : "danger"}
           isLoading={busy}

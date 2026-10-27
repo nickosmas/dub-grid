@@ -155,9 +155,10 @@ export function PlatformBillingPolicyCard() {
       </div>
       {draft && platform && (
         <ConfirmDialog
-          title="Edit billing policy"
+          title="Edit the platform billing defaults?"
           message={
             <div style={{ display: "grid", gap: 14 }}>
+              <span>An organization&apos;s own override takes their place.</span>
               {BILLING_POLICY_KEYS.map((key) => (
                 <label key={key} style={{ display: "grid", gap: 4 }}>
                   <span style={{ fontWeight: 600 }}>{BILLING_POLICY_LABELS[key].label}</span>
@@ -265,13 +266,10 @@ export function OrganizationBillingPolicyCard({ org }: { org: GridmasterBillingO
       </div>
       {draft && (
         <ConfirmDialog
-          title="Billing policy overrides"
+          title={`Override ${org.orgName}'s billing policy?`}
           message={
             <div style={{ display: "grid", gap: 14 }}>
-              <span>
-                Override a value for {org.orgName} only. Turn an override off to use the platform
-                default again.
-              </span>
+              <span>Turn an override off to use the platform default again.</span>
               {BILLING_POLICY_KEYS.map((key) => {
                 const entry = draft[key];
                 return (

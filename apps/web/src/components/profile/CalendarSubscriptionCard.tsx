@@ -193,7 +193,12 @@ export function CalendarSubscriptionCard() {
       {pendingAction === "replace" && (
         <ConfirmDialog
           title="Replace private link?"
-          message="The previous URL stops working immediately and must be updated in every calendar app that uses it."
+          summary={{
+            points: [
+              "The previous URL stops working immediately.",
+              "Every calendar app that uses it needs the new link.",
+            ],
+          }}
           confirmLabel="Replace link"
           variant="warning"
           onConfirm={confirmPendingAction}
@@ -203,7 +208,7 @@ export function CalendarSubscriptionCard() {
       {pendingAction === "disable" && (
         <ConfirmDialog
           title="Disable calendar subscription?"
-          message="Calendar apps will stop receiving updates until you create a new link."
+          message="Calendar apps stop receiving updates until you create a new link."
           confirmLabel="Disable subscription"
           variant="danger"
           onConfirm={confirmPendingAction}

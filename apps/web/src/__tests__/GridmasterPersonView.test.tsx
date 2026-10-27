@@ -300,9 +300,12 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Force logout" })).getByRole("button", {
-        name: "Force logout",
-      }),
+      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
+        "button",
+        {
+          name: "Force logout",
+        },
+      ),
     );
 
     await waitFor(() =>
@@ -320,9 +323,12 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Force logout" })).getByRole("button", {
-        name: "Force logout",
-      }),
+      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
+        "button",
+        {
+          name: "Force logout",
+        },
+      ),
     );
 
     await waitFor(() => expect(fetchGridmasterPersonNotifications).toHaveBeenCalledTimes(2));
@@ -334,9 +340,12 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Force logout" })).getByRole("button", {
-        name: "Force logout",
-      }),
+      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
+        "button",
+        {
+          name: "Force logout",
+        },
+      ),
     );
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
@@ -470,7 +479,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit name" }));
-    const dialog = screen.getByRole("dialog", { name: "Edit name" });
+    const dialog = screen.getByRole("dialog", { name: "Edit the name on this account?" });
     fireEvent.change(within(dialog).getByLabelText("First name"), {
       target: { value: " Augusta " },
     });
@@ -491,7 +500,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "augusta@example.com" },
     });
@@ -516,7 +525,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "grace@example.com" },
     });
@@ -525,7 +534,9 @@ describe("GridmasterPersonView", () => {
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("That email belongs to a different user account."),
     );
-    expect(screen.getByRole("dialog", { name: "Change sign-in email" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Change this account's sign-in email?" }),
+    ).toBeInTheDocument();
   });
 
   it("changes no email when step-up is cancelled", async () => {
@@ -533,7 +544,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change sign-in email" });
+    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "augusta@example.com" },
     });
@@ -695,7 +706,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "End session" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "End this session?" })).getByRole("button", {
         name: "End session",
       }),
     );
@@ -720,7 +731,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "End session" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End session" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "End this session?" })).getByRole("button", {
         name: "End session",
       }),
     );
@@ -738,7 +749,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Clear sign-in lock" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Clear sign-in lock" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "Clear this sign-in lock?" })).getByRole("button", {
         name: "Clear lock",
       }),
     );
@@ -757,7 +768,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Reset two-factor" }));
-    const dialog = screen.getByRole("dialog", { name: "Reset two-factor" });
+    const dialog = screen.getByRole("dialog", { name: "Reset this account's two-factor?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
     expect(toast.error).toHaveBeenCalledWith("Give a reason for the reset.");
     expect(resetGridmasterPersonTwoFactor).not.toHaveBeenCalled();
@@ -788,7 +799,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Deactivate user" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "Deactivate this account?" })).getByRole("button", {
         name: "Deactivate",
       }),
     );
@@ -803,7 +814,7 @@ describe("GridmasterPersonView", () => {
   });
 
   describe("account and device actions (F-95)", () => {
-    function confirmIn(dialogName: string, button = dialogName) {
+    function confirmIn(dialogName: string | RegExp, button: string) {
       fireEvent.click(
         within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
           name: button,
@@ -815,14 +826,14 @@ describe("GridmasterPersonView", () => {
       renderView(linkedRecord());
 
       fireEvent.click(await screen.findByRole("button", { name: "Terminate account" }));
-      confirmIn("Terminate account");
+      confirmIn("Terminate this account?", "Terminate account");
       expect(toast.error).toHaveBeenCalledWith("Give a reason for the termination.");
       expect(terminateGridmasterUser).not.toHaveBeenCalled();
 
       fireEvent.change(screen.getByLabelText("Termination reason"), {
         target: { value: "  Fraud  " },
       });
-      confirmIn("Terminate account");
+      confirmIn("Terminate this account?", "Terminate account");
 
       await waitFor(() =>
         expect(terminateGridmasterUser).toHaveBeenCalledWith(USER, "Fraud", "fresh-token"),
@@ -839,7 +850,7 @@ describe("GridmasterPersonView", () => {
       fireEvent.change(screen.getByLabelText("Termination reason"), {
         target: { value: "Fraud" },
       });
-      confirmIn("Terminate account");
+      confirmIn("Terminate this account?", "Terminate account");
 
       await waitFor(() =>
         expect(toast.warning).toHaveBeenCalledWith(
@@ -857,7 +868,7 @@ describe("GridmasterPersonView", () => {
       );
 
       fireEvent.click(await screen.findByRole("button", { name: "Reinstate" }));
-      confirmIn("Reinstate account", "Reinstate");
+      confirmIn("Reinstate this account?", "Reinstate");
 
       await waitFor(() =>
         expect(reinstateGridmasterUser).toHaveBeenCalledWith(USER, "fresh-token"),
@@ -868,21 +879,31 @@ describe("GridmasterPersonView", () => {
       renderView(linkedRecord());
 
       fireEvent.click(await screen.findByRole("button", { name: "Send password reset" }));
-      confirmIn("Send password reset", "Send reset email");
+      confirmIn(/^Send a password reset email to /, "Send reset email");
 
       await waitFor(() => expect(sendGridmasterPasswordReset).toHaveBeenCalledOnce());
       expect(sendGridmasterPasswordReset.mock.calls[0][1]).toBe("fresh-token");
     });
 
     it.each([
-      ["Forget", "Forget device", "Forget device", { action: "forgetDevice", deviceId: "d-1" }],
+      [
+        "Forget",
+        "Forget this device?",
+        "Forget device",
+        { action: "forgetDevice", deviceId: "d-1" },
+      ],
       [
         "Turn off",
-        "Turn off push notifications",
+        "Turn off push notifications to this device?",
         "Turn off",
         { action: "disablePushDevice", deviceId: "p-1" },
       ],
-      ["Revoke", "Revoke calendar feed", "Revoke", { action: "revokeCalendarFeed", feedId: "c-1" }],
+      [
+        "Revoke",
+        "Revoke this calendar feed?",
+        "Revoke",
+        { action: "revokeCalendarFeed", feedId: "c-1" },
+      ],
     ])("%s runs its security action through step-up", async (button, dialog, confirm, input) => {
       const record = linkedRecord();
       renderView({
@@ -928,7 +949,9 @@ describe("GridmasterPersonView", () => {
       const { rerender } = renderView(linkedRecord());
 
       fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
-      expect(screen.getByRole("dialog", { name: "Force logout" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("dialog", { name: "End every session for this person?" }),
+      ).toBeInTheDocument();
 
       stepUpState.dialog = <div role="dialog" aria-label="Confirm your identity" />;
       rerender();
@@ -937,11 +960,15 @@ describe("GridmasterPersonView", () => {
       expect(
         screen.getAllByRole("dialog", { name: "Confirm your identity" }).length,
       ).toBeGreaterThan(0);
-      expect(screen.queryByRole("dialog", { name: "Force logout" })).toBeNull();
+      expect(
+        screen.queryByRole("dialog", { name: "End every session for this person?" }),
+      ).toBeNull();
 
       stepUpState.dialog = null;
       rerender();
-      expect(screen.getByRole("dialog", { name: "Force logout" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("dialog", { name: "End every session for this person?" }),
+      ).toBeInTheDocument();
     });
   });
 });

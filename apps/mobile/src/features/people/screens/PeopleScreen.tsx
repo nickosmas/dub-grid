@@ -1089,7 +1089,7 @@ export default function PeopleScreen() {
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "Safeguards will run before this account loses access."
+            ? "This teammate's account will lose access. Safeguards run before it does."
             : profileRequestConfirmation?.action === "approve"
               ? "The change will be applied to this teammate's profile."
               : "The teammate's profile will stay as it is."

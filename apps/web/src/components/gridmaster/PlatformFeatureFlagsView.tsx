@@ -295,11 +295,15 @@ export default function PlatformFeatureFlagsView() {
               ? `Turn Off "${pendingInfo.label}"?`
               : `Turn On "${pendingInfo.label}"?`
           }
-          message={
-            pendingFlag.enabled
-              ? `This affects every organization on the platform immediately. ${pendingInfo.description}`
-              : `This restores it for every organization on the platform immediately. ${pendingInfo.description}`
-          }
+          message={pendingInfo.description}
+          summary={{
+            points: [
+              pendingFlag.enabled
+                ? "Every organization on the platform is affected."
+                : "Every organization on the platform gets it back.",
+              "The change takes effect immediately.",
+            ],
+          }}
           confirmLabel={pendingFlag.enabled ? "Turn it off" : "Turn it on"}
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}

@@ -412,11 +412,8 @@ function IndicatorRow({
                 message={
                   <>
                     <strong>{trimmedName || "this schedule note"}</strong> is currently{" "}
-                    {dependencyInfo!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving will preserve those notes but remove the schedule note from future
-                    use.
+                    {dependencyInfo!.summary.toLowerCase()}. Archiving removes it from future use
+                    and keeps the notes already placed.
                   </>
                 }
                 confirmLabel="Archive"
@@ -431,12 +428,7 @@ function IndicatorRow({
             return (
               <ConfirmDialog
                 title={`Archive "${trimmedName || "schedule note"}"?`}
-                message={
-                  <>
-                    This will archive <strong>{trimmedName || "this schedule note"}</strong>.
-                    Historical records will be preserved.
-                  </>
-                }
+                message="Archiving removes it from future use and keeps its historical records."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting}
@@ -448,12 +440,7 @@ function IndicatorRow({
           return (
             <ConfirmDialog
               title={`Delete "${trimmedName || "schedule note"}"?`}
-              message={
-                <>
-                  This will permanently delete{" "}
-                  <strong>{trimmedName || "this schedule note"}</strong>. Nothing references it.
-                </>
-              }
+              message={`Nothing uses ${trimmedName || "this schedule note"}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               isLoading={deleting}

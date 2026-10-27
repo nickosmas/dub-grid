@@ -226,7 +226,7 @@ export default function ProfileCalendarScreen() {
         body={
           pendingConfirmation?.kind === "disable"
             ? "Calendar apps stop receiving updates until you add a calendar again."
-            : "Any calendar already using it stops updating."
+            : "Any calendar already using the old link stops updating."
         }
         iconName={
           pendingConfirmation?.kind === "disable" ? "close-circle-outline" : "refresh-outline"

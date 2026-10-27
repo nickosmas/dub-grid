@@ -1046,13 +1046,15 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    expect(screen.getByText("Send invitation?")).toBeInTheDocument();
+    expect(screen.getByText(/^Send an invitation to .+\?$/)).toBeInTheDocument();
     confirmDialog("Send invitation");
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
-    expect(screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^An existing app account matches this staff profile\./),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
-    expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Send an invitation to .+\?$/)).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link existing account"));
@@ -1066,7 +1068,11 @@ describe("PersonDetailScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("Name mismatch found")).toBeInTheDocument();
     });
-    expect(screen.getByText(/Minnie Diaz[\s\S]*Link it and update Mina Diaz/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The existing account is under a different name. Linking it updates the staff profile to match the account name.",
+      ),
+    ).toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Use account name"));
@@ -1147,12 +1153,16 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    expect(screen.getByText("Send invitation?")).toBeInTheDocument();
+    expect(screen.getByText(/^Send an invitation to .+\?$/)).toBeInTheDocument();
     confirmDialog("Send invitation");
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
-    expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
-    expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /matches this staff profile\. You can link it instead of sending a new invitation\./,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Send an invitation to .+\?$/)).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link existing account"));
@@ -1199,7 +1209,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
       expect(screen.getByText("Mark Mina Diaz away?")).toBeInTheDocument();
-      expect(screen.getByText(/can still sign in and keep their role/)).toBeInTheDocument();
+      expect(screen.getByText("They can still sign in and keep their role.")).toBeInTheDocument();
       fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
@@ -1215,7 +1225,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Archive" }));
       expect(screen.getByText("Archive Mina Diaz?")).toBeInTheDocument();
-      expect(screen.getByText(/can't sign in and won't be scheduled/)).toBeInTheDocument();
+      expect(screen.getByText("They can no longer sign in.")).toBeInTheDocument();
       fireEvent.click(screen.getAllByRole("button", { name: "Archive" }).at(-1)!);
 
       expect(mutate.mock.calls[0]?.[0]).toEqual({
@@ -1672,7 +1682,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(accessRow());
       fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
 
-      expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
+      expect(screen.getByText(/^Change access from .+ to Admin\?$/)).toBeInTheDocument();
     });
   });
 
@@ -1758,7 +1768,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@dubgrid.test" } });
       fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-      expect(screen.getByText("Change the staff email?")).toBeInTheDocument();
+      expect(screen.getByText("Change the staff email to new@dubgrid.test?")).toBeInTheDocument();
       confirmDialog("Save");
 
       await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));

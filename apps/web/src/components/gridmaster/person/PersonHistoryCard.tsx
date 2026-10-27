@@ -142,8 +142,8 @@ export function PersonHistoryCard({
       {stepUp.dialog}
       {exportConfirm && !stepUp.dialog ? (
         <ConfirmDialog
-          title="Export history"
-          message="Download this person's whole history as a file? The export is recorded in the audit log."
+          title="Export this person's history?"
+          message="It downloads as a file, and the export is recorded in the audit log."
           confirmLabel="Export"
           variant="warning"
           isLoading={exporting}

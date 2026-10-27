@@ -1553,13 +1553,13 @@ export function RecurringScheduleSection({
         <ConfirmDialog
           title={
             pendingRecurringAction === "save"
-              ? "Save Recurring Schedule Changes?"
-              : "Discard Recurring Schedule Draft?"
+              ? `Save ${dirtyCount} Recurring Schedule Change${dirtyCount === 1 ? "" : "s"}?`
+              : `Discard ${dirtyCount} Recurring Schedule Draft Change${dirtyCount === 1 ? "" : "s"}?`
           }
           message={
             pendingRecurringAction === "save"
-              ? `Save ${dirtyCount} recurring schedule change${dirtyCount === 1 ? "" : "s"}? These templates affect future schedule generation.`
-              : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
+              ? "These templates affect future schedule generation."
+              : "This can't be undone."
           }
           confirmLabel={pendingRecurringAction === "save" ? "Save" : "Discard"}
           variant={pendingRecurringAction === "save" ? "info" : "danger"}

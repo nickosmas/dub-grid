@@ -176,8 +176,8 @@ describe("ProfileSessionsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
 
     // The confirmation names the same device the row did.
-    expect(screen.getByText("Sign out this device?")).toBeInTheDocument();
-    expect(screen.getByText("Pixel 8 will lose access immediately.")).toBeInTheDocument();
+    expect(screen.getByText("Sign out Pixel 8?")).toBeInTheDocument();
+    expect(screen.getByText("It will lose access right away.")).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
@@ -202,8 +202,8 @@ describe("ProfileSessionsScreen", () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
-    expect(screen.getByText("Sign out this device?")).toBeInTheDocument();
-    expect(screen.getByText("Pixel 8 will lose access immediately.")).toBeInTheDocument();
+    expect(screen.getByText("Sign out Pixel 8?")).toBeInTheDocument();
+    expect(screen.getByText("It will lose access right away.")).toBeInTheDocument();
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 

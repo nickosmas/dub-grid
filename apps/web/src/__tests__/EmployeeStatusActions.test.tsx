@@ -56,7 +56,8 @@ describe("EmployeeStatusActions", () => {
 
     await user.click(screen.getByRole("button", { name: "Archive" }));
     const dialog = screen.getByRole("dialog", { name: "Archive Alice Smith?" });
-    expect(within(dialog).getByText(/can't sign in and won't be scheduled/i)).toBeInTheDocument();
+    const summary = within(within(dialog).getByRole("region", { name: "Keep in mind" }));
+    expect(summary.getByText("They can no longer sign in.")).toBeInTheDocument();
 
     await user.type(
       within(dialog).getByPlaceholderText(/Reason \(optional\)/),

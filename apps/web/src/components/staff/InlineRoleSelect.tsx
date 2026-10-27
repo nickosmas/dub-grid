@@ -81,11 +81,21 @@ export function InlineRoleSelect({
       />
       {pending && !stepUp.dialog && (
         <ConfirmDialog
-          title={pendingInvitationEmail ? "Change invitation access?" : "Change role"}
-          message={
+          title={
             pendingInvitationEmail
-              ? `Change access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}? Their current invite link stops working immediately, and a new one is sent to ${pendingInvitationEmail}.`
-              : `Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`
+              ? `Change invitation access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}?`
+              : `Change this person's role to ${ORG_ROLE_LABELS[pending]}?`
+          }
+          message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
+          summary={
+            pendingInvitationEmail
+              ? {
+                  points: [
+                    "The current invite link stops working immediately.",
+                    `A new invite link is sent to ${pendingInvitationEmail}.`,
+                  ],
+                }
+              : undefined
           }
           confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
           variant="warning"

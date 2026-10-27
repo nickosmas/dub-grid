@@ -18,20 +18,23 @@ const localTrial = { trialEndsAt: "2026-10-20T00:00:00Z", stripeSubscriptionId: 
 describe("describeOverrideOutcome", () => {
   it("says Active grants open access without payment", () => {
     expect(describeOverrideOutcome(localTrial, "active", now)).toEqual([
-      "The organization stays open with full access, without a payment.",
+      "The organization stays open with full access.",
+      "No payment is needed.",
     ]);
   });
 
   it("says Canceled locks the organization", () => {
     expect(describeOverrideOutcome(localTrial, "canceled", now)).toEqual([
-      "The organization locks. Members can't use it until billing changes again.",
+      "The organization locks.",
+      "Members can't use it until billing changes again.",
     ]);
   });
 
   it("says a trial override keeps the trial's own end date", () => {
-    expect(describeOverrideOutcome(localTrial, "trialing", now)[0]).toBe(
-      "The organization stays open on its trial. The trial end date doesn't change.",
-    );
+    expect(describeOverrideOutcome(localTrial, "trialing", now)).toEqual([
+      "The organization stays open on its trial.",
+      "The trial end date doesn't change.",
+    ]);
     expect(
       describeOverrideOutcome(
         { ...localTrial, trialEndsAt: "2026-10-11T00:00:00Z" },
@@ -42,9 +45,10 @@ describe("describeOverrideOutcome", () => {
   });
 
   it("asks for payment on a past-due override", () => {
-    expect(describeOverrideOutcome(localTrial, "past_due", now)[0]).toBe(
-      "The organization stays open, and its Super Admins are asked to update payment.",
-    );
+    expect(describeOverrideOutcome(localTrial, "past_due", now)).toEqual([
+      "The organization stays open.",
+      "Its Super Admins are asked to update payment.",
+    ]);
   });
 
   it("warns that Stripe replaces an override on a subscribed organization", () => {
@@ -194,11 +198,13 @@ describe("billing holds in Gridmaster views", () => {
 
   it("says which clock a pause stops", () => {
     const org = { status: "trialing", stripeSubscriptionId: null };
-    expect(describePauseOutcome({ ...org, trialEndsAt: "2026-10-20T00:00:00Z" }, now)[1]).toBe(
-      "The trial stops counting down. Resuming gives back the paused days.",
-    );
+    expect(describePauseOutcome({ ...org, trialEndsAt: "2026-10-20T00:00:00Z" }, now)).toEqual([
+      "The organization keeps full access while billing is paused.",
+      "The trial stops counting down.",
+      "Resuming gives back the paused days.",
+    ]);
     expect(describePauseOutcome({ ...org, trialEndsAt: "2026-10-11T00:00:00Z" }, now)[1]).toBe(
-      "The grace period stops counting down. Resuming gives back the paused days.",
+      "The grace period stops counting down.",
     );
   });
 

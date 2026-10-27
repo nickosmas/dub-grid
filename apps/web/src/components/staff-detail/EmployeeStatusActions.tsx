@@ -84,7 +84,8 @@ export function EmployeeStatusActions({
         <ConfirmDialog
           isLoading={pending}
           title={copy.title}
-          message={copy.body}
+          message={copy.message || undefined}
+          summary={{ points: copy.points }}
           confirmLabel={copy.label}
           variant="warning"
           onConfirm={async () => {
@@ -103,17 +104,18 @@ export function EmployeeStatusActions({
         title={copy.title}
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <span>{copy.body}</span>
+            {copy.message ? <span>{copy.message}</span> : null}
             <input
               className="dg-input"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={NOTE_PLACEHOLDERS[confirming]}
               aria-label="Reason (optional)"
-              style={{ fontSize: "var(--dg-fs-label)" }}
+              style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
             />
           </div>
         }
+        summary={{ points: copy.points }}
         confirmLabel={copy.label}
         variant={isArchive ? "danger" : "warning"}
         onConfirm={async () => {

@@ -527,8 +527,8 @@ describe("PeopleScreen", () => {
     // leaving: iOS refuses a present that overlaps a dismiss.
     fireEvent.click(await screen.findByText("Super Admin"));
 
-    expect(screen.getByText("Replace invitation access?")).toBeInTheDocument();
-    expect(screen.getByText(/current invitation will be revoked/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Change access from .+ to Super Admin\?$/)).toBeInTheDocument();
+    expect(screen.getByText(/^A replacement invitation goes to /)).toBeInTheDocument();
     expect(mutateCalls.flatMap((mutate) => mutate.mock.calls)).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke and resend" }));

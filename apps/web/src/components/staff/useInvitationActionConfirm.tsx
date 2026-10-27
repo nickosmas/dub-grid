@@ -14,30 +14,29 @@ type Pending = {
 export const INVITATION_ACTION_COPY: Record<
   InvitationActionKind,
   {
-    title: string;
+    title: (who: string) => string;
     confirmLabel: string;
     variant: "danger" | "warning";
-    message: (who: string) => string;
+    message: string;
   }
 > = {
   revoke: {
-    title: "Revoke Invitation?",
+    title: (who) => `Revoke the invitation for ${who}?`,
     confirmLabel: "Revoke",
     variant: "danger",
     // The revoked link never comes back, but inviting the person again is
     // always open and issues a new one. Saying only the first half read as
     // though they could never be invited again.
-    message: (who) =>
-      `Revoke the invitation for ${who}? Their invite link stops working right away. If you change your mind, you can send them a new invitation.`,
+    message:
+      "Their invite link stops working right away, but you can send them a new invitation if you change your mind.",
   },
   resend: {
-    title: "Reissue Invitation?",
+    title: (who) => `Reissue the invitation for ${who}?`,
     confirmLabel: "Reissue",
     variant: "warning",
     // Reissuing rotates the token on the same invitation, so the link the
     // invitee already holds dies the moment this is confirmed.
-    message: (who) =>
-      `Send ${who} a new invitation link? Their current link stops working immediately.`,
+    message: "A new invitation link is sent, and the current one stops working immediately.",
   },
 };
 
@@ -70,8 +69,8 @@ export function useInvitationActionConfirm(): {
     confirmDialog:
       pending && copy ? (
         <ConfirmDialog
-          title={copy.title}
-          message={copy.message(pending.email ?? "this person")}
+          title={copy.title(pending.email ?? "this person")}
+          message={copy.message}
           confirmLabel={copy.confirmLabel}
           variant={copy.variant}
           onConfirm={() => settle(true)}

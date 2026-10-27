@@ -57,14 +57,16 @@ export interface StatusActionCopy {
   /** The button, and the confirmation's primary action. */
   label: string;
   title: string;
-  /** What happens, for the manager about to confirm. */
-  body: string;
+  /** A short message under the title, only when it adds to the title; else empty. */
+  message: string;
+  /**
+   * Two or more extra things the manager should know, one full sentence each;
+   * a single fact goes in `message` instead.
+   */
+  points: string[];
   /** The toast once it's done. */
   done: string;
 }
-
-const LEAVING_SCHEDULE =
-  "Their upcoming shifts come off in the draft, their recurring schedule is removed, and their open requests close.";
 
 /** The action that brings someone back from a status. */
 export function statusUndoAction(status: EmployeeStatus): StatusAction | null {
@@ -73,34 +75,61 @@ export function statusUndoAction(status: EmployeeStatus): StatusAction | null {
   return null;
 }
 
-export function describeStatusAction(action: StatusAction, name: string): StatusActionCopy {
+/**
+ * `name` is the person, or a count such as "3 people" with `group` set. Only
+ * the title names them: the message and points say "they", and the points
+ * open with what each one is about rather than all with "Their".
+ */
+export function describeStatusAction(
+  action: StatusAction,
+  name: string,
+  { group = false }: { group?: boolean } = {},
+): StatusActionCopy {
+  const leavingSchedule = [
+    "Any upcoming shifts come off the schedule in the draft.",
+    "Recurring schedules set up for them are removed.",
+    "Open requests they're part of are closed.",
+  ];
   switch (action) {
     case "markAway":
       return {
         label: "Mark away",
         title: `Mark ${name} away?`,
-        body: `They can still sign in and keep their role, but they won't be scheduled while they're away. ${LEAVING_SCHEDULE}`,
+        message: "They won't be scheduled while they're away.",
+        points: [
+          group
+            ? "They can still sign in and keep their roles."
+            : "They can still sign in and keep their role.",
+          ...leavingSchedule,
+        ],
         done: "Marked away",
       };
     case "archive":
       return {
         label: "Archive",
         title: `Archive ${name}?`,
-        body: `They can't sign in and won't be scheduled. ${LEAVING_SCHEDULE} Their history stays, and you can restore them later.`,
+        message: "",
+        points: [
+          "They can no longer sign in.",
+          ...leavingSchedule,
+          "Past records stay, and you can restore them later.",
+        ],
         done: "Archived",
       };
     case "markActive":
       return {
         label: "Mark active",
         title: `Mark ${name} active?`,
-        body: "They can be scheduled again.",
+        message: "Shifts that came off when they were marked away don't come back.",
+        points: [],
         done: "Marked active",
       };
     case "restore":
       return {
         label: "Restore",
         title: `Restore ${name}?`,
-        body: "They're back on staff and can be scheduled again.",
+        message: "Shifts that came off when they were archived don't come back.",
+        points: [],
         done: "Restored",
       };
   }

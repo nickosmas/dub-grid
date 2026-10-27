@@ -102,7 +102,7 @@ function invitation(overrides: Partial<Invitation> = {}): Invitation {
   };
 }
 
-function confirm(dialogName: string, buttonName: string) {
+function confirm(dialogName: string | RegExp, buttonName: string) {
   fireEvent.click(
     within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
       name: buttonName,
@@ -225,7 +225,7 @@ describe("PersonInvitationActions", () => {
     render(<PersonInvitationActions invitation={invitation()} onChanged={onChanged} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Resend" }));
-    confirm("Resend invitation", "Resend");
+    confirm(/^Resend the invitation to /, "Resend");
 
     await waitFor(() =>
       expect(resendOrganizationInvitationGuarded).toHaveBeenCalledWith({
@@ -241,7 +241,7 @@ describe("PersonInvitationActions", () => {
     render(<PersonInvitationActions invitation={invitation()} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
-    confirm("Revoke invitation", "Revoke");
+    confirm(/^Revoke the invitation to /, "Revoke");
 
     await waitFor(() => expect(revokeOrganizationInvitationGuarded).toHaveBeenCalled());
   });

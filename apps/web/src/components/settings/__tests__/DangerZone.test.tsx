@@ -133,7 +133,7 @@ describe("DangerZone", () => {
 
     await screen.findByDisplayValue(CONFIRM_PHRASE);
     expect(global.fetch).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Delete organization" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /^Delete .*\?$/ })).toBeInTheDocument();
   });
 
   it("toasts a generic message on a failed delete and does not sign out", async () => {

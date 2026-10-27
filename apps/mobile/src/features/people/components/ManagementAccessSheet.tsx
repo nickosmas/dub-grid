@@ -225,8 +225,8 @@ export function ManagementAccessSheet({
       <ConfirmationModal
         body={
           isSelf
-            ? "You'll come off the management roster. Your staff profile and schedule stay exactly as they are."
-            : "They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
+            ? "Your staff profile and schedule stay exactly as they are."
+            : "Their staff profile and schedule stay exactly as they are."
         }
         confirmLabel="Remove access"
         confirmTone="danger"

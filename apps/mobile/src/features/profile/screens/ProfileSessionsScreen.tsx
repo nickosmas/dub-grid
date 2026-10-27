@@ -194,12 +194,14 @@ export default function ProfileSessionsScreen() {
     ? "Sign out all devices?"
     : isScopeConfirmation
       ? "Sign out other devices?"
-      : "Sign out this device?";
+      : pendingConfirmation?.kind === "revoke"
+        ? `Sign out ${formatSessionDeviceLabel(pendingConfirmation.session)}?`
+        : "Sign out this device?";
   const confirmationBody = isGlobalConfirmation
-    ? "Every device, including this one, will be signed out."
+    ? "This device is signed out too."
     : isScopeConfirmation
-      ? "Every device except this one will be signed out."
-      : `${pendingConfirmation?.kind === "revoke" ? formatSessionDeviceLabel(pendingConfirmation.session) : "This device"} will lose access immediately.`;
+      ? undefined
+      : "It will lose access right away.";
 
   return (
     <Screen

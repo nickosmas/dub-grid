@@ -769,12 +769,20 @@ function DefaultShiftToggle({
                 <strong>Default Shift Job</strong> appears in Jobs settings.
               </>
             ) : (
-              <>
-                Staff can no longer be scheduled with just a shift going forward, and the{" "}
-                <strong>Default Shift Job</strong> is hidden from Jobs settings. Shifts and coverage
-                requirements that already use it keep working as before.
-              </>
+              "Staff can no longer be scheduled with just a shift going forward."
             )
+          }
+          summary={
+            pendingValue
+              ? undefined
+              : {
+                  points: [
+                    <>
+                      The <strong>Default Shift Job</strong> is hidden from Jobs settings.
+                    </>,
+                    "Shifts and coverage requirements that already use it keep working as before.",
+                  ],
+                }
           }
           confirmLabel={pendingValue ? "Enable" : "Disable"}
           variant={pendingValue ? "info" : "warning"}
@@ -2550,11 +2558,8 @@ function JobRow({
                   message={
                     <>
                       <strong>{form.name}</strong> is currently{" "}
-                      {dependencyInfo!.summary.toLowerCase()}.
-                      <br />
-                      <br />
-                      Archiving will preserve history but remove the job from future scheduling and
-                      coverage configuration.
+                      {dependencyInfo!.summary.toLowerCase()}. Archiving keeps its history but
+                      removes it from future scheduling and coverage configuration.
                     </>
                   }
                   confirmLabel="Archive"
@@ -2569,12 +2574,7 @@ function JobRow({
               return (
                 <ConfirmDialog
                   title={`Archive "${form.name}"?`}
-                  message={
-                    <>
-                      This will archive <strong>{form.name}</strong>. Historical records will stay
-                      intact.
-                    </>
-                  }
+                  message="Archiving keeps its historical records but removes it from future scheduling and coverage configuration."
                   confirmLabel="Archive"
                   variant="warning"
                   isLoading={deleting}
@@ -2586,12 +2586,7 @@ function JobRow({
             return (
               <ConfirmDialog
                 title={`Delete "${form.name}"?`}
-                message={
-                  <>
-                    This will permanently delete <strong>{form.name}</strong>. Nothing references
-                    it.
-                  </>
-                }
+                message={`Nothing uses ${form.name}, so it's deleted permanently.`}
                 confirmLabel="Delete"
                 variant="danger"
                 isLoading={deleting}

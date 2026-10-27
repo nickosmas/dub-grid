@@ -540,8 +540,7 @@ export function UsersTab({
       {/* Remove confirm */}
       {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Remove User"
-          message={`Remove "${removeConfirm.email ?? removeConfirm.id}" from this organization? They will lose access.`}
+          title={`Remove ${removeConfirm.email ?? removeConfirm.id} from this organization?`}
           confirmLabel="Remove"
           variant="danger"
           isLoading={removing}
@@ -552,8 +551,7 @@ export function UsersTab({
 
       {roleChangeConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Change Organization Role"
-          message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
+          title={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
           confirmLabel="Change role"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
@@ -565,8 +563,8 @@ export function UsersTab({
       {stepUp.dialog}
       {addUserConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title="Add Organization User"
-          message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization? If no account uses this email, it gets an invitation instead.`}
+          title={`Add ${addUserConfirm.email} as ${formatOrganizationRoleLabel(addUserConfirm.role)}?`}
+          message="If no account uses this email, it gets an invitation instead."
           confirmLabel="Add"
           variant="warning"
           isLoading={adding}

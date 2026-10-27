@@ -193,7 +193,7 @@ export default function ProfilePasswordScreen() {
     // sign-out left unfinished (41b2/F-09).
     title: passwordChanged ? "Leave without signing out?" : "Discard this password change?",
     body: passwordChanged
-      ? "Your password already changed, but your other sessions are still signed in. Stay to finish signing out."
+      ? "Your password has already changed, but your other sessions are still signed in."
       : "The password you were entering won't be saved.",
     onDiscard: () => {
       setCurrentPassword("");
@@ -481,8 +481,8 @@ export default function ProfilePasswordScreen() {
       <ConfirmationModal
         body={
           passwordChanged
-            ? "Your password already changed. Sign out every session to finish."
-            : "You'll be signed out of every device after the password is updated."
+            ? "Your password has already changed."
+            : "You'll be signed out of every device."
         }
         confirmLabel={passwordChanged ? "Sign out everywhere" : "Update and sign out"}
         confirmTone="warning"

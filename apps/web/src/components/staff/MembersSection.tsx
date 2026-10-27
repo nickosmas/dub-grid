@@ -72,7 +72,11 @@ import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
-import { getAvatarInitials, getDirectoryPersonAvatarSeed } from "@/lib/utils";
+import {
+  getAvatarInitials,
+  getDirectoryPersonAvatarSeed,
+  getEmployeeDisplayName,
+} from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -2498,31 +2502,46 @@ export function MembersSection({
             const count = bulkConfirm.employeeIds.length;
             const showReason =
               bulkConfirm.action === "deactivate" || bulkConfirm.action === "remove";
-            const copy = describeStatusAction(
-              BULK_STATUS_ACTIONS[bulkConfirm.action],
-              count === 1 ? "1 person" : `${count} people`,
-            );
-            const summary = copy.body;
+            const only =
+              count === 1
+                ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
+                    (employee) => employee.id === bulkConfirm.employeeIds[0],
+                  )
+                : undefined;
+            const copy = only
+              ? describeStatusAction(
+                  BULK_STATUS_ACTIONS[bulkConfirm.action],
+                  getEmployeeDisplayName(only),
+                )
+              : describeStatusAction(
+                  BULK_STATUS_ACTIONS[bulkConfirm.action],
+                  count === 1 ? "1 person" : `${count} people`,
+                  {
+                    group: count !== 1,
+                  },
+                );
             return (
               <ConfirmDialog
                 title={copy.title}
                 message={
                   showReason ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <span>{summary}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {copy.message ? <span>{copy.message}</span> : null}
                       <input
                         className="dg-input"
                         value={bulkNote}
                         onChange={(e) => setBulkNote(e.target.value)}
                         disabled={isBulkActionRunning}
                         placeholder="Reason (optional, applies to all selected)"
-                        style={{ fontSize: "var(--dg-fs-label)" }}
+                        aria-label="Reason (optional)"
+                        style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
                       />
                     </div>
                   ) : (
-                    summary
+                    copy.message || undefined
                   )
                 }
+                summary={{ points: copy.points }}
                 confirmLabel={copy.label}
                 variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
                 isLoading={isBulkActionRunning}

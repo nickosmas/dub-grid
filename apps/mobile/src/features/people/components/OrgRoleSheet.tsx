@@ -76,15 +76,20 @@ export function OrgRoleSheet({
     const next = pendingRole ?? currentRole;
     if (invitationEmail) {
       return {
-        title: "Replace invitation access?",
-        body: `Change access from ${ORG_ROLE_LABELS[currentRole]} to ${ORG_ROLE_LABELS[next]}? The current invitation will be revoked and a replacement will be sent to ${invitationEmail}.`,
+        title: `Change access from ${ORG_ROLE_LABELS[currentRole]} to ${ORG_ROLE_LABELS[next]}?`,
+        body: undefined,
+        points: [
+          "The current invitation is revoked.",
+          `A replacement invitation goes to ${invitationEmail}.`,
+        ],
         confirmLabel: "Revoke and resend",
         confirmTone: "danger" as const,
       };
     }
     return {
-      title: "Change role",
-      body: `Change this person's role to ${ORG_ROLE_LABELS[next]}? Their access updates immediately.`,
+      title: `Change role to ${ORG_ROLE_LABELS[next]}?`,
+      body: "Their access updates right away.",
+      points: [],
       confirmLabel: "Change role",
       confirmTone: "primary" as const,
     };
@@ -95,6 +100,7 @@ export function OrgRoleSheet({
   const confirmationOverlay = (
     <ConfirmationModal
       body={confirmation.body}
+      summary={confirmation.points.length > 0 ? { points: confirmation.points } : undefined}
       confirmLabel={confirmation.confirmLabel}
       confirmTone={confirmation.confirmTone}
       loading={isPending}

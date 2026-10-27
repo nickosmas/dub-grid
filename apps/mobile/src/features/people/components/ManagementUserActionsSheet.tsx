@@ -210,7 +210,6 @@ export function ManagementUserActionsSheet({
     <>
       <ConfirmationModal
         presentation="inline"
-        body="They'll come off the management roster."
         confirmLabel="Remove access"
         error={error}
         confirmTone="danger"
@@ -232,8 +231,8 @@ export function ManagementUserActionsSheet({
         presentation="inline"
         body={
           invitationConfirmAction === "resend"
-            ? `The current invitation for ${displayed.email} will be canceled and a new one sent.`
-            : `The current invite link for ${displayed.email} will stop working.`
+            ? "The current invitation will be canceled."
+            : "The invite link stops working."
         }
         confirmLabel={
           invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
@@ -249,7 +248,11 @@ export function ManagementUserActionsSheet({
           if (invitationConfirmAction)
             return invitationMutation.mutateAsync(invitationConfirmAction);
         }}
-        title={invitationConfirmAction === "resend" ? "Reissue invitation?" : "Revoke invitation?"}
+        title={
+          invitationConfirmAction === "resend"
+            ? `Reissue the invitation to ${displayed.email}?`
+            : `Revoke the invitation to ${displayed.email}?`
+        }
         visible={invitationConfirmAction != null}
       />
     </>

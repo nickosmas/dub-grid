@@ -1133,12 +1133,8 @@ export default function StringListSettings({
                 message={
                   <>
                     <strong>{deleteConfirm.item.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.
-                    <br />
-                    <br />
-                    Archiving will preserve historical records but remove it from dropdowns and new
-                    assignments. Consider renaming instead if this item is still needed under a
-                    different name.
+                    {deps!.summary.toLowerCase()}. Archiving keeps its historical records but
+                    removes it from dropdowns and new assignments.
                   </>
                 }
                 confirmLabel="Archive"
@@ -1163,12 +1159,7 @@ export default function StringListSettings({
             return (
               <ConfirmDialog
                 title={`Archive "${deleteConfirm.item.name}"?`}
-                message={
-                  <>
-                    This will archive <strong>{deleteConfirm.item.name}</strong>. Historical records
-                    will be preserved.
-                  </>
-                }
+                message="Archiving keeps its historical records but removes it from dropdowns and new assignments."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {
@@ -1182,12 +1173,7 @@ export default function StringListSettings({
           return (
             <ConfirmDialog
               title={`Delete "${deleteConfirm.item.name}"?`}
-              message={
-                <>
-                  This will permanently delete <strong>{deleteConfirm.item.name}</strong>. Nothing
-                  references it.
-                </>
-              }
+              message={`Nothing uses ${deleteConfirm.item.name}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               onConfirm={() => {

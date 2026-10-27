@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
@@ -107,6 +107,10 @@ function renderBoard({
   return { onClaim, onRespond, onResolve, onCancel };
 }
 
+function whatHappens() {
+  return within(screen.getByRole("region", { name: "Keep in mind" }));
+}
+
 async function confirmDialogAction(user: ReturnType<typeof userEvent.setup>, label: string) {
   const buttons = screen.getAllByRole("button", { name: label });
   await user.click(buttons[buttons.length - 1]);
@@ -170,7 +174,9 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
     expect(onClaim).not.toHaveBeenCalled();
-    expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /^Claim .* on Apr 16, 2026\?$/ }),
+    ).toBeInTheDocument();
     await confirmDialogAction(user, "Claim");
 
     expect(onClaim).toHaveBeenCalledWith("req-1");
@@ -181,7 +187,7 @@ describe("ShiftRequestBoard", () => {
     renderBoard({ openPickups: [makeRequest()] });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
-    expect(screen.getByText(/sent for manager approval/)).toBeInTheDocument();
+    expect(screen.getByText("It's sent for manager approval.")).toBeInTheDocument();
   });
 
   it("tells an approver their claim goes straight on the schedule", async () => {
@@ -190,7 +196,7 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
     expect(
-      screen.getByText(/As an admin, this goes on the schedule right away\./),
+      screen.getByText("As an admin, it goes on the schedule right away."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/manager approval/)).not.toBeInTheDocument();
   });
@@ -313,7 +319,7 @@ describe("ShiftRequestBoard", () => {
       fetchShiftRequestDraftCells.mockResolvedValueOnce([]);
       await openApprove();
 
-      expect(screen.getByText(/This will finalize the staffing change/)).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Keep in mind" })).not.toBeInTheDocument();
       expect(screen.queryByRole("note")).not.toBeInTheDocument();
     });
 
@@ -453,8 +459,12 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Cancel request" }));
 
     expect(
-      screen.getByText(/Bob hasn't responded to this swap yet\. Cancelling withdraws it/),
+      screen.getByText("The other person hasn't responded to this swap yet."),
     ).toBeInTheDocument();
+    expect(
+      whatHappens().getByText("The request is withdrawn for both people."),
+    ).toBeInTheDocument();
+    expect(whatHappens().getByText("Nothing on the schedule changes.")).toBeInTheDocument();
     await confirmDialogAction(user, "Cancel request");
 
     expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1", "Covered another way");

@@ -407,7 +407,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       {pendingConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title="Update password?"
-          message="Confirm that you want to update your password. You will be signed out of every session."
+          message="You'll be signed out of every session."
           confirmLabel="Update and sign out"
           variant="warning"
           isLoading={saving}
@@ -425,8 +425,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           }
           message={
             pendingSessionSignOut === "others"
-              ? "Every other device will be signed out. You will stay signed in here."
-              : "Every device, including this one, will be signed out. You will need to sign in again."
+              ? "You'll stay signed in on this device."
+              : "This device is signed out too, so you'll need to sign in again."
           }
           confirmLabel={
             pendingSessionSignOut === "others" ? "Sign out other devices" : "Sign out everywhere"

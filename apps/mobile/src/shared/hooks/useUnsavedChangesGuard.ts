@@ -71,7 +71,7 @@ export function useUnsavedChangesGuard({
   onDiscard,
   onClose,
   title = "Discard unsaved changes?",
-  body = "Your edits will be lost.",
+  body = "Your edits won't be saved.",
   confirmLabel = "Discard",
   cancelLabel = "Keep Editing",
 }: {
@@ -89,7 +89,7 @@ export function useUnsavedChangesGuard({
   onClose?: () => void;
   /** Default: "Discard unsaved changes?" */
   title?: string;
-  /** Default: "Your edits will be lost." Name what is lost where you can. */
+  /** Default: "Your edits won't be saved." Name what is lost where you can. */
   body?: string;
   /** Default: "Discard". */
   confirmLabel?: string;

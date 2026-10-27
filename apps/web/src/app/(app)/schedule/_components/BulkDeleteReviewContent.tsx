@@ -90,7 +90,8 @@ export default function BulkDeleteReviewContent({
       }}
     >
       <p style={{ margin: 0 }}>
-        {`Remove ${targets.length} selected entr${targets.length === 1 ? "y" : "ies"}? Entries already on the published schedule will be removed from the live schedule when you publish these changes.`}
+        Entries already on the published schedule are removed from the live schedule when you
+        publish.
       </p>
       <div
         style={{

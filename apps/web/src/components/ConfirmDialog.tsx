@@ -6,10 +6,23 @@ import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
+/**
+ * Extra things the manager should know before confirming, one short point
+ * each, in a box above the buttons. Context and the plain effect go in the
+ * dialog's short message instead.
+ */
+export interface ConfirmSummary {
+  /** Defaults to "Keep in mind". */
+  title?: string;
+  points: React.ReactNode[];
+}
+
 interface ConfirmDialogProps {
   title: string;
   returnFocus?: React.RefObject<HTMLElement | null>;
-  message: string | React.ReactNode;
+  /** A short message under the title, and any fields the confirm needs. */
+  message?: string | React.ReactNode;
+  summary?: ConfirmSummary;
   confirmLabel?: string;
   cancelLabel?: string;
   /**
@@ -45,6 +58,7 @@ export default function ConfirmDialog({
   title,
   returnFocus,
   message,
+  summary,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "danger",
@@ -99,14 +113,32 @@ export default function ConfirmDialog({
     >
       <div
         id={descId}
-        style={{
-          fontSize: "var(--dg-fs-body-sm)",
-          color: "var(--dg-color-text-secondary)",
-          marginBottom: 24,
-          lineHeight: 1.5,
-        }}
+        style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}
       >
-        {message}
+        {message ? (
+          <div
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--dg-color-text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            {message}
+          </div>
+        ) : null}
+        {summary && summary.points.length === 1 ? (
+          // A box with one item reads oddly; a lone fact reads as a sentence.
+          <div
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--dg-color-text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            {summary.points[0]}
+          </div>
+        ) : null}
+        {summary && summary.points.length > 1 ? <ConfirmSummaryBox summary={summary} /> : null}
       </div>
       <div
         style={{
@@ -149,5 +181,65 @@ export default function ConfirmDialog({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+/** The publish dialog's summary box: the extra things a confirm does that the manager should know. */
+export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
+  const title = summary.title ?? "Keep in mind";
+  return (
+    // The label sits above the box at body size: inside the border it read
+    // as a cramped caption rather than a heading.
+    <section aria-label={title} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h3
+        style={{
+          margin: 0,
+          fontSize: "var(--dg-fs-body-sm)",
+          fontWeight: 600,
+          color: "var(--dg-color-text-primary)",
+        }}
+      >
+        {title}
+      </h3>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: "4px 16px",
+          border: "1px solid var(--dg-color-border)",
+          borderRadius: 14,
+          background: "var(--dg-color-bg)",
+        }}
+      >
+        {summary.points.map((point, index) => (
+          <li
+            key={index}
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 10,
+              padding: "8px 0",
+              borderTop: index === 0 ? undefined : "1px solid var(--dg-color-border-light)",
+              fontSize: "var(--dg-fs-body-sm)",
+              lineHeight: 1.45,
+              color: "var(--dg-color-text-primary)",
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: "var(--dg-color-text-subtle)",
+                flexShrink: 0,
+                transform: "translateY(-2px)",
+              }}
+            />
+            <span style={{ minWidth: 0 }}>{point}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

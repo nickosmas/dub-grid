@@ -311,6 +311,7 @@ import {
 } from "./_lib/operations";
 import {
   PublishChangeSummary,
+  publishSummaryPoints,
   type PublishCoverageChange,
   type PublishActiveEditor,
   type PublishEditorRow,
@@ -6679,6 +6680,12 @@ function SchedulerContent({
     publishedDateSet,
     showPublishConfirm,
   ]);
+  const publishPoints = publishSummaryPoints({
+    editorRows: publishEditorRows,
+    activeEditors: publishActiveEditors,
+    coverageGapCount: allCoverageGaps.length,
+    coverageChange: publishCoverageChange,
+  });
 
   // Editors only, while the panel is open: every suggestion is measured on a
   // copy of the schedule by the engine, so this reruns as the draft changes.
@@ -6796,6 +6803,7 @@ function SchedulerContent({
     suggestion: CoverageSuggestion;
     title: string;
     message: string;
+    points: string[];
   } | null>(null);
 
   // Fill a spot's own builder, so a suggestion never writes what the dialog could not.
@@ -6858,11 +6866,14 @@ function SchedulerContent({
         setPendingApproval({
           suggestion,
           title: `Approve ${name}'s pickup request?`,
-          message: `${name} gets the ${lookups.assignmentName(suggestion.subject.assignmentId)} on ${lookups.formatDate(
+          message: `They get the ${lookups.assignmentName(suggestion.subject.assignmentId)} on ${lookups.formatDate(
             suggestion.subject.dateKey,
-          )} right away. Staff see it without a publish, and it can't be undone here.${
-            entry?.draftKind ? " Their draft change for that day is replaced." : ""
-          }`,
+          )} right away.`,
+          points: [
+            "Staff see the change without a publish.",
+            "You can't undo the approval here.",
+            ...(entry?.draftKind ? ["Any draft change they had for that day is replaced."] : []),
+          ],
         });
         return;
       }
@@ -8748,6 +8759,7 @@ function SchedulerContent({
               <ConfirmDialog
                 title={pendingApproval.title}
                 message={pendingApproval.message}
+                summary={{ points: pendingApproval.points }}
                 confirmLabel="Approve"
                 variant="info"
                 isLoading={busySuggestionId === pendingApproval.suggestion.id}
@@ -8759,8 +8771,7 @@ function SchedulerContent({
             {/* Confirm dialog for context-menu shift removal */}
             {pendingClearShift && (
               <ConfirmDialog
-                title="Remove Entry?"
-                message={`Remove "${pendingClearShift.shiftLabel}" from ${pendingClearShift.empName} on ${formatDate(pendingClearShift.date)}?`}
+                title={`Remove "${pendingClearShift.shiftLabel}" on ${formatDate(pendingClearShift.date)}?`}
                 confirmLabel="Remove"
                 variant="danger"
                 onConfirm={() => {
@@ -8774,7 +8785,9 @@ function SchedulerContent({
 
             {showBulkDeleteReview && (
               <ConfirmDialog
-                title="Review Bulk Removal"
+                title={`Remove ${bulkDeleteSelectedTargets.length} selected entr${
+                  bulkDeleteSelectedTargets.length === 1 ? "y" : "ies"
+                }?`}
                 message={<BulkDeleteReviewContent targets={bulkDeleteSelectedTargets} />}
                 confirmLabel="Remove"
                 cancelLabel="Back"
@@ -8942,15 +8955,11 @@ function SchedulerContent({
                 confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
-                  <>
-                    Claim <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
-                    <strong>{pendingCoverageGapVolunteer.date}</strong>?{" "}
-                    {canApproveShiftRequests
-                      ? "As an admin, this goes on the schedule right away."
-                      : "This will be sent to your admin for approval."}
-                  </>
+                  canApproveShiftRequests
+                    ? "As an admin, it goes on the schedule right away."
+                    : "It's sent to your admin for approval."
                 }
-                title="Claim this shift?"
+                title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${pendingCoverageGapVolunteer.date}?`}
                 variant="info"
                 onCancel={() => {
                   if (!isCoverageGapVolunteerPending) {
@@ -8982,23 +8991,15 @@ function SchedulerContent({
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
-                title="Claim this shift?"
-                message={
-                  <>
-                    <strong>
-                      {spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
-                        pendingClaimShift.assignmentLabel}
-                    </strong>{" "}
-                    on <strong>{pendingClaimShift.date}</strong>
-                    {pendingClaimShift.calledOffBy && (
-                      <> (called off by {pendingClaimShift.calledOffBy})</>
-                    )}
-                    <br />
-                    {canApproveShiftRequests
-                      ? "As an admin, this goes on the schedule right away."
-                      : "We'll send this to your admin for approval."}
-                  </>
-                }
+                title={`Claim ${
+                  spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
+                  pendingClaimShift.assignmentLabel
+                } on ${pendingClaimShift.date}?`}
+                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${
+                  canApproveShiftRequests
+                    ? "As an admin, it goes on the schedule right away."
+                    : "It's sent to your admin for approval."
+                }`}
                 confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
@@ -9083,8 +9084,7 @@ function SchedulerContent({
             {/* Confirm dialog for pasting over an existing shift */}
             {pendingPasteOver && (
               <ConfirmDialog
-                title="Replace Entry?"
-                message={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
+                title={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
                 confirmLabel="Replace"
                 variant="warning"
                 onConfirm={() => {
@@ -9475,27 +9475,27 @@ function SchedulerContent({
 
           {showDiscardConfirm && (
             <ConfirmDialog
-              title="Discard drafts?"
+              title={`Discard drafts for ${currentPublishWindow.label}?`}
               message={
                 <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: 10,
+                    gap: 14,
                   }}
                 >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "var(--dg-fs-body-sm)",
-                      lineHeight: 1.5,
-                      color: "var(--dg-color-text-secondary)",
-                    }}
-                  >
-                    {showOrganizationDiscardScope
-                      ? `Published schedule stays live. Choose which drafts to discard for ${currentPublishWindow.label}. Drafts in other periods are left alone.`
-                      : `Published schedule stays live. These drafts for ${currentPublishWindow.label} will be removed. Drafts in other periods are left alone.`}
-                  </p>
+                  {showOrganizationDiscardScope ? (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "var(--dg-fs-body-sm)",
+                        lineHeight: 1.5,
+                        color: "var(--dg-color-text-secondary)",
+                      }}
+                    >
+                      Choose which drafts to discard.
+                    </p>
+                  ) : null}
                   <div
                     style={{
                       display: "grid",
@@ -9520,6 +9520,12 @@ function SchedulerContent({
                   </div>
                 </div>
               }
+              summary={{
+                points: [
+                  "The published schedule stays live.",
+                  "Drafts in other periods are left alone.",
+                ],
+              }}
               confirmLabel="Discard my drafts"
               cancelLabel="Keep drafts"
               variant="danger"
@@ -9546,17 +9552,13 @@ function SchedulerContent({
 
           {showPublishConfirm && (
             <ConfirmDialog
-              title="Publish Schedule?"
+              title={`Publish ${draftBreakdown.totalChanges} change${
+                draftBreakdown.totalChanges === 1 ? "" : "s"
+              } for ${currentPublishWindow.label}?`}
               message={
-                <PublishChangeSummary
-                  editorRows={publishEditorRows}
-                  activeEditors={publishActiveEditors}
-                  windowLabel={currentPublishWindow.label}
-                  totalChanges={draftBreakdown.totalChanges}
-                  coverageGapCount={allCoverageGaps.length}
-                  coverageChange={publishCoverageChange}
-                />
+                <PublishChangeSummary editorRows={publishEditorRows} points={publishPoints} />
               }
+              summary={publishPoints.length > 1 ? { points: publishPoints } : undefined}
               maxWidth={560}
               wrapActions
               confirmLabel="Publish"
@@ -9572,8 +9574,8 @@ function SchedulerContent({
 
           {showAutoFillConfirm && autoFillPreview && (
             <ConfirmDialog
-              title="Fill from Recurring Schedules?"
-              message={`This fills ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} from recurring schedules. Shifts already on the schedule are not overwritten.`}
+              title={`Fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} from recurring schedules?`}
+              message={`This covers ${autoFillPreview.dateRange}. Shifts already on the schedule are not overwritten.`}
               confirmLabel="Fill"
               variant="info"
               isLoading={isApplyingRecurring}
@@ -9587,19 +9589,21 @@ function SchedulerContent({
 
           {showImportConfirm && importPreview && (
             <ConfirmDialog
-              title="Import Previous Schedule?"
+              title={`Import ${importPreview.breakdown.imported} shift${
+                importPreview.breakdown.imported === 1 ? "" : "s"
+              } from ${importPreview.sourceRange}?`}
               message={(() => {
-                const { breakdown, sourceRange, targetRange, outcomes } = importPreview;
-                const copyLine = `This will copy ${breakdown.imported} shift${
-                  breakdown.imported === 1 ? "" : "s"
-                } from ${sourceRange} into ${targetRange}.`;
+                const { breakdown, targetRange, outcomes } = importPreview;
+                const copyLine = `They're copied into ${targetRange}.`;
                 if (breakdown.totalSkipped === 0) return copyLine;
                 const description = formatImportPreviousSkipDescription(
                   outcomes,
                   breakdown,
                   employeeNameById,
                 );
-                return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
+                return `${copyLine} ${breakdown.totalSkipped} shift${
+                  breakdown.totalSkipped === 1 ? "" : "s"
+                } will be skipped: ${description}.`;
               })()}
               confirmLabel="Import"
               variant="info"

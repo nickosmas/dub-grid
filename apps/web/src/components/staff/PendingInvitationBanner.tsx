@@ -150,8 +150,8 @@ export function PendingInvitationBanner({
       </div>
       {pendingAction && (
         <ConfirmDialog
-          title={copy.title}
-          message={copy.message(pendingInvitation.email)}
+          title={copy.title(pendingInvitation.email)}
+          message={copy.message}
           confirmLabel={copy.confirmLabel}
           variant={copy.variant}
           isLoading={busy}

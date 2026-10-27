@@ -31,6 +31,22 @@ function formatRequestType(type: ProfileChangeRequest["type"]) {
   return type === "account_deletion" ? "Account deletion" : "Profile update";
 }
 
+function resolutionMessage({
+  request,
+  action,
+}: {
+  request: ProfileChangeRequest;
+  action: "approve" | "reject";
+}) {
+  const deletion = request.type === "account_deletion";
+  if (action === "approve") {
+    return deletion ? "The requester's account is permanently deleted." : undefined;
+  }
+  return deletion
+    ? "The requester's account isn't deleted."
+    : "The requester's profile isn't changed.";
+}
+
 const FIELD_LABELS: Record<string, string> = {
   firstName: "First name",
   lastName: "Last name",
@@ -437,16 +453,17 @@ export function ProfileChangeRequestQueue({
         <ConfirmDialog
           title={
             pendingResolution.action === "approve"
-              ? `Approve ${formatRequestType(pendingResolution.request.type)}?`
-              : `Reject ${formatRequestType(pendingResolution.request.type)}?`
+              ? `Approve this person's ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
+              : `Reject this person's ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
           }
-          message={
+          message={resolutionMessage(pendingResolution)}
+          summary={
             pendingResolution.request.type === "account_deletion" &&
             pendingResolution.action === "approve"
-              ? "Permanently delete this user's account and remove them from your organization? This can't be undone."
-              : pendingResolution.action === "approve"
-                ? "Approve this profile change request and apply the requested updates?"
-                : "Reject this request? The requester will not receive the requested changes."
+              ? {
+                  points: ["They're removed from your organization.", "This can't be undone."],
+                }
+              : undefined
           }
           confirmLabel={pendingResolution.action === "approve" ? "Approve" : "Reject"}
           variant={

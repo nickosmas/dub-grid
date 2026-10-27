@@ -21,7 +21,9 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 interface Pending {
   input: GridmasterPersonSecurityAction;
   title: string;
-  message: string;
+  message?: string;
+  /** Two or more consequences; a single one belongs in the message. */
+  points?: string[];
   confirmLabel: string;
   success: string;
 }
@@ -73,6 +75,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
         <ConfirmDialog
           title={securityConfirm.title}
           message={securityConfirm.message}
+          summary={securityConfirm.points ? { points: securityConfirm.points } : undefined}
           confirmLabel={securityConfirm.confirmLabel}
           variant="warning"
           isLoading={busy}
@@ -93,44 +96,44 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
     renderSessionActions: (session: GridmasterSession) =>
       button("End session", {
         input: { action: "endSession", sessionId: session.id },
-        title: "End session",
-        message:
-          "Sign this session out for good? The device has to sign in again; their other sessions stay.",
+        title: "End this session?",
+        message: "The device has to sign in again, and their other sessions stay signed in.",
         confirmLabel: "End session",
         success: "Session ended",
       }),
     renderDeviceActions: (device: GridmasterKnownDevice) =>
       button("Forget", {
         input: { action: "forgetDevice", deviceId: device.id },
-        title: "Forget device",
-        message:
-          "Forget this device? Their next sign-in from it sends a new-device alert. Any session on it stays signed in.",
+        title: "Forget this device?",
+        points: [
+          "Their next sign-in from it sends a new-device alert.",
+          "Any session on it stays signed in.",
+        ],
         confirmLabel: "Forget device",
         success: "Device forgotten",
       }),
     renderPushActions: (device: GridmasterPushDevice) =>
       button("Turn off", {
         input: { action: "disablePushDevice", deviceId: device.id },
-        title: "Turn off push notifications",
+        title: "Turn off push notifications to this device?",
         message:
-          "Stop push notifications to this device? If the app is still signed in, it turns them back on the next time it opens, so end its session for a lost phone.",
+          "If the app is still signed in, it turns them back on the next time it opens, so end its session for a lost phone.",
         confirmLabel: "Turn off",
         success: "Push notifications turned off for that device",
       }),
     renderFeedActions: (feed: GridmasterCalendarFeed) =>
       button("Revoke", {
         input: { action: "revokeCalendarFeed", feedId: feed.id },
-        title: "Revoke calendar feed",
-        message:
-          "Revoke this calendar feed? Its link stops working now. They can create a new one from their profile.",
+        title: "Revoke this calendar feed?",
+        message: "Its link stops working now, and they can create a new one from their profile.",
         confirmLabel: "Revoke",
         success: "Calendar feed revoked",
       }),
     loginLockActions: button("Clear sign-in lock", {
       input: { action: "clearLoginLock" },
-      title: "Clear sign-in lock",
+      title: "Clear this sign-in lock?",
       message:
-        "Let them try to sign in again now? Another server may keep the lock for up to a minute.",
+        "They can try to sign in again now. Another server may keep the lock for up to a minute.",
       confirmLabel: "Clear lock",
       success: "Sign-in lock cleared",
     }),

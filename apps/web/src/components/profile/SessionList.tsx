@@ -394,7 +394,7 @@ export function SessionList({
       {confirmCurrentSessionSignOut && (
         <ConfirmDialog
           title="Sign out this device?"
-          message="You will need to sign in again to use DubGrid on this device."
+          message="You'll need to sign in again to use the app on this device."
           confirmLabel="Sign out"
           onConfirm={() => signOut({ scope: "local" })}
           onCancel={() => setConfirmCurrentSessionSignOut(false)}

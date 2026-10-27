@@ -101,9 +101,12 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Change role" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Change role" })).getByRole("button", {
-        name: "Change role",
-      }),
+      within(screen.getByRole("dialog", { name: /^Change this person's role in / })).getByRole(
+        "button",
+        {
+          name: "Change role",
+        },
+      ),
     );
 
     await waitFor(() =>
@@ -130,15 +133,20 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Change role" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Change role" })).getByRole("button", {
-        name: "Change role",
-      }),
+      within(screen.getByRole("dialog", { name: /^Change this person's role in / })).getByRole(
+        "button",
+        {
+          name: "Change role",
+        },
+      ),
     );
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Change role" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /^Change this person's role in / }),
+    ).toBeInTheDocument();
   });
 
   it("reports a permission conflict once and tells the editor the save did not happen", async () => {
@@ -180,9 +188,12 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Remove from organization" })).getByRole("button", {
-        name: "Remove",
-      }),
+      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+        "button",
+        {
+          name: "Remove",
+        },
+      ),
     );
 
     // Through step-up after the credential check, with the assured token (F-96).
@@ -202,9 +213,12 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Remove from organization" })).getByRole("button", {
-        name: "Remove",
-      }),
+      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+        "button",
+        {
+          name: "Remove",
+        },
+      ),
     );
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
@@ -220,9 +234,12 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Remove from organization" })).getByRole("button", {
-        name: "Remove",
-      }),
+      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+        "button",
+        {
+          name: "Remove",
+        },
+      ),
     );
 
     await waitFor(() =>

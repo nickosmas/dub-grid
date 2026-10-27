@@ -329,7 +329,7 @@ export default function ScheduleRules({
         {confirmOpen && (
           <ConfirmDialog
             title="Save Schedule Rule"
-            message="This change updates an organization-wide scheduling rule. Review carefully before saving."
+            message="Updates a scheduling rule for the whole organization. Review it carefully before saving."
             confirmLabel="Save"
             variant="info"
             isLoading={saving}
