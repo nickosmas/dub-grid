@@ -125,6 +125,24 @@ describe("OpenShiftStaffingModal", () => {
     expect(within(dialog).getByRole("button", { name: "Assign to schedule" })).toBeDisabled();
   });
 
+  it("says a suspended person won't see the shift, and still lets you assign them", () => {
+    const list = candidates();
+    list[0] = {
+      ...list[0],
+      employee: { ...list[0].employee, suspendedAt: "2026-10-26T12:00:00Z" },
+    };
+    const { onAssign } = renderModal({ candidates: list });
+
+    const ada = screen.getByRole("radio", { name: /Ada Nurse/ });
+    expect(ada).toHaveAccessibleName(/Suspended: won't see this in the app/);
+    expect(screen.getByRole("radio", { name: /Grace Nurse/ })).not.toHaveAccessibleName(
+      /Suspended/,
+    );
+    fireEvent.click(ada);
+    fireEvent.click(screen.getByRole("button", { name: "Assign to schedule" }));
+    expect(onAssign).toHaveBeenCalledWith(list[0], dayOption);
+  });
+
   it("pins and identifies the current employee without selecting them automatically", () => {
     renderModal({ currentEmployeeId: "grace" });
     const radios = screen.getAllByRole("radio");

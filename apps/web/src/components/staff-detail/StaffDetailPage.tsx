@@ -29,6 +29,7 @@ import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
   reinstateEmployee,
+  suspendEmployee,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -594,6 +595,27 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
+  const handleSuspend = useCallback(
+    async (empId: string, accessToken?: string) => {
+      if (!orgId || !employee) return false;
+      try {
+        syncEmployeeCaches(await suspendEmployee(empId, orgId, employee.version, accessToken));
+        toast.success("Suspended");
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        if (getStepUpMethod(err)) throw err;
+        toast.error(formatClientErrorMessage(err, "We couldn't suspend them. Try again."));
+        return false;
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
   const handleReinstate = useCallback(
     async (empId: string) => {
       if (!orgId || !employee) return;
@@ -1138,6 +1160,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     onActivate={handleActivate}
                     onSetReturnDate={handleSetReturnDate}
                     onReinstate={handleReinstate}
+                    onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
                     absenceTypes={absenceTypes}
                     onRemove={(empId, note) =>
                       runStatusChange((token) => handleRemove(empId, note, token))

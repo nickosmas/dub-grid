@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox";
-import { canMarkInactive, describeStatusAction, statusUndoAction } from "@dubgrid/domain";
+import {
+  describeCurrentStatus,
+  describeStatusAction,
+  statusChoices,
+  type StatusAction,
+} from "@dubgrid/domain";
 import {
   Linking,
   StyleSheet,
@@ -119,7 +124,21 @@ import {
   type OrgRole,
 } from "../components/OrgRoleSheet";
 
-type ConfirmAction = "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | null;
+/** The one Change status sheet (51d), or nothing open. */
+type ConfirmAction = "status" | null;
+type StatusMutationAction =
+  "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | "suspend";
+
+/** The request each choice in the Change status sheet sends. */
+const STATUS_REQUEST: Record<StatusAction, StatusMutationAction> = {
+  markAway: "deactivate",
+  archive: "remove",
+  markActive: "activate",
+  restore: "activate",
+  reinstate: "reinstate",
+  suspend: "suspend",
+  setReturnDate: "setReturnDate",
+};
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
@@ -271,6 +290,7 @@ export default function PersonDetailScreen() {
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
+  const [statusChoice, setStatusChoice] = useState<StatusAction | null>(null);
   const [returnDate, setReturnDate] = useState<string | null>(null);
   // The absence a return date's away days hold (51f); it goes when the date does.
   const [awayAbsenceTypeId, setAwayAbsenceTypeId] = useState<number | null>(null);
@@ -467,13 +487,13 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate";
+      action: StatusMutationAction;
+      /** Names the done toast: Restored rather than Marked active. */
+      copyAction: StatusAction;
       note?: string;
       returnDate?: string | null;
       absenceTypeId?: number | null;
       expectedVersion: number;
-      /** Only names the done toast: Restored rather than Marked active. */
-      fromStatus: MobilePerson["status"];
       fromReturnDate: string | null;
     }) =>
       updateMobilePersonStatus(accessToken!, personId!, {
@@ -492,28 +512,17 @@ export default function PersonDetailScreen() {
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
       setConfirmAction(null);
+      setStatusChoice(null);
       setInactiveNote("");
       setReturnDate(null);
       setAwayAbsenceTypeId(null);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
-        title: describeStatusAction(
-          variables.action === "activate"
-            ? (statusUndoAction(variables.fromStatus) ?? "markActive")
-            : variables.action === "reinstate"
-              ? "reinstate"
-              : variables.action === "deactivate"
-                ? "markAway"
-                : variables.action === "setReturnDate"
-                  ? "setReturnDate"
-                  : "archive",
-          getFullName(result.person),
-          {
-            returnDate: variables.returnDate ?? null,
-            currentReturnDate: variables.fromReturnDate,
-          },
-        ).done,
+        title: describeStatusAction(variables.copyAction, getFullName(result.person), {
+          returnDate: variables.returnDate ?? null,
+          currentReturnDate: variables.fromReturnDate,
+        }).done,
         message: "Staff status was updated.",
       });
     },
@@ -631,9 +640,12 @@ export default function PersonDetailScreen() {
   useNavigationDiscardGuard(guard);
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
-      ((confirmAction === "deactivate" || confirmAction === "remove") &&
-        Boolean(inactiveNote.trim())) ||
-      (confirmAction === "deactivate" && returnDate !== null),
+      confirmAction === "status" &&
+      (statusChoice !== null ||
+        Boolean(inactiveNote.trim()) ||
+        returnDate !== (person?.status === "inactive" ? (person.awayUntil ?? null) : null) ||
+        awayAbsenceTypeId !==
+          (person?.status === "inactive" ? (person.awayAbsenceTypeId ?? null) : null)),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
   });
@@ -839,7 +851,6 @@ export default function PersonDetailScreen() {
   const isOnSchedule = person.focusAreaIds.length > 0;
   // Inactive only takes someone off the schedule, so a management-only person
   // can only be removed. Same rule web and the server apply.
-  const canBeInactive = canMarkInactive(person.focusAreaIds);
   // Through the shared resolver so the hero, the editor's row and the picker
   // inside the sheet can't disagree: an invitation's `roleToAssign` is the
   // role until it is accepted, and reading `orgRole` alone showed a pending
@@ -886,35 +897,42 @@ export default function PersonDetailScreen() {
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
   function confirmStatusAction(): Promise<void> | undefined {
-    if (!confirmAction || !person) return;
-
+    if (confirmAction !== "status" || !person) return;
+    const choice = statusChoice ?? "setReturnDate";
+    const dated = choice === "markAway" || choice === "setReturnDate";
     const input = {
-      action: confirmAction,
+      action: STATUS_REQUEST[choice],
+      copyAction: choice,
       expectedVersion: person.version,
-      fromStatus: person.status,
       fromReturnDate: person.awayUntil,
       note:
-        confirmAction === "deactivate" || confirmAction === "remove"
+        choice === "markAway" || choice === "archive"
           ? inactiveNote.trim() || undefined
           : undefined,
       returnDate:
-        confirmAction === "setReturnDate"
-          ? returnDate
-          : confirmAction === "deactivate" && returnDate
-            ? returnDate
-            : undefined,
+        choice === "setReturnDate" ? returnDate : dated && returnDate ? returnDate : undefined,
       absenceTypeId:
-        confirmAction === "setReturnDate" || (confirmAction === "deactivate" && returnDate)
-          ? chosenAbsenceTypeId
-          : undefined,
+        choice === "setReturnDate" || (dated && returnDate) ? chosenAbsenceTypeId : undefined,
     };
     return new Promise<void>((resolve) => {
       statusMutation.mutate(input, { onSettled: () => resolve() });
     });
   }
 
+  function openStatusSheet() {
+    if (!person) return;
+    const away = person.status === "inactive";
+    setStatusChoice(null);
+    setInactiveNote("");
+    setReturnDate(away ? (person.awayUntil ?? null) : null);
+    setAwayAbsenceTypeId(away ? (person.awayAbsenceTypeId ?? null) : null);
+    setConfirmationError(null);
+    setConfirmAction("status");
+  }
+
   function closeStatusConfirmation() {
     setConfirmAction(null);
+    setStatusChoice(null);
     setConfirmationError(null);
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
@@ -953,33 +971,53 @@ export default function PersonDetailScreen() {
         onToggle={(id) => setAwayAbsenceTypeId(id === -1 ? null : id)}
       />
     ) : null;
-  const statusCopy = confirmAction
-    ? describeStatusAction(
-        confirmAction === "activate"
-          ? (statusUndoAction(person.status) ?? "markActive")
-          : confirmAction === "reinstate"
-            ? "reinstate"
-            : confirmAction === "deactivate"
-              ? "markAway"
-              : confirmAction === "setReturnDate"
-                ? "setReturnDate"
-                : "archive",
-        getFullName(person),
-        confirmAction === "deactivate" || confirmAction === "setReturnDate"
-          ? {
-              returnDate,
-              currentReturnDate: person.awayUntil,
-              absenceName: chosenAbsenceName,
-            }
-          : {},
-      )
-    : null;
+  const isAway = person.status === "inactive";
+  const choices = statusChoices({ ...person, focusAreaIds: person.focusAreaIds });
+  const currentStatus = describeCurrentStatus(person);
+  // Tinted like their status pill, so the box reads as where they stand.
+  const currentStatusTone = {
+    success: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+      color: mobileColors.successText,
+    },
+    warning: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      color: mobileColors.warningText,
+    },
+    danger: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+      color: mobileColors.dangerText,
+    },
+    neutral: {
+      backgroundColor: mobileColors.controlNeutralBg,
+      borderColor: mobileColors.controlNeutralBg,
+      color: mobileColors.textSecondary,
+    },
+  };
+  const awayDetailsChanged =
+    isAway &&
+    (returnDate !== (person.awayUntil ?? null) ||
+      chosenAbsenceTypeId !== (person.awayAbsenceTypeId ?? null));
+  const statusCopy = statusChoice
+    ? describeStatusAction(statusChoice, getFullName(person), {
+        returnDate: statusChoice === "markAway" ? returnDate : null,
+        absenceName: statusChoice === "markAway" ? chosenAbsenceName : null,
+      })
+    : awayDetailsChanged
+      ? describeStatusAction("setReturnDate", getFullName(person), {
+          returnDate,
+          currentReturnDate: person.awayUntil,
+          absenceName: chosenAbsenceName,
+        })
+      : null;
   // A return date is the first day back, so the organization's tomorrow at the earliest.
   const firstReturnDate = addDaysToIsoDate(
     getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null),
     1,
   );
-  const undoAction = statusUndoAction(person.status);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? `Send an invitation to ${person.email}?`
@@ -1398,69 +1436,12 @@ export default function PersonDetailScreen() {
                   tone="secondary"
                 />
               ) : null}
-              {undoAction ? (
-                <Button
-                  disabled={statusMutation.isPending || isSelf}
-                  label={describeStatusAction(undoAction, getFullName(person)).label}
-                  loading={statusMutation.isPending}
-                  onPress={() => setConfirmAction("activate")}
-                  tone="success"
-                />
-              ) : null}
-              {person.status === "inactive" ? (
-                <Button
-                  disabled={statusMutation.isPending || isSelf}
-                  label={
-                    describeStatusAction("setReturnDate", getFullName(person), {
-                      currentReturnDate: person.awayUntil,
-                    }).label
-                  }
-                  onPress={() => {
-                    setReturnDate(person.awayUntil);
-                    setAwayAbsenceTypeId(person.awayAbsenceTypeId ?? null);
-                    setConfirmationError(null);
-                    setConfirmAction("setReturnDate");
-                  }}
-                  tone="secondary"
-                />
-              ) : null}
-              {person.suspendedAt ? (
-                <Button
-                  disabled={statusMutation.isPending || isSelf}
-                  label={describeStatusAction("reinstate", getFullName(person)).label}
-                  loading={statusMutation.isPending}
-                  onPress={() => {
-                    setConfirmationError(null);
-                    setConfirmAction("reinstate");
-                  }}
-                  tone="success"
-                />
-              ) : null}
-              {person.status === "active" && canBeInactive && !person.suspendedAt ? (
-                <Button
-                  disabled={statusMutation.isPending || isSelf}
-                  label={describeStatusAction("markAway", getFullName(person)).label}
-                  onPress={() => {
-                    setInactiveNote("");
-                    setReturnDate(null);
-                    setConfirmationError(null);
-                    setConfirmAction("deactivate");
-                  }}
-                  tone="warning"
-                />
-              ) : null}
-              {person.status !== "removed" ? (
-                <Button
-                  disabled={statusMutation.isPending || isSelf}
-                  label={describeStatusAction("archive", getFullName(person)).label}
-                  onPress={() => {
-                    setInactiveNote("");
-                    setConfirmationError(null);
-                    setConfirmAction("remove");
-                  }}
-                  tone="secondary"
-                />
-              ) : null}
+              <Button
+                disabled={statusMutation.isPending || isSelf}
+                label="Change status"
+                onPress={openStatusSheet}
+                tone="secondary"
+              />
             </ProfileActionStack>
           ) : null}
         </>
@@ -1485,32 +1466,16 @@ export default function PersonDetailScreen() {
       />
       {stepUp.sheet}
       <ConfirmationModal {...guard.confirmationProps} />
-      <ConfirmationModal
-        body={statusCopy?.message || undefined}
-        summary={statusCopy ? { points: statusCopy.points } : undefined}
-        confirmLabel={statusCopy?.label ?? ""}
-        error={confirmationError}
-        loading={statusMutation.isPending}
-        onCancel={closeStatusConfirmation}
-        onConfirm={confirmStatusAction}
-        title={statusCopy?.title ?? ""}
-        visible={confirmAction === "activate" || confirmAction === "reinstate"}
-      />
       <BottomSheetModal
-        debugName="Change staff status"
+        debugName="Change status"
         dismissDisabled={statusMutation.isPending}
-        header={
-          <SheetHeader
-            title={statusCopy?.title ?? ""}
-            subtitle={statusCopy?.message || undefined}
-          />
-        }
+        header={<SheetHeader title={`Change ${getFullName(person)}'s status?`} />}
         // The discard prompt rides inside the sheet: iOS refuses a second
         // Modal while this one is up, so as a sibling it never appeared and a
-        // dismissal with a reason typed or Remove picked went nowhere.
+        // dismissal with a reason typed or a status picked went nowhere.
         overlay={<ConfirmationModal presentation="inline" {...statusGuard.confirmationProps} />}
         scrollable
-        visible={confirmAction === "deactivate" || confirmAction === "remove"}
+        visible={confirmAction === "status"}
         onDismiss={statusGuard.requestClose}
         footer={
           <>
@@ -1518,10 +1483,23 @@ export default function PersonDetailScreen() {
             <SheetActions
               primaryAction={
                 <Button
-                  label={statusCopy?.label ?? ""}
+                  disabled={!statusChoice && !awayDetailsChanged}
+                  label={
+                    statusChoice
+                      ? (statusCopy?.label ?? "")
+                      : isAway
+                        ? "Save changes"
+                        : "Change status"
+                  }
                   loading={statusMutation.isPending}
                   onPress={confirmStatusAction}
-                  tone={confirmAction === "remove" ? "danger" : "warning"}
+                  tone={
+                    statusChoice === "archive"
+                      ? "danger"
+                      : statusChoice === "markAway" || statusChoice === "suspend"
+                        ? "warning"
+                        : "primary"
+                  }
                 />
               }
             >
@@ -1535,14 +1513,50 @@ export default function PersonDetailScreen() {
           </>
         }
       >
-        {confirmAction === "deactivate" || confirmAction === "remove" ? (
+        <View
+          accessibilityRole="summary"
+          style={[styles.currentStatus, currentStatusTone[currentStatus.tone]]}
+        >
+          <Text
+            style={[
+              styles.currentStatusText,
+              { color: currentStatusTone[currentStatus.tone].color },
+            ]}
+          >
+            {currentStatus.text}
+          </Text>
+          <Text style={styles.currentStatusDetail}>{currentStatus.detail}</Text>
+        </View>
+        {isAway && !statusChoice ? (
+          <>
+            <ReturnDateField
+              disabled={statusMutation.isPending}
+              minDate={firstReturnDate}
+              onChange={setReturnDate}
+              value={returnDate}
+            />
+            {awayAbsenceChoices}
+          </>
+        ) : null}
+        <ProfileChoiceGroup
+          items={choices.map((choice) => ({
+            id: choice.action,
+            name: choice.label,
+            detail: choice.detail,
+          }))}
+          label="Status"
+          selection="single"
+          selectedIds={statusChoice ? [statusChoice] : []}
+          onToggle={(id) => setStatusChoice(id)}
+        />
+        {statusChoice === "markAway" || statusChoice === "archive" ? (
           <ProfileTextInput
             editable={!statusMutation.isPending}
             accessibilityLabel="Reason"
             autoCapitalize="sentences"
             label="Reason"
             placeholder={
-              confirmAction === "remove"
+              statusChoice === "archive"
                 ? "Reason (optional) - e.g. Left the company"
                 : "Reason (optional) - e.g. Family leave"
             }
@@ -1550,71 +1564,21 @@ export default function PersonDetailScreen() {
             onChangeText={setInactiveNote}
           />
         ) : null}
-        {confirmAction === "deactivate" ? (
-          <ReturnDateField
-            disabled={statusMutation.isPending}
-            minDate={firstReturnDate}
-            onChange={setReturnDate}
-            value={returnDate}
-          />
-        ) : null}
-        {confirmAction === "deactivate" ? awayAbsenceChoices : null}
-        {statusCopy && confirmAction !== "activate" && confirmAction !== "reinstate" ? (
-          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
-        ) : null}
-      </BottomSheetModal>
-      <BottomSheetModal
-        debugName="Set return date"
-        dismissDisabled={statusMutation.isPending}
-        header={
-          <SheetHeader
-            title={confirmAction === "setReturnDate" ? (statusCopy?.title ?? "") : ""}
-            subtitle={
-              confirmAction === "setReturnDate" ? statusCopy?.message || undefined : undefined
-            }
-          />
-        }
-        scrollable
-        visible={confirmAction === "setReturnDate"}
-        onDismiss={closeStatusConfirmation}
-        footer={
+        {statusChoice === "markAway" ? (
           <>
-            {confirmationError ? <InlineError message={confirmationError} /> : null}
-            <SheetActions
-              primaryAction={
-                <Button
-                  disabled={
-                    returnDate === person.awayUntil &&
-                    chosenAbsenceTypeId === (person.awayAbsenceTypeId ?? null)
-                  }
-                  label={statusCopy?.label ?? ""}
-                  loading={statusMutation.isPending}
-                  onPress={confirmStatusAction}
-                  tone="primary"
-                />
-              }
-            >
-              <Button
-                label="Cancel"
-                disabled={statusMutation.isPending}
-                onPress={closeStatusConfirmation}
-                tone="plain"
-              />
-            </SheetActions>
+            <ReturnDateField
+              disabled={statusMutation.isPending}
+              minDate={firstReturnDate}
+              onChange={setReturnDate}
+              value={returnDate}
+            />
+            {awayAbsenceChoices}
           </>
-        }
-      >
-        {confirmAction === "setReturnDate" ? (
-          <ReturnDateField
-            disabled={statusMutation.isPending}
-            initiallyOpen
-            minDate={firstReturnDate}
-            onChange={setReturnDate}
-            value={returnDate}
-          />
         ) : null}
-        {confirmAction === "setReturnDate" ? awayAbsenceChoices : null}
-        {confirmAction === "setReturnDate" && statusCopy && statusCopy.points.length > 0 ? (
+        {statusCopy?.message ? (
+          <Text style={styles.statusMessage}>{statusCopy.message}</Text>
+        ) : null}
+        {statusCopy && statusCopy.points.length > 0 ? (
           <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}
       </BottomSheetModal>
@@ -1989,6 +1953,24 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     actionButton: {
       flex: 1,
+    },
+    currentStatus: {
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      gap: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.sm,
+    },
+    currentStatusText: {
+      ...mobileTextWeighted("body", "semibold"),
+    },
+    currentStatusDetail: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    statusMessage: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
     },
     noteText: {
       ...mobileText.body,

@@ -1243,6 +1243,12 @@ input[type="color"]::-moz-color-swatch {
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
+.dg-open-shift-staffing-person-copy .dg-open-shift-staffing-suspended {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dg-color-danger-text);
+}
 .dg-open-shift-staffing-assignment > label {
   color: var(--dg-color-text-secondary);
   font-size: var(--dg-fs-footnote);

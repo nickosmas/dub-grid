@@ -418,6 +418,8 @@ export function ProfileChoiceGroup<TId extends string | number>({
   items: Array<{
     id: TId;
     name: string;
+    /** A muted line under the name, saying what the choice means. */
+    detail?: string;
     abbr?: string | null;
     disabled?: boolean;
     disabledReason?: string;
@@ -445,9 +447,9 @@ export function ProfileChoiceGroup<TId extends string | number>({
             const selected = selectedIds.includes(item.id);
             return (
               <PressableRow
-                accessibilityLabel={
-                  item.disabledReason ? `${item.name}. ${item.disabledReason}` : item.name
-                }
+                accessibilityLabel={[item.name, item.detail, item.disabledReason]
+                  .filter(Boolean)
+                  .join(". ")}
                 accessibilityRole={selection === "single" ? "radio" : "checkbox"}
                 checked={selected}
                 disabled={item.disabled}
@@ -455,12 +457,26 @@ export function ProfileChoiceGroup<TId extends string | number>({
                 onPress={() => onToggle(item.id)}
                 style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
               >
-                <Text
-                  maxFontSizeMultiplier={MAX_FONT_SCALE}
-                  style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
-                >
-                  {item.name}
-                </Text>
+                {item.detail ? (
+                  <View style={styles.choiceText}>
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.rowDetail}>
+                      {item.detail}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    maxFontSizeMultiplier={MAX_FONT_SCALE}
+                    style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}
+                  >
+                    {item.name}
+                  </Text>
+                )}
                 <View
                   style={[
                     styles.choiceMark,
@@ -942,6 +958,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.body,
       color: mobileColors.textPrimary,
       flex: 1,
+      minWidth: 0,
+    },
+    choiceText: {
+      flex: 1,
+      gap: mobileSpace.xs,
       minWidth: 0,
     },
     choiceLabelSelected: {

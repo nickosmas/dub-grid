@@ -17,6 +17,7 @@ import {
   updateMobileEmployeeSuspensionRow,
 } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
+import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { endUserSessions } from "@/lib/auth/revocation";
 import { requireMobileAuth } from "@/features/mobile/server";
 import { mapEmployeeToMobilePerson } from "./people";
@@ -105,6 +106,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     );
 
     if (result.kind === "updated") {
+      if (parsed.data.action === "suspend") {
+        scheduleSuspensionNotice({ orgId: auth.currentOrg.id, empId: id, actorId: auth.user.id });
+      }
       return NextResponse.json(
         mobilePersonStatusUpdateResponseSchema.parse({
           success: true,

@@ -23,6 +23,10 @@ const orgTimezoneSingle = vi.fn();
 const endUserSessions = vi.fn();
 const disableMobilePushTokensForOrg = vi.fn();
 
+const scheduleSuspensionNotice = vi.fn();
+vi.mock("@/features/employees/server/suspension-notice", () => ({
+  scheduleSuspensionNotice: (...args: unknown[]) => scheduleSuspensionNotice(...args),
+}));
 vi.mock("@/lib/auth/revocation", () => ({
   revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
   endUserSessions: (...args: unknown[]) => endUserSessions(...args),
@@ -972,6 +976,11 @@ describe("POST /api/employees/status", () => {
         }),
       );
       expect((await response.json()).employee.suspendedAt).toEqual(expect.any(String));
+      expect(scheduleSuspensionNotice).toHaveBeenCalledWith({
+        orgId: ORG_ID,
+        empId: EMP_ID,
+        actorId: USER_ID,
+      });
     });
 
     it("still suspends when signing out fails, which the hook backs up", async () => {
@@ -1038,6 +1047,7 @@ describe("POST /api/employees/status", () => {
       expect(auditInsert).toHaveBeenCalledWith(
         expect.objectContaining({ action: "employee.reinstated" }),
       );
+      expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
     });
 
     it("refuses to reinstate someone who isn't suspended", async () => {

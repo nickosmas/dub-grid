@@ -1091,7 +1091,7 @@
   - [x] 51c. **Suspended: access** - can't sign in (signed out everywhere,
         push off), an "Access suspended" message on web and mobile, and
         Reinstate. Needs a migration.
-  - [ ] 51d. **Suspended: managing it** - the Suspend dialog and Reinstate,
+  - [x] 51d. **Suspended: managing it** - the Suspend dialog and Reinstate,
         a lock on the grid row, "won't see this in the app" in the shift
         picker, the notice email and the Super Admin alert, and their open
         requests close.

@@ -10,6 +10,7 @@ import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import logger from "@/lib/logger";
+import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
@@ -414,6 +415,10 @@ export async function POST(req: NextRequest) {
           "Failed to end sessions or push after suspending",
         );
       }
+    }
+
+    if (action === "suspend") {
+      scheduleSuspensionNotice({ orgId, empId, actorId: user.id });
     }
 
     if (action === "remove" && currentEmployee.userId) {

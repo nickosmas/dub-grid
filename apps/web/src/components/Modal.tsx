@@ -29,6 +29,8 @@ interface ModalProps {
   /** Action row pinned below the scroll region, spaced evenly above and below. */
   footer?: React.ReactNode;
   returnFocus?: React.RefObject<HTMLElement | null>;
+  /** Where focus starts when the modal opens; the first focusable element when absent. */
+  initialFocus?: React.RefObject<HTMLElement | null>;
   "aria-describedby"?: string;
 }
 
@@ -46,6 +48,7 @@ export default function Modal({
   headerSafe = false,
   footer,
   returnFocus,
+  initialFocus,
   "aria-describedby": ariaDescribedby,
 }: ModalProps) {
   const closingRef = useRef(false);
@@ -85,7 +88,7 @@ export default function Modal({
         >
           <Dialog.Popup
             aria-modal={headerSafe ? undefined : true}
-            initialFocus
+            initialFocus={initialFocus ?? true}
             finalFocus={returnFocus ?? true}
             aria-label={subtitle ? `${title}, ${subtitle}` : title}
             aria-describedby={ariaDescribedby}

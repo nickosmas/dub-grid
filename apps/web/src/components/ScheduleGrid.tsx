@@ -20,14 +20,14 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, UserPen, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { formatReturnDate } from "@dubgrid/domain";
+import { formatReturnDate, SUSPENDED_SCHEDULE_NOTE } from "@dubgrid/domain";
 import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
@@ -2264,24 +2264,41 @@ const SectionBlock = memo(function SectionBlock({
                         justifyContent: "center",
                       }}
                     >
-                      <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-body-sm)",
-                            fontWeight: 600,
-                            color:
-                              hasHighlightedSearch && isHighlighted
-                                ? "var(--dg-color-brand)"
-                                : "var(--dg-color-text-secondary)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            lineHeight: "var(--dg-lh-tight)",
-                          }}
-                        >
-                          {getEmployeeDisplayName(emp)}
-                        </span>
-                      </MaybeHint>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                        <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-body-sm)",
+                              fontWeight: 600,
+                              color:
+                                hasHighlightedSearch && isHighlighted
+                                  ? "var(--dg-color-brand)"
+                                  : "var(--dg-color-text-secondary)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              lineHeight: "var(--dg-lh-tight)",
+                            }}
+                          >
+                            {getEmployeeDisplayName(emp)}
+                          </span>
+                        </MaybeHint>
+                        {emp.suspendedAt ? (
+                          <MaybeHint content={SUSPENDED_SCHEDULE_NOTE} side="top">
+                            <span
+                              role="img"
+                              aria-label={SUSPENDED_SCHEDULE_NOTE}
+                              style={{
+                                display: "inline-flex",
+                                flexShrink: 0,
+                                color: "var(--dg-color-danger-text)",
+                              }}
+                            >
+                              <Lock aria-hidden="true" size={12} strokeWidth={2.4} />
+                            </span>
+                          </MaybeHint>
+                        ) : null}
+                      </div>
                       {emp.roleIds.length > 0 && (
                         <EmployeeDetailHoverCard
                           employeeName={getEmployeeDisplayName(emp)}

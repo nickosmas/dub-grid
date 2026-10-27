@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
 import { formatReturnDate } from "@dubgrid/domain";
@@ -302,7 +302,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -1180,7 +1180,7 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  describe("deactivating", () => {
+  describe("Change status", () => {
     // One shared spy across all three useMutation calls is enough: only the
     // status confirm fires a mutate in these tests.
     function renderWithStatusMutation(person: Record<string, unknown> = {}) {
@@ -1202,232 +1202,204 @@ describe("PersonDetailScreen", () => {
       return mutate;
     }
 
-    it("offers Mark away and Archive for an active person on the schedule", () => {
+    // No organization timezone in these tests, so the first return date is UTC's tomorrow.
+    const day = (offset: number) =>
+      addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), offset);
+    const choose = (date: string) =>
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Choose ${formatReturnDate(date, { weekday: true })}`,
+        }),
+      );
+    const pick = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
+    const confirm = (label: string) =>
+      fireEvent.click(screen.getAllByRole("button", { name: label }).at(-1)!);
+
+    it("offers one Change status button for every status", () => {
+      for (const person of [
+        {},
+        { status: "inactive" },
+        { suspendedAt: "2026-10-26T12:00:00Z" },
+        { status: "removed" },
+      ]) {
+        renderWithStatusMutation(person);
+        expect(screen.getAllByRole("button", { name: "Change status" })).toHaveLength(1);
+        for (const old of ["Mark away", "Archive", "Mark active", "Restore", "Reinstate"]) {
+          expect(screen.queryByRole("button", { name: old })).not.toBeInTheDocument();
+        }
+        cleanup();
+      }
+    });
+
+    it("says where they stand and lists only where they can go", () => {
       renderWithStatusMutation();
 
-      expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getByText("Change Mina Diaz's status?")).toBeInTheDocument();
+      expect(screen.getByText("Can sign in and be scheduled.")).toBeInTheDocument();
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        [
+          "Away. Keeps sign-in. Not scheduled while away.",
+          "Suspended. Can't sign in. Stays on the schedule.",
+          "Archived. Off staff. Can't sign in or be scheduled.",
+        ],
+      );
     });
 
-    it("marks someone away from its own sheet", () => {
+    it("marks someone away with a reason", () => {
       const mutate = renderWithStatusMutation();
 
-      fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
-      expect(screen.getByText("Mark Mina Diaz away?")).toBeInTheDocument();
-      expect(screen.getByText("They can still sign in and keep their role.")).toBeInTheDocument();
-      fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Away/);
+      fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "  Family leave  " } });
+      confirm("Mark away");
 
-      expect(mutate.mock.calls[0]?.[0]).toEqual({
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "deactivate",
+        copyAction: "markAway",
         expectedVersion: 7,
-        fromStatus: "active",
-        note: undefined,
-      });
-    });
-
-    it("archives from its own sheet", () => {
-      const mutate = renderWithStatusMutation();
-
-      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-      expect(screen.getByText("Archive Mina Diaz?")).toBeInTheDocument();
-      expect(screen.getByText("They can no longer sign in.")).toBeInTheDocument();
-      fireEvent.click(screen.getAllByRole("button", { name: "Archive" }).at(-1)!);
-
-      expect(mutate.mock.calls[0]?.[0]).toEqual({
-        action: "remove",
-        expectedVersion: 7,
-        fromStatus: "active",
-        note: undefined,
-      });
-    });
-
-    it("offers only Archive for someone who isn't on the schedule", () => {
-      renderWithStatusMutation({ focusAreaIds: [] });
-
-      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
-    });
-
-    it("carries the reason through", () => {
-      const mutate = renderWithStatusMutation();
-
-      fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
-      fireEvent.change(screen.getByPlaceholderText(/Reason \(optional\)/), {
-        target: { value: "  Family leave  " },
-      });
-      fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
-
-      expect(mutate.mock.calls[0]?.[0]).toEqual({
-        action: "deactivate",
-        expectedVersion: 7,
-        fromStatus: "active",
         note: "Family leave",
       });
     });
 
-    it("brings an Away person back with Mark active and keeps Archive", () => {
-      renderWithStatusMutation({ status: "inactive" });
+    it("marks someone away until a day they pick, with an absence", () => {
+      const mutate = renderWithStatusMutation();
 
-      expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-    });
-
-    describe("a return date", () => {
-      // No organization timezone in these tests, so the first return date is UTC's tomorrow.
-      const day = (offset: number) =>
-        addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), offset);
-      const choose = (date: string) =>
-        fireEvent.click(
-          screen.getByRole("button", {
-            name: `Choose ${formatReturnDate(date, { weekday: true })}`,
-          }),
-        );
-
-      it("marks someone away until a day they pick", () => {
-        const mutate = renderWithStatusMutation();
-
-        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
-        expect(
-          screen.getByText(
-            "They're back to Active on this day. Leave it empty to mark them active yourself.",
-          ),
-        ).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
-        choose(day(1));
-        expect(
-          screen.getByText(
-            `Recurring schedules pause and fill again from ${formatReturnDate(day(1))}.`,
-          ),
-        ).toBeInTheDocument();
-        fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
-
-        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
-          action: "deactivate",
-          expectedVersion: 7,
-          returnDate: day(1),
-        });
-      });
-
-      it("never offers today as a return date", () => {
-        renderWithStatusMutation();
-
-        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
-        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
-
-        expect(
-          screen.getByRole("button", {
-            name: `Choose ${formatReturnDate(day(0), { weekday: true })}`,
-          }),
-        ).toBeDisabled();
-      });
-
-      it("changes an Away person's return date from its own sheet", () => {
-        const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
-
-        expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
-        expect(screen.getByText("Change Mina Diaz's return date?")).toBeInTheDocument();
-        // Nothing to save until the date changes.
-        expect(screen.getAllByRole("button", { name: "Change return date" }).at(-1)).toBeDisabled();
-
-        choose(day(2));
-        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
-
-        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
-          action: "setReturnDate",
-          returnDate: day(2),
-          fromReturnDate: day(1),
-        });
-      });
-
-      it("clears a return date", () => {
-        const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
-
-        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
-        fireEvent.click(screen.getByRole("button", { name: "No return date" }));
-        expect(
-          screen.getByText("They stay away until someone marks them active."),
-        ).toBeInTheDocument();
-        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
-
-        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
-          action: "setReturnDate",
-          returnDate: null,
-        });
-      });
-
-      it("fills the away days with an absence picked under the date", () => {
-        const mutate = renderWithStatusMutation();
-
-        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
-        // The absence needs a return date first.
-        expect(screen.queryByText("No absence")).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
-        choose(day(1));
-        fireEvent.click(screen.getByText("Vacation"));
-        expect(
-          screen.getByText(
-            `Every day until ${formatReturnDate(day(1))} shows Vacation in the draft, in place of any shift.`,
-          ),
-        ).toBeInTheDocument();
-        fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
-
-        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
-          action: "deactivate",
-          returnDate: day(1),
-          absenceTypeId: 134,
-        });
-      });
-
-      it("changes only the absence on an Away person's days", () => {
-        const mutate = renderWithStatusMutation({
-          status: "inactive",
-          awayUntil: day(2),
-          awayAbsenceTypeId: 134,
-        });
-
-        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
-        expect(screen.getAllByRole("button", { name: "Change return date" }).at(-1)).toBeDisabled();
-        fireEvent.click(screen.getByText("Sick"));
-        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
-
-        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
-          action: "setReturnDate",
-          returnDate: day(2),
-          absenceTypeId: 135,
-        });
-      });
-
-      it("offers Set return date to someone away without one", () => {
-        renderWithStatusMutation({ status: "inactive" });
-
-        expect(screen.getByRole("button", { name: "Set return date" })).toBeInTheDocument();
-      });
-    });
-
-    it("reinstates a suspended person instead of offering Mark away", () => {
-      const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-27T05:00:00Z" });
-
-      expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
-      expect(screen.getByText("Reinstate Mina Diaz?")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Away/);
+      fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+      choose(day(1));
+      fireEvent.click(screen.getByRole("radio", { name: "Vacation" }));
       expect(
-        screen.getByText("They can sign in again on the web and in the app."),
+        screen.getByText(
+          `Every day until ${formatReturnDate(day(1))} shows Vacation in the draft, in place of any shift.`,
+        ),
       ).toBeInTheDocument();
-      fireEvent.click(screen.getAllByRole("button", { name: "Reinstate" }).at(-1)!);
+      confirm("Mark away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "deactivate",
+        returnDate: day(1),
+        absenceTypeId: 134,
+      });
+    });
+
+    it("never offers today as a return date", () => {
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Away/);
+      fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+
+      expect(
+        screen.getByRole("button", {
+          name: `Choose ${formatReturnDate(day(0), { weekday: true })}`,
+        }),
+      ).toBeDisabled();
+    });
+
+    it("archives with a reason", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Archived/);
+      fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Left" } });
+      confirm("Archive");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "remove", note: "Left" });
+    });
+
+    it("suspends, saying what that does", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+      expect(
+        screen.getByText("They're signed out on every device and can't sign in."),
+      ).toBeInTheDocument();
+      confirm("Suspend");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "suspend" });
+    });
+
+    it("offers no Away to someone who isn't on the schedule", () => {
+      renderWithStatusMutation({ focusAreaIds: [] });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
+    });
+
+    it("brings an Away person back with Mark active", () => {
+      const mutate = renderWithStatusMutation({ status: "inactive" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Active/);
+      confirm("Mark active");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "activate",
+        copyAction: "markActive",
+      });
+    });
+
+    it("changes an Away person's return date with nothing picked, as Save changes", () => {
+      const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
+      choose(day(2));
+      confirm("Save changes");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setReturnDate",
+        returnDate: day(2),
+        fromReturnDate: day(1),
+      });
+    });
+
+    it("changes only the absence on an Away person's days", () => {
+      const mutate = renderWithStatusMutation({
+        status: "inactive",
+        awayUntil: day(2),
+        awayAbsenceTypeId: 134,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Sick" }));
+      confirm("Save changes");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setReturnDate",
+        returnDate: day(2),
+        absenceTypeId: 135,
+      });
+    });
+
+    it("reinstates a suspended person", () => {
+      const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      expect(screen.getByText("Suspended since Oct 26")).toBeInTheDocument();
+      pick(/^Active/);
+      confirm("Reinstate");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "reinstate", expectedVersion: 7 });
     });
 
-    it("brings an Archived person back with Restore and nothing else", () => {
-      renderWithStatusMutation({ status: "removed" });
+    it("restores an archived person", () => {
+      const mutate = renderWithStatusMutation({ status: "removed" });
 
-      expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Mark active" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Active/);
+      confirm("Restore");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "activate",
+        copyAction: "restore",
+      });
     });
   });
 
@@ -1487,7 +1459,7 @@ describe("PersonDetailScreen", () => {
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();
     });
 
     // Under the hero: Call and Email, always both, the one without a number or
@@ -1518,7 +1490,7 @@ describe("PersonDetailScreen", () => {
         "Revoke invite",
         "Add to schedule",
         "Add to management",
-        "Archive",
+        "Change status",
       ]);
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
@@ -1566,7 +1538,7 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.getByRole("button", { name: "Call" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Email" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
     });

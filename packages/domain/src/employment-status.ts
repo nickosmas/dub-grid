@@ -128,6 +128,9 @@ export function formatReturnDate(isoDate: string, { weekday = false } = {}): str
 /** The status as people see it, with an Away person's return date: "Away until Jan 4". */
 export const SUSPENDED_LABEL = "Suspended";
 
+/** Wherever someone schedules a suspended person, who can't sign in to see it (51d). */
+export const SUSPENDED_SCHEDULE_NOTE = "Suspended: won't see this in the app";
+
 /**
  * A suspended person (51c) is stored `active`, so suspension wins over the
  * stored status when it is set.
@@ -146,7 +149,7 @@ export function describeEmploymentStatus(
 }
 
 export type StatusAction =
-  "markAway" | "archive" | "markActive" | "restore" | "setReturnDate" | "reinstate";
+  "markAway" | "archive" | "markActive" | "restore" | "setReturnDate" | "reinstate" | "suspend";
 
 export interface StatusActionCopy {
   /** The button, and the confirmation's primary action. */
@@ -282,7 +285,7 @@ export function describeStatusAction(
       return {
         label: "Mark away",
         title: `Mark ${name} away?`,
-        message: "They won't be scheduled while they're away.",
+        message: "",
         points: [keepsAccess, ...leavingSchedule],
         done: "Marked away",
       };
@@ -304,15 +307,26 @@ export function describeStatusAction(
       return {
         label: "Mark active",
         title: `Mark ${name} active?`,
-        message: "Shifts that came off when they were marked away don't come back.",
+        message: "",
         points: [],
         done: "Marked active",
+      };
+    case "suspend":
+      return {
+        label: "Suspend",
+        title: `Suspend ${name}?`,
+        message: "",
+        points: [
+          "They're signed out on every device and can't sign in.",
+          "Their shifts stay, and you can keep scheduling them.",
+        ],
+        done: "Suspended",
       };
     case "reinstate":
       return {
         label: "Reinstate",
         title: `Reinstate ${name}?`,
-        message: "They can sign in again on the web and in the app.",
+        message: "",
         points: [],
         done: "Reinstated",
       };
@@ -320,9 +334,136 @@ export function describeStatusAction(
       return {
         label: "Restore",
         title: `Restore ${name}?`,
-        message: "Shifts that came off when they were archived don't come back.",
+        message: "",
         points: [],
         done: "Restored",
+      };
+  }
+}
+
+/** The four statuses a person can be in, as people see them (51d). */
+export type StatusChoiceKind = "active" | "away" | "suspended" | "archived";
+
+export interface StatusChoice {
+  kind: StatusChoiceKind;
+  /** What picking it does. */
+  action: StatusAction;
+  label: string;
+  /** What being in it means, in one short sentence. */
+  detail: string;
+}
+
+export interface CurrentStatusState {
+  status: EmployeeStatus;
+  awayUntil?: string | null;
+  suspendedAt?: string | null;
+  archivedAt?: string | null;
+  focusAreaIds: readonly number[];
+}
+
+const AWAY_DETAIL = "Keeps sign-in. Not scheduled while away.";
+const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
+const ARCHIVED_DETAIL = "Off staff. Can't sign in or be scheduled.";
+
+function currentKind(state: CurrentStatusState): StatusChoiceKind {
+  if (state.status === "removed" || state.archivedAt) return "archived";
+  if (state.status === "inactive") return "away";
+  return state.suspendedAt ? "suspended" : "active";
+}
+
+/**
+ * The statuses someone can move to from where they are, in the order the
+ * Change status dialog lists them. Their current status is never one.
+ */
+export function statusChoices(state: CurrentStatusState): StatusChoice[] {
+  const away: StatusChoice = {
+    kind: "away",
+    action: "markAway",
+    label: EMPLOYMENT_STATUS_LABELS.inactive,
+    detail: AWAY_DETAIL,
+  };
+  const archived: StatusChoice = {
+    kind: "archived",
+    action: "archive",
+    label: EMPLOYMENT_STATUS_LABELS.removed,
+    detail: ARCHIVED_DETAIL,
+  };
+  const canBeAway = canMarkInactive(state.focusAreaIds);
+  switch (currentKind(state)) {
+    case "active":
+      return [
+        ...(canBeAway ? [away] : []),
+        { kind: "suspended", action: "suspend", label: SUSPENDED_LABEL, detail: SUSPENDED_DETAIL },
+        archived,
+      ];
+    case "suspended":
+      return [
+        {
+          kind: "active",
+          action: "reinstate",
+          label: EMPLOYMENT_STATUS_LABELS.active,
+          detail: "Can sign in again on the web and in the app.",
+        },
+        ...(canBeAway ? [away] : []),
+        archived,
+      ];
+    case "away":
+      return [
+        {
+          kind: "active",
+          action: "markActive",
+          label: EMPLOYMENT_STATUS_LABELS.active,
+          detail: "Back on the schedule from today.",
+        },
+        archived,
+      ];
+    case "archived":
+      return [
+        {
+          kind: "active",
+          action: "restore",
+          label: EMPLOYMENT_STATUS_LABELS.active,
+          detail: "Back on staff. Can sign in and be scheduled.",
+        },
+      ];
+  }
+}
+
+export type StatusTone = "success" | "warning" | "danger" | "neutral";
+
+const SINCE_DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/**
+ * Where someone stands, for the box at the top of Change status: "Away until
+ * Fri, Oct 30" and what that means. The tone is their pill's.
+ */
+export function describeCurrentStatus(state: CurrentStatusState): {
+  text: string;
+  detail: string;
+  tone: StatusTone;
+} {
+  switch (currentKind(state)) {
+    case "away":
+      return {
+        text: state.awayUntil
+          ? `${EMPLOYMENT_STATUS_LABELS.inactive} until ${formatReturnDate(state.awayUntil, { weekday: true })}`
+          : EMPLOYMENT_STATUS_LABELS.inactive,
+        detail: AWAY_DETAIL,
+        tone: "warning",
+      };
+    case "suspended":
+      return {
+        text: `${SUSPENDED_LABEL} since ${SINCE_DAY.format(new Date(state.suspendedAt as string))}`,
+        detail: SUSPENDED_DETAIL,
+        tone: "danger",
+      };
+    case "archived":
+      return { text: EMPLOYMENT_STATUS_LABELS.removed, detail: ARCHIVED_DETAIL, tone: "neutral" };
+    case "active":
+      return {
+        text: EMPLOYMENT_STATUS_LABELS.active,
+        detail: "Can sign in and be scheduled.",
+        tone: "success",
       };
   }
 }

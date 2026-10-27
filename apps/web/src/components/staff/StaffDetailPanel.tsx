@@ -68,6 +68,8 @@ interface StaffDetailPanelProps {
   onActivate: (empId: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
+  /** Suspends someone's access (51c). */
+  onSuspend?: (empId: string) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -106,6 +108,7 @@ export function StaffDetailPanel({
   absenceTypes,
   onActivate,
   onReinstate,
+  onSuspend,
   statusStepUpOpen = false,
   onClose,
   onInvite,
@@ -461,6 +464,7 @@ export function StaffDetailPanel({
                           absenceTypes={absenceTypes}
                           onActivate={onActivate}
                           onReinstate={onReinstate}
+                          onSuspend={onSuspend}
                           onRemove={onRemove}
                           stepUpOpen={statusStepUpOpen}
                           variant="page"

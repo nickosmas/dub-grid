@@ -167,6 +167,8 @@ export interface MembersSectionProps {
   onActivate: (empId: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
+  /** Suspends someone's access (51c). */
+  onSuspend?: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -202,6 +204,7 @@ export function MembersSection({
   statusStepUpOpen = false,
   onActivate,
   onReinstate,
+  onSuspend,
   onAdd,
   canViewEmployeeDetails,
   canManageEmployees,
@@ -2219,6 +2222,7 @@ export function MembersSection({
           absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
           onReinstate={onReinstate}
+          onSuspend={onSuspend}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
           onInvite={

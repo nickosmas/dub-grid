@@ -127,6 +127,8 @@ interface StaffViewProps {
   onActivate: (empId: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
+  /** Suspends someone's access (51c). */
+  onSuspend?: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];
@@ -168,6 +170,7 @@ export default function StaffView({
   statusStepUpOpen = false,
   onActivate,
   onReinstate,
+  onSuspend,
   onAdd,
   orgId,
   assignments,
@@ -364,6 +367,7 @@ export default function StaffView({
             statusStepUpOpen={statusStepUpOpen}
             onActivate={onActivate}
             onReinstate={onReinstate}
+            onSuspend={onSuspend}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
             canManageEmployees={canManageEmployees ?? false}

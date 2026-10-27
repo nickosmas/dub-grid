@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   EMPLOYMENT_STATUS_LABELS,
   canMarkInactive,
+  describeCurrentStatus,
   describeEmploymentStatus,
   describeStatusAction,
+  statusChoices,
   formatReturnDate,
   isSchedulableOn,
   isValidReturnDate,
@@ -149,11 +151,21 @@ describe("describeStatusAction", () => {
     }
   });
 
-  it("adds a message only when it says more than the title", () => {
-    expect(describeStatusAction("archive", "Ana").message).toBe("");
-    for (const action of ["markAway", "markActive", "restore"] as const) {
-      expect(describeStatusAction(action, "Ana").message).toMatch(/^[A-Z].*\.$/);
+  it("adds no caption that repeats the title or the choice (owner, 2026-10-27)", () => {
+    for (const action of [
+      "archive",
+      "markAway",
+      "markActive",
+      "restore",
+      "reinstate",
+      "suspend",
+    ] as const) {
+      expect(describeStatusAction(action, "Ana").message).toBe("");
     }
+    // A return date is news the title doesn't carry.
+    expect(describeStatusAction("markAway", "Ana", { returnDate: "2027-01-04" }).message).toMatch(
+      /^They won't be scheduled before Mon, Jan 4/,
+    );
   });
 
   it("never names the product", () => {
@@ -273,9 +285,100 @@ describe("describeStatusAction reinstate", () => {
     expect(describeStatusAction("reinstate", "Ana Torres")).toEqual({
       label: "Reinstate",
       title: "Reinstate Ana Torres?",
-      message: "They can sign in again on the web and in the app.",
+      message: "",
       points: [],
       done: "Reinstated",
     });
+  });
+});
+
+describe("statusChoices", () => {
+  const onSchedule = { focusAreaIds: [7] };
+  const kinds = (state: Parameters<typeof statusChoices>[0]) =>
+    statusChoices(state).map((choice) => `${choice.label}:${choice.action}`);
+
+  it("offers an active person Away, Suspended and Archived", () => {
+    expect(kinds({ status: "active", ...onSchedule })).toEqual([
+      "Away:markAway",
+      "Suspended:suspend",
+      "Archived:archive",
+    ]);
+  });
+
+  it("leaves Away out for someone not on the schedule", () => {
+    expect(kinds({ status: "active", focusAreaIds: [] })).toEqual([
+      "Suspended:suspend",
+      "Archived:archive",
+    ]);
+  });
+
+  it("brings a suspended person back with Reinstate", () => {
+    expect(kinds({ status: "active", suspendedAt: "2026-10-26T12:00:00Z", ...onSchedule })).toEqual(
+      ["Active:reinstate", "Away:markAway", "Archived:archive"],
+    );
+  });
+
+  it("brings an Away person back with Mark active, and offers no suspension", () => {
+    expect(kinds({ status: "inactive", ...onSchedule })).toEqual([
+      "Active:markActive",
+      "Archived:archive",
+    ]);
+  });
+
+  it("only restores an archived person", () => {
+    expect(kinds({ status: "removed", archivedAt: "2026-10-01T00:00:00Z", ...onSchedule })).toEqual(
+      ["Active:restore"],
+    );
+  });
+
+  it("never offers the status they're in", () => {
+    for (const state of [
+      { status: "active" as const, ...onSchedule },
+      { status: "inactive" as const, ...onSchedule },
+    ]) {
+      expect(statusChoices(state).map((choice) => choice.label)).not.toContain(
+        describeEmploymentStatus(state.status),
+      );
+    }
+  });
+});
+
+describe("describeCurrentStatus", () => {
+  it("names the status, its date and its pill tone", () => {
+    expect(
+      describeCurrentStatus({ status: "inactive", awayUntil: "2026-10-30", focusAreaIds: [] }),
+    ).toEqual({
+      text: "Away until Fri, Oct 30",
+      detail: "Keeps sign-in. Not scheduled while away.",
+      tone: "warning",
+    });
+    expect(
+      describeCurrentStatus({
+        status: "active",
+        suspendedAt: "2026-10-26T12:00:00Z",
+        focusAreaIds: [],
+      }),
+    ).toEqual({
+      text: "Suspended since Oct 26",
+      detail: "Can't sign in. Stays on the schedule.",
+      tone: "danger",
+    });
+    expect(describeCurrentStatus({ status: "active", focusAreaIds: [] })).toEqual({
+      text: "Active",
+      detail: "Can sign in and be scheduled.",
+      tone: "success",
+    });
+    expect(describeCurrentStatus({ status: "removed", focusAreaIds: [] }).text).toBe("Archived");
+  });
+});
+
+describe("describeStatusAction suspend", () => {
+  it("names the person in the title only and keeps two full sentences in the box", () => {
+    const copy = describeStatusAction("suspend", "Ana Torres");
+    expect(copy.title).toBe("Suspend Ana Torres?");
+    expect(copy.message).toBe("");
+    expect(copy.points).toHaveLength(2);
+    for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
+    expect(copy.points.join(" ")).not.toContain("Ana");
   });
 });

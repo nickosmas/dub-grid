@@ -3,6 +3,7 @@ import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
   reinstateEmployee,
+  suspendEmployee,
   deactivateEmployee,
   EmployeeProfileConflictError,
   EmployeeStatusConflictError,
@@ -57,6 +58,8 @@ export interface EmployeesData {
   handleActivateEmployee: (empId: string) => Promise<void>;
   /** Gives a suspended person their access back (51c). */
   handleReinstateEmployee: (empId: string) => Promise<void>;
+  /** A step-up refusal is rethrown for the caller to prompt. */
+  handleSuspendEmployee: (empId: string, accessToken?: string) => Promise<boolean>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   handleSetEmployeeReturnDate: (
     empId: string,
@@ -373,6 +376,36 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
+  const handleSuspendEmployee = useCallback(
+    async (empId: string, accessToken?: string) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return false;
+      try {
+        const updatedEmployee = await suspendEmployee(
+          empId,
+          orgId,
+          targetEmployee.version,
+          accessToken,
+        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+        toast.success("Suspended");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        if (getStepUpMethod(err)) throw err;
+        toast.error(formatClientErrorMessage(err, "We couldn't suspend them. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
   const handleReinstateEmployee = useCallback(
     async (empId: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
@@ -480,6 +513,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleDeactivateEmployee,
     handleActivateEmployee,
     handleReinstateEmployee,
+    handleSuspendEmployee,
     handleSetEmployeeReturnDate,
   };
 }

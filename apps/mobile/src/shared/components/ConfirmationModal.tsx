@@ -19,6 +19,7 @@ import { Button, type ButtonTone } from "./Button";
 import { ConfirmSummaryBox, type ConfirmSummary } from "./ConfirmSummaryBox";
 import { InlineError } from "./InlineError";
 import { Pressable } from "./Pressable";
+import { createIconControlStyle } from "./icon-control-style";
 import { registerModalPresentation } from "../lib/modal-presentation";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -26,6 +27,7 @@ import { useMotionPreference } from "../motion/useMotionPreference";
 import {
   mobileControl,
   mobileElevation,
+  mobileMotion,
   mobileRadii,
   mobileSpace,
   type MobileColors,
@@ -224,6 +226,22 @@ export function ConfirmationModal({
           style={styles.avoider}
         >
           <Animated.View accessibilityRole="alert" style={[styles.card, cardAnimatedStyle]}>
+            {/* Every confirmation can be closed from its corner, like a sheet (owner, 2026-10-27). */}
+            <Pressable
+              accessibilityLabel="Close"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isBusy }}
+              disabled={isBusy}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.closeButton,
+                isBusy && styles.closeButtonDisabled,
+                pressed && !isBusy && styles.closeButtonPressed,
+              ]}
+              onPress={handleDismiss}
+            >
+              <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
+            </Pressable>
             <View style={styles.header}>
               <View style={[styles.iconBadge, { backgroundColor: iconColors.background }]}>
                 <Ionicons
@@ -334,6 +352,19 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, windowHeight:
       backgroundColor: mobileColors.surface,
       overflow: "hidden",
       ...mobileElevation("overlay", isDark),
+    },
+    closeButton: {
+      ...createIconControlStyle(mobileColors, isDark),
+      position: "absolute",
+      top: mobileSpace.md,
+      right: mobileSpace.md,
+      zIndex: 1,
+    },
+    closeButtonPressed: {
+      transform: [{ scale: mobileMotion.press.iconOnlyScale }],
+    },
+    closeButtonDisabled: {
+      opacity: 0.4,
     },
     header: {
       alignItems: "center",

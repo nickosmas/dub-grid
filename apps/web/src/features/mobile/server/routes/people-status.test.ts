@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
 
+const scheduleSuspensionNotice = vi.fn();
+vi.mock("@/features/employees/server/suspension-notice", () => ({
+  scheduleSuspensionNotice: (...args: unknown[]) => scheduleSuspensionNotice(...args),
+}));
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
 }));
@@ -214,5 +218,7 @@ describe("mobile people status route", () => {
       },
     });
     expect(auditInsert).toHaveBeenCalledTimes(1);
+    // Only a suspension sends the notice email and alert.
+    expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
   });
 });

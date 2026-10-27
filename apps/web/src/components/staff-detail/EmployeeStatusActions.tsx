@@ -7,11 +7,13 @@ import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
+import { RadioCardList } from "@/components/ui/radio-card-list";
 import {
-  canMarkInactive,
+  describeCurrentStatus,
   describeStatusAction,
-  statusUndoAction,
+  statusChoices,
   type StatusAction,
+  type StatusTone,
 } from "@dubgrid/domain";
 
 export interface EmployeeStatusActionsProps {
@@ -35,20 +37,19 @@ export interface EmployeeStatusActionsProps {
     returnDate: string | null,
     absenceTypeId?: number | null,
   ) => void | Promise<unknown>;
-  /** Gives a suspended person their access back (51c); hidden when absent. */
+  /** Gives a suspended person their access back (51c); not offered when absent. */
   onReinstate?: (empId: string) => void | Promise<unknown>;
+  /** Suspends someone's access (51c); not offered when absent. */
+  onSuspend?: (empId: string) => void | Promise<unknown>;
   /** Live absence types; with a return date, one can fill the away days (51f). */
   absenceTypes?: readonly AbsenceType[];
   onRemove: (empId: string, note?: string) => void | Promise<unknown>;
   variant: "panel" | "page";
-  /** Stretches the active button to fill its container, for an equal-width row of actions. */
+  /** Stretches the button to fill its container, for an equal-width row of actions. */
   fillWidth?: boolean;
   /** Hides the confirmation while a step-up prompt asks for fresh proof. */
   stepUpOpen?: boolean;
 }
-
-type ConfirmingAction =
-  Exclude<StatusAction, "restore" | "markActive" | "reinstate"> | "undo" | "reinstate";
 
 const RETURN_DATE_HINT =
   "They're back to Active on this day. Leave it empty to mark them active yourself.";
@@ -130,11 +131,76 @@ function AwayAbsenceField({
   );
 }
 
-const NOTE_PLACEHOLDERS: Record<"markAway" | "archive", string> = {
+const NOTE_PLACEHOLDERS: Partial<Record<StatusAction, string>> = {
   markAway: "Reason (optional) - e.g. Family leave",
   archive: "Reason (optional) - e.g. Left the company",
 };
 
+const TONE_COLORS: Record<StatusTone, { bg: string; border: string; text: string }> = {
+  success: {
+    bg: "var(--dg-color-success-bg)",
+    border: "var(--dg-color-success-border)",
+    text: "var(--dg-color-success-text)",
+  },
+  warning: {
+    bg: "var(--dg-color-warning-bg)",
+    border: "var(--dg-color-warning-border)",
+    text: "var(--dg-color-warning-text)",
+  },
+  danger: {
+    bg: "var(--dg-color-danger-bg)",
+    border: "var(--dg-color-danger-border)",
+    text: "var(--dg-color-danger-text)",
+  },
+  neutral: {
+    bg: "var(--dg-color-bg-secondary)",
+    border: "var(--dg-color-border-light)",
+    text: "var(--dg-color-text-secondary)",
+  },
+};
+
+/** Where they stand, at the top of the dialog, tinted like their status pill. */
+function CurrentStatusBox({
+  text,
+  detail,
+  tone,
+}: {
+  text: string;
+  detail: string;
+  tone: StatusTone;
+}) {
+  const colors = TONE_COLORS[tone];
+  return (
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        padding: "10px 12px",
+        borderRadius: "var(--dg-radius-lg)",
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+      }}
+    >
+      <span
+        className="dg-tabular-nums"
+        style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: colors.text }}
+      >
+        {text}
+      </span>
+      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}>
+        {detail}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Every status change goes through one Change status button and one dialog
+ * (51d): a box at the top, tinted like their pill, says where they stand, the list holds only
+ * the statuses they can move to, and the confirm button names what happens.
+ */
 export function EmployeeStatusActions({
   employee,
   canEdit,
@@ -144,294 +210,177 @@ export function EmployeeStatusActions({
   onRemove,
   onSetReturnDate,
   onReinstate,
+  onSuspend,
   absenceTypes = [],
   variant,
   fillWidth = false,
   stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
-  // Away only takes someone off the schedule, so a management-only person can
-  // only be archived.
-  const canBeAway = canMarkInactive(employee.focusAreaIds);
-  const [confirming, setConfirming] = useState<ConfirmingAction | null>(null);
-  const [note, setNote] = useState(employee.statusNote || "");
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<StatusAction | null>(null);
+  const [note, setNote] = useState("");
   const [returnDate, setReturnDate] = useState(employee.awayUntil ?? "");
   const [absenceTypeId, setAbsenceTypeId] = useState(employee.awayAbsenceTypeId ?? NO_ABSENCE);
-  // The confirmation unmounts while a step-up prompt shows, which drops its
-  // own latch, so the pending state lives here to survive the round trip.
+  // The dialog unmounts while a step-up prompt shows, which drops its own
+  // latch, so the pending state lives here to survive the round trip.
   const [pending, setPending] = useState(false);
-
-  const displayName = getEmployeeDisplayName(employee);
-  const undoAction = statusUndoAction(employee.status);
-
-  async function runPending(action: () => unknown) {
-    setPending(true);
-    try {
-      await action();
-    } finally {
-      setPending(false);
-    }
-  }
-
-  function closeConfirm() {
-    setConfirming(null);
-    setNote(employee.statusNote || "");
-    setReturnDate(employee.awayUntil ?? "");
-    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
-  }
-
-  function openConfirm(action: ConfirmingAction) {
-    setReturnDate(employee.awayUntil ?? "");
-    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
-    setConfirming(action);
-  }
-
-  // The absence only applies with a return date, so it goes when the date does.
-  const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
-  const chosenAbsenceName =
-    absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId)?.name ?? null;
-  const absenceField =
-    returnDate && absenceTypes.length > 0 ? (
-      <AwayAbsenceField
-        value={chosenAbsenceTypeId ?? NO_ABSENCE}
-        absenceTypes={absenceTypes}
-        onChange={setAbsenceTypeId}
-      />
-    ) : null;
 
   // Self-action guard: you can't change your own status, so callers hide this
   // whole section rather than show it with nothing actionable inside.
   if (!canEdit || isSelf) return null;
 
-  const confirmation = (() => {
-    if (!confirming || stepUpOpen) return null;
-    if (confirming === "reinstate") {
-      const copy = describeStatusAction("reinstate", displayName);
-      return (
-        <ConfirmDialog
-          isLoading={pending}
-          title={copy.title}
-          message={copy.message}
-          summary={{ points: copy.points }}
-          confirmLabel={copy.label}
-          variant="warning"
-          onConfirm={async () => {
-            await runPending(() => onReinstate?.(employee.id));
-            closeConfirm();
-          }}
-          onCancel={closeConfirm}
-        />
-      );
-    }
-    if (confirming === "undo") {
-      if (!undoAction) return null;
-      const copy = describeStatusAction(undoAction, displayName);
-      return (
-        <ConfirmDialog
-          isLoading={pending}
-          title={copy.title}
-          message={copy.message || undefined}
-          summary={{ points: copy.points }}
-          confirmLabel={copy.label}
-          variant="warning"
-          onConfirm={async () => {
-            await runPending(() => onActivate(employee.id));
-            closeConfirm();
-          }}
-          onCancel={closeConfirm}
-        />
-      );
-    }
-    if (confirming === "setReturnDate") {
-      const currentReturnDate = employee.awayUntil ?? null;
-      const currentAbsenceTypeId = employee.awayAbsenceTypeId ?? null;
-      const copy = describeStatusAction("setReturnDate", displayName, {
-        returnDate: returnDate || null,
-        currentReturnDate,
-        absenceName: chosenAbsenceName,
-      });
-      return (
-        <ConfirmDialog
-          isLoading={pending}
-          title={copy.title}
-          message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {copy.message ? <span>{copy.message}</span> : null}
-              <ReturnDateField value={returnDate} onChange={setReturnDate} />
-              {absenceField}
-            </div>
-          }
-          summary={{ points: copy.points }}
-          confirmLabel={copy.label}
-          confirmDisabled={
-            (returnDate || null) === currentReturnDate &&
-            chosenAbsenceTypeId === currentAbsenceTypeId
-          }
-          variant="warning"
-          onConfirm={async () => {
-            await runPending(() =>
-              onSetReturnDate?.(employee.id, returnDate || null, chosenAbsenceTypeId),
-            );
-            closeConfirm();
-          }}
-          onCancel={closeConfirm}
-        />
-      );
-    }
-    const isArchive = confirming === "archive";
-    const copy = describeStatusAction(confirming, displayName, {
-      returnDate: isArchive ? null : returnDate || null,
-      absenceName: isArchive ? null : chosenAbsenceName,
-    });
-    return (
-      <ConfirmDialog
-        isLoading={pending}
-        title={copy.title}
-        message={
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {copy.message ? <span>{copy.message}</span> : null}
-            <input
-              className="dg-input"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={NOTE_PLACEHOLDERS[confirming]}
-              aria-label="Reason (optional)"
-              style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
-            />
-            {isArchive ? null : <ReturnDateField value={returnDate} onChange={setReturnDate} />}
-            {isArchive ? null : absenceField}
-          </div>
-        }
-        summary={{ points: copy.points }}
-        confirmLabel={copy.label}
-        variant={isArchive ? "danger" : "warning"}
-        onConfirm={async () => {
-          const trimmedNote = note.trim() || undefined;
-          // Revoking any linked org membership happens server-side, atomically
-          // with the status change (see /api/employees/status), not as a
-          // second client call, so the two can't diverge on partial failure.
-          await runPending(() =>
-            isArchive
-              ? onRemove(employee.id, trimmedNote)
-              : returnDate
-                ? onDeactivate(employee.id, trimmedNote, returnDate, chosenAbsenceTypeId)
-                : onDeactivate(employee.id, trimmedNote),
-          );
-          closeConfirm();
-        }}
-        onCancel={closeConfirm}
-      />
-    );
-  })();
+  const displayName = getEmployeeDisplayName(employee);
+  const isAway = employee.status === "inactive" && !employee.archivedAt;
+  const handlers: Partial<Record<StatusAction, unknown>> = {
+    suspend: onSuspend,
+    reinstate: onReinstate,
+  };
+  const choices = statusChoices(employee).filter(
+    (option) => !(option.action in handlers) || Boolean(handlers[option.action]),
+  );
+  const current = describeCurrentStatus(employee);
 
-  const buttonStyle = fillWidth
-    ? { flex: 1, width: "100%", minWidth: 0 }
-    : variant === "page"
-      ? { flex: "0 0 auto", minWidth: 140 }
-      : { flex: 1, minWidth: 0 };
-  const groupStyle = fillWidth
-    ? { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }
-    : { display: "flex", gap: 8, flexWrap: variant === "page" ? ("wrap" as const) : undefined };
+  // The absence only applies with a return date, so it goes when the date does.
+  const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
+  const chosenAbsenceName =
+    absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId)?.name ?? null;
+  const awayDetailsChanged =
+    isAway &&
+    ((returnDate || null) !== (employee.awayUntil ?? null) ||
+      chosenAbsenceTypeId !== (employee.awayAbsenceTypeId ?? null));
+  const datedFields = (
+    <>
+      <ReturnDateField value={returnDate} onChange={setReturnDate} />
+      {returnDate && absenceTypes.length > 0 ? (
+        <AwayAbsenceField
+          value={chosenAbsenceTypeId ?? NO_ABSENCE}
+          absenceTypes={absenceTypes}
+          onChange={setAbsenceTypeId}
+        />
+      ) : null}
+    </>
+  );
 
-  if (undoAction) {
-    const copy = describeStatusAction(undoAction, displayName);
-    const returnDateLabel = describeStatusAction("setReturnDate", displayName, {
-      currentReturnDate: employee.awayUntil ?? null,
-    }).label;
-    const canSetReturnDate = Boolean(onSetReturnDate) && employee.status === "inactive";
-    const undoButton = (
-      <Button
-        onClick={() => openConfirm("undo")}
-        className={variant === "page" ? "dg-btn dg-btn-success" : "dg-btn dg-btn-ghost dg-btn-xs"}
-        style={{
-          // Inline success colors here would outrank the variant's :hover,
-          // so the page button wears the class and only ghost tints inline.
-          ...(variant === "page" ? null : { color: "var(--dg-color-success-text)" }),
-          ...(fillWidth
-            ? { flex: 1, width: "100%" }
-            : canSetReturnDate && variant === "page"
-              ? buttonStyle
-              : null),
-        }}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        {copy.label}
-      </Button>
-    );
-    if (!canSetReturnDate) {
-      return (
-        <>
-          {undoButton}
-          {confirmation}
-        </>
-      );
-    }
-    return (
-      <>
-        <div style={groupStyle}>
-          {undoButton}
-          <Button
-            onClick={() => openConfirm("setReturnDate")}
-            className={
-              variant === "page" ? "dg-btn dg-btn-secondary" : "dg-btn dg-btn-ghost dg-btn-xs"
-            }
-            style={variant === "page" ? buttonStyle : undefined}
-          >
-            {returnDateLabel}
-          </Button>
-        </div>
-        {confirmation}
-      </>
-    );
+  function reset() {
+    setChoice(null);
+    setNote("");
+    setReturnDate(employee.awayUntil ?? "");
+    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
   }
 
-  // Suspended (51c) people are stored active; Reinstate takes Mark away's place.
-  const canReinstate = Boolean(onReinstate) && Boolean(employee.suspendedAt);
+  function close() {
+    setOpen(false);
+    reset();
+  }
+
+  async function confirm() {
+    const trimmedNote = note.trim() || undefined;
+    setPending(true);
+    try {
+      switch (choice) {
+        case null:
+          await onSetReturnDate?.(employee.id, returnDate || null, chosenAbsenceTypeId);
+          break;
+        case "markAway":
+          await (returnDate
+            ? onDeactivate(employee.id, trimmedNote, returnDate, chosenAbsenceTypeId)
+            : onDeactivate(employee.id, trimmedNote));
+          break;
+        // Revoking any linked org membership happens server-side, atomically
+        // with the status change (see /api/employees/status).
+        case "archive":
+          await onRemove(employee.id, trimmedNote);
+          break;
+        case "suspend":
+          await onSuspend?.(employee.id);
+          break;
+        case "reinstate":
+          await onReinstate?.(employee.id);
+          break;
+        default:
+          await onActivate(employee.id);
+      }
+    } finally {
+      setPending(false);
+    }
+    close();
+  }
+
+  const copy = choice
+    ? describeStatusAction(choice, displayName, {
+        returnDate: choice === "markAway" ? returnDate || null : null,
+        absenceName: choice === "markAway" ? chosenAbsenceName : null,
+      })
+    : awayDetailsChanged
+      ? describeStatusAction("setReturnDate", displayName, {
+          returnDate: returnDate || null,
+          currentReturnDate: employee.awayUntil ?? null,
+          absenceName: chosenAbsenceName,
+        })
+      : null;
+  const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
+
+  const dialog =
+    open && !stepUpOpen ? (
+      <ConfirmDialog
+        isLoading={pending}
+        title={`Change ${displayName}'s status?`}
+        message={
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <CurrentStatusBox text={current.text} detail={current.detail} tone={current.tone} />
+            {isAway && !choice && onSetReturnDate ? datedFields : null}
+            <RadioCardList
+              label="Status"
+              options={choices.map((option) => ({
+                value: option.action,
+                label: option.label,
+                detail: option.detail,
+              }))}
+              value={choice}
+              onChange={setChoice}
+            />
+            {notePlaceholder ? (
+              <input
+                className="dg-input"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder={notePlaceholder}
+                aria-label="Reason (optional)"
+                style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
+              />
+            ) : null}
+            {choice === "markAway" ? datedFields : null}
+            {copy?.message ? <span>{copy.message}</span> : null}
+          </div>
+        }
+        summary={copy ? { points: copy.points } : undefined}
+        confirmLabel={
+          choice
+            ? (copy?.label ?? "")
+            : isAway && onSetReturnDate
+              ? "Save changes"
+              : "Change status"
+        }
+        confirmDisabled={!choice && !awayDetailsChanged}
+        variant={choice === "archive" ? "danger" : "warning"}
+        onConfirm={confirm}
+        onCancel={close}
+      />
+    ) : null;
 
   return (
     <>
-      <div style={groupStyle}>
-        {canReinstate && (
-          <Button
-            onClick={() => openConfirm("reinstate")}
-            className="dg-btn dg-btn-success"
-            style={buttonStyle}
-          >
-            {describeStatusAction("reinstate", displayName).label}
-          </Button>
-        )}
-        {canBeAway && !employee.suspendedAt && (
-          <Button
-            onClick={() => openConfirm("markAway")}
-            className="dg-btn dg-btn-warning-filled"
-            style={buttonStyle}
-          >
-            {describeStatusAction("markAway", displayName).label}
-          </Button>
-        )}
-        <Button
-          onClick={() => openConfirm("archive")}
-          className="dg-btn dg-btn-secondary"
-          style={{
-            ...buttonStyle,
-            // Alone, Archive spans both columns rather than sitting half-width.
-            ...(fillWidth && !canBeAway && !canReinstate ? { gridColumn: "1 / -1" } : null),
-          }}
-        >
-          {describeStatusAction("archive", displayName).label}
-        </Button>
-      </div>
-      {confirmation}
+      <Button
+        onClick={() => {
+          reset();
+          setOpen(true);
+        }}
+        className={variant === "page" ? "dg-btn dg-btn-secondary" : "dg-btn dg-btn-ghost dg-btn-xs"}
+        style={fillWidth ? { width: "100%", minWidth: 0 } : undefined}
+      >
+        Change status
+      </Button>
+      {dialog}
     </>
   );
 }
