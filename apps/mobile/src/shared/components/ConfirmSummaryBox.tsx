@@ -6,7 +6,7 @@ import { useMobileColors } from "../providers/ThemeModeProvider";
 
 /** Extra things the person should know before confirming, one short point each. */
 export interface ConfirmSummary {
-  /** Defaults to "Keep in mind". */
+  /** A visible label above the box; none by default. */
   title?: string;
   points: string[];
 }
@@ -27,8 +27,8 @@ export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
 
   return (
     <View accessibilityLabel={summary.title ?? "Keep in mind"} style={styles.section}>
-      {/* Above the box at reading size: inside the border it read as a cramped caption. */}
-      <AppText variant="bodyStrong">{summary.title ?? "Keep in mind"}</AppText>
+      {/* No visible label by default; the view keeps a name for screen readers. */}
+      {summary.title ? <AppText variant="bodyStrong">{summary.title}</AppText> : null}
       <View style={styles.box}>
         {summary.points.map((point, index) => (
           <View key={point} style={[styles.point, index > 0 && styles.divided]}>

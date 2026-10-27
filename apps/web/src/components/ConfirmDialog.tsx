@@ -12,7 +12,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
  * dialog's short message instead.
  */
 export interface ConfirmSummary {
-  /** Defaults to "Keep in mind". */
+  /** A visible label above the box; none by default. */
   title?: string;
   points: React.ReactNode[];
 }
@@ -186,21 +186,25 @@ export default function ConfirmDialog({
 
 /** The publish dialog's summary box: the extra things a confirm does that the manager should know. */
 export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
-  const title = summary.title ?? "Keep in mind";
+  // No visible label by default (the owner dropped it); the region keeps a
+  // name for screen readers. A caller can still show one with `title`.
   return (
-    // The label sits above the box at body size: inside the border it read
-    // as a cramped caption rather than a heading.
-    <section aria-label={title} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h3
-        style={{
-          margin: 0,
-          fontSize: "var(--dg-fs-body-sm)",
-          fontWeight: 600,
-          color: "var(--dg-color-text-primary)",
-        }}
-      >
-        {title}
-      </h3>
+    <section
+      aria-label={summary.title ?? "Keep in mind"}
+      style={{ display: "flex", flexDirection: "column", gap: 8 }}
+    >
+      {summary.title ? (
+        <h3
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-body-sm)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          {summary.title}
+        </h3>
+      ) : null}
       <ul
         style={{
           listStyle: "none",
