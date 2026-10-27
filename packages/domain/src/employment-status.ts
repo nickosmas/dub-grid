@@ -209,9 +209,12 @@ export interface StatusActionCopy {
   message: string;
   /**
    * Two or more extra things the manager should know, one full sentence each;
-   * a single fact goes in `message` instead.
+   * a single fact goes in `message` instead. Only what changes; what stays
+   * as it is goes in `unchanged`.
    */
   points: string[];
+  /** What stays as it is, one full sentence each, shown apart from `points`. */
+  unchanged: string[];
   /** The toast once it's done. */
   done: string;
 }
@@ -278,6 +281,7 @@ function describeSetReturnDate(
             "Recurring schedules set up for them are removed.",
           ]
         : [],
+      unchanged: [],
       done: "Return date cleared",
     };
   }
@@ -289,6 +293,7 @@ function describeSetReturnDate(
         ...base,
         message: `They're back to Active on ${day}.`,
         points: returnDatePoints(returnDate, absenceName),
+        unchanged: [],
         done: "Return date changed",
       }
     : {
@@ -297,6 +302,7 @@ function describeSetReturnDate(
           ? `They're back to Active on ${day}, and can be scheduled from then. ${awayAbsenceSentence(returnDate, absenceName)}`
           : `They're back to Active on ${day}, and can be scheduled from then.`,
         points: [],
+        unchanged: [],
         done: "Return date set",
       };
 }
@@ -370,6 +376,7 @@ export function describeStatusAction(
           title: `Mark ${name} away?`,
           message: `They stay Active until ${formatReturnDate(startDate, { weekday: true })}.`,
           points: plannedAwayPoints(startDate, returnDate, absenceName),
+          unchanged: [],
           done: "Away scheduled",
         };
       }
@@ -379,11 +386,11 @@ export function describeStatusAction(
           title: `Mark ${name} away?`,
           message: `They won't be scheduled before ${formatReturnDate(returnDate, { weekday: true })}, when they're back to Active.`,
           points: [
-            keepsAccess,
             ...returnDatePoints(returnDate, absenceName),
             `Open requests for days before ${formatReturnDate(returnDate)} are closed.`,
             ...cancelsPlan,
           ],
+          unchanged: [keepsAccess],
           done: "Marked away",
         };
       }
@@ -391,7 +398,8 @@ export function describeStatusAction(
         label: "Mark away",
         title: `Mark ${name} away?`,
         message: "",
-        points: [keepsAccess, ...leavingSchedule, ...cancelsPlan],
+        points: [...leavingSchedule, ...cancelsPlan],
+        unchanged: [keepsAccess],
         done: "Marked away",
       };
     case "setPlannedChange":
@@ -400,6 +408,7 @@ export function describeStatusAction(
         title: `Change ${name}'s planned away?`,
         message: startDate ? plannedAwaySentence(startDate, returnDate) : "",
         points: startDate ? plannedAwayPoints(startDate, returnDate, absenceName) : [],
+        unchanged: [],
         done: "Planned away changed",
       };
     case "cancelPlannedChange":
@@ -409,10 +418,11 @@ export function describeStatusAction(
         message: "",
         points: [
           "They stay Active and can be scheduled on those days again.",
-          absenceName
-            ? `Those days go back to what was published, without ${absenceName}.`
-            : "Shifts already taken off those days stay off.",
+          ...(absenceName
+            ? [`Those days go back to what was published, without ${absenceName}.`]
+            : []),
         ],
+        unchanged: absenceName ? [] : ["Shifts already taken off those days stay off."],
         done: "Planned away cancelled",
       };
     case "setReturnDate":
@@ -422,12 +432,8 @@ export function describeStatusAction(
         label: "Archive",
         title: `Archive ${name}?`,
         message: "",
-        points: [
-          "They can no longer sign in.",
-          ...leavingSchedule,
-          "Past records stay, and you can restore them later.",
-          ...cancelsPlan,
-        ],
+        points: ["They can no longer sign in.", ...leavingSchedule, ...cancelsPlan],
+        unchanged: ["Past records stay, and you can restore them later."],
         done: "Archived",
       };
     case "markActive":
@@ -436,6 +442,7 @@ export function describeStatusAction(
         title: `Mark ${name} active?`,
         message: "",
         points: [],
+        unchanged: [],
         done: "Marked active",
       };
     case "suspend":
@@ -445,9 +452,10 @@ export function describeStatusAction(
         message: "",
         points: [
           "They're signed out on every device and can't sign in.",
-          "Their shifts stay, and you can keep scheduling them.",
+          "Open requests they're part of are closed, and pickups they claimed go back up for others.",
           ...cancelsPlan,
         ],
+        unchanged: ["Their shifts stay, and you can keep scheduling them."],
         done: "Suspended",
       };
     case "reinstate":
@@ -456,6 +464,7 @@ export function describeStatusAction(
         title: `Reinstate ${name}?`,
         message: "",
         points: [],
+        unchanged: [],
         done: "Reinstated",
       };
     case "restore":
@@ -464,6 +473,7 @@ export function describeStatusAction(
         title: `Restore ${name}?`,
         message: "",
         points: [],
+        unchanged: [],
         done: "Restored",
       };
   }
@@ -479,21 +489,27 @@ export interface StatusChoice {
   label: string;
   /** What being in it means, in one short sentence. */
   detail: string;
+  /** What picking it does, as one sentence, for a dialog where it's the only choice. */
+  outcome: string;
 }
 
-export interface CurrentStatusState extends PlannedChangeState {
+export interface StatusState extends PlannedChangeState {
   status: EmployeeStatus;
   awayUntil?: string | null;
   suspendedAt?: string | null;
   archivedAt?: string | null;
+}
+
+export interface CurrentStatusState extends StatusState {
   focusAreaIds: readonly number[];
 }
 
 const AWAY_DETAIL = "Keeps sign-in. Not scheduled while away.";
 const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
 const ARCHIVED_DETAIL = "Off staff. Can't sign in or be scheduled.";
+const ACTIVE_DETAIL = "Can sign in and be scheduled.";
 
-function currentKind(state: CurrentStatusState): StatusChoiceKind {
+function currentKind(state: StatusState): StatusChoiceKind {
   if (state.status === "removed" || state.archivedAt) return "archived";
   if (state.status === "inactive") return "away";
   return state.suspendedAt ? "suspended" : "active";
@@ -509,19 +525,29 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
     action: "markAway",
     label: EMPLOYMENT_STATUS_LABELS.inactive,
     detail: AWAY_DETAIL,
+    outcome: "They'll be Away: they keep sign-in, and they aren't scheduled.",
   };
   const archived: StatusChoice = {
     kind: "archived",
     action: "archive",
     label: EMPLOYMENT_STATUS_LABELS.removed,
     detail: ARCHIVED_DETAIL,
+    outcome: "They'll be Archived: off staff, and they can't sign in or be scheduled.",
   };
-  const canBeAway = canMarkInactive(state.focusAreaIds);
+  // A planned away is edited through its own dates, so Away isn't offered twice.
+  const canBeAway =
+    canMarkInactive(state.focusAreaIds) && !(state.plannedStatus === "away" && state.plannedFrom);
   switch (currentKind(state)) {
     case "active":
       return [
         ...(canBeAway ? [away] : []),
-        { kind: "suspended", action: "suspend", label: SUSPENDED_LABEL, detail: SUSPENDED_DETAIL },
+        {
+          kind: "suspended",
+          action: "suspend",
+          label: SUSPENDED_LABEL,
+          detail: SUSPENDED_DETAIL,
+          outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
+        },
         archived,
       ];
     case "suspended":
@@ -531,6 +557,7 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           action: "reinstate",
           label: EMPLOYMENT_STATUS_LABELS.active,
           detail: "Can sign in again on the web and in the app.",
+          outcome: "They'll be Active again and can sign in on the web and in the app.",
         },
         ...(canBeAway ? [away] : []),
         archived,
@@ -542,6 +569,7 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           action: "markActive",
           label: EMPLOYMENT_STATUS_LABELS.active,
           detail: "Back on the schedule from today.",
+          outcome: "They'll be Active again and back on the schedule from today.",
         },
         archived,
       ];
@@ -552,9 +580,20 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           action: "restore",
           label: EMPLOYMENT_STATUS_LABELS.active,
           detail: "Back on staff. Can sign in and be scheduled.",
+          outcome: "They'll be Active again: back on staff, and they can sign in and be scheduled.",
         },
       ];
   }
+}
+
+/**
+ * The change most people in this status want next, offered as the status
+ * card's main button: Reinstate, Mark active or Restore. Active has none, so
+ * its card offers Change status alone.
+ */
+export function suggestedStatusChoice(state: CurrentStatusState): StatusChoice | null {
+  if (currentKind(state) === "active") return null;
+  return statusChoices(state).find((choice) => choice.kind === "active") ?? null;
 }
 
 export type StatusTone = "success" | "warning" | "danger" | "neutral";
@@ -565,7 +604,7 @@ const SINCE_DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numer
  * Where someone stands, for the box at the top of Change status: "Away until
  * Fri, Oct 30" and what that means. The tone is their pill's.
  */
-export function describeCurrentStatus(state: CurrentStatusState): {
+export function describeCurrentStatus(state: StatusState | CurrentStatusState): {
   text: string;
   detail: string;
   tone: StatusTone;
@@ -593,7 +632,7 @@ export function describeCurrentStatus(state: CurrentStatusState): {
         detail:
           state.plannedStatus === "away" && state.plannedFrom
             ? plannedAwaySentence(state.plannedFrom, state.plannedUntil ?? null)
-            : "Can sign in and be scheduled.",
+            : ACTIVE_DETAIL,
         tone: "success",
       };
   }
@@ -610,4 +649,73 @@ export function describePlannedChangeInFull(state: PlannedChangeState): string |
 export function describePlannedChange(state: PlannedChangeState): string | null {
   if (state.plannedStatus !== "away" || !state.plannedFrom) return null;
   return `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(state.plannedFrom)}`;
+}
+
+/** The icon beside a person's name; Active with nothing planned has none. */
+export type StatusMarkKind = "suspended" | "away" | "planned" | "archived";
+
+export interface StatusMark {
+  kind: StatusMarkKind;
+  /** Its hover text and accessible name. */
+  label: string;
+  tone: StatusTone;
+}
+
+/** Which status icon sits after someone's name, and what it says. */
+export function statusMark(state: StatusState): StatusMark | null {
+  switch (currentKind(state)) {
+    case "archived":
+      return { kind: "archived", label: EMPLOYMENT_STATUS_LABELS.removed, tone: "neutral" };
+    case "suspended":
+      return { kind: "suspended", label: SUSPENDED_SCHEDULE_NOTE, tone: "danger" };
+    case "away":
+      return { kind: "away", label: describeCurrentStatus(state).text, tone: "warning" };
+    case "active": {
+      const planned = describePlannedChangeInFull(state);
+      return planned ? { kind: "planned", label: planned, tone: "warning" } : null;
+    }
+  }
+}
+
+export interface StatusCardCopy {
+  /** The status card: where they stand now. */
+  current: { kind: StatusChoiceKind; title: string; detail: string; tone: StatusTone };
+  /** A second, dashed card for an Away planned for later. */
+  planned: { title: string; detail: string } | null;
+}
+
+/**
+ * The status card at the top of a person's profile, in the same words as the
+ * Change status dialog. `absenceName` is the absence their away days hold.
+ */
+export function describeStatusCard(
+  state: StatusState,
+  { absenceName = null }: { absenceName?: string | null } = {},
+): StatusCardCopy {
+  const kind = currentKind(state);
+  const current = describeCurrentStatus(state);
+  const holds = absenceName ? ` ${absenceName} on those days.` : "";
+  const plannedFrom = state.plannedStatus === "away" ? state.plannedFrom : null;
+  return {
+    current: {
+      kind,
+      title: current.text,
+      detail:
+        kind === "active"
+          ? ACTIVE_DETAIL
+          : kind === "away" && state.awayUntil
+            ? `${current.detail}${holds}`
+            : current.detail,
+      tone: current.tone,
+    },
+    planned:
+      kind === "active" && plannedFrom
+        ? {
+            title: `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(plannedFrom, { weekday: true })}`,
+            detail: state.plannedUntil
+              ? `Back ${formatReturnDate(state.plannedUntil, { weekday: true })}.${holds}`
+              : "No return date.",
+          }
+        : null,
+  };
 }

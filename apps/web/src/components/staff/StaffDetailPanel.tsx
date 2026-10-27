@@ -26,7 +26,12 @@ import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StaffPanelFooter } from "./StaffPanelFooter";
-import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
+import {
+  EmployeeStatusActions,
+  StatusCardActions,
+} from "@/components/staff-detail/EmployeeStatusActions";
+import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard";
+import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
 
@@ -159,8 +164,7 @@ export function StaffDetailPanel({
     showPendingInvitationActions ||
     showPermissionsAction ||
     showSendInviteAction ||
-    showManagementAccessAction ||
-    showEmploymentStatusActions;
+    showManagementAccessAction;
   // Person actions are a single, predictable two-column grid. The final action
   // spans both columns when the count is odd, so buttons remain symmetrical
   // whether an organization exposes one, two, three, or more actions.
@@ -213,6 +217,42 @@ export function StaffDetailPanel({
   // own inline Save passes its handler straight through and always spun; this
   // one dropped the promise, so the same operation had two different buttons.
   const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
+
+  const statusActions = (label: string) => (
+    <EmployeeStatusActions
+      employee={employee}
+      canEdit={canManageEmployees}
+      isSelf={false}
+      onDeactivate={onDeactivate}
+      onSetReturnDate={onSetReturnDate}
+      absenceTypes={absenceTypes}
+      onActivate={onActivate}
+      onReinstate={onReinstate}
+      onSuspend={onSuspend}
+      onSetPlannedAway={onSetPlannedAway}
+      onRemove={onRemove}
+      stepUpOpen={statusStepUpOpen}
+      variant="card"
+      label={label}
+      focus="plan"
+    />
+  );
+  const cardActions = (
+    <StatusCardActions
+      employee={employee}
+      canEdit={canManageEmployees}
+      isSelf={false}
+      onDeactivate={onDeactivate}
+      onSetReturnDate={onSetReturnDate}
+      absenceTypes={absenceTypes}
+      onActivate={onActivate}
+      onReinstate={onReinstate}
+      onSuspend={onSuspend}
+      onSetPlannedAway={onSetPlannedAway}
+      onRemove={onRemove}
+      stepUpOpen={statusStepUpOpen}
+    />
+  );
 
   return createPortal(
     <>
@@ -268,6 +308,7 @@ export function StaffDetailPanel({
                 >
                   {getEmployeeDisplayName(employee)}
                 </span>
+                <StatusMarkIcon person={employee} size={14} />
                 <AccessInsignia orgRole={orgRole} size="md" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
@@ -348,6 +389,14 @@ export function StaffDetailPanel({
           ref={scrollRef}
           style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 20 }}
         >
+          <div style={{ padding: "16px 20px 0" }}>
+            <EmployeeStatusCard
+              employee={employee}
+              absenceTypes={absenceTypes}
+              action={showEmploymentStatusActions ? cardActions : undefined}
+              planAction={showEmploymentStatusActions ? statusActions("Edit plan") : undefined}
+            />
+          </div>
           <InlineEditEmployee
             employee={employee}
             orgId={orgId}
@@ -389,10 +438,7 @@ export function StaffDetailPanel({
                 surface, so it is the same popup wherever it opens from. Role
                 already lives in the header's inline select, so this renders
                 only the permissions launcher. */}
-                {(showPermissionsAction ||
-                  showSendInviteAction ||
-                  showManagementAccessAction ||
-                  showEmploymentStatusActions) && (
+                {(showPermissionsAction || showSendInviteAction || showManagementAccessAction) && (
                   <div
                     data-slot="staff-person-actions"
                     className="grid grid-cols-2 items-stretch gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
@@ -457,26 +503,6 @@ export function StaffDetailPanel({
                           ? "Edit Management Access"
                           : "Add to Management"}
                       </Button>
-                    )}
-                    {showEmploymentStatusActions && (
-                      <div className="w-full">
-                        <EmployeeStatusActions
-                          employee={employee}
-                          canEdit={canManageEmployees}
-                          isSelf={false}
-                          onDeactivate={onDeactivate}
-                          onSetReturnDate={onSetReturnDate}
-                          absenceTypes={absenceTypes}
-                          onActivate={onActivate}
-                          onReinstate={onReinstate}
-                          onSuspend={onSuspend}
-                          onSetPlannedAway={onSetPlannedAway}
-                          onRemove={onRemove}
-                          stepUpOpen={statusStepUpOpen}
-                          variant="page"
-                          fillWidth
-                        />
-                      </div>
                     )}
                   </div>
                 )}

@@ -4,19 +4,23 @@ import { useState } from "react";
 import type { AbsenceType, Employee } from "@/types";
 import { Button } from "@/components/Button";
 import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmDialog, { ConfirmSummaryBox } from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedAway } from "@/features/employees/client";
+import { CalendarDays } from "lucide-react";
 import {
-  describeCurrentStatus,
+  AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
+  describeStatusCard,
   PLANNED_START_MAX_DAYS,
   statusChoices,
+  suggestedStatusChoice,
   type StatusAction,
-  type StatusTone,
+  type StatusCardCopy,
 } from "@dubgrid/domain";
+import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusIconCircle } from "./StatusMarkIcon";
 
 export interface EmployeeStatusActionsProps {
   employee: Employee;
@@ -49,7 +53,18 @@ export interface EmployeeStatusActionsProps {
   /** Live absence types; with a return date, one can fill the away days (51f). */
   absenceTypes?: readonly AbsenceType[];
   onRemove: (empId: string, note?: string) => void | Promise<unknown>;
-  variant: "panel" | "page";
+  variant: "panel" | "page" | "card" | "card-quiet";
+  /** The button's label; Edit plan opens the same dialog from the planned card. */
+  label?: string;
+  /** Opens a confirmation for this change alone, as the card's Reinstate does. */
+  initialChoice?: StatusAction;
+  /** Left out of the list because a button beside this one already offers it. */
+  excludeChoice?: StatusAction;
+  /**
+   * For someone with an away planned: Edit plan opens its dates alone, and
+   * Change status the list alone, so the two never offer the same thing.
+   */
+  focus?: "plan" | "status";
   /** Stretches the button to fill its container, for an equal-width row of actions. */
   fillWidth?: boolean;
   /** Hides the confirmation while a step-up prompt asks for fresh proof. */
@@ -95,7 +110,15 @@ function ReturnDateField({
 }
 
 /** The first day away; empty means today, and a later day plans it (51g1). */
-function StartDateField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function StartDateField({
+  value,
+  onChange,
+  hint,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span
@@ -116,6 +139,11 @@ function StartDateField({ value, onChange }: { value: string; onChange: (value: 
         maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
         allowClear
       />
+      {hint ? (
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+          {hint}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -129,10 +157,13 @@ function AwayAbsenceField({
   value,
   absenceTypes,
   onChange,
+  disabled = false,
 }: {
   value: number;
   absenceTypes: readonly AbsenceType[];
   onChange: (value: number) => void;
+  /** Until there's a return date: the absence fills the days up to it. */
+  disabled?: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -147,6 +178,7 @@ function AwayAbsenceField({
       </span>
       <CustomSelect
         ariaLabel="Absence"
+        disabled={disabled}
         value={value}
         options={[
           { value: NO_ABSENCE, label: "No absence" },
@@ -158,81 +190,110 @@ function AwayAbsenceField({
         onChange={onChange}
       />
       <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
-        {AWAY_ABSENCE_HINT}
+        {disabled ? AWAY_ABSENCE_NEEDS_DATE_MESSAGE : AWAY_ABSENCE_HINT}
       </span>
     </div>
   );
 }
+
+/** The tint of the status each choice leads to. */
+const CHOICE_TONES = {
+  active: "success",
+  away: "warning",
+  suspended: "danger",
+  archived: "neutral",
+} as const;
 
 const NOTE_PLACEHOLDERS: Partial<Record<StatusAction, string>> = {
   markAway: "Reason (optional) - e.g. Family leave",
   archive: "Reason (optional) - e.g. Left the company",
 };
 
-const TONE_COLORS: Record<StatusTone, { bg: string; border: string; text: string }> = {
-  success: {
-    bg: "var(--dg-color-success-bg)",
-    border: "var(--dg-color-success-border)",
-    text: "var(--dg-color-success-text)",
-  },
-  warning: {
-    bg: "var(--dg-color-warning-bg)",
-    border: "var(--dg-color-warning-border)",
-    text: "var(--dg-color-warning-text)",
-  },
-  danger: {
-    bg: "var(--dg-color-danger-bg)",
-    border: "var(--dg-color-danger-border)",
-    text: "var(--dg-color-danger-text)",
-  },
-  neutral: {
-    bg: "var(--dg-color-bg-secondary)",
-    border: "var(--dg-color-border-light)",
-    text: "var(--dg-color-text-secondary)",
-  },
-};
+const LABEL_STYLE = {
+  fontSize: "var(--dg-fs-caption)",
+  fontWeight: 600,
+  color: "var(--dg-color-text-secondary)",
+} as const;
 
-/** Where they stand, at the top of the dialog, tinted like their status pill. */
-function CurrentStatusBox({
-  text,
-  detail,
-  tone,
-}: {
-  text: string;
-  detail: string;
-  tone: StatusTone;
-}) {
-  const colors = TONE_COLORS[tone];
+/** Where they stand, at the top of the dialog: the profile's status card, without its tint. */
+function CurrentStatusCard({ card }: { card: StatusCardCopy }) {
+  const { current, planned } = card;
+  const titleColor =
+    current.kind === "active"
+      ? "var(--dg-color-text-primary)"
+      : STATUS_TONE_COLORS[current.tone].text;
   return (
-    <div
-      role="status"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        padding: "10px 12px",
-        borderRadius: "var(--dg-radius-lg)",
-        border: `1px solid ${colors.border}`,
-        background: colors.bg,
-      }}
-    >
-      <span
-        className="dg-tabular-nums"
-        style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: colors.text }}
+    <div role="status" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          borderRadius: "var(--dg-radius-lg)",
+          border: "1px solid var(--dg-color-border)",
+          background: "var(--dg-color-surface)",
+        }}
       >
-        {text}
-      </span>
-      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}>
-        {detail}
-      </span>
+        <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} size={30} />
+        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <span
+            className="dg-tabular-nums"
+            style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: titleColor }}
+          >
+            {current.title}
+          </span>
+          <span
+            className="dg-tabular-nums"
+            style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
+          >
+            {current.detail}
+          </span>
+        </span>
+      </div>
+      {planned ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 12px",
+            borderRadius: "var(--dg-radius-lg)",
+            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+          }}
+        >
+          <StatusIconCircle icon={CalendarDays} tone="warning" size={26} />
+          <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <span
+              className="dg-tabular-nums"
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+                color: STATUS_TONE_COLORS.warning.text,
+              }}
+            >
+              {`Planned: ${planned.title}`}
+            </span>
+            <span
+              className="dg-tabular-nums"
+              style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
+            >
+              {planned.detail}
+            </span>
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 /**
  * Every status change goes through one Change status button and one dialog
- * (51d): a box at the top, tinted like their pill, says where they stand, the list holds only
- * the statuses they can move to, and the confirm button names what happens.
+ * (51d): a card at the top says where they stand, the list holds only the
+ * statuses they can move to, the title and confirm button name what happens,
+ * and what changes is kept apart from what stays the same. With one status to
+ * move to, or opened from a button that names its change, there is no list,
+ * only a sentence saying what it does.
  */
 export function EmployeeStatusActions({
   employee,
@@ -247,6 +308,10 @@ export function EmployeeStatusActions({
   onSetPlannedAway,
   absenceTypes = [],
   variant,
+  label = "Change status",
+  initialChoice,
+  excludeChoice,
+  focus,
   fillWidth = false,
   stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
@@ -286,9 +351,20 @@ export function EmployeeStatusActions({
     addDays(laterStart ? new Date(`${laterStart}T00:00:00`) : new Date(), 1),
   );
   const choices = statusChoices(employee).filter(
-    (option) => !(option.action in handlers) || Boolean(handlers[option.action]),
+    (option) =>
+      option.action !== excludeChoice &&
+      (!(option.action in handlers) || Boolean(handlers[option.action])),
   );
-  const current = describeCurrentStatus(employee);
+  // One status to move to, or a card button that names its own change
+  // (Reinstate, Restore): a confirmation for that change alone, with no list.
+  const onlyChoice =
+    focus === "plan"
+      ? null
+      : choices.length === 1 && !excludeChoice
+        ? choices[0]
+        : initialChoice
+          ? (choices.find((option) => option.action === initialChoice) ?? null)
+          : null;
 
   // The absence only applies with a return date, so it goes when the date does.
   const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
@@ -305,24 +381,32 @@ export function EmployeeStatusActions({
     (laterStart !== employee.plannedFrom ||
       (returnDate || null) !== (employee.plannedUntil ?? null) ||
       chosenAbsenceTypeId !== (employee.plannedAbsenceTypeId ?? null));
+  // Clearing a planned away's start date starts it today instead.
+  const startsNow = hasPlan && !cancellingPlan && !startDate && focus !== "status";
   const plannedAbsenceName =
     absenceTypes.find((absenceType) => absenceType.id === employee.plannedAbsenceTypeId)?.name ??
     null;
+  const statusCard = describeStatusCard(employee, {
+    absenceName: isAway
+      ? absenceTypes.find((absenceType) => absenceType.id === employee.awayAbsenceTypeId)?.name
+      : plannedAbsenceName,
+  });
   const datedFields = (
     <>
       <ReturnDateField value={returnDate} minDate={returnMinDate} onChange={setReturnDate} />
-      {returnDate && absenceTypes.length > 0 ? (
+      {absenceTypes.length > 0 ? (
         <AwayAbsenceField
           value={chosenAbsenceTypeId ?? NO_ABSENCE}
           absenceTypes={absenceTypes}
           onChange={setAbsenceTypeId}
+          disabled={!returnDate}
         />
       ) : null}
     </>
   );
 
   function reset() {
-    setChoice(null);
+    setChoice(onlyChoice?.action ?? null);
     setNote("");
     setReturnDate(initialReturnDate);
     setAbsenceTypeId(initialAbsenceTypeId);
@@ -341,7 +425,11 @@ export function EmployeeStatusActions({
     try {
       switch (choice) {
         case null:
-          if (hasPlan) {
+          if (startsNow) {
+            await (returnDate
+              ? onDeactivate(employee.id, undefined, returnDate, chosenAbsenceTypeId)
+              : onDeactivate(employee.id));
+          } else if (hasPlan) {
             await onSetPlannedAway?.(
               employee.id,
               cancellingPlan || !laterStart
@@ -398,64 +486,116 @@ export function EmployeeStatusActions({
         plannedFrom:
           hasPlan && !(choice === "markAway" && laterStart) ? employee.plannedFrom : null,
       })
-    : cancellingPlan
-      ? describeStatusAction("cancelPlannedChange", displayName, {
-          absenceName: plannedAbsenceName,
+    : startsNow
+      ? describeStatusAction("markAway", displayName, {
+          returnDate: returnDate || null,
+          absenceName: chosenAbsenceName,
         })
-      : planChanged
-        ? describeStatusAction("setPlannedChange", displayName, {
-            startDate: laterStart,
-            returnDate: returnDate || null,
-            absenceName: chosenAbsenceName,
+      : cancellingPlan
+        ? describeStatusAction("cancelPlannedChange", displayName, {
+            absenceName: plannedAbsenceName,
           })
-        : awayDetailsChanged
-          ? describeStatusAction("setReturnDate", displayName, {
+        : planChanged
+          ? describeStatusAction("setPlannedChange", displayName, {
+              startDate: laterStart,
               returnDate: returnDate || null,
-              currentReturnDate: employee.awayUntil ?? null,
               absenceName: chosenAbsenceName,
             })
-          : null;
+          : awayDetailsChanged
+            ? describeStatusAction("setReturnDate", displayName, {
+                returnDate: returnDate || null,
+                currentReturnDate: employee.awayUntil ?? null,
+                absenceName: chosenAbsenceName,
+              })
+            : null;
   const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
+
+  const detailsAboveLine = (
+    <>
+      {isAway && !choice && onSetReturnDate ? datedFields : null}
+      {hasPlan && !choice && onSetPlannedAway && focus !== "status" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {cancellingPlan ? null : (
+            <>
+              <StartDateField
+                value={startDate}
+                onChange={setStartDate}
+                hint="Clear it to start their time away today."
+              />
+              {datedFields}
+            </>
+          )}
+          <Button
+            className="dg-btn dg-btn-ghost dg-btn-xs"
+            style={{ alignSelf: "flex-start" }}
+            onClick={() => setCancellingPlan((value) => !value)}
+          >
+            {cancellingPlan ? "Keep planned away" : "Cancel planned away"}
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+  const ordinary = choice === "markActive" || choice === "reinstate" || choice === "restore";
+  const showList = !onlyChoice && focus !== "plan";
 
   const dialog =
     open && !stepUpOpen ? (
       <ConfirmDialog
         isLoading={pending}
-        title={`Change ${displayName}'s status?`}
+        // Wider than a plain confirm: the status cards carry a line of detail each.
+        maxWidth={540}
+        title={
+          copy?.title ??
+          (focus === "plan"
+            ? `Change ${displayName}'s planned away?`
+            : `Change ${displayName}'s status?`)
+        }
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <CurrentStatusBox text={current.text} detail={current.detail} tone={current.tone} />
-            {isAway && !choice && onSetReturnDate ? datedFields : null}
-            {hasPlan && !choice && onSetPlannedAway ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {cancellingPlan ? null : (
-                  <>
-                    <StartDateField value={startDate} onChange={setStartDate} />
-                    {datedFields}
-                  </>
-                )}
-                <Button
-                  className="dg-btn dg-btn-ghost dg-btn-xs"
-                  style={{ alignSelf: "flex-start" }}
-                  onClick={() => setCancellingPlan((value) => !value)}
-                >
-                  {cancellingPlan ? "Keep planned away" : "Cancel planned away"}
-                </Button>
+            <div
+              style={
+                !showList
+                  ? { display: "flex", flexDirection: "column", gap: 14 }
+                  : {
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                      paddingBottom: 16,
+                      borderBottom: "1px solid var(--dg-color-border)",
+                    }
+              }
+            >
+              <CurrentStatusCard card={statusCard} />
+              {detailsAboveLine}
+            </div>
+            {onlyChoice ? (
+              <span style={{ color: "var(--dg-color-text-primary)" }}>{onlyChoice.outcome}</span>
+            ) : !showList ? null : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={LABEL_STYLE}>Change to</span>
+                <RadioCardList
+                  label="Change to"
+                  options={choices.map((option) => ({
+                    value: option.action,
+                    label: option.label,
+                    detail: option.detail,
+                    icon: (
+                      <StatusIconCircle
+                        icon={STATUS_KIND_ICONS[option.kind]}
+                        tone={CHOICE_TONES[option.kind]}
+                        size={30}
+                      />
+                    ),
+                  }))}
+                  value={choice}
+                  onChange={(next) => {
+                    setChoice(next);
+                    setCancellingPlan(false);
+                  }}
+                />
               </div>
-            ) : null}
-            <RadioCardList
-              label="Status"
-              options={choices.map((option) => ({
-                value: option.action,
-                label: option.label,
-                detail: option.detail,
-              }))}
-              value={choice}
-              onChange={(next) => {
-                setChoice(next);
-                setCancellingPlan(false);
-              }}
-            />
+            )}
             {notePlaceholder ? (
               <input
                 className="dg-input"
@@ -473,18 +613,25 @@ export function EmployeeStatusActions({
               </>
             ) : null}
             {copy?.message ? <span>{copy.message}</span> : null}
+            {copy && copy.points.length > 0 ? (
+              <ConfirmSummaryBox summary={{ title: "Changes", points: copy.points }} />
+            ) : null}
+            {copy && copy.unchanged.length > 0 ? (
+              <ConfirmSummaryBox summary={{ title: "Stays the same", points: copy.unchanged }} />
+            ) : null}
           </div>
         }
-        summary={copy ? { points: copy.points } : undefined}
         confirmLabel={
-          choice || cancellingPlan
+          choice || cancellingPlan || startsNow
             ? (copy?.label ?? "")
-            : (isAway && onSetReturnDate) || (hasPlan && onSetPlannedAway)
+            : (isAway && onSetReturnDate) || (hasPlan && onSetPlannedAway && focus !== "status")
               ? "Save changes"
               : "Change status"
         }
-        confirmDisabled={!choice && !awayDetailsChanged && !planChanged && !cancellingPlan}
-        variant={choice === "archive" ? "danger" : "warning"}
+        confirmDisabled={
+          !choice && !awayDetailsChanged && !planChanged && !cancellingPlan && !startsNow
+        }
+        variant={choice === "archive" ? "danger" : ordinary ? "info" : "warning"}
         onConfirm={confirm}
         onCancel={close}
       />
@@ -497,12 +644,68 @@ export function EmployeeStatusActions({
           reset();
           setOpen(true);
         }}
-        className={variant === "page" ? "dg-btn dg-btn-secondary" : "dg-btn dg-btn-ghost dg-btn-xs"}
+        className={
+          variant === "page"
+            ? "dg-btn dg-btn-secondary"
+            : variant === "card"
+              ? "dg-btn dg-btn-secondary dg-btn-sm"
+              : variant === "card-quiet"
+                ? "dg-btn dg-btn-ghost dg-btn-sm"
+                : "dg-btn dg-btn-ghost dg-btn-xs"
+        }
         style={fillWidth ? { width: "100%", minWidth: 0 } : undefined}
       >
-        Change status
+        {label}
       </Button>
       {dialog}
     </>
+  );
+}
+
+/**
+ * The status card's buttons: the change most people want next (Reinstate,
+ * Mark active, Restore) opens a confirmation for it alone, beside a quieter
+ * Change status that lists the other statuses they can move to. Active people
+ * get Change status alone.
+ */
+export function StatusCardActions(
+  props: Omit<
+    EmployeeStatusActionsProps,
+    "variant" | "label" | "initialChoice" | "excludeChoice" | "focus"
+  >,
+) {
+  // Only changes this surface can make: one without a Reinstate handler offers no Reinstate.
+  const offered = (action: StatusAction) =>
+    (action !== "reinstate" || Boolean(props.onReinstate)) &&
+    (action !== "suspend" || Boolean(props.onSuspend));
+  const likely = suggestedStatusChoice(props.employee);
+  const suggested = likely && offered(likely.action) ? likely : null;
+  if (!suggested) return <EmployeeStatusActions {...props} variant="card" focus="status" />;
+  // Change status lists only what the suggested button doesn't. A lone
+  // remaining change is named on its button instead, except for someone Away,
+  // whose Change status also edits the return date and absence.
+  const rest = statusChoices(props.employee).filter(
+    (option) => option.action !== suggested.action && offered(option.action),
+  );
+  const away = props.employee.status === "inactive" && !props.employee.archivedAt;
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      {rest.length === 1 && !away ? (
+        <EmployeeStatusActions
+          {...props}
+          variant="card-quiet"
+          label={describeStatusAction(rest[0].action, "").label}
+          initialChoice={rest[0].action}
+        />
+      ) : rest.length > 0 ? (
+        <EmployeeStatusActions {...props} variant="card-quiet" excludeChoice={suggested.action} />
+      ) : null}
+      <EmployeeStatusActions
+        {...props}
+        variant="card"
+        label={describeStatusAction(suggested.action, "").label}
+        initialChoice={suggested.action}
+      />
+    </div>
   );
 }

@@ -2598,7 +2598,7 @@ export function MembersSection({
                     copy.message || undefined
                   )
                 }
-                summary={{ points: copy.points }}
+                summary={{ points: [...copy.points, ...copy.unchanged] }}
                 confirmLabel={copy.label}
                 variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
                 isLoading={isBulkActionRunning}

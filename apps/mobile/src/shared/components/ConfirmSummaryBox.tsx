@@ -16,8 +16,9 @@ export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (summary.points.length === 0) return null;
-  // A box with one item reads oddly; a lone fact reads as a sentence.
-  if (summary.points.length === 1) {
+  // A box with one item reads oddly; a lone fact reads as a sentence, unless
+  // a title names the box, as Changes and Stays the same do.
+  if (summary.points.length === 1 && !summary.title) {
     return (
       <AppText style={styles.lone} tone="secondary" variant="body">
         {summary.points[0]}

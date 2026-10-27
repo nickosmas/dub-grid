@@ -19,6 +19,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { MaybeHint } from "@/components/ui/hint";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
@@ -269,6 +270,7 @@ function StaffRowCells({
                   {displayName}
                 </span>
               )}
+              {canViewEmployeeDetails ? <StatusMarkIcon person={emp} /> : null}
               <AccessInsignia orgRole={orgRole} />
               {isYou && (
                 <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">

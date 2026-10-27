@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox";
 import {
-  describeCurrentStatus,
+  AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
   statusChoices,
   type StatusAction,
@@ -116,6 +116,14 @@ import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactC
 import { hasManagementAccess } from "../lib/managementAccess";
 import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { SectionNotice } from "../components/SectionNotice";
+import {
+  STATUS_KIND_ICONS,
+  STATUS_KIND_TONES,
+  StatusCards,
+  StatusIconCircle,
+  StatusMarkIcon,
+  type StatusSheetOpening,
+} from "../components/StatusMark";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import {
   getPersonOrgRole,
@@ -300,6 +308,7 @@ export default function PersonDetailScreen() {
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
   const [statusChoice, setStatusChoice] = useState<StatusAction | null>(null);
+  const [statusOpening, setStatusOpening] = useState<StatusSheetOpening>({});
   const [returnDate, setReturnDate] = useState<string | null>(null);
   /** The first day away; null means today, and a later day plans it (51g1). */
   const [startDate, setStartDate] = useState<string | null>(null);
@@ -922,12 +931,20 @@ export default function PersonDetailScreen() {
     person.status === "active" && person.plannedStatus === "away" && !!person.plannedFrom;
   // A start after today plans the Away rather than starting it.
   const laterStart = startDate && startDate > orgToday ? startDate : null;
+  // Clearing a planned away's start date starts it today instead.
+  const startsNow = hasPlan && !cancellingPlan && !startDate && statusOpening.focus !== "status";
 
   function confirmStatusAction(): Promise<void> | undefined {
     if (confirmAction !== "status" || !person) return;
     const choice: StatusAction =
       statusChoice ??
-      (hasPlan ? (cancellingPlan ? "cancelPlannedChange" : "setPlannedChange") : "setReturnDate");
+      (startsNow
+        ? "markAway"
+        : hasPlan
+          ? cancellingPlan
+            ? "cancelPlannedChange"
+            : "setPlannedChange"
+          : "setReturnDate");
     const dated =
       choice === "markAway" || choice === "setReturnDate" || choice === "setPlannedChange";
     const input = {
@@ -957,10 +974,15 @@ export default function PersonDetailScreen() {
     });
   }
 
-  function openStatusSheet() {
+  function openStatusSheet(opening: StatusSheetOpening = {}) {
     if (!person) return;
     const away = person.status === "inactive";
-    setStatusChoice(null);
+    const options = statusChoices(person).filter((choice) => choice.action !== opening.exclude);
+    setStatusOpening(opening);
+    // With one status to move to, or a button that named its change, there is nothing to pick.
+    setStatusChoice(
+      opening.only ?? (options.length === 1 && !opening.exclude ? options[0].action : null),
+    );
     setInactiveNote("");
     setReturnDate(
       away ? (person.awayUntil ?? null) : hasPlan ? (person.plannedUntil ?? null) : null,
@@ -1005,59 +1027,50 @@ export default function PersonDetailScreen() {
   const chosenAbsenceTypeId = returnDate ? awayAbsenceTypeId : null;
   const chosenAbsence = absenceTypes.find((absenceType) => absenceType.id === chosenAbsenceTypeId);
   const chosenAbsenceName = chosenAbsence ? (chosenAbsence.name ?? chosenAbsence.label) : null;
+  // The absence fills the days up to the return date, so it waits for one.
   const awayAbsenceChoices =
-    returnDate && absenceTypes.length > 0 ? (
-      <ProfileChoiceGroup
-        items={[
-          { id: -1, name: "No absence" },
-          ...absenceTypes.map((absenceType) => ({
-            id: absenceType.id,
-            name: absenceType.name ?? absenceType.label,
-          })),
-        ]}
-        label="Absence"
-        selection="single"
-        selectedIds={[chosenAbsenceTypeId ?? -1]}
-        onToggle={(id) => setAwayAbsenceTypeId(id === -1 ? null : id)}
-      />
+    absenceTypes.length > 0 ? (
+      <View style={styles.statusTop}>
+        <ProfileChoiceGroup
+          items={[
+            { id: -1, name: "No absence", disabled: !returnDate },
+            ...absenceTypes.map((absenceType) => ({
+              id: absenceType.id,
+              name: absenceType.name ?? absenceType.label,
+              disabled: !returnDate,
+            })),
+          ]}
+          label="Absence"
+          selection="single"
+          selectedIds={[chosenAbsenceTypeId ?? -1]}
+          onToggle={(id) => setAwayAbsenceTypeId(id === -1 ? null : id)}
+        />
+        {returnDate ? null : (
+          <Text style={styles.statusMessage}>{AWAY_ABSENCE_NEEDS_DATE_MESSAGE}</Text>
+        )}
+      </View>
     ) : null;
   const isAway = person.status === "inactive";
   const startField = (
     <ReturnDateField
       disabled={statusMutation.isPending}
       emptyLabel="Today"
-      hint={null}
+      hint={hasPlan && !statusChoice ? "Clear it to start their time away today." : null}
       label="Starts"
       minDate={orgToday}
       onChange={setStartDate}
       value={startDate}
     />
   );
-  const choices = statusChoices({ ...person, focusAreaIds: person.focusAreaIds });
-  const currentStatus = describeCurrentStatus(person);
-  // Tinted like their status pill, so the box reads as where they stand.
-  const currentStatusTone = {
-    success: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-      color: mobileColors.successText,
-    },
-    warning: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-      color: mobileColors.warningText,
-    },
-    danger: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-      color: mobileColors.dangerText,
-    },
-    neutral: {
-      backgroundColor: mobileColors.controlNeutralBg,
-      borderColor: mobileColors.controlNeutralBg,
-      color: mobileColors.textSecondary,
-    },
-  };
+  const choices = statusChoices(person).filter((choice) => choice.action !== statusOpening.exclude);
+  const onlyChoice =
+    statusOpening.focus === "plan"
+      ? null
+      : choices.length === 1 && !statusOpening.exclude
+        ? choices[0]
+        : statusOpening.only
+          ? (choices.find((choice) => choice.action === statusOpening.only) ?? null)
+          : null;
   const awayDetailsChanged =
     isAway &&
     (returnDate !== (person.awayUntil ?? null) ||
@@ -1069,6 +1082,7 @@ export default function PersonDetailScreen() {
     (laterStart !== person.plannedFrom ||
       returnDate !== (person.plannedUntil ?? null) ||
       chosenAbsenceTypeId !== (person.plannedAbsenceTypeId ?? null));
+  const showChoices = !onlyChoice && statusOpening.focus !== "plan";
   const plannedAbsence = absenceTypes.find(
     (absenceType) => absenceType.id === person.plannedAbsenceTypeId,
   );
@@ -1080,23 +1094,28 @@ export default function PersonDetailScreen() {
         plannedFrom:
           hasPlan && !(statusChoice === "markAway" && laterStart) ? person.plannedFrom : null,
       })
-    : cancellingPlan
-      ? describeStatusAction("cancelPlannedChange", getFullName(person), {
-          absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
+    : startsNow
+      ? describeStatusAction("markAway", getFullName(person), {
+          returnDate,
+          absenceName: chosenAbsenceName,
         })
-      : planChanged
-        ? describeStatusAction("setPlannedChange", getFullName(person), {
-            startDate: laterStart,
-            returnDate,
-            absenceName: chosenAbsenceName,
+      : cancellingPlan
+        ? describeStatusAction("cancelPlannedChange", getFullName(person), {
+            absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
           })
-        : awayDetailsChanged
-          ? describeStatusAction("setReturnDate", getFullName(person), {
+        : planChanged
+          ? describeStatusAction("setPlannedChange", getFullName(person), {
+              startDate: laterStart,
               returnDate,
-              currentReturnDate: person.awayUntil,
               absenceName: chosenAbsenceName,
             })
-          : null;
+          : awayDetailsChanged
+            ? describeStatusAction("setReturnDate", getFullName(person), {
+                returnDate,
+                currentReturnDate: person.awayUntil,
+                absenceName: chosenAbsenceName,
+              })
+            : null;
   // A return date is the first day back, so the organization's tomorrow at the
   // earliest, or the day after a planned Away's start.
   const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
@@ -1219,9 +1238,9 @@ export default function PersonDetailScreen() {
       {/* The hero is the avatar, the name and the tier's insignia beside it,
           nothing else. A pill under the name used to spell the tier out too,
           and status and account chips sat there before that; each made a
-          second heading out of a fact stated elsewhere. Status reads from the
-          Activate / Deactivate button and the "Status updated" row below, and
-          the role from the editor's Access row. */}
+          second heading out of a fact stated elsewhere. Status is the icon
+          after the name and the status card below, and the role is the
+          editor's Access row. */}
       <ProfileHero
         align="center"
         avatarStyle={{
@@ -1233,12 +1252,16 @@ export default function PersonDetailScreen() {
         initials={getProfileInitials(fullName)}
         orgRole={orgRole}
         title={fullName}
+        titleAdornment={
+          canViewEmployeeDetails ? <StatusMarkIcon person={person} size={18} /> : null
+        }
       />
 
       {/* The contact pair, always both, as tiles the reader can name: a
           missing number or address dims its tile rather than dropping it, so
-          the pair keeps its shape from one person to the next. Everything that
-          manages the person sits at the foot of the page. A viewer the API
+          the pair keeps its shape from one person to the next. Change status
+          sits in the status card below; the rest that manages the person sits
+          at the foot of the page. A viewer the API
           redacts contact details for gets no pair at all: two tiles that can
           never light up would be two things to wonder about. */}
       {!editing && canViewEmployeeDetails ? (
@@ -1262,6 +1285,17 @@ export default function PersonDetailScreen() {
             }}
           />
         </ProfileQuickActions>
+      ) : null}
+
+      {/* Where they stand, in the Change status sheet's words, under the
+          contact pair: the sheet opens from here rather than the page foot. */}
+      {!editing && canViewEmployeeDetails ? (
+        <StatusCards
+          absenceTypes={absenceTypes}
+          disabled={statusMutation.isPending}
+          onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
+          person={person}
+        />
       ) : null}
 
       {/* Where the app account stands, one line under the actions rather than a
@@ -1518,12 +1552,6 @@ export default function PersonDetailScreen() {
                   tone="secondary"
                 />
               ) : null}
-              <Button
-                disabled={statusMutation.isPending || isSelf}
-                label="Change status"
-                onPress={openStatusSheet}
-                tone="secondary"
-              />
             </ProfileActionStack>
           ) : null}
         </>
@@ -1551,7 +1579,16 @@ export default function PersonDetailScreen() {
       <BottomSheetModal
         debugName="Change status"
         dismissDisabled={statusMutation.isPending}
-        header={<SheetHeader title={`Change ${getFullName(person)}'s status?`} />}
+        header={
+          <SheetHeader
+            title={
+              statusCopy?.title ??
+              (statusOpening.focus === "plan"
+                ? `Change ${getFullName(person)}'s planned away?`
+                : `Change ${getFullName(person)}'s status?`)
+            }
+          />
+        }
         // The discard prompt rides inside the sheet: iOS refuses a second
         // Modal while this one is up, so as a sibling it never appeared and a
         // dismissal with a reason typed or a status picked went nowhere.
@@ -1565,11 +1602,17 @@ export default function PersonDetailScreen() {
             <SheetActions
               primaryAction={
                 <Button
-                  disabled={!statusChoice && !awayDetailsChanged && !planChanged && !cancellingPlan}
+                  disabled={
+                    !statusChoice &&
+                    !awayDetailsChanged &&
+                    !planChanged &&
+                    !cancellingPlan &&
+                    !startsNow
+                  }
                   label={
-                    statusChoice || cancellingPlan
+                    statusChoice || cancellingPlan || startsNow
                       ? (statusCopy?.label ?? "")
-                      : isAway || hasPlan
+                      : isAway || (hasPlan && statusOpening.focus !== "status")
                         ? "Save changes"
                         : "Change status"
                   }
@@ -1578,7 +1621,7 @@ export default function PersonDetailScreen() {
                   tone={
                     statusChoice === "archive"
                       ? "danger"
-                      : statusChoice === "markAway" || statusChoice === "suspend"
+                      : statusChoice === "markAway" || statusChoice === "suspend" || startsNow
                         ? "warning"
                         : "primary"
                   }
@@ -1595,68 +1638,68 @@ export default function PersonDetailScreen() {
           </>
         }
       >
-        <View
-          accessibilityRole="summary"
-          style={[styles.currentStatus, currentStatusTone[currentStatus.tone]]}
-        >
-          <Text
-            style={[
-              styles.currentStatusText,
-              { color: currentStatusTone[currentStatus.tone].color },
-            ]}
-          >
-            {currentStatus.text}
-          </Text>
-          <Text style={styles.currentStatusDetail}>{currentStatus.detail}</Text>
+        <View style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}>
+          <StatusCards absenceTypes={absenceTypes} person={person} plain />
+          {isAway && !statusChoice ? (
+            <>
+              <ReturnDateField
+                disabled={statusMutation.isPending}
+                minDate={firstReturnDate}
+                onChange={setReturnDate}
+                value={returnDate}
+              />
+              {awayAbsenceChoices}
+            </>
+          ) : null}
+          {hasPlan && !statusChoice && statusOpening.focus !== "status" ? (
+            <>
+              {cancellingPlan ? null : (
+                <>
+                  {startField}
+                  <ReturnDateField
+                    disabled={statusMutation.isPending}
+                    minDate={firstReturnDate}
+                    onChange={setReturnDate}
+                    value={returnDate}
+                  />
+                  {awayAbsenceChoices}
+                </>
+              )}
+              <Button
+                compact
+                disabled={statusMutation.isPending}
+                label={cancellingPlan ? "Keep planned away" : "Cancel planned away"}
+                onPress={() => setCancellingPlan((value) => !value)}
+                tone="plain"
+              />
+            </>
+          ) : null}
         </View>
-        {isAway && !statusChoice ? (
-          <>
-            <ReturnDateField
-              disabled={statusMutation.isPending}
-              minDate={firstReturnDate}
-              onChange={setReturnDate}
-              value={returnDate}
-            />
-            {awayAbsenceChoices}
-          </>
-        ) : null}
-        {hasPlan && !statusChoice ? (
-          <>
-            {cancellingPlan ? null : (
-              <>
-                {startField}
-                <ReturnDateField
-                  disabled={statusMutation.isPending}
-                  minDate={firstReturnDate}
-                  onChange={setReturnDate}
-                  value={returnDate}
+        {onlyChoice ? (
+          <Text style={styles.statusMessage}>{onlyChoice.outcome}</Text>
+        ) : !showChoices ? null : (
+          <ProfileChoiceGroup
+            items={choices.map((choice) => ({
+              id: choice.action,
+              name: choice.label,
+              detail: choice.detail,
+              leading: (
+                <StatusIconCircle
+                  name={STATUS_KIND_ICONS[choice.kind]}
+                  size={30}
+                  tone={STATUS_KIND_TONES[choice.kind]}
                 />
-                {awayAbsenceChoices}
-              </>
-            )}
-            <Button
-              compact
-              disabled={statusMutation.isPending}
-              label={cancellingPlan ? "Keep planned away" : "Cancel planned away"}
-              onPress={() => setCancellingPlan((value) => !value)}
-              tone="plain"
-            />
-          </>
-        ) : null}
-        <ProfileChoiceGroup
-          items={choices.map((choice) => ({
-            id: choice.action,
-            name: choice.label,
-            detail: choice.detail,
-          }))}
-          label="Status"
-          selection="single"
-          selectedIds={statusChoice ? [statusChoice] : []}
-          onToggle={(id) => {
-            setStatusChoice(id);
-            setCancellingPlan(false);
-          }}
-        />
+              ),
+            }))}
+            label="Change to"
+            selection="single"
+            selectedIds={statusChoice ? [statusChoice] : []}
+            onToggle={(id) => {
+              setStatusChoice(id);
+              setCancellingPlan(false);
+            }}
+          />
+        )}
         {statusChoice === "markAway" || statusChoice === "archive" ? (
           <ProfileTextInput
             editable={!statusMutation.isPending}
@@ -1687,8 +1730,11 @@ export default function PersonDetailScreen() {
         {statusCopy?.message ? (
           <Text style={styles.statusMessage}>{statusCopy.message}</Text>
         ) : null}
-        {statusCopy && statusCopy.points.length > 0 ? (
-          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
+        {statusCopy ? (
+          <ConfirmSummaryBox summary={{ title: "Changes", points: statusCopy.points }} />
+        ) : null}
+        {statusCopy ? (
+          <ConfirmSummaryBox summary={{ title: "Stays the same", points: statusCopy.unchanged }} />
         ) : null}
       </BottomSheetModal>
       <ManagementAccessSheet
@@ -2063,19 +2109,13 @@ const createStyles = (mobileColors: MobileColors) =>
     actionButton: {
       flex: 1,
     },
-    currentStatus: {
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      gap: mobileSpace.xs,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
+    statusTop: {
+      gap: mobileSpace.md,
     },
-    currentStatusText: {
-      ...mobileTextWeighted("body", "semibold"),
-    },
-    currentStatusDetail: {
-      ...mobileText.body,
-      color: mobileColors.textSecondary,
+    statusTopDivided: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      paddingBottom: mobileSpace.lg,
     },
     statusMessage: {
       ...mobileText.body,

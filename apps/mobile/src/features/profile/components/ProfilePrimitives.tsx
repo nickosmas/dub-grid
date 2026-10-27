@@ -88,6 +88,7 @@ export function ProfileHero({
   orgRole,
   avatarStyle,
   avatarTextStyle,
+  titleAdornment,
   style,
   children,
 }: {
@@ -111,6 +112,8 @@ export function ProfileHero({
   orgRole?: string | null;
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
+  /** Drawn right after the name, such as the status icon. */
+  titleAdornment?: ReactNode;
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
@@ -148,6 +151,7 @@ export function ProfileHero({
                   >
                     {title}
                   </Text>
+                  {titleAdornment}
                   <AccessInsignia orgRole={orgRole} size={isCentered ? "lg" : "sm"} />
                 </View>
               ) : null}
@@ -423,6 +427,8 @@ export function ProfileChoiceGroup<TId extends string | number>({
     abbr?: string | null;
     disabled?: boolean;
     disabledReason?: string;
+    /** Drawn before the name, such as the icon of the status a choice leads to. */
+    leading?: ReactNode;
   }>;
   selectedIds: TId[];
   /** `"single"` for a group where choosing one row replaces the last. */
@@ -457,6 +463,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
                 onPress={() => onToggle(item.id)}
                 style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
               >
+                {item.leading}
                 {item.detail ? (
                   <View style={styles.choiceText}>
                     <Text

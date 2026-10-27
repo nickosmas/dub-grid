@@ -5,6 +5,7 @@ import type { Employee, OrganizationRole } from "@/types";
 import { PersonProfileHeader } from "@/components/staff/PersonProfileHeader";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { resolveAvatarSeed } from "@dubgrid/design-tokens";
+import { StatusMarkIcon } from "./StatusMarkIcon";
 
 interface StaffDetailHeaderProps {
   employee: Employee;
@@ -24,6 +25,7 @@ export function StaffDetailHeader({ employee, orgRole, actions }: StaffDetailHea
       employmentType={employee.focusAreaIds.length > 0 ? employee.employmentType : undefined}
       employeeNumber={employee.employeeNumber}
       actions={actions}
+      nameAdornment={<StatusMarkIcon person={employee} size={20} />}
     />
   );
 }

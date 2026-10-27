@@ -79,7 +79,8 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { EmployeeStatusActions } from "./EmployeeStatusActions";
+import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
+import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { RecurringScheduleCard } from "./RecurringScheduleCard";
@@ -902,6 +903,58 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ],
   );
 
+  const statusActions = (person: Employee, label?: string) =>
+    label ? (
+      <EmployeeStatusActions
+        employee={person}
+        canEdit={perms.canManageEmployees}
+        isSelf={isSelfAction(currentUser?.id, person.userId)}
+        onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
+          runStatusChange((token) =>
+            returnDate || startDate
+              ? handleDeactivate(empId, note, token, returnDate, absenceTypeId, startDate)
+              : handleDeactivate(empId, note, token),
+          )
+        }
+        onActivate={handleActivate}
+        onSetReturnDate={handleSetReturnDate}
+        onReinstate={handleReinstate}
+        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSetPlannedAway={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        }
+        absenceTypes={absenceTypes}
+        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        stepUpOpen={Boolean(statusStepUp.dialog)}
+        variant="card"
+        label={label}
+        focus="plan"
+      />
+    ) : (
+      <StatusCardActions
+        employee={person}
+        canEdit={perms.canManageEmployees}
+        isSelf={isSelfAction(currentUser?.id, person.userId)}
+        onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
+          runStatusChange((token) =>
+            returnDate || startDate
+              ? handleDeactivate(empId, note, token, returnDate, absenceTypeId, startDate)
+              : handleDeactivate(empId, note, token),
+          )
+        }
+        onActivate={handleActivate}
+        onSetReturnDate={handleSetReturnDate}
+        onReinstate={handleReinstate}
+        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSetPlannedAway={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        }
+        absenceTypes={absenceTypes}
+        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        stepUpOpen={Boolean(statusStepUp.dialog)}
+      />
+    );
+
   const isLoading = loading || orgLoading || perms.isLoading;
 
   if (!perms.isLoading && !perms.canViewEmployeeDetails) {
@@ -944,6 +997,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           {activeSection === "profile" && (
             <div className="space-y-6">
               <StaffDetailHeader employee={employee} orgRole={effectiveOrgRole} />
+              <EmployeeStatusCard
+                employee={employee}
+                absenceTypes={absenceTypes}
+                action={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee)
+                    : undefined
+                }
+                planAction={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee, "Edit plan")
+                    : undefined
+                }
+              />
 
               {perms.canManageEmployees && pendingInvite && (
                 <PendingInvitationBanner
@@ -1176,38 +1243,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       Add to schedule
                     </Button>
                   ) : null}
-                  <EmployeeStatusActions
-                    employee={employee}
-                    canEdit={perms.canManageEmployees}
-                    isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                    onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
-                      runStatusChange((token) =>
-                        returnDate || startDate
-                          ? handleDeactivate(
-                              empId,
-                              note,
-                              token,
-                              returnDate,
-                              absenceTypeId,
-                              startDate,
-                            )
-                          : handleDeactivate(empId, note, token),
-                      )
-                    }
-                    onActivate={handleActivate}
-                    onSetReturnDate={handleSetReturnDate}
-                    onReinstate={handleReinstate}
-                    onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
-                    onSetPlannedAway={(empId, plan) =>
-                      runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
-                    }
-                    absenceTypes={absenceTypes}
-                    onRemove={(empId, note) =>
-                      runStatusChange((token) => handleRemove(empId, note, token))
-                    }
-                    stepUpOpen={Boolean(statusStepUp.dialog)}
-                    variant="page"
-                  />
                 </div>
               )}
             </div>

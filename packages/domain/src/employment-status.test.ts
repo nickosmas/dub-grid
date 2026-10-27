@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  suggestedStatusChoice,
+  describeStatusCard,
+  statusMark,
   EMPLOYMENT_STATUS_LABELS,
   canMarkInactive,
   describeCurrentStatus,
@@ -125,15 +128,32 @@ describe("describeStatusAction", () => {
   });
 
   it("tells the manager that Away keeps sign-in and Archive ends it", () => {
-    expect(describeStatusAction("markAway", "Ana").points[0]).toBe(
+    expect(describeStatusAction("markAway", "Ana").unchanged).toEqual([
       "They can still sign in and keep their role.",
-    );
+    ]);
     expect(describeStatusAction("archive", "Ana").points[0]).toBe("They can no longer sign in.");
+    expect(describeStatusAction("archive", "Ana").unchanged).toEqual([
+      "Past records stay, and you can restore them later.",
+    ]);
+  });
+
+  it("keeps what changes apart from what stays the same", () => {
+    const suspend = describeStatusAction("suspend", "Ana");
+    expect(suspend.points).toEqual([
+      "They're signed out on every device and can't sign in.",
+      "Open requests they're part of are closed, and pickups they claimed go back up for others.",
+    ]);
+    expect(suspend.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
+    expect(describeStatusAction("cancelPlannedChange", "Ana")).toMatchObject({
+      points: ["They stay Active and can be scheduled on those days again."],
+      unchanged: ["Shifts already taken off those days stay off."],
+    });
   });
 
   it("keeps the box to two or more full sentences, or none", () => {
     for (const action of ["markAway", "archive", "markActive", "restore"] as const) {
-      const { points } = describeStatusAction(action, "Ana");
+      const copy = describeStatusAction(action, "Ana");
+      const points = [...copy.points, ...copy.unchanged];
       // A box with one item reads oddly: a lone fact belongs in the message.
       expect(points.length === 0 || points.length >= 2).toBe(true);
       for (const point of points) expect(point).toMatch(/^[A-Z].*\.$/);
@@ -192,8 +212,8 @@ describe("describeStatusAction with a return date", () => {
     expect(copy.message).toBe(
       "They won't be scheduled before Mon, Jan 4, when they're back to Active.",
     );
+    expect(copy.unchanged).toEqual(["They can still sign in and keep their role."]);
     expect(copy.points).toEqual([
-      "They can still sign in and keep their role.",
       "Shifts before Jan 4 come off the schedule in the draft.",
       "Recurring schedules pause and fill again from Jan 4.",
       "Open requests for days before Jan 4 are closed.",
@@ -206,6 +226,7 @@ describe("describeStatusAction with a return date", () => {
       title: "Set a return date for Ana Torres?",
       message: "They're back to Active on Mon, Jan 4, and can be scheduled from then.",
       points: [],
+      unchanged: [],
       done: "Return date set",
     });
   });
@@ -240,7 +261,6 @@ describe("describeStatusAction with a return date", () => {
     const options = { returnDate: RETURN, absenceName: "Vacation" };
 
     expect(describeStatusAction("markAway", "Ana Torres", options).points).toEqual([
-      "They can still sign in and keep their role.",
       "Every day until Jan 4 shows Vacation in the draft, in place of any shift.",
       "Recurring schedules pause and fill again from Jan 4.",
       "Open requests for days before Jan 4 are closed.",
@@ -291,6 +311,7 @@ describe("describeStatusAction reinstate", () => {
       title: "Reinstate Ana Torres?",
       message: "",
       points: [],
+      unchanged: [],
       done: "Reinstated",
     });
   });
@@ -329,10 +350,36 @@ describe("statusChoices", () => {
     ]);
   });
 
+  it("offers no second Away to someone with an away planned", () => {
+    expect(
+      kinds({ status: "active", plannedStatus: "away", plannedFrom: "2026-11-10", ...onSchedule }),
+    ).toEqual(["Suspended:suspend", "Archived:archive"]);
+  });
+
   it("only restores an archived person", () => {
     expect(kinds({ status: "removed", archivedAt: "2026-10-01T00:00:00Z", ...onSchedule })).toEqual(
       ["Active:restore"],
     );
+  });
+
+  it("says what each choice does, in one sentence, for when it's the only one", () => {
+    const [restore] = statusChoices({
+      status: "removed",
+      archivedAt: "2026-10-01T00:00:00Z",
+      ...onSchedule,
+    });
+    expect(restore.outcome).toBe(
+      "They'll be Active again: back on staff, and they can sign in and be scheduled.",
+    );
+    for (const state of [
+      { status: "active" as const, ...onSchedule },
+      { status: "inactive" as const, ...onSchedule },
+      { status: "active" as const, suspendedAt: "2026-10-26T12:00:00Z", ...onSchedule },
+    ]) {
+      for (const choice of statusChoices(state)) {
+        expect(choice.outcome).toMatch(new RegExp(`^They'll be ${choice.label}\\b.*\\.$`));
+      }
+    }
   });
 
   it("never offers the status they're in", () => {
@@ -477,5 +524,109 @@ describe("isValidPlannedStart", () => {
     expect(isValidPlannedStart("2027-10-27", "2026-10-27")).toBe(true);
     expect(isValidPlannedStart("2027-10-28", "2026-10-27")).toBe(false);
     expect(isValidPlannedStart("soon", "2026-10-27")).toBe(false);
+  });
+});
+
+describe("statusMark", () => {
+  it("marks Suspended, Away, a planned away and Archived, and leaves Active bare", () => {
+    expect(statusMark({ status: "active" })).toBeNull();
+    expect(statusMark({ status: "active", suspendedAt: "2026-10-26T12:00:00Z" })).toEqual({
+      kind: "suspended",
+      label: "Suspended: won't see this in the app",
+      tone: "danger",
+    });
+    expect(statusMark({ status: "inactive", awayUntil: "2027-01-04" })).toEqual({
+      kind: "away",
+      label: "Away until Mon, Jan 4",
+      tone: "warning",
+    });
+    expect(statusMark({ status: "inactive" })?.label).toBe("Away");
+    expect(
+      statusMark({
+        status: "active",
+        plannedStatus: "away",
+        plannedFrom: "2026-11-10",
+        plannedUntil: "2027-01-04",
+      }),
+    ).toEqual({ kind: "planned", label: "Away from Nov 10, back Jan 4", tone: "warning" });
+    expect(statusMark({ status: "removed" })).toEqual({
+      kind: "archived",
+      label: "Archived",
+      tone: "neutral",
+    });
+  });
+});
+
+describe("describeStatusCard", () => {
+  it("says where they stand, and a planned away on a card of its own", () => {
+    expect(
+      describeStatusCard(
+        {
+          status: "active",
+          plannedStatus: "away",
+          plannedFrom: "2026-11-10",
+          plannedUntil: "2027-01-04",
+        },
+        { absenceName: "Vacation" },
+      ),
+    ).toEqual({
+      current: {
+        kind: "active",
+        title: "Active",
+        detail: "Can sign in and be scheduled.",
+        tone: "success",
+      },
+      planned: {
+        title: "Away from Tue, Nov 10",
+        detail: "Back Mon, Jan 4. Vacation on those days.",
+      },
+    });
+  });
+
+  it("names the absence an Away person's days hold, and nothing planned", () => {
+    const card = describeStatusCard(
+      { status: "inactive", awayUntil: "2027-01-04" },
+      { absenceName: "Vacation" },
+    );
+    expect(card.current).toMatchObject({
+      kind: "away",
+      title: "Away until Mon, Jan 4",
+      detail: "Keeps sign-in. Not scheduled while away. Vacation on those days.",
+    });
+    expect(card.planned).toBeNull();
+    expect(
+      describeStatusCard({ status: "active", suspendedAt: "2026-10-26T12:00:00Z" }).current,
+    ).toMatchObject({ kind: "suspended", detail: "Can't sign in. Stays on the schedule." });
+  });
+});
+
+describe("suggestedStatusChoice", () => {
+  const onSchedule = { focusAreaIds: [7] };
+
+  it("offers bringing them back first, and nothing for someone Active", () => {
+    expect(
+      suggestedStatusChoice({
+        status: "active",
+        suspendedAt: "2026-10-26T12:00:00Z",
+        ...onSchedule,
+      })?.action,
+    ).toBe("reinstate");
+    expect(suggestedStatusChoice({ status: "inactive", ...onSchedule })?.action).toBe("markActive");
+    expect(
+      suggestedStatusChoice({
+        status: "removed",
+        archivedAt: "2026-10-01T00:00:00Z",
+        ...onSchedule,
+      })?.action,
+    ).toBe("restore");
+    expect(suggestedStatusChoice({ status: "active", ...onSchedule })).toBeNull();
+    expect(
+      suggestedStatusChoice({
+        status: "active",
+        plannedStatus: "away",
+        plannedFrom: "2026-11-10",
+        ...onSchedule,
+      }),
+    ).toBeNull();
   });
 });

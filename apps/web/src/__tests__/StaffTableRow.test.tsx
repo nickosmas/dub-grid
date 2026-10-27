@@ -199,6 +199,39 @@ describe("StaffTableRow column gating", () => {
     expect(getByText("Away until Jan 4")).toBeInTheDocument();
   });
 
+  it("draws the status icon right after the name, and none while Active", () => {
+    for (const [state, name, kind] of [
+      [
+        { status: "active", suspendedAt: "2026-10-26T12:00:00Z" },
+        "Suspended: won't see this in the app",
+        "suspended",
+      ],
+      [{ status: "inactive", awayUntil: "2027-01-04" }, "Away until Mon, Jan 4", "away"],
+      [
+        {
+          status: "active",
+          plannedStatus: "away",
+          plannedFrom: "2026-11-10",
+          plannedUntil: "2027-01-04",
+        },
+        "Away from Nov 10, back Jan 4",
+        "planned",
+      ],
+      [{ status: "removed" }, "Archived", "archived"],
+    ] as const) {
+      const { getByRole, unmount } = renderRow(true, true, state);
+      expect(getByRole("img", { name })).toHaveAttribute("data-status-mark", kind);
+      unmount();
+    }
+    const { container } = renderRow(true);
+    expect(container.querySelector("[data-status-mark]")).toBeNull();
+  });
+
+  it("keeps the status icon from people who can't see staff details", () => {
+    const { container } = renderRow(false, true, { status: "inactive" });
+    expect(container.querySelector("[data-status-mark]")).toBeNull();
+  });
+
   it("shows status only when the selected tab combines employee statuses", () => {
     const { queryByText } = renderRow(true, false);
 

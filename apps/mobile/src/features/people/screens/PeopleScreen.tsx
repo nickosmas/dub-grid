@@ -82,6 +82,7 @@ import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { StatusMarkIcon } from "../components/StatusMark";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -1187,7 +1188,7 @@ function PersonRow({
   /** A staff record's status; a pill names it unless they're Active. */
   staffStatus?: Pick<
     MobilePerson,
-    "status" | "awayUntil" | "suspendedAt" | "plannedStatus" | "plannedFrom"
+    "status" | "awayUntil" | "suspendedAt" | "plannedStatus" | "plannedFrom" | "plannedUntil"
   >;
   subtitle: string;
   isLast: boolean;
@@ -1236,6 +1237,7 @@ function PersonRow({
             <Text numberOfLines={1} style={styles.personName}>
               {name}
             </Text>
+            {staffStatus ? <StatusMarkIcon person={staffStatus} /> : null}
             {orgRoleBadge ? (
               <View style={orgRoleBadge.containerStyle}>
                 <MaterialCommunityIcons

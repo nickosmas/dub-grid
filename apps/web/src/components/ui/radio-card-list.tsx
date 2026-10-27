@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/Button";
 
 export interface RadioCardOption<T extends string | number> {
@@ -10,6 +11,8 @@ export interface RadioCardOption<T extends string | number> {
   detail?: string | null;
   /** An accented line under the detail, such as what only this choice can change. */
   note?: string | null;
+  /** Drawn in place of the radio; the picked card then carries a check. */
+  icon?: ReactNode;
 }
 
 interface RadioCardListProps<T extends string | number> {
@@ -44,7 +47,7 @@ export function RadioCardList<T extends string | number>({
             onClick={() => onChange(option.value)}
             style={{
               display: "flex",
-              alignItems: "flex-start",
+              alignItems: option.icon ? "center" : "flex-start",
               gap: 12,
               padding: "12px 14px",
               borderRadius: "var(--dg-radius-lg)",
@@ -55,33 +58,37 @@ export function RadioCardList<T extends string | number>({
               cursor: "pointer",
             }}
           >
+            {option.icon ?? (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 18,
+                  height: 18,
+                  marginTop: 1,
+                  flexShrink: 0,
+                  borderRadius: 9,
+                  border: `2px solid ${checked ? "var(--dg-color-primary)" : "var(--dg-color-border-strong)"}`,
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {checked ? (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      background: "var(--dg-color-primary)",
+                    }}
+                  />
+                ) : null}
+              </span>
+            )}
             <span
-              aria-hidden="true"
-              style={{
-                width: 18,
-                height: 18,
-                marginTop: 1,
-                flexShrink: 0,
-                borderRadius: 9,
-                border: `2px solid ${checked ? "var(--dg-color-primary)" : "var(--dg-color-border-strong)"}`,
-                boxSizing: "border-box",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}
             >
-              {checked ? (
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    background: "var(--dg-color-primary)",
-                  }}
-                />
-              ) : null}
-            </span>
-            <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
               <span
                 style={{
                   fontSize: "var(--dg-fs-label)",
@@ -111,6 +118,13 @@ export function RadioCardList<T extends string | number>({
                 </span>
               ) : null}
             </span>
+            {option.icon && checked ? (
+              <CircleCheck
+                aria-hidden="true"
+                size={18}
+                style={{ flexShrink: 0, color: "var(--dg-color-primary)" }}
+              />
+            ) : null}
           </Button>
         );
       })}

@@ -208,7 +208,9 @@ export function PersonStaffActions({
               ) : null}
             </div>
           }
-          summary={{ points: copyFor(statusChange).points }}
+          summary={{
+            points: [...copyFor(statusChange).points, ...copyFor(statusChange).unchanged],
+          }}
           confirmLabel={copyFor(statusChange).label}
           variant={statusChange === "activate" ? "info" : "danger"}
           isLoading={busy}
