@@ -20,6 +20,17 @@ describe("getMobileStatusPill", () => {
     expect(archived?.textStyle.color).toBe(mobileColors.textSecondary);
   });
 
+  it("says Suspended in the danger tone for someone stored active", () => {
+    const pill = getMobileStatusPill(mobileColors, {
+      status: "active",
+      awayUntil: null,
+      suspendedAt: "2026-10-27T05:00:00Z",
+    });
+
+    expect(pill?.label).toBe("Suspended");
+    expect(pill?.textStyle.color).toBe(mobileColors.dangerText);
+  });
+
   it("shows nothing for an active person", () => {
     expect(getMobileStatusPill(mobileColors, { status: "active", awayUntil: null })).toBeNull();
   });

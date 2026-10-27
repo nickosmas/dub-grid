@@ -411,7 +411,7 @@ describe("StaffDetailPage", () => {
     // Once in the banner, once as the Record card's account state.
     expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
 
@@ -526,7 +526,7 @@ describe("StaffDetailPage", () => {
     await screen.findByText("Work details");
     expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
     // Management settings always open in a popup, never inline in the card.
@@ -740,11 +740,11 @@ describe("StaffDetailPage", () => {
   });
 
   it.each([
-    ["Mark away", deactivateEmployee],
-    ["Archive", removeEmployee],
+    ["Mark away", /^Away/, deactivateEmployee],
+    ["Archive", /^Archived/, removeEmployee],
   ] as const)(
     "%s asks a Gridmaster for fresh proof and retries with the assured token",
-    async (confirmLabel, statusCall) => {
+    async (confirmLabel, choice, statusCall) => {
       const refusal = Object.assign(new Error("Confirm your identity."), {
         status: 403,
         code: "STEP_UP_REQUIRED",
@@ -755,10 +755,10 @@ describe("StaffDetailPage", () => {
         .mockResolvedValueOnce({ ...mockEmployee, status: "inactive", version: 2 });
 
       render(<StaffDetailPage employeeId="emp-1" />);
-      fireEvent.click(await screen.findByRole("button", { name: confirmLabel }));
-      fireEvent.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: confirmLabel }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Change status" }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("radio", { name: choice }));
+      fireEvent.click(within(dialog).getByRole("button", { name: confirmLabel }));
 
       await waitFor(() => expect(statusCall).toHaveBeenCalledTimes(2));
       expect(stepUpPrompt).toHaveBeenCalledOnce();

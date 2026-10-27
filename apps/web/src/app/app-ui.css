@@ -1752,6 +1752,11 @@ button.dg-cc-sg-main {
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* A scrolling box clips its sides too, which cut the 3px focus ring off
+     every field at the edge. The padding gives the ring room and the margin
+     takes it back, so the content sits exactly where it did. */
+  padding: 4px;
+  margin: -4px;
 }
 /* A pinned action row keeps 16px on both sides of its buttons, so the modal's
    own bottom padding tightens to match instead of stacking underneath. */

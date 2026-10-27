@@ -179,6 +179,7 @@ type MobilePeopleRow = Pick<
   | "statusNote"
   | "awayUntil"
   | "awayAbsenceTypeId"
+  | "suspendedAt"
   | "certificationId"
   | "roleIds"
   | "seniority"
@@ -2061,6 +2062,7 @@ export async function fetchMobilePeople(
     statusNote: row.status_note ?? "",
     awayUntil: row.away_until ?? null,
     awayAbsenceTypeId: row.away_absence_type_id ?? null,
+    suspendedAt: row.suspended_at ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority ?? 0,

@@ -12,7 +12,7 @@ import AuthTransitionScreen from "@/components/AuthTransitionScreen";
 import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { preloadDashboardView } from "@/components/dashboard/preloadDashboardView";
 import { Button } from "@/components/Button";
-import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
+import { ACCOUNT_DISABLED_CODE, ACCOUNT_SUSPENDED_CODE } from "@dubgrid/domain";
 import { withThemeParam } from "@/lib/theme-preference";
 import { consumeAuthTransition, markAuthTransition } from "@/lib/auth-transition";
 import { setUserViewActive } from "@/hooks";
@@ -35,6 +35,7 @@ import {
 } from "@/features/account/client";
 import { ORG_NOT_FOUND_PARAM } from "./constants";
 import {
+  AccessSuspendedModal,
   AccountDisabledModal,
   apexLoginHref,
   resolvePostLoginDestination,
@@ -245,6 +246,7 @@ export default function OrgLogin({
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
+  const [accessSuspended, setAccessSuspended] = useState(false);
   const [gridmasterPortalRequired, setGridmasterPortalRequired] = useState(false);
   const [handoffActive, setHandoffActive] = useState(false);
   const [handoffFailed, setHandoffFailed] = useState(false);
@@ -338,6 +340,12 @@ export default function OrgLogin({
         }
         if (res.status === 403 && result?.code === ACCOUNT_DISABLED_CODE) {
           setAccountDisabled(true);
+          setPassword("");
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result?.code === ACCOUNT_SUSPENDED_CODE) {
+          setAccessSuspended(true);
           setPassword("");
           setLoading(false);
           return;
@@ -649,6 +657,7 @@ export default function OrgLogin({
           </Card>
         </div>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
+        {accessSuspended && <AccessSuspendedModal onClose={() => setAccessSuspended(false)} />}
       </PageShell>
     </PublicRoute>
   );

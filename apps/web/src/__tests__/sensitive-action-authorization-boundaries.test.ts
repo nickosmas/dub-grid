@@ -81,8 +81,11 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bcanManageEmployees\s*\(/,
       // Removal signs the person out everywhere; marking inactive (Away) doesn't (51a).
       /if \(action === "remove" && currentEmployee\.userId\) \{\s*try \{\s*await revokeAllUserSessions\(/,
-      // A Gridmaster taking a staff record out needs fresh proof before any read or write (F-96).
-      /if \(isGridmaster && \(action === "deactivate" \|\| action === "remove"\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
+      // A Gridmaster taking a staff record out or suspending it needs fresh
+      // proof before any read or write (F-96, 51c).
+      /if \(isGridmaster && \(action === "deactivate" \|\| action === "remove" \|\| action === "suspend"\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
+      // Suspension signs only the suspended person out (51c).
+      /if \(action === "suspend" && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {
@@ -312,6 +315,12 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   "apps/web/src/features/mobile/server/routes/auth-login.ts": [
     /if \(clientHasGoneAway\(req, startedAt\)\) \{[\s\S]*?discardSession\(payload\.session\.accessToken\)[\s\S]*?status: 504/,
     /const verified = await verifyAccessToken\(accessToken\);[\s\S]*?endUserSession\(verified\.userId, verified\.sessionId\)/,
+  ],
+  // Suspending ends the suspended person's sessions, never the caller's, and
+  // only after the core has checked canManageEmployees and the guards (51c).
+  // Gridmasters can't reach mobile, so no fresh-proof step is owed.
+  "apps/web/src/features/mobile/server/routes/people-status.ts": [
+    /endAccess: async \(serviceClient, \{ userId, orgId \}\) => \{\s*try \{\s*await endUserSessions\(userId\);/,
   ],
   "apps/web/src/features/mobile/server/routes/person.ts": [
     /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,

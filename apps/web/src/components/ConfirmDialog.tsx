@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef } from "react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -92,6 +92,9 @@ export default function ConfirmDialog({
     variant === "warning" ? { background: "var(--dg-color-warning)", border: "none" } : undefined;
 
   const descId = useId();
+  // Opening on Cancel, not the close button now in the corner: the safe
+  // choice is the one a stray Enter takes.
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const actionDisabled = confirmBusy || secondaryBusy;
   const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
@@ -105,9 +108,9 @@ export default function ConfirmDialog({
     <Modal
       title={title}
       returnFocus={returnFocus}
+      initialFocus={cancelRef}
       onClose={onCancel}
       onRequestClose={() => !actionDisabled}
-      showCloseButton={false}
       style={{ maxWidth }}
       aria-describedby={descId}
     >
@@ -150,6 +153,7 @@ export default function ConfirmDialog({
         }}
       >
         <Button
+          ref={cancelRef}
           className="dg-btn dg-btn-secondary"
           onClick={onCancel}
           disabled={actionDisabled}

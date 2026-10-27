@@ -57,7 +57,11 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
         ) : null}
         <RecordField
           label="Status"
-          value={describeEmploymentStatus(employee.status, employee.awayUntil)}
+          value={describeEmploymentStatus(
+            employee.status,
+            employee.awayUntil,
+            employee.suspendedAt,
+          )}
         />
         <RecordField
           label="Status changed"

@@ -24,7 +24,6 @@ export function StepUpDialog({ method, error, onConfirm, onCancel }: StepUpDialo
         if (!inFlight.current) onCancel();
         return false;
       }}
-      showCloseButton={false}
       aria-describedby={`${id}-description`}
       className="max-w-md"
     >

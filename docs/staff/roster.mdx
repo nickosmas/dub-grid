@@ -47,15 +47,16 @@ A Super Admin sets each person's access in the **Access** column: **User**, **Ad
 
 Changing the access of someone whose invitation is still pending sends them a new invitation, and their old link stops working.
 
-## Active, Away, and Archived
+## Active, Away, Suspended, and Archived
 
-| Status       | What it means                                                            |
-| ------------ | ------------------------------------------------------------------------ |
-| **Active**   | On the schedule and able to sign in. Only active staff can be scheduled. |
-| **Away**     | Off the schedule for now. They keep their role and can still sign in.    |
-| **Archived** | No longer on staff: off the schedule and unable to sign in.              |
+| Status        | What it means                                                                           |
+| ------------- | --------------------------------------------------------------------------------------- |
+| **Active**    | On the schedule and able to sign in. Only active staff can be scheduled.                |
+| **Away**      | Off the schedule for now. They keep their role and can still sign in.                   |
+| **Suspended** | Can't sign in on the web or in the app, but stays on the schedule and keeps their role. |
+| **Archived**  | No longer on staff: off the schedule and unable to sign in.                             |
 
-To change someone's status, select **Mark away** or **Archive**, with an optional reason. Only someone on the schedule can be marked away; someone with no focus area can only be archived. **Mark active** brings an Away person back, and **Restore** brings back someone archived. You can also select several people and use **Mark away**, **Mark active**, **Restore**, or **Archive** together.
+To change someone's status, select **Change status** on their record or in the People panel. It shows their status now and lists only the statuses they can move to; pick one, add an optional reason where it asks, and confirm. The button names what happens, such as **Mark away**, **Suspend**, **Reinstate** or **Restore**. Only someone on the schedule can be marked away. Suspending someone signs them out everywhere at once, emails them that their access is suspended, and alerts your other Super Admins. Their open requests close, and a pickup they claimed goes back up for others. They stay on the schedule with a lock beside their name, since they won't see their shifts in the app until you reinstate them. You can also select several people and use **Mark away**, **Mark active**, **Restore**, or **Archive** together.
 
 When someone is marked away or archived:
 
@@ -65,7 +66,7 @@ When someone is marked away or archived:
 
 ### Away until a date
 
-When you mark someone away, you can give a **Return date**: the first day they're back. Until then they show as **Away until** that date. You can change or clear it later with **Change return date**.
+When you mark someone away, you can give a **Return date**: the first day they're back. Until then they show as **Away until** that date. You can change or clear it, and its absence, later from **Change status**.
 
 - Only the days before the return date are cleared, and they can be scheduled again from that date, even while still Away.
 - Their recurring schedules pause instead of stopping, and fill again from the return date.

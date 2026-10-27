@@ -109,6 +109,8 @@ const APP_AUTH_EMAILS: AppAuthEmail[] = [
 const NOT_SIGN_IN_EMAILS: Record<string, string> = {
   DemoRequestEmail: "Goes to DubGrid sales, not to an account holder.",
   TrialWelcomeEmail: "A billing welcome, not a sign-in event.",
+  AccessSuspendedEmail:
+    "Their organization's decision about their access, which only it can lift, so it points them to their administrator.",
 };
 
 /**

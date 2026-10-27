@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:7bc38cbc17ace34420009af51ffbc398a0408cb46bcf95af257bd999fb23b6da",
+  "sourceDigest": "sha256:1e7820cef4811c0257dab2c2e8e98e7670f8804c5b13d3720ba397c9bf3135c0",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4794,6 +4794,26 @@
       "sha256": "0bdc2d44dd8526cc033bdd53596a06692957f06751b5bc2815a8430b78bdb313",
       "source": {
         "path": "supabase/migrations/100_away_absence.sql"
+      }
+    },
+    {
+      "id": "migration:101_suspended_access.sql",
+      "version": "101",
+      "name": "suspended_access",
+      "file": "101_suspended_access.sql",
+      "sha256": "4f6394d21ba5f0d0049a1d9a78bb54ea915e15aa131c14a42f509e89bb2d85cc",
+      "source": {
+        "path": "supabase/migrations/101_suspended_access.sql"
+      }
+    },
+    {
+      "id": "migration:102_suspension_closes_requests.sql",
+      "version": "102",
+      "name": "suspension_closes_requests",
+      "file": "102_suspension_closes_requests.sql",
+      "sha256": "7920069a3fbb9a67e84f80d55a4f71dea5d87e8bfe1a842b2fa18f076549af9c",
+      "source": {
+        "path": "supabase/migrations/102_suspension_closes_requests.sql"
       }
     }
   ],

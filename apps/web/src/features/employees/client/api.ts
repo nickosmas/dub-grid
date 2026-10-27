@@ -312,7 +312,7 @@ async function updateEmployeeStatus(
   input: {
     empId: string;
     orgId: string;
-    action: "deactivate" | "activate" | "remove" | "setReturnDate";
+    action: "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | "suspend";
     expectedVersion: number;
     note?: string;
     returnDate?: string | null;
@@ -418,6 +418,25 @@ export function setEmployeeReturnDate(
     returnDate,
     absenceTypeId: returnDate ? absenceTypeId : null,
   });
+}
+
+/** Suspends someone's access (51c); a Gridmaster passes fresh proof as the token. */
+export function suspendEmployee(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+  accessToken?: string,
+): Promise<Employee> {
+  return updateEmployeeStatus({ empId, orgId, action: "suspend", expectedVersion }, accessToken);
+}
+
+/** Gives a suspended person (51c) their access back. */
+export function reinstateEmployee(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+): Promise<Employee> {
+  return updateEmployeeStatus({ empId, orgId, action: "reinstate", expectedVersion });
 }
 
 export function activateEmployee(

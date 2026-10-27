@@ -12,6 +12,7 @@ export interface DbEmployee {
   status_note: string;
   away_until?: string | null;
   away_absence_type_id?: number | null;
+  suspended_at?: string | null;
   certification_id: number | null;
   role_ids: number[];
   seniority: number;

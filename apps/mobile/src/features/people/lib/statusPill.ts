@@ -11,21 +11,39 @@ import {
 
 /**
  * The status pill a People row shows for anyone not Active: "Away until Jan 4",
- * "Away" or "Archived", in the tones web uses. Active people show none.
+ * "Away", "Suspended" or "Archived". Active people show none.
  */
 export function getMobileStatusPill(
   mobileColors: MobileColors,
-  person: Pick<MobilePerson, "status" | "awayUntil">,
+  person: Pick<MobilePerson, "status" | "awayUntil"> & { suspendedAt?: string | null },
 ) {
-  if (person.status === "active") return null;
+  const suspended = person.status === "active" && Boolean(person.suspendedAt);
+  if (person.status === "active" && !suspended) return null;
   const away = person.status === "inactive";
+  const tone = suspended
+    ? {
+        bg: mobileColors.dangerSoft,
+        border: mobileColors.dangerBorder,
+        text: mobileColors.dangerText,
+      }
+    : away
+      ? {
+          bg: mobileColors.warningSoft,
+          border: mobileColors.warningBorder,
+          text: mobileColors.warningText,
+        }
+      : {
+          bg: mobileColors.controlNeutralBg,
+          border: mobileColors.controlNeutralBg,
+          text: mobileColors.textSecondary,
+        };
   return {
-    label: describeEmploymentStatus(person.status, person.awayUntil),
+    label: describeEmploymentStatus(person.status, person.awayUntil, person.suspendedAt),
     containerStyle: {
       ...mobilePillOverflow.displayContainer,
       alignItems: "center" as const,
-      backgroundColor: away ? mobileColors.warningSoft : mobileColors.controlNeutralBg,
-      borderColor: away ? mobileColors.warningBorder : mobileColors.controlNeutralBg,
+      backgroundColor: tone.bg,
+      borderColor: tone.border,
       borderRadius: mobileRadii.pill,
       borderWidth: 1,
       paddingHorizontal: mobileSpace.sm,
@@ -35,7 +53,7 @@ export function getMobileStatusPill(
       ...mobileTextWeighted("caption", "bold"),
       ...mobileTabularText,
       ...mobilePillOverflow.displayText,
-      color: away ? mobileColors.warningText : mobileColors.textSecondary,
+      color: tone.text,
     },
   };
 }

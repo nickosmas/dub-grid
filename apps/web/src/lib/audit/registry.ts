@@ -510,6 +510,16 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     suppressKeys: ["awayUntil"],
   },
+  "employee.suspended": {
+    category: "people",
+    severity: "delete",
+    headline: (d, ctx) => `Suspended ${who(d, ctx, "a team member")}'s access`,
+  },
+  "employee.reinstated": {
+    category: "people",
+    severity: "create",
+    headline: (d, ctx) => `Reinstated ${who(d, ctx, "a team member")}'s access`,
+  },
   "employee.removed": {
     category: "people",
     severity: "delete",

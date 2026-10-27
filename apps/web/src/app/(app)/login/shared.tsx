@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
 import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import { ACCESS_SUSPENDED_BODY, ACCESS_SUSPENDED_TITLE } from "@dubgrid/domain";
 
 export { POST_LOGIN_DESTINATION };
 
@@ -103,6 +104,23 @@ export function useSessionInvalidToast() {
 // hook refuses terminated employees with a sentinel message that the route
 // translates into this structured response. A modal (not a toast) so the user
 // has to acknowledge it and there's no ambiguity with the generic 401 toast.
+
+// Shown for code ACCOUNT_SUSPENDED (51c): the hook refuses a suspended
+// employee in this organization. Calm, since nothing is wrong with the account.
+export function AccessSuspendedModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title={ACCESS_SUSPENDED_TITLE} onClose={onClose} className="dg-modal--account-disabled">
+      <p className="dg-auth-modal-copy">{ACCESS_SUSPENDED_BODY}</p>
+      <Button
+        type="button"
+        onClick={onClose}
+        className="dg-btn dg-btn-primary dg-auth-state-primary"
+      >
+        OK
+      </Button>
+    </Modal>
+  );
+}
 
 export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
   return (

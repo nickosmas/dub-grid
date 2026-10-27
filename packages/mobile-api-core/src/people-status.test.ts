@@ -64,10 +64,24 @@ function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expect
           version: 2,
         }),
     ),
+    updateEmployeeSuspension: vi.fn(
+      async (_client: SupabaseClient, input: { suspended: boolean }) =>
+        employee({
+          ...current,
+          suspendedAt: input.suspended ? "2026-10-27T05:00:00.000Z" : null,
+          version: 2,
+        }),
+    ),
+    endAccess: vi.fn(async () => undefined),
     insertAuditLog: vi.fn(async () => undefined),
     mapEmployeeToMobilePerson: vi.fn(
       (person: Employee) =>
-        ({ id: person.id, status: person.status, awayUntil: person.awayUntil }) as MobilePerson,
+        ({
+          id: person.id,
+          status: person.status,
+          awayUntil: person.awayUntil,
+          suspendedAt: person.suspendedAt ?? null,
+        }) as MobilePerson,
     ),
     fetchActiveMembershipOrgRole: vi.fn(async () => null),
     countActiveSuperAdmins: vi.fn(async () => 2),
@@ -250,5 +264,64 @@ describe("updateMobilePersonStatus with a return date", () => {
       expect.anything(),
       expect.objectContaining({ status: "active", awayUntil: null }),
     );
+  });
+});
+
+describe("updateMobilePersonStatus suspending", () => {
+  it("suspends someone, ends their access and records it", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), { action: "suspend" });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "updated",
+      person: { status: "active", suspendedAt: "2026-10-27T05:00:00.000Z" },
+    });
+    expect(deps.updateEmployeeSuspension).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ suspended: true, updatedBy: "manager-1" }),
+    );
+    expect(deps.endAccess).toHaveBeenCalledWith(expect.anything(), {
+      userId: "user-9",
+      orgId: ORG_ID,
+    });
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "employee.suspended" }),
+    );
+  });
+
+  it("refuses to suspend someone who isn't active", async () => {
+    const { deps, result } = run(employee({ status: "inactive" }), { action: "suspend" });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "invalid_status_change",
+      code: "NOT_SUSPENDABLE",
+    });
+    expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+  });
+
+  it("refuses to suspend the only super admin", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), { action: "suspend" });
+    deps.fetchActiveMembershipOrgRole.mockResolvedValue("super_admin" as never);
+    deps.countActiveSuperAdmins.mockResolvedValue(1);
+
+    await expect(result).resolves.toMatchObject({ kind: "cannot_remove_last_super_admin" });
+    expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+  });
+
+  it("reinstates without ending anything, and refuses someone not suspended", async () => {
+    const suspended = run(employee({ suspendedAt: "2026-10-26T00:00:00Z" }), {
+      action: "reinstate",
+    });
+    await expect(suspended.result).resolves.toMatchObject({
+      kind: "updated",
+      person: { suspendedAt: null },
+    });
+    expect(suspended.deps.endAccess).not.toHaveBeenCalled();
+
+    const active = run(employee(), { action: "reinstate" });
+    await expect(active.result).resolves.toMatchObject({
+      kind: "invalid_status_change",
+      code: "NOT_SUSPENDED",
+    });
   });
 });

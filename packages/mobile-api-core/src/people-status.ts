@@ -11,6 +11,10 @@ import {
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
+  NOT_SUSPENDABLE_CODE,
+  NOT_SUSPENDABLE_MESSAGE,
+  NOT_SUSPENDED_CODE,
+  NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
@@ -78,6 +82,23 @@ type UpdateEmployeeReturnDate = (
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
+
+type UpdateEmployeeSuspension = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    suspended: boolean;
+    updatedBy: string;
+  },
+) => Promise<Employee | null>;
+
+/** Signs someone out everywhere and stops their push in one organization. */
+type EndAccess = (
+  serviceClient: SupabaseClient,
+  input: { userId: string; orgId: string },
+) => Promise<void>;
 
 type InsertAuditLog = (
   serviceClient: SupabaseClient,
@@ -151,6 +172,12 @@ type PeopleStatusResult =
       status: 400;
     }
   | {
+      kind: "invalid_status_change";
+      error: string;
+      code: typeof NOT_SUSPENDABLE_CODE | typeof NOT_SUSPENDED_CODE;
+      status: 400;
+    }
+  | {
       kind: "latest_unavailable";
       error: string;
       status: 500;
@@ -173,6 +200,8 @@ export async function updateMobilePersonStatus(
     fetchEmployeeById: FetchEmployeeById;
     updateEmployeeStatus: UpdateEmployeeStatus;
     updateEmployeeReturnDate: UpdateEmployeeReturnDate;
+    updateEmployeeSuspension: UpdateEmployeeSuspension;
+    endAccess: EndAccess;
     insertAuditLog: InsertAuditLog;
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
     fetchActiveMembershipOrgRole: FetchActiveMembershipOrgRole;
@@ -248,6 +277,10 @@ export async function updateMobilePersonStatus(
     returnDate === null
   ) {
     return awayAbsenceInvalid(AWAY_ABSENCE_NEEDS_DATE_MESSAGE);
+  }
+
+  if (input.body.action === "suspend" || input.body.action === "reinstate") {
+    return changeSuspension(auth, input, currentEmployee, deps);
   }
 
   try {
@@ -492,6 +525,118 @@ async function setReturnDate(
         : {}),
       changedFields: ["away_until"],
     },
+    ip_address: input.requestIp,
+    user_agent: input.userAgent,
+  });
+
+  return {
+    kind: "updated",
+    person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+    status: 200,
+  };
+}
+
+/**
+ * Suspends someone (51c), signing them out everywhere and stopping their
+ * push, or reinstates them. They stay Active either way.
+ */
+async function changeSuspension(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
+  const suspending = input.body.action === "suspend";
+  if (
+    suspending &&
+    (currentEmployee.status !== "active" ||
+      currentEmployee.archivedAt ||
+      currentEmployee.suspendedAt)
+  ) {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_SUSPENDABLE_MESSAGE,
+      code: NOT_SUSPENDABLE_CODE,
+      status: 400,
+    };
+  }
+  if (!suspending && !currentEmployee.suspendedAt) {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_SUSPENDED_MESSAGE,
+      code: NOT_SUSPENDED_CODE,
+      status: 400,
+    };
+  }
+
+  if (suspending && currentEmployee.userId) {
+    const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      currentEmployee.userId,
+    );
+    if (
+      targetOrgRole === "super_admin" &&
+      (await deps.countActiveSuperAdmins(auth.serviceClient, auth.currentOrg.id)) <= 1
+    ) {
+      return {
+        kind: "cannot_remove_last_super_admin",
+        error: "Cannot suspend the only super admin. Transfer ownership first.",
+        status: 400,
+      };
+    }
+  }
+
+  const updatedEmployee = await deps.updateEmployeeSuspension(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: input.employeeId,
+    expectedVersion: input.body.expectedVersion,
+    suspended: suspending,
+    updatedBy: auth.user.id,
+  });
+
+  if (!updatedEmployee) {
+    const latestEmployee = await deps.fetchEmployeeById(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      input.employeeId,
+    );
+    if (!latestEmployee) {
+      return {
+        kind: "latest_unavailable",
+        error: "We couldn't load the latest employee state.",
+        status: 500,
+      };
+    }
+    return {
+      kind: "conflict",
+      error: STATUS_CONFLICT_MESSAGE,
+      code: "EMPLOYEE_STATUS_CONFLICT",
+      person: deps.mapEmployeeToMobilePerson(latestEmployee),
+      status: 409,
+    };
+  }
+
+  if (suspending && currentEmployee.userId) {
+    await deps.endAccess(auth.serviceClient, {
+      userId: currentEmployee.userId,
+      orgId: auth.currentOrg.id,
+    });
+  }
+
+  await deps.insertAuditLog(auth.serviceClient, {
+    org_id: auth.currentOrg.id,
+    actor_id: auth.user.id,
+    actor_email: auth.user.email ?? null,
+    action: suspending ? "employee.suspended" : "employee.reinstated",
+    resource_type: "employee",
+    resource_id: input.employeeId,
+    details: { changedFields: ["suspended_at"] },
     ip_address: input.requestIp,
     user_agent: input.userAgent,
   });

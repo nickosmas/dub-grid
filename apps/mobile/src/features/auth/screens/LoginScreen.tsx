@@ -3,7 +3,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiResponseError } from "@dubgrid/api-client";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
-import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
+import {
+  ACCESS_SUSPENDED_BODY,
+  ACCESS_SUSPENDED_TITLE,
+  ACCOUNT_DISABLED_CODE,
+  ACCOUNT_DISABLED_MESSAGE,
+  ACCOUNT_SUSPENDED_CODE,
+} from "@dubgrid/domain";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { resolvePostLoginDestination } from "../lib/post-login-destination";
 import { Platform, StyleSheet, TextInput, View } from "react-native";
@@ -374,6 +380,18 @@ export default function LoginScreen() {
           message: ACCOUNT_DISABLED_MESSAGE,
           tone: "error",
         });
+        setPassword("");
+        return;
+      }
+      if (
+        loginError instanceof ApiResponseError &&
+        loginError.status === 403 &&
+        loginError.payload &&
+        typeof loginError.payload === "object" &&
+        (loginError.payload as { code?: unknown }).code === ACCOUNT_SUSPENDED_CODE
+      ) {
+        setError(ACCESS_SUSPENDED_BODY);
+        pushToast({ title: ACCESS_SUSPENDED_TITLE, message: ACCESS_SUSPENDED_BODY, tone: "info" });
         setPassword("");
         return;
       }

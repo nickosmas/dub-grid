@@ -1183,7 +1183,7 @@ function PersonRow({
   navigable: boolean;
   orgRole: MobileOrgRole;
   /** A staff record's status; a pill names it unless they're Active. */
-  staffStatus?: Pick<MobilePerson, "status" | "awayUntil">;
+  staffStatus?: Pick<MobilePerson, "status" | "awayUntil" | "suspendedAt">;
   subtitle: string;
   isLast: boolean;
   onPress: () => void;

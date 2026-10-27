@@ -349,12 +349,20 @@ Item 51 is split:
   activity log, with Mark away, Archive, Mark active and Restore as separate
   actions; a calm "You're away." bar replaces the warning bar; Settings >
   Billing lists who takes a seat and who isn't billed. No migration.
-- **51c - Suspended: access:** can't sign in (signed out everywhere, push
-  off), an "Access suspended" message on web and mobile, and Reinstate.
-  Needs a migration.
-- **51d - Suspended: managing it:** the Suspend dialog and Reinstate, a lock
-  on the grid row, "won't see this in the app" in the shift picker, the
-  notice email and the Super Admin alert, and their open requests close.
+- **51c - Suspended: access:** shipped; a suspended person stays Active and
+  on the schedule but can't sign in to that organization (the hook refuses
+  them), is signed out everywhere and gets no push, and sees "Access
+  suspended" at sign-in on web and mobile. Suspended pills, and Reinstate in
+  place of Mark away, on web, mobile and Gridmaster (migration 101). The
+  Suspend dialog is 51d.
+- **51d - Suspended: managing it:** shipped; one Change status button and
+  dialog (web and mobile) replaces the separate status buttons: a tinted box
+  says where they stand and only the statuses they can move to are listed,
+  Suspend among them. Every confirmation has a close button. A suspended
+  person's grid row carries a lock, Assign open shift says "won't see this
+  in the app", suspending emails them and alerts the other Super Admins, and
+  their open requests close while a pickup they claimed goes back up
+  (migration 102).
 - **51e - Away until a date:** shipped; Mark away takes an optional return
   date (web and mobile), the person is schedulable again from that date, and
   a daily job sets them back to Active in the organization's timezone. Their
@@ -582,7 +590,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `100`.
+  checksum-locked through `102`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

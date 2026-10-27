@@ -128,8 +128,8 @@ function StaffFacts({
         label="Status"
         value={
           employee.statusChangedAt
-            ? `${describeEmploymentStatus(employee.status, employee.awayUntil)} since ${formatDay(employee.statusChangedAt)}`
-            : describeEmploymentStatus(employee.status, employee.awayUntil)
+            ? `${describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)} since ${formatDay(employee.statusChangedAt)}`
+            : describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)
         }
       />
       <PersonField

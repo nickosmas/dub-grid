@@ -129,7 +129,9 @@ describe("ConfirmDialog dismissal", () => {
         screen.getByRole("button", { name: action === "primary" ? "Discard mine" : "Discard all" }),
       );
       expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Close modal" })).toBeNull();
+      // Every confirmation has a close button (owner, 2026-10-27); a running
+      // request blocks it like every other exit.
+      fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
       fireEvent.click(screen.getByRole("presentation"));
       fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
       await new Promise((resolve) => setTimeout(resolve, 180));

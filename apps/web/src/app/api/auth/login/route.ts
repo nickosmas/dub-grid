@@ -4,7 +4,10 @@ import { z } from "zod";
 import {
   ACCOUNT_DISABLED_CODE,
   ACCOUNT_DISABLED_MESSAGE,
+  ACCOUNT_SUSPENDED_CODE,
+  ACCOUNT_SUSPENDED_MESSAGE,
   isAccountDisabledMessage,
+  isAccountSuspendedMessage,
 } from "@dubgrid/domain";
 import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -488,6 +491,19 @@ export async function POST(req: NextRequest) {
           code: ACCOUNT_DISABLED_CODE,
           error: ACCOUNT_DISABLED_MESSAGE,
         },
+        { status: 403 },
+      );
+    }
+    // A suspended employee (101) gets their own code, for "Access suspended".
+    if (isAccountSuspendedMessage(error.message)) {
+      await writeSecurityAuditEvent({
+        event: "security.auth.login",
+        outcome: "rejected",
+        reason: "account_suspended",
+        metadata: { targetHash: emailHash, surface: "web" },
+      });
+      return NextResponse.json(
+        { success: false, code: ACCOUNT_SUSPENDED_CODE, error: ACCOUNT_SUSPENDED_MESSAGE },
         { status: 403 },
       );
     }

@@ -1088,10 +1088,10 @@
         Inactive and Removed in pills, tabs and filters on web, mobile and
         Gridmaster; a calm Away banner replaces the read-only bar; billing
         breaks down who takes a seat.
-  - [ ] 51c. **Suspended: access** - can't sign in (signed out everywhere,
+  - [x] 51c. **Suspended: access** - can't sign in (signed out everywhere,
         push off), an "Access suspended" message on web and mobile, and
         Reinstate. Needs a migration.
-  - [ ] 51d. **Suspended: managing it** - the Suspend dialog and Reinstate,
+  - [x] 51d. **Suspended: managing it** - the Suspend dialog and Reinstate,
         a lock on the grid row, "won't see this in the app" in the shift
         picker, the notice email and the Super Admin alert, and their open
         requests close.

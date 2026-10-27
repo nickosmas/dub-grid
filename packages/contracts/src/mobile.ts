@@ -991,6 +991,8 @@ export const mobilePersonSchema = z.object({
   awayUntil: z.string().date().nullable().default(null),
   /** The absence their away days hold, or null. */
   awayAbsenceTypeId: z.number().int().nullable().default(null),
+  /** When their access was suspended, or null. */
+  suspendedAt: z.string().nullable().default(null),
   userId: z.string().uuid().nullable().default(null),
   version: z.number().int().nonnegative().default(0),
   /**
@@ -1081,7 +1083,7 @@ export const mobileOrgStatusResponseSchema = z.object({
 });
 
 export const mobilePersonStatusUpdateBodySchema = z.object({
-  action: z.enum(["deactivate", "activate", "remove", "setReturnDate"]),
+  action: z.enum(["deactivate", "activate", "remove", "setReturnDate", "suspend", "reinstate"]),
   expectedVersion: z.number().int().nonnegative(),
   note: z.string().trim().max(500).optional(),
   /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */

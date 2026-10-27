@@ -1,4 +1,9 @@
-import { ACCOUNT_DISABLED_MESSAGE, isAccountDisabledMessage } from "@dubgrid/domain";
+import {
+  ACCESS_SUSPENDED_BODY,
+  ACCOUNT_DISABLED_MESSAGE,
+  isAccountDisabledMessage,
+  isAccountSuspendedMessage,
+} from "@dubgrid/domain";
 
 /** Shape of the GoTrue AuthError fields this needs, without importing the SDK. */
 export type SignInFailure = { message?: string; status?: number; code?: string };
@@ -22,6 +27,7 @@ export const EXISTING_ACCOUNT_MESSAGE =
 export function describeSignInFailure(error: SignInFailure, registerStatus: string): string {
   // The JWT hook refuses a disabled account with a user-facing sentinel.
   if (isAccountDisabledMessage(error.message)) return ACCOUNT_DISABLED_MESSAGE;
+  if (isAccountSuspendedMessage(error.message)) return ACCESS_SUSPENDED_BODY;
 
   const httpStatus = typeof error.status === "number" ? error.status : null;
 

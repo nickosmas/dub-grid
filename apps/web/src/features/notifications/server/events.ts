@@ -124,6 +124,11 @@ export type NotificationEvent =
       toStatus: string;
     }
   | {
+      action: "employee_suspended";
+      orgId: string;
+      empId: string;
+    }
+  | {
       action: "employee_profile_changed";
       orgId: string;
       empId: string;
@@ -335,6 +340,8 @@ function getShiftRequestTypeLabel(type: "pickup" | "swap" | "calloff"): string {
 function capitalize(value: string): string {
   return value.length > 0 ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
 }
+
+export const SUSPENDED_ALERT_BODY = "They can't sign in. Their shifts stay on the schedule.";
 
 async function getOrgSuperAdmins(orgId: string): Promise<string[]> {
   const db = getServiceClient();
@@ -1070,6 +1077,32 @@ async function dispatchNotificationEventInternal(
               fromStatus: event.fromStatus,
               toStatus: event.toStatus,
             },
+          ),
+        ),
+      );
+      return;
+    }
+
+    // The suspended person can't sign in to read an alert, so they get an
+    // email instead (suspension-notice.ts); the other Super Admins get this.
+    case "employee_suspended": {
+      const [empUserId, empName, superAdmins] = await Promise.all([
+        getEmployeeUserId(event.empId),
+        getEmployeeName(event.empId),
+        getOrgSuperAdmins(event.orgId),
+      ]);
+      const recipients = superAdmins.filter(
+        (userId) => userId !== actorUserId && userId !== empUserId,
+      );
+      await Promise.all(
+        recipients.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "employee_status_changed" as NotificationType,
+            `${empName} is suspended`,
+            SUSPENDED_ALERT_BODY,
+            { empId: event.empId, toStatus: "suspended" },
           ),
         ),
       );

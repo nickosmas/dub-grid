@@ -297,6 +297,36 @@ describe("mobile auth login route", () => {
     });
   });
 
+  it("returns 403 ACCOUNT_SUSPENDED when the JWT hook refuses a suspended employee", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    createClient.mockReturnValue(
+      createSessionClientMock({
+        signInError: {
+          message: "Your access has been suspended. Contact your organization admin.",
+        },
+      }),
+    );
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Your access has been suspended. Contact your organization admin.",
+      code: "ACCOUNT_SUSPENDED",
+    });
+  });
+
   it("returns 429 when the mobile login rate limit is hit", async () => {
     checkRateLimit.mockResolvedValue({
       limited: true,

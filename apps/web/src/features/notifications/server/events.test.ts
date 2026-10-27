@@ -1137,4 +1137,39 @@ describe("dispatchNotificationEvent", () => {
       );
     });
   });
+
+  it("alerts the other Super Admins that someone is suspended, not the actor or them", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "employees") {
+        return makeSingleRowBuilder({
+          user_id: "suspended-user",
+          first_name: "Priya",
+          last_name: "Shah",
+        });
+      }
+      return makeMembershipBuilder({
+        superAdmins: [
+          { user_id: "actor-user" },
+          { user_id: "other-super-admin" },
+          { user_id: "suspended-user" },
+        ],
+      });
+    });
+
+    await dispatchNotificationEvent("actor-user", {
+      action: "employee_suspended",
+      orgId: "org-1",
+      empId: "emp-1",
+    });
+
+    expect(sendNotification).toHaveBeenCalledOnce();
+    expect(sendNotification).toHaveBeenCalledWith(
+      "other-super-admin",
+      "org-1",
+      "employee_status_changed",
+      "Priya Shah is suspended",
+      "They can't sign in. Their shifts stay on the schedule.",
+      { empId: "emp-1", toStatus: "suspended" },
+    );
+  });
 });

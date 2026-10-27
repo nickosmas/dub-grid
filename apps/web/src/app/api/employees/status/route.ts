@@ -5,10 +5,12 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessions, revokeAllUserSessions } from "@/lib/auth/revocation";
+import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import logger from "@/lib/logger";
+import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
@@ -24,6 +26,10 @@ import {
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_CODE,
   NOT_ON_SCHEDULE_MESSAGE,
+  NOT_SUSPENDABLE_CODE,
+  NOT_SUSPENDABLE_MESSAGE,
+  NOT_SUSPENDED_CODE,
+  NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
@@ -38,7 +44,7 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
-  action: z.enum(["deactivate", "activate", "remove", "setReturnDate"]),
+  action: z.enum(["deactivate", "activate", "remove", "setReturnDate", "suspend", "reinstate"]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
   /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
@@ -152,7 +158,7 @@ export async function POST(req: NextRequest) {
 
     // Taking a staff record out of the organization is an access removal, so a
     // Gridmaster needs fresh proof for it; reactivating does not (F-96).
-    if (isGridmaster && (action === "deactivate" || action === "remove")) {
+    if (isGridmaster && (action === "deactivate" || action === "remove" || action === "suspend")) {
       const assurance = await requireSensitiveActionAuth(req);
       if ("response" in assurance) return assurance.response;
     }
@@ -184,6 +190,25 @@ export async function POST(req: NextRequest) {
     if (action === "deactivate" && !canMarkInactive(currentEmployee.focusAreaIds)) {
       return NextResponse.json(
         { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (
+      action === "suspend" &&
+      (currentEmployee.status !== "active" ||
+        currentEmployee.archivedAt ||
+        currentEmployee.suspendedAt)
+    ) {
+      return NextResponse.json(
+        { error: NOT_SUSPENDABLE_MESSAGE, code: NOT_SUSPENDABLE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (action === "reinstate" && !currentEmployee.suspendedAt) {
+      return NextResponse.json(
+        { error: NOT_SUSPENDED_MESSAGE, code: NOT_SUSPENDED_CODE },
         { status: 400 },
       );
     }
@@ -222,7 +247,7 @@ export async function POST(req: NextRequest) {
     // super_admin here would lock the org out just as surely as deleting their
     // membership would — the same guard DELETE /api/organizations/access
     // applies before letting a super_admin be removed.
-    if (action === "remove" && currentEmployee.userId) {
+    if ((action === "remove" || action === "suspend") && currentEmployee.userId) {
       const { data: targetMembership } = await serviceClient
         .from("organization_memberships")
         .select("org_role")
@@ -241,7 +266,12 @@ export async function POST(req: NextRequest) {
 
         if ((count ?? 0) <= 1) {
           return NextResponse.json(
-            { error: "Cannot remove the only super admin. Transfer ownership first." },
+            {
+              error:
+                action === "suspend"
+                  ? "Cannot suspend the only super admin. Transfer ownership first."
+                  : "Cannot remove the only super admin. Transfer ownership first.",
+            },
             { status: 400 },
           );
         }
@@ -304,6 +334,18 @@ export async function POST(req: NextRequest) {
           toStatus: "active",
         };
         break;
+      case "suspend":
+        update.suspended_at = now;
+        update.suspended_by = user.id;
+        auditAction = "employee.suspended";
+        auditDetails = {};
+        break;
+      case "reinstate":
+        update.suspended_at = null;
+        update.suspended_by = null;
+        auditAction = "employee.reinstated";
+        auditDetails = {};
+        break;
       case "remove":
         update.status = "removed";
         update.status_note = note ?? "";
@@ -358,6 +400,27 @@ export async function POST(req: NextRequest) {
     // locally now. Org-scoped routes would still reject them on the
     // per-request membership check; this covers the routes that only
     // authenticate. Non-fatal: never fail the status change over it.
+    // A suspension signs them out of every device and stops their push here;
+    // the hook refuses their next sign-in and refresh (101).
+    if (action === "suspend" && currentEmployee.userId) {
+      try {
+        await endUserSessions(currentEmployee.userId);
+        await disableMobilePushTokensForOrg(serviceClient, {
+          userId: currentEmployee.userId,
+          orgId,
+        });
+      } catch (err) {
+        logger.error(
+          { error: err, orgId, empId, userId: currentEmployee.userId, action },
+          "Failed to end sessions or push after suspending",
+        );
+      }
+    }
+
+    if (action === "suspend") {
+      scheduleSuspensionNotice({ orgId, empId, actorId: user.id });
+    }
+
     if (action === "remove" && currentEmployee.userId) {
       try {
         await revokeAllUserSessions(currentEmployee.userId);
@@ -422,7 +485,13 @@ export async function POST(req: NextRequest) {
       resource_id: empId,
       details: {
         ...auditDetails,
-        changedFields: [action === "setReturnDate" ? "away_until" : "status"],
+        changedFields: [
+          action === "setReturnDate"
+            ? "away_until"
+            : action === "suspend" || action === "reinstate"
+              ? "suspended_at"
+              : "status",
+        ],
       },
       ip_address: getRequestIp(req),
       user_agent: req.headers.get("user-agent"),
