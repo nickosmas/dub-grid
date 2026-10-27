@@ -140,6 +140,13 @@ let lastStaffDetailPanelProps: {
   orgRole?: OrganizationRole | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
   onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+  onDeactivate?: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
+    startDate?: string | null,
+  ) => unknown;
 } | null = null;
 
 vi.mock("@/components/staff/ManagementStaffPanel", () => ({
@@ -179,6 +186,13 @@ vi.mock("@/components/staff/StaffDetailPanel", () => ({
     orgRole?: OrganizationRole | null;
     onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
     onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+    onDeactivate?: (
+      empId: string,
+      note?: string,
+      returnDate?: string | null,
+      absenceTypeId?: number | null,
+      startDate?: string | null,
+    ) => unknown;
   }) => {
     lastStaffDetailPanelProps = props;
     return <div data-testid="staff-detail-panel" />;
@@ -433,6 +447,31 @@ describe("MembersSection — management-only view access", () => {
     expect(screen.getByRole("dialog", { name: "Add to management" })).toBeInTheDocument();
     expect(screen.getByTestId("employee-management-access-editor")).toBeInTheDocument();
     expect(lastStaffDetailPanelProps).not.toHaveProperty("managementAccessEditor");
+  });
+
+  it("hands the panel's Schedule away on with its start date, so it plans rather than starts", async () => {
+    const user = userEvent.setup();
+    const onDeactivate = vi.fn();
+    renderMembersSection({
+      canManageEmployees: true,
+      employees: [makeEmployee({ id: "emp-1" })],
+      onDeactivate,
+    });
+
+    const row = screen.getByText("Pat Doe").closest("tr");
+    if (!row) throw new Error("Expected to find the employee row");
+    await user.click(row);
+    await act(async () => {
+      await lastStaffDetailPanelProps?.onDeactivate?.(
+        "emp-1",
+        undefined,
+        "2027-01-04",
+        134,
+        "2026-11-10",
+      );
+    });
+
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, "2027-01-04", 134, "2026-11-10");
   });
 
   it("keeps a management-only member (not on the schedule) on ManagementStaffPanel", async () => {

@@ -2220,9 +2220,7 @@ export function MembersSection({
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}
-          onDeactivate={(employeeId, note, returnDate, absenceTypeId) =>
-            onDeactivate(employeeId, note, returnDate, absenceTypeId)
-          }
+          onDeactivate={onDeactivate}
           onSetReturnDate={onSetReturnDate}
           absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
