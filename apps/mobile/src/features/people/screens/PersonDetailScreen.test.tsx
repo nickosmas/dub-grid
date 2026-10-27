@@ -1399,6 +1399,24 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("closes a card button's own confirmation, or an untouched plan, without asking to discard", () => {
+      renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+      fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Cancel" }).at(-1)!);
+      expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+      expect(screen.queryByText("Reinstate Mina Diaz?")).not.toBeInTheDocument();
+      cleanup();
+
+      renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Cancel" }).at(-1)!);
+      expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+    });
+
     it("cancels a planned Away (51g1)", () => {
       const mutate = renderWithStatusMutation({
         plannedStatus: "away",

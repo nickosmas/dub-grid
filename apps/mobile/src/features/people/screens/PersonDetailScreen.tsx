@@ -309,6 +309,8 @@ export default function PersonDetailScreen() {
   const [inactiveNote, setInactiveNote] = useState("");
   const [statusChoice, setStatusChoice] = useState<StatusAction | null>(null);
   const [statusOpening, setStatusOpening] = useState<StatusSheetOpening>({});
+  // The choice the sheet opened with (Reinstate, Restore): picked for them, not an edit.
+  const [openedChoice, setOpenedChoice] = useState<StatusAction | null>(null);
   const [returnDate, setReturnDate] = useState<string | null>(null);
   /** The first day away; null means today, and a later day plans it (51g1). */
   const [startDate, setStartDate] = useState<string | null>(null);
@@ -664,14 +666,26 @@ export default function PersonDetailScreen() {
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
+  const plannedAway =
+    person?.status === "active" && person.plannedStatus === "away" && !!person.plannedFrom;
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
       confirmAction === "status" &&
-      (statusChoice !== null ||
+      (statusChoice !== openedChoice ||
         Boolean(inactiveNote.trim()) ||
-        returnDate !== (person?.status === "inactive" ? (person.awayUntil ?? null) : null) ||
+        returnDate !==
+          (person?.status === "inactive"
+            ? (person.awayUntil ?? null)
+            : plannedAway
+              ? (person.plannedUntil ?? null)
+              : null) ||
         awayAbsenceTypeId !==
-          (person?.status === "inactive" ? (person.awayAbsenceTypeId ?? null) : null)),
+          (person?.status === "inactive"
+            ? (person.awayAbsenceTypeId ?? null)
+            : plannedAway
+              ? (person.plannedAbsenceTypeId ?? null)
+              : null) ||
+        startDate !== (plannedAway ? (person.plannedFrom ?? null) : null)),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
   });
@@ -980,9 +994,10 @@ export default function PersonDetailScreen() {
     const options = statusChoices(person).filter((choice) => choice.action !== opening.exclude);
     setStatusOpening(opening);
     // With one status to move to, or a button that named its change, there is nothing to pick.
-    setStatusChoice(
-      opening.only ?? (options.length === 1 && !opening.exclude ? options[0].action : null),
-    );
+    const picked =
+      opening.only ?? (options.length === 1 && !opening.exclude ? options[0].action : null);
+    setStatusChoice(picked);
+    setOpenedChoice(picked);
     setInactiveNote("");
     setReturnDate(
       away ? (person.awayUntil ?? null) : hasPlan ? (person.plannedUntil ?? null) : null,
