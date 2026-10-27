@@ -312,11 +312,20 @@ async function updateEmployeeStatus(
   input: {
     empId: string;
     orgId: string;
-    action: "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | "suspend";
+    action:
+      | "deactivate"
+      | "activate"
+      | "remove"
+      | "setReturnDate"
+      | "reinstate"
+      | "suspend"
+      | "setPlannedChange"
+      | "cancelPlannedChange";
     expectedVersion: number;
     note?: string;
     returnDate?: string | null;
     absenceTypeId?: number | null;
+    startDate?: string | null;
   },
   accessToken?: string,
 ): Promise<Employee> {
@@ -384,6 +393,7 @@ export function deactivateEmployee(
   accessToken?: string,
   returnDate?: string | null,
   absenceTypeId?: number | null,
+  startDate?: string | null,
 ): Promise<Employee> {
   return updateEmployeeStatus(
     {
@@ -394,7 +404,42 @@ export function deactivateEmployee(
       expectedVersion,
       ...(returnDate ? { returnDate } : {}),
       ...(returnDate && absenceTypeId ? { absenceTypeId } : {}),
+      ...(startDate ? { startDate } : {}),
     },
+    accessToken,
+  );
+}
+
+/** An Away planned for a later date (51g1). */
+export interface PlannedAway {
+  startDate: string;
+  returnDate: string | null;
+  absenceTypeId: number | null;
+}
+
+/**
+ * Moves or changes someone's planned Away, or cancels it (null). A Gridmaster
+ * passes fresh proof as the token to change one.
+ */
+export function setEmployeePlannedAway(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+  plan: PlannedAway | null,
+  accessToken?: string,
+): Promise<Employee> {
+  return updateEmployeeStatus(
+    plan
+      ? {
+          empId,
+          orgId,
+          action: "setPlannedChange",
+          expectedVersion,
+          startDate: plan.startDate,
+          returnDate: plan.returnDate,
+          absenceTypeId: plan.returnDate ? plan.absenceTypeId : null,
+        }
+      : { empId, orgId, action: "cancelPlannedChange", expectedVersion },
     accessToken,
   );
 }

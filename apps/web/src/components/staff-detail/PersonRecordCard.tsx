@@ -1,6 +1,6 @@
 "use client";
 
-import { describeEmploymentStatus } from "@dubgrid/domain";
+import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -63,6 +63,13 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             employee.suspendedAt,
           )}
         />
+        {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+          <RecordField
+            label="Planned"
+            value={describePlannedChangeInFull(employee) ?? ""}
+            tabular
+          />
+        ) : null}
         <RecordField
           label="Status changed"
           value={employee.statusChangedAt ? formatDay(employee.statusChangedAt) : "Not recorded"}

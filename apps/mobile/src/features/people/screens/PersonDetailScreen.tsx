@@ -127,7 +127,14 @@ import {
 /** The one Change status sheet (51d), or nothing open. */
 type ConfirmAction = "status" | null;
 type StatusMutationAction =
-  "deactivate" | "activate" | "remove" | "setReturnDate" | "reinstate" | "suspend";
+  | "deactivate"
+  | "activate"
+  | "remove"
+  | "setReturnDate"
+  | "reinstate"
+  | "suspend"
+  | "setPlannedChange"
+  | "cancelPlannedChange";
 
 /** The request each choice in the Change status sheet sends. */
 const STATUS_REQUEST: Record<StatusAction, StatusMutationAction> = {
@@ -138,6 +145,8 @@ const STATUS_REQUEST: Record<StatusAction, StatusMutationAction> = {
   reinstate: "reinstate",
   suspend: "suspend",
   setReturnDate: "setReturnDate",
+  setPlannedChange: "setPlannedChange",
+  cancelPlannedChange: "cancelPlannedChange",
 };
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
@@ -292,6 +301,9 @@ export default function PersonDetailScreen() {
   const [inactiveNote, setInactiveNote] = useState("");
   const [statusChoice, setStatusChoice] = useState<StatusAction | null>(null);
   const [returnDate, setReturnDate] = useState<string | null>(null);
+  /** The first day away; null means today, and a later day plans it (51g1). */
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
   // The absence a return date's away days hold (51f); it goes when the date does.
   const [awayAbsenceTypeId, setAwayAbsenceTypeId] = useState<number | null>(null);
   const [accountLinkChallenge, setAccountLinkChallenge] =
@@ -493,6 +505,7 @@ export default function PersonDetailScreen() {
       note?: string;
       returnDate?: string | null;
       absenceTypeId?: number | null;
+      startDate?: string | null;
       expectedVersion: number;
       fromReturnDate: string | null;
     }) =>
@@ -502,6 +515,7 @@ export default function PersonDetailScreen() {
         note: input.note,
         ...(input.returnDate !== undefined ? { returnDate: input.returnDate } : {}),
         ...(input.absenceTypeId !== undefined ? { absenceTypeId: input.absenceTypeId } : {}),
+        ...(input.startDate ? { startDate: input.startDate } : {}),
       }),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
@@ -516,12 +530,15 @@ export default function PersonDetailScreen() {
       setInactiveNote("");
       setReturnDate(null);
       setAwayAbsenceTypeId(null);
+      setStartDate(null);
+      setCancellingPlan(false);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
         title: describeStatusAction(variables.copyAction, getFullName(result.person), {
           returnDate: variables.returnDate ?? null,
           currentReturnDate: variables.fromReturnDate,
+          startDate: variables.startDate ?? null,
         }).done,
         message: "Staff status was updated.",
       });
@@ -896,10 +913,23 @@ export default function PersonDetailScreen() {
   const showStaffingSection = canViewEmployeeDetails || showCertificationRow;
   const avatarTone = getAvatarTone(resolveAvatarSeed(person), isDark);
 
+  const orgToday = getIsoDateInTimeZone(
+    new Date(),
+    bootstrapQuery.data?.currentOrg.timezone ?? null,
+  );
+  // Someone with an Away planned (51g1) edits the plan's dates in the sheet.
+  const hasPlan =
+    person.status === "active" && person.plannedStatus === "away" && !!person.plannedFrom;
+  // A start after today plans the Away rather than starting it.
+  const laterStart = startDate && startDate > orgToday ? startDate : null;
+
   function confirmStatusAction(): Promise<void> | undefined {
     if (confirmAction !== "status" || !person) return;
-    const choice = statusChoice ?? "setReturnDate";
-    const dated = choice === "markAway" || choice === "setReturnDate";
+    const choice: StatusAction =
+      statusChoice ??
+      (hasPlan ? (cancellingPlan ? "cancelPlannedChange" : "setPlannedChange") : "setReturnDate");
+    const dated =
+      choice === "markAway" || choice === "setReturnDate" || choice === "setPlannedChange";
     const input = {
       action: STATUS_REQUEST[choice],
       copyAction: choice,
@@ -910,9 +940,17 @@ export default function PersonDetailScreen() {
           ? inactiveNote.trim() || undefined
           : undefined,
       returnDate:
-        choice === "setReturnDate" ? returnDate : dated && returnDate ? returnDate : undefined,
+        choice === "setReturnDate" || choice === "setPlannedChange"
+          ? returnDate
+          : dated && returnDate
+            ? returnDate
+            : undefined,
       absenceTypeId:
         choice === "setReturnDate" || (dated && returnDate) ? chosenAbsenceTypeId : undefined,
+      startDate:
+        choice === "setPlannedChange" || (choice === "markAway" && laterStart)
+          ? laterStart
+          : undefined,
     };
     return new Promise<void>((resolve) => {
       statusMutation.mutate(input, { onSettled: () => resolve() });
@@ -924,8 +962,18 @@ export default function PersonDetailScreen() {
     const away = person.status === "inactive";
     setStatusChoice(null);
     setInactiveNote("");
-    setReturnDate(away ? (person.awayUntil ?? null) : null);
-    setAwayAbsenceTypeId(away ? (person.awayAbsenceTypeId ?? null) : null);
+    setReturnDate(
+      away ? (person.awayUntil ?? null) : hasPlan ? (person.plannedUntil ?? null) : null,
+    );
+    setAwayAbsenceTypeId(
+      away
+        ? (person.awayAbsenceTypeId ?? null)
+        : hasPlan
+          ? (person.plannedAbsenceTypeId ?? null)
+          : null,
+    );
+    setStartDate(hasPlan ? (person.plannedFrom ?? null) : null);
+    setCancellingPlan(false);
     setConfirmationError(null);
     setConfirmAction("status");
   }
@@ -939,6 +987,8 @@ export default function PersonDetailScreen() {
     setInactiveNote("");
     setReturnDate(null);
     setAwayAbsenceTypeId(null);
+    setStartDate(null);
+    setCancellingPlan(false);
   }
 
   function confirmInvitationAction(): Promise<void> | undefined {
@@ -972,6 +1022,17 @@ export default function PersonDetailScreen() {
       />
     ) : null;
   const isAway = person.status === "inactive";
+  const startField = (
+    <ReturnDateField
+      disabled={statusMutation.isPending}
+      emptyLabel="Today"
+      hint={null}
+      label="Starts"
+      minDate={orgToday}
+      onChange={setStartDate}
+      value={startDate}
+    />
+  );
   const choices = statusChoices({ ...person, focusAreaIds: person.focusAreaIds });
   const currentStatus = describeCurrentStatus(person);
   // Tinted like their status pill, so the box reads as where they stand.
@@ -1001,23 +1062,44 @@ export default function PersonDetailScreen() {
     isAway &&
     (returnDate !== (person.awayUntil ?? null) ||
       chosenAbsenceTypeId !== (person.awayAbsenceTypeId ?? null));
+  const planChanged =
+    hasPlan &&
+    !cancellingPlan &&
+    !!laterStart &&
+    (laterStart !== person.plannedFrom ||
+      returnDate !== (person.plannedUntil ?? null) ||
+      chosenAbsenceTypeId !== (person.plannedAbsenceTypeId ?? null));
+  const plannedAbsence = absenceTypes.find(
+    (absenceType) => absenceType.id === person.plannedAbsenceTypeId,
+  );
   const statusCopy = statusChoice
     ? describeStatusAction(statusChoice, getFullName(person), {
         returnDate: statusChoice === "markAway" ? returnDate : null,
         absenceName: statusChoice === "markAway" ? chosenAbsenceName : null,
+        startDate: statusChoice === "markAway" ? laterStart : null,
+        plannedFrom:
+          hasPlan && !(statusChoice === "markAway" && laterStart) ? person.plannedFrom : null,
       })
-    : awayDetailsChanged
-      ? describeStatusAction("setReturnDate", getFullName(person), {
-          returnDate,
-          currentReturnDate: person.awayUntil,
-          absenceName: chosenAbsenceName,
+    : cancellingPlan
+      ? describeStatusAction("cancelPlannedChange", getFullName(person), {
+          absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
         })
-      : null;
-  // A return date is the first day back, so the organization's tomorrow at the earliest.
-  const firstReturnDate = addDaysToIsoDate(
-    getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null),
-    1,
-  );
+      : planChanged
+        ? describeStatusAction("setPlannedChange", getFullName(person), {
+            startDate: laterStart,
+            returnDate,
+            absenceName: chosenAbsenceName,
+          })
+        : awayDetailsChanged
+          ? describeStatusAction("setReturnDate", getFullName(person), {
+              returnDate,
+              currentReturnDate: person.awayUntil,
+              absenceName: chosenAbsenceName,
+            })
+          : null;
+  // A return date is the first day back, so the organization's tomorrow at the
+  // earliest, or the day after a planned Away's start.
+  const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? `Send an invitation to ${person.email}?`
@@ -1483,11 +1565,11 @@ export default function PersonDetailScreen() {
             <SheetActions
               primaryAction={
                 <Button
-                  disabled={!statusChoice && !awayDetailsChanged}
+                  disabled={!statusChoice && !awayDetailsChanged && !planChanged && !cancellingPlan}
                   label={
-                    statusChoice
+                    statusChoice || cancellingPlan
                       ? (statusCopy?.label ?? "")
-                      : isAway
+                      : isAway || hasPlan
                         ? "Save changes"
                         : "Change status"
                   }
@@ -1538,6 +1620,29 @@ export default function PersonDetailScreen() {
             {awayAbsenceChoices}
           </>
         ) : null}
+        {hasPlan && !statusChoice ? (
+          <>
+            {cancellingPlan ? null : (
+              <>
+                {startField}
+                <ReturnDateField
+                  disabled={statusMutation.isPending}
+                  minDate={firstReturnDate}
+                  onChange={setReturnDate}
+                  value={returnDate}
+                />
+                {awayAbsenceChoices}
+              </>
+            )}
+            <Button
+              compact
+              disabled={statusMutation.isPending}
+              label={cancellingPlan ? "Keep planned away" : "Cancel planned away"}
+              onPress={() => setCancellingPlan((value) => !value)}
+              tone="plain"
+            />
+          </>
+        ) : null}
         <ProfileChoiceGroup
           items={choices.map((choice) => ({
             id: choice.action,
@@ -1547,7 +1652,10 @@ export default function PersonDetailScreen() {
           label="Status"
           selection="single"
           selectedIds={statusChoice ? [statusChoice] : []}
-          onToggle={(id) => setStatusChoice(id)}
+          onToggle={(id) => {
+            setStatusChoice(id);
+            setCancellingPlan(false);
+          }}
         />
         {statusChoice === "markAway" || statusChoice === "archive" ? (
           <ProfileTextInput
@@ -1566,6 +1674,7 @@ export default function PersonDetailScreen() {
         ) : null}
         {statusChoice === "markAway" ? (
           <>
+            {startField}
             <ReturnDateField
               disabled={statusMutation.isPending}
               minDate={firstReturnDate}

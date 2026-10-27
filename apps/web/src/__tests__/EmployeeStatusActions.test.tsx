@@ -78,6 +78,7 @@ function renderActions(employee: Employee, absenceTypes: AbsenceType[] = []) {
     onSetReturnDate: vi.fn(),
     onReinstate: vi.fn(),
     onSuspend: vi.fn(),
+    onSetPlannedAway: vi.fn(),
   };
   render(
     <EmployeeStatusActions
@@ -278,6 +279,77 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("button", { name: "Restore" }));
 
     expect(onActivate).toHaveBeenCalledWith("emp-1");
+  });
+
+  it("schedules an Away for a later start, keeping them Active until then", async () => {
+    const user = userEvent.setup();
+    const { onDeactivate } = renderActions(makeEmployee());
+    const start = dayFromToday(1);
+    const back = dayFromToday(2);
+
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole("radio", { name: /^Away/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Starts" }));
+    await user.click(screen.getByRole("button", { name: start.label }));
+    await user.click(within(dialog).getByRole("button", { name: "Return date" }));
+    await user.click(screen.getByRole("button", { name: back.label }));
+
+    expect(within(dialog).getByText(/^They stay Active until /)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Schedule away" }));
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, back.key, null, start.key);
+  });
+
+  const planned = {
+    plannedStatus: "away" as const,
+    plannedFrom: "2099-01-05",
+    plannedUntil: "2099-01-12",
+    plannedAbsenceTypeId: 134,
+  };
+
+  it("shows a planned Away under the status and saves a changed absence", async () => {
+    const user = userEvent.setup();
+    const { onSetPlannedAway } = renderActions(makeEmployee(planned), ABSENCE_TYPES);
+
+    const dialog = await openDialog(user);
+    expect(within(dialog).getByText("Away from Mon, Jan 5, back Mon, Jan 12.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+    await user.click(within(dialog).getByRole("button", { name: "Absence" }));
+    await user.click(screen.getByRole("option", { name: "Sick" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    expect(onSetPlannedAway).toHaveBeenCalledWith("emp-1", {
+      startDate: "2099-01-05",
+      returnDate: "2099-01-12",
+      absenceTypeId: 135,
+    });
+  });
+
+  it("cancels a planned Away", async () => {
+    const user = userEvent.setup();
+    const { onSetPlannedAway } = renderActions(makeEmployee(planned), ABSENCE_TYPES);
+
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel planned away" }));
+    expect(
+      within(dialog).getByText("Those days go back to what was published, without Vacation."),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getAllByRole("button", { name: "Cancel planned away" }).at(-1) as HTMLElement,
+    );
+
+    expect(onSetPlannedAway).toHaveBeenCalledWith("emp-1", null);
+  });
+
+  it("says suspending someone cancels their planned Away", async () => {
+    const user = userEvent.setup();
+    renderActions(makeEmployee(planned));
+
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole("radio", { name: /^Suspended/ }));
+
+    expect(
+      within(dialog).getByText("The away planned from Jan 5 is cancelled."),
+    ).toBeInTheDocument();
   });
 
   it("shows nothing for your own record or without permission", () => {

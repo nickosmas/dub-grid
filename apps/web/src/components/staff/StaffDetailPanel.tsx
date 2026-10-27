@@ -1,4 +1,5 @@
 "use client";
+import type { PlannedAway } from "@/features/employees/client";
 import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -56,6 +57,7 @@ interface StaffDetailPanelProps {
     note?: string,
     returnDate?: string | null,
     absenceTypeId?: number | null,
+    startDate?: string | null,
   ) => void | Promise<boolean>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   onSetReturnDate?: (
@@ -70,6 +72,8 @@ interface StaffDetailPanelProps {
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
   onSuspend?: (empId: string) => void | Promise<unknown>;
+  /** Moves or changes a planned Away, or cancels it (null) (51g1). */
+  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -109,6 +113,7 @@ export function StaffDetailPanel({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetPlannedAway,
   statusStepUpOpen = false,
   onClose,
   onInvite,
@@ -465,6 +470,7 @@ export function StaffDetailPanel({
                           onActivate={onActivate}
                           onReinstate={onReinstate}
                           onSuspend={onSuspend}
+                          onSetPlannedAway={onSetPlannedAway}
                           onRemove={onRemove}
                           stepUpOpen={statusStepUpOpen}
                           variant="page"

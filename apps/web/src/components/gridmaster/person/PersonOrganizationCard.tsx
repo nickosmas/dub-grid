@@ -1,6 +1,6 @@
 "use client";
 
-import { describeEmploymentStatus } from "@dubgrid/domain";
+import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
@@ -132,6 +132,9 @@ function StaffFacts({
             : describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)
         }
       />
+      {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+        <PersonField label="Planned" value={describePlannedChangeInFull(employee) ?? ""} tabular />
+      ) : null}
       <PersonField
         label="Employment"
         value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}

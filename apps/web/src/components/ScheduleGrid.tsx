@@ -139,7 +139,7 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
-import { awayLockedHint, awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
+import { awayLockedHint, awayRangeOf, buildRowAwayDays } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -2118,19 +2118,21 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              // Someone away until a date (51e) has an Away bar on those days
-              // from today on, and nothing else there.
-              const rowAwayUntil = awayReturnDate(emp);
+              // Someone away until a date (51e), or with an Away planned (51g1),
+              // has an Away bar on those days from today on, and nothing else there.
+              const rowAwayRange = awayRangeOf(emp);
               const rowAwayDays = buildRowAwayDays(
-                rowAwayUntil,
+                rowAwayRange,
                 weekDates.map((date) => formatDateKey(date)),
                 todayKey,
                 splitAtIndex,
               );
-              const rowAwayHint = rowAwayUntil ? awayLockedHint(rowAwayUntil) : undefined;
+              const rowAwayHint = rowAwayRange ? awayLockedHint(rowAwayRange) : undefined;
+              const rowAwayAbsenceTypeId =
+                rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
               const rowAwayAbsence =
-                emp.awayAbsenceTypeId != null
-                  ? (absenceTypeMap?.get(emp.awayAbsenceTypeId) ?? null)
+                rowAwayAbsenceTypeId != null
+                  ? (absenceTypeMap?.get(rowAwayAbsenceTypeId) ?? null)
                   : null;
               const rowShiftLabels = weekDates.map((date, index) =>
                 rowAwayDays?.runs[index] ? null : shiftForKey(emp.id, date),

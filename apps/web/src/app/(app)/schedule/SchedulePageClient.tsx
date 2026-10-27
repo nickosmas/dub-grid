@@ -148,7 +148,7 @@ import {
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
-import { awayUntilById, withoutAwayDays } from "./_lib/away-coverage";
+import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -539,12 +539,16 @@ function SchedulerContent({
     () => [...employees, ...inactiveEmployees, ...removedEmployees],
     [employees, inactiveEmployees, removedEmployees],
   );
-  // Away people with a return date are scheduled again from it (51e), so the
-  // grid, coverage and Auto-build count them from that day on.
-  const awayUntil = useMemo(() => awayUntilById(inactiveEmployees), [inactiveEmployees]);
+  // Away people with a return date are scheduled again from it (51e), and an
+  // Away planned for later takes its days out from its start (51g1), so the
+  // grid, coverage and Auto-build count only the days in between.
+  const awayRanges = useMemo(
+    () => awayRangesById([...employees, ...inactiveEmployees]),
+    [employees, inactiveEmployees],
+  );
   const scheduleEmployees = useMemo(
-    () => [...employees, ...inactiveEmployees.filter((employee) => awayUntil.has(employee.id))],
-    [employees, inactiveEmployees, awayUntil],
+    () => [...employees, ...inactiveEmployees.filter((employee) => awayRanges.has(employee.id))],
+    [employees, inactiveEmployees, awayRanges],
   );
   // Who a peer's draft broadcast may touch on this grid; see readDraftChangedBroadcast.
   const visibleEmployeeIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
@@ -3139,7 +3143,7 @@ function SchedulerContent({
     [shifts],
   );
   // What coverage counts: someone away until a date only from that date.
-  const coverageShifts = useMemo(() => withoutAwayDays(shifts, awayUntil), [shifts, awayUntil]);
+  const coverageShifts = useMemo(() => withoutAwayDays(shifts, awayRanges), [shifts, awayRanges]);
   const coverageAssignmentIdsForKey = useCallback(
     (empId: string, date: Date): number[] =>
       coverageShifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
@@ -6773,7 +6777,7 @@ function SchedulerContent({
       // Counted as the matrix counts; an Away person is planned only from their return date.
       shifts: coverageShifts,
       employees: scheduleEmployees,
-      awayUntil,
+      awayRanges,
       assignments: Array.from(assignmentById.values()),
       shiftCategories,
       jobs,
@@ -6814,7 +6818,7 @@ function SchedulerContent({
     shiftPreferences,
     jobPreferences,
     canEditShifts,
-    awayUntil,
+    awayRanges,
     coverageBase,
     coverageMatrix,
     coverageShifts,

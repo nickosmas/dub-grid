@@ -47,6 +47,10 @@ type MobilePersonSource = Pick<
   | "awayUntil"
   | "awayAbsenceTypeId"
   | "suspendedAt"
+  | "plannedStatus"
+  | "plannedFrom"
+  | "plannedUntil"
+  | "plannedAbsenceTypeId"
   | "userId"
   | "version"
 > & {
@@ -88,6 +92,10 @@ export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
     awayUntil: person.awayUntil ?? null,
     awayAbsenceTypeId: person.awayAbsenceTypeId ?? null,
     suspendedAt: person.suspendedAt ?? null,
+    plannedStatus: person.plannedStatus ?? null,
+    plannedFrom: person.plannedFrom ?? null,
+    plannedUntil: person.plannedUntil ?? null,
+    plannedAbsenceTypeId: person.plannedAbsenceTypeId ?? null,
     userId: person.userId,
     version: person.version,
     membershipUpdatedAt: person.membershipUpdatedAt ?? null,

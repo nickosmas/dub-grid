@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   awayLockedHint,
+  awayRangeOf,
   awayReturnDate,
   awayRunLabel,
   buildRowAwayDays,
@@ -56,11 +57,11 @@ describe("isOnScheduleGrid", () => {
 describe("buildRowAwayDays", () => {
   it("is null without a return date or with no day before it", () => {
     expect(buildRowAwayDays(null, week, period.todayKey)).toBeNull();
-    expect(buildRowAwayDays("2026-11-01", week, period.todayKey)).toBeNull();
+    expect(buildRowAwayDays({ from: null, until: "2026-11-01" }, week, period.todayKey)).toBeNull();
   });
 
   it("locks every day before the return date and runs the ones from today", () => {
-    const away = buildRowAwayDays("2026-11-05", week, period.todayKey);
+    const away = buildRowAwayDays({ from: null, until: "2026-11-05" }, week, period.todayKey);
     expect(away?.locked).toEqual([true, true, true, true, false, false, false]);
     expect(away?.runs).toEqual([
       null,
@@ -74,7 +75,7 @@ describe("buildRowAwayDays", () => {
   });
 
   it("draws a single away day as its own run", () => {
-    const away = buildRowAwayDays("2026-11-03", week, period.todayKey);
+    const away = buildRowAwayDays({ from: null, until: "2026-11-03" }, week, period.todayKey);
     expect(away?.runs[1]).toEqual({ runIndex: 0, start: 1, length: 1, position: "start" });
     expect(away?.runs.filter(Boolean)).toHaveLength(1);
   });
@@ -90,7 +91,7 @@ describe("buildRowAwayDays", () => {
       "2026-11-13",
       "2026-11-14",
     ];
-    const away = buildRowAwayDays("2026-11-10", twoWeeks, "2026-11-01", 7);
+    const away = buildRowAwayDays({ from: null, until: "2026-11-10" }, twoWeeks, "2026-11-01", 7);
     expect(away?.runs[0]).toMatchObject({ runIndex: 0, start: 0, length: 7 });
     expect(away?.runs[7]).toMatchObject({ runIndex: 1, start: 7, length: 2, position: "start" });
     expect(away?.runs[8]).toMatchObject({ runIndex: 1, position: "end" });
@@ -107,8 +108,32 @@ describe("awayRunLabel", () => {
 
 describe("awayLockedHint", () => {
   it("names the return date and where to change it", () => {
-    expect(awayLockedHint("2026-11-06")).toBe(
+    expect(awayLockedHint({ from: null, until: "2026-11-06" })).toBe(
       "Away until Fri, Nov 6. Change the return date on their record to change these days.",
+    );
+  });
+});
+
+describe("planned away in the grid (51g1)", () => {
+  it("takes the range from a planned Away, and only for someone Active", () => {
+    const plan = { plannedStatus: "away" as const, plannedFrom: "2026-11-04", plannedUntil: null };
+    expect(awayRangeOf({ status: "active", ...plan })).toEqual({ from: "2026-11-04", until: null });
+    expect(awayRangeOf({ status: "inactive", awayUntil: "2026-11-05", ...plan })).toEqual({
+      from: null,
+      until: "2026-11-05",
+    });
+    expect(awayRangeOf({ status: "active" })).toBeNull();
+  });
+
+  it("locks and draws only the days from the start up to the return date", () => {
+    const away = buildRowAwayDays({ from: "2026-11-03", until: "2026-11-05" }, week, "2026-11-01");
+    expect(away?.locked).toEqual([false, false, true, true, false, false, false]);
+    expect(away?.runs.filter(Boolean)).toHaveLength(2);
+  });
+
+  it("says where to change a planned Away", () => {
+    expect(awayLockedHint({ from: "2026-11-03", until: "2026-11-05" })).toBe(
+      "Away from Tue, Nov 3 until Thu, Nov 5. Change the planned away on their record to change these days.",
     );
   });
 });

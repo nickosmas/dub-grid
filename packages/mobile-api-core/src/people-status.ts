@@ -7,16 +7,24 @@ import {
   canMarkInactive,
   isAwayAbsenceRefusal,
   isSelfAction,
+  isValidPlannedStart,
   isValidReturnDate,
+  NO_PLANNED_CHANGE_CODE,
+  NO_PLANNED_CHANGE_MESSAGE,
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
+  NOT_PLANNABLE_CODE,
+  NOT_PLANNABLE_MESSAGE,
   NOT_SUSPENDABLE_CODE,
   NOT_SUSPENDABLE_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
+  PLANNED_RETURN_INVALID_MESSAGE,
+  PLANNED_START_INVALID_CODE,
+  PLANNED_START_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
@@ -90,6 +98,21 @@ type UpdateEmployeeSuspension = (
     employeeId: string;
     expectedVersion: number;
     suspended: boolean;
+    updatedBy: string;
+  },
+) => Promise<Employee | null>;
+
+type UpdateEmployeePlannedChange = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    plannedStatus: "away" | null;
+    plannedFrom: string | null;
+    plannedUntil: string | null;
+    plannedAbsenceTypeId: number | null;
+    plannedNote?: string;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -174,7 +197,13 @@ type PeopleStatusResult =
   | {
       kind: "invalid_status_change";
       error: string;
-      code: typeof NOT_SUSPENDABLE_CODE | typeof NOT_SUSPENDED_CODE;
+      code:
+        | typeof NOT_SUSPENDABLE_CODE
+        | typeof NOT_SUSPENDED_CODE
+        | typeof NOT_PLANNABLE_CODE
+        | typeof NO_PLANNED_CHANGE_CODE
+        | typeof PLANNED_START_INVALID_CODE
+        | typeof RETURN_DATE_INVALID_CODE;
       status: 400;
     }
   | {
@@ -201,6 +230,7 @@ export async function updateMobilePersonStatus(
     updateEmployeeStatus: UpdateEmployeeStatus;
     updateEmployeeReturnDate: UpdateEmployeeReturnDate;
     updateEmployeeSuspension: UpdateEmployeeSuspension;
+    updateEmployeePlannedChange: UpdateEmployeePlannedChange;
     endAccess: EndAccess;
     insertAuditLog: InsertAuditLog;
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
@@ -249,18 +279,24 @@ export async function updateMobilePersonStatus(
     };
   }
 
-  if (input.body.action === "deactivate" && !canMarkInactive(currentEmployee.focusAreaIds)) {
+  if (
+    (input.body.action === "deactivate" || input.body.action === "setPlannedChange") &&
+    !canMarkInactive(currentEmployee.focusAreaIds)
+  ) {
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
   }
 
   const returnDate = input.body.returnDate ?? null;
+  const today = getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null);
+  const startDate = input.body.startDate ?? null;
+  // A start date after today plans the Away rather than starting it (51g1).
+  const planning =
+    input.body.action === "setPlannedChange" ||
+    (input.body.action === "deactivate" && startDate !== null && startDate !== today);
   if (
     returnDate !== null &&
     (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
-    !isValidReturnDate(
-      returnDate,
-      getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null),
-    )
+    !isValidReturnDate(returnDate, today)
   ) {
     return {
       kind: "invalid_return_date",
@@ -273,10 +309,30 @@ export async function updateMobilePersonStatus(
   const absenceTypeId = input.body.absenceTypeId;
   if (
     absenceTypeId != null &&
-    (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
+    (input.body.action === "deactivate" ||
+      input.body.action === "setReturnDate" ||
+      input.body.action === "setPlannedChange") &&
     returnDate === null
   ) {
     return awayAbsenceInvalid(AWAY_ABSENCE_NEEDS_DATE_MESSAGE);
+  }
+
+  if (planning || input.body.action === "cancelPlannedChange") {
+    const refusal = planRefusal(
+      currentEmployee,
+      input.body.action,
+      planning,
+      startDate,
+      returnDate,
+      today,
+    );
+    if (refusal) return refusal;
+    try {
+      return await changePlan(auth, input, currentEmployee, planning, startDate, returnDate, deps);
+    } catch (error) {
+      if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
+      throw error;
+    }
   }
 
   if (input.body.action === "suspend" || input.body.action === "reinstate") {
@@ -292,6 +348,133 @@ export async function updateMobilePersonStatus(
     if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
     throw error;
   }
+}
+
+function planRefusal(
+  employee: Employee,
+  action: MobilePersonStatusUpdateBody["action"],
+  planning: boolean,
+  startDate: string | null,
+  returnDate: string | null,
+  today: string,
+): PeopleStatusResult | null {
+  const refuse = (
+    error: string,
+    code:
+      | typeof NOT_PLANNABLE_CODE
+      | typeof NO_PLANNED_CHANGE_CODE
+      | typeof PLANNED_START_INVALID_CODE
+      | typeof RETURN_DATE_INVALID_CODE,
+  ): PeopleStatusResult => ({ kind: "invalid_status_change", error, code, status: 400 });
+  if (planning && (employee.status !== "active" || employee.archivedAt || employee.suspendedAt)) {
+    return refuse(NOT_PLANNABLE_MESSAGE, NOT_PLANNABLE_CODE);
+  }
+  if (
+    (action === "setPlannedChange" || action === "cancelPlannedChange") &&
+    !employee.plannedStatus
+  ) {
+    return refuse(NO_PLANNED_CHANGE_MESSAGE, NO_PLANNED_CHANGE_CODE);
+  }
+  if (planning && (startDate === null || !isValidPlannedStart(startDate, today))) {
+    return refuse(PLANNED_START_INVALID_MESSAGE, PLANNED_START_INVALID_CODE);
+  }
+  if (planning && returnDate !== null && startDate !== null && returnDate <= startDate) {
+    return refuse(PLANNED_RETURN_INVALID_MESSAGE, RETURN_DATE_INVALID_CODE);
+  }
+  return null;
+}
+
+/** Plans, moves or cancels an Away for a later date (51g1); their status stays Active. */
+async function changePlan(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  planning: boolean,
+  startDate: string | null,
+  returnDate: string | null,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
+  const action = input.body.action;
+  const updatedEmployee = await deps.updateEmployeePlannedChange(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: input.employeeId,
+    expectedVersion: input.body.expectedVersion,
+    plannedStatus: planning ? "away" : null,
+    plannedFrom: planning ? startDate : null,
+    plannedUntil: planning ? returnDate : null,
+    plannedAbsenceTypeId: planning && returnDate ? (input.body.absenceTypeId ?? null) : null,
+    ...(action === "deactivate" || input.body.note !== undefined
+      ? { plannedNote: input.body.note ?? "" }
+      : {}),
+    updatedBy: auth.user.id,
+  });
+
+  if (!updatedEmployee) {
+    const latestEmployee = await deps.fetchEmployeeById(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      input.employeeId,
+    );
+    if (!latestEmployee) {
+      return {
+        kind: "latest_unavailable",
+        error: "We couldn't load the latest employee state.",
+        status: 500,
+      };
+    }
+    return {
+      kind: "conflict",
+      error: STATUS_CONFLICT_MESSAGE,
+      code: "EMPLOYEE_STATUS_CONFLICT",
+      person: deps.mapEmployeeToMobilePerson(latestEmployee),
+      status: 409,
+    };
+  }
+
+  await deps.insertAuditLog(auth.serviceClient, {
+    org_id: auth.currentOrg.id,
+    actor_id: auth.user.id,
+    actor_email: auth.user.email ?? null,
+    action:
+      action === "deactivate"
+        ? "employee.away_planned"
+        : action === "setPlannedChange"
+          ? "employee.away_plan_changed"
+          : "employee.away_plan_cancelled",
+    resource_type: "employee",
+    resource_id: input.employeeId,
+    details: planning
+      ? {
+          ...(action === "setPlannedChange"
+            ? {
+                fromPlannedFrom: currentEmployee.plannedFrom ?? null,
+                fromPlannedUntil: currentEmployee.plannedUntil ?? null,
+              }
+            : {}),
+          plannedFrom: startDate,
+          plannedUntil: returnDate,
+          ...(input.body.absenceTypeId ? { plannedAbsenceTypeId: input.body.absenceTypeId } : {}),
+          changedFields: ["planned_status"],
+        }
+      : {
+          plannedFrom: currentEmployee.plannedFrom ?? null,
+          plannedUntil: currentEmployee.plannedUntil ?? null,
+          changedFields: ["planned_status"],
+        },
+    ip_address: input.requestIp,
+    user_agent: input.userAgent,
+  });
+
+  return {
+    kind: "updated",
+    person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+    status: 200,
+  };
 }
 
 function awayAbsenceInvalid(error: string): PeopleStatusResult {

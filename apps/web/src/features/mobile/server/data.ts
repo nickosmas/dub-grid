@@ -180,6 +180,10 @@ type MobilePeopleRow = Pick<
   | "awayUntil"
   | "awayAbsenceTypeId"
   | "suspendedAt"
+  | "plannedStatus"
+  | "plannedFrom"
+  | "plannedUntil"
+  | "plannedAbsenceTypeId"
   | "certificationId"
   | "roleIds"
   | "seniority"
@@ -2063,6 +2067,10 @@ export async function fetchMobilePeople(
     awayUntil: row.away_until ?? null,
     awayAbsenceTypeId: row.away_absence_type_id ?? null,
     suspendedAt: row.suspended_at ?? null,
+    plannedStatus: row.planned_status ?? null,
+    plannedFrom: row.planned_from ?? null,
+    plannedUntil: row.planned_until ?? null,
+    plannedAbsenceTypeId: row.planned_absence_type_id ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority ?? 0,

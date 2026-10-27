@@ -4,9 +4,13 @@ import {
   canMarkInactive,
   describeCurrentStatus,
   describeEmploymentStatus,
+  describePlannedChange,
+  describePlannedChangeInFull,
   describeStatusAction,
   statusChoices,
   formatReturnDate,
+  isPlannedAwayOn,
+  isValidPlannedStart,
   isSchedulableOn,
   isValidReturnDate,
   statusUndoAction,
@@ -380,5 +384,98 @@ describe("describeStatusAction suspend", () => {
     expect(copy.points).toHaveLength(2);
     for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
     expect(copy.points.join(" ")).not.toContain("Ana");
+  });
+});
+
+describe("planned away (51g1)", () => {
+  const planned = {
+    status: "active" as const,
+    plannedStatus: "away" as const,
+    plannedFrom: "2026-11-10",
+    plannedUntil: "2027-01-04",
+  };
+
+  it("locks the days from the start up to the day they're back", () => {
+    expect(isSchedulableOn(planned, "2026-11-09")).toBe(true);
+    expect(isSchedulableOn(planned, "2026-11-10")).toBe(false);
+    expect(isSchedulableOn(planned, "2027-01-03")).toBe(false);
+    expect(isSchedulableOn(planned, "2027-01-04")).toBe(true);
+  });
+
+  it("locks every day from the start when there's no return date", () => {
+    const open = { ...planned, plannedUntil: null };
+    expect(isPlannedAwayOn(open, "2026-11-09")).toBe(false);
+    expect(isPlannedAwayOn(open, "2030-01-01")).toBe(true);
+    expect(isSchedulableOn(open, "2030-01-01")).toBe(false);
+  });
+
+  it("says what's planned beside the Active pill and in the status box", () => {
+    expect(describePlannedChange(planned)).toBe("Away from Nov 10");
+    expect(describePlannedChange({ plannedStatus: null })).toBeNull();
+    expect(describePlannedChangeInFull(planned)).toBe("Away from Nov 10, back Jan 4");
+    expect(describeCurrentStatus({ ...planned, focusAreaIds: [1] })).toEqual({
+      text: "Active",
+      detail: "Away from Tue, Nov 10, back Mon, Jan 4.",
+      tone: "success",
+    });
+    expect(
+      describeCurrentStatus({ ...planned, plannedUntil: null, focusAreaIds: [1] }).detail,
+    ).toBe("Away from Tue, Nov 10.");
+  });
+
+  it("schedules the away for a later start, and keeps Mark away for today", () => {
+    const later = describeStatusAction("markAway", "Ana Diaz", {
+      startDate: "2026-11-10",
+      returnDate: "2027-01-04",
+      absenceName: "Vacation",
+    });
+    expect(later.label).toBe("Schedule away");
+    expect(later.message).toBe("They stay Active until Tue, Nov 10.");
+    expect(later.points).toEqual([
+      "Every day from Nov 10 until Jan 4 shows Vacation in the draft, in place of any shift.",
+      "Recurring schedules pause from Nov 10 and fill again from Jan 4.",
+      "Open requests for those days are closed.",
+    ]);
+    expect(describeStatusAction("markAway", "Ana Diaz").label).toBe("Mark away");
+  });
+
+  it("removes recurring schedules on the start date when there's no return date", () => {
+    const copy = describeStatusAction("markAway", "Ana Diaz", { startDate: "2026-11-10" });
+    expect(copy.points).toContain("Recurring schedules set up for them are removed on Nov 10.");
+  });
+
+  it("says another change today cancels the planned away", () => {
+    for (const action of ["markAway", "suspend", "archive"] as const) {
+      const copy = describeStatusAction(action, "Ana Diaz", { plannedFrom: "2026-11-10" });
+      expect(copy.points).toContain("The away planned from Nov 10 is cancelled.");
+    }
+  });
+
+  it("edits and cancels a planned away within the dialog rules", () => {
+    const edit = describeStatusAction("setPlannedChange", "Ana Diaz", {
+      startDate: "2026-11-12",
+      returnDate: "2027-01-04",
+    });
+    expect(edit.label).toBe("Save changes");
+    expect(edit.message).toBe("Away from Thu, Nov 12, back Mon, Jan 4.");
+    const cancel = describeStatusAction("cancelPlannedChange", "Ana Diaz", {
+      absenceName: "Vacation",
+    });
+    expect(cancel.label).toBe("Cancel planned away");
+    for (const copy of [edit, cancel]) {
+      expect(copy.points.length).toBeGreaterThanOrEqual(2);
+      for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
+      expect([copy.message, ...copy.points].join(" ")).not.toContain("Ana");
+    }
+  });
+});
+
+describe("isValidPlannedStart", () => {
+  it("takes a day after today up to a year ahead", () => {
+    expect(isValidPlannedStart("2026-10-27", "2026-10-27")).toBe(false);
+    expect(isValidPlannedStart("2026-10-28", "2026-10-27")).toBe(true);
+    expect(isValidPlannedStart("2027-10-27", "2026-10-27")).toBe(true);
+    expect(isValidPlannedStart("2027-10-28", "2026-10-27")).toBe(false);
+    expect(isValidPlannedStart("soon", "2026-10-27")).toBe(false);
   });
 });

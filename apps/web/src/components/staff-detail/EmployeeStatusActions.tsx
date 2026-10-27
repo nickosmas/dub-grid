@@ -8,9 +8,11 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
+import type { PlannedAway } from "@/features/employees/client";
 import {
   describeCurrentStatus,
   describeStatusAction,
+  PLANNED_START_MAX_DAYS,
   statusChoices,
   type StatusAction,
   type StatusTone,
@@ -26,6 +28,7 @@ export interface EmployeeStatusActionsProps {
     note?: string,
     returnDate?: string,
     absenceTypeId?: number | null,
+    startDate?: string,
   ) => void | Promise<unknown>;
   onActivate: (empId: string) => void | Promise<unknown>;
   /**
@@ -41,6 +44,8 @@ export interface EmployeeStatusActionsProps {
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c); not offered when absent. */
   onSuspend?: (empId: string) => void | Promise<unknown>;
+  /** Moves or changes a planned Away, or cancels it (null) (51g1); not offered when absent. */
+  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
   /** Live absence types; with a return date, one can fill the away days (51f). */
   absenceTypes?: readonly AbsenceType[];
   onRemove: (empId: string, note?: string) => void | Promise<unknown>;
@@ -56,9 +61,11 @@ const RETURN_DATE_HINT =
 
 function ReturnDateField({
   value,
+  minDate,
   onChange,
 }: {
   value: string;
+  minDate: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -77,12 +84,38 @@ function ReturnDateField({
         onChange={onChange}
         label="Return date"
         placeholder="No return date"
-        minDate={formatDateKey(addDays(new Date(), 1))}
+        minDate={minDate}
         allowClear
       />
       <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
         {RETURN_DATE_HINT}
       </span>
+    </div>
+  );
+}
+
+/** The first day away; empty means today, and a later day plans it (51g1). */
+function StartDateField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 600,
+          color: "var(--dg-color-text-primary)",
+        }}
+      >
+        Starts
+      </span>
+      <CalendarDatePicker
+        value={value}
+        onChange={onChange}
+        label="Starts"
+        placeholder="Today"
+        minDate={formatDateKey(new Date())}
+        maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
+        allowClear
+      />
     </div>
   );
 }
@@ -211,16 +244,27 @@ export function EmployeeStatusActions({
   onSetReturnDate,
   onReinstate,
   onSuspend,
+  onSetPlannedAway,
   absenceTypes = [],
   variant,
   fillWidth = false,
   stepUpOpen = false,
 }: EmployeeStatusActionsProps) {
+  const hasPlan =
+    employee.status === "active" && employee.plannedStatus === "away" && !!employee.plannedFrom;
+  // Someone Away edits their return date here; someone with an Away planned
+  // edits the plan's dates (51g1). Both start from what they have.
+  const initialReturnDate = (hasPlan ? employee.plannedUntil : employee.awayUntil) ?? "";
+  const initialAbsenceTypeId =
+    (hasPlan ? employee.plannedAbsenceTypeId : employee.awayAbsenceTypeId) ?? NO_ABSENCE;
+  const initialStartDate = hasPlan ? (employee.plannedFrom ?? "") : "";
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<StatusAction | null>(null);
   const [note, setNote] = useState("");
-  const [returnDate, setReturnDate] = useState(employee.awayUntil ?? "");
-  const [absenceTypeId, setAbsenceTypeId] = useState(employee.awayAbsenceTypeId ?? NO_ABSENCE);
+  const [returnDate, setReturnDate] = useState(initialReturnDate);
+  const [absenceTypeId, setAbsenceTypeId] = useState(initialAbsenceTypeId);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
   // The dialog unmounts while a step-up prompt shows, which drops its own
   // latch, so the pending state lives here to survive the round trip.
   const [pending, setPending] = useState(false);
@@ -235,6 +279,12 @@ export function EmployeeStatusActions({
     suspend: onSuspend,
     reinstate: onReinstate,
   };
+  const todayKey = formatDateKey(new Date());
+  // A start after today plans the Away rather than starting it.
+  const laterStart = startDate && startDate > todayKey ? startDate : null;
+  const returnMinDate = formatDateKey(
+    addDays(laterStart ? new Date(`${laterStart}T00:00:00`) : new Date(), 1),
+  );
   const choices = statusChoices(employee).filter(
     (option) => !(option.action in handlers) || Boolean(handlers[option.action]),
   );
@@ -248,9 +298,19 @@ export function EmployeeStatusActions({
     isAway &&
     ((returnDate || null) !== (employee.awayUntil ?? null) ||
       chosenAbsenceTypeId !== (employee.awayAbsenceTypeId ?? null));
+  const planChanged =
+    hasPlan &&
+    !cancellingPlan &&
+    !!laterStart &&
+    (laterStart !== employee.plannedFrom ||
+      (returnDate || null) !== (employee.plannedUntil ?? null) ||
+      chosenAbsenceTypeId !== (employee.plannedAbsenceTypeId ?? null));
+  const plannedAbsenceName =
+    absenceTypes.find((absenceType) => absenceType.id === employee.plannedAbsenceTypeId)?.name ??
+    null;
   const datedFields = (
     <>
-      <ReturnDateField value={returnDate} onChange={setReturnDate} />
+      <ReturnDateField value={returnDate} minDate={returnMinDate} onChange={setReturnDate} />
       {returnDate && absenceTypes.length > 0 ? (
         <AwayAbsenceField
           value={chosenAbsenceTypeId ?? NO_ABSENCE}
@@ -264,8 +324,10 @@ export function EmployeeStatusActions({
   function reset() {
     setChoice(null);
     setNote("");
-    setReturnDate(employee.awayUntil ?? "");
-    setAbsenceTypeId(employee.awayAbsenceTypeId ?? NO_ABSENCE);
+    setReturnDate(initialReturnDate);
+    setAbsenceTypeId(initialAbsenceTypeId);
+    setStartDate(initialStartDate);
+    setCancellingPlan(false);
   }
 
   function close() {
@@ -279,12 +341,33 @@ export function EmployeeStatusActions({
     try {
       switch (choice) {
         case null:
-          await onSetReturnDate?.(employee.id, returnDate || null, chosenAbsenceTypeId);
+          if (hasPlan) {
+            await onSetPlannedAway?.(
+              employee.id,
+              cancellingPlan || !laterStart
+                ? null
+                : {
+                    startDate: laterStart,
+                    returnDate: returnDate || null,
+                    absenceTypeId: chosenAbsenceTypeId,
+                  },
+            );
+          } else {
+            await onSetReturnDate?.(employee.id, returnDate || null, chosenAbsenceTypeId);
+          }
           break;
         case "markAway":
-          await (returnDate
-            ? onDeactivate(employee.id, trimmedNote, returnDate, chosenAbsenceTypeId)
-            : onDeactivate(employee.id, trimmedNote));
+          await (laterStart
+            ? onDeactivate(
+                employee.id,
+                trimmedNote,
+                returnDate || undefined,
+                chosenAbsenceTypeId,
+                laterStart,
+              )
+            : returnDate
+              ? onDeactivate(employee.id, trimmedNote, returnDate, chosenAbsenceTypeId)
+              : onDeactivate(employee.id, trimmedNote));
           break;
         // Revoking any linked org membership happens server-side, atomically
         // with the status change (see /api/employees/status).
@@ -310,14 +393,28 @@ export function EmployeeStatusActions({
     ? describeStatusAction(choice, displayName, {
         returnDate: choice === "markAway" ? returnDate || null : null,
         absenceName: choice === "markAway" ? chosenAbsenceName : null,
+        startDate: choice === "markAway" ? laterStart : null,
+        // Any other change today replaces the plan, and says so.
+        plannedFrom:
+          hasPlan && !(choice === "markAway" && laterStart) ? employee.plannedFrom : null,
       })
-    : awayDetailsChanged
-      ? describeStatusAction("setReturnDate", displayName, {
-          returnDate: returnDate || null,
-          currentReturnDate: employee.awayUntil ?? null,
-          absenceName: chosenAbsenceName,
+    : cancellingPlan
+      ? describeStatusAction("cancelPlannedChange", displayName, {
+          absenceName: plannedAbsenceName,
         })
-      : null;
+      : planChanged
+        ? describeStatusAction("setPlannedChange", displayName, {
+            startDate: laterStart,
+            returnDate: returnDate || null,
+            absenceName: chosenAbsenceName,
+          })
+        : awayDetailsChanged
+          ? describeStatusAction("setReturnDate", displayName, {
+              returnDate: returnDate || null,
+              currentReturnDate: employee.awayUntil ?? null,
+              absenceName: chosenAbsenceName,
+            })
+          : null;
   const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
 
   const dialog =
@@ -329,6 +426,23 @@ export function EmployeeStatusActions({
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <CurrentStatusBox text={current.text} detail={current.detail} tone={current.tone} />
             {isAway && !choice && onSetReturnDate ? datedFields : null}
+            {hasPlan && !choice && onSetPlannedAway ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {cancellingPlan ? null : (
+                  <>
+                    <StartDateField value={startDate} onChange={setStartDate} />
+                    {datedFields}
+                  </>
+                )}
+                <Button
+                  className="dg-btn dg-btn-ghost dg-btn-xs"
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={() => setCancellingPlan((value) => !value)}
+                >
+                  {cancellingPlan ? "Keep planned away" : "Cancel planned away"}
+                </Button>
+              </div>
+            ) : null}
             <RadioCardList
               label="Status"
               options={choices.map((option) => ({
@@ -337,7 +451,10 @@ export function EmployeeStatusActions({
                 detail: option.detail,
               }))}
               value={choice}
-              onChange={setChoice}
+              onChange={(next) => {
+                setChoice(next);
+                setCancellingPlan(false);
+              }}
             />
             {notePlaceholder ? (
               <input
@@ -349,19 +466,24 @@ export function EmployeeStatusActions({
                 style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
               />
             ) : null}
-            {choice === "markAway" ? datedFields : null}
+            {choice === "markAway" ? (
+              <>
+                <StartDateField value={startDate} onChange={setStartDate} />
+                {datedFields}
+              </>
+            ) : null}
             {copy?.message ? <span>{copy.message}</span> : null}
           </div>
         }
         summary={copy ? { points: copy.points } : undefined}
         confirmLabel={
-          choice
+          choice || cancellingPlan
             ? (copy?.label ?? "")
-            : isAway && onSetReturnDate
+            : (isAway && onSetReturnDate) || (hasPlan && onSetPlannedAway)
               ? "Save changes"
               : "Change status"
         }
-        confirmDisabled={!choice && !awayDetailsChanged}
+        confirmDisabled={!choice && !awayDetailsChanged && !planChanged && !cancellingPlan}
         variant={choice === "archive" ? "danger" : "warning"}
         onConfirm={confirm}
         onCancel={close}

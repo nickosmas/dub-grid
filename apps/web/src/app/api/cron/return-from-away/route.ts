@@ -11,15 +11,28 @@ import { bearerMatchesSecret } from "@/lib/cron-auth";
 export const dynamic = "force-dynamic";
 
 // Runs daily via the vercel.json crons block, at 08:00 UTC so it lands just
-// after midnight across US timezones: anyone Away whose return date has come
-// in their organization's timezone is set back to Active. Their
-// recurring schedules were kept while they were away and the fills already
-// start from the return date, so nothing else changes.
+// after midnight across US timezones. First anyone whose planned Away (51g1)
+// starts today in their organization's timezone is marked Away, with the
+// plan's return date and absence; their days were already cleared when it
+// was planned. Then anyone Away whose return date has come is set back to
+// Active. Their recurring schedules were kept while they were away and the
+// fills already start from the return date, so nothing else changes.
 //
 // Auth: Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`.
 
 const UPDATE_BATCH_SIZE = 25;
 const DAY_MS = 86_400_000;
+
+interface PlannedRow {
+  id: string;
+  org_id: string;
+  planned_from: string;
+  planned_until: string | null;
+  planned_absence_type_id: number | null;
+  planned_note: string | null;
+  version: number;
+  organization: { timezone: string | null } | null;
+}
 
 interface AwayRow {
   id: string;
@@ -48,6 +61,15 @@ export async function GET(req: NextRequest) {
   // No timezone is more than a day ahead of UTC, so this bounds every
   // organization's today; each row is then checked against its own.
   const latestToday = new Date(now.getTime() + DAY_MS).toISOString().slice(0, 10);
+
+  // A failed start never holds up the returns below.
+  let started = 0;
+  try {
+    started = await startPlannedAways(db, now, latestToday);
+  } catch (error) {
+    logger.error({ error }, "return-from-away: starting planned aways failed");
+  }
+
   const { data, error } = await db
     .from("employees")
     .select("id, org_id, away_until, version, organization:organizations(timezone)")
@@ -65,7 +87,7 @@ export async function GET(req: NextRequest) {
     (row) => row.away_until <= getIsoDateInTimeZone(now, row.organization?.timezone ?? null),
   );
   if (due.length === 0) {
-    return NextResponse.json({ ok: true, returned: 0 });
+    return NextResponse.json({ ok: true, started, returned: 0 });
   }
 
   const statusChangedAt = now.toISOString();
@@ -124,7 +146,104 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    started,
     returned: returned.length,
     skipped: due.length - returned.length,
   });
+}
+
+type ServiceClient = ReturnType<typeof getServiceClient>;
+
+/**
+ * Marks Away everyone whose planned Away starts today or earlier in their
+ * organization's timezone, in one version-guarded update each; a plan whose
+ * return date has already come is dropped instead. Returns how many started.
+ */
+async function startPlannedAways(
+  db: ServiceClient,
+  now: Date,
+  latestToday: string,
+): Promise<number> {
+  const { data, error } = await db
+    .from("employees")
+    .select(
+      "id, org_id, planned_from, planned_until, planned_absence_type_id, planned_note, version, organization:organizations(timezone)",
+    )
+    .eq("status", "active")
+    .is("archived_at", null)
+    .is("suspended_at", null)
+    .eq("planned_status", "away")
+    .lte("planned_from", latestToday);
+  if (error) throw error;
+
+  const due = ((data ?? []) as unknown as PlannedRow[]).flatMap((row) => {
+    const today = getIsoDateInTimeZone(now, row.organization?.timezone ?? null);
+    return row.planned_from <= today ? [{ row, today }] : [];
+  });
+  if (due.length === 0) return 0;
+
+  const statusChangedAt = now.toISOString();
+  const startedRows: PlannedRow[] = [];
+  for (let start = 0; start < due.length; start += UPDATE_BATCH_SIZE) {
+    const batch = due.slice(start, start + UPDATE_BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async ({ row, today }) => {
+        const over = row.planned_until !== null && row.planned_until <= today;
+        const { data: updated, error: updateError } = await db
+          .from("employees")
+          .update(
+            over
+              ? { planned_status: null, version: row.version + 1 }
+              : {
+                  status: "inactive",
+                  status_note: row.planned_note ?? "",
+                  status_changed_at: statusChangedAt,
+                  away_until: row.planned_until,
+                  away_absence_type_id: row.planned_absence_type_id,
+                  planned_status: null,
+                  version: row.version + 1,
+                },
+          )
+          .eq("id", row.id)
+          .eq("org_id", row.org_id)
+          .eq("version", row.version)
+          .select("id")
+          .maybeSingle();
+        if (updateError) {
+          logger.error({ error: updateError, empId: row.id }, "return-from-away: start failed");
+          return null;
+        }
+        return updated && !over ? row : null;
+      }),
+    );
+    startedRows.push(...results.filter((row): row is PlannedRow => row !== null));
+  }
+
+  if (startedRows.length > 0) {
+    const { error: auditError } = await db.from("audit_log").insert(
+      startedRows.map((row) => ({
+        org_id: row.org_id,
+        actor_id: null,
+        actor_email: null,
+        action: "employee.deactivated",
+        resource_type: "employee",
+        resource_id: row.id,
+        details: {
+          fromStatus: "active",
+          toStatus: "inactive",
+          plannedFrom: row.planned_from,
+          ...(row.planned_until ? { awayUntil: row.planned_until } : {}),
+          ...(row.planned_absence_type_id
+            ? { awayAbsenceTypeId: row.planned_absence_type_id }
+            : {}),
+          changedFields: ["status"],
+        },
+      })),
+    );
+    if (auditError) {
+      logger.error({ error: auditError }, "return-from-away: start audit log write failed");
+    }
+    await cacheDel(...new Set(startedRows.map((row) => CacheKey.employees(row.org_id))));
+  }
+  return startedRows.length;
 }

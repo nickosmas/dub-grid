@@ -1,4 +1,4 @@
-import { formatReturnDate } from "@dubgrid/domain";
+import { formatReturnDate, isPlannedAwayOn } from "@dubgrid/domain";
 import { buildAbsenceRuns, type AbsenceRunDay } from "@dubgrid/schedule-core";
 import type { Employee } from "@/types";
 
@@ -9,12 +9,54 @@ export function awayRunLabel(absenceName: string | null): string {
   return absenceName ? `${AWAY_RUN_LABEL} · ${absenceName}` : AWAY_RUN_LABEL;
 }
 
+/**
+ * The days someone is away and can't be scheduled: from `from` (or always,
+ * when null) up to the day before `until` (or onward, when null).
+ */
+export interface AwayRange {
+  from: string | null;
+  until: string | null;
+}
+
+export function isInAwayRange(range: AwayRange, dateKey: string): boolean {
+  return (
+    (range.from === null || dateKey >= range.from) &&
+    (range.until === null || dateKey < range.until)
+  );
+}
+
 /** Why a locked away day can't be selected, and where to change it. */
-export function awayLockedHint(awayUntil: string): string {
-  return `Away until ${formatReturnDate(awayUntil, { weekday: true })}. Change the return date on their record to change these days.`;
+export function awayLockedHint(range: AwayRange): string {
+  if (range.from !== null) {
+    const from = formatReturnDate(range.from, { weekday: true });
+    return range.until
+      ? `Away from ${from} until ${formatReturnDate(range.until, { weekday: true })}. Change the planned away on their record to change these days.`
+      : `Away from ${from}. Change the planned away on their record to change these days.`;
+  }
+  return `Away until ${formatReturnDate(range.until ?? "", { weekday: true })}. Change the return date on their record to change these days.`;
 }
 
 type AwayFields = Pick<Employee, "status" | "awayUntil" | "archivedAt">;
+
+type RangeFields = AwayFields & Pick<Employee, "plannedStatus" | "plannedFrom" | "plannedUntil">;
+
+/**
+ * Someone's away days: until their return date when Away until a date (51e),
+ * or from the start of a planned Away (51g1). Null for anyone else.
+ */
+export function awayRangeOf(employee: RangeFields): AwayRange | null {
+  const until = awayReturnDate(employee);
+  if (until) return { from: null, until };
+  if (
+    employee.status === "active" &&
+    !employee.archivedAt &&
+    employee.plannedFrom &&
+    isPlannedAwayOn(employee, employee.plannedFrom)
+  ) {
+    return { from: employee.plannedFrom, until: employee.plannedUntil ?? null };
+  }
+  return null;
+}
 
 /** An Away person's first day back (YYYY-MM-DD), or null for anyone else. */
 export function awayReturnDate(employee: AwayFields): string | null {
@@ -52,13 +94,13 @@ const AWAY_RUN_ID = -1;
 
 /** A row's away days, or null when the row has none in the period. */
 export function buildRowAwayDays(
-  awayUntil: string | null,
+  range: AwayRange | null,
   dateKeys: readonly string[],
   todayKey: string,
   splitAt?: number,
 ): RowAwayDays | null {
-  if (!awayUntil) return null;
-  const locked = dateKeys.map((dateKey) => dateKey < awayUntil);
+  if (!range) return null;
+  const locked = dateKeys.map((dateKey) => isInAwayRange(range, dateKey));
   if (!locked.includes(true)) return null;
   const isAway = dateKeys.map((dateKey, index) => locked[index] && dateKey >= todayKey);
   const built = buildAbsenceRuns(

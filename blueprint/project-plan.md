@@ -166,11 +166,13 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   customer behavior only in public guides; Gridmaster tooling, Test Sandbox,
   feature flags, migrations, environment variables, and internal HTTP
   endpoints stay internal, and future drift fails verification.
-- Staff statuses: every person is Active, Away, Suspended or Archived, with
-  an optional last day and return date. Away keeps sign-in and role but
-  takes them off the schedule (optionally under an absence for the whole
-  time away); Suspended can't sign in but keeps their shifts; a last day
-  archives them after it. Schedule changes from a status go through the
+- Staff statuses: every person is Active, Away, Suspended or Archived, and
+  any status change can be set for a later date: leave booked ahead that
+  ends on a return date, a last day that archives them after it, a
+  suspension that ends on a date, and a new hire's first day. Away keeps
+  sign-in and role but takes them off the schedule (optionally under an
+  absence for the whole time away); Suspended can't sign in but keeps their
+  shifts. Schedule changes from a status go through the
   draft and publish with the period, and staff are told only their state
   and its date. Recurring schedules pause while someone is away until a
   date, losing a focus area asks what to do with upcoming shifts there,
@@ -197,7 +199,8 @@ runtime evidence.
 - Organization memberships (per-tenant role assignment)
 - Per-membership onboarding completion and onboarding-tour state
 - Employees / staff records, focus areas, certifications, employment
-  status (Active, Away, Archived), suspended access, return date, last day
+  status (Active, Away, Archived), suspended access, return date, a
+  planned status change with its dates, first day
 - Schedules: recurring shifts, published schedule entries, draft state,
   shift snapshots for audit history. A cell holds worked shifts, an
   absence, or up to two worked shifts plus one absence covering scheduled

@@ -14,6 +14,7 @@ import {
   restoreMobileOrganizationMembership,
   updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
+  updateMobileEmployeePlannedChangeRow,
   updateMobileEmployeeSuspensionRow,
 } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
@@ -81,6 +82,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         },
         updateEmployeeSuspension: async (serviceClient, input) => {
           const row = await updateMobileEmployeeSuspensionRow(serviceClient, input);
+          return row ? rowToEmployee(row) : null;
+        },
+        updateEmployeePlannedChange: async (serviceClient, input) => {
+          const row = await updateMobileEmployeePlannedChangeRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
         },
         // Never fail the suspension over tidying up: the hook already

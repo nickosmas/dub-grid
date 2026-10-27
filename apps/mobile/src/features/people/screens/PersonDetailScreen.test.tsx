@@ -1285,6 +1285,55 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("schedules an Away for a later start (51g1)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Away/);
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(1));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Starts, ${formatReturnDate(day(1), { weekday: true })}`,
+        }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+      choose(day(2));
+      expect(
+        screen.getByText(`They stay Active until ${formatReturnDate(day(1), { weekday: true })}.`),
+      ).toBeInTheDocument();
+      confirm("Schedule away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "deactivate",
+        copyAction: "markAway",
+        startDate: day(1),
+        returnDate: day(2),
+      });
+    });
+
+    it("cancels a planned Away (51g1)", () => {
+      const mutate = renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      expect(
+        screen.getByText(
+          `Away from ${formatReturnDate(day(5), { weekday: true })}, back ${formatReturnDate(day(9), { weekday: true })}.`,
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned away" }));
+      confirm("Cancel planned away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "cancelPlannedChange",
+        copyAction: "cancelPlannedChange",
+      });
+    });
+
     it("never offers today as a return date", () => {
       renderWithStatusMutation();
 
