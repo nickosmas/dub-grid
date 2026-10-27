@@ -19,6 +19,8 @@ const INDEPENDENTLY_AUTHENTICATED_ROUTES: Record<string, string> = {
     "Public consent capture is CSRF-protected; service access only attributes a verified optional account.",
   "apps/web/src/app/api/cron/expire-requests/route.ts":
     "CRON_SECRET authenticates this system job.",
+  "apps/web/src/app/api/cron/return-from-away/route.ts":
+    "CRON_SECRET authenticates this system job.",
   "apps/web/src/app/api/cron/sandbox-cleanup/route.ts":
     "CRON_SECRET authenticates this system job.",
   "apps/web/src/app/api/cron/trial-expiry/route.ts": "CRON_SECRET authenticates this system job.",

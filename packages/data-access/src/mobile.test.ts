@@ -26,6 +26,7 @@ function makeRow(n: number): MobilePeopleQueryRow {
     status: "active",
     status_changed_at: null,
     status_note: null,
+    away_until: null,
     certification_id: null,
     role_ids: null,
     seniority: null,

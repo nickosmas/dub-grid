@@ -312,9 +312,10 @@ async function updateEmployeeStatus(
   input: {
     empId: string;
     orgId: string;
-    action: "deactivate" | "activate" | "remove";
+    action: "deactivate" | "activate" | "remove" | "setReturnDate";
     expectedVersion: number;
     note?: string;
+    returnDate?: string | null;
   },
   accessToken?: string,
 ): Promise<Employee> {
@@ -380,6 +381,7 @@ export function deactivateEmployee(
   orgId: string,
   expectedVersion: number,
   accessToken?: string,
+  returnDate?: string | null,
 ): Promise<Employee> {
   return updateEmployeeStatus(
     {
@@ -388,9 +390,26 @@ export function deactivateEmployee(
       action: "deactivate",
       note,
       expectedVersion,
+      ...(returnDate ? { returnDate } : {}),
     },
     accessToken,
   );
+}
+
+/** Sets, moves or clears (null) an Away person's return date. */
+export function setEmployeeReturnDate(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+  returnDate: string | null,
+): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "setReturnDate",
+    expectedVersion,
+    returnDate,
+  });
 }
 
 export function activateEmployee(

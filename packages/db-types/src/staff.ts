@@ -10,6 +10,7 @@ export interface DbEmployee {
   status: EmployeeStatus;
   status_changed_at: string | null;
   status_note: string;
+  away_until?: string | null;
   certification_id: number | null;
   role_ids: number[];
   seniority: number;

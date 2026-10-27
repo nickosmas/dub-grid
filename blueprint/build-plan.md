@@ -1095,7 +1095,7 @@
         a lock on the grid row, "won't see this in the app" in the shift
         picker, the notice email and the Super Admin alert, and their open
         requests close.
-  - [ ] 51e. **Away until a date** - an optional return date, schedulable
+  - [x] 51e. **Away until a date** - an optional return date, schedulable
         again from that date, and a daily job that sets them back to Active
         in the organization's timezone; their recurring schedules are paused
         while away, not archived, and fill again from the return date; the

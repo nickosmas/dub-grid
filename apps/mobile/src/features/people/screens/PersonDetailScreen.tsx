@@ -61,6 +61,8 @@ import {
   type MobileStaffField,
 } from "../../../shared/lib/api";
 import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import { ReturnDateField } from "../components/ReturnDatePicker";
 import {
   getDepartmentNames,
   getScheduledDepartmentNames,
@@ -117,7 +119,7 @@ import {
   type OrgRole,
 } from "../components/OrgRoleSheet";
 
-type ConfirmAction = "deactivate" | "activate" | "remove" | null;
+type ConfirmAction = "deactivate" | "activate" | "remove" | "setReturnDate" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
@@ -269,6 +271,7 @@ export default function PersonDetailScreen() {
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [managementAccessError, setManagementAccessError] = useState<string | null>(null);
   const [inactiveNote, setInactiveNote] = useState("");
+  const [returnDate, setReturnDate] = useState<string | null>(null);
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
   const [showOrgRole, setShowOrgRole] = useState(false);
@@ -462,16 +465,19 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "deactivate" | "activate" | "remove";
+      action: "deactivate" | "activate" | "remove" | "setReturnDate";
       note?: string;
+      returnDate?: string | null;
       expectedVersion: number;
       /** Only names the done toast: Restored rather than Marked active. */
       fromStatus: MobilePerson["status"];
+      fromReturnDate: string | null;
     }) =>
       updateMobilePersonStatus(accessToken!, personId!, {
         action: input.action,
         expectedVersion: input.expectedVersion,
         note: input.note,
+        ...(input.returnDate !== undefined ? { returnDate: input.returnDate } : {}),
       }),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
@@ -483,6 +489,7 @@ export default function PersonDetailScreen() {
       updateCachedPerson(result.person);
       setConfirmAction(null);
       setInactiveNote("");
+      setReturnDate(null);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
@@ -491,8 +498,14 @@ export default function PersonDetailScreen() {
             ? (statusUndoAction(variables.fromStatus) ?? "markActive")
             : variables.action === "deactivate"
               ? "markAway"
-              : "archive",
+              : variables.action === "setReturnDate"
+                ? "setReturnDate"
+                : "archive",
           getFullName(result.person),
+          {
+            returnDate: variables.returnDate ?? null,
+            currentReturnDate: variables.fromReturnDate,
+          },
         ).done,
         message: "Staff status was updated.",
       });
@@ -611,8 +624,9 @@ export default function PersonDetailScreen() {
   useNavigationDiscardGuard(guard);
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
-      (confirmAction === "deactivate" || confirmAction === "remove") &&
-      Boolean(inactiveNote.trim()),
+      ((confirmAction === "deactivate" || confirmAction === "remove") &&
+        Boolean(inactiveNote.trim())) ||
+      (confirmAction === "deactivate" && returnDate !== null),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
   });
@@ -871,10 +885,17 @@ export default function PersonDetailScreen() {
       action: confirmAction,
       expectedVersion: person.version,
       fromStatus: person.status,
+      fromReturnDate: person.awayUntil,
       note:
         confirmAction === "deactivate" || confirmAction === "remove"
           ? inactiveNote.trim() || undefined
           : undefined,
+      returnDate:
+        confirmAction === "setReturnDate"
+          ? returnDate
+          : confirmAction === "deactivate" && returnDate
+            ? returnDate
+            : undefined,
     };
     return new Promise<void>((resolve) => {
       statusMutation.mutate(input, { onSettled: () => resolve() });
@@ -887,6 +908,7 @@ export default function PersonDetailScreen() {
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
     setInactiveNote("");
+    setReturnDate(null);
   }
 
   function confirmInvitationAction(): Promise<void> | undefined {
@@ -905,10 +927,20 @@ export default function PersonDetailScreen() {
           ? (statusUndoAction(person.status) ?? "markActive")
           : confirmAction === "deactivate"
             ? "markAway"
-            : "archive",
+            : confirmAction === "setReturnDate"
+              ? "setReturnDate"
+              : "archive",
         getFullName(person),
+        confirmAction === "deactivate" || confirmAction === "setReturnDate"
+          ? { returnDate, currentReturnDate: person.awayUntil }
+          : {},
       )
     : null;
+  // A return date is the first day back, so the organization's tomorrow at the earliest.
+  const firstReturnDate = addDaysToIsoDate(
+    getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null),
+    1,
+  );
   const undoAction = statusUndoAction(person.status);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
@@ -1337,12 +1369,29 @@ export default function PersonDetailScreen() {
                   tone="success"
                 />
               ) : null}
+              {person.status === "inactive" ? (
+                <Button
+                  disabled={statusMutation.isPending || isSelf}
+                  label={
+                    describeStatusAction("setReturnDate", getFullName(person), {
+                      currentReturnDate: person.awayUntil,
+                    }).label
+                  }
+                  onPress={() => {
+                    setReturnDate(person.awayUntil);
+                    setConfirmationError(null);
+                    setConfirmAction("setReturnDate");
+                  }}
+                  tone="secondary"
+                />
+              ) : null}
               {person.status === "active" && canBeInactive ? (
                 <Button
                   disabled={statusMutation.isPending || isSelf}
                   label={describeStatusAction("markAway", getFullName(person)).label}
                   onPress={() => {
                     setInactiveNote("");
+                    setReturnDate(null);
                     setConfirmationError(null);
                     setConfirmAction("deactivate");
                   }}
@@ -1450,7 +1499,66 @@ export default function PersonDetailScreen() {
             onChangeText={setInactiveNote}
           />
         ) : null}
+        {confirmAction === "deactivate" ? (
+          <ReturnDateField
+            disabled={statusMutation.isPending}
+            minDate={firstReturnDate}
+            onChange={setReturnDate}
+            value={returnDate}
+          />
+        ) : null}
         {statusCopy && confirmAction !== "activate" ? (
+          <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
+        ) : null}
+      </BottomSheetModal>
+      <BottomSheetModal
+        debugName="Set return date"
+        dismissDisabled={statusMutation.isPending}
+        header={
+          <SheetHeader
+            title={confirmAction === "setReturnDate" ? (statusCopy?.title ?? "") : ""}
+            subtitle={
+              confirmAction === "setReturnDate" ? statusCopy?.message || undefined : undefined
+            }
+          />
+        }
+        scrollable
+        visible={confirmAction === "setReturnDate"}
+        onDismiss={closeStatusConfirmation}
+        footer={
+          <>
+            {confirmationError ? <InlineError message={confirmationError} /> : null}
+            <SheetActions
+              primaryAction={
+                <Button
+                  disabled={returnDate === person.awayUntil}
+                  label={statusCopy?.label ?? ""}
+                  loading={statusMutation.isPending}
+                  onPress={confirmStatusAction}
+                  tone="primary"
+                />
+              }
+            >
+              <Button
+                label="Cancel"
+                disabled={statusMutation.isPending}
+                onPress={closeStatusConfirmation}
+                tone="plain"
+              />
+            </SheetActions>
+          </>
+        }
+      >
+        {confirmAction === "setReturnDate" ? (
+          <ReturnDateField
+            disabled={statusMutation.isPending}
+            initiallyOpen
+            minDate={firstReturnDate}
+            onChange={setReturnDate}
+            value={returnDate}
+          />
+        ) : null}
+        {confirmAction === "setReturnDate" && statusCopy && statusCopy.points.length > 0 ? (
           <ConfirmSummaryBox summary={{ points: statusCopy.points }} />
         ) : null}
       </BottomSheetModal>

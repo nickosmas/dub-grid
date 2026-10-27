@@ -27,6 +27,7 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { formatReturnDate } from "@dubgrid/domain";
 import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
@@ -136,8 +137,9 @@ import {
 } from "./schedule-grid/badges";
 import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
-import { AbsenceRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
+import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
+import { awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -2116,9 +2118,19 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              const rowShiftLabels = weekDates.map((date) => shiftForKey(emp.id, date));
-              const rowAbsenceTypeIds = weekDates.map(
-                (date) => absenceTypeIdForKey?.(emp.id, date) ?? null,
+              // Someone away until a date (51e) has an Away bar on those days
+              // from today on, and nothing else there.
+              const rowAwayDays = buildRowAwayDays(
+                awayReturnDate(emp),
+                weekDates.map((date) => formatDateKey(date)),
+                todayKey,
+                splitAtIndex,
+              );
+              const rowShiftLabels = weekDates.map((date, index) =>
+                rowAwayDays?.runs[index] ? null : shiftForKey(emp.id, date),
+              );
+              const rowAbsenceTypeIds = weekDates.map((date, index) =>
+                rowAwayDays?.runs[index] ? null : (absenceTypeIdForKey?.(emp.id, date) ?? null),
               );
               // Whole-day absences on days in a row draw as one bar per week
               // (item 52). Bulk removal selects day by day, so it keeps pills.
@@ -2141,7 +2153,7 @@ const SectionBlock = memo(function SectionBlock({
               const grownCellHeights = new Set<string>();
               const rowCellGrows = weekDates.map(() => false);
               for (const [index, date] of weekDates.entries()) {
-                if (rowAbsenceTypeIds[index] != null) continue;
+                if (rowAbsenceTypeIds[index] != null || rowAwayDays?.runs[index]) continue;
                 const labels = rowShiftLabels[index]?.split("/") ?? [];
                 // A rest-of-day absence (item 45) is one more pill, after the shifts.
                 const pillCount =
@@ -2530,7 +2542,11 @@ const SectionBlock = memo(function SectionBlock({
                       // not open. Everything else there starts past it.
                       const cornerLockClearance = hasPeerEditor ? LOCK_CORNER_CLEARANCE : 0;
 
-                      const showDiffCellTint = !!draftKind || showsPublishDiff;
+                      const awayRunDay = rowAwayDays?.runs[index] ?? null;
+                      // Before the return date nothing can be scheduled for them.
+                      const isAwayLocked = !!rowAwayDays?.locked[index];
+                      const isDayInteractive = isCellInteractive && !isAwayLocked;
+                      const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                       // The row above paints its own bottom stroke inside its
                       // own box — the header cells and the open-shifts row both
                       // do it with a background-image at their bottom edge. Row
@@ -2546,6 +2562,7 @@ const SectionBlock = memo(function SectionBlock({
                       const hasDraggableEntry =
                         canDragShifts &&
                         !bulkDeleteMode &&
+                        !isAwayLocked &&
                         !!shiftLabel &&
                         shiftLabel !== "OFF" &&
                         draftKind !== "deleted";
@@ -2558,7 +2575,8 @@ const SectionBlock = memo(function SectionBlock({
                       const leadingDividerInset = index === 0 ? 0 : 1;
                       const absenceRunDay = rowAbsenceRuns?.days[index] ?? null;
                       const absenceRunInside =
-                        absenceRunDay != null && absenceRunDay.position !== "start";
+                        (absenceRunDay != null && absenceRunDay.position !== "start") ||
+                        (awayRunDay != null && awayRunDay.position !== "start");
                       // Only the cell's own top divider eats into its box. The
                       // header/open-shifts stroke above row 0 lives in that
                       // row's box, so row 0 needs no inset and its pills line up
@@ -2576,20 +2594,22 @@ const SectionBlock = memo(function SectionBlock({
                           data={{
                             cellId,
                           }}
-                          disabled={!isCellInteractive || bulkDeleteMode}
+                          disabled={!isDayInteractive || bulkDeleteMode}
                           className="dg-grid-cell"
                           role="gridcell"
                           aria-label={
-                            shiftLabel && shiftLabel !== "OFF"
-                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
-                              : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
+                            awayRunDay
+                              ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
+                              : shiftLabel && shiftLabel !== "OFF"
+                                ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
+                                : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                           }
                           aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
-                          tabIndex={isCellInteractive || isBulkSelectable ? 0 : -1}
+                          tabIndex={isDayInteractive || isBulkSelectable ? 0 : -1}
                           data-emp-id={emp.id}
                           data-date-key={dateKey}
                           data-section-id={sectionId}
-                          data-interactive={isCellInteractive ? "true" : "false"}
+                          data-interactive={isDayInteractive ? "true" : "false"}
                           data-peer-editing={hasPeerEditor ? "true" : "false"}
                           data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
                           data-slot="cell"
@@ -2605,6 +2625,8 @@ const SectionBlock = memo(function SectionBlock({
                           data-top-divider={topDivider}
                           data-absence-run={absenceRunDay?.position}
                           data-absence-run-index={absenceRunDay?.runIndex}
+                          data-away-run={awayRunDay?.position}
+                          data-away-locked={isAwayLocked ? "true" : undefined}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2619,7 +2641,7 @@ const SectionBlock = memo(function SectionBlock({
                             // them may stack its own background above it.
                             zIndex: showDiffCellTint
                               ? 8
-                              : ri === 0 && !absenceRunDay
+                              : ri === 0 && !absenceRunDay && !awayRunDay
                                 ? 5
                                 : undefined,
                           }}
@@ -2633,11 +2655,15 @@ const SectionBlock = memo(function SectionBlock({
                               ? (event) => setAbsenceRunHover(event.currentTarget, false)
                               : undefined
                           }
-                          onClick={() => triggerCellActivation(emp, date, "click")}
-                          onContextMenu={(event) =>
-                            triggerCellContextMenu(event, event.currentTarget, cellId, emp, date)
-                          }
+                          onClick={() => {
+                            if (!isAwayLocked) triggerCellActivation(emp, date, "click");
+                          }}
+                          onContextMenu={(event) => {
+                            if (isAwayLocked) return;
+                            triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
+                          }}
                           onKeyDown={(event) => {
+                            if (isAwayLocked) return;
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               triggerCellActivation(emp, date, "keyboard");
@@ -2682,7 +2708,17 @@ const SectionBlock = memo(function SectionBlock({
                                   bottom={4}
                                 />
                               )}
-                            {shiftLabel && shiftLabel !== "OFF" ? (
+                            {awayRunDay?.position === "start" && (
+                              <AwayRunBar
+                                runIndex={awayRunDay.runIndex}
+                                length={awayRunDay.length}
+                                top={insetFromVisibleCellTop(4)}
+                                left={insetFromVisibleCellLeft(4)}
+                                sideInset={4}
+                                bottom={4}
+                              />
+                            )}
+                            {awayRunDay ? null : shiftLabel && shiftLabel !== "OFF" ? (
                               <DraggableShift
                                 id={`drag_${emp.id}_${dateKey}_${sectionName}`}
                                 data={{

@@ -11,6 +11,7 @@ export type AuditAction =
   | "employee.benched"
   | "employee.deactivated"
   | "employee.activated"
+  | "employee.return_date_changed"
   // Shift management
   | "shift.created"
   | "shift.updated"

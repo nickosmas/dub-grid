@@ -174,7 +174,7 @@ function StaffRowCells({
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const statusLabel = describeEmploymentStatus(emp.status);
+  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil);
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",

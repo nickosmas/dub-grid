@@ -15,22 +15,41 @@ import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS, cacheDel, CacheKey } from "@/lib/db/shared";
 import {
   canMarkInactive,
+  isValidReturnDate,
+  NOT_AWAY_CODE,
+  NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_CODE,
   NOT_ON_SCHEDULE_MESSAGE,
+  RETURN_DATE_INVALID_CODE,
+  RETURN_DATE_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
+import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
-  action: z.enum(["deactivate", "activate", "remove"]),
+  action: z.enum(["deactivate", "activate", "remove", "setReturnDate"]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
+  /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
+  returnDate: z.string().date().nullable().optional(),
 });
+
+async function fetchOrgToday(serviceClient: SupabaseClient, orgId: string): Promise<string> {
+  const { data, error } = await serviceClient
+    .from("organizations")
+    .select("timezone")
+    .eq("id", orgId)
+    .single();
+  if (error) throw error;
+  return getIsoDateInTimeZone(new Date(), (data as { timezone: string | null }).timezone);
+}
 
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(
@@ -89,6 +108,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { empId, action, expectedVersion, note } = parsed.data;
+  const returnDate = parsed.data.returnDate ?? null;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -158,6 +178,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      action === "setReturnDate" &&
+      (currentEmployee.status !== "inactive" || currentEmployee.archivedAt)
+    ) {
+      return NextResponse.json({ error: NOT_AWAY_MESSAGE, code: NOT_AWAY_CODE }, { status: 400 });
+    }
+
+    if (
+      returnDate !== null &&
+      (action === "deactivate" || action === "setReturnDate") &&
+      !isValidReturnDate(returnDate, await fetchOrgToday(serviceClient, orgId))
+    ) {
+      return NextResponse.json(
+        { error: RETURN_DATE_INVALID_MESSAGE, code: RETURN_DATE_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
     // Removing staff already fully blocks login at the JWT hook regardless of
     // org_role (see 002_functions_triggers.sql), so removing the org's only
     // super_admin here would lock the org out just as surely as deleting their
@@ -193,10 +231,10 @@ export async function POST(req: NextRequest) {
     // The service client has no auth.uid(), so name the actor: leaving turns
     // their future shifts into pending removals credited to this person.
     const update: Record<string, unknown> = {
-      status_changed_at: now,
       updated_by: user.id,
       version: expectedVersion + 1,
     };
+    if (action !== "setReturnDate") update.status_changed_at = now;
 
     let auditAction = "employee.updated";
     let auditDetails: Record<string, unknown> = {
@@ -207,16 +245,27 @@ export async function POST(req: NextRequest) {
       case "deactivate":
         update.status = "inactive";
         update.status_note = note ?? "";
+        update.away_until = returnDate;
         auditAction = "employee.deactivated";
         auditDetails = {
           ...auditDetails,
           toStatus: "inactive",
           note: note ?? "",
+          ...(returnDate ? { awayUntil: returnDate } : {}),
+        };
+        break;
+      case "setReturnDate":
+        update.away_until = returnDate;
+        auditAction = "employee.return_date_changed";
+        auditDetails = {
+          fromAwayUntil: currentEmployee.awayUntil ?? null,
+          toAwayUntil: returnDate,
         };
         break;
       case "activate":
         update.status = "active";
         update.status_note = "";
+        update.away_until = null;
         update.archived_at = null;
         auditAction = "employee.activated";
         auditDetails = {
@@ -334,7 +383,7 @@ export async function POST(req: NextRequest) {
       resource_id: empId,
       details: {
         ...auditDetails,
-        changedFields: ["status"],
+        changedFields: [action === "setReturnDate" ? "away_until" : "status"],
       },
       ip_address: getRequestIp(req),
       user_agent: req.headers.get("user-agent"),

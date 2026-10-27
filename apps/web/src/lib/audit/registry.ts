@@ -478,17 +478,34 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d, ctx) => {
       const note = d.text("note");
-      return `Marked ${who(d, ctx, "a team member")} away${note ? `: ${note}` : ""}`;
+      const until = d.date("awayUntil");
+      return `Marked ${who(d, ctx, "a team member")} away${until ? ` until ${until}` : ""}${note ? `: ${note}` : ""}`;
     },
-    suppressKeys: ["note"],
+    suppressKeys: ["note", "awayUntil"],
+  },
+  "employee.return_date_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const until = d.date("toAwayUntil");
+      return until
+        ? `Set ${who(d, ctx, "a team member")} to return ${until}`
+        : `Cleared ${who(d, ctx, "a team member")}'s return date`;
+    },
+    suppressKeys: ["fromAwayUntil", "toAwayUntil"],
   },
   "employee.activated": {
     category: "people",
     severity: "create",
-    headline: (d, ctx) =>
-      d.text("fromStatus") === "removed"
-        ? `Restored ${who(d, ctx, "a team member")}`
-        : `Marked ${who(d, ctx, "a team member")} active`,
+    headline: (d, ctx) => {
+      if (d.text("fromStatus") === "removed") return `Restored ${who(d, ctx, "a team member")}`;
+      // The return-from-away job writes the date they came back on, and no actor.
+      const back = d.date("awayUntil");
+      return back
+        ? `${who(d, ctx, "A team member")} came back from away on ${back}`
+        : `Marked ${who(d, ctx, "a team member")} active`;
+    },
+    suppressKeys: ["awayUntil"],
   },
   "employee.removed": {
     category: "people",

@@ -1,5 +1,7 @@
 import { absenceStripeCss, type AbsenceStripeColors } from "@dubgrid/design-tokens";
 import { formatAbsenceRunLabel } from "@dubgrid/schedule-core";
+import type { CSSProperties } from "react";
+import { AWAY_RUN_LABEL } from "./awayRuns";
 import { gridFitLine } from "./gridFit";
 import { SINGLE_SHIFT_PILL_RADIUS } from "./gridHelpers";
 
@@ -37,29 +39,68 @@ export function AbsenceRunBar({
       data-absence-run-bar={runIndex}
       aria-hidden="true"
       style={{
-        position: "absolute",
-        top,
-        bottom,
-        left,
-        right: `calc(${-(length - 1)} * 100% + ${sideInset}px)`,
+        ...runBarFrame({ top, bottom, left, length, sideInset }),
         background: absenceStripeCss(stripes.stripeA, stripes.stripeB),
         border: `1px solid ${stripes.border}`,
-        borderRadius: SINGLE_SHIFT_PILL_RADIUS,
         color: stripes.text,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2px 6px",
-        pointerEvents: "none",
       }}
     >
-      <span
-        data-pill-fit=""
-        className="dg-absence-run__label"
-        style={{ ...gridFitLine("var(--dg-fs-caption)"), fontWeight: 600, lineHeight: 1.2 }}
-      >
-        {formatAbsenceRunLabel(name, length)}
-      </span>
+      <RunBarLabel>{formatAbsenceRunLabel(name, length)}</RunBarLabel>
+    </div>
+  );
+}
+
+type RunBarFrame = Pick<AbsenceRunBarProps, "top" | "left" | "sideInset" | "bottom" | "length">;
+
+/** Where a run's bar sits: from its first cell across `length` cells. */
+function runBarFrame({ top, bottom, left, length, sideInset }: RunBarFrame): CSSProperties {
+  return {
+    position: "absolute",
+    top,
+    bottom,
+    left,
+    right: `calc(${-(length - 1)} * 100% + ${sideInset}px)`,
+    borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "2px 6px",
+    pointerEvents: "none",
+  };
+}
+
+function RunBarLabel({ children }: { children: string }) {
+  return (
+    <span
+      data-pill-fit=""
+      className="dg-absence-run__label"
+      style={{ ...gridFitLine("var(--dg-fs-caption)"), fontWeight: 600, lineHeight: 1.2 }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The days someone is away until their return date (51e), drawn like an
+ * absence run but in neutral colors, since nothing is wrong. It is one label
+ * across the stretch, with no count. The days can't be scheduled, so their
+ * cells hold nothing else.
+ */
+export function AwayRunBar(props: RunBarFrame & { runIndex: number }) {
+  return (
+    <div
+      className="dg-away-run"
+      data-away-run-bar={props.runIndex}
+      aria-hidden="true"
+      style={{
+        ...runBarFrame(props),
+        background: "var(--dg-color-bg-secondary)",
+        border: "1px solid var(--dg-color-border)",
+        color: "var(--dg-color-text-secondary)",
+      }}
+    >
+      <RunBarLabel>{AWAY_RUN_LABEL}</RunBarLabel>
     </div>
   );
 }

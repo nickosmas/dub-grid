@@ -51,7 +51,13 @@ interface StaffDetailPanelProps {
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+  ) => void | Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date. */
+  onSetReturnDate?: (empId: string, returnDate: string | null) => void | Promise<unknown>;
   onActivate: (empId: string) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
@@ -87,6 +93,7 @@ export function StaffDetailPanel({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  onSetReturnDate,
   onActivate,
   statusStepUpOpen = false,
   onClose,
@@ -439,6 +446,7 @@ export function StaffDetailPanel({
                           canEdit={canManageEmployees}
                           isSelf={false}
                           onDeactivate={onDeactivate}
+                          onSetReturnDate={onSetReturnDate}
                           onActivate={onActivate}
                           onRemove={onRemove}
                           stepUpOpen={statusStepUpOpen}

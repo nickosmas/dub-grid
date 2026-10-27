@@ -44,6 +44,7 @@ type MobilePersonSource = Pick<
   | "contactNotes"
   | "statusChangedAt"
   | "statusNote"
+  | "awayUntil"
   | "userId"
   | "version"
 > & {
@@ -82,6 +83,7 @@ export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
     contactNotes: person.contactNotes,
     statusChangedAt: person.statusChangedAt,
     statusNote: person.statusNote,
+    awayUntil: person.awayUntil ?? null,
     userId: person.userId,
     version: person.version,
     membershipUpdatedAt: person.membershipUpdatedAt ?? null,

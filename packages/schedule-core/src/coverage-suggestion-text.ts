@@ -204,6 +204,8 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
       return "works only their chosen jobs";
     case "excluded":
       return "excluded from this build";
+    case "away":
+      return `away until ${lookups.formatDate(reason.until)}`;
   }
 }
 

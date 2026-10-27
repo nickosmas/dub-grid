@@ -35,6 +35,7 @@ import {
   fetchEmployeeShifts,
   updateEmployee,
   removeEmployee,
+  setEmployeeReturnDate,
   EmployeeAccessDeniedError,
   EmployeeContactConflictError,
   EmployeeProfileConflictError,
@@ -491,7 +492,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     });
 
   const handleDeactivate = useCallback(
-    async (empId: string, note?: string, accessToken?: string) => {
+    async (empId: string, note?: string, accessToken?: string, returnDate?: string) => {
       if (!orgId || !employee) return false;
       setEmployee((prev) =>
         prev
@@ -499,18 +500,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               ...prev,
               status: "inactive" as const,
               statusNote: note ?? "",
+              awayUntil: returnDate ?? null,
               statusChangedAt: new Date().toISOString(),
             }
           : prev,
       );
       try {
-        const updatedEmployee = await deactivateEmployee(
-          empId,
-          note,
-          orgId,
-          employee.version,
-          accessToken,
-        );
+        const updatedEmployee = await (returnDate
+          ? deactivateEmployee(empId, note, orgId, employee.version, accessToken, returnDate)
+          : deactivateEmployee(empId, note, orgId, employee.version, accessToken));
         syncEmployeeCaches(updatedEmployee);
         toast.success("Marked away");
         return true;
@@ -522,7 +520,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         // Revert on failure
         setEmployee((prev) =>
-          prev ? { ...prev, status: "active" as const, statusNote: "" } : prev,
+          prev ? { ...prev, status: "active" as const, statusNote: "", awayUntil: null } : prev,
         );
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
@@ -546,6 +544,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               ...prev,
               status: "active" as const,
               statusNote: "",
+              awayUntil: null,
               statusChangedAt: new Date().toISOString(),
             }
           : prev,
@@ -566,6 +565,30 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         toast.error("We couldn't change their status. Try again.");
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
+  const handleSetReturnDate = useCallback(
+    async (empId: string, returnDate: string | null) => {
+      if (!orgId || !employee) return;
+      try {
+        const updatedEmployee = await setEmployeeReturnDate(
+          empId,
+          orgId,
+          employee.version,
+          returnDate,
+        );
+        syncEmployeeCaches(updatedEmployee);
+        toast.success(returnDate ? "Return date saved" : "Return date cleared");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the return date. Try again."));
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -1062,10 +1085,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     employee={employee}
                     canEdit={perms.canManageEmployees}
                     isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                    onDeactivate={(empId, note) =>
-                      runStatusChange((token) => handleDeactivate(empId, note, token))
+                    onDeactivate={(empId, note, returnDate) =>
+                      runStatusChange((token) =>
+                        returnDate
+                          ? handleDeactivate(empId, note, token, returnDate)
+                          : handleDeactivate(empId, note, token),
+                      )
                     }
                     onActivate={handleActivate}
+                    onSetReturnDate={handleSetReturnDate}
                     onRemove={(empId, note) =>
                       runStatusChange((token) => handleRemove(empId, note, token))
                     }

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
+import { formatReturnDate } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
@@ -1266,6 +1268,97 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    });
+
+    describe("a return date", () => {
+      // No organization timezone in these tests, so the first return date is UTC's tomorrow.
+      const day = (offset: number) =>
+        addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), offset);
+      const choose = (date: string) =>
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: `Choose ${formatReturnDate(date, { weekday: true })}`,
+          }),
+        );
+
+      it("marks someone away until a day they pick", () => {
+        const mutate = renderWithStatusMutation();
+
+        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
+        expect(
+          screen.getByText(
+            "They're back to Active on this day. Leave it empty to mark them active yourself.",
+          ),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+        choose(day(1));
+        expect(
+          screen.getByText(
+            `Recurring schedules pause and fill again from ${formatReturnDate(day(1))}.`,
+          ),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getAllByRole("button", { name: "Mark away" }).at(-1)!);
+
+        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+          action: "deactivate",
+          expectedVersion: 7,
+          returnDate: day(1),
+        });
+      });
+
+      it("never offers today as a return date", () => {
+        renderWithStatusMutation();
+
+        fireEvent.click(screen.getByRole("button", { name: "Mark away" }));
+        fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+
+        expect(
+          screen.getByRole("button", {
+            name: `Choose ${formatReturnDate(day(0), { weekday: true })}`,
+          }),
+        ).toBeDisabled();
+      });
+
+      it("changes an Away person's return date from its own sheet", () => {
+        const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
+
+        expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
+        expect(screen.getByText("Change Mina Diaz's return date?")).toBeInTheDocument();
+        // Nothing to save until the date changes.
+        expect(screen.getAllByRole("button", { name: "Change return date" }).at(-1)).toBeDisabled();
+
+        choose(day(2));
+        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
+
+        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+          action: "setReturnDate",
+          returnDate: day(2),
+          fromReturnDate: day(1),
+        });
+      });
+
+      it("clears a return date", () => {
+        const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
+
+        fireEvent.click(screen.getByRole("button", { name: "Change return date" }));
+        fireEvent.click(screen.getByRole("button", { name: "No return date" }));
+        expect(
+          screen.getByText("They stay away until someone marks them active."),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getAllByRole("button", { name: "Change return date" }).at(-1)!);
+
+        expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+          action: "setReturnDate",
+          returnDate: null,
+        });
+      });
+
+      it("offers Set return date to someone away without one", () => {
+        renderWithStatusMutation({ status: "inactive" });
+
+        expect(screen.getByRole("button", { name: "Set return date" })).toBeInTheDocument();
+      });
     });
 
     it("brings an Archived person back with Restore and nothing else", () => {

@@ -22,6 +22,7 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { withoutHiddenRequests } from "@dubgrid/data-access";
+import { isSchedulableOn, type EmployeeStatus } from "@dubgrid/domain";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -1957,7 +1958,7 @@ export async function POST(req: NextRequest) {
         const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
-            .select(`${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at)`)
+            .select(`${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at, away_until)`)
             .eq("org_id", data.orgId)
             .is("archived_at", null)
             .lte("effective_from", data.endDate)
@@ -1970,15 +1971,35 @@ export async function POST(req: NextRequest) {
         if (recurringError) {
           throw recurringError;
         }
-        // The database refuses to schedule someone who has left, so one
-        // leftover template would otherwise fail the whole apply part way.
-        // emp_id is a many-to-one foreign key, so the embed is one row, not the
-        // array the generated types infer.
+        // The database refuses to schedule someone who has left, or someone
+        // Away before their return date, so one such template would otherwise
+        // fail the whole apply part way. emp_id is a many-to-one foreign key,
+        // so the embed is one row, not the array the generated types infer.
         const activeTemplates = (
           (recurringRows ?? []) as unknown as Array<
-            DbRecurringShift & { employee: { status: string; archived_at: string | null } | null }
+            DbRecurringShift & {
+              employee: {
+                status: EmployeeStatus;
+                archived_at: string | null;
+                away_until: string | null;
+              } | null;
+            }
           >
-        ).filter((row) => row.employee?.status === "active" && !row.employee.archived_at);
+        ).filter(
+          (row) =>
+            row.employee &&
+            isSchedulableOn(
+              {
+                status: row.employee.status,
+                archivedAt: row.employee.archived_at,
+                awayUntil: row.employee.away_until,
+              },
+              data.endDate,
+            ),
+        );
+        const awayUntilByEmp = new Map(
+          activeTemplates.map((row) => [row.emp_id, row.employee?.away_until ?? null]),
+        );
 
         const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
         for (const row of activeTemplates) {
@@ -2044,6 +2065,10 @@ export async function POST(req: NextRequest) {
               continue;
             }
             if (template.effective_until && template.effective_until < dateKey) {
+              continue;
+            }
+            const awayUntil = awayUntilByEmp.get(template.emp_id);
+            if (awayUntil && dateKey < awayUntil) {
               continue;
             }
 

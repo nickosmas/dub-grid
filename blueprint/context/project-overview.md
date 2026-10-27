@@ -355,11 +355,12 @@ Item 51 is split:
 - **51d - Suspended: managing it:** the Suspend dialog and Reinstate, a lock
   on the grid row, "won't see this in the app" in the shift picker, the
   notice email and the Super Admin alert, and their open requests close.
-- **51e - Away until a date:** an optional return date, schedulable again
-  from that date, and a daily job that sets them back to Active in the
-  organization's timezone; their recurring schedules are paused while away,
-  not archived, and fill again from the return date; the "Away until Jan 4"
-  pill and the grid's Away bar, drawn like item 52's absence runs.
+- **51e - Away until a date:** shipped; Mark away takes an optional return
+  date (web and mobile), the person is schedulable again from that date, and
+  a daily job sets them back to Active in the organization's timezone. Their
+  recurring schedules pause while away and fill again from the return date;
+  "Away until Jan 4" shows on pills and the record, and the grid draws their
+  away days as one Away bar per week (migration 099).
 - **51f - An absence while away:** with a return date, an optional absence
   type fills every day of the away range in the draft, replacing shifts,
   published with the period; those days are locked in the grid with an
@@ -579,7 +580,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `096`.
+  checksum-locked through `099`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

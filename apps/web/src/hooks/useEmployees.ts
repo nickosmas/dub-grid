@@ -8,6 +8,7 @@ import {
   fetchEmployees,
   insertEmployee,
   removeEmployee,
+  setEmployeeReturnDate,
   updateEmployee,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
@@ -49,8 +50,11 @@ export interface EmployeesData {
     empId: string,
     note?: string,
     accessToken?: string,
+    returnDate?: string | null,
   ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
+  /** Sets, moves or clears (null) an Away person's return date. */
+  handleSetEmployeeReturnDate: (empId: string, returnDate: string | null) => Promise<boolean>;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -300,7 +304,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleDeactivateEmployee = useCallback(
-    async (empId: string, note?: string, accessToken?: string) => {
+    async (empId: string, note?: string, accessToken?: string, returnDate?: string | null) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
 
@@ -312,19 +316,16 @@ export function useEmployees(orgId: string | null): EmployeesData {
                 ...e,
                 status: "inactive" as const,
                 statusNote: note ?? "",
+                awayUntil: returnDate ?? null,
                 statusChangedAt: new Date().toISOString(),
               }
             : e,
         ),
       );
       try {
-        const updatedEmployee = await deactivateEmployee(
-          empId,
-          note,
-          orgId,
-          targetEmployee.version,
-          accessToken,
-        );
+        const updatedEmployee = await (returnDate
+          ? deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken, returnDate)
+          : deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken));
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
         toast.success("Marked away");
         invalidateEmployees();
@@ -359,7 +360,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
       setAllLocal((prev) =>
         prev.map((e) =>
           e.id === empId
-            ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
+            ? {
+                ...e,
+                status: "active" as const,
+                statusNote: "",
+                awayUntil: null,
+                statusChangedAt: now,
+              }
             : e,
         ),
       );
@@ -386,6 +393,35 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
+  const handleSetEmployeeReturnDate = useCallback(
+    async (empId: string, returnDate: string | null) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return false;
+      try {
+        const updatedEmployee = await setEmployeeReturnDate(
+          empId,
+          orgId,
+          targetEmployee.version,
+          returnDate,
+        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+        toast.success(returnDate ? "Return date saved" : "Return date cleared");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the return date. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
   return {
     employees,
     inactiveEmployees,
@@ -397,5 +433,6 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,
+    handleSetEmployeeReturnDate,
   };
 }

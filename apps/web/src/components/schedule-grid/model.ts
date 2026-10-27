@@ -4,6 +4,7 @@ import type { AbsencePillLayout } from "@/lib/absence-pill";
 import type React from "react";
 
 import { formatDateKey } from "@/lib/utils";
+import { isOnScheduleGrid } from "./awayRuns";
 import type { ScheduleNoteMark } from "./noteDots";
 import type {
   AbsenceType,
@@ -229,8 +230,8 @@ function cellNeedsLayoutStack(args: { draftKind: DraftKind }): boolean {
 }
 
 export function buildScheduleGridModel({
-  filteredEmployees,
-  allEmployees,
+  filteredEmployees: filteredEmployeesInput,
+  allEmployees: allEmployeesInput,
   week1,
   week2,
   spanWeeks,
@@ -262,6 +263,11 @@ export function buildScheduleGridModel({
   accessors,
 }: BuildScheduleGridModelInput): ScheduleGridModel {
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
+  const period = { lastDateKey: formatDateKey(allDates[allDates.length - 1]), todayKey };
+  const filteredEmployees = filteredEmployeesInput.filter((employee) =>
+    isOnScheduleGrid(employee, period),
+  );
+  const allEmployees = allEmployeesInput.filter((employee) => isOnScheduleGrid(employee, period));
   const columns = allDates.map((date, columnIndex): GridColumnMeta => ({
     columnIndex,
     date,

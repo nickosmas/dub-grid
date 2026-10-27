@@ -2432,6 +2432,142 @@ describe("ScheduleGrid", () => {
     });
   });
 
+  describe("away until a date (51e)", () => {
+    const jamie: Employee = {
+      ...employees[0],
+      id: "emp-away",
+      firstName: "Jamie",
+      lastName: "Fox",
+      seniority: 2,
+      status: "inactive",
+      awayUntil: "2024-01-17",
+    };
+    const indefinitelyAway: Employee = {
+      ...employees[0],
+      id: "emp-gone",
+      firstName: "Robin",
+      lastName: "Lane",
+      seniority: 3,
+      status: "inactive",
+      awayUntil: null,
+    };
+    const people = [employees[0], jamie, indefinitelyAway];
+
+    // Today is Tue, Jan 9; Jamie is back on Wed, Jan 17.
+    function renderAway(options: RenderGridOptions = {}) {
+      return renderGrid({
+        filteredEmployees: people,
+        allEmployees: people,
+        todayKey: "2024-01-09",
+        ...options,
+      });
+    }
+
+    function cellsOf(empId: string): HTMLElement[] {
+      return (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === empId,
+      );
+    }
+
+    it("draws the away days from today as one Away bar per week, with nothing else in them", () => {
+      observedWidth = 1600;
+      renderAway();
+
+      const cells = cellsOf("emp-away");
+      expect(cells).toHaveLength(14);
+      expect(screen.getAllByText("Away")).toHaveLength(2);
+      expect(cells.map((cell) => cell.dataset.awayRun)).toEqual([
+        undefined,
+        undefined,
+        "start",
+        "middle",
+        "middle",
+        "middle",
+        "end",
+        "start",
+        "middle",
+        "end",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      expect(cells[2].querySelector("[data-away-run-bar]")).not.toBeNull();
+      expect(cells[3].querySelector("[data-away-run-bar]")).toBeNull();
+      for (const cell of cells.slice(2, 10)) {
+        expect(cell.querySelector("[data-shift-pill]")).toBeNull();
+      }
+      expect(cells.slice(2, 8).map((cell) => cell.dataset.leadingDivider)).toEqual([
+        "light",
+        "none",
+        "none",
+        "none",
+        "none",
+        "split",
+      ]);
+      expect(cells[3].getAttribute("aria-label")).toBe("Jamie Fox, Away on Wed, Jan 10");
+    });
+
+    it("keeps away days out of editing and the return date on", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      const onOpenCellMenu = vi.fn();
+      renderAway({ onActivateCell, onOpenCellMenu });
+
+      const cells = cellsOf("emp-away");
+      // Days before today keep what they held, but can't be changed either.
+      for (const cell of [cells[0], cells[3], cells[9]]) {
+        expect(cell.dataset.interactive).toBe("false");
+        expect(cell.dataset.awayLocked).toBe("true");
+        expect(cell.tabIndex).toBe(-1);
+        fireEvent.click(cell);
+        fireEvent.keyDown(cell, { key: "Enter" });
+        fireEvent.contextMenu(cell);
+      }
+      expect(cells[0].querySelector('[data-shift-pill="single"]')?.textContent).toBe("D");
+      expect(onActivateCell).not.toHaveBeenCalled();
+      expect(onOpenCellMenu).not.toHaveBeenCalled();
+
+      const back = cells[10];
+      expect(back.dataset.awayRun).toBeUndefined();
+      expect(back.dataset.awayLocked).toBeUndefined();
+      expect(back.dataset.interactive).toBe("true");
+      expect(back.querySelector('[data-shift-pill="single"]')?.textContent).toBe("D");
+      fireEvent.click(back);
+      expect(onActivateCell).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cellId: { empId: "emp-away", dateKey: "2024-01-17", sectionId: 1 },
+          trigger: "click",
+        }),
+      );
+    });
+
+    it("reads a single away day as Away", () => {
+      observedWidth = 1600;
+      renderAway({
+        filteredEmployees: [{ ...jamie, awayUntil: "2024-01-10" }],
+        allEmployees: [{ ...jamie, awayUntil: "2024-01-10" }],
+      });
+
+      const cells = cellsOf("emp-away");
+      expect(screen.getAllByText("Away")).toHaveLength(1);
+      expect(cells[2].dataset.awayRun).toBe("start");
+      expect(cells[3].dataset.awayRun).toBeUndefined();
+      expect(screen.queryByText(/\u00d7/)).not.toBeInTheDocument();
+    });
+
+    it("leaves off someone away with no return date, and the away-until row in a past period", () => {
+      observedWidth = 1600;
+      const { unmount } = renderAway();
+      expect(cellsOf("emp-gone")).toHaveLength(0);
+      unmount();
+
+      renderAway({ todayKey: "2024-01-21" });
+      expect(cellsOf("emp-away")).toHaveLength(0);
+      expect(cellsOf("emp-1")).toHaveLength(14);
+    });
+  });
+
   describe("a rest-of-day absence (item 45)", () => {
     const sick: AbsenceType = {
       id: 9,

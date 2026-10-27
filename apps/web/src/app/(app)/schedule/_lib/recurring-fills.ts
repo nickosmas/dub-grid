@@ -19,6 +19,11 @@ export interface RecurringFillInput {
   activeAbsenceTypeIds: ReadonlySet<number>;
   /** Only these people; everyone when omitted. */
   employeeIds?: ReadonlySet<string>;
+  /**
+   * Whether someone can be scheduled that day, as the database decides it
+   * (someone Away until a date only from that date). Everyone when omitted.
+   */
+  schedulableOn?: (employeeId: string, dateKey: string) => boolean;
 }
 
 function isStillActive(input: ScheduleCellInput, fill: RecurringFillInput): boolean {
@@ -37,8 +42,9 @@ function isStillActive(input: ScheduleCellInput, fill: RecurringFillInput): bool
 
 /**
  * The cells recurring schedules fill, by the server's own rule: only empty
- * cells, on the schedule's weekday, within its effective dates with the
- * latest start winning, and never from an archived shift, job or absence.
+ * cells of someone schedulable that day, on the schedule's weekday, within its
+ * effective dates with the latest start winning, and never from an archived
+ * shift, job or absence.
  */
 export function planRecurringFills(fill: RecurringFillInput): RecurringFill[] {
   const byEmployee = new Map<string, RecurringShift[]>();
@@ -49,6 +55,7 @@ export function planRecurringFills(fill: RecurringFillInput): RecurringFill[] {
   const fills: RecurringFill[] = [];
   for (const { dateKey, dayOfWeek } of iterateDateRange(fill.startDate, fill.endDate)) {
     for (const [employeeId, schedules] of byEmployee) {
+      if (fill.schedulableOn && !fill.schedulableOn(employeeId, dateKey)) continue;
       if (hasVisibleGridShiftEntry(fill.shifts[`${employeeId}_${dateKey}`])) continue;
       const match = schedules
         .filter((schedule) => schedule.dayOfWeek === dayOfWeek)

@@ -4,8 +4,47 @@ import {
   canMarkInactive,
   describeEmploymentStatus,
   describeStatusAction,
+  formatReturnDate,
+  isSchedulableOn,
+  isValidReturnDate,
   statusUndoAction,
 } from "./employment-status";
+
+describe("isSchedulableOn", () => {
+  it("schedules an active person on any day", () => {
+    expect(isSchedulableOn({ status: "active" }, "2027-01-01")).toBe(true);
+  });
+
+  it("schedules someone Away until a date from that date on, and not before", () => {
+    const away = { status: "inactive" as const, awayUntil: "2027-01-04" };
+    expect(isSchedulableOn(away, "2027-01-03")).toBe(false);
+    expect(isSchedulableOn(away, "2027-01-04")).toBe(true);
+    expect(isSchedulableOn(away, "2027-01-10")).toBe(true);
+  });
+
+  it("never schedules someone Away without a date, or anyone archived", () => {
+    expect(isSchedulableOn({ status: "inactive", awayUntil: null }, "2099-01-01")).toBe(false);
+    expect(isSchedulableOn({ status: "removed" }, "2099-01-01")).toBe(false);
+    expect(
+      isSchedulableOn({ status: "active", archivedAt: "2026-01-01T00:00:00Z" }, "2027-01-01"),
+    ).toBe(false);
+  });
+});
+
+describe("isValidReturnDate", () => {
+  it("takes a real day after today", () => {
+    expect(isValidReturnDate("2027-01-04", "2027-01-03")).toBe(true);
+    expect(isValidReturnDate("2028-02-29", "2027-01-03")).toBe(true);
+  });
+
+  it("refuses today, the past, a day that doesn't exist and anything not YYYY-MM-DD", () => {
+    expect(isValidReturnDate("2027-01-03", "2027-01-03")).toBe(false);
+    expect(isValidReturnDate("2026-12-31", "2027-01-03")).toBe(false);
+    expect(isValidReturnDate("2027-02-29", "2027-01-03")).toBe(false);
+    expect(isValidReturnDate("2027-1-4", "2027-01-03")).toBe(false);
+    expect(isValidReturnDate("2027-01-04T00:00:00Z", "2027-01-03")).toBe(false);
+  });
+});
 
 describe("canMarkInactive", () => {
   it("allows someone with a focus area", () => {
@@ -22,6 +61,17 @@ describe("describeEmploymentStatus", () => {
     expect(describeEmploymentStatus("active")).toBe("Active");
     expect(describeEmploymentStatus("inactive")).toBe("Away");
     expect(describeEmploymentStatus("removed")).toBe("Archived");
+  });
+
+  it("names an Away person's return date, and only theirs", () => {
+    expect(describeEmploymentStatus("inactive", "2027-01-04")).toBe("Away until Jan 4");
+    expect(describeEmploymentStatus("inactive", null)).toBe("Away");
+    expect(describeEmploymentStatus("active", "2027-01-04")).toBe("Active");
+  });
+
+  it("formats a return date as a short day, with the weekday on request", () => {
+    expect(formatReturnDate("2027-01-04")).toBe("Jan 4");
+    expect(formatReturnDate("2027-01-04", { weekday: true })).toBe("Mon, Jan 4");
   });
 
   it("reads an unknown or missing status as Active", () => {
@@ -107,6 +157,80 @@ describe("describeStatusAction", () => {
       expect([copy.title, copy.message, ...copy.points].join(" ")).not.toMatch(
         /DubGrid|inactive|deactivat/i,
       );
+    }
+  });
+});
+
+describe("describeStatusAction with a return date", () => {
+  const RETURN = "2027-01-04";
+
+  it("says what Mark away changes before and after the date", () => {
+    const copy = describeStatusAction("markAway", "Ana Torres", { returnDate: RETURN });
+
+    expect(copy.title).toBe("Mark Ana Torres away?");
+    expect(copy.message).toBe(
+      "They won't be scheduled before Mon, Jan 4, when they're back to Active.",
+    );
+    expect(copy.points).toEqual([
+      "They can still sign in and keep their role.",
+      "Shifts before Jan 4 come off the schedule in the draft.",
+      "Recurring schedules pause and fill again from Jan 4.",
+      "Open requests for days before Jan 4 are closed.",
+    ]);
+  });
+
+  it("sets a first return date with a message alone", () => {
+    expect(describeStatusAction("setReturnDate", "Ana Torres", { returnDate: RETURN })).toEqual({
+      label: "Set return date",
+      title: "Set a return date for Ana Torres?",
+      message: "They're back to Active on Mon, Jan 4, and can be scheduled from then.",
+      points: [],
+      done: "Return date set",
+    });
+  });
+
+  it("changes a return date with what the new range clears", () => {
+    const copy = describeStatusAction("setReturnDate", "Ana Torres", {
+      returnDate: "2027-01-11",
+      currentReturnDate: RETURN,
+    });
+
+    expect(copy).toMatchObject({
+      label: "Change return date",
+      title: "Change Ana Torres's return date?",
+      message: "They're back to Active on Mon, Jan 11.",
+      done: "Return date changed",
+    });
+    expect(copy.points).toEqual([
+      "Shifts before Jan 11 come off the schedule in the draft.",
+      "Recurring schedules pause and fill again from Jan 11.",
+    ]);
+  });
+
+  it("clears a return date with what indefinite Away removes", () => {
+    const copy = describeStatusAction("setReturnDate", "Ana", { currentReturnDate: RETURN });
+
+    expect(copy.message).toBe("They stay away until someone marks them active.");
+    expect(copy.points).toHaveLength(2);
+    expect(copy.done).toBe("Return date cleared");
+  });
+
+  it("follows the dialog rules for every return-date form", () => {
+    const forms = [
+      describeStatusAction("markAway", "Ana Torres", { returnDate: RETURN }),
+      describeStatusAction("setReturnDate", "Ana Torres", { returnDate: RETURN }),
+      describeStatusAction("setReturnDate", "Ana Torres", {
+        returnDate: "2027-01-11",
+        currentReturnDate: RETURN,
+      }),
+      describeStatusAction("setReturnDate", "Ana Torres", { currentReturnDate: RETURN }),
+    ];
+    for (const copy of forms) {
+      expect(copy.points.length === 0 || copy.points.length >= 2).toBe(true);
+      for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
+      expect([copy.message, ...copy.points].join(" ")).not.toContain("Ana");
+      const firstWords = copy.points.map((point) => point.split(" ")[0]);
+      expect(new Set(firstWords).size).toBe(firstWords.length);
     }
   });
 });

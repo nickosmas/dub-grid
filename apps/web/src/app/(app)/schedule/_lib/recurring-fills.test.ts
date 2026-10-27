@@ -111,4 +111,15 @@ describe("planRecurringFills", () => {
     expect(fill({ employeeIds: new Set(["ben"]) })).toEqual([]);
     expect(fill({ employeeIds: new Set(["ana"]) })).toHaveLength(1);
   });
+
+  it("fills someone Away until a date only from that date", () => {
+    const awayUntil = "2026-10-28";
+    const schedulableOn = (employeeId: string, dateKey: string) =>
+      employeeId !== "ana" || dateKey >= awayUntil;
+    const everyWeekday = [1, 2, 3, 4].map((dayOfWeek) => recurring({ dayOfWeek }));
+
+    expect(
+      fill({ recurringShifts: everyWeekday, schedulableOn }).map((planned) => planned.dateKey),
+    ).toEqual(["2026-10-28", "2026-10-29"]);
+  });
 });

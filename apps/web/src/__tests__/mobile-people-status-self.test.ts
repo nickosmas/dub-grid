@@ -30,6 +30,7 @@ function makeDeps(currentEmployee: Employee) {
   return {
     fetchEmployeeById: vi.fn().mockResolvedValue(currentEmployee),
     updateEmployeeStatus: vi.fn(),
+    updateEmployeeReturnDate: vi.fn(),
     insertAuditLog: vi.fn(),
     mapEmployeeToMobilePerson: vi.fn((emp: Employee) => ({
       id: emp.id,

@@ -1,6 +1,6 @@
 "use client";
 
-import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -21,8 +21,6 @@ const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
   "not-invited": "Not invited",
   "no-email": "No email",
 };
-
-const STATUS_LABELS: Record<Employee["status"], string> = EMPLOYMENT_STATUS_LABELS;
 
 function formatDay(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {
@@ -57,7 +55,10 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             tabular={Boolean(employee.joinedAt)}
           />
         ) : null}
-        <RecordField label="Status" value={STATUS_LABELS[employee.status]} />
+        <RecordField
+          label="Status"
+          value={describeEmploymentStatus(employee.status, employee.awayUntil)}
+        />
         <RecordField
           label="Status changed"
           value={employee.statusChangedAt ? formatDay(employee.statusChangedAt) : "Not recorded"}

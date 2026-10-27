@@ -341,6 +341,9 @@ describe("describeCoverageRuledOutReason", () => {
       "Ana Crawford: excluded from this build",
     );
     expect(
+      describeCoverageRuledOut({ ...entry, reason: { kind: "away", until: TUE } }, LOOKUPS),
+    ).toBe("Ana Crawford: away until Tue, Oct 27");
+    expect(
       describeCoverageRuledOut({ ...entry, reason: { kind: "workWeek", days: 6 } }, LOOKUPS),
     ).toBe("Ana Crawford: would work 6 days that week");
     expect(describeCoverageRuledOut({ ...entry, reason: { kind: "doubleShift" } }, LOOKUPS)).toBe(

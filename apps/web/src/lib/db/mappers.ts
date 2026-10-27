@@ -391,6 +391,7 @@ export function rowToEmployee(row: DbEmployee): Employee {
     status: row.status ?? "active",
     statusChangedAt: row.status_changed_at ?? null,
     statusNote: row.status_note ?? "",
+    awayUntil: row.away_until ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority,
@@ -417,6 +418,7 @@ export function employeeToRow(
   | "status"
   | "status_changed_at"
   | "status_note"
+  | "away_until"
   | "archived_at"
   | "user_id"
   | "version"

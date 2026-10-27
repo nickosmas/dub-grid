@@ -142,6 +142,8 @@ const SIGNED_MUTATION_EXEMPTIONS: Record<string, string> = {
 const SYSTEM_JOB_ROUTES: Record<string, string> = {
   "apps/web/src/app/api/cron/expire-requests/route.ts":
     "Vercel cron authenticates with CRON_SECRET.",
+  "apps/web/src/app/api/cron/return-from-away/route.ts":
+    "Vercel cron authenticates with CRON_SECRET.",
   "apps/web/src/app/api/cron/sandbox-cleanup/route.ts":
     "Vercel cron authenticates with CRON_SECRET.",
   "apps/web/src/app/api/cron/trial-expiry/route.ts": "Vercel cron authenticates with CRON_SECRET.",

@@ -1180,6 +1180,35 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
   });
 
+  it("names an Away person's return date on their row", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            status: "inactive",
+            awayUntil: "2027-01-04",
+          }),
+          buildPerson({ id: "emp-3", firstName: "Owen", lastName: "Lee", status: "inactive" }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
+    fireEvent.click(screen.getByText("Away"));
+
+    // One pill each: the dated one for June, and Owen's plain Away beside the filter's own row.
+    expect(screen.getAllByText("Away until Jan 4")).toHaveLength(1);
+    expect(screen.getAllByText("Away")).toHaveLength(2);
+  });
+
   it("filters admins out of the staff directory by access level", () => {
     useQuery.mockReturnValue({
       data: {

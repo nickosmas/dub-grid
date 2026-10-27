@@ -46,6 +46,17 @@ describe("PersonRecordCard", () => {
     expect(screen.getByText("Last active")).toBeInTheDocument();
   });
 
+  it("names an Away person's return date in their status", () => {
+    render(
+      <PersonRecordCard
+        employee={makeEmployee({ status: "inactive", awayUntil: "2027-01-04" })}
+        accountState={{ kind: "not-invited" }}
+      />,
+    );
+
+    expect(fieldValue("Status")).toBe("Away until Jan 4");
+  });
+
   it("says plainly when an unlinked person has not joined or been invited", () => {
     render(
       <PersonRecordCard

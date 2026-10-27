@@ -148,7 +148,13 @@ export interface MembersSectionProps {
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string) => void | Promise<boolean>;
-  onDeactivate: (empId: string, note?: string) => void | Promise<boolean>;
+  onDeactivate: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+  ) => void | Promise<boolean>;
+  /** Sets, moves or clears (null) an Away person's return date. */
+  onSetReturnDate?: (empId: string, returnDate: string | null) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onActivate: (empId: string) => void | Promise<unknown>;
   onAdd: () => void;
@@ -181,6 +187,7 @@ export function MembersSection({
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
+  onSetReturnDate,
   statusStepUpOpen = false,
   onActivate,
   onAdd,
@@ -232,6 +239,11 @@ export function MembersSection({
           )
         : suppliedRemovedEmployees,
     [currentUserId, regularUserMode, suppliedRemovedEmployees],
+  );
+  // The directory rows carry the status alone; an Away person's return date is on their record.
+  const awayUntilByEmployeeId = useMemo(
+    () => new Map(inactiveEmployees.map((employee) => [employee.id, employee.awayUntil ?? null])),
+    [inactiveEmployees],
   );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
@@ -1873,7 +1885,10 @@ export function MembersSection({
                         ? person.invitationStatus === "expired"
                           ? "Expired"
                           : "Pending"
-                        : describeEmploymentStatus(person.employeeStatus);
+                        : describeEmploymentStatus(
+                            person.employeeStatus,
+                            person.employeeId ? awayUntilByEmployeeId.get(person.employeeId) : null,
+                          );
                       const statusTone: StatusPillTone = isPending
                         ? "warning"
                         : person.employeeStatus === "removed"
@@ -2170,7 +2185,10 @@ export function MembersSection({
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}
-          onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
+          onDeactivate={(employeeId, note, returnDate) =>
+            onDeactivate(employeeId, note, returnDate)
+          }
+          onSetReturnDate={onSetReturnDate}
           onActivate={(employeeId) => onActivate(employeeId)}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}

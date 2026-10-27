@@ -59,6 +59,7 @@ function PeopleContent() {
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,
+    handleSetEmployeeReturnDate,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
@@ -134,9 +135,14 @@ function PeopleContent() {
             onRemove={(empId, note) =>
               runStatusChange((token) => handleRemoveEmployee(empId, note, token))
             }
-            onDeactivate={(empId, note) =>
-              runStatusChange((token) => handleDeactivateEmployee(empId, note, token))
+            onDeactivate={(empId, note, returnDate) =>
+              runStatusChange((token) =>
+                returnDate
+                  ? handleDeactivateEmployee(empId, note, token, returnDate)
+                  : handleDeactivateEmployee(empId, note, token),
+              )
             }
+            onSetReturnDate={handleSetEmployeeReturnDate}
             statusStepUpOpen={Boolean(statusStepUp.dialog)}
             onActivate={handleActivateEmployee}
             onAdd={() => setShowAddModal(true)}

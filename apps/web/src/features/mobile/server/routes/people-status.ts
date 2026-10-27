@@ -11,6 +11,7 @@ import {
   fetchMobileEmployeeRowById,
   insertMobileAuditLogEntry,
   restoreMobileOrganizationMembership,
+  updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
 } from "@dubgrid/data-access";
 import { requireMobileAuth } from "@/features/mobile/server";
@@ -69,6 +70,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           const row = await updateMobileEmployeeStatusRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
         },
+        updateEmployeeReturnDate: async (serviceClient, input) => {
+          const row = await updateMobileEmployeeReturnDateRow(serviceClient, input);
+          return row ? rowToEmployee(row) : null;
+        },
         insertAuditLog: insertMobileAuditLogEntry,
         mapEmployeeToMobilePerson,
         fetchActiveMembershipOrgRole: fetchMobileActiveMembershipOrgRole,
@@ -98,7 +103,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       );
     }
 
-    if (result.kind === "self_action_forbidden") {
+    if (result.kind === "self_action_forbidden" || result.kind === "invalid_return_date") {
       return NextResponse.json(
         { error: result.error, code: result.code },
         { status: result.status },

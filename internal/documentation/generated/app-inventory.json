@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:9ae6baefe2d4928395aaf507d294db5caaaf90909258e207c4cf8971832410ad",
+  "sourceDigest": "sha256:15911ce8bc87764e3bafaf0e4709fa443cee91dba8a37adcb9e370a291f0e0fc",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1236,6 +1236,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/cron/expire-requests/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/cron/return-from-away",
+      "method": "GET",
+      "path": "/api/cron/return-from-away",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/cron/return-from-away/route.ts"
       }
     },
     {
@@ -4766,6 +4775,16 @@
       "source": {
         "path": "supabase/migrations/098_away_keeps_access.sql"
       }
+    },
+    {
+      "id": "migration:099_away_until.sql",
+      "version": "099",
+      "name": "away_until",
+      "file": "099_away_until.sql",
+      "sha256": "a870eba8c046887cdca0d158a47a60847486f3e51c2a08b1c8f0c7361a4e8c16",
+      "source": {
+        "path": "supabase/migrations/099_away_until.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -7028,6 +7047,19 @@
       "category": "repository-maintenance",
       "source": {
         "path": ".github/workflows/e2e.yml"
+      }
+    },
+    {
+      "id": "schedule:vercel:/api/cron/return-from-away",
+      "provider": "vercel",
+      "schedule": "0 8 * * *",
+      "target": {
+        "kind": "http",
+        "path": "/api/cron/return-from-away"
+      },
+      "category": "product",
+      "source": {
+        "path": "apps/web/vercel.json"
       }
     },
     {
