@@ -42,7 +42,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     phone: "",
     email: "alice@example.com",
     contactNotes: "",
-    userId: null,
+    userId: "user-1",
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
@@ -557,6 +557,20 @@ describe("EmployeeStatusActions", () => {
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
       "Change status",
     ]);
+  });
+
+  it("offers someone with no account no Suspend, and says nothing of sign-in", async () => {
+    const user = userEvent.setup();
+    renderActions(makeEmployee({ userId: null }));
+
+    const dialog = await openDialog(user);
+    expect(choices(dialog)).toEqual([
+      "AwayNot scheduled while away.",
+      "ArchivedOff staff. Can't be scheduled.",
+    ]);
+    expect(within(dialog).getByRole("status")).toHaveTextContent("ActiveCan be scheduled.");
+    await user.click(within(dialog).getByRole("radio", { name: /^Archived/ }));
+    expect(dialog).not.toHaveTextContent(/sign in/i);
   });
 
   it("shows nothing for your own record or without permission", () => {

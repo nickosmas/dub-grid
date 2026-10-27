@@ -18,6 +18,8 @@ import {
   NOT_PLANNABLE_MESSAGE,
   NOT_SUSPENDABLE_CODE,
   NOT_SUSPENDABLE_MESSAGE,
+  NO_ACCOUNT_CODE,
+  NO_ACCOUNT_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
@@ -199,6 +201,7 @@ type PeopleStatusResult =
       error: string;
       code:
         | typeof NOT_SUSPENDABLE_CODE
+        | typeof NO_ACCOUNT_CODE
         | typeof NOT_SUSPENDED_CODE
         | typeof NOT_PLANNABLE_CODE
         | typeof NO_PLANNED_CHANGE_CODE
@@ -745,6 +748,14 @@ async function changeSuspension(
       kind: "invalid_status_change",
       error: NOT_SUSPENDABLE_MESSAGE,
       code: NOT_SUSPENDABLE_CODE,
+      status: 400,
+    };
+  }
+  if (suspending && !currentEmployee.userId) {
+    return {
+      kind: "invalid_status_change",
+      error: NO_ACCOUNT_MESSAGE,
+      code: NO_ACCOUNT_CODE,
       status: 400,
     };
   }

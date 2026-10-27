@@ -479,6 +479,7 @@ export function EmployeeStatusActions({
 
   const copy = choice
     ? describeStatusAction(choice, displayName, {
+        hasAccount: Boolean(employee.userId),
         returnDate: choice === "markAway" ? returnDate || null : null,
         absenceName: choice === "markAway" ? chosenAbsenceName : null,
         startDate: choice === "markAway" ? laterStart : null,
@@ -488,6 +489,7 @@ export function EmployeeStatusActions({
       })
     : startsNow
       ? describeStatusAction("markAway", displayName, {
+          hasAccount: Boolean(employee.userId),
           returnDate: returnDate || null,
           absenceName: chosenAbsenceName,
         })

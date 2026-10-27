@@ -52,6 +52,11 @@ export const NOT_SUSPENDABLE_CODE = "NOT_SUSPENDABLE";
 
 export const NOT_SUSPENDABLE_MESSAGE = "Only someone who is active can be suspended.";
 
+export const NO_ACCOUNT_CODE = "NO_ACCOUNT";
+
+/** Suspension only stops sign-in, so someone with no account can't be suspended. */
+export const NO_ACCOUNT_MESSAGE = "Only someone with an account can be suspended.";
+
 export const NOT_SUSPENDED_CODE = "NOT_SUSPENDED";
 
 export const NOT_SUSPENDED_MESSAGE = "They aren't suspended.";
@@ -242,6 +247,8 @@ export interface StatusActionOptions {
   startDate?: string | null;
   /** The first day of an Away they already have planned, which this action cancels. */
   plannedFrom?: string | null;
+  /** False for someone with no account: nothing is said about their sign-in. */
+  hasAccount?: boolean;
 }
 
 /** The absence filling the away days, as one full sentence. */
@@ -354,6 +361,7 @@ export function describeStatusAction(
     absenceName = null,
     startDate = null,
     plannedFrom = null,
+    hasAccount: account = true,
   }: StatusActionOptions = {},
 ): StatusActionCopy {
   // Any other change today replaces an Away they have planned.
@@ -365,9 +373,13 @@ export function describeStatusAction(
     "Recurring schedules set up for them are removed.",
     "Open requests they're part of are closed.",
   ];
-  const keepsAccess = group
-    ? "They can still sign in and keep their roles."
-    : "They can still sign in and keep their role.";
+  const keepsAccess = !account
+    ? []
+    : [
+        group
+          ? "They can still sign in and keep their roles."
+          : "They can still sign in and keep their role.",
+      ];
   switch (action) {
     case "markAway":
       if (startDate) {
@@ -390,7 +402,7 @@ export function describeStatusAction(
             `Open requests for days before ${formatReturnDate(returnDate)} are closed.`,
             ...cancelsPlan,
           ],
-          unchanged: [keepsAccess],
+          unchanged: keepsAccess,
           done: "Marked away",
         };
       }
@@ -399,7 +411,7 @@ export function describeStatusAction(
         title: `Mark ${name} away?`,
         message: "",
         points: [...leavingSchedule, ...cancelsPlan],
-        unchanged: [keepsAccess],
+        unchanged: keepsAccess,
         done: "Marked away",
       };
     case "setPlannedChange":
@@ -432,7 +444,11 @@ export function describeStatusAction(
         label: "Archive",
         title: `Archive ${name}?`,
         message: "",
-        points: ["They can no longer sign in.", ...leavingSchedule, ...cancelsPlan],
+        points: [
+          ...(account ? ["They can no longer sign in."] : []),
+          ...leavingSchedule,
+          ...cancelsPlan,
+        ],
         unchanged: ["Past records stay, and you can restore them later."],
         done: "Archived",
       };
@@ -495,6 +511,8 @@ export interface StatusChoice {
 
 export interface StatusState extends PlannedChangeState {
   status: EmployeeStatus;
+  /** Their linked account; null for someone who can't sign in at all. Left out, they have one. */
+  userId?: string | null;
   awayUntil?: string | null;
   suspendedAt?: string | null;
   archivedAt?: string | null;
@@ -509,6 +527,17 @@ const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
 const ARCHIVED_DETAIL = "Off staff. Can't sign in or be scheduled.";
 const ACTIVE_DETAIL = "Can sign in and be scheduled.";
 
+/** Someone with no account never signs in, so their lines say nothing of it. */
+function hasAccount(state: { userId?: string | null }): boolean {
+  return !("userId" in state) || Boolean(state.userId);
+}
+
+const NO_ACCOUNT_DETAILS = {
+  active: "Can be scheduled.",
+  away: "Not scheduled while away.",
+  archived: "Off staff. Can't be scheduled.",
+} as const;
+
 function currentKind(state: StatusState): StatusChoiceKind {
   if (state.status === "removed" || state.archivedAt) return "archived";
   if (state.status === "inactive") return "away";
@@ -520,27 +549,31 @@ function currentKind(state: StatusState): StatusChoiceKind {
  * Change status dialog lists them. Their current status is never one.
  */
 export function statusChoices(state: CurrentStatusState): StatusChoice[] {
+  const account = hasAccount(state);
   const away: StatusChoice = {
     kind: "away",
     action: "markAway",
     label: EMPLOYMENT_STATUS_LABELS.inactive,
-    detail: AWAY_DETAIL,
-    outcome: "They'll be Away: they keep sign-in, and they aren't scheduled.",
+    detail: account ? AWAY_DETAIL : NO_ACCOUNT_DETAILS.away,
+    outcome: account
+      ? "They'll be Away: they keep sign-in, and they aren't scheduled."
+      : "They'll be Away, and they aren't scheduled.",
   };
   const archived: StatusChoice = {
     kind: "archived",
     action: "archive",
     label: EMPLOYMENT_STATUS_LABELS.removed,
-    detail: ARCHIVED_DETAIL,
-    outcome: "They'll be Archived: off staff, and they can't sign in or be scheduled.",
+    detail: account ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
+    outcome: account
+      ? "They'll be Archived: off staff, and they can't sign in or be scheduled."
+      : "They'll be Archived: off staff, and they can't be scheduled.",
   };
   // A planned away is edited through its own dates, so Away isn't offered twice.
   const canBeAway =
     canMarkInactive(state.focusAreaIds) && !(state.plannedStatus === "away" && state.plannedFrom);
-  switch (currentKind(state)) {
-    case "active":
-      return [
-        ...(canBeAway ? [away] : []),
+  // Suspension only stops sign-in, so it needs an account to stop.
+  const suspend: StatusChoice[] = account
+    ? [
         {
           kind: "suspended",
           action: "suspend",
@@ -548,16 +581,21 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           detail: SUSPENDED_DETAIL,
           outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
         },
-        archived,
-      ];
+      ]
+    : [];
+  switch (currentKind(state)) {
+    case "active":
+      return [...(canBeAway ? [away] : []), ...suspend, archived];
     case "suspended":
       return [
         {
           kind: "active",
           action: "reinstate",
           label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: "Can sign in again on the web and in the app.",
-          outcome: "They'll be Active again and can sign in on the web and in the app.",
+          detail: account ? "Can sign in again on the web and in the app." : "Back to Active.",
+          outcome: account
+            ? "They'll be Active again and can sign in on the web and in the app."
+            : "They'll be Active again.",
         },
         ...(canBeAway ? [away] : []),
         archived,
@@ -579,8 +617,12 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           kind: "active",
           action: "restore",
           label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: "Back on staff. Can sign in and be scheduled.",
-          outcome: "They'll be Active again: back on staff, and they can sign in and be scheduled.",
+          detail: account
+            ? "Back on staff. Can sign in and be scheduled."
+            : "Back on staff. Can be scheduled.",
+          outcome: account
+            ? "They'll be Active again: back on staff, and they can sign in and be scheduled."
+            : "They'll be Active again: back on staff, and they can be scheduled.",
         },
       ];
   }
@@ -615,7 +657,7 @@ export function describeCurrentStatus(state: StatusState | CurrentStatusState): 
         text: state.awayUntil
           ? `${EMPLOYMENT_STATUS_LABELS.inactive} until ${formatReturnDate(state.awayUntil, { weekday: true })}`
           : EMPLOYMENT_STATUS_LABELS.inactive,
-        detail: AWAY_DETAIL,
+        detail: hasAccount(state) ? AWAY_DETAIL : NO_ACCOUNT_DETAILS.away,
         tone: "warning",
       };
     case "suspended":
@@ -625,14 +667,20 @@ export function describeCurrentStatus(state: StatusState | CurrentStatusState): 
         tone: "danger",
       };
     case "archived":
-      return { text: EMPLOYMENT_STATUS_LABELS.removed, detail: ARCHIVED_DETAIL, tone: "neutral" };
+      return {
+        text: EMPLOYMENT_STATUS_LABELS.removed,
+        detail: hasAccount(state) ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
+        tone: "neutral",
+      };
     case "active":
       return {
         text: EMPLOYMENT_STATUS_LABELS.active,
         detail:
           state.plannedStatus === "away" && state.plannedFrom
             ? plannedAwaySentence(state.plannedFrom, state.plannedUntil ?? null)
-            : ACTIVE_DETAIL,
+            : hasAccount(state)
+              ? ACTIVE_DETAIL
+              : NO_ACCOUNT_DETAILS.active,
         tone: "success",
       };
   }
@@ -702,7 +750,9 @@ export function describeStatusCard(
       title: current.text,
       detail:
         kind === "active"
-          ? ACTIVE_DETAIL
+          ? hasAccount(state)
+            ? ACTIVE_DETAIL
+            : NO_ACCOUNT_DETAILS.active
           : kind === "away" && state.awayUntil
             ? `${current.detail}${holds}`
             : current.detail,

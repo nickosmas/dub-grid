@@ -1103,6 +1103,7 @@ export default function PersonDetailScreen() {
   );
   const statusCopy = statusChoice
     ? describeStatusAction(statusChoice, getFullName(person), {
+        hasAccount: Boolean(person.userId),
         returnDate: statusChoice === "markAway" ? returnDate : null,
         absenceName: statusChoice === "markAway" ? chosenAbsenceName : null,
         startDate: statusChoice === "markAway" ? laterStart : null,
@@ -1111,6 +1112,7 @@ export default function PersonDetailScreen() {
       })
     : startsNow
       ? describeStatusAction("markAway", getFullName(person), {
+          hasAccount: Boolean(person.userId),
           returnDate,
           absenceName: chosenAbsenceName,
         })

@@ -33,6 +33,8 @@ import {
   NOT_PLANNABLE_MESSAGE,
   NOT_SUSPENDABLE_CODE,
   NOT_SUSPENDABLE_MESSAGE,
+  NO_ACCOUNT_CODE,
+  NO_ACCOUNT_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
@@ -241,6 +243,13 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: NOT_SUSPENDABLE_MESSAGE, code: NOT_SUSPENDABLE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (action === "suspend" && !currentEmployee.userId) {
+      return NextResponse.json(
+        { error: NO_ACCOUNT_MESSAGE, code: NO_ACCOUNT_CODE },
         { status: 400 },
       );
     }

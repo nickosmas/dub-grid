@@ -630,3 +630,38 @@ describe("suggestedStatusChoice", () => {
     ).toBeNull();
   });
 });
+
+describe("someone with no account", () => {
+  const onSchedule = { focusAreaIds: [7], userId: null };
+
+  it("can't be suspended, and nothing promises them sign-in", () => {
+    const choices = statusChoices({ status: "active", ...onSchedule });
+    expect(choices.map((choice) => choice.action)).toEqual(["markAway", "archive"]);
+    for (const choice of choices) expect(choice.detail + choice.outcome).not.toMatch(/sign/i);
+    expect(describeCurrentStatus({ status: "active", ...onSchedule }).detail).toBe(
+      "Can be scheduled.",
+    );
+    expect(describeCurrentStatus({ status: "inactive", ...onSchedule }).detail).toBe(
+      "Not scheduled while away.",
+    );
+    expect(
+      statusChoices({ status: "removed", archivedAt: "2026-10-01T00:00:00Z", ...onSchedule })[0]
+        .outcome,
+    ).toBe("They'll be Active again: back on staff, and they can be scheduled.");
+  });
+
+  it("confirms Away and Archive without mentioning sign-in", () => {
+    for (const action of ["markAway", "archive"] as const) {
+      const copy = describeStatusAction(action, "Ana", { hasAccount: false });
+      expect([...copy.points, ...copy.unchanged].join(" ")).not.toMatch(/sign in/i);
+    }
+  });
+
+  it("still offers an account holder Suspend", () => {
+    expect(
+      statusChoices({ status: "active", focusAreaIds: [7], userId: "user-1" }).map(
+        (choice) => choice.action,
+      ),
+    ).toContain("suspend");
+  });
+});

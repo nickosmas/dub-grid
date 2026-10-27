@@ -1238,6 +1238,16 @@ describe("PersonDetailScreen", () => {
       }
     });
 
+    it("offers someone with no account no Suspend", () => {
+      renderWithStatusMutation({ userId: null });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        ["Away. Not scheduled while away.", "Archived. Off staff. Can't be scheduled."],
+      );
+    });
+
     it("lists only the other statuses behind a suspended person's Change status", () => {
       renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
 

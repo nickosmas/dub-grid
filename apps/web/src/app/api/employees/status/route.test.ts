@@ -1134,6 +1134,19 @@ describe("POST /api/employees/status", () => {
       expect(endUserSessions).not.toHaveBeenCalled();
     });
 
+    it("refuses to suspend someone with no account", async () => {
+      arrange({ user_id: null });
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone with an account can be suspended.",
+        code: "NO_ACCOUNT",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
     it("refuses to suspend the only super admin", async () => {
       arrange({}, "gridmaster");
       targetMembershipMaybeSingle.mockResolvedValue({

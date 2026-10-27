@@ -318,6 +318,16 @@ describe("updateMobilePersonStatus suspending", () => {
     expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
   });
 
+  it("refuses to suspend someone with no account, since there's no sign-in to stop", async () => {
+    const { deps, result } = run(employee({ userId: null }), { action: "suspend" });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "invalid_status_change",
+      code: "NO_ACCOUNT",
+    });
+    expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+  });
+
   it("refuses to suspend the only super admin", async () => {
     const { deps, result } = run(employee({ userId: "user-9" }), { action: "suspend" });
     deps.fetchActiveMembershipOrgRole.mockResolvedValue("super_admin" as never);
