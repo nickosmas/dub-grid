@@ -543,8 +543,8 @@ function SchedulerContent({
   // Away planned for later takes its days out from its start (51g1), so the
   // grid, coverage and Auto-build count only the days in between.
   const awayRanges = useMemo(
-    () => awayRangesById([...employees, ...inactiveEmployees]),
-    [employees, inactiveEmployees],
+    () => awayRangesById([...employees, ...inactiveEmployees], org?.timezone ?? null),
+    [employees, inactiveEmployees, org?.timezone],
   );
   const scheduleEmployees = useMemo(
     () => [...employees, ...inactiveEmployees.filter((employee) => awayRanges.has(employee.id))],
@@ -7693,6 +7693,7 @@ function SchedulerContent({
         week2,
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
         todayKey,
+        awayRanges,
         focusAreas,
         departments,
         assignments,
@@ -7749,6 +7750,7 @@ function SchedulerContent({
       week2,
       spanWeeks,
       todayKey,
+      awayRanges,
       focusAreas,
       departments,
       assignments,

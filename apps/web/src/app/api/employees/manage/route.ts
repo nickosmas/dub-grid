@@ -185,6 +185,11 @@ const requestSchema = z.discriminatedUnion("action", [
     endDate: z.string().date().optional(),
   }),
   z.object({
+    action: z.literal("fetchEmployeeHasStarted"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+  }),
+  z.object({
     action: z.literal("fetchEmployeeInvitations"),
     orgId: z.string().uuid(),
     employeeId: z.string().uuid(),
@@ -1103,6 +1108,31 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ employee });
+      }
+
+      case "fetchEmployeeHasStarted": {
+        const auth = await requireEmployeeSetupPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        // Started means a worked shift on or before today; an absence alone doesn't count.
+        const { data: worked, error: workedError } = await auth.serviceClient
+          .from("schedule_cells")
+          .select(
+            "id, snapshots:schedule_cell_snapshots!inner(segments:schedule_cell_segments!inner(id))",
+          )
+          .eq("org_id", data.orgId)
+          .eq("emp_id", data.employeeId)
+          .lte("date", await fetchOrgToday(auth.serviceClient, data.orgId))
+          .limit(1);
+        if (workedError) throw workedError;
+        return NextResponse.json({ started: (worked ?? []).length > 0 });
       }
 
       case "fetchEmployeeShifts": {

@@ -1161,3 +1161,18 @@
       tint over the label, names never pluralized. Design reference: the
       "Absence runs in the grid" board on the "Staff status across surfaces"
       canvas.
+- [ ] 53. **Past-day corrections** - days before today are finished in the
+      Week and 2 Weeks grid: a light wash behind past day columns and
+      headers, shifts and absences at full color. They can't be dragged, pasted, bulk-deleted or filled by Auto-build or recurring
+      schedules. Clicking a past cell (schedule edit permission) opens
+      Correct this day: shift and absence, a required reason (Called off,
+      Left early, Swapped with someone, Wrong shift recorded, or Other with
+      a note), and Before and After. A correction changes the published day
+      right away with no draft, sends staff no alert, keeps the published
+      version in Publish History, writes an activity-log row with the
+      reason, and marks the cell Corrected. Hours and reports use the
+      corrected cell. Admins correct the last 14 days, and older days need a
+      Super Admin. A day someone was away, suspended, or not yet started can
+      be corrected when they could have worked it, which replaces the lock
+      099 puts on days before an Away person went away. Owner decisions,
+      2026-10-28: Light tint; reports use the correction; 14 days for Admins.

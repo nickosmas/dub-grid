@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { checkEmployeeEmailConflict } from "@/features/employees/client";
+import { checkEmployeeEmailConflict, fetchEmployeeHasStarted } from "@/features/employees/client";
 import { Employee, FocusArea, Invitation, NamedItem } from "@/types";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 
@@ -14,6 +14,7 @@ vi.mock("@/hooks", async (importOriginal) => ({
 
 vi.mock("@/features/employees/client", () => ({
   checkEmployeeEmailConflict: vi.fn(),
+  fetchEmployeeHasStarted: vi.fn(async () => true),
 }));
 
 const requireCredentialAssurance = vi.fn(async (_accessToken: string) => ({
@@ -194,6 +195,24 @@ describe("EditEmployeePanel", () => {
       renderPanel({ employee: { ...employee, firstDay: "2099-11-10" } });
 
       expect(screen.getByText("First day")).toBeInTheDocument();
+    });
+
+    it("offers Set first day to someone who hasn't worked a shift yet", async () => {
+      vi.mocked(fetchEmployeeHasStarted).mockResolvedValueOnce(false);
+      renderPanel({ employee: { ...employee, firstDay: null }, orgId: "org-1" });
+
+      fireEvent.click(await screen.findByRole("button", { name: "Set first day" }));
+
+      expect(screen.getByText("First day")).toBeInTheDocument();
+      expect(fetchEmployeeHasStarted).toHaveBeenCalledWith("org-1", employee.id);
+    });
+
+    it("offers no first day to someone who has already worked a shift", async () => {
+      vi.mocked(fetchEmployeeHasStarted).mockResolvedValueOnce(true);
+      renderPanel({ employee: { ...employee, firstDay: null }, orgId: "org-1" });
+
+      await waitFor(() => expect(fetchEmployeeHasStarted).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: "Set first day" })).not.toBeInTheDocument();
     });
 
     it("leaves a first day that has passed to the record", () => {

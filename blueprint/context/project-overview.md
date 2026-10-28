@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash bc95f5fb9f1e6d117a8125b625426bcd5a28f73cc166cf1522da5288be4ba0ca -->
+<!-- blueprint:source-hash 229bb6ddd76edd47176616010e558bb1c9f5faddf5b23730460fcc5bafe9031f -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 52 are
-shipped. Item 40 is in progress.
+shipped. Item 40 is in progress. Item 53 is planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -87,6 +87,7 @@ shipped. Item 40 is in progress.
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
 | 51   | Shipped     | People are Active, Away, Suspended or Offboarded, with a last day and return date; managers see who takes a seat.               |
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
+| 53   | Planned     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
 
 Item 40 is split:
 
@@ -402,7 +403,8 @@ Item 51 is split, and every part has shipped:
     planned suspension the way a manual Suspend does (migration 105).
   - **51g4 - First day:** shipped; Add Staff Members takes an optional
     First day, from today up to a year ahead (web and mobile), and the
-    person form offers it only while it's ahead (owner, 2026-10-28). Nobody
+    person form offers it only while it's ahead, or as Set first day to
+    someone Active who hasn't worked a shift yet (owner, 2026-10-28). Nobody
     can schedule them before it, and setting it later clears those draft
     days and closes their requests; they show "Starts Nov 10" in the People
     list, on a dashed card and in the grid until then, keep sign-in and a
@@ -472,6 +474,16 @@ label and lights its column header, and its panel offers Remove this day or
 Remove all 4 days in the draft with one Undo (owner decisions, 2026-10-26).
 Design reference: the "Absence runs in the grid" board on the "Staff status
 across surfaces" canvas.
+
+Item 53, past-day corrections, is planned. Days before today get a light
+wash in the grid, with shifts and absences at full color, and drag, paste,
+bulk delete, Auto-build and recurring fills never touch them. A past cell opens Correct
+this day: shift and absence, a required reason, and Before and After. The
+correction changes the published day at once, sends staff no alert, keeps
+the published version in Publish History, logs the reason, and marks the
+cell Corrected; hours and reports use it. Admins correct the last 14 days,
+older days need a Super Admin, and a day someone could have worked can be
+corrected even while they're away (owner decisions, 2026-10-28).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

@@ -147,6 +147,7 @@ import {
   isBeforeRangeFirstDay,
   LEAVING_RUN_LABEL,
   startsRunLabel,
+  type AwayRange,
 } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
@@ -226,6 +227,7 @@ interface LegacyScheduleGridProps {
     trigger?: "click" | "keyboard",
   ) => void;
   todayKey: string;
+  awayRanges?: ReadonlyMap<string, AwayRange>;
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   focusAreas: FocusArea[];
@@ -333,6 +335,7 @@ interface SectionBlockProps {
   renderedRows?: number;
   weekDates: Date[];
   todayKey: string;
+  awayRanges?: ReadonlyMap<string, AwayRange>;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
@@ -1092,6 +1095,7 @@ const SectionBlock = memo(function SectionBlock({
   renderedRows,
   weekDates,
   todayKey,
+  awayRanges,
   shiftForKey,
   assignmentIdsForKey,
   segmentsForKey,
@@ -2128,10 +2132,10 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              // Someone away until a date (51e), with an Away planned (51g1), or
-              // past a planned last day (51g2) has a bar on those days from today
-              // on, and nothing else there.
-              const rowAwayRange = awayRangeOf(emp);
+              // Someone away until a date (51e) has a bar from the day they went
+              // away; with an Away planned (51g1) or past a planned last day
+              // (51g2), from today on. Nothing else shows there.
+              const rowAwayRange = awayRanges?.get(emp.id) ?? awayRangeOf(emp);
               const rowAwayDays = buildRowAwayDays(
                 rowAwayRange,
                 weekDates.map((date) => formatDateKey(date)),
@@ -4855,6 +4859,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   getShiftStyle,
   handleCellClick,
   todayKey,
+  awayRanges,
   highlightEmpIds,
   highlightScrollKey,
   focusAreas,
@@ -5290,6 +5295,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     renderedRows={mount === "full" ? undefined : mount.rows}
                     weekDates={allDates}
                     todayKey={todayKey}
+                    awayRanges={awayRanges}
                     shiftForKey={shiftForKey}
                     assignmentIdsForKey={assignmentIdsForKey}
                     segmentsForKey={segmentsForKey}
@@ -5535,6 +5541,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           getShiftStyle={model.accessors.getShiftStyle}
           handleCellClick={handleLegacyCellClick}
           todayKey={model.todayKey}
+          awayRanges={model.awayRanges}
           highlightEmpIds={model.options.highlightEmpIds}
           highlightScrollKey={model.options.highlightScrollKey}
           focusAreas={model.focusAreas}

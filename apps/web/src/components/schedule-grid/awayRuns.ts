@@ -5,7 +5,7 @@ import {
   isPlannedAwayOn,
   plannedLastDay,
 } from "@dubgrid/domain";
-import { buildAbsenceRuns, type AbsenceRunDay } from "@dubgrid/schedule-core";
+import { buildAbsenceRuns, getIsoDateInTimeZone, type AbsenceRunDay } from "@dubgrid/schedule-core";
 import type { Employee } from "@/types";
 
 export const AWAY_RUN_LABEL = "Away";
@@ -29,12 +29,16 @@ export function startsRunLabel(firstDay: string): string {
  * `lastDay`, they're the days after someone's last day (51g2) instead. With
  * `firstDay`, every day before it is locked too (51g4); a range with only a
  * first day has `from` equal to `until`, which holds no day of its own.
+ * `since` is the day someone Away until a date went away: the bar and
+ * coverage start there, while every earlier day stays locked as the
+ * database still refuses them.
  */
 export interface AwayRange {
   from: string | null;
   until: string | null;
   lastDay?: string | null;
   firstDay?: string | null;
+  since?: string | null;
 }
 
 /** Whether `dateKey` is before the range's first day (51g4). */
@@ -51,6 +55,15 @@ export function isInAwayRange(range: AwayRange, dateKey: string): boolean {
 }
 
 /**
+ * Whether they're away on `dateKey`, rather than only locked: from the day
+ * they went away when it's known, and every locked day otherwise.
+ */
+export function isAwayOn(range: AwayRange, dateKey: string): boolean {
+  if (!isInAwayRange(range, dateKey)) return false;
+  return isBeforeRangeFirstDay(range, dateKey) || !range.since || dateKey >= range.since;
+}
+
+/**
  * Why a locked away day can't be selected, and where to change it. A day
  * before their first day says so; give `dateKey` to tell which.
  */
@@ -62,6 +75,9 @@ export function awayLockedHint(range: AwayRange, dateKey?: string): string {
   }
   if (range.lastDay) {
     return `Last day ${formatReturnDate(range.lastDay, { weekday: true })}. Change the last day on their record to change these days.`;
+  }
+  if (range.since && dateKey !== undefined && dateKey < range.since) {
+    return `Away since ${formatReturnDate(range.since, { weekday: true })}. Days before they went away can't be changed while they're away.`;
   }
   if (range.from !== null) {
     const from = formatReturnDate(range.from, { weekday: true });
@@ -75,23 +91,30 @@ export function awayLockedHint(range: AwayRange, dateKey?: string): string {
 type AwayFields = Pick<Employee, "status" | "awayUntil" | "archivedAt">;
 
 type RangeFields = AwayFields &
-  Pick<Employee, "plannedStatus" | "plannedFrom" | "plannedUntil" | "firstDay">;
+  Pick<Employee, "plannedStatus" | "plannedFrom" | "plannedUntil" | "firstDay"> &
+  Partial<Pick<Employee, "statusChangedAt">>;
 
 /**
  * Someone's locked days: until their return date when Away until a date
  * (51e), from the start of a planned Away (51g1), after a planned last day
- * (51g2), and before their first day (51g4). Null for anyone else.
+ * (51g2), and before their first day (51g4). Null for anyone else. The
+ * organization's timezone dates the day they went away.
  */
-export function awayRangeOf(employee: RangeFields): AwayRange | null {
-  const range = statusRangeOf(employee);
+export function awayRangeOf(employee: RangeFields, timeZone?: string | null): AwayRange | null {
+  const range = statusRangeOf(employee, timeZone);
   const firstDay = employee.archivedAt ? null : (employee.firstDay ?? null);
   if (!firstDay) return range;
   return range ? { ...range, firstDay } : { from: firstDay, until: firstDay, firstDay };
 }
 
-function statusRangeOf(employee: RangeFields): AwayRange | null {
+function statusRangeOf(employee: RangeFields, timeZone?: string | null): AwayRange | null {
   const until = awayReturnDate(employee);
-  if (until) return { from: null, until };
+  if (until) {
+    const changedAt = employee.statusChangedAt;
+    return changedAt
+      ? { from: null, until, since: getIsoDateInTimeZone(new Date(changedAt), timeZone) }
+      : { from: null, until };
+  }
   const lastDay = plannedLastDay(employee);
   if (employee.status === "active" && !employee.archivedAt && lastDay) {
     return { from: employee.plannedFrom ?? null, until: null, lastDay };
@@ -116,24 +139,27 @@ export function awayReturnDate(employee: AwayFields): string | null {
 
 /**
  * Who has a row in the Week and 2 Weeks grid: everyone active, and someone
- * Away with a return date while the period reaches today or later (51e).
- * Someone Away with no return date stays off it, and a past period keeps the
- * rows it always had.
+ * Away with a return date while the period reaches the day they went away
+ * (`since`), or today when that isn't known (51e). Someone Away with no
+ * return date stays off it, and an earlier period keeps the rows it always
+ * had.
  */
 export function isOnScheduleGrid(
   employee: AwayFields,
   period: { lastDateKey: string; todayKey: string },
+  since?: string | null,
 ): boolean {
   if (employee.status === "active") return true;
-  return awayReturnDate(employee) != null && period.lastDateKey >= period.todayKey;
+  return awayReturnDate(employee) != null && period.lastDateKey >= (since ?? period.todayKey);
 }
 
 export interface RowAwayDays {
   /** Days before the return date, on which nothing can be scheduled for them. */
   locked: boolean[];
   /**
-   * Locked days from today on, each in one run per stretch and week; null
-   * elsewhere. Earlier days keep what they held before they went away.
+   * Locked days from the day they went away (or today, when that isn't
+   * known), each in one run per stretch and week; null elsewhere. Earlier
+   * days keep what they held before they went away.
    */
   runs: (AbsenceRunDay | null)[];
 }
@@ -151,7 +177,8 @@ export function buildRowAwayDays(
   if (!range) return null;
   const locked = dateKeys.map((dateKey) => isInAwayRange(range, dateKey));
   if (!locked.includes(true)) return null;
-  const isAway = dateKeys.map((dateKey, index) => locked[index] && dateKey >= todayKey);
+  const barFrom = range.since ?? todayKey;
+  const isAway = dateKeys.map((dateKey, index) => locked[index] && dateKey >= barFrom);
   const built = buildAbsenceRuns(
     isAway.map((away) => ({
       absenceTypeId: away ? AWAY_RUN_ID : null,

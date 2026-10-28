@@ -35,12 +35,14 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { FirstDayField } from "@/components/staff/FirstDayField";
 import { upcomingFirstDay } from "@dubgrid/domain";
+import { CalendarPlus } from "lucide-react";
 import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   checkEmployeeEmailConflict,
+  fetchEmployeeHasStarted,
   type EmployeeEmailConflictResult,
 } from "@/features/employees/client";
 
@@ -184,6 +186,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
     const [pendingReinviteSave, setPendingReinviteSave] = useState<Employee | null>(null);
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
+    const [hasStarted, setHasStarted] = useState<boolean | null>(null);
+    const [addingFirstDay, setAddingFirstDay] = useState(false);
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [emailConflict, setEmailConflict] = useState(false);
@@ -270,7 +274,28 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     useEffect(() => {
       setForm(buildEditForm(employee));
       setTouched({});
+      setAddingFirstDay(false);
     }, [employee]);
+
+    // A first day can still be given to someone Active who hasn't worked a shift yet.
+    const mayStillStart = Boolean(orgId) && employee.status === "active" && !employee.firstDay;
+    useEffect(() => {
+      if (!mayStillStart || !orgId) {
+        setHasStarted(null);
+        return;
+      }
+      let cancelled = false;
+      fetchEmployeeHasStarted(orgId, employee.id)
+        .then((started) => {
+          if (!cancelled) setHasStarted(started);
+        })
+        .catch(() => {
+          if (!cancelled) setHasStarted(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [mayStillStart, orgId, employee.id]);
 
     const isModified = useMemo(() => {
       return (
@@ -616,14 +641,24 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         style={{ width: "100%" }}
                       />
                     </div>
-                    {/* Asked when adding someone; here only while it's ahead, to move or clear. */}
-                    {upcomingFirstDay(employee, formatDateKey(new Date())) ? (
+                    {/* Here only while it's ahead, or for someone who hasn't worked a shift yet. */}
+                    {upcomingFirstDay(employee, formatDateKey(new Date())) || addingFirstDay ? (
                       <FirstDayField
                         value={form.firstDay}
                         onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
                         labelStyle={{ ...fieldLabel, marginBottom: 0 }}
                         disabled={readOnly}
                       />
+                    ) : mayStillStart && hasStarted === false && !readOnly ? (
+                      <div style={{ paddingTop: 22 }}>
+                        <Button
+                          className="dg-btn dg-btn-ghost dg-btn-sm"
+                          onClick={() => setAddingFirstDay(true)}
+                        >
+                          <CalendarPlus size={14} aria-hidden />
+                          Set first day
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                 )}
