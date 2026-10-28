@@ -235,13 +235,18 @@ describe("EmployeeStatusActions", () => {
     expect(onSuspend).toHaveBeenCalledWith("emp-1");
   });
 
-  it("offers a management-only person no Away", async () => {
+  it("lists Away disabled, with its reason, for a management-only person", async () => {
     const user = userEvent.setup();
     renderActions(makeEmployee({ focusAreaIds: [] }));
 
     const dialog = await openDialog(user);
+    const away = within(dialog).getByRole("radio", { name: /^Away/ });
 
-    expect(within(dialog).queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
+    expect(away).toHaveAttribute("aria-disabled", "true");
+    expect(away).toHaveTextContent("Only someone on the schedule can be marked away.");
+    await user.click(away);
+    expect(away).toHaveAttribute("aria-checked", "false");
+    expect(within(dialog).getByRole("button", { name: "Change status" })).toBeDisabled();
   });
 
   it("reinstates a suspended person", async () => {
@@ -261,7 +266,11 @@ describe("EmployeeStatusActions", () => {
     const { onActivate } = renderActions(makeEmployee({ status: "inactive" }));
 
     const dialog = await openDialog(user);
-    expect(choices(dialog)).toHaveLength(2);
+    expect(choices(dialog)).toEqual([
+      "ActiveBack on the schedule from today.",
+      "SuspendedOnly someone who is active can be suspended.",
+      "OffboardedNo longer on staff. Can't sign in or be scheduled.",
+    ]);
     await user.click(within(dialog).getByRole("radio", { name: /^Active/ }));
     await user.click(within(dialog).getByRole("button", { name: "Mark active" }));
 
@@ -306,14 +315,14 @@ describe("EmployeeStatusActions", () => {
       makeEmployee({ status: "removed", archivedAt: "2026-10-01T00:00:00Z" }),
     );
 
-    // Restore is the only way on, so there is nothing to pick: the dialog says what it does.
-    const dialog = await openDialog(user, "Restore Alice Smith?");
-    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
-    expect(
-      within(dialog).getByText(
-        "They'll be Active again: back on staff, and they can sign in and be scheduled.",
-      ),
-    ).toBeInTheDocument();
+    // Restore is the only way on, but Change status still lists every status.
+    const dialog = await openDialog(user);
+    expect(choices(dialog)).toEqual([
+      "ActiveBack on staff. Can sign in and be scheduled.",
+      "AwayOnly someone on staff can be marked away.",
+      "SuspendedOnly someone who is active can be suspended.",
+    ]);
+    await user.click(within(dialog).getByRole("radio", { name: /^Active/ }));
     await user.click(within(dialog).getByRole("button", { name: "Restore" }));
 
     expect(onActivate).toHaveBeenCalledWith("emp-1");
@@ -393,12 +402,13 @@ describe("EmployeeStatusActions", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers no second Away to someone with an away planned", async () => {
+  it("lists Away disabled, pointing at Edit plan, for someone with an away planned", async () => {
     const user = userEvent.setup();
     renderActions(makeEmployee(planned));
 
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
+      expect.stringMatching(/^AwayPlanned from \w{3}, \w{3} \d+\. Change it with Edit plan\.$/),
       "SuspendedCan't sign in. Stays on the schedule.",
       "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
@@ -457,7 +467,7 @@ describe("EmployeeStatusActions", () => {
 
   const leaving = { plannedStatus: "removed" as const, plannedFrom: "2099-01-09" };
 
-  it("shows a last day under the status, with Offboard left out of the list", async () => {
+  it("shows a last day under the status, with Offboard disabled in the list", async () => {
     const user = userEvent.setup();
     const { onSetPlannedChange } = renderActions(makeEmployee(leaving));
 
@@ -467,6 +477,7 @@ describe("EmployeeStatusActions", () => {
     expect(choices(dialog)).toEqual([
       "AwayKeeps sign-in. Not scheduled while away.",
       "SuspendedCan't sign in. Stays on the schedule.",
+      "OffboardedLeaving Thu, Jan 8. Change it with Edit plan.",
     ]);
     expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
     expect(onSetPlannedChange).not.toHaveBeenCalled();
@@ -544,7 +555,7 @@ describe("EmployeeStatusActions", () => {
     render(<EmployeeStatusActions {...base} focus="status" />);
     dialog = await openDialog(user);
     expect(within(dialog).queryByRole("button", { name: "Starts" })).not.toBeInTheDocument();
-    expect(choices(dialog)).toHaveLength(2);
+    expect(choices(dialog)).toHaveLength(3);
   });
 
   const cardButtons = () =>
@@ -652,18 +663,105 @@ describe("EmployeeStatusActions", () => {
     ]);
   });
 
-  it("offers someone with no account no Suspend, and says nothing of sign-in", async () => {
+  it("lists Suspend disabled for someone with no account, and says nothing of sign-in", async () => {
     const user = userEvent.setup();
     renderActions(makeEmployee({ userId: null }));
 
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
       "AwayNot scheduled while away.",
+      "SuspendedOnly someone with an account can be suspended.",
       "OffboardedNo longer on staff. Can't be scheduled.",
     ]);
     expect(within(dialog).getByRole("status")).toHaveTextContent("ActiveCan be scheduled.");
     await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
     expect(dialog).not.toHaveTextContent(/sign in/i);
+  });
+
+  it("lists every status for no account and an away planned, never jumping to one (prod bug)", async () => {
+    const user = userEvent.setup();
+    renderActions(makeEmployee({ userId: null, plannedStatus: "away", plannedFrom: "2026-11-01" }));
+
+    const dialog = await openDialog(user);
+    expect(choices(dialog)).toEqual([
+      "AwayPlanned from Sun, Nov 1. Change it with Edit plan.",
+      "SuspendedOnly someone with an account can be suspended.",
+      "OffboardedNo longer on staff. Can't be scheduled.",
+    ]);
+    expect(
+      within(dialog)
+        .getAllByRole("radio")
+        .map((radio) => radio.getAttribute("aria-disabled")),
+    ).toEqual(["true", "true", null]);
+    // Nothing is picked for them, not even the one choice left.
+    expect(within(dialog).getByRole("radio", { name: /^Offboarded/ })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("names the card's button for the one change left, and opens its confirmation", async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    render(
+      <StatusCardActions
+        employee={makeEmployee({ userId: null, plannedStatus: "away", plannedFrom: "2026-11-01" })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={onRemove}
+        onReinstate={vi.fn()}
+        onSuspend={vi.fn()}
+      />,
+    );
+
+    expect(cardButtons()).toEqual(["Offboard"]);
+    await user.click(screen.getByRole("button", { name: "Offboard" }));
+    const dialog = screen.getByRole("dialog", { name: "Offboard Alice Smith?" });
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
+    expect(onRemove).toHaveBeenCalledWith("emp-1", undefined);
+  });
+
+  it("keeps Change status, with the disabled rows, when two or more changes are left", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatusCardActions
+        employee={makeEmployee({ userId: null })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        onReinstate={vi.fn()}
+        onSuspend={vi.fn()}
+      />,
+    );
+
+    expect(cardButtons()).toEqual(["Change status"]);
+    const dialog = await openDialog(user);
+    expect(within(dialog).getByRole("radio", { name: /^Suspended/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("shows no card button when no change is left", () => {
+    const { container } = render(
+      <StatusCardActions
+        employee={makeEmployee({
+          userId: null,
+          focusAreaIds: [],
+          plannedStatus: "removed",
+          plannedFrom: "2099-01-09",
+        })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        onSuspend={vi.fn()}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows nothing for your own record or without permission", () => {

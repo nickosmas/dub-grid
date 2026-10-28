@@ -13,6 +13,8 @@ export interface RadioCardOption<T extends string | number> {
   note?: string | null;
   /** Drawn in place of the radio; the picked card then carries a check. */
   icon?: ReactNode;
+  /** Shown muted and can't be picked; its detail should say why. */
+  disabled?: boolean;
 }
 
 interface RadioCardListProps<T extends string | number> {
@@ -39,12 +41,17 @@ export function RadioCardList<T extends string | number>({
       {options.map((option) => {
         const checked = option.value === value;
         const note = option.note;
+        const disabled = Boolean(option.disabled);
         return (
           <Button
             key={String(option.value)}
             role="radio"
             aria-checked={checked}
-            onClick={() => onChange(option.value)}
+            // Left focusable, so a screen reader still reaches the reason.
+            aria-disabled={disabled || undefined}
+            onClick={() => {
+              if (!disabled) onChange(option.value);
+            }}
             style={{
               display: "flex",
               alignItems: option.icon ? "center" : "flex-start",
@@ -55,7 +62,8 @@ export function RadioCardList<T extends string | number>({
               background: checked ? "var(--dg-color-primary-bg)" : "var(--dg-color-surface)",
               textAlign: "left",
               font: "inherit",
-              cursor: "pointer",
+              cursor: disabled ? "not-allowed" : "pointer",
+              opacity: disabled ? 0.6 : undefined,
             }}
           >
             {option.icon ?? (

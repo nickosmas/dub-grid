@@ -614,6 +614,10 @@ export interface StatusChoice {
   detail: string;
   /** What picking it does, as one sentence, for a dialog where it's the only choice. */
   outcome: string;
+  /** False when it can't be picked right now; the list still shows it, disabled. */
+  available: boolean;
+  /** Why it can't be picked, shown in place of `detail`; null when it can. */
+  unavailableReason: string | null;
 }
 
 export interface StatusState extends PlannedChangeState {
@@ -651,53 +655,78 @@ function currentKind(state: StatusState): StatusChoiceKind {
   return state.suspendedAt ? "suspended" : "active";
 }
 
+/** A status choice, shown disabled with its reason when one is given. */
+function choice(
+  base: Omit<StatusChoice, "available" | "unavailableReason">,
+  unavailableReason: string | null = null,
+): StatusChoice {
+  return { ...base, available: unavailableReason === null, unavailableReason };
+}
+
+const EDIT_PLAN_HINT = "Change it with Edit plan.";
+
 /**
- * The statuses someone can move to from where they are, in the order the
- * Change status dialog lists them. Their current status is never one.
+ * Every status other than the one they're in, in the order the Change status
+ * dialog lists them. One that can't be picked right now stays in the list
+ * with `available` false and a reason, so the list never silently shrinks.
  */
 export function statusChoices(state: CurrentStatusState): StatusChoice[] {
   const account = hasAccount(state);
-  const away: StatusChoice = {
-    kind: "away",
-    action: "markAway",
-    label: EMPLOYMENT_STATUS_LABELS.inactive,
-    detail: account ? AWAY_DETAIL : NO_ACCOUNT_DETAILS.away,
-    outcome: account
-      ? "They'll be Away: they keep sign-in, and they aren't scheduled."
-      : "They'll be Away, and they aren't scheduled.",
-  };
-  const archived: StatusChoice = {
-    kind: "archived",
-    action: "archive",
-    label: EMPLOYMENT_STATUS_LABELS.removed,
-    detail: account ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
-    outcome: account
-      ? "They'll be Offboarded: no longer on staff, and they can't sign in or be scheduled."
-      : "They'll be Offboarded: no longer on staff, and they can't be scheduled.",
-  };
-  // A planned away is edited through its own dates, so Away isn't offered twice.
-  const canBeAway =
-    canMarkInactive(state.focusAreaIds) && !(state.plannedStatus === "away" && state.plannedFrom);
+  const kind = currentKind(state);
+  const plannedAwayFrom = state.plannedStatus === "away" ? (state.plannedFrom ?? null) : null;
+  const lastDay = plannedLastDay(state);
+  // A planned away or last day is edited through its own dates, so neither is offered twice.
+  const awayReason =
+    kind === "archived"
+      ? "Only someone on staff can be marked away."
+      : !canMarkInactive(state.focusAreaIds)
+        ? NOT_ON_SCHEDULE_MESSAGE
+        : plannedAwayFrom
+          ? `Planned from ${formatReturnDate(plannedAwayFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
+          : null;
+  const away = choice(
+    {
+      kind: "away",
+      action: "markAway",
+      label: EMPLOYMENT_STATUS_LABELS.inactive,
+      detail: account ? AWAY_DETAIL : NO_ACCOUNT_DETAILS.away,
+      outcome: account
+        ? "They'll be Away: they keep sign-in, and they aren't scheduled."
+        : "They'll be Away, and they aren't scheduled.",
+    },
+    awayReason,
+  );
   // Suspension only stops sign-in, so it needs an account to stop.
-  const suspend: StatusChoice[] = account
-    ? [
-        {
-          kind: "suspended",
-          action: "suspend",
-          label: SUSPENDED_LABEL,
-          detail: SUSPENDED_DETAIL,
-          outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
-        },
-      ]
-    : [];
-  // A planned last day is edited through its own date, so Offboard isn't offered twice.
-  const canOffboard = !(state.plannedStatus === "removed" && state.plannedFrom);
-  switch (currentKind(state)) {
+  const suspended = choice(
+    {
+      kind: "suspended",
+      action: "suspend",
+      label: SUSPENDED_LABEL,
+      detail: SUSPENDED_DETAIL,
+      outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
+    },
+    kind !== "active" ? NOT_SUSPENDABLE_MESSAGE : !account ? NO_ACCOUNT_MESSAGE : null,
+  );
+  const archived = choice(
+    {
+      kind: "archived",
+      action: "archive",
+      label: EMPLOYMENT_STATUS_LABELS.removed,
+      detail: account ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
+      outcome: account
+        ? "They'll be Offboarded: no longer on staff, and they can't sign in or be scheduled."
+        : "They'll be Offboarded: no longer on staff, and they can't be scheduled.",
+    },
+    lastDay
+      ? `${LEAVING_LABEL} ${formatReturnDate(lastDay, { weekday: true })}. ${EDIT_PLAN_HINT}`
+      : null,
+  );
+  switch (kind) {
     case "active":
-      return [...(canBeAway ? [away] : []), ...suspend, ...(canOffboard ? [archived] : [])];
+      return [away, suspended, archived];
     case "suspended":
       return [
-        {
+        choice({
           kind: "active",
           action: "reinstate",
           label: EMPLOYMENT_STATUS_LABELS.active,
@@ -705,24 +734,25 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           outcome: account
             ? "They'll be Active again and can sign in on the web and in the app."
             : "They'll be Active again.",
-        },
-        ...(canBeAway ? [away] : []),
+        }),
+        away,
         archived,
       ];
     case "away":
       return [
-        {
+        choice({
           kind: "active",
           action: "markActive",
           label: EMPLOYMENT_STATUS_LABELS.active,
           detail: "Back on the schedule from today.",
           outcome: "They'll be Active again and back on the schedule from today.",
-        },
+        }),
+        suspended,
         archived,
       ];
     case "archived":
       return [
-        {
+        choice({
           kind: "active",
           action: "restore",
           label: EMPLOYMENT_STATUS_LABELS.active,
@@ -732,9 +762,16 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
           outcome: account
             ? "They'll be Active again: back on staff, and they can sign in and be scheduled."
             : "They'll be Active again: back on staff, and they can be scheduled.",
-        },
+        }),
+        away,
+        suspended,
       ];
   }
+}
+
+/** The changes that can be made right now, for buttons and menus that name one. */
+export function availableStatusChoices(state: CurrentStatusState): StatusChoice[] {
+  return statusChoices(state).filter((option) => option.available);
 }
 
 /**
@@ -744,7 +781,7 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
  */
 export function suggestedStatusChoice(state: CurrentStatusState): StatusChoice | null {
   if (currentKind(state) === "active") return null;
-  return statusChoices(state).find((choice) => choice.kind === "active") ?? null;
+  return availableStatusChoices(state).find((option) => option.kind === "active") ?? null;
 }
 
 export type StatusTone = "success" | "warning" | "danger" | "neutral";

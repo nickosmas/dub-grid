@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   describeStatusAction,
   describeStatusCard,
-  statusChoices,
+  availableStatusChoices,
   statusMark,
   suggestedStatusChoice,
   type CurrentStatusState,
@@ -180,9 +180,12 @@ export function StatusCards({
   const colors = statusToneColors(mobileColors, current.tone);
   const warning = statusToneColors(mobileColors, "warning");
   // The change most people want next gets its own button (Reinstate, Mark
-  // active, Restore); a menu names each other change, and for someone Away
-  // their return date. Every one opens a confirmation for that change alone.
+  // active, Restore); a menu names each other change that can be made now,
+  // and for someone Away their return date. Every one opens a confirmation
+  // for that change alone. Someone Active gets Change status, or a button
+  // named for the one change left, or none when nothing can change now.
   const suggested = plain ? null : suggestedStatusChoice(person);
+  const available = availableStatusChoices(person);
   const away = person.status === "inactive" && !person.archivedAt;
   const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested
     ? [
@@ -198,7 +201,7 @@ export function StatusCards({
               },
             ]
           : []),
-        ...statusChoices(person)
+        ...available
           .filter((choice) => choice.action !== suggested.action)
           .map((choice) => ({
             key: choice.action,
@@ -229,6 +232,13 @@ export function StatusCards({
         />
       ) : null}
     </View>
+  ) : available.length === 0 ? null : available.length === 1 ? (
+    <Button
+      disabled={disabled}
+      label={describeStatusAction(available[0].action, "").label}
+      onPress={() => onChangeStatus({ only: available[0].action })}
+      tone="secondary"
+    />
   ) : (
     <Button
       disabled={disabled}

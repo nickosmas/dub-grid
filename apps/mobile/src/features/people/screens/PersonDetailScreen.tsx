@@ -1025,11 +1025,11 @@ export default function PersonDetailScreen() {
   function openStatusSheet(opening: StatusSheetOpening = {}) {
     if (!person) return;
     const away = person.status === "inactive";
-    const options = statusChoices(person).filter((choice) => choice.action !== opening.exclude);
     setStatusOpening(opening);
-    // With one status to move to, or a button that named its change, there is nothing to pick.
+    // A button that named its change has nothing to pick; Change status always opens the list.
     const picked =
-      opening.only ?? (options.length === 1 && !opening.exclude ? options[0].action : null);
+      statusChoices(person).find((choice) => choice.available && choice.action === opening.only)
+        ?.action ?? null;
     setStatusChoice(picked);
     setOpenedChoice(picked);
     setInactiveNote("");
@@ -1113,15 +1113,13 @@ export default function PersonDetailScreen() {
       value={startDate}
     />
   );
+  // Every other status is listed, an unavailable one disabled with its reason.
   const choices = statusChoices(person).filter((choice) => choice.action !== statusOpening.exclude);
   const onlyChoice =
-    statusOpening.focus === "plan"
+    statusOpening.focus === "plan" || !statusOpening.only
       ? null
-      : choices.length === 1 && !statusOpening.exclude
-        ? choices[0]
-        : statusOpening.only
-          ? (choices.find((choice) => choice.action === statusOpening.only) ?? null)
-          : null;
+      : (choices.find((choice) => choice.available && choice.action === statusOpening.only) ??
+        null);
   const awayDetailsChanged =
     isAway &&
     (returnDate !== (person.awayUntil ?? null) ||
@@ -1782,7 +1780,8 @@ export default function PersonDetailScreen() {
             items={choices.map((choice) => ({
               id: choice.action,
               name: choice.label,
-              detail: choice.detail,
+              detail: choice.unavailableReason ?? choice.detail,
+              disabled: !choice.available,
               leading: (
                 <StatusIconCircle
                   name={STATUS_KIND_ICONS[choice.kind]}

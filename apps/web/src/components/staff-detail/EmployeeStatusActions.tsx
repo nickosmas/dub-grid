@@ -17,6 +17,7 @@ import {
   describeStatusCard,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
+  availableStatusChoices,
   statusChoices,
   suggestedStatusChoice,
   type StatusAction,
@@ -341,11 +342,11 @@ function CurrentStatusCard({ card }: { card: StatusCardCopy }) {
 
 /**
  * Every status change goes through one Change status button and one dialog
- * (51d): a card at the top says where they stand, the list holds only the
- * statuses they can move to, the title and confirm button name what happens,
- * and what changes is kept apart from what stays the same. With one status to
- * move to, or opened from a button that names its change, there is no list,
- * only a sentence saying what it does.
+ * (51d): a card at the top says where they stand, the list holds every other
+ * status (one they can't move to now is disabled and says why), the title and
+ * confirm button name what happens, and what changes is kept apart from what
+ * stays the same. Opened from a button that names its change, there is no
+ * list, only a sentence saying what it does.
  */
 export function EmployeeStatusActions({
   employee,
@@ -410,21 +411,19 @@ export function EmployeeStatusActions({
   const returnMinDate = formatDateKey(
     addDays(laterStart ? new Date(`${laterStart}T00:00:00`) : new Date(), 1),
   );
+  // Every other status is listed, an unavailable one disabled with its reason;
+  // only a change this surface has no handler for is left out.
   const choices = statusChoices(employee).filter(
     (option) =>
       option.action !== excludeChoice &&
       (!(option.action in handlers) || Boolean(handlers[option.action])),
   );
-  // One status to move to, or a card button that names its own change
-  // (Reinstate, Restore): a confirmation for that change alone, with no list.
+  // A button that names its own change (Reinstate, Restore, Offboard) opens a
+  // confirmation for that change alone. Change status always opens the list.
   const onlyChoice =
-    focus === "plan"
+    focus === "plan" || !initialChoice
       ? null
-      : choices.length === 1 && !excludeChoice
-        ? choices[0]
-        : initialChoice
-          ? (choices.find((option) => option.action === initialChoice) ?? null)
-          : null;
+      : (choices.find((option) => option.available && option.action === initialChoice) ?? null);
 
   // The absence only applies with a return date, so it goes when the date does.
   const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
@@ -691,7 +690,8 @@ export function EmployeeStatusActions({
                   options={choices.map((option) => ({
                     value: option.action,
                     label: option.label,
-                    detail: option.detail,
+                    detail: option.unavailableReason ?? option.detail,
+                    disabled: !option.available,
                     icon: (
                       <StatusIconCircle
                         icon={STATUS_KIND_ICONS[option.kind]}
@@ -789,8 +789,9 @@ export function EmployeeStatusActions({
 /**
  * The status card's buttons: the change most people want next (Reinstate,
  * Mark active, Restore) as a button, and a menu naming each other change
- * (Mark away, Offboard, and for someone Away, Change return date). Every one
- * opens a confirmation for that change alone. Active people get Change status.
+ * that can be made now (Mark away, Offboard, and for someone Away, Change
+ * return date). Every one opens a confirmation for that change alone. Active
+ * people get Change status, or a button named for the one change left.
  */
 export function StatusCardActions(
   props: Omit<
@@ -807,10 +808,26 @@ export function StatusCardActions(
     (action !== "suspend" || Boolean(props.onSuspend));
   const likely = suggestedStatusChoice(props.employee);
   const suggested = likely && offered(likely.action) ? likely : null;
-  if (!suggested) return <EmployeeStatusActions {...props} variant="card" focus="status" />;
-  const rest = statusChoices(props.employee).filter(
-    (option) => option.action !== suggested.action && offered(option.action),
+  const available = availableStatusChoices(props.employee).filter((option) =>
+    offered(option.action),
   );
+  if (!suggested) {
+    // One change left is the button's name; with none, the planned card's Edit plan is the way in.
+    if (available.length === 0) return null;
+    if (available.length === 1) {
+      const [only] = available;
+      return (
+        <EmployeeStatusActions
+          {...props}
+          variant="card"
+          label={describeStatusAction(only.action, "").label}
+          initialChoice={only.action}
+        />
+      );
+    }
+    return <EmployeeStatusActions {...props} variant="card" focus="status" />;
+  }
+  const rest = available.filter((option) => option.action !== suggested.action);
   const away = props.employee.status === "inactive" && !props.employee.archivedAt;
   const items: { key: string; label: string; open: MenuOpening }[] = [
     ...(away && props.onSetReturnDate
