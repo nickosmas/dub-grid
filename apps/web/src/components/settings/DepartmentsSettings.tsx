@@ -30,6 +30,7 @@ import { orderFocusAreasByDepartment } from "@/lib/focus-area-order";
 import type { DependencyInfo } from "@/features/settings/client";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
+import { Banner } from "@/components/ui/Banner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1165,27 +1166,16 @@ function DepartmentSection({
 
       {/* Error banner */}
       {(duplicateDepartmentName || duplicateFocusAreaName || error) && (
-        <div
-          style={{
-            margin: "0 16px 12px",
-            padding: 12,
-            background: "var(--dg-color-danger-bg)",
-            border: "1px solid var(--dg-color-danger-border)",
-            borderRadius: "var(--dg-radius-md)",
-            color: "var(--dg-color-danger-text)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 500,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
-        >
-          <strong>
-            {duplicateDepartmentName || duplicateFocusAreaName
-              ? "Validation Error:"
-              : "Save Error:"}
-          </strong>{" "}
-          {duplicateDepartmentName ?? duplicateFocusAreaName ?? error}
-        </div>
+        <Banner tone="danger" className="mx-4 mb-3">
+          <span className="whitespace-pre-wrap break-words">
+            <strong>
+              {duplicateDepartmentName || duplicateFocusAreaName
+                ? "Validation Error:"
+                : "Save Error:"}
+            </strong>{" "}
+            {duplicateDepartmentName ?? duplicateFocusAreaName ?? error}
+          </span>
+        </Banner>
       )}
 
       {footerActions}

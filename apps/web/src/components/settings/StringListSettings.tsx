@@ -29,6 +29,7 @@ import { getCompactNamedItemLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
+import { Banner } from "@/components/ui/Banner";
 
 export default function StringListSettings({
   label,
@@ -1100,23 +1101,12 @@ export default function StringListSettings({
       )}
 
       {(duplicateName || error) && (
-        <div
-          style={{
-            marginTop: 12,
-            padding: 12,
-            background: "var(--dg-color-danger-bg)",
-            border: "1px solid var(--dg-color-danger-border)",
-            borderRadius: "var(--dg-radius-md)",
-            color: "var(--dg-color-danger-text)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 500,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
-        >
-          <strong>{duplicateName ? "Validation Error:" : "Save Error:"}</strong>{" "}
-          {duplicateName ?? error}
-        </div>
+        <Banner tone="danger" className="mt-3">
+          <span className="whitespace-pre-wrap break-words">
+            <strong>{duplicateName ? "Validation Error:" : "Save Error:"}</strong>{" "}
+            {duplicateName ?? error}
+          </span>
+        </Banner>
       )}
 
       {footerActions}

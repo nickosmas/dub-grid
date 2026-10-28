@@ -2871,21 +2871,24 @@ button.dg-cc-sg-main {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   margin: 8px 16px;
-  background: var(--dg-color-warning-bg);
-  border: 1px solid var(--dg-color-warning-border);
-  border-radius: var(--dg-radius-md);
+  background: var(--dg-color-banner-warning-bg);
+  border: 1px solid var(--dg-color-banner-warning-border);
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--dg-color-warning-text);
+  color: var(--dg-color-banner-warning-text);
 }
-.dg-draft-banner-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dg-color-warning);
-  flex-shrink: 0;
+.dg-draft-banner--danger {
+  background: var(--dg-color-banner-danger-bg);
+  border-color: var(--dg-color-banner-danger-border);
+  color: var(--dg-color-banner-danger-text);
+}
+.dg-draft-banner--info {
+  background: var(--dg-color-banner-info-bg);
+  border-color: var(--dg-color-banner-info-border);
+  color: var(--dg-color-banner-info-text);
 }
 .dg-draft-banner-actions {
   margin-left: auto;

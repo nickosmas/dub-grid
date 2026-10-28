@@ -67,7 +67,19 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
-import { Check, ChevronLeft, ChevronRight, Clock, Trash2, User } from "lucide-react";
+import {
+  CalendarOff,
+  CalendarX2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Hourglass,
+  RefreshCw,
+  Trash2,
+  User,
+} from "lucide-react";
+import { Banner } from "@/components/ui/Banner";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
@@ -2083,19 +2095,9 @@ export default function ShiftEditPanel({
         </div>
 
         {activeAbsenceTypes.length === 0 && (
-          <div
-            style={{
-              padding: "12px 14px",
-              borderRadius: "var(--dg-radius-xl)",
-              border: "1px solid var(--dg-color-warning-border)",
-              background: "var(--dg-color-warning-bg)",
-              fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--dg-color-warning-text)",
-              lineHeight: 1.5,
-            }}
-          >
+          <Banner tone="warning" icon={CalendarOff}>
             Call off is unavailable until at least one active absence type is set up.
-          </div>
+          </Banner>
         )}
 
         {showPickupTargetOptions && onMakeAvailable && (
@@ -4784,89 +4786,34 @@ export default function ShiftEditPanel({
                 </div>
               )}
               {isOwnShift && hasActiveRequest && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: "10px 12px",
-                    background: "var(--dg-color-warning-bg)",
-                    borderRadius: "var(--dg-radius-md)",
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-warning-text)",
-                    textAlign: "center",
-                  }}
-                >
+                <Banner tone="warning" icon={Hourglass} className="mt-4">
                   A request is already active for this shift
-                </div>
+                </Banner>
               )}
               {isStale && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: "10px 12px",
-                    background: "var(--dg-color-danger-bg)",
-                    border: "1px solid var(--dg-color-danger-border)",
-                    borderRadius: "var(--dg-radius-md)",
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-danger-dark)",
-                  }}
-                >
+                <Banner tone="danger" icon={RefreshCw} className="mt-4">
                   This shift changed in another tab or by another editor. Close and reopen it before
                   saving.
-                </div>
+                </Banner>
               )}
               {overlapWarnings.length > 0 && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: "10px 12px",
-                    background: enforceConflicts
-                      ? "var(--dg-color-danger-bg)"
-                      : "var(--dg-color-warning-bg)",
-                    border: `1px solid ${enforceConflicts ? "var(--dg-color-danger-border)" : "var(--dg-color-warning-border)"}`,
-                    borderRadius: "var(--dg-radius-md)",
-                  }}
+                <Banner
+                  tone={enforceConflicts ? "danger" : "warning"}
+                  icon={CalendarX2}
+                  title={enforceConflicts ? "Conflict Blocked" : "Overlap Warning"}
+                  className="mt-4"
                 >
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-badge)",
-                      fontWeight: 700,
-                      color: enforceConflicts
-                        ? "var(--dg-color-danger-dark)"
-                        : "var(--dg-color-warning-text)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginBottom: 4,
-                    }}
-                  >
-                    {enforceConflicts ? "Conflict Blocked" : "Overlap Warning"}
-                  </div>
                   {overlapWarnings.map((w, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: enforceConflicts
-                          ? "var(--dg-color-danger-dark)"
-                          : "var(--dg-color-warning-text)",
-                        marginTop: i > 0 ? 4 : 0,
-                      }}
-                    >
+                    <span key={i} className="font-normal">
                       {w}
-                    </div>
+                    </span>
                   ))}
                   {enforceConflicts && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-text-muted)",
-                        marginTop: 6,
-                        fontStyle: "italic",
-                      }}
-                    >
+                    <span className="font-normal italic">
                       Resolve the overlap to save this shift.
-                    </div>
+                    </span>
                   )}
-                </div>
+                </Banner>
               )}
             </>
           ) : (

@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUpDown, ChevronLeft, Clock } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, Clock, Hourglass } from "lucide-react";
 
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -25,6 +25,7 @@ import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { NumericBadge } from "@/components/ui/numeric-badge";
+import { Banner } from "@/components/ui/Banner";
 import CustomSelect from "@/components/CustomSelect";
 import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
@@ -607,19 +608,9 @@ export default function ShiftRequestBoard({
         {/* A manager sees why an open swap cannot be decided yet: it is
             waiting on the person it was aimed at, not on them. */}
         {canApprove && isAwaitingRecipient(req) && req.targetName ? (
-          <div
-            role="note"
-            style={{
-              fontSize: "var(--dg-fs-footnote)",
-              color: "var(--dg-color-warning-text)",
-              background: "var(--dg-color-warning-bg)",
-              border: "1px solid var(--dg-color-warning-border)",
-              borderRadius: "var(--dg-radius-sm)",
-              padding: "6px 10px",
-            }}
-          >
+          <Banner tone="warning" icon={Hourglass}>
             {describeAwaitingRecipient(req.targetName)}
-          </div>
+          </Banner>
         ) : null}
         {/* Expiry while it can still be acted on; when it was decided once it is over */}
         <div

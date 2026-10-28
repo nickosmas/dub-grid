@@ -27,6 +27,7 @@ import {
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
 import { tintStripeCss } from "@/lib/absence-stripes";
+import { Banner } from "@/components/ui/Banner";
 
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
@@ -171,19 +172,9 @@ export default function ReadOnlyScheduleView({
       </div>
 
       {error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {error}
-        </div>
+        </Banner>
       )}
 
       {scheduleQuery.isLoading ? (

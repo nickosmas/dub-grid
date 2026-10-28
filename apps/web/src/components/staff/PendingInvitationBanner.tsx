@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Mail, MailX } from "lucide-react";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Banner } from "@/components/ui/Banner";
 import type { Invitation } from "@/types";
 import { INVITATION_ACTION_COPY } from "./useInvitationActionConfirm";
 
@@ -62,92 +64,46 @@ export function PendingInvitationBanner({
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          background: "var(--dg-color-warning-bg)",
-          border: "1px solid var(--dg-color-warning-border)",
-          borderRadius: "var(--dg-radius-lg)",
-          padding: "10px 14px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--dg-color-warning-text)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ flexShrink: 0 }}
-          >
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
-          </svg>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                color: "var(--dg-color-warning-text)",
-              }}
-            >
-              {expired ? "Invitation expired" : "Invitation pending"}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-warning-text)",
-                marginTop: 1,
-              }}
-            >
-              Sent to {pendingInvitation.email}
-            </div>
-            <div
-              className="dg-tabular-nums"
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-warning-text)",
-                marginTop: 1,
-              }}
-            >
-              Sent {formatInvitationTime(pendingInvitation.createdAt)}.{" "}
-              {expired ? "Expired" : "Expires"} {formatInvitationTime(pendingInvitation.expiresAt)}.
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {onReinvite && (
+      <Banner
+        tone="warning"
+        icon={expired ? MailX : Mail}
+        title={expired ? "Invitation expired" : "Invitation pending"}
+        action={
+          <div className="flex gap-1.5">
+            {onReinvite && (
+              <Button
+                disabled={isInSandbox}
+                onClick={() => setPendingAction("reinvite")}
+                className="dg-btn dg-btn-secondary dg-btn-xs"
+                title={
+                  isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
+                }
+              >
+                Reinvite
+              </Button>
+            )}
             <Button
               disabled={isInSandbox}
-              onClick={() => setPendingAction("reinvite")}
-              className="dg-btn dg-btn-ghost dg-btn-xs"
-              style={{ color: "var(--dg-color-link)" }}
+              onClick={() => setPendingAction("revoke")}
+              className="dg-btn dg-btn-secondary dg-btn-xs"
               title={
-                isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
+                isInSandbox ? "Revoking invitations isn't available in sandbox mode." : undefined
               }
             >
-              Reinvite
+              Revoke
             </Button>
-          )}
-          <Button
-            disabled={isInSandbox}
-            onClick={() => setPendingAction("revoke")}
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ color: "var(--dg-color-danger)" }}
-            title={
-              isInSandbox ? "Revoking invitations isn't available in sandbox mode." : undefined
-            }
-          >
-            Revoke
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      >
+        <span className="font-normal">
+          Sent to {pendingInvitation.email}
+          <br />
+          <span className="dg-tabular-nums">
+            Sent {formatInvitationTime(pendingInvitation.createdAt)}.{" "}
+            {expired ? "Expired" : "Expires"} {formatInvitationTime(pendingInvitation.expiresAt)}.
+          </span>
+        </span>
+      </Banner>
       {pendingAction && (
         <ConfirmDialog
           title={copy.title(pendingInvitation.email)}

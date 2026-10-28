@@ -23,6 +23,7 @@ import { ActivityEmptyPeriod } from "@/components/activity/ActivityEmptyPeriod";
 import { PeriodNavigator } from "@/components/activity/PeriodNavigator";
 import { useActivityPeriod } from "@/components/activity/useActivityPeriod";
 import type { FullAuditLogEntry } from "@/types";
+import { Banner } from "@/components/ui/Banner";
 
 const PAGE_SIZE = 100;
 
@@ -222,12 +223,9 @@ export default function AuditLogView({
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          className="mb-4 rounded-[var(--dg-radius-lg)] bg-[var(--dg-color-danger-bg)] px-4 py-3 text-[length:var(--dg-fs-label)] font-semibold text-[var(--dg-color-danger)]"
-        >
+        <Banner tone="danger" role="alert" className="mb-4">
           {error}
-        </p>
+        </Banner>
       ) : auditQuery.isPending ? (
         <ActivitySkeleton rows={8} />
       ) : entries.length === 0 ? (

@@ -3,6 +3,8 @@
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Banner } from "@/components/ui/Banner";
+import { ShieldAlert } from "lucide-react";
 
 export interface ReviewChange {
   key: string;
@@ -50,19 +52,9 @@ export default function ChangeReviewModal({
         </p>
 
         {hasSensitiveChanges ? (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--dg-color-warning-border)",
-              background: "var(--dg-color-warning-bg)",
-              color: "var(--dg-color-warning-text)",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
-            }}
-          >
+          <Banner tone="warning" icon={ShieldAlert}>
             {warningText ?? "This save includes sensitive changes."}
-          </div>
+          </Banner>
         ) : null}
 
         <div

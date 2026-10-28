@@ -1321,7 +1321,6 @@ export default function PersonDetailScreen() {
       {!editing && invitationBanner ? (
         <StatusBanner
           body={invitationBanner.body}
-          bordered={false}
           title={invitationBanner.title}
           tone={invitationBanner.tone}
         />

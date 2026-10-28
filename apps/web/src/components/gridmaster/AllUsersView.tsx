@@ -24,6 +24,7 @@ import GridmasterPersonView from "@/components/gridmaster/person/GridmasterPerso
 import { StaffWithoutAccountSearch } from "@/components/gridmaster/person/StaffWithoutAccountSearch";
 import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
 import { formatDateTimeLabel } from "@/lib/client-facing";
+import { Banner } from "@/components/ui/Banner";
 
 function RoleBadge({ role }: { role: string }) {
   const { resolvedTheme } = useTheme();
@@ -187,22 +188,12 @@ export default function AllUsersView({
       </h2>
 
       {usersQuery.error instanceof Error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {formatClientErrorMessage(
             usersQuery.error,
             "We couldn't load users. Refresh and try again.",
           )}
-        </div>
+        </Banner>
       )}
 
       {/* Toolbar */}

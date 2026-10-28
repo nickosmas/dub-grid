@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { useTheme } from "next-themes";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
@@ -32,6 +32,7 @@ import { addDays, cn } from "@/lib/utils";
 import { generateSeriesDates } from "@/lib/series-dates";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Banner } from "@/components/ui/Banner";
 import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -822,43 +823,30 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
 
       {/* Preview summary */}
       {preview.total > 0 && (
-        <div
-          style={{
-            marginTop: 8,
-            padding: "10px 12px",
-            borderRadius: "var(--dg-radius-md)",
-            background:
-              preview.overwrites > 0 ? "var(--dg-color-warning-bg)" : "var(--dg-color-success-bg)",
-            border: `1px solid ${preview.overwrites > 0 ? "var(--dg-color-warning)" : "var(--dg-color-info-border)"}`,
-            fontSize: "var(--dg-fs-caption)",
-            lineHeight: 1.5,
-            color: "var(--dg-color-text-secondary)",
-          }}
+        <Banner
+          tone={preview.overwrites > 0 ? "warning" : "success"}
+          icon={Repeat}
+          className="mt-2"
         >
           <div style={{ fontWeight: 600 }}>
             {preview.total} {isAbsence ? "absence" : "shift"}
             {preview.total === 1 ? "" : "s"} {editing ? "in the series" : "will be created"}
-            {endType === "never" && (
-              <span style={{ fontWeight: 400, color: "var(--dg-color-text-subtle)" }}>
-                {" "}
-                (6-month max)
-              </span>
-            )}
+            {endType === "never" && <span style={{ fontWeight: 400 }}> (6-month max)</span>}
           </div>
-          {patternChange && <div style={{ marginTop: 4 }}>{patternChangeText(patternChange)}</div>}
+          {patternChange && <div>{patternChangeText(patternChange)}</div>}
           {isCapped && (
-            <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
+            <div>
               Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date
               range or &ldquo;After N occurrences&rdquo; for more control.
             </div>
           )}
           {preview.overwrites > 0 && (
-            <div style={{ marginTop: 4, color: "var(--dg-color-warning-text)", fontWeight: 500 }}>
+            <div>
               {overwriteCountText(preview.overwrites)} You can replace or keep{" "}
               {preview.overwrites === 1 ? "it" : "them"}.
             </div>
           )}
-        </div>
+        </Banner>
       )}
 
       {overwritePrompt && (

@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SectionNotice } from "@/components/ui/SectionNotice";
+import { Banner } from "@/components/ui/Banner";
+import { FlaskConical } from "lucide-react";
 import CustomSelect from "@/components/CustomSelect";
 import type {
   AssignableOrganizationRole,
@@ -446,20 +448,10 @@ export const EmployeeManagementAccessEditor = forwardRef<
         </div>
 
         {isInSandbox && (
-          <p
-            style={{
-              color: "var(--dg-color-info-text)",
-              fontSize: "var(--dg-fs-body-sm)",
-              margin: 0,
-              padding: "8px 12px",
-              background: "var(--dg-color-info-bg)",
-              border: "1px solid var(--dg-color-info-border)",
-              borderRadius: "var(--dg-radius-md)",
-            }}
-          >
+          <Banner tone="info" icon={FlaskConical}>
             Granting management access isn't available in sandbox mode. Exit the sandbox to update
             access on your real organization.
-          </p>
+          </Banner>
         )}
 
         {!hideActions && (

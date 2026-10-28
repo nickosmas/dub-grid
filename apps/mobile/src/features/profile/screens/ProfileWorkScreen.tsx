@@ -565,7 +565,11 @@ export default function ProfileWorkScreen() {
       ) : (
         <>
           {profile.pendingProfileChangeRequest ? (
-            <StatusBanner body={PENDING_PROFILE_CHANGE_MESSAGE} title="Request pending" />
+            <StatusBanner
+              body={PENDING_PROFILE_CHANGE_MESSAGE}
+              title="Request pending"
+              tone="warning"
+            />
           ) : null}
 
           {/* No organization block here. This page is the account and staff

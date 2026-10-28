@@ -2,7 +2,14 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  FileWarning,
+  Import as ImportIcon,
+  UserSearch,
+  XCircle,
+} from "lucide-react";
+import { Banner } from "@/components/ui/Banner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
@@ -615,19 +622,7 @@ export function BulkImportModal({
               {(blockedCount > 0 || warningCount > 0) && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                   {blockedCount > 0 && (
-                    <div
-                      style={{
-                        padding: 12,
-                        background: "var(--dg-color-danger-bg)",
-                        border: "1px solid var(--dg-color-danger-border)",
-                        borderRadius: "var(--dg-radius-md)",
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-danger-text)",
-                        display: "flex",
-                        gap: 8,
-                      }}
-                    >
-                      <XCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <Banner tone="danger" icon={XCircle}>
                       <div>
                         <div>
                           {importableCount} of {rows.length} row{rows.length !== 1 ? "s" : ""} will
@@ -647,47 +642,22 @@ export function BulkImportModal({
                           </ul>
                         )}
                       </div>
-                    </div>
+                    </Banner>
                   )}
                   {warningCount > 0 && (
-                    <div
-                      style={{
-                        padding: 12,
-                        background: "var(--dg-color-warning-bg)",
-                        border: "1px solid var(--dg-color-warning-border)",
-                        borderRadius: "var(--dg-radius-md)",
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-warning-text)",
-                        display: "flex",
-                        gap: 8,
-                      }}
-                    >
-                      <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <Banner tone="warning" icon={UserSearch}>
                       <div>
                         {warningCount} row{warningCount !== 1 ? "s" : ""}{" "}
                         {warningCount !== 1 ? "look" : "looks"} similar to existing employees —
                         review before importing.
                       </div>
-                    </div>
+                    </Banner>
                   )}
                 </div>
               )}
 
               {parseErrors.length > 0 && (
-                <div
-                  style={{
-                    padding: 12,
-                    background: "var(--dg-color-warning-bg)",
-                    border: "1px solid var(--dg-color-warning-border)",
-                    borderRadius: "var(--dg-radius-md)",
-                    marginBottom: 16,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-warning-text)",
-                    display: "flex",
-                    gap: 8,
-                  }}
-                >
-                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                <Banner tone="warning" icon={FileWarning} className="mb-4">
                   <div>
                     <strong>{parseErrors.length} warning(s):</strong>
                     <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
@@ -697,7 +667,7 @@ export function BulkImportModal({
                       {parseErrors.length > 5 && <li>...and {parseErrors.length - 5} more</li>}
                     </ul>
                   </div>
-                </div>
+                </Banner>
               )}
 
               <div
@@ -842,43 +812,13 @@ export function BulkImportModal({
 
           {step === "result" && result && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: 16,
-                  background:
-                    result.inserted > 0
-                      ? "var(--dg-color-success-bg)"
-                      : "var(--dg-color-danger-bg)",
-                  border: `1px solid ${result.inserted > 0 ? "var(--dg-color-success-border)" : "var(--dg-color-danger-border)"}`,
-                  borderRadius: "var(--dg-radius-lg)",
-                }}
-              >
-                {result.inserted > 0 ? (
-                  <CheckCircle
-                    size={24}
-                    style={{ flexShrink: 0, color: "var(--dg-color-success-text)" }}
-                  />
-                ) : (
-                  <AlertTriangle
-                    size={24}
-                    style={{ flexShrink: 0, color: "var(--dg-color-danger)" }}
-                  />
-                )}
+              <Banner tone={result.inserted > 0 ? "success" : "danger"}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: "var(--dg-fs-body)" }}>
                     {result.inserted} of {result.total} employees imported
                   </div>
                   {(result.errors.length > 0 || skippedDuplicates > 0) && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-text-muted)",
-                        marginTop: 2,
-                      }}
-                    >
+                    <div style={{ fontWeight: 400, marginTop: 2 }}>
                       {result.errors.length > 0 && `${result.errors.length} error(s)`}
                       {result.errors.length > 0 && skippedDuplicates > 0 && " · "}
                       {skippedDuplicates > 0 &&
@@ -886,19 +826,10 @@ export function BulkImportModal({
                     </div>
                   )}
                 </div>
-              </div>
+              </Banner>
 
               {result.errors.length > 0 && (
-                <div
-                  style={{
-                    padding: 12,
-                    background: "var(--dg-color-danger-bg)",
-                    border: "1px solid var(--dg-color-danger-border)",
-                    borderRadius: "var(--dg-radius-md)",
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-danger-text)",
-                  }}
-                >
+                <Banner tone="danger">
                   <strong>Errors:</strong>
                   <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
                     {result.errors.slice(0, 10).map((e) => (
@@ -908,7 +839,7 @@ export function BulkImportModal({
                     ))}
                     {result.errors.length > 10 && <li>...and {result.errors.length - 10} more</li>}
                   </ul>
-                </div>
+                </Banner>
               )}
             </div>
           )}

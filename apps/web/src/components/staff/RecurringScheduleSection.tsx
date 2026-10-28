@@ -1,5 +1,5 @@
 "use client";
-import { Search } from "lucide-react";
+import { PencilLine, Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -16,6 +16,7 @@ import {
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Banner } from "@/components/ui/Banner";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
@@ -1034,9 +1035,9 @@ export function RecurringScheduleSection({
             position: "sticky",
             top: 0,
             zIndex: 20,
-            background: "var(--dg-color-info-bg)",
-            border: "1px solid var(--dg-color-info-border)",
-            borderRadius: "var(--dg-radius-lg)",
+            background: "var(--dg-color-banner-info-bg)",
+            border: "1px solid var(--dg-color-banner-info-border)",
+            borderRadius: 10,
             padding: isMobile ? "10px 12px" : "10px 20px",
             display: "flex",
             alignItems: "center",
@@ -1047,13 +1048,13 @@ export function RecurringScheduleSection({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="dg-draft-banner-dot" />
+            <PencilLine size={16} color="var(--dg-color-banner-info-text)" aria-hidden="true" />
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--dg-color-info-text)",
+                  color: "var(--dg-color-banner-info-text)",
                 }}
               >
                 {dirtyCount} unsaved change{dirtyCount !== 1 ? "s" : ""}
@@ -1062,8 +1063,7 @@ export function RecurringScheduleSection({
                 <span
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-info)",
-                    opacity: 0.75,
+                    color: "var(--dg-color-banner-info-text)",
                   }}
                 >
                   Draft saved {formatDateTimeLabel(savedDraftTimestamp)}
@@ -1489,17 +1489,9 @@ export function RecurringScheduleSection({
           })}
 
           {error && (
-            <div
-              style={{
-                padding: "10px 20px",
-                background: "var(--dg-color-danger-bg)",
-                borderTop: "1px solid var(--dg-color-danger-border)",
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-danger)",
-              }}
-            >
+            <Banner tone="danger" className="mx-5 my-2.5">
               {error}
-            </div>
+            </Banner>
           )}
         </div>
       )}

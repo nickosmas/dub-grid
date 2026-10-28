@@ -12,7 +12,7 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
-import { Check, Trash2, X } from "lucide-react";
+import { Check, Clock, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
 import DeleteAccountCard from "@/components/account/DeleteAccountCard";
@@ -60,6 +60,7 @@ import type {
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Banner } from "@/components/ui/Banner";
 
 interface ProfilePanelProps {
   user: User | null;
@@ -953,19 +954,24 @@ export function ProfilePanel({
             </div>
 
             {pendingNameRequest && (
-              <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-warning-border)] bg-[var(--dg-color-warning-bg)] p-3 text-[13px] text-[var(--dg-color-warning-text)]">
+              <Banner
+                tone="warning"
+                icon={Clock}
+                action={
+                  <Button
+                    type="button"
+                    onClick={() => cancelRequest(pendingNameRequest)}
+                    disabled={cancellingId === pendingNameRequest.id}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
+                      Cancel request
+                    </ButtonLoading>
+                  </Button>
+                }
+              >
                 A name change request is pending admin review.
-                <Button
-                  type="button"
-                  onClick={() => cancelRequest(pendingNameRequest)}
-                  disabled={cancellingId === pendingNameRequest.id}
-                  className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
-                >
-                  <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
-                    Cancel request
-                  </ButtonLoading>
-                </Button>
-              </div>
+              </Banner>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1060,19 +1066,24 @@ export function ProfilePanel({
               </p>
             </div>
             {pendingDeletion ? (
-              <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-warning-border)] bg-[var(--dg-color-warning-bg)] p-3 text-[13px] text-[var(--dg-color-warning-text)]">
+              <Banner
+                tone="warning"
+                icon={Clock}
+                action={
+                  <Button
+                    type="button"
+                    onClick={() => cancelRequest(pendingDeletion)}
+                    disabled={cancellingId === pendingDeletion.id}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    <ButtonLoading loading={cancellingId === pendingDeletion.id}>
+                      Cancel request
+                    </ButtonLoading>
+                  </Button>
+                }
+              >
                 Account deletion request pending admin review.
-                <Button
-                  type="button"
-                  onClick={() => cancelRequest(pendingDeletion)}
-                  disabled={cancellingId === pendingDeletion.id}
-                  className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
-                >
-                  <ButtonLoading loading={cancellingId === pendingDeletion.id}>
-                    Cancel request
-                  </ButtonLoading>
-                </Button>
-              </div>
+              </Banner>
             ) : (
               <Button
                 type="button"

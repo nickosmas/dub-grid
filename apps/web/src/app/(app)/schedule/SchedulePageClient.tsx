@@ -67,7 +67,7 @@ import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingM
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
-import { X } from "lucide-react";
+import { CalendarCheck, CalendarRange, Trash2, Unplug, X } from "lucide-react";
 
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
   ssr: false,
@@ -8236,7 +8236,7 @@ function SchedulerContent({
           >
             {isSessionEnded && (
               <div className="dg-draft-banner no-print" role="status">
-                <div className="dg-draft-banner-dot" />
+                <Unplug size={16} className="shrink-0" aria-hidden="true" />
                 <strong>Schedule session ended</strong>
                 <span>
                   This tab is read-only. Any unsaved schedule changes here were not saved.
@@ -8260,26 +8260,10 @@ function SchedulerContent({
               />
             )}
             {isBulkDeleteMode && (
-              <div
-                className="dg-draft-banner no-print"
-                style={{
-                  background: "var(--dg-color-danger-bg)",
-                  borderColor: "var(--dg-color-danger-border)",
-                  color: "var(--dg-color-danger-text)",
-                }}
-              >
-                <div
-                  className="dg-draft-banner-dot"
-                  style={{ background: "var(--dg-color-danger)" }}
-                />
+              <div className="dg-draft-banner dg-draft-banner--danger no-print">
+                <Trash2 size={16} className="shrink-0" aria-hidden="true" />
                 <span style={{ fontWeight: 700 }}>Bulk delete</span>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-danger-text)",
-                    marginLeft: 4,
-                  }}
-                >
+                <span style={{ fontSize: "var(--dg-fs-caption)", marginLeft: 4 }}>
                   {`${bulkDeleteSelectedKeys.size} selected of ${visibleBulkDeleteTargets.length} removable visible entr${visibleBulkDeleteTargets.length === 1 ? "y" : "ies"}`}
                   {offscreenBulkDeleteCount > 0
                     ? ` (${offscreenBulkDeleteCount} in another period, not removed from here)`
@@ -8347,19 +8331,10 @@ function SchedulerContent({
               outOfWindowDraftGroups.length > 0 &&
               !outOfWindowDraftsDismissed && (
                 <div
-                  className="dg-draft-banner no-print"
+                  className="dg-draft-banner dg-draft-banner--info no-print"
                   data-tour="draft-banner-other-weeks"
-                  style={{
-                    background: "var(--dg-color-info-bg)",
-                    borderColor: "var(--dg-color-info-border)",
-                    color: "var(--dg-color-info-text)",
-                    flexWrap: "wrap",
-                  }}
                 >
-                  <div
-                    className="dg-draft-banner-dot"
-                    style={{ background: "var(--dg-color-info-text)" }}
-                  />
+                  <CalendarRange size={16} className="shrink-0" aria-hidden="true" />
                   <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
                   <span>
                     {(() => {
@@ -8437,19 +8412,8 @@ function SchedulerContent({
                 const noun =
                   spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
-                  <div
-                    className="dg-draft-banner no-print"
-                    style={{
-                      background: "var(--dg-color-info-bg)",
-                      borderColor: "var(--dg-color-info-border)",
-                      color: "var(--dg-color-info-text)",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div
-                      className="dg-draft-banner-dot"
-                      style={{ background: "var(--dg-color-info-text)" }}
-                    />
+                  <div className="dg-draft-banner dg-draft-banner--info no-print">
+                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span>
                       {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
@@ -8510,18 +8474,8 @@ function SchedulerContent({
               (() => {
                 const latest = inWindowPublishHistory[0];
                 return (
-                  <div
-                    className="dg-draft-banner no-print"
-                    style={{
-                      background: "var(--dg-color-info-bg)",
-                      borderColor: "var(--dg-color-info-border)",
-                      color: "var(--dg-color-info-text)",
-                    }}
-                  >
-                    <div
-                      className="dg-draft-banner-dot"
-                      style={{ background: "var(--dg-color-primary)" }}
-                    />
+                  <div className="dg-draft-banner dg-draft-banner--info no-print">
+                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
                     <span style={{ fontWeight: 600 }}>
                       Published{" "}
                       {(() => {

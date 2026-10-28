@@ -169,7 +169,11 @@ export default function ProfileSecurityScreen() {
       ) : profileQuery.data ? (
         <>
           {profileQuery.data.pendingAccountDeletionRequest ? (
-            <StatusBanner body={PENDING_ACCOUNT_DELETION_MESSAGE} title="Request pending" />
+            <StatusBanner
+              body={PENDING_ACCOUNT_DELETION_MESSAGE}
+              title="Request pending"
+              tone="warning"
+            />
           ) : null}
 
           <ProfileSection title="Sign-in">

@@ -1,6 +1,7 @@
 "use client";
 
-import { Repeat } from "lucide-react";
+import { CalendarCog, Repeat } from "lucide-react";
+import { Banner } from "@/components/ui/Banner";
 import type { ShiftSeriesPattern } from "@/types";
 import {
   buildSeriesCalendar,
@@ -164,36 +165,12 @@ export function SeriesSummaryCard({
       />
 
       {changedHere ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 8,
-            padding: "10px 12px",
-            borderRadius: "var(--dg-radius-md)",
-            background: "var(--dg-color-warning-bg)",
-            border: "1px solid var(--dg-color-warning-border)",
-            color: "var(--dg-color-warning-text)",
-            fontSize: "var(--dg-fs-caption)",
-            lineHeight: 1.45,
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              background: "var(--dg-color-warning-text)",
-              marginTop: 6,
-              flexShrink: 0,
-            }}
-          />
+        <Banner tone="warning" icon={CalendarCog}>
           <span>
             Changed on this day only.
             {seriesItemText ? ` The series is ${seriesItemText}.` : null}
           </span>
-        </div>
+        </Banner>
       ) : null}
 
       <div

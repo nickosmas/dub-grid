@@ -15,6 +15,8 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { Banner } from "@/components/ui/Banner";
+import { FlaskConical, UserCheck } from "lucide-react";
 import {
   createOrganizationInvitation,
   checkUserExistsByEmail,
@@ -405,47 +407,33 @@ export default function InviteEmployeeModal({
                 </div>
               )}
               {!fieldErrors.email && !emailLookupLoading && emailLookup?.existsInThisOrg && (
-                <div
-                  role="alert"
-                  style={{
-                    marginTop: 8,
-                    padding: "8px 12px",
-                    borderRadius: "var(--dg-radius-sm)",
-                    background: "var(--dg-color-danger-bg)",
-                    color: "var(--dg-color-danger-text)",
-                    fontSize: "var(--dg-fs-footnote)",
-                  }}
-                >
-                  <strong>{emailLookup.displayName ?? trimmedEmail}</strong> is already on your
-                  team. Find them in the People list to update their record instead of inviting
-                  again.
-                </div>
+                <Banner tone="danger" role="alert" className="mt-2">
+                  <span>
+                    <strong>{emailLookup.displayName ?? trimmedEmail}</strong> is already on your
+                    team. Find them in the People list to update their record instead of inviting
+                    again.
+                  </span>
+                </Banner>
               )}
               {!fieldErrors.email &&
                 !emailLookupLoading &&
                 emailLookup?.exists &&
                 !emailLookup.existsInThisOrg && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      padding: "8px 12px",
-                      borderRadius: "var(--dg-radius-sm)",
-                      background: "var(--dg-color-info-bg)",
-                      color: "var(--dg-color-info-text)",
-                      fontSize: "var(--dg-fs-footnote)",
-                    }}
-                  >
-                    <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a DubGrid
-                    account. They&apos;ll join your organization when they accept the invite
-                    {emailLookup.displayName ? (
-                      <>
-                        {", and your roster will show their name as "}
-                        <strong>{emailLookup.displayName}</strong>.
-                      </>
-                    ) : (
-                      <>.</>
-                    )}
-                  </div>
+                  <Banner tone="info" icon={UserCheck} className="mt-2">
+                    <span>
+                      <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a
+                      DubGrid account. They&apos;ll join your organization when they accept the
+                      invite
+                      {emailLookup.displayName ? (
+                        <>
+                          {", and your roster will show their name as "}
+                          <strong>{emailLookup.displayName}</strong>.
+                        </>
+                      ) : (
+                        <>.</>
+                      )}
+                    </span>
+                  </Banner>
                 )}
             </div>
           ) : !trimmedEmail ? (
@@ -565,11 +553,14 @@ export default function InviteEmployeeModal({
 
           {/* Sandbox notice */}
           {isInSandbox && (
-            <SandboxNotice message="Sending invitations isn't available in sandbox mode. Exit the sandbox to invite people to your real organization." />
+            <Banner tone="info" icon={FlaskConical}>
+              Sending invitations isn&apos;t available in sandbox mode. Exit the sandbox to invite
+              people to your real organization.
+            </Banner>
           )}
 
           {/* Error */}
-          {error && <ErrorBanner message={error} />}
+          {error && <Banner tone="danger">{error}</Banner>}
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
@@ -592,41 +583,6 @@ export default function InviteEmployeeModal({
       {unsavedChangesDialog}
       {stepUp.dialog}
     </>
-  );
-}
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <p
-      style={{
-        color: "var(--dg-color-danger-dark)",
-        fontSize: "var(--dg-fs-body-sm)",
-        margin: 0,
-        padding: "8px 12px",
-        background: "var(--dg-color-danger-bg)",
-        borderRadius: "var(--dg-radius-md)",
-      }}
-    >
-      {message}
-    </p>
-  );
-}
-
-function SandboxNotice({ message }: { message: string }) {
-  return (
-    <p
-      style={{
-        color: "var(--dg-color-info-text)",
-        fontSize: "var(--dg-fs-body-sm)",
-        margin: 0,
-        padding: "8px 12px",
-        background: "var(--dg-color-info-bg)",
-        border: "1px solid var(--dg-color-info-border)",
-        borderRadius: "var(--dg-radius-md)",
-      }}
-    >
-      {message}
-    </p>
   );
 }
 

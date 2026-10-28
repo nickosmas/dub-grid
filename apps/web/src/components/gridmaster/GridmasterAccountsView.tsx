@@ -37,6 +37,7 @@ import {
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
 import { formatDateTimeLabel } from "@/lib/client-facing";
+import { Banner } from "@/components/ui/Banner";
 
 function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
   if (!deactivatedAt) return null;
@@ -284,22 +285,12 @@ export default function GridmasterAccountsView({
       </h2>
 
       {accountsQuery.error instanceof Error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {formatClientErrorMessage(
             accountsQuery.error,
             "We couldn't load gridmaster accounts. Refresh and try again.",
           )}
-        </div>
+        </Banner>
       )}
 
       <Form

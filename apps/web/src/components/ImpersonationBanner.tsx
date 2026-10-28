@@ -1,5 +1,5 @@
 "use client";
-import { User } from "lucide-react";
+import { VenetianMask } from "lucide-react";
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,8 +15,7 @@ import { markAuthTransition } from "@/lib/auth-transition";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-
-const BANNER_HEIGHT = 40;
+import { Banner } from "@/components/ui/Banner";
 
 export default function ImpersonationBanner() {
   const queryClient = useQueryClient();
@@ -92,72 +91,34 @@ export default function ImpersonationBanner() {
   if (!imp) return null;
 
   return (
-    <div
-      style={{
-        height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, var(--dg-color-danger), var(--dg-color-danger-dark))",
-        color: "var(--dg-color-text-inverse)",
-        padding: "0 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 16,
-        fontSize: "var(--dg-fs-label, 13px)",
-        fontWeight: 600,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-      }}
+    <Banner
+      icon={VenetianMask}
+      layout="bar"
+      tone="danger"
+      action={
+        <span className="flex items-center gap-3">
+          {countdown && <span className="dg-tabular-nums font-semibold">{countdown}</span>}
+          <Button
+            onClick={handleEnd}
+            disabled={ending}
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+          >
+            <ButtonLoading loading={ending}>End Session</ButtonLoading>
+          </Button>
+        </span>
+      }
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <User size={16} strokeWidth={2.5} />
+      <span>
         Viewing <strong>{imp.targetOrgName || "organization"}</strong> as{" "}
         {formatOrganizationRoleLabel(imp.targetOrgRole).toLowerCase()} ({imp.targetEmail})
         {imp.justification && (
           <MaybeHint content={imp.justification} side="bottom">
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote, 11px)",
-                maxWidth: 300,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span className="ml-1 inline-block max-w-[300px] truncate align-bottom text-[length:var(--dg-fs-footnote)]">
               — {imp.justification}
             </span>
           </MaybeHint>
         )}
       </span>
-      {countdown && (
-        <span
-          style={{
-            fontFamily: "var(--font-dm-mono, monospace)",
-            background: "rgba(0,0,0,0.2)",
-            borderRadius: "var(--dg-radius-sm)",
-            padding: "2px 8px",
-            fontSize: "var(--dg-fs-caption, 12px)",
-          }}
-        >
-          {countdown}
-        </span>
-      )}
-      <Button
-        onClick={handleEnd}
-        disabled={ending}
-        style={{
-          background: "rgba(255,255,255,0.2)",
-          color: "var(--dg-color-text-inverse)",
-          border: "1px solid rgba(255,255,255,0.4)",
-          borderRadius: "var(--dg-radius-sm)",
-          padding: "4px 12px",
-          fontSize: "var(--dg-fs-caption, 12px)",
-          fontWeight: 700,
-          cursor: ending ? "not-allowed" : "pointer",
-          opacity: ending ? 0.6 : 1,
-          fontFamily: "inherit",
-        }}
-      >
-        <ButtonLoading loading={ending}>End Session</ButtonLoading>
-      </Button>
-    </div>
+    </Banner>
   );
 }

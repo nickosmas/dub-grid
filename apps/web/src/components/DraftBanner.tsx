@@ -1,5 +1,6 @@
 "use client";
 
+import { FilePen } from "lucide-react";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -38,8 +39,7 @@ export default function DraftBanner({
 
   return (
     <div className="dg-draft-banner no-print" data-tour="draft-banner">
-      {/* A title, where a bare amber dot used to sit: the banner is already
-          amber and bordered, so the dot said nothing the banner hadn't. */}
+      <FilePen size={16} className="shrink-0" aria-hidden="true" />
       <span style={{ fontWeight: 700 }}>Draft changes</span>
       {/* Every draft change is highlighted on the grid, with no toggle to
           switch that off, so these counts are also the key for what is

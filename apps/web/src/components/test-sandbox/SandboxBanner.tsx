@@ -11,6 +11,8 @@ import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
+import { Banner } from "@/components/ui/Banner";
+import { FlaskConical } from "lucide-react";
 
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
@@ -75,83 +77,40 @@ export default function SandboxBanner() {
           label={pendingAction === "exit" ? "Leaving sandbox" : "Resetting sandbox"}
         />
       ) : null}
-      <div
+      <Banner
+        tone="danger"
+        layout="bar"
+        icon={FlaskConical}
         role="status"
         aria-label="You're in sandbox mode"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          padding: "8px 16px",
-          background: "var(--dg-color-danger)",
-          borderBottom: "1px solid var(--dg-color-danger-dark)",
-          color: "var(--dg-color-text-inverse)",
-          fontSize: "var(--dg-fs-caption)",
-          fontWeight: 600,
-        }}
+        className="flex-wrap"
+        action={
+          <div className="flex items-center gap-2">
+            {error ? <span>{error}</span> : null}
+            <Button
+              type="button"
+              onClick={handleReset}
+              disabled={pendingAction != null}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              title="Discard all sandbox changes and start over with a fresh clone of your organization."
+            >
+              <ButtonLoading loading={pendingAction === "reset"}>Reset sandbox</ButtonLoading>
+            </Button>
+            <Button
+              type="button"
+              onClick={handleExit}
+              disabled={pendingAction != null}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              <ButtonLoading loading={pendingAction === "exit"}>Exit sandbox</ButtonLoading>
+            </Button>
+          </div>
+        }
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span
-            aria-hidden="true"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 18,
-              height: 18,
-              borderRadius: 9,
-              border: "1.5px solid currentColor",
-              fontSize: "var(--dg-type-badge-size)",
-              lineHeight: 1,
-              flexShrink: 0,
-            }}
-          >
-            !
-          </span>
-          <span
-            style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real organization.
-          </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {error ? <span style={{ fontWeight: 500 }}>{error}</span> : null}
-          <Button
-            type="button"
-            onClick={handleReset}
-            disabled={pendingAction != null}
-            className="dg-btn dg-btn-on-danger-outline"
-            title="Discard all sandbox changes and start over with a fresh clone of your organization."
-            style={{
-              minHeight: 28,
-              padding: "0 10px",
-              fontSize: "var(--dg-fs-caption)",
-            }}
-          >
-            <ButtonLoading loading={pendingAction === "reset"}>Reset sandbox</ButtonLoading>
-          </Button>
-          <Button
-            type="button"
-            onClick={handleExit}
-            disabled={pendingAction != null}
-            className="dg-btn dg-btn-on-danger-solid"
-            style={{
-              minHeight: 28,
-              padding: "0 10px",
-              fontSize: "var(--dg-fs-caption)",
-            }}
-          >
-            <ButtonLoading loading={pendingAction === "exit"}>Exit sandbox</ButtonLoading>
-          </Button>
-        </div>
-      </div>
+        <span className="truncate">
+          You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real organization.
+        </span>
+      </Banner>
     </>
   );
 }
