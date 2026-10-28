@@ -87,7 +87,14 @@ function RunBarLabel({ children }: { children: string }) {
  * across the stretch, with no count, naming the absence the days hold (51f). The days can't be scheduled, so their
  * cells hold nothing else.
  */
-export function AwayRunBar(props: RunBarFrame & { runIndex: number; absenceName?: string | null }) {
+export function AwayRunBar(
+  props: RunBarFrame & {
+    runIndex: number;
+    absenceName?: string | null;
+    /** In place of the Away label, as "Offboarded" after a last day (51g2). */
+    label?: string;
+  },
+) {
   return (
     <div
       className="dg-away-run"
@@ -100,7 +107,7 @@ export function AwayRunBar(props: RunBarFrame & { runIndex: number; absenceName?
         color: "var(--dg-color-text-secondary)",
       }}
     >
-      <RunBarLabel>{awayRunLabel(props.absenceName ?? null)}</RunBarLabel>
+      <RunBarLabel>{props.label ?? awayRunLabel(props.absenceName ?? null)}</RunBarLabel>
     </div>
   );
 }

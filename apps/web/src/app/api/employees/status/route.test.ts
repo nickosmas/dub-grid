@@ -679,6 +679,120 @@ describe("POST /api/employees/status", () => {
       },
     );
 
+    it("sets a last day without offboarding them now (51g2)", async () => {
+      arrange("active", null, null, { user_id: "55555555-5555-4555-8555-555555555555" });
+      targetMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
+
+      const response = await post({ action: "remove", lastDay: TODAY, note: "Moving" });
+
+      expect(response.status).toBe(200);
+      const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+      expect(update).toMatchObject({
+        planned_status: "removed",
+        planned_from: "2026-10-27",
+        planned_until: null,
+        planned_absence_type_id: null,
+        planned_note: "Moving",
+        planned_by: USER_ID,
+      });
+      expect(update).not.toHaveProperty("status");
+      expect(update).not.toHaveProperty("archived_at");
+      expect(update).not.toHaveProperty("status_changed_at");
+      expect(revokeAllUserSessions).not.toHaveBeenCalled();
+      expect(membershipArchiveUpdate).not.toHaveBeenCalled();
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.last_day_set",
+          details: { lastDay: TODAY, changedFields: ["planned_status"] },
+        }),
+      );
+    });
+
+    it("sets a last day for someone not on the schedule", async () => {
+      arrange("active", null, null, { focus_area_ids: [] });
+
+      const response = await post({ action: "remove", lastDay: "2026-11-08" });
+
+      expect(response.status).toBe(200);
+    });
+
+    it.each([
+      ["yesterday", "2026-10-25"],
+      ["more than a year ahead", "2027-10-27"],
+    ])("refuses a last day %s", async (_label, lastDay) => {
+      arrange("active");
+
+      const response = await post({ action: "remove", lastDay });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).code).toBe("LAST_DAY_INVALID");
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a last day for someone suspended or away", async () => {
+      for (const [status, extra] of [
+        ["active", { suspended_at: "2026-10-20T00:00:00Z" }],
+        ["inactive", {}],
+      ] as const) {
+        arrange(status, null, null, extra);
+        const response = await post({ action: "remove", lastDay: "2026-11-08" });
+        expect((await response.json()).code).toBe("NOT_PLANNABLE");
+      }
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("moves a last day and cancels one", async () => {
+      const leaving = { planned_status: "removed", planned_from: "2026-11-09" };
+      arrange("active", null, null, leaving);
+
+      const moved = await post({ action: "setPlannedChange", lastDay: "2026-11-12" });
+      expect(moved.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ planned_status: "removed", planned_from: "2026-11-13" }),
+      );
+      expect(employeeUpdate.mock.calls.at(-1)?.[0]).not.toHaveProperty("planned_note");
+      expect(auditInsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: "employee.last_day_changed",
+          details: expect.objectContaining({ fromLastDay: "2026-11-08", lastDay: "2026-11-12" }),
+        }),
+      );
+
+      arrange("active", null, null, leaving);
+      const cancelled = await post({ action: "cancelPlannedChange" });
+      expect(cancelled.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ planned_status: null }),
+      );
+      expect(auditInsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: "employee.last_day_cancelled",
+          details: expect.objectContaining({ lastDay: "2026-11-08" }),
+        }),
+      );
+    });
+
+    it("replaces a planned away with a last day", async () => {
+      arrange("active", null, null, {
+        planned_status: "away",
+        planned_from: "2026-11-02",
+        planned_until: "2026-11-09",
+        planned_absence_type_id: 134,
+      });
+
+      const response = await post({ action: "remove", lastDay: "2026-11-20" });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          planned_status: "removed",
+          planned_from: "2026-11-21",
+          planned_until: null,
+          planned_absence_type_id: null,
+        }),
+      );
+    });
+
     it.each(["deactivate", "setReturnDate"])(
       "refuses an absence without a return date on %s",
       async (action) => {

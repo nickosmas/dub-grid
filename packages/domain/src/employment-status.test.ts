@@ -11,9 +11,17 @@ import {
   describePlannedChangeInFull,
   describeStatusAction,
   statusChoices,
+  availableStatusChoices,
+  NO_ACCOUNT_MESSAGE,
+  NOT_ON_SCHEDULE_MESSAGE,
+  NOT_SUSPENDABLE_MESSAGE,
   formatReturnDate,
   isPlannedAwayOn,
+  isAfterPlannedLastDay,
+  isValidLastDay,
   isValidPlannedStart,
+  plannedFromForLastDay,
+  plannedLastDay,
   isSchedulableOn,
   isValidReturnDate,
   statusUndoAction,
@@ -320,7 +328,13 @@ describe("describeStatusAction reinstate", () => {
 describe("statusChoices", () => {
   const onSchedule = { focusAreaIds: [7] };
   const kinds = (state: Parameters<typeof statusChoices>[0]) =>
-    statusChoices(state).map((choice) => `${choice.label}:${choice.action}`);
+    statusChoices(state).map(
+      (choice) => `${choice.label}:${choice.action}${choice.available ? "" : " (disabled)"}`,
+    );
+  const reasons = (state: Parameters<typeof statusChoices>[0]) =>
+    Object.fromEntries(
+      statusChoices(state).map((choice) => [choice.kind, choice.unavailableReason]),
+    );
 
   it("offers an active person Away, Suspended and Offboarded", () => {
     expect(kinds({ status: "active", ...onSchedule })).toEqual([
@@ -330,11 +344,14 @@ describe("statusChoices", () => {
     ]);
   });
 
-  it("leaves Away out for someone not on the schedule", () => {
-    expect(kinds({ status: "active", focusAreaIds: [] })).toEqual([
+  it("lists Away, disabled with a reason, for someone not on the schedule", () => {
+    const state = { status: "active" as const, focusAreaIds: [] };
+    expect(kinds(state)).toEqual([
+      "Away:markAway (disabled)",
       "Suspended:suspend",
       "Offboarded:archive",
     ]);
+    expect(reasons(state).away).toBe(NOT_ON_SCHEDULE_MESSAGE);
   });
 
   it("brings a suspended person back with Reinstate", () => {
@@ -343,23 +360,78 @@ describe("statusChoices", () => {
     );
   });
 
-  it("brings an Away person back with Mark active, and offers no suspension", () => {
-    expect(kinds({ status: "inactive", ...onSchedule })).toEqual([
+  it("brings an Away person back with Mark active, and says why they can't be suspended", () => {
+    const state = { status: "inactive" as const, ...onSchedule };
+    expect(kinds(state)).toEqual([
       "Active:markActive",
+      "Suspended:suspend (disabled)",
       "Offboarded:archive",
     ]);
+    expect(reasons(state).suspended).toBe(NOT_SUSPENDABLE_MESSAGE);
   });
 
-  it("offers no second Away to someone with an away planned", () => {
-    expect(
-      kinds({ status: "active", plannedStatus: "away", plannedFrom: "2026-11-10", ...onSchedule }),
-    ).toEqual(["Suspended:suspend", "Offboarded:archive"]);
+  it("lists Away disabled, pointing at Edit plan, for someone with an away planned", () => {
+    const state = {
+      status: "active" as const,
+      plannedStatus: "away" as const,
+      plannedFrom: "2026-11-01",
+      ...onSchedule,
+    };
+    expect(kinds(state)).toEqual([
+      "Away:markAway (disabled)",
+      "Suspended:suspend",
+      "Offboarded:archive",
+    ]);
+    expect(reasons(state).away).toBe("Planned from Sun, Nov 1. Change it with Edit plan.");
   });
 
-  it("only restores an archived person", () => {
-    expect(kinds({ status: "removed", archivedAt: "2026-10-01T00:00:00Z", ...onSchedule })).toEqual(
-      ["Active:restore"],
-    );
+  it("restores an archived person, and says why the rest wait", () => {
+    const state = { status: "removed" as const, archivedAt: "2026-10-01T00:00:00Z", ...onSchedule };
+    expect(kinds(state)).toEqual([
+      "Active:restore",
+      "Away:markAway (disabled)",
+      "Suspended:suspend (disabled)",
+    ]);
+    expect(reasons(state)).toEqual({
+      active: null,
+      away: "Only someone on staff can be marked away.",
+      suspended: NOT_SUSPENDABLE_MESSAGE,
+    });
+  });
+
+  it("lists all three for someone with no account and an away planned, Offboard alone available", () => {
+    const state = {
+      status: "active" as const,
+      userId: null,
+      plannedStatus: "away" as const,
+      plannedFrom: "2026-11-01",
+      ...onSchedule,
+    };
+    expect(kinds(state)).toEqual([
+      "Away:markAway (disabled)",
+      "Suspended:suspend (disabled)",
+      "Offboarded:archive",
+    ]);
+    expect(reasons(state).suspended).toBe(NO_ACCOUNT_MESSAGE);
+    expect(availableStatusChoices(state).map((choice) => choice.action)).toEqual(["archive"]);
+  });
+
+  it("gives every unavailable choice a reason, and an available one none", () => {
+    for (const state of [
+      { status: "active" as const, focusAreaIds: [], userId: null },
+      { status: "inactive" as const, ...onSchedule },
+      { status: "removed" as const, archivedAt: "2026-10-01T00:00:00Z", ...onSchedule },
+      {
+        status: "active" as const,
+        plannedStatus: "removed" as const,
+        plannedFrom: "2026-10-30",
+        ...onSchedule,
+      },
+    ]) {
+      for (const choice of statusChoices(state)) {
+        expect(Boolean(choice.unavailableReason)).toBe(!choice.available);
+      }
+    }
   });
 
   it("says what each choice does, in one sentence, for when it's the only one", () => {
@@ -517,6 +589,130 @@ describe("planned away (51g1)", () => {
   });
 });
 
+describe("last day (51g2)", () => {
+  // Last day Sun, Nov 8: stored as offboarded from Mon, Nov 9.
+  const leaving = {
+    status: "active" as const,
+    plannedStatus: "removed" as const,
+    plannedFrom: "2026-11-09",
+    plannedUntil: null,
+  };
+
+  it("stores the day after the last day, and reads the last day back", () => {
+    expect(plannedFromForLastDay("2026-11-08")).toBe("2026-11-09");
+    expect(plannedFromForLastDay("2026-12-31")).toBe("2027-01-01");
+    expect(plannedLastDay(leaving)).toBe("2026-11-08");
+    expect(plannedLastDay({ plannedStatus: "away", plannedFrom: "2026-11-09" })).toBeNull();
+  });
+
+  it("schedules them through the last day and never after it", () => {
+    expect(isSchedulableOn(leaving, "2026-11-08")).toBe(true);
+    expect(isAfterPlannedLastDay(leaving, "2026-11-08")).toBe(false);
+    expect(isSchedulableOn(leaving, "2026-11-09")).toBe(false);
+    expect(isSchedulableOn(leaving, "2030-01-01")).toBe(false);
+    expect(isPlannedAwayOn(leaving, "2026-11-09")).toBe(false);
+  });
+
+  it("takes a last day from today up to a year ahead", () => {
+    expect(isValidLastDay("2026-10-27", "2026-10-27")).toBe(true);
+    expect(isValidLastDay("2026-10-26", "2026-10-27")).toBe(false);
+    expect(isValidLastDay("2027-10-27", "2026-10-27")).toBe(true);
+    expect(isValidLastDay("2027-10-28", "2026-10-27")).toBe(false);
+    expect(isValidLastDay("2027-02-29", "2026-10-27")).toBe(false);
+    expect(isValidLastDay("soon", "2026-10-27")).toBe(false);
+  });
+
+  it("says Leaving with the last day on the pill, the record, the box and the card", () => {
+    expect(describePlannedChange(leaving)).toBe("Leaving Nov 8");
+    expect(describePlannedChangeInFull(leaving)).toBe("Leaving Nov 8");
+    expect(describeCurrentStatus({ ...leaving, focusAreaIds: [] }).detail).toBe(
+      "Leaving Sun, Nov 8.",
+    );
+    expect(describeStatusCard(leaving).planned).toEqual({
+      title: "Leaving Sun, Nov 8",
+      detail: "Offboarded on Mon, Nov 9.",
+    });
+    expect(statusMark(leaving)).toEqual({
+      kind: "planned",
+      label: "Leaving Nov 8",
+      tone: "warning",
+    });
+  });
+
+  it("sets a last day through Offboard, within the dialog rules", () => {
+    const copy = describeStatusAction("archive", "Ana Diaz", { lastDay: "2026-11-08" });
+    expect(copy.label).toBe("Set last day");
+    expect(copy.title).toBe("Offboard Ana Diaz?");
+    expect(copy.message).toBe("They stay Active through Sun, Nov 8, their last day.");
+    expect(copy.points).toEqual([
+      "Shifts after Nov 8 come off the schedule in the draft.",
+      "Open requests for days after Nov 8 are closed.",
+      "On Nov 9 they're offboarded: they can no longer sign in, and recurring schedules set up for them are removed.",
+    ]);
+    expect(copy.done).toBe("Last day set");
+    const noAccount = describeStatusAction("archive", "Ana Diaz", {
+      lastDay: "2026-11-08",
+      hasAccount: false,
+    });
+    expect(noAccount.points.join(" ")).not.toMatch(/sign in/);
+    expect(describeStatusAction("archive", "Ana Diaz").label).toBe("Offboard");
+  });
+
+  it("replaces a planned away, and is replaced by any other change, saying so", () => {
+    const replacingAway = describeStatusAction("archive", "Ana", {
+      lastDay: "2026-11-08",
+      plannedFrom: "2026-11-02",
+      plannedStatus: "away",
+    });
+    expect(replacingAway.points).toContain("The away planned from Nov 2 is cancelled.");
+    for (const options of [{}, { startDate: "2026-11-02" }]) {
+      const copy = describeStatusAction("markAway", "Ana", {
+        ...options,
+        plannedFrom: "2026-11-09",
+        plannedStatus: "removed",
+      });
+      expect(copy.points).toContain("The last day planned for Nov 8 is cancelled.");
+    }
+    expect(
+      describeStatusAction("suspend", "Ana", {
+        plannedFrom: "2026-11-09",
+        plannedStatus: "removed",
+      }).points,
+    ).toContain("The last day planned for Nov 8 is cancelled.");
+  });
+
+  it("changes and cancels a last day", () => {
+    const edit = describeStatusAction("setPlannedChange", "Ana", {
+      plannedStatus: "removed",
+      lastDay: "2026-11-12",
+    });
+    expect(edit).toMatchObject({
+      label: "Save changes",
+      title: "Change Ana's last day?",
+      message: "They stay Active through Thu, Nov 12, their last day.",
+      done: "Last day changed",
+    });
+    expect(edit.unchanged).toEqual(["Shifts already taken off after their old last day stay off."]);
+    expect(
+      describeStatusAction("cancelPlannedChange", "Ana", { plannedStatus: "removed" }),
+    ).toMatchObject({
+      label: "Cancel last day",
+      title: "Cancel Ana's last day?",
+      message: "They stay Active and can be scheduled after that day again.",
+      points: [],
+      done: "Last day cancelled",
+    });
+  });
+
+  it("lists Offboard disabled, pointing at Edit plan, while a last day is planned", () => {
+    const choices = statusChoices({ ...leaving, focusAreaIds: [1] });
+    expect(choices.map((c) => c.kind)).toEqual(["away", "suspended", "archived"]);
+    const offboard = choices.find((c) => c.kind === "archived");
+    expect(offboard?.available).toBe(false);
+    expect(offboard?.unavailableReason).toBe("Leaving Sun, Nov 8. Change it with Edit plan.");
+  });
+});
+
 describe("isValidPlannedStart", () => {
   it("takes a day after today up to a year ahead", () => {
     expect(isValidPlannedStart("2026-10-27", "2026-10-27")).toBe(false);
@@ -635,7 +831,7 @@ describe("someone with no account", () => {
   const onSchedule = { focusAreaIds: [7], userId: null };
 
   it("can't be suspended, and nothing promises them sign-in", () => {
-    const choices = statusChoices({ status: "active", ...onSchedule });
+    const choices = availableStatusChoices({ status: "active", ...onSchedule });
     expect(choices.map((choice) => choice.action)).toEqual(["markAway", "archive"]);
     for (const choice of choices) expect(choice.detail + choice.outcome).not.toMatch(/sign/i);
     expect(describeCurrentStatus({ status: "active", ...onSchedule }).detail).toBe(

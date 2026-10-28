@@ -6,20 +6,64 @@ const updateEmployee = vi.fn();
 const updateMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
 const cacheDel = vi.fn();
+const endOffboardedAccess = vi.fn();
+/** org_role by "<userId>:<orgId>", and platform_role by user id. */
+const orgRoles = new Map<string, string>();
+const platformRoles = new Map<string, string>();
+const superAdminCount = vi.fn(() => 2);
+
+vi.mock("@/features/employees/server/offboard-access", () => ({
+  endOffboardedAccess: (...args: unknown[]) => endOffboardedAccess(...args),
+}));
 
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {
       if (table === "audit_log") return { insert: auditInsert };
+      if (table === "profiles") {
+        return {
+          select: () => ({
+            eq: (_column: string, id: string) => ({
+              maybeSingle: async () => ({
+                data: platformRoles.has(id) ? { platform_role: platformRoles.get(id) } : null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "organization_memberships") {
+        return {
+          select: (_columns: string, options?: { count?: string }) => {
+            const eqs: Record<string, unknown> = {};
+            const query = {
+              eq: (column: string, value: unknown) => {
+                eqs[column] = value;
+                return query;
+              },
+              is: () => (options?.count ? Promise.resolve({ count: superAdminCount() }) : query),
+              maybeSingle: async () => {
+                const role = orgRoles.get(`${eqs.user_id}:${eqs.org_id}`);
+                return { data: role ? { org_role: role } : null };
+              },
+            };
+            return query;
+          },
+        };
+      }
       if (table !== "employees") throw new Error(`Unexpected table: ${table}`);
       return {
-        // Both reads end in lte(column, bound); the column tells them apart.
+        // Every read ends in lte(column, bound); the column and the planned
+        // status filter tell them apart.
         select: vi.fn(() => {
+          const eqs: Record<string, unknown> = {};
           const query = {
-            eq: () => query,
+            eq: (column: string, value: unknown) => {
+              eqs[column] = value;
+              return query;
+            },
             is: () => query,
             not: () => query,
-            lte: (...args: unknown[]) => selectLte(...args),
+            lte: (column: string, bound: string) => selectLte(column, bound, eqs.planned_status),
           };
           return query;
         }),
@@ -50,7 +94,7 @@ vi.mock("@/lib/db/shared", () => ({
 }));
 
 vi.mock("@/lib/logger", () => ({
-  default: { error: vi.fn() },
+  default: { error: vi.fn(), warn: vi.fn() },
 }));
 
 const isFeatureEnabled = vi.fn(async (_key: string) => true);
@@ -79,12 +123,33 @@ function planned(id: string, orgId: string, from: string, until: string | null, 
   };
 }
 
-/** The planned-away read gets `plans`, the return read `aways`. */
-function rows(plans: unknown[], aways: unknown[] = []) {
-  selectLte.mockImplementation(async (column: string) => ({
-    data: column === "planned_from" ? plans : aways,
+/** The planned-away read gets `plans`, the last-day read `lastDays`, the return read `aways`. */
+function rows(plans: unknown[], aways: unknown[] = [], lastDays: unknown[] = []) {
+  selectLte.mockImplementation(async (column: string, _bound: string, plannedStatus: unknown) => ({
+    data: column !== "planned_from" ? aways : plannedStatus === "removed" ? lastDays : plans,
     error: null,
   }));
+}
+
+/** Last day the day before `from`, set by `plannedBy`. */
+function leaving(
+  id: string,
+  orgId: string,
+  from: string,
+  timezone: string,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    org_id: orgId,
+    user_id: `user-${id}`,
+    planned_from: from,
+    planned_note: "Moving",
+    planned_by: "manager-1",
+    version: 5,
+    organization: { timezone },
+    ...extra,
+  };
 }
 
 function away(id: string, orgId: string, awayUntil: string, timezone: string) {
@@ -94,6 +159,9 @@ function away(id: string, orgId: string, awayUntil: string, timezone: string) {
 describe("GET /api/cron/return-from-away", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    orgRoles.clear();
+    platformRoles.clear();
+    superAdminCount.mockReturnValue(2);
     vi.useFakeTimers({ toFake: ["Date"] });
     // Oct 27 in UTC and Tokyo, still Oct 26 in Los Angeles.
     vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
@@ -143,9 +211,15 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 0,
+      offboarded: 0,
+      returned: 1,
+      skipped: 0,
+    });
     // A day past UTC's today bounds every timezone.
-    expect(selectLte).toHaveBeenCalledWith("away_until", "2026-10-28");
+    expect(selectLte).toHaveBeenCalledWith("away_until", "2026-10-28", undefined);
     expect(updateEmployee).toHaveBeenCalledWith(
       {
         status: "active",
@@ -183,7 +257,13 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 0,
+      offboarded: 0,
+      returned: 1,
+      skipped: 0,
+    });
     expect(updateEmployee).toHaveBeenCalledTimes(1);
     expect(updateEmployee.mock.calls[0][1]).toContainEqual(["id", "emp-tokyo"]);
   });
@@ -191,7 +271,7 @@ describe("GET /api/cron/return-from-away", () => {
   it("does nothing when nobody is due", async () => {
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 0 });
+    expect(await res.json()).toEqual({ ok: true, started: 0, offboarded: 0, returned: 0 });
     expect(updateEmployee).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
@@ -205,7 +285,13 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 0, skipped: 1 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 0,
+      offboarded: 0,
+      returned: 0,
+      skipped: 1,
+    });
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
@@ -214,8 +300,8 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 1, returned: 0 });
-    expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28");
+    expect(await res.json()).toEqual({ ok: true, started: 1, offboarded: 0, returned: 0 });
+    expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28", "away");
     expect(updateEmployee).toHaveBeenCalledWith(
       {
         status: "inactive",
@@ -267,6 +353,98 @@ describe("GET /api/cron/return-from-away", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
+  it("offboards someone the day after their last day, as a manual Offboard does (51g2)", async () => {
+    orgRoles.set("manager-1:org-la", "super_admin");
+    rows([], [], [leaving("emp-la", "org-la", "2026-10-26", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).offboarded).toBe(1);
+    expect(updateEmployee).toHaveBeenCalledWith(
+      {
+        status: "removed",
+        status_note: "Moving",
+        archived_at: "2026-10-27T01:00:00.000Z",
+        status_changed_at: "2026-10-27T01:00:00.000Z",
+        updated_by: "manager-1",
+        version: 6,
+      },
+      [
+        ["id", "emp-la"],
+        ["org_id", "org-la"],
+        ["version", 5],
+      ],
+    );
+    expect(endOffboardedAccess).toHaveBeenCalledWith(expect.anything(), {
+      orgId: "org-la",
+      empId: "emp-la",
+      userId: "user-emp-la",
+      actorId: "manager-1",
+      endMembership: true,
+      at: "2026-10-27T01:00:00.000Z",
+    });
+    expect(auditInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        action: "employee.removed",
+        actor_id: null,
+        resource_id: "emp-la",
+        details: expect.objectContaining({ toStatus: "removed", lastDay: "2026-10-25" }),
+      }),
+    ]);
+  });
+
+  it("keeps the membership when an admin set the last day, and ends it for a Gridmaster", async () => {
+    orgRoles.set("manager-1:org-la", "admin");
+    platformRoles.set("gm-1", "gridmaster");
+    rows(
+      [],
+      [],
+      [
+        leaving("emp-1", "org-la", "2026-10-26", "America/Los_Angeles"),
+        leaving("emp-2", "org-la", "2026-10-26", "America/Los_Angeles", { planned_by: "gm-1" }),
+      ],
+    );
+
+    await GET(makeReq());
+
+    expect(endOffboardedAccess.mock.calls.map((call) => call[1].endMembership)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
+  it("waits while their last day is still today in the organization's timezone", async () => {
+    rows([], [], [leaving("emp-la", "org-la", "2026-10-27", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).offboarded).toBe(0);
+    expect(updateEmployee).not.toHaveBeenCalled();
+  });
+
+  it("leaves the organization's only Super Admin as they are", async () => {
+    orgRoles.set("user-emp-la:org-la", "super_admin");
+    superAdminCount.mockReturnValue(1);
+    rows([], [], [leaving("emp-la", "org-la", "2026-10-26", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).offboarded).toBe(0);
+    expect(updateEmployee).not.toHaveBeenCalled();
+    expect(endOffboardedAccess).not.toHaveBeenCalled();
+  });
+
+  it("skips the follow-up for someone a manager changed meanwhile", async () => {
+    updateMaybeSingle.mockResolvedValue({ data: null, error: null });
+    rows([], [], [leaving("emp-la", "org-la", "2026-10-26", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).offboarded).toBe(0);
+    expect(endOffboardedAccess).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
   it("still returns people when starting plans fails", async () => {
     selectLte.mockImplementation(async (column: string) =>
       column === "planned_from"
@@ -276,6 +454,12 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 0,
+      offboarded: 0,
+      returned: 1,
+      skipped: 0,
+    });
   });
 });

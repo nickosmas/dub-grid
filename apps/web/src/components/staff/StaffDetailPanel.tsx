@@ -1,5 +1,5 @@
 "use client";
-import type { PlannedAway } from "@/features/employees/client";
+import type { PlannedChange } from "@/features/employees/client";
 import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -56,7 +56,7 @@ interface StaffDetailPanelProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
-  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<boolean>;
   onDeactivate: (
     empId: string,
     note?: string,
@@ -78,7 +78,7 @@ interface StaffDetailPanelProps {
   /** Suspends someone's access (51c). */
   onSuspend?: (empId: string) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
-  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
+  onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -118,7 +118,7 @@ export function StaffDetailPanel({
   onActivate,
   onReinstate,
   onSuspend,
-  onSetPlannedAway,
+  onSetPlannedChange,
   statusStepUpOpen = false,
   onClose,
   onInvite,
@@ -229,7 +229,7 @@ export function StaffDetailPanel({
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
-      onSetPlannedAway={onSetPlannedAway}
+      onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
       variant="card"
@@ -248,7 +248,7 @@ export function StaffDetailPanel({
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
-      onSetPlannedAway={onSetPlannedAway}
+      onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
     />

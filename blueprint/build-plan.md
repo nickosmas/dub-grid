@@ -1118,7 +1118,7 @@
           person, shown as "Away from Nov 10", editable and cancellable), the
           daily job, and Away as its first use: Change status takes a start
           date beside the return date, on web and mobile.
-    - [ ] 51g2. **Last day** - "Leaving Nov 8": shifts after it come off in
+    - [x] 51g2. **Last day** - "Leaving Nov 8": shifts after it come off in
           the draft, nobody can schedule them past it, and the job archives
           them the day after.
     - [ ] 51g3. **Suspended until** - an optional end date on a suspension,

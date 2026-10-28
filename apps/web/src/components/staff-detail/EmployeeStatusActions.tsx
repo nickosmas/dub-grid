@@ -9,13 +9,15 @@ import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
-import type { PlannedAway } from "@/features/employees/client";
+import type { PlannedChange } from "@/features/employees/client";
 import { CalendarDays, Ellipsis } from "lucide-react";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
   describeStatusCard,
   PLANNED_START_MAX_DAYS,
+  plannedLastDay,
+  availableStatusChoices,
   statusChoices,
   suggestedStatusChoice,
   type StatusAction,
@@ -49,11 +51,15 @@ export interface EmployeeStatusActionsProps {
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c); not offered when absent. */
   onSuspend?: (empId: string) => void | Promise<unknown>;
-  /** Moves or changes a planned Away, or cancels it (null) (51g1); not offered when absent. */
-  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
+  /**
+   * Moves or changes a planned Away (51g1) or last day (51g2), or cancels it
+   * (null); not offered when absent.
+   */
+  onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   /** Live absence types; with a return date, one can fill the away days (51f). */
   absenceTypes?: readonly AbsenceType[];
-  onRemove: (empId: string, note?: string) => void | Promise<unknown>;
+  /** Offboards them now, or with `lastDay` the day after it (51g2). */
+  onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<unknown>;
   variant: "panel" | "page" | "card" | "card-quiet";
   /** The button's label; Edit plan opens the same dialog from the planned card. */
   label?: string;
@@ -154,6 +160,46 @@ function StartDateField({
     </div>
   );
 }
+
+/** Their last day; empty offboards them now, a day plans it for the day after (51g2). */
+function LastDayField({
+  value,
+  onChange,
+  hint,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  hint: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 600,
+          color: "var(--dg-color-text-primary)",
+        }}
+      >
+        Last day
+      </span>
+      <CalendarDatePicker
+        value={value}
+        onChange={onChange}
+        label="Last day"
+        placeholder="Offboard now"
+        minDate={formatDateKey(new Date())}
+        maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
+        allowClear
+      />
+      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+        {hint}
+      </span>
+    </div>
+  );
+}
+
+const LAST_DAY_HINT =
+  "They stay Active through this day and are offboarded the day after. Leave it empty to offboard them now.";
 
 const NO_ABSENCE = 0;
 
@@ -296,11 +342,11 @@ function CurrentStatusCard({ card }: { card: StatusCardCopy }) {
 
 /**
  * Every status change goes through one Change status button and one dialog
- * (51d): a card at the top says where they stand, the list holds only the
- * statuses they can move to, the title and confirm button name what happens,
- * and what changes is kept apart from what stays the same. With one status to
- * move to, or opened from a button that names its change, there is no list,
- * only a sentence saying what it does.
+ * (51d): a card at the top says where they stand, the list holds every other
+ * status (one they can't move to now is disabled and says why), the title and
+ * confirm button name what happens, and what changes is kept apart from what
+ * stays the same. Opened from a button that names its change, there is no
+ * list, only a sentence saying what it does.
  */
 export function EmployeeStatusActions({
   employee,
@@ -312,7 +358,7 @@ export function EmployeeStatusActions({
   onSetReturnDate,
   onReinstate,
   onSuspend,
-  onSetPlannedAway,
+  onSetPlannedChange,
   absenceTypes = [],
   variant,
   label = "Change status",
@@ -326,6 +372,9 @@ export function EmployeeStatusActions({
 }: EmployeeStatusActionsProps) {
   const hasPlan =
     employee.status === "active" && employee.plannedStatus === "away" && !!employee.plannedFrom;
+  // A last day planned ahead (51g2) is edited here like a planned Away.
+  const plannedLeave = employee.status === "active" ? plannedLastDay(employee) : null;
+  const initialLastDay = plannedLeave ?? "";
   // Someone Away edits their return date here; someone with an Away planned
   // edits the plan's dates (51g1). Both start from what they have.
   const initialReturnDate = (hasPlan ? employee.plannedUntil : employee.awayUntil) ?? "";
@@ -340,6 +389,7 @@ export function EmployeeStatusActions({
   const [returnDate, setReturnDate] = useState(initialReturnDate);
   const [absenceTypeId, setAbsenceTypeId] = useState(initialAbsenceTypeId);
   const [startDate, setStartDate] = useState(initialStartDate);
+  const [lastDay, setLastDay] = useState(initialLastDay);
   const [cancellingPlan, setCancellingPlan] = useState(false);
   // The dialog unmounts while a step-up prompt shows, which drops its own
   // latch, so the pending state lives here to survive the round trip.
@@ -361,21 +411,19 @@ export function EmployeeStatusActions({
   const returnMinDate = formatDateKey(
     addDays(laterStart ? new Date(`${laterStart}T00:00:00`) : new Date(), 1),
   );
+  // Every other status is listed, an unavailable one disabled with its reason;
+  // only a change this surface has no handler for is left out.
   const choices = statusChoices(employee).filter(
     (option) =>
       option.action !== excludeChoice &&
       (!(option.action in handlers) || Boolean(handlers[option.action])),
   );
-  // One status to move to, or a card button that names its own change
-  // (Reinstate, Restore): a confirmation for that change alone, with no list.
+  // A button that names its own change (Reinstate, Restore, Offboard) opens a
+  // confirmation for that change alone. Change status always opens the list.
   const onlyChoice =
-    focus === "plan"
+    focus === "plan" || !initialChoice
       ? null
-      : choices.length === 1 && !excludeChoice
-        ? choices[0]
-        : initialChoice
-          ? (choices.find((option) => option.action === initialChoice) ?? null)
-          : null;
+      : (choices.find((option) => option.available && option.action === initialChoice) ?? null);
 
   // The absence only applies with a return date, so it goes when the date does.
   const chosenAbsenceTypeId = returnDate && absenceTypeId !== NO_ABSENCE ? absenceTypeId : null;
@@ -397,6 +445,12 @@ export function EmployeeStatusActions({
   const plannedAbsenceName =
     absenceTypes.find((absenceType) => absenceType.id === employee.plannedAbsenceTypeId)?.name ??
     null;
+  // A last day can be set only for someone Active and not suspended, as a plan needs.
+  const canPlanLastDay =
+    employee.status === "active" && !employee.archivedAt && !employee.suspendedAt;
+  const lastDayChanged = !!plannedLeave && !cancellingPlan && !!lastDay && lastDay !== plannedLeave;
+  // Clearing a planned last day offboards them today instead.
+  const offboardsNow = !!plannedLeave && !cancellingPlan && !lastDay && focus !== "status";
   const statusCard = describeStatusCard(employee, {
     absenceName: isAway
       ? absenceTypes.find((absenceType) => absenceType.id === employee.awayAbsenceTypeId)?.name
@@ -422,6 +476,7 @@ export function EmployeeStatusActions({
     setReturnDate(initialReturnDate);
     setAbsenceTypeId(initialAbsenceTypeId);
     setStartDate(initialStartDate);
+    setLastDay(initialLastDay);
     setCancellingPlan(false);
   }
 
@@ -437,12 +492,16 @@ export function EmployeeStatusActions({
     try {
       switch (choice) {
         case null:
-          if (startsNow) {
+          if (plannedLeave) {
+            await (offboardsNow
+              ? onRemove(employee.id)
+              : onSetPlannedChange?.(employee.id, cancellingPlan ? null : { lastDay }));
+          } else if (startsNow) {
             await (returnDate
               ? onDeactivate(employee.id, undefined, returnDate, chosenAbsenceTypeId)
               : onDeactivate(employee.id));
           } else if (hasPlan) {
-            await onSetPlannedAway?.(
+            await onSetPlannedChange?.(
               employee.id,
               cancellingPlan || !laterStart
                 ? null
@@ -472,7 +531,9 @@ export function EmployeeStatusActions({
         // Revoking any linked org membership happens server-side, atomically
         // with the status change (see /api/employees/status).
         case "archive":
-          await onRemove(employee.id, trimmedNote);
+          await (canPlanLastDay && lastDay
+            ? onRemove(employee.id, trimmedNote, lastDay)
+            : onRemove(employee.id, trimmedNote));
           break;
         case "suspend":
           await onSuspend?.(employee.id);
@@ -495,39 +556,71 @@ export function EmployeeStatusActions({
         returnDate: choice === "markAway" ? returnDate || null : null,
         absenceName: choice === "markAway" ? chosenAbsenceName : null,
         startDate: choice === "markAway" ? laterStart : null,
-        // Any other change today replaces the plan, and says so.
+        lastDay: choice === "archive" && canPlanLastDay ? lastDay || null : null,
+        // Any other change replaces the plan, and says so.
         plannedFrom:
-          hasPlan && !(choice === "markAway" && laterStart) ? employee.plannedFrom : null,
+          plannedLeave || (hasPlan && !(choice === "markAway" && laterStart))
+            ? employee.plannedFrom
+            : null,
+        plannedStatus: employee.plannedStatus ?? null,
       })
-    : startsNow
-      ? describeStatusAction("markAway", displayName, {
-          hasAccount: Boolean(employee.userId),
-          returnDate: returnDate || null,
-          absenceName: chosenAbsenceName,
-        })
-      : cancellingPlan
-        ? describeStatusAction("cancelPlannedChange", displayName, {
-            absenceName: plannedAbsenceName,
-          })
-        : planChanged
+    : offboardsNow
+      ? describeStatusAction("archive", displayName, { hasAccount: Boolean(employee.userId) })
+      : plannedLeave && cancellingPlan
+        ? describeStatusAction("cancelPlannedChange", displayName, { plannedStatus: "removed" })
+        : lastDayChanged
           ? describeStatusAction("setPlannedChange", displayName, {
-              startDate: laterStart,
-              returnDate: returnDate || null,
-              absenceName: chosenAbsenceName,
+              plannedStatus: "removed",
+              lastDay,
+              hasAccount: Boolean(employee.userId),
             })
-          : awayDetailsChanged
-            ? describeStatusAction("setReturnDate", displayName, {
+          : startsNow
+            ? describeStatusAction("markAway", displayName, {
+                hasAccount: Boolean(employee.userId),
                 returnDate: returnDate || null,
-                currentReturnDate: employee.awayUntil ?? null,
                 absenceName: chosenAbsenceName,
               })
-            : null;
+            : cancellingPlan
+              ? describeStatusAction("cancelPlannedChange", displayName, {
+                  absenceName: plannedAbsenceName,
+                })
+              : planChanged
+                ? describeStatusAction("setPlannedChange", displayName, {
+                    startDate: laterStart,
+                    returnDate: returnDate || null,
+                    absenceName: chosenAbsenceName,
+                  })
+                : awayDetailsChanged
+                  ? describeStatusAction("setReturnDate", displayName, {
+                      returnDate: returnDate || null,
+                      currentReturnDate: employee.awayUntil ?? null,
+                      absenceName: chosenAbsenceName,
+                    })
+                  : null;
   const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
 
   const detailsAboveLine = (
     <>
       {isAway && !choice && onSetReturnDate ? datedFields : null}
-      {hasPlan && !choice && onSetPlannedAway && focus !== "status" ? (
+      {plannedLeave && !choice && onSetPlannedChange && focus !== "status" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {cancellingPlan ? null : (
+            <LastDayField
+              value={lastDay}
+              onChange={setLastDay}
+              hint="Clear it to offboard them today."
+            />
+          )}
+          <Button
+            className="dg-btn dg-btn-ghost dg-btn-xs"
+            style={{ alignSelf: "flex-start" }}
+            onClick={() => setCancellingPlan((value) => !value)}
+          >
+            {cancellingPlan ? "Keep last day" : "Cancel last day"}
+          </Button>
+        </div>
+      ) : null}
+      {hasPlan && !choice && onSetPlannedChange && focus !== "status" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {cancellingPlan ? null : (
             <>
@@ -564,7 +657,9 @@ export function EmployeeStatusActions({
           (focus === "plan"
             ? isAway
               ? `Change ${displayName}'s return date?`
-              : `Change ${displayName}'s planned away?`
+              : plannedLeave
+                ? `Change ${displayName}'s last day?`
+                : `Change ${displayName}'s planned away?`
             : `Change ${displayName}'s status?`)
         }
         message={
@@ -595,7 +690,8 @@ export function EmployeeStatusActions({
                   options={choices.map((option) => ({
                     value: option.action,
                     label: option.label,
-                    detail: option.detail,
+                    detail: option.unavailableReason ?? option.detail,
+                    disabled: !option.available,
                     icon: (
                       <StatusIconCircle
                         icon={STATUS_KIND_ICONS[option.kind]}
@@ -628,6 +724,9 @@ export function EmployeeStatusActions({
                 {datedFields}
               </>
             ) : null}
+            {choice === "archive" && canPlanLastDay && onSetPlannedChange ? (
+              <LastDayField value={lastDay} onChange={setLastDay} hint={LAST_DAY_HINT} />
+            ) : null}
             {copy?.message ? <span>{copy.message}</span> : null}
             {copy && copy.points.length > 0 ? (
               <ConfirmSummaryBox summary={{ title: "Changes", points: copy.points }} />
@@ -638,16 +737,23 @@ export function EmployeeStatusActions({
           </div>
         }
         confirmLabel={
-          choice || cancellingPlan || startsNow
+          choice || cancellingPlan || startsNow || offboardsNow
             ? (copy?.label ?? "")
-            : (isAway && onSetReturnDate) || (hasPlan && onSetPlannedAway && focus !== "status")
+            : (isAway && onSetReturnDate) ||
+                ((hasPlan || plannedLeave) && onSetPlannedChange && focus !== "status")
               ? "Save changes"
               : "Change status"
         }
         confirmDisabled={
-          !choice && !awayDetailsChanged && !planChanged && !cancellingPlan && !startsNow
+          !choice &&
+          !awayDetailsChanged &&
+          !planChanged &&
+          !lastDayChanged &&
+          !cancellingPlan &&
+          !startsNow &&
+          !offboardsNow
         }
-        variant={choice === "archive" ? "danger" : ordinary ? "info" : "warning"}
+        variant={choice === "archive" || offboardsNow ? "danger" : ordinary ? "info" : "warning"}
         onConfirm={confirm}
         onCancel={close}
       />
@@ -683,8 +789,9 @@ export function EmployeeStatusActions({
 /**
  * The status card's buttons: the change most people want next (Reinstate,
  * Mark active, Restore) as a button, and a menu naming each other change
- * (Mark away, Offboard, and for someone Away, Change return date). Every one
- * opens a confirmation for that change alone. Active people get Change status.
+ * that can be made now (Mark away, Offboard, and for someone Away, Change
+ * return date). Every one opens a confirmation for that change alone. Active
+ * people get Change status, or a button named for the one change left.
  */
 export function StatusCardActions(
   props: Omit<
@@ -701,10 +808,26 @@ export function StatusCardActions(
     (action !== "suspend" || Boolean(props.onSuspend));
   const likely = suggestedStatusChoice(props.employee);
   const suggested = likely && offered(likely.action) ? likely : null;
-  if (!suggested) return <EmployeeStatusActions {...props} variant="card" focus="status" />;
-  const rest = statusChoices(props.employee).filter(
-    (option) => option.action !== suggested.action && offered(option.action),
+  const available = availableStatusChoices(props.employee).filter((option) =>
+    offered(option.action),
   );
+  if (!suggested) {
+    // One change left is the button's name; with none, the planned card's Edit plan is the way in.
+    if (available.length === 0) return null;
+    if (available.length === 1) {
+      const [only] = available;
+      return (
+        <EmployeeStatusActions
+          {...props}
+          variant="card"
+          label={describeStatusAction(only.action, "").label}
+          initialChoice={only.action}
+        />
+      );
+    }
+    return <EmployeeStatusActions {...props} variant="card" focus="status" />;
+  }
+  const rest = available.filter((option) => option.action !== suggested.action);
   const away = props.employee.status === "inactive" && !props.employee.archivedAt;
   const items: { key: string; label: string; open: MenuOpening }[] = [
     ...(away && props.onSetReturnDate

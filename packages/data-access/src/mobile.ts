@@ -1605,14 +1605,14 @@ export async function updateMobileEmployeeReturnDateRow(
   return (data as DbEmployee | null | undefined) ?? null;
 }
 
-/** Plans, moves or cancels (null) a status change for a later date (51g1). */
+/** Plans, moves or cancels (null) a status change for a later date (51g). */
 export async function updateMobileEmployeePlannedChangeRow(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | null;
+    plannedStatus: "away" | "removed" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;

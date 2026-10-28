@@ -7,8 +7,13 @@ import {
   canMarkInactive,
   isAwayAbsenceRefusal,
   isSelfAction,
+  isValidLastDay,
   isValidPlannedStart,
   isValidReturnDate,
+  LAST_DAY_INVALID_CODE,
+  LAST_DAY_INVALID_MESSAGE,
+  plannedFromForLastDay,
+  plannedLastDay,
   NO_PLANNED_CHANGE_CODE,
   NO_PLANNED_CHANGE_MESSAGE,
   NOT_AWAY_CODE,
@@ -110,7 +115,7 @@ type UpdateEmployeePlannedChange = (
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | null;
+    plannedStatus: "away" | "removed" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;
@@ -206,6 +211,7 @@ type PeopleStatusResult =
         | typeof NOT_PLANNABLE_CODE
         | typeof NO_PLANNED_CHANGE_CODE
         | typeof PLANNED_START_INVALID_CODE
+        | typeof LAST_DAY_INVALID_CODE
         | typeof RETURN_DATE_INVALID_CODE;
       status: 400;
     }
@@ -282,8 +288,12 @@ export async function updateMobilePersonStatus(
     };
   }
 
+  // A planned last day (51g2) is edited through the same action as a planned Away.
+  const editingLastDay =
+    input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "removed";
   if (
-    (input.body.action === "deactivate" || input.body.action === "setPlannedChange") &&
+    (input.body.action === "deactivate" ||
+      (input.body.action === "setPlannedChange" && !editingLastDay)) &&
     !canMarkInactive(currentEmployee.focusAreaIds)
   ) {
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
@@ -292,8 +302,12 @@ export async function updateMobilePersonStatus(
   const returnDate = input.body.returnDate ?? null;
   const today = getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null);
   const startDate = input.body.startDate ?? null;
-  // A start date after today plans the Away rather than starting it (51g1).
+  const lastDay = input.body.lastDay ?? null;
+  // A start date after today plans the Away rather than starting it (51g1),
+  // and a last day plans the Offboard for the day after it (51g2).
+  const planningLastDay = (input.body.action === "remove" && lastDay !== null) || editingLastDay;
   const planning =
+    planningLastDay ||
     input.body.action === "setPlannedChange" ||
     (input.body.action === "deactivate" && startDate !== null && startDate !== today);
   if (
@@ -321,17 +335,31 @@ export async function updateMobilePersonStatus(
   }
 
   if (planning || input.body.action === "cancelPlannedChange") {
-    const refusal = planRefusal(
-      currentEmployee,
-      input.body.action,
-      planning,
-      startDate,
-      returnDate,
-      today,
-    );
+    const refusal = planningLastDay
+      ? lastDayRefusal(currentEmployee, lastDay, today)
+      : planRefusal(currentEmployee, input.body.action, planning, startDate, returnDate, today);
     if (refusal) return refusal;
+    if (input.body.action === "remove") {
+      const lastSuperAdmin = await lastSuperAdminRefusal(auth, currentEmployee, deps);
+      if (lastSuperAdmin) return lastSuperAdmin;
+    }
     try {
-      return await changePlan(auth, input, currentEmployee, planning, startDate, returnDate, deps);
+      if (planningLastDay) {
+        return await changePlan(
+          auth,
+          input,
+          currentEmployee,
+          { kind: "lastDay", lastDay: lastDay as string },
+          deps,
+        );
+      }
+      return await changePlan(
+        auth,
+        input,
+        currentEmployee,
+        planning ? { kind: "away", startDate, returnDate } : null,
+        deps,
+      );
     } catch (error) {
       if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
       throw error;
@@ -387,7 +415,68 @@ function planRefusal(
   return null;
 }
 
-/** Plans, moves or cancels an Away for a later date (51g1); their status stays Active. */
+function lastDayRefusal(
+  employee: Employee,
+  lastDay: string | null,
+  today: string,
+): PeopleStatusResult | null {
+  if (employee.status !== "active" || employee.archivedAt || employee.suspendedAt) {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_PLANNABLE_MESSAGE,
+      code: NOT_PLANNABLE_CODE,
+      status: 400,
+    };
+  }
+  if (lastDay === null || !isValidLastDay(lastDay, today)) {
+    return {
+      kind: "invalid_status_change",
+      error: LAST_DAY_INVALID_MESSAGE,
+      code: LAST_DAY_INVALID_CODE,
+      status: 400,
+    };
+  }
+  return null;
+}
+
+/**
+ * Offboarding blocks login at the JWT hook regardless of org_role, so
+ * offboarding the org's only super_admin, now or on a last day, would lock
+ * the org out; the same guard as DELETE /api/organizations/access on web.
+ */
+async function lastSuperAdminRefusal(
+  auth: PeopleStatusContext,
+  currentEmployee: Employee,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult | null> {
+  if (!currentEmployee.userId) return null;
+  const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    currentEmployee.userId,
+  );
+  if (
+    targetOrgRole === "super_admin" &&
+    (await deps.countActiveSuperAdmins(auth.serviceClient, auth.currentOrg.id)) <= 1
+  ) {
+    return {
+      kind: "cannot_remove_last_super_admin",
+      error: "Cannot remove the only super admin. Transfer ownership first.",
+      status: 400,
+    };
+  }
+  return null;
+}
+
+type PlanChange =
+  | { kind: "away"; startDate: string | null; returnDate: string | null }
+  | { kind: "lastDay"; lastDay: string }
+  | null;
+
+/**
+ * Plans, moves or cancels (null) an Away for a later date (51g1) or a last
+ * day (51g2); their status stays Active until the day.
+ */
 async function changePlan(
   auth: PeopleStatusContext,
   input: {
@@ -397,21 +486,21 @@ async function changePlan(
     userAgent: string | null;
   },
   currentEmployee: Employee,
-  planning: boolean,
-  startDate: string | null,
-  returnDate: string | null,
+  plan: PlanChange,
   deps: Parameters<typeof updateMobilePersonStatus>[2],
 ): Promise<PeopleStatusResult> {
   const action = input.body.action;
+  const away = plan?.kind === "away" ? plan : null;
   const updatedEmployee = await deps.updateEmployeePlannedChange(auth.serviceClient, {
     orgId: auth.currentOrg.id,
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
-    plannedStatus: planning ? "away" : null,
-    plannedFrom: planning ? startDate : null,
-    plannedUntil: planning ? returnDate : null,
-    plannedAbsenceTypeId: planning && returnDate ? (input.body.absenceTypeId ?? null) : null,
-    ...(action === "deactivate" || input.body.note !== undefined
+    plannedStatus: plan?.kind === "lastDay" ? "removed" : away ? "away" : null,
+    plannedFrom:
+      plan?.kind === "lastDay" ? plannedFromForLastDay(plan.lastDay) : (away?.startDate ?? null),
+    plannedUntil: away?.returnDate ?? null,
+    plannedAbsenceTypeId: away?.returnDate ? (input.body.absenceTypeId ?? null) : null,
+    ...(action === "deactivate" || action === "remove" || input.body.note !== undefined
       ? { plannedNote: input.body.note ?? "" }
       : {}),
     updatedBy: auth.user.id,
@@ -439,36 +528,56 @@ async function changePlan(
     };
   }
 
+  const wasLastDay = currentEmployee.plannedStatus === "removed";
   await deps.insertAuditLog(auth.serviceClient, {
     org_id: auth.currentOrg.id,
     actor_id: auth.user.id,
     actor_email: auth.user.email ?? null,
     action:
-      action === "deactivate"
-        ? "employee.away_planned"
-        : action === "setPlannedChange"
-          ? "employee.away_plan_changed"
-          : "employee.away_plan_cancelled",
+      plan?.kind === "lastDay"
+        ? action === "remove"
+          ? "employee.last_day_set"
+          : "employee.last_day_changed"
+        : action === "deactivate"
+          ? "employee.away_planned"
+          : action === "setPlannedChange"
+            ? "employee.away_plan_changed"
+            : wasLastDay
+              ? "employee.last_day_cancelled"
+              : "employee.away_plan_cancelled",
     resource_type: "employee",
     resource_id: input.employeeId,
-    details: planning
-      ? {
-          ...(action === "setPlannedChange"
-            ? {
-                fromPlannedFrom: currentEmployee.plannedFrom ?? null,
-                fromPlannedUntil: currentEmployee.plannedUntil ?? null,
-              }
-            : {}),
-          plannedFrom: startDate,
-          plannedUntil: returnDate,
-          ...(input.body.absenceTypeId ? { plannedAbsenceTypeId: input.body.absenceTypeId } : {}),
-          changedFields: ["planned_status"],
-        }
-      : {
-          plannedFrom: currentEmployee.plannedFrom ?? null,
-          plannedUntil: currentEmployee.plannedUntil ?? null,
-          changedFields: ["planned_status"],
-        },
+    details:
+      plan?.kind === "lastDay"
+        ? {
+            ...(action === "setPlannedChange"
+              ? { fromLastDay: plannedLastDay(currentEmployee) }
+              : {}),
+            lastDay: plan.lastDay,
+            changedFields: ["planned_status"],
+          }
+        : away
+          ? {
+              ...(action === "setPlannedChange"
+                ? {
+                    fromPlannedFrom: currentEmployee.plannedFrom ?? null,
+                    fromPlannedUntil: currentEmployee.plannedUntil ?? null,
+                  }
+                : {}),
+              plannedFrom: away.startDate,
+              plannedUntil: away.returnDate,
+              ...(input.body.absenceTypeId
+                ? { plannedAbsenceTypeId: input.body.absenceTypeId }
+                : {}),
+              changedFields: ["planned_status"],
+            }
+          : wasLastDay
+            ? { lastDay: plannedLastDay(currentEmployee), changedFields: ["planned_status"] }
+            : {
+                plannedFrom: currentEmployee.plannedFrom ?? null,
+                plannedUntil: currentEmployee.plannedUntil ?? null,
+                changedFields: ["planned_status"],
+              },
     ip_address: input.requestIp,
     user_agent: input.userAgent,
   });
@@ -496,31 +605,9 @@ async function changeStatus(
   returnDate: string | null,
   deps: Parameters<typeof updateMobilePersonStatus>[2],
 ): Promise<PeopleStatusResult> {
-  // Removing staff already fully blocks login at the JWT hook regardless of
-  // org_role, so removing the org's only super_admin here would lock the org
-  // out just as surely as deleting their membership would — same guard as
-  // DELETE /api/organizations/access on web.
-  if (input.body.action === "remove" && currentEmployee.userId) {
-    const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
-      auth.serviceClient,
-      auth.currentOrg.id,
-      currentEmployee.userId,
-    );
-
-    if (targetOrgRole === "super_admin") {
-      const superAdminCount = await deps.countActiveSuperAdmins(
-        auth.serviceClient,
-        auth.currentOrg.id,
-      );
-
-      if (superAdminCount <= 1) {
-        return {
-          kind: "cannot_remove_last_super_admin",
-          error: "Cannot remove the only super admin. Transfer ownership first.",
-          status: 400,
-        };
-      }
-    }
+  if (input.body.action === "remove") {
+    const refusal = await lastSuperAdminRefusal(auth, currentEmployee, deps);
+    if (refusal) return refusal;
   }
 
   const now = new Date().toISOString();

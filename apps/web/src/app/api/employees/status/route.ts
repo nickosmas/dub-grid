@@ -5,7 +5,8 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser, requireSensitiveActionAuth } from "@/lib/api-auth";
-import { endUserSessions, revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessions } from "@/lib/auth/revocation";
+import { endOffboardedAccess } from "@/features/employees/server/offboard-access";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { canManageEmployees } from "@/app/api/employees/shared";
@@ -21,8 +22,13 @@ import {
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
   isAwayAbsenceRefusal,
+  isValidLastDay,
   isValidPlannedStart,
   isValidReturnDate,
+  LAST_DAY_INVALID_CODE,
+  LAST_DAY_INVALID_MESSAGE,
+  plannedFromForLastDay,
+  plannedLastDay,
   NO_PLANNED_CHANGE_CODE,
   NO_PLANNED_CHANGE_MESSAGE,
   NOT_AWAY_CODE,
@@ -78,6 +84,11 @@ const bodySchema = z.object({
    * plans the Away (51g1) instead of starting it; today or left out starts it.
    */
   startDate: z.string().date().nullable().optional(),
+  /**
+   * Offboard, and setPlannedChange on a planned last day: their last day
+   * (51g2). They're offboarded the day after it instead of now.
+   */
+  lastDay: z.string().date().nullable().optional(),
 });
 
 async function fetchOrgToday(serviceClient: SupabaseClient, orgId: string): Promise<string> {
@@ -150,6 +161,7 @@ export async function POST(req: NextRequest) {
   const returnDate = parsed.data.returnDate ?? null;
   const absenceTypeId = parsed.data.absenceTypeId;
   const startDate = parsed.data.startDate ?? null;
+  const lastDay = parsed.data.lastDay ?? null;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -218,15 +230,20 @@ export async function POST(req: NextRequest) {
       return buildConflictResponse(currentEmployee);
     }
 
-    // A start date after today plans the Away rather than starting it (51g1).
+    // A start date after today plans the Away rather than starting it (51g1),
+    // and a last day plans the Offboard for the day after it (51g2).
     let today: string | null = null;
     const orgToday = async () => (today ??= await fetchOrgToday(serviceClient, orgId));
-    const planning =
-      action === "setPlannedChange" ||
+    const editingLastDay =
+      action === "setPlannedChange" && currentEmployee.plannedStatus === "removed";
+    const planningLastDay = (action === "remove" && lastDay !== null) || editingLastDay;
+    const planningAway =
+      (action === "setPlannedChange" && !editingLastDay) ||
       (action === "deactivate" && startDate !== null && startDate !== (await orgToday()));
+    const planning = planningAway || planningLastDay;
 
     if (
-      (action === "deactivate" || action === "setPlannedChange") &&
+      (action === "deactivate" || (action === "setPlannedChange" && !editingLastDay)) &&
       !canMarkInactive(currentEmployee.focusAreaIds)
     ) {
       return NextResponse.json(
@@ -290,14 +307,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (planning && (startDate === null || !isValidPlannedStart(startDate, await orgToday()))) {
+    if (planningLastDay && (lastDay === null || !isValidLastDay(lastDay, await orgToday()))) {
+      return NextResponse.json(
+        { error: LAST_DAY_INVALID_MESSAGE, code: LAST_DAY_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (planningAway && (startDate === null || !isValidPlannedStart(startDate, await orgToday()))) {
       return NextResponse.json(
         { error: PLANNED_START_INVALID_MESSAGE, code: PLANNED_START_INVALID_CODE },
         { status: 400 },
       );
     }
 
-    if (planning && returnDate !== null && startDate !== null && returnDate <= startDate) {
+    if (planningAway && returnDate !== null && startDate !== null && returnDate <= startDate) {
       return NextResponse.json(
         { error: PLANNED_RETURN_INVALID_MESSAGE, code: RETURN_DATE_INVALID_CODE },
         { status: 400 },
@@ -378,7 +402,20 @@ export async function POST(req: NextRequest) {
       fromStatus: currentEmployee.status,
     };
 
-    switch (planning ? "plan" : action) {
+    switch (planningLastDay ? "planLastDay" : planning ? "plan" : action) {
+      case "planLastDay":
+        update.planned_status = "removed";
+        update.planned_from = plannedFromForLastDay(lastDay as string);
+        update.planned_until = null;
+        update.planned_absence_type_id = null;
+        if (action === "remove" || note !== undefined) update.planned_note = note ?? "";
+        update.planned_by = user.id;
+        auditAction = editingLastDay ? "employee.last_day_changed" : "employee.last_day_set";
+        auditDetails = {
+          ...(editingLastDay ? { fromLastDay: plannedLastDay(currentEmployee) } : {}),
+          lastDay,
+        };
+        break;
       case "plan":
         update.planned_status = "away";
         update.planned_from = startDate;
@@ -402,6 +439,11 @@ export async function POST(req: NextRequest) {
         break;
       case "cancelPlannedChange":
         update.planned_status = null;
+        if (currentEmployee.plannedStatus === "removed") {
+          auditAction = "employee.last_day_cancelled";
+          auditDetails = { lastDay: plannedLastDay(currentEmployee) };
+          break;
+        }
         auditAction = "employee.away_plan_cancelled";
         auditDetails = {
           plannedFrom: currentEmployee.plannedFrom ?? null,
@@ -536,17 +578,6 @@ export async function POST(req: NextRequest) {
       scheduleSuspensionNotice({ orgId, empId, actorId: user.id });
     }
 
-    if (action === "remove" && currentEmployee.userId) {
-      try {
-        await revokeAllUserSessions(currentEmployee.userId);
-      } catch (err) {
-        logger.error(
-          { error: err, orgId, empId, userId: currentEmployee.userId, action },
-          "Failed to revoke sessions after employee status change",
-        );
-      }
-    }
-
     // Remove/activate a linked user's org membership in lockstep with their
     // employees.status, in the same request that already committed the status
     // change — not as a second, separately-triggered client call — so the two
@@ -556,25 +587,24 @@ export async function POST(req: NextRequest) {
     // DELETE /api/organizations/access — so a plain admin with only
     // canManageEmployees can't use Remove/Activate as a side door to change
     // org access they aren't allowed to touch directly.
-    if (
-      (action === "remove" || action === "activate") &&
-      currentEmployee.userId &&
-      (isGridmaster || isSuperAdmin)
-    ) {
-      const { error: membershipError } =
-        action === "remove"
-          ? await serviceClient
-              .from("organization_memberships")
-              .update({ archived_at: now, archived_by: user.id })
-              .eq("user_id", currentEmployee.userId)
-              .eq("org_id", orgId)
-              .is("archived_at", null)
-          : await serviceClient
-              .from("organization_memberships")
-              .update({ archived_at: null, archived_by: null })
-              .eq("user_id", currentEmployee.userId)
-              .eq("org_id", orgId)
-              .not("archived_at", "is", null);
+    if (action === "remove" && !planning) {
+      await endOffboardedAccess(serviceClient, {
+        orgId,
+        empId,
+        userId: currentEmployee.userId,
+        actorId: user.id,
+        endMembership: isGridmaster || isSuperAdmin,
+        at: now,
+      });
+    }
+
+    if (action === "activate" && currentEmployee.userId && (isGridmaster || isSuperAdmin)) {
+      const { error: membershipError } = await serviceClient
+        .from("organization_memberships")
+        .update({ archived_at: null, archived_by: null })
+        .eq("user_id", currentEmployee.userId)
+        .eq("org_id", orgId)
+        .not("archived_at", "is", null);
 
       if (membershipError) {
         logger.error(

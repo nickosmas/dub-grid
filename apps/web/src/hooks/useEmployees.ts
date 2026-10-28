@@ -10,10 +10,11 @@ import {
   fetchEmployees,
   insertEmployee,
   removeEmployee,
-  setEmployeePlannedAway,
+  setEmployeePlannedChange,
+  plannedChangeToast,
   setEmployeeReturnDate,
   updateEmployee,
-  type PlannedAway,
+  type PlannedChange,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
@@ -49,7 +50,12 @@ export interface EmployeesData {
     runStepUp: StepUpRun,
   ) => Promise<boolean>;
   /** A step-up refusal is rethrown (after the optimistic change is undone) for the caller to prompt. */
-  handleRemoveEmployee: (empId: string, note?: string, accessToken?: string) => Promise<boolean>;
+  handleRemoveEmployee: (
+    empId: string,
+    note?: string,
+    accessToken?: string,
+    lastDay?: string,
+  ) => Promise<boolean>;
   handleDeactivateEmployee: (
     empId: string,
     note?: string,
@@ -63,9 +69,9 @@ export interface EmployeesData {
    * Moves or changes a planned Away, or cancels it (null). A step-up refusal
    * is rethrown for the caller to prompt.
    */
-  handleSetPlannedAway: (
+  handleSetPlannedChange: (
     empId: string,
-    plan: PlannedAway | null,
+    plan: PlannedChange | null,
     accessToken?: string,
   ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
@@ -284,27 +290,26 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleRemoveEmployee = useCallback(
-    async (empId: string, note?: string, accessToken?: string) => {
+    async (empId: string, note?: string, accessToken?: string, lastDay?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
 
       const now = new Date().toISOString();
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) =>
-        prev.map((e) =>
-          e.id === empId ? { ...e, status: "removed" as const, statusChangedAt: now } : e,
-        ),
-      );
-      try {
-        const updatedEmployee = await removeEmployee(
-          empId,
-          orgId,
-          targetEmployee.version,
-          note,
-          accessToken,
+      // A last day keeps them as they are until the day after it (51g2).
+      if (!lastDay) {
+        setAllLocal((prev) =>
+          prev.map((e) =>
+            e.id === empId ? { ...e, status: "removed" as const, statusChangedAt: now } : e,
+          ),
         );
+      }
+      try {
+        const updatedEmployee = await (lastDay
+          ? removeEmployee(empId, orgId, targetEmployee.version, note, accessToken, lastDay)
+          : removeEmployee(empId, orgId, targetEmployee.version, note, accessToken));
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Offboarded");
+        toast.success(lastDay ? "Last day set" : "Offboarded");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -393,12 +398,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
-  const handleSetPlannedAway = useCallback(
-    async (empId: string, plan: PlannedAway | null, accessToken?: string) => {
+  const handleSetPlannedChange = useCallback(
+    async (empId: string, plan: PlannedChange | null, accessToken?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
       try {
-        const updatedEmployee = await setEmployeePlannedAway(
+        const updatedEmployee = await setEmployeePlannedChange(
           empId,
           orgId,
           targetEmployee.version,
@@ -406,7 +411,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success(plan ? "Planned away changed" : "Planned away cancelled");
+        toast.success(plannedChangeToast(plan, targetEmployee.plannedStatus));
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -563,6 +568,6 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleReinstateEmployee,
     handleSuspendEmployee,
     handleSetEmployeeReturnDate,
-    handleSetPlannedAway,
+    handleSetPlannedChange,
   };
 }

@@ -140,7 +140,12 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
-import { awayLockedHint, awayRangeOf, buildRowAwayDays } from "./schedule-grid/awayRuns";
+import {
+  awayLockedHint,
+  awayRangeOf,
+  buildRowAwayDays,
+  LEAVING_RUN_LABEL,
+} from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -2121,8 +2126,9 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              // Someone away until a date (51e), or with an Away planned (51g1),
-              // has an Away bar on those days from today on, and nothing else there.
+              // Someone away until a date (51e), with an Away planned (51g1), or
+              // past a planned last day (51g2) has a bar on those days from today
+              // on, and nothing else there.
               const rowAwayRange = awayRangeOf(emp);
               const rowAwayDays = buildRowAwayDays(
                 rowAwayRange,
@@ -2727,6 +2733,7 @@ const SectionBlock = memo(function SectionBlock({
                             {awayRunDay?.position === "start" && (
                               <AwayRunBar
                                 runIndex={awayRunDay.runIndex}
+                                label={rowAwayRange?.lastDay ? LEAVING_RUN_LABEL : undefined}
                                 absenceName={
                                   rowAwayAbsence
                                     ? rowAwayAbsence.name || rowAwayAbsence.label

@@ -326,6 +326,7 @@ async function updateEmployeeStatus(
     returnDate?: string | null;
     absenceTypeId?: number | null;
     startDate?: string | null;
+    lastDay?: string | null;
   },
   accessToken?: string,
 ): Promise<Employee> {
@@ -366,12 +367,14 @@ async function updateEmployeeStatus(
   return body.employee;
 }
 
+/** Offboards someone now, or with `lastDay` (51g2) the day after it. */
 export function removeEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
   note?: string,
   accessToken?: string,
+  lastDay?: string | null,
 ): Promise<Employee> {
   return updateEmployeeStatus(
     {
@@ -380,6 +383,7 @@ export function removeEmployee(
       action: "remove",
       expectedVersion,
       note,
+      ...(lastDay ? { lastDay } : {}),
     },
     accessToken,
   );
@@ -417,29 +421,48 @@ export interface PlannedAway {
   absenceTypeId: number | null;
 }
 
+/** A last day planned ahead (51g2): offboarded the day after it. */
+export interface PlannedLastDay {
+  lastDay: string;
+}
+
+/** A status change planned for a later date (51g). */
+export type PlannedChange = PlannedAway | PlannedLastDay;
+
+/** The toast once a planned change is saved or cancelled. */
+export function plannedChangeToast(
+  plan: PlannedChange | null,
+  plannedStatus: Employee["plannedStatus"],
+): string {
+  if (plan) return "lastDay" in plan ? "Last day changed" : "Planned away changed";
+  return plannedStatus === "removed" ? "Last day cancelled" : "Planned away cancelled";
+}
+
 /**
- * Moves or changes someone's planned Away, or cancels it (null). A Gridmaster
- * passes fresh proof as the token to change one.
+ * Moves or changes someone's planned Away or last day, or cancels it (null).
+ * A Gridmaster passes fresh proof as the token to change one.
  */
-export function setEmployeePlannedAway(
+export function setEmployeePlannedChange(
   empId: string,
   orgId: string,
   expectedVersion: number,
-  plan: PlannedAway | null,
+  plan: PlannedChange | null,
   accessToken?: string,
 ): Promise<Employee> {
   return updateEmployeeStatus(
-    plan
-      ? {
-          empId,
-          orgId,
-          action: "setPlannedChange",
-          expectedVersion,
-          startDate: plan.startDate,
-          returnDate: plan.returnDate,
-          absenceTypeId: plan.returnDate ? plan.absenceTypeId : null,
-        }
-      : { empId, orgId, action: "cancelPlannedChange", expectedVersion },
+    plan && "lastDay" in plan
+      ? { empId, orgId, action: "setPlannedChange", expectedVersion, lastDay: plan.lastDay }
+      : plan
+        ? {
+            empId,
+            orgId,
+            action: "setPlannedChange",
+            expectedVersion,
+            startDate: plan.startDate,
+            returnDate: plan.returnDate,
+            absenceTypeId: plan.returnDate ? plan.absenceTypeId : null,
+          }
+        : { empId, orgId, action: "cancelPlannedChange", expectedVersion },
     accessToken,
   );
 }

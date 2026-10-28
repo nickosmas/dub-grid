@@ -1244,14 +1244,67 @@ describe("PersonDetailScreen", () => {
       }
     });
 
-    it("offers someone with no account no Suspend", () => {
+    it("lists Suspend disabled for someone with no account", () => {
       renderWithStatusMutation({ userId: null });
 
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
 
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
-        ["Away. Not scheduled while away.", "Offboarded. No longer on staff. Can't be scheduled."],
+        [
+          "Away. Not scheduled while away.",
+          "Suspended. Only someone with an account can be suspended.",
+          "Offboarded. No longer on staff. Can't be scheduled.",
+        ],
       );
+      expect(screen.getByRole("radio", { name: /^Suspended/ })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
+    it("names the button for Offboard, the one change left with no account and an away planned (prod bug)", () => {
+      renderWithStatusMutation({
+        userId: null,
+        focusAreaIds: [1],
+        plannedStatus: "away",
+        plannedFrom: "2026-11-01",
+      });
+
+      // Offboard is the one change left, so the card's button is named for it.
+      expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+      expect(screen.getByText("Offboard Mina Diaz?")).toBeInTheDocument();
+      expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    });
+
+    it("keeps Change status, with the disabled rows, when two or more changes are left", () => {
+      renderWithStatusMutation({ plannedStatus: "away", plannedFrom: "2026-11-01" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        [
+          "Away. Planned from Sun, Nov 1. Change it with Edit plan.",
+          "Suspended. Can't sign in. Stays on the schedule.",
+          "Offboarded. No longer on staff. Can't sign in or be scheduled.",
+        ],
+      );
+      // Nothing is picked for them, and a disabled row can't be.
+      pick(/^Away/);
+      expect(screen.getByRole("radio", { name: /^Away/ })).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("shows no status button when no change is left", () => {
+      renderWithStatusMutation({
+        userId: null,
+        focusAreaIds: [],
+        plannedStatus: "removed",
+        plannedFrom: day(5),
+      });
+
+      expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Offboard" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit plan" })).toBeInTheDocument();
     });
 
     it("names each other change in a suspended person's menu, each with its own sheet", async () => {
@@ -1375,7 +1428,7 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("keeps a planned away's Change status to the list, with no second Away", () => {
+    it("keeps a planned away's Change status to the list, with Away disabled", () => {
       renderWithStatusMutation({
         plannedStatus: "away",
         plannedFrom: day(5),
@@ -1386,6 +1439,7 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
+          `Away. Planned from ${formatReturnDate(day(5), { weekday: true })}. Change it with Edit plan.`,
           "Suspended. Can't sign in. Stays on the schedule.",
           "Offboarded. No longer on staff. Can't sign in or be scheduled.",
         ],
@@ -1457,6 +1511,92 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("sets a last day through Offboard (51g2)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      fireEvent.click(screen.getByRole("button", { name: "Last day, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(
+          `They stay Active through ${formatReturnDate(day(3), { weekday: true })}, their last day.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Set last day");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "remove",
+        copyAction: "archive",
+        lastDay: day(3),
+      });
+    });
+
+    it("offboards now when no last day is picked", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      confirm("Offboard");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "remove", lastDay: null });
+    });
+
+    it("moves, cancels and clears a last day from Edit plan", () => {
+      const leaving = { plannedStatus: "removed" as const, plannedFrom: day(5) };
+      const mutate = renderWithStatusMutation(leaving);
+
+      expect(
+        screen.getByText(`Leaving ${formatReturnDate(day(4), { weekday: true })}`),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Change Mina Diaz's last day?")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Last day, / }));
+      choose(day(6));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        copyAction: "setPlannedChange",
+        lastDay: day(6),
+        startDate: undefined,
+        fromPlannedStatus: "removed",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(leaving);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel last day" }));
+      confirm("Cancel last day");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(leaving);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Last day, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Offboard now" }));
+      expect(screen.getByText("Offboard Mina Diaz?")).toBeInTheDocument();
+      confirm("Offboard");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({ action: "remove", lastDay: undefined });
+    });
+
+    it("lists Offboard disabled while a last day is planned", () => {
+      renderWithStatusMutation({ plannedStatus: "removed", plannedFrom: day(5) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        [
+          "Away. Keeps sign-in. Not scheduled while away.",
+          "Suspended. Can't sign in. Stays on the schedule.",
+          `Offboarded. Leaving ${formatReturnDate(day(4), { weekday: true })}. Change it with Edit plan.`,
+        ],
+      );
+      pick(/^Suspended/);
+      expect(screen.getByLabelText("Changes")).toHaveTextContent(
+        `The last day planned for ${formatReturnDate(day(4))} is cancelled.`,
+      );
+    });
+
     it("never offers today as a return date", () => {
       renderWithStatusMutation();
 
@@ -1495,12 +1635,16 @@ describe("PersonDetailScreen", () => {
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "suspend" });
     });
 
-    it("offers no Away to someone who isn't on the schedule", () => {
+    it("lists Away disabled for someone who isn't on the schedule", () => {
       renderWithStatusMutation({ focusAreaIds: [] });
 
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
 
-      expect(screen.queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /^Away/ })).toHaveAttribute(
+        "aria-label",
+        "Away. Only someone on the schedule can be marked away.",
+      );
+      expect(screen.getByRole("radio", { name: /^Away/ })).toHaveAttribute("aria-disabled", "true");
     });
 
     it("brings an Away person back with Mark active", () => {
@@ -1675,9 +1819,10 @@ describe("PersonDetailScreen", () => {
         "Add to schedule",
         "Add to management",
       ]);
-      // Change status sits in the status card, between the contact pair and the sections.
-      expect(names.indexOf("Change status")).toBeGreaterThan(names.indexOf("Email"));
-      expect(names.indexOf("Change status")).toBeLessThan(footStart);
+      // The status button sits in the status card, between the contact pair and the
+      // sections; Offboard is the one change left for them, so it's named for it.
+      expect(names.indexOf("Offboard")).toBeGreaterThan(names.indexOf("Email"));
+      expect(names.indexOf("Offboard")).toBeLessThan(footStart);
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
       expect(

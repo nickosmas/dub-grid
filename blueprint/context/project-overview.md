@@ -386,9 +386,14 @@ Item 51 is split:
     picked), the plan shows as "Away from Nov 10" and can be changed or
     cancelled, and the daily job marks them Away on the day (migration
     103).
-  - **51g2 - Last day:** "Leaving Nov 8"; shifts after it come off in the
-    draft, nobody can schedule them past it, and the job archives them the
-    day after.
+  - **51g2 - Last day:** shipped; Offboard takes an optional Last day,
+    today up to a year ahead (web and mobile). They stay Active through it
+    and show "Leaving Nov 8"; the days after it are locked and cleared in the
+    draft, with their open requests closed, nobody can schedule them, the
+    grid draws them as an Offboarded bar, and the daily job offboards them
+    the day after the way a manual Offboard does. One plan per person: a
+    last day replaces a planned away, and any other change cancels it
+    (migration 104).
   - **51g3 - Suspended until:** an optional end date on a suspension; the
     job reinstates them on it.
   - **51g4 - First day:** a new hire can't be scheduled before their first
@@ -609,7 +614,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `103`.
+  checksum-locked through `104`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.
