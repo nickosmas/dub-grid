@@ -22,7 +22,14 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { withoutHiddenRequests } from "@dubgrid/data-access";
-import { isSchedulableOn, type EmployeeStatus } from "@dubgrid/domain";
+import {
+  CORRECTION_NOTE_MAX_LENGTH,
+  CORRECTION_REASON_KEYS,
+  correctionNeedsNote,
+  isSchedulableOn,
+  type CorrectionReason,
+  type EmployeeStatus,
+} from "@dubgrid/domain";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -144,6 +151,17 @@ const requestActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("updateScheduleLastViewed"),
     orgId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("correctShift"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    input: scheduleCellStateSchema,
+    expectedVersion: z.number().int().nonnegative().optional(),
+    reason: z.enum(CORRECTION_REASON_KEYS),
+    note: z.string().trim().max(CORRECTION_NOTE_MAX_LENGTH).optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("upsertShift"),
@@ -774,6 +792,90 @@ async function readCellStateForAudit(
   }
 }
 
+/** The published cell a correction replaces, for its activity-log row. */
+async function readPublishedCellStateForAudit(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+): Promise<ScheduleCellState | null | undefined> {
+  try {
+    return cellStateFromSnapshotPayload(
+      await fetchScheduleCellSnapshotPayload(serviceClient, orgId, employeeId, date, "published"),
+    );
+  } catch (error) {
+    logger.error({ error, orgId }, "Schedule correction before-state read failed");
+    return undefined;
+  }
+}
+
+/** A refusal from correct_schedule_cell (110), worded for the person correcting. */
+class CorrectionRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly status: 403 | 422,
+  ) {
+    super(message);
+  }
+}
+
+const CORRECTION_REFUSAL_PREFIX = "Correction not allowed: ";
+
+function correctionRefusal(error: { message?: string }): CorrectionRefusedError | null {
+  const message = error.message ?? "";
+  const index = message.indexOf(CORRECTION_REFUSAL_PREFIX);
+  if (index < 0) return null;
+  const why = message.slice(index + CORRECTION_REFUSAL_PREFIX.length).trim();
+  const sentence = `${why.charAt(0).toUpperCase()}${why.slice(1)}.`;
+  const forbidden = /Publish schedule|Super Admin|signed-in/.test(why);
+  return new CorrectionRefusedError(sentence, forbidden ? 403 : 422);
+}
+
+/** Corrects one person's published past day (53a) through the caller's own client. */
+async function correctShiftSnapshot(
+  client: ScheduleServiceClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    date: string;
+    state: ScheduleCellInput;
+    expectedVersion?: number;
+    reason: CorrectionReason;
+    note?: string;
+  },
+): Promise<void> {
+  const state = input.state.kind === "deleted" ? null : normalizeScheduleInput(input.state);
+  const storage = state ? getScheduleCellStorage(state) : null;
+  const { error } = await client.rpc("correct_schedule_cell", {
+    p_org_id: input.orgId,
+    p_emp_id: input.employeeId,
+    p_date: input.date,
+    p_state_kind: state?.kind ?? "deleted",
+    p_shift_ids: storage?.shiftIds ?? [],
+    p_job_ids: storage?.jobIds ?? [],
+    p_is_mentored_flags: storage?.isMentoredFlags ?? [],
+    p_absence_type_id: storage?.absenceTypeId ?? null,
+    p_custom_start_time: storage?.customStartTime ?? null,
+    p_custom_end_time: storage?.customEndTime ?? null,
+    p_absence_start_time: storage?.absenceStartTime ?? null,
+    p_absence_end_time: storage?.absenceEndTime ?? null,
+    p_expected_version: input.expectedVersion ?? null,
+    p_reason: input.reason,
+    p_note: input.note || null,
+  });
+  if (!error) return;
+  if (error.message?.includes("Optimistic lock failed")) {
+    await raiseOptimisticConflict(
+      client,
+      input.orgId,
+      input.employeeId,
+      input.date,
+      input.expectedVersion ?? 0,
+    );
+  }
+  throw correctionRefusal(error) ?? error;
+}
+
 /**
  * An indicator describes a shift, so a cell has to be carrying one before it
  * can be tagged. A draft shift counts: schedulers tag while they build.
@@ -1165,6 +1267,58 @@ export async function POST(req: NextRequest) {
           throw error;
         }
         return NextResponse.json({ success: true });
+      }
+
+      case "correctShift": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            (permissions.canEditShifts && permissions.canPublishSchedule),
+          { actor, gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+        if (correctionNeedsNote(data.reason) && !data.note) {
+          return NextResponse.json(
+            { error: "Say what happened.", code: "CORRECTION_REFUSED" },
+            { status: 422 },
+          );
+        }
+
+        const before = await readPublishedCellStateForAudit(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+        );
+        await correctShiftSnapshot(auth.userClient, {
+          orgId: data.orgId,
+          employeeId: data.employeeId,
+          date: data.date,
+          state: data.input,
+          expectedVersion: data.expectedVersion,
+          reason: data.reason,
+          note: data.note,
+        });
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift.corrected",
+          resourceType: "shift",
+          resourceId: `${data.employeeId}:${data.date}`,
+          details: { input: data.input, before, reason: data.reason, note: data.note ?? null },
+        });
+        return writeResponse(
+          auth.serviceClient,
+          data.orgId,
+          [{ employeeId: data.employeeId, date: data.date }],
+          data.echo,
+        );
       }
 
       case "upsertShift": {
@@ -2332,6 +2486,13 @@ export async function POST(req: NextRequest) {
           code: "SHIFT_OVERLAP",
         },
         { status: 409 },
+      );
+    }
+
+    if (error instanceof CorrectionRefusedError) {
+      return NextResponse.json(
+        { error: error.message, code: "CORRECTION_REFUSED" },
+        { status: error.status },
       );
     }
 

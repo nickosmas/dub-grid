@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 229bb6ddd76edd47176616010e558bb1c9f5faddf5b23730460fcc5bafe9031f -->
+<!-- blueprint:source-hash 46ae31997488017e77a794f32b9efef8434d29b8886b8af5a7d4487f1e26e2b8 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 52 are
-shipped. Item 40 is in progress. Item 53 is planned.
+shipped. Item 40 is in progress. Items 53 and 54 are planned.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,6 +88,7 @@ shipped. Item 40 is in progress. Item 53 is planned.
 | 51   | Shipped     | People are Active, Away, Suspended or Offboarded, with a last day and return date; managers see who takes a seat.               |
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 | 53   | Planned     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
+| 54   | Planned     | People away or absent all period sit last in their section, under a group row that folds.                                       |
 
 Item 40 is split:
 
@@ -484,6 +485,30 @@ the published version in Publish History, logs the reason, and marks the
 cell Corrected; hours and reports use it. Admins correct the last 14 days,
 older days need a Super Admin, and a day someone could have worked can be
 corrected even while they're away (owner decisions, 2026-10-28).
+Correcting needs Edit shifts and Publish schedule, and each correction is
+kept in its own record, read by the activity log and the cell's mark;
+Publish History stays as each publish left it (owner decisions, 2026-10-28).
+
+Item 53 is split:
+
+- **53a - The correction itself:** shipped; a server function and route
+  (migration 110) write the published day, clear its draft, check the
+  reason, the 14-day window and that the person could have worked the day,
+  record the correction and an activity-log row, and send no alert. It also
+  stops the cell-save function writing published cells for people who can
+  only edit shifts.
+- **53b - Past days in the grid:** planned; the Light tint, every bulk and
+  fill path skipping past days, the server refusing past drafts, and the
+  Correct this day panel.
+- **53c - Corrected everywhere:** planned; the Corrected mark, the activity
+  log, dashboard hours and the public docs.
+
+Item 54, Away all period, is planned. In the Week and 2 Weeks grid, anyone
+Away or on a whole-day absence for every day on screen moves to the end of
+their section under a group row "Away all period · 2" that folds; folded, it
+names each person and why. The day off absence alone doesn't count, the
+group starts open, and each viewer's browser remembers folding it (owner
+decisions, 2026-10-28).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
@@ -659,7 +684,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `108`.
+  checksum-locked through `110`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

@@ -1176,3 +1176,35 @@
       be corrected when they could have worked it, which replaces the lock
       099 puts on days before an Away person went away. Owner decisions,
       2026-10-28: Light tint; reports use the correction; 14 days for Admins.
+  - [x] 53a. **The correction itself** - a correction function and route
+        (migration 110, no UI) write the published day directly and clear
+        that cell's draft, with a required reason. It needs Edit shifts and
+        Publish schedule; Admins correct the last 14 days and older days
+        need a Super Admin, in the organization's timezone. It accepts a day
+        the person could have worked (on or after their first day, before
+        they went away) and refuses any other. It records each correction
+        in its own record with Before, After, the reason and who made it,
+        never in Publish History, writes a `shift.corrected` activity-log
+        row, and sends no alert or broadcast. It also stops the cell-save
+        function from writing published cells for anyone who can only edit
+        shifts.
+  - [ ] 53b. **Past days in the grid** - the Light tint on past days; drag,
+        paste, clear, bulk delete, Auto-build, Fill from Recurring Schedules
+        and import skip them, and the server refuses a draft for a past
+        date. Clicking a past cell opens Correct this day, built on 53a. Auto-build's
+        day-off and plan checks use the organization's today, not the
+        browser's.
+  - [ ] 53c. **Corrected everywhere** - the Corrected mark on a cell with
+        the reason on hover, corrections with their reason in the activity
+        log, web dashboard hours that follow a correction, and the public
+        docs.
+- [ ] 54. **Away all period** - in the Week and 2 Weeks grid, anyone Away or
+      on a whole-day absence for every day of the period on screen moves to
+      the end of their section, under a group row "Away all period · 2"
+      with a chevron. Open, their rows show as usual (the Away bar or the
+      absence run per week); folded, the row lists each name with why
+      ("Diane Patterson (Away until Nov 9), Shirley Bihag (Leave every
+      day)"). The day off absence on its own doesn't count. The group
+      starts open, and each viewer's browser remembers folding it. Owner
+      decisions, 2026-10-28; design reference: the inline prototype approved
+      that day.

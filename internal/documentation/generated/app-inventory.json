@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:28486ea21282b9709d617bb8e154c2bd1b0c28d459921fb60d6ffbce743cc381",
+  "sourceDigest": "sha256:a60f38df6e6afe5d811c8ba94b560bb28a34c6ece6ea0ecddb1b08356fdc8499",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4894,6 +4894,16 @@
       "source": {
         "path": "supabase/migrations/109_planned_restore.sql"
       }
+    },
+    {
+      "id": "migration:110_past_day_corrections.sql",
+      "version": "110",
+      "name": "past_day_corrections",
+      "file": "110_past_day_corrections.sql",
+      "sha256": "777b8874f1bd4d7ac0c45895032ffb48ae3f8fa025eee22a238722186bbda0fb",
+      "source": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -5279,6 +5289,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.schedule_cell_corrections",
+      "schema": "public",
+      "table": "schedule_cell_corrections",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
       }
     },
     {
