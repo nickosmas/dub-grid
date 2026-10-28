@@ -190,10 +190,16 @@ describe("EditEmployeePanel", () => {
       expect(screen.queryByText("First day")).not.toBeInTheDocument();
     });
 
-    it("keeps First day to move or clear once one is set", () => {
-      renderPanel({ employee: { ...employee, firstDay: "2026-11-10" } });
+    it("keeps First day to move or clear while it's ahead", () => {
+      renderPanel({ employee: { ...employee, firstDay: "2099-11-10" } });
 
       expect(screen.getByText("First day")).toBeInTheDocument();
+    });
+
+    it("leaves a first day that has passed to the record", () => {
+      renderPanel({ employee: { ...employee, firstDay: "2019-03-04" } });
+
+      expect(screen.queryByText("First day")).not.toBeInTheDocument();
     });
 
     it("scopes identity fields to explicit contact autofill tokens", () => {

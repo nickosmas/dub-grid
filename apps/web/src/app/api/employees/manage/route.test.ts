@@ -555,25 +555,49 @@ describe("POST /api/employees/manage", () => {
 
         expect(response.status).toBe(400);
         await expect(response.json()).resolves.toEqual({
-          error: "Choose a first day no more than a year ahead.",
+          error: "Choose a first day from today up to a year ahead.",
           code: "FIRST_DAY_INVALID",
         });
         expect(employeeUpdatePayloads).toHaveLength(0);
       });
 
-      it("takes a past first day and records the change", async () => {
+      it("refuses a new past first day, before writing", async () => {
         mockAuth({ canManageEmployees: true });
 
         const response = await POST(
-          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2019-03-04" }),
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2026-10-27" }),
+        );
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({ code: "FIRST_DAY_INVALID" });
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("takes a first day from today on and records the change", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2026-10-28" }),
         );
 
         expect(response.status).toBe(200);
         expect(firstDayAudit()?.details).toMatchObject({
           changedFields: expect.arrayContaining(["firstDay"]),
           from: { firstDay: null },
-          to: { firstDay: "2019-03-04" },
+          to: { firstDay: "2026-10-28" },
         });
+      });
+
+      it("keeps a past first day the save leaves as it was", async () => {
+        mockAuth({ canManageEmployees: true });
+        rowToEmployee.mockReturnValue(makeEmployee({ firstDay: "2019-03-04", focusAreaIds: [3] }));
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2019-03-04" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(fetchOrgToday).not.toHaveBeenCalled();
       });
 
       it("never re-checks a first day the save leaves as it was", async () => {

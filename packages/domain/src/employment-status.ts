@@ -127,7 +127,7 @@ export function canOffboardAtTier(
 
 export const FIRST_DAY_INVALID_CODE = "FIRST_DAY_INVALID";
 
-export const FIRST_DAY_INVALID_MESSAGE = "Choose a first day no more than a year ahead.";
+export const FIRST_DAY_INVALID_MESSAGE = "Choose a first day from today up to a year ahead.";
 
 /** How far ahead a status change can be planned, in days. */
 export const PLANNED_START_MAX_DAYS = 365;
@@ -166,14 +166,18 @@ export function isValidLastDay(lastDay: string, today: string): boolean {
   return lastDay >= today && lastDay <= shiftDateKey(today, PLANNED_START_MAX_DAYS);
 }
 
-/** A first day (YYYY-MM-DD, 51g4): any real past day, or up to a year after `today`. */
+/**
+ * A new or moved first day (YYYY-MM-DD, 51g4): from `today` up to a year
+ * ahead. It only matters while it's ahead, so a past one is never set; one
+ * already stored is kept as it is.
+ */
 export function isValidFirstDay(firstDay: string, today: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDay)) return false;
   const parsed = new Date(`${firstDay}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== firstDay) {
     return false;
   }
-  return firstDay <= shiftDateKey(today, PLANNED_START_MAX_DAYS);
+  return firstDay >= today && firstDay <= shiftDateKey(today, PLANNED_START_MAX_DAYS);
 }
 
 /**

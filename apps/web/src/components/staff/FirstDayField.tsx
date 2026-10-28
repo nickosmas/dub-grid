@@ -5,7 +5,7 @@ import { FIRST_DAY_FIELD_HINT, PLANNED_START_MAX_DAYS } from "@dubgrid/domain";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import { addDays, formatDateKey } from "@/lib/utils";
 
-/** A person's first day (51g4): any past day, or up to a year ahead; empty for none. */
+/** A person's first day (51g4): from today up to a year ahead; empty for none. */
 export function FirstDayField({
   value,
   onChange,
@@ -25,6 +25,7 @@ export function FirstDayField({
         onChange={onChange}
         label="First day"
         placeholder="Not set"
+        minDate={formatDateKey(new Date())}
         maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
         disabled={disabled}
         allowClear

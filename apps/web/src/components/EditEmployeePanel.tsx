@@ -34,6 +34,8 @@ import { satisfiesCertificationRequirement } from "@/lib/credential-requirements
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { FirstDayField } from "@/components/staff/FirstDayField";
+import { upcomingFirstDay } from "@dubgrid/domain";
+import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -614,8 +616,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         style={{ width: "100%" }}
                       />
                     </div>
-                    {/* Asked when adding someone; once set, it stays here to move or clear. */}
-                    {employee.firstDay ? (
+                    {/* Asked when adding someone; here only while it's ahead, to move or clear. */}
+                    {upcomingFirstDay(employee, formatDateKey(new Date())) ? (
                       <FirstDayField
                         value={form.firstDay}
                         onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
