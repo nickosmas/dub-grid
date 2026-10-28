@@ -48,6 +48,9 @@ import {
   PLANNED_RETURN_INVALID_MESSAGE,
   PLANNED_START_INVALID_CODE,
   PLANNED_START_INVALID_MESSAGE,
+  PLANNED_SUSPENSION_END_INVALID_MESSAGE,
+  SUSPENDED_UNTIL_INVALID_CODE,
+  SUSPENDED_UNTIL_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
@@ -67,12 +70,17 @@ const bodySchema = z.object({
     "setReturnDate",
     "suspend",
     "reinstate",
+    "setSuspendedUntil",
     "setPlannedChange",
     "cancelPlannedChange",
   ]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
-  /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
+  /**
+   * Mark away: an optional first day back. setReturnDate: the new one, or null
+   * to clear it. Suspend, setSuspendedUntil and a planned suspension's
+   * setPlannedChange: the first day with access again (51g3), or null for none.
+   */
   returnDate: z.string().date().nullable().optional(),
   /**
    * Mark away and setReturnDate: the absence their away days hold (51f), or
@@ -80,8 +88,9 @@ const bodySchema = z.object({
    */
   absenceTypeId: z.number().int().positive().nullable().optional(),
   /**
-   * Mark away and setPlannedChange: the first day away. A day after today
-   * plans the Away (51g1) instead of starting it; today or left out starts it.
+   * Mark away, Suspend and setPlannedChange: the first day. A day after today
+   * plans the change (51g1, 51g3) instead of starting it; today or left out
+   * starts it.
    */
   startDate: z.string().date().nullable().optional(),
   /**
@@ -230,20 +239,26 @@ export async function POST(req: NextRequest) {
       return buildConflictResponse(currentEmployee);
     }
 
-    // A start date after today plans the Away rather than starting it (51g1),
-    // and a last day plans the Offboard for the day after it (51g2).
+    // A start date after today plans an Away (51g1) or a suspension (51g3)
+    // rather than starting it, and a last day plans the Offboard for the day
+    // after it (51g2).
     let today: string | null = null;
     const orgToday = async () => (today ??= await fetchOrgToday(serviceClient, orgId));
     const editingLastDay =
       action === "setPlannedChange" && currentEmployee.plannedStatus === "removed";
+    const editingSuspension =
+      action === "setPlannedChange" && currentEmployee.plannedStatus === "suspended";
     const planningLastDay = (action === "remove" && lastDay !== null) || editingLastDay;
+    const laterStart = async () => startDate !== null && startDate !== (await orgToday());
+    const planningSuspension = (action === "suspend" && (await laterStart())) || editingSuspension;
     const planningAway =
-      (action === "setPlannedChange" && !editingLastDay) ||
-      (action === "deactivate" && startDate !== null && startDate !== (await orgToday()));
-    const planning = planningAway || planningLastDay;
+      (action === "setPlannedChange" && !editingLastDay && !editingSuspension) ||
+      (action === "deactivate" && (await laterStart()));
+    const planning = planningAway || planningLastDay || planningSuspension;
 
     if (
-      (action === "deactivate" || (action === "setPlannedChange" && !editingLastDay)) &&
+      (action === "deactivate" ||
+        (action === "setPlannedChange" && !editingLastDay && !editingSuspension)) &&
       !canMarkInactive(currentEmployee.focusAreaIds)
     ) {
       return NextResponse.json(
@@ -271,7 +286,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (action === "reinstate" && !currentEmployee.suspendedAt) {
+    if (
+      (action === "reinstate" || action === "setSuspendedUntil") &&
+      !currentEmployee.suspendedAt
+    ) {
       return NextResponse.json(
         { error: NOT_SUSPENDED_MESSAGE, code: NOT_SUSPENDED_CODE },
         { status: 400 },
@@ -314,7 +332,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (planningAway && (startDate === null || !isValidPlannedStart(startDate, await orgToday()))) {
+    if (
+      (planningAway || planningSuspension) &&
+      (startDate === null || !isValidPlannedStart(startDate, await orgToday()))
+    ) {
       return NextResponse.json(
         { error: PLANNED_START_INVALID_MESSAGE, code: PLANNED_START_INVALID_CODE },
         { status: 400 },
@@ -324,6 +345,30 @@ export async function POST(req: NextRequest) {
     if (planningAway && returnDate !== null && startDate !== null && returnDate <= startDate) {
       return NextResponse.json(
         { error: PLANNED_RETURN_INVALID_MESSAGE, code: RETURN_DATE_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (
+      planningSuspension &&
+      returnDate !== null &&
+      startDate !== null &&
+      returnDate <= startDate
+    ) {
+      return NextResponse.json(
+        { error: PLANNED_SUSPENSION_END_INVALID_MESSAGE, code: SUSPENDED_UNTIL_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (
+      returnDate !== null &&
+      !planningSuspension &&
+      (action === "suspend" || action === "setSuspendedUntil") &&
+      !isValidReturnDate(returnDate, await orgToday())
+    ) {
+      return NextResponse.json(
+        { error: SUSPENDED_UNTIL_INVALID_MESSAGE, code: SUSPENDED_UNTIL_INVALID_CODE },
         { status: 400 },
       );
     }
@@ -393,7 +438,12 @@ export async function POST(req: NextRequest) {
       updated_by: user.id,
       version: expectedVersion + 1,
     };
-    if (!planning && action !== "setReturnDate" && action !== "cancelPlannedChange") {
+    if (
+      !planning &&
+      action !== "setReturnDate" &&
+      action !== "setSuspendedUntil" &&
+      action !== "cancelPlannedChange"
+    ) {
       update.status_changed_at = now;
     }
 
@@ -402,7 +452,36 @@ export async function POST(req: NextRequest) {
       fromStatus: currentEmployee.status,
     };
 
-    switch (planningLastDay ? "planLastDay" : planning ? "plan" : action) {
+    switch (
+      planningLastDay
+        ? "planLastDay"
+        : planningSuspension
+          ? "planSuspension"
+          : planning
+            ? "plan"
+            : action
+    ) {
+      case "planSuspension":
+        update.planned_status = "suspended";
+        update.planned_from = startDate;
+        update.planned_until = returnDate;
+        update.planned_absence_type_id = null;
+        if (note !== undefined) update.planned_note = note;
+        update.planned_by = user.id;
+        auditAction = editingSuspension
+          ? "employee.suspension_plan_changed"
+          : "employee.suspension_planned";
+        auditDetails = {
+          ...(editingSuspension
+            ? {
+                fromPlannedFrom: currentEmployee.plannedFrom ?? null,
+                fromPlannedUntil: currentEmployee.plannedUntil ?? null,
+              }
+            : {}),
+          plannedFrom: startDate,
+          plannedUntil: returnDate,
+        };
+        break;
       case "planLastDay":
         update.planned_status = "removed";
         update.planned_from = plannedFromForLastDay(lastDay as string);
@@ -439,6 +518,14 @@ export async function POST(req: NextRequest) {
         break;
       case "cancelPlannedChange":
         update.planned_status = null;
+        if (currentEmployee.plannedStatus === "suspended") {
+          auditAction = "employee.suspension_plan_cancelled";
+          auditDetails = {
+            plannedFrom: currentEmployee.plannedFrom ?? null,
+            plannedUntil: currentEmployee.plannedUntil ?? null,
+          };
+          break;
+        }
         if (currentEmployee.plannedStatus === "removed") {
           auditAction = "employee.last_day_cancelled";
           auditDetails = { lastDay: plannedLastDay(currentEmployee) };
@@ -494,8 +581,17 @@ export async function POST(req: NextRequest) {
       case "suspend":
         update.suspended_at = now;
         update.suspended_by = user.id;
+        update.suspended_until = returnDate;
         auditAction = "employee.suspended";
-        auditDetails = {};
+        auditDetails = returnDate ? { suspendedUntil: returnDate } : {};
+        break;
+      case "setSuspendedUntil":
+        update.suspended_until = returnDate;
+        auditAction = "employee.suspension_end_changed";
+        auditDetails = {
+          fromSuspendedUntil: currentEmployee.suspendedUntil ?? null,
+          toSuspendedUntil: returnDate,
+        };
         break;
       case "reinstate":
         update.suspended_at = null;
@@ -559,7 +655,7 @@ export async function POST(req: NextRequest) {
     // authenticate. Non-fatal: never fail the status change over it.
     // A suspension signs them out of every device and stops their push here;
     // the hook refuses their next sign-in and refresh (101).
-    if (action === "suspend" && currentEmployee.userId) {
+    if (action === "suspend" && !planning && currentEmployee.userId) {
       try {
         await endUserSessions(currentEmployee.userId);
         await disableMobilePushTokensForOrg(serviceClient, {
@@ -574,7 +670,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (action === "suspend") {
+    if (action === "suspend" && !planning) {
       scheduleSuspensionNotice({ orgId, empId, actorId: user.id });
     }
 
@@ -635,9 +731,11 @@ export async function POST(req: NextRequest) {
             ? "planned_status"
             : action === "setReturnDate"
               ? "away_until"
-              : action === "suspend" || action === "reinstate"
-                ? "suspended_at"
-                : "status",
+              : action === "setSuspendedUntil"
+                ? "suspended_until"
+                : action === "suspend" || action === "reinstate"
+                  ? "suspended_at"
+                  : "status",
         ],
       },
       ip_address: getRequestIp(req),

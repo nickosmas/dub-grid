@@ -56,9 +56,9 @@ Changing the access of someone whose invitation is still pending sends them a ne
 | **Suspended**  | Can't sign in on the web or in the app, but stays on the schedule and keeps their role. |
 | **Offboarded** | No longer on staff: off the schedule and unable to sign in.                             |
 
-A person's status shows in a card at the top of their record and the People panel, under their name. A planned time away or last day gets a second card of its own with **Edit plan**. In the People list and on their record, an icon after the name marks anyone who isn't plainly Active: a lock for Suspended, a moon for Away, a calendar for time away or a last day that's planned, and a person with a minus sign for Offboarded. Point at the icon to read what it means.
+A person's status shows in a card at the top of their record and the People panel, under their name. A planned time away, suspension or last day gets a second card of its own with **Edit plan**. In the People list and on their record, an icon after the name marks anyone who isn't plainly Active: a lock for Suspended, a moon for Away, a calendar for time away, a suspension or a last day that's planned, and a person with a minus sign for Offboarded. Point at the icon to read what it means.
 
-The card's button is the likely next step. For someone suspended it's **Reinstate**, for someone away **Mark active**, and for someone offboarded **Restore**; each opens a confirmation for that change alone. The **⋯** menu beside it names each other change, such as **Mark away** or **Offboard**, and for someone away **Change return date**, each with its own confirmation. Someone active has **Change status** instead, or, when only one change is possible for them right now, a button named for it, such as **Offboard**.
+The card's button is the likely next step. For someone suspended it's **Reinstate**, for someone away **Mark active**, and for someone offboarded **Restore**; each opens a confirmation for that change alone. The **⋯** menu beside it names each other change, such as **Mark away** or **Offboard**, for someone away **Change return date**, and for someone suspended **Set end date** or **Change end date**, each with its own confirmation. Someone active has **Change status** instead, or, when only one change is possible for them right now, a button named for it, such as **Offboard**.
 
 To change someone's status, select **Change status** in that card. It shows their status now and lists every other status; pick one, add an optional reason where it asks, and confirm. A status they can't move to right now is still listed, grayed out, with the reason in place of its description, such as a planned away you change with **Edit plan**. The title and the button name what happens, such as **Mark away**, **Suspend**, **Reinstate** or **Restore**, and the confirmation lists what changes apart from what stays the same. Only someone on the schedule can be marked away, and only someone with an account can be suspended, since suspending only stops sign-in. Suspending someone signs them out everywhere at once, emails them that their access is suspended, and alerts your other Super Admins. Their open requests close, and a pickup they claimed goes back up for others. They stay on the schedule with a lock beside their name, since they won't see their shifts in the app until you reinstate them. You can also select several people and use **Mark away**, **Mark active**, **Restore**, or **Offboard** together.
 
@@ -84,7 +84,7 @@ Time away can also start later. Pick a **Starts** date up to a year ahead and co
 - From the start date, their days can't be scheduled. Those days are cleared in the draft straight away, under the absence if you picked one, and open requests for them are closed.
 - On the start date they're marked **Away** automatically, with the return date and absence you chose.
 - To change the dates or the absence, select **Edit plan** and then **Save changes**. To start the time away today instead, clear **Starts** and confirm with **Mark away**. **Cancel planned away** puts back the days that held the absence, and keeps the rest cleared.
-- Suspending or offboarding them cancels the planned time away.
+- Suspending or offboarding them, or scheduling a suspension, cancels the planned time away.
 
 ### A last day
 
@@ -94,8 +94,19 @@ When someone is leaving, pick **Offboard** and give their **Last day**, today or
 - The days after it can't be scheduled. Their shifts after it are cleared in the draft straight away, and open requests for those days are closed.
 - The day after their last day, in your organization's time zone, they're offboarded automatically, just as if you'd selected **Offboard** then.
 - To move the last day, select **Edit plan** and then **Save changes**. To offboard them today instead, clear **Last day** and confirm with **Offboard**. **Cancel last day** keeps them Active; shifts already cleared stay cleared.
-- Someone has one planned change at a time: a last day replaces a planned time away, and marking them away, scheduling time away or suspending them cancels the last day. Each confirmation says so.
+- Someone has one planned change at a time: a last day replaces a planned time away or suspension, and marking them away, scheduling time away or suspending them cancels the last day. Each confirmation says so.
 - Only someone Active can have a last day. Someone away or suspended is offboarded straight away.
+
+### Suspended with dates
+
+When you suspend someone, you can give an **Ends** date: the first day they have access again. Until then they show as **Suspended until** that date, and when they try to sign in they're told their access is suspended until then. On that date, in your organization's time zone, they're reinstated automatically, just as if you'd selected **Reinstate**. For someone suspended, **Set end date** or **Change end date** in the card's **⋯** menu changes or clears it.
+
+A suspension can also start later. Pick a **Starts** date up to a year ahead and confirm with **Schedule suspension**:
+
+- They keep their access until then, and their record shows **Suspended from** that date. Nothing changes on the schedule: a suspended person stays on it.
+- On the start date they're suspended automatically, just as if you'd selected **Suspend** then: signed out everywhere, emailed, your other Super Admins alerted, and their open requests closed. It ends on the **Ends** date if you gave one.
+- To change the dates, select **Edit plan** and then **Save changes**. To suspend them today instead, clear **Starts** and confirm with **Suspend**. **Cancel planned suspension** keeps their access as it is.
+- It's one planned change like the others: it replaces a planned time away or last day, and marking them away or offboarding them cancels it.
 
 You can't change your own status, and an organization's only Super Admin can't be offboarded.
 

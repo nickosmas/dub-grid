@@ -38,6 +38,7 @@ function makeDeps(
     updateEmployeeStatus: vi.fn(),
     updateEmployeeReturnDate: vi.fn(),
     updateEmployeeSuspension: vi.fn(),
+    updateEmployeeSuspendedUntil: vi.fn(),
     updateEmployeePlannedChange: vi.fn(),
     endAccess: vi.fn(),
     insertAuditLog: vi.fn(),

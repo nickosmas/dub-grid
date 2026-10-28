@@ -571,12 +571,68 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.suspended": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Suspended ${who(d, ctx, "a team member")}'s access`,
+    headline: (d, ctx) => {
+      // The daily job starts a planned suspension (51g3) with no actor.
+      const name = who(d, ctx, "a team member");
+      const until = d.date("suspendedUntil");
+      if (d.date("plannedFrom")) {
+        return until
+          ? `${who(d, ctx, "A team member")}'s planned suspension started, until ${until}`
+          : `${who(d, ctx, "A team member")}'s planned suspension started`;
+      }
+      return until ? `Suspended ${name}'s access until ${until}` : `Suspended ${name}'s access`;
+    },
+    suppressKeys: ["suspendedUntil", "plannedFrom"],
   },
   "employee.reinstated": {
     category: "people",
     severity: "create",
-    headline: (d, ctx) => `Reinstated ${who(d, ctx, "a team member")}'s access`,
+    headline: (d, ctx) => {
+      // The daily job reinstates someone on their suspension's end date, with no actor.
+      const until = d.date("suspendedUntil");
+      return until
+        ? `${who(d, ctx, "A team member")}'s suspension ended on ${until}`
+        : `Reinstated ${who(d, ctx, "a team member")}'s access`;
+    },
+    suppressKeys: ["suspendedUntil"],
+  },
+  "employee.suspension_end_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const until = d.date("toSuspendedUntil");
+      const name = who(d, ctx, "a team member");
+      return until
+        ? `Set ${name}'s suspension to end ${until}`
+        : `Cleared the end date of ${name}'s suspension`;
+    },
+    suppressKeys: ["fromSuspendedUntil", "toSuspendedUntil"],
+  },
+  "employee.suspension_planned": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const from = d.date("plannedFrom");
+      const until = d.date("plannedUntil");
+      const name = who(d, ctx, "a team member");
+      if (!from) return `Planned a suspension for ${name}`;
+      return until
+        ? `Planned ${name}'s suspension ${from} to ${until}`
+        : `Planned ${name}'s suspension from ${from}`;
+    },
+    suppressKeys: ["plannedFrom", "plannedUntil"],
+  },
+  "employee.suspension_plan_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Changed ${who(d, ctx, "a team member")}'s planned suspension`,
+    suppressKeys: ["fromPlannedFrom", "fromPlannedUntil", "plannedFrom", "plannedUntil"],
+  },
+  "employee.suspension_plan_cancelled": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned suspension`,
+    suppressKeys: ["plannedFrom", "plannedUntil"],
   },
   "employee.removed": {
     category: "people",

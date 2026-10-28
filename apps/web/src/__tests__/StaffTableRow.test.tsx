@@ -199,6 +199,16 @@ describe("StaffTableRow column gating", () => {
     expect(getByText("Away until Jan 4")).toBeInTheDocument();
   });
 
+  it("names a suspension's end in the status pill (51g3)", () => {
+    const { getByText } = renderRow(true, true, {
+      status: "active",
+      suspendedAt: "2026-10-26T12:00:00Z",
+      suspendedUntil: "2026-11-20",
+    });
+
+    expect(getByText("Suspended until Nov 20")).toBeInTheDocument();
+  });
+
   it("draws the status icon right after the name, and none while Active", () => {
     for (const [state, name, kind] of [
       [
@@ -220,6 +230,16 @@ describe("StaffTableRow column gating", () => {
       [
         { status: "active", plannedStatus: "removed", plannedFrom: "2026-11-09" },
         "Leaving Nov 8",
+        "planned",
+      ],
+      [
+        {
+          status: "active",
+          plannedStatus: "suspended",
+          plannedFrom: "2026-11-10",
+          plannedUntil: "2026-11-20",
+        },
+        "Suspended from Nov 10, until Nov 20",
         "planned",
       ],
       [{ status: "removed" }, "Offboarded", "archived"],

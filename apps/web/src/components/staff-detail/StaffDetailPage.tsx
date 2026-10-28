@@ -30,9 +30,11 @@ import {
   activateEmployee,
   reinstateEmployee,
   suspendEmployee,
+  setEmployeeSuspendedUntil,
   setEmployeePlannedChange,
   plannedChangeToast,
   type PlannedChange,
+  type SuspensionDates,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -605,11 +607,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleSuspend = useCallback(
-    async (empId: string, accessToken?: string) => {
+    async (empId: string, accessToken?: string, dates?: SuspensionDates) => {
       if (!orgId || !employee) return false;
       try {
-        syncEmployeeCaches(await suspendEmployee(empId, orgId, employee.version, accessToken));
-        toast.success("Suspended");
+        const updated = await suspendEmployee(empId, orgId, employee.version, accessToken, dates);
+        syncEmployeeCaches(updated);
+        toast.success(updated.suspendedAt ? "Suspended" : "Suspension scheduled");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -643,6 +646,24 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         if (getStepUpMethod(err)) throw err;
         toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
         return false;
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
+  const handleSetSuspendedUntil = useCallback(
+    async (empId: string, until: string | null) => {
+      if (!orgId || !employee) return;
+      try {
+        syncEmployeeCaches(await setEmployeeSuspendedUntil(empId, orgId, employee.version, until));
+        toast.success(until ? "End date saved" : "End date cleared");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the end date. Try again."));
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -919,7 +940,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onActivate={handleActivate}
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
-        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSuspend={(empId, dates) => runStatusChange((token) => handleSuspend(empId, token, dates))}
+        onSetSuspendedUntil={handleSetSuspendedUntil}
         onSetPlannedChange={(empId, plan) =>
           runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }
@@ -949,7 +971,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onActivate={handleActivate}
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
-        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSuspend={(empId, dates) => runStatusChange((token) => handleSuspend(empId, token, dates))}
+        onSetSuspendedUntil={handleSetSuspendedUntil}
         onSetPlannedChange={(empId, plan) =>
           runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }

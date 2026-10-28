@@ -8,6 +8,7 @@ import {
   ACCOUNT_SUSPENDED_MESSAGE,
   isAccountDisabledMessage,
   isAccountSuspendedMessage,
+  suspendedUntilFromMessage,
 } from "@dubgrid/domain";
 import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -496,6 +497,7 @@ export async function POST(req: NextRequest) {
     }
     // A suspended employee (101) gets their own code, for "Access suspended".
     if (isAccountSuspendedMessage(error.message)) {
+      const suspendedUntil = suspendedUntilFromMessage(error.message);
       await writeSecurityAuditEvent({
         event: "security.auth.login",
         outcome: "rejected",
@@ -503,7 +505,13 @@ export async function POST(req: NextRequest) {
         metadata: { targetHash: emailHash, surface: "web" },
       });
       return NextResponse.json(
-        { success: false, code: ACCOUNT_SUSPENDED_CODE, error: ACCOUNT_SUSPENDED_MESSAGE },
+        {
+          success: false,
+          code: ACCOUNT_SUSPENDED_CODE,
+          error: ACCOUNT_SUSPENDED_MESSAGE,
+          // The hook names a suspension's end (105), for "until Fri, Nov 20".
+          ...(suspendedUntil ? { suspendedUntil } : {}),
+        },
         { status: 403 },
       );
     }

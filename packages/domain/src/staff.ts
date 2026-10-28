@@ -1,10 +1,11 @@
 export type EmployeeStatus = "active" | "inactive" | "removed";
 export type EmployeeEmploymentType = "full_time" | "part_time";
 /**
- * The statuses a change can be planned for (51g): Away from a date (51g1), and
- * Offboarded after a last day (51g2), whose `plannedFrom` is the day after it.
+ * The statuses a change can be planned for (51g): Away from a date (51g1),
+ * Offboarded after a last day (51g2), whose `plannedFrom` is the day after it,
+ * and Suspended from a date (51g3).
  */
-export type PlannedStatus = "away" | "removed";
+export type PlannedStatus = "away" | "removed" | "suspended";
 
 export interface Employee {
   id: string;
@@ -22,11 +23,13 @@ export interface Employee {
   awayAbsenceTypeId?: number | null;
   /** When their access was suspended (51c); they stay active and schedulable. */
   suspendedAt?: string | null;
+  /** The first day a suspended person has access again (YYYY-MM-DD, 51g3), or null. */
+  suspendedUntil?: string | null;
   /** A status change set for a later date (51g), or null. */
   plannedStatus?: PlannedStatus | null;
   /** The planned change's first day (YYYY-MM-DD); for a last day, the day after it. */
   plannedFrom?: string | null;
-  /** The first day back from a planned Away (YYYY-MM-DD), or null. */
+  /** The first day back from a planned Away or suspension (YYYY-MM-DD), or null. */
   plannedUntil?: string | null;
   /** The absence a planned Away's days hold, or null. */
   plannedAbsenceTypeId?: number | null;

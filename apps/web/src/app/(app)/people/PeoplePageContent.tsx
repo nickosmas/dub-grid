@@ -61,6 +61,7 @@ function PeopleContent() {
     handleActivateEmployee,
     handleReinstateEmployee,
     handleSuspendEmployee,
+    handleSetSuspendedUntil,
     handleSetEmployeeReturnDate,
     handleSetPlannedChange,
   } = useEmployees(orgId ?? org?.id ?? null);
@@ -160,7 +161,10 @@ function PeopleContent() {
             statusStepUpOpen={Boolean(statusStepUp.dialog)}
             onActivate={handleActivateEmployee}
             onReinstate={handleReinstateEmployee}
-            onSuspend={(empId) => runStatusChange((token) => handleSuspendEmployee(empId, token))}
+            onSuspend={(empId, dates) =>
+              runStatusChange((token) => handleSuspendEmployee(empId, token, dates))
+            }
+            onSetSuspendedUntil={handleSetSuspendedUntil}
             onSetPlannedChange={(empId, plan) =>
               runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
             }

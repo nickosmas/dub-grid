@@ -96,6 +96,12 @@ export const LAST_DAY_INVALID_CODE = "LAST_DAY_INVALID";
 
 export const LAST_DAY_INVALID_MESSAGE = "Choose a last day from today to a year ahead.";
 
+export const SUSPENDED_UNTIL_INVALID_CODE = "SUSPENDED_UNTIL_INVALID";
+
+export const SUSPENDED_UNTIL_INVALID_MESSAGE = "Choose an end date after today.";
+
+export const PLANNED_SUSPENSION_END_INVALID_MESSAGE = "Choose an end date after the start date.";
+
 /** How far ahead a status change can be planned, in days. */
 export const PLANNED_START_MAX_DAYS = 365;
 
@@ -232,8 +238,13 @@ export function describeEmploymentStatus(
   status: string | null | undefined,
   awayUntil?: string | null,
   suspendedAt?: string | null,
+  suspendedUntil?: string | null,
 ): string {
-  if (suspendedAt && (status === "active" || status == null)) return SUSPENDED_LABEL;
+  if (suspendedAt && (status === "active" || status == null)) {
+    return suspendedUntil
+      ? `${SUSPENDED_LABEL} until ${formatReturnDate(suspendedUntil)}`
+      : SUSPENDED_LABEL;
+  }
   const label =
     EMPLOYMENT_STATUS_LABELS[status as EmployeeStatus] ?? EMPLOYMENT_STATUS_LABELS.active;
   return status === "inactive" && awayUntil
@@ -249,6 +260,7 @@ export type StatusAction =
   | "setReturnDate"
   | "reinstate"
   | "suspend"
+  | "setSuspendedUntil"
   | "setPlannedChange"
   | "cancelPlannedChange";
 
@@ -280,20 +292,24 @@ export function statusUndoAction(status: EmployeeStatus): StatusAction | null {
 export interface StatusActionOptions {
   /** `name` is a count such as "3 people". */
   group?: boolean;
-  /** Mark away or Set return date: the first day back chosen (YYYY-MM-DD), if any. */
+  /**
+   * Mark away or Set return date: the first day back chosen (YYYY-MM-DD), if
+   * any. Suspend, Set end date or a planned suspension: the first day they
+   * have access again (51g3).
+   */
   returnDate?: string | null;
-  /** Set return date: the person's current one, if any. */
+  /** Set return date or Set end date: the person's current one, if any. */
   currentReturnDate?: string | null;
   /** With a return date: the absence their away days hold (51f), by name. */
   absenceName?: string | null;
   /**
-   * Mark away or Save changes: a first day after today (YYYY-MM-DD) plans the
-   * Away for then instead of starting it (51g1).
+   * Mark away, Suspend or Save changes: a first day after today (YYYY-MM-DD)
+   * plans the change for then instead of starting it (51g1, 51g3).
    */
   startDate?: string | null;
   /** The first day of a change they already have planned, which this action cancels. */
   plannedFrom?: string | null;
-  /** Which change is planned: an Away (the default) or a last day (51g2). */
+  /** Which change is planned: an Away (the default), a last day (51g2) or a suspension (51g3). */
   plannedStatus?: PlannedStatus | null;
   /**
    * Offboard, Save changes or Cancel last day: the last day (YYYY-MM-DD).
@@ -417,6 +433,54 @@ function lastDayPoints(lastDay: string, account: boolean): string[] {
   ];
 }
 
+/** "Suspended from Mon, Nov 10, until Fri, Nov 20." (51g3) */
+function plannedSuspensionSentence(startDate: string, until: string | null): string {
+  const from = formatReturnDate(startDate, { weekday: true });
+  return until
+    ? `${SUSPENDED_LABEL} from ${from}, until ${formatReturnDate(until, { weekday: true })}.`
+    : `${SUSPENDED_LABEL} from ${from}.`;
+}
+
+/** "They get access back on Fri, Nov 20." */
+function accessBackSentence(until: string): string {
+  return `They get access back on ${formatReturnDate(until, { weekday: true })}.`;
+}
+
+/** What a suspension does, now or from a later start, one full sentence each. */
+function suspensionPoints(startDate: string | null, until: string | null): string[] {
+  if (!startDate) {
+    return [
+      "They're signed out on every device and can't sign in.",
+      "Open requests they're part of are closed, and pickups they claimed go back up for others.",
+    ];
+  }
+  return [
+    `On ${formatReturnDate(startDate)} they're signed out on every device and can't sign in.`,
+    "Open requests they're part of are closed then, and pickups they claimed go back up for others.",
+    ...(until ? [`They get access back on ${formatReturnDate(until)}.`] : []),
+  ];
+}
+
+function describeSetSuspendedUntil(
+  name: string,
+  until: string | null,
+  currentUntil: string | null,
+): StatusActionCopy {
+  const changing = currentUntil !== null;
+  return {
+    label: changing ? "Change end date" : "Set end date",
+    title: changing
+      ? `Change when ${name}'s suspension ends?`
+      : `Set an end date for ${name}'s suspension?`,
+    message: until
+      ? accessBackSentence(until)
+      : "They stay suspended until someone reinstates them.",
+    points: [],
+    unchanged: [],
+    done: !until ? "End date cleared" : changing ? "End date changed" : "End date set",
+  };
+}
+
 /**
  * `name` is the person, or a count such as "3 people" with `group` set. Only
  * the title names them: the message and points say "they", and the points
@@ -444,7 +508,9 @@ export function describeStatusAction(
       ? [
           `The last day planned for ${formatReturnDate(plannedLastDay({ plannedStatus, plannedFrom }) ?? plannedFrom)} is cancelled.`,
         ]
-      : [`The away planned from ${formatReturnDate(plannedFrom)} is cancelled.`];
+      : plannedStatus === "suspended"
+        ? [`The suspension planned from ${formatReturnDate(plannedFrom)} is cancelled.`]
+        : [`The away planned from ${formatReturnDate(plannedFrom)} is cancelled.`];
   const leavingSchedule = [
     "Any upcoming shifts come off the schedule in the draft.",
     "Recurring schedules set up for them are removed.",
@@ -492,6 +558,16 @@ export function describeStatusAction(
         done: "Marked away",
       };
     case "setPlannedChange":
+      if (plannedStatus === "suspended") {
+        return {
+          label: "Save changes",
+          title: `Change ${name}'s planned suspension?`,
+          message: startDate ? plannedSuspensionSentence(startDate, returnDate) : "",
+          points: [],
+          unchanged: [],
+          done: "Planned suspension changed",
+        };
+      }
       if (plannedStatus === "removed") {
         return {
           label: "Save changes",
@@ -511,6 +587,16 @@ export function describeStatusAction(
         done: "Planned away changed",
       };
     case "cancelPlannedChange":
+      if (plannedStatus === "suspended") {
+        return {
+          label: "Cancel planned suspension",
+          title: `Cancel ${name}'s planned suspension?`,
+          message: "They keep their access.",
+          points: [],
+          unchanged: [],
+          done: "Planned suspension cancelled",
+        };
+      }
       if (plannedStatus === "removed") {
         return {
           label: "Cancel last day",
@@ -536,6 +622,8 @@ export function describeStatusAction(
       };
     case "setReturnDate":
       return describeSetReturnDate(name, returnDate, currentReturnDate, absenceName);
+    case "setSuspendedUntil":
+      return describeSetSuspendedUntil(name, returnDate, currentReturnDate);
     case "archive":
       if (lastDay) {
         return {
@@ -570,16 +658,16 @@ export function describeStatusAction(
       };
     case "suspend":
       return {
-        label: "Suspend",
+        label: startDate ? "Schedule suspension" : "Suspend",
         title: `Suspend ${name}?`,
-        message: "",
-        points: [
-          "They're signed out on every device and can't sign in.",
-          "Open requests they're part of are closed, and pickups they claimed go back up for others.",
-          ...cancelsPlan,
-        ],
+        message: startDate
+          ? `They keep their access until ${formatReturnDate(startDate, { weekday: true })}.`
+          : returnDate
+            ? accessBackSentence(returnDate)
+            : "",
+        points: [...suspensionPoints(startDate, returnDate), ...cancelsPlan],
         unchanged: ["Their shifts stay, and you can keep scheduling them."],
-        done: "Suspended",
+        done: startDate ? "Suspension scheduled" : "Suspended",
       };
     case "reinstate":
       return {
@@ -626,6 +714,8 @@ export interface StatusState extends PlannedChangeState {
   userId?: string | null;
   awayUntil?: string | null;
   suspendedAt?: string | null;
+  /** A suspended person's first day with access again (51g3). */
+  suspendedUntil?: string | null;
   archivedAt?: string | null;
 }
 
@@ -675,7 +765,9 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
   const kind = currentKind(state);
   const plannedAwayFrom = state.plannedStatus === "away" ? (state.plannedFrom ?? null) : null;
   const lastDay = plannedLastDay(state);
-  // A planned away or last day is edited through its own dates, so neither is offered twice.
+  const plannedSuspensionFrom =
+    state.plannedStatus === "suspended" ? (state.plannedFrom ?? null) : null;
+  // A planned away, suspension or last day is edited through its own dates, so none is offered twice.
   const awayReason =
     kind === "archived"
       ? "Only someone on staff can be marked away."
@@ -705,7 +797,13 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
       detail: SUSPENDED_DETAIL,
       outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
     },
-    kind !== "active" ? NOT_SUSPENDABLE_MESSAGE : !account ? NO_ACCOUNT_MESSAGE : null,
+    kind !== "active"
+      ? NOT_SUSPENDABLE_MESSAGE
+      : !account
+        ? NO_ACCOUNT_MESSAGE
+        : plannedSuspensionFrom
+          ? `Planned from ${formatReturnDate(plannedSuspensionFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
+          : null,
   );
   const archived = choice(
     {
@@ -808,7 +906,9 @@ export function describeCurrentStatus(state: StatusState | CurrentStatusState): 
       };
     case "suspended":
       return {
-        text: `${SUSPENDED_LABEL} since ${SINCE_DAY.format(new Date(state.suspendedAt as string))}`,
+        text: state.suspendedUntil
+          ? `${SUSPENDED_LABEL} until ${formatReturnDate(state.suspendedUntil, { weekday: true })}`
+          : `${SUSPENDED_LABEL} since ${SINCE_DAY.format(new Date(state.suspendedAt as string))}`,
         detail: SUSPENDED_DETAIL,
         tone: "danger",
       };
@@ -824,11 +924,13 @@ export function describeCurrentStatus(state: StatusState | CurrentStatusState): 
         detail:
           state.plannedStatus === "away" && state.plannedFrom
             ? plannedAwaySentence(state.plannedFrom, state.plannedUntil ?? null)
-            : plannedLastDay(state)
-              ? `Leaving ${formatReturnDate(plannedLastDay(state) as string, { weekday: true })}.`
-              : hasAccount(state)
-                ? ACTIVE_DETAIL
-                : NO_ACCOUNT_DETAILS.active,
+            : state.plannedStatus === "suspended" && state.plannedFrom
+              ? plannedSuspensionSentence(state.plannedFrom, state.plannedUntil ?? null)
+              : plannedLastDay(state)
+                ? `Leaving ${formatReturnDate(plannedLastDay(state) as string, { weekday: true })}.`
+                : hasAccount(state)
+                  ? ACTIVE_DETAIL
+                  : NO_ACCOUNT_DETAILS.active,
         tone: "success",
       };
   }
@@ -837,10 +939,13 @@ export function describeCurrentStatus(state: StatusState | CurrentStatusState): 
 /** A planned change in full, for a record: "Away from Nov 10, back Jan 4". */
 export function describePlannedChangeInFull(state: PlannedChangeState): string | null {
   const short = describePlannedChange(state);
-  if (!short) return null;
-  return state.plannedStatus === "away" && state.plannedUntil
-    ? `${short}, back ${formatReturnDate(state.plannedUntil)}`
-    : short;
+  if (!short || !state.plannedUntil) return short;
+  if (state.plannedStatus === "away")
+    return `${short}, back ${formatReturnDate(state.plannedUntil)}`;
+  if (state.plannedStatus === "suspended") {
+    return `${short}, until ${formatReturnDate(state.plannedUntil)}`;
+  }
+  return short;
 }
 
 /** The word for someone leaving on a planned last day: "Leaving Nov 8" (51g2). */
@@ -848,12 +953,16 @@ export const LEAVING_LABEL = "Leaving";
 
 /**
  * The muted text beside an Active pill when a change is planned: "Away from
- * Nov 10", or "Leaving Nov 8" on a last day.
+ * Nov 10", "Suspended from Nov 10", or "Leaving Nov 8" on a last day.
  */
 export function describePlannedChange(state: PlannedChangeState): string | null {
   const lastDay = plannedLastDay(state);
   if (lastDay) return `${LEAVING_LABEL} ${formatReturnDate(lastDay)}`;
-  if (state.plannedStatus !== "away" || !state.plannedFrom) return null;
+  if (!state.plannedFrom) return null;
+  if (state.plannedStatus === "suspended") {
+    return `${SUSPENDED_LABEL} from ${formatReturnDate(state.plannedFrom)}`;
+  }
+  if (state.plannedStatus !== "away") return null;
   return `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(state.plannedFrom)}`;
 }
 
@@ -886,7 +995,7 @@ export function statusMark(state: StatusState): StatusMark | null {
 export interface StatusCardCopy {
   /** The status card: where they stand now. */
   current: { kind: StatusChoiceKind; title: string; detail: string; tone: StatusTone };
-  /** A second, dashed card for an Away or a last day planned for later. */
+  /** A second, dashed card for an Away, a suspension or a last day planned for later. */
   planned: { title: string; detail: string } | null;
 }
 
@@ -902,6 +1011,7 @@ export function describeStatusCard(
   const current = describeCurrentStatus(state);
   const holds = absenceName ? ` ${absenceName} on those days.` : "";
   const plannedFrom = state.plannedStatus === "away" ? state.plannedFrom : null;
+  const suspendFrom = state.plannedStatus === "suspended" ? state.plannedFrom : null;
   const lastDay = plannedLastDay(state);
   return {
     current: {
@@ -923,13 +1033,20 @@ export function describeStatusCard(
             title: `${LEAVING_LABEL} ${formatReturnDate(lastDay, { weekday: true })}`,
             detail: `Offboarded on ${formatReturnDate(plannedFromForLastDay(lastDay), { weekday: true })}.`,
           }
-        : kind === "active" && plannedFrom
+        : kind === "active" && suspendFrom
           ? {
-              title: `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(plannedFrom, { weekday: true })}`,
+              title: `${SUSPENDED_LABEL} from ${formatReturnDate(suspendFrom, { weekday: true })}`,
               detail: state.plannedUntil
-                ? `Back ${formatReturnDate(state.plannedUntil, { weekday: true })}.${holds}`
-                : "No return date.",
+                ? `Until ${formatReturnDate(state.plannedUntil, { weekday: true })}.`
+                : "No end date.",
             }
-          : null,
+          : kind === "active" && plannedFrom
+            ? {
+                title: `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(plannedFrom, { weekday: true })}`,
+                detail: state.plannedUntil
+                  ? `Back ${formatReturnDate(state.plannedUntil, { weekday: true })}.${holds}`
+                  : "No return date.",
+              }
+            : null,
   };
 }

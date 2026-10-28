@@ -65,18 +65,26 @@ function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expect
         }),
     ),
     updateEmployeeSuspension: vi.fn(
-      async (_client: SupabaseClient, input: { suspended: boolean }) =>
+      async (
+        _client: SupabaseClient,
+        input: { suspended: boolean; suspendedUntil?: string | null },
+      ) =>
         employee({
           ...current,
           suspendedAt: input.suspended ? "2026-10-27T05:00:00.000Z" : null,
+          suspendedUntil: input.suspended ? (input.suspendedUntil ?? null) : null,
           version: 2,
         }),
+    ),
+    updateEmployeeSuspendedUntil: vi.fn(
+      async (_client: SupabaseClient, input: { suspendedUntil: string | null }) =>
+        employee({ ...current, suspendedUntil: input.suspendedUntil, version: 2 }),
     ),
     updateEmployeePlannedChange: vi.fn(
       async (
         _client: SupabaseClient,
         input: {
-          plannedStatus: "away" | "removed" | null;
+          plannedStatus: "away" | "removed" | "suspended" | null;
           plannedFrom: string | null;
           plannedUntil: string | null;
           plannedAbsenceTypeId: number | null;
@@ -548,5 +556,175 @@ describe("updateMobilePersonStatus with a last day (51g2)", () => {
       expect.objectContaining({ status: "removed" }),
     );
     expect(deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateMobilePersonStatus with a suspension's start and end (51g3)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+    vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("suspends now with an end date and records it", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      returnDate: "2026-11-20",
+    });
+
+    await expect(result).resolves.toMatchObject({ kind: "updated" });
+    expect(deps.updateEmployeeSuspension).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ suspended: true, suspendedUntil: "2026-11-20" }),
+    );
+    expect(deps.endAccess).toHaveBeenCalled();
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.suspended",
+        details: { suspendedUntil: "2026-11-20", changedFields: ["suspended_at"] },
+      }),
+    );
+  });
+
+  it("refuses an end date on or before today in the organization's timezone", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      returnDate: "2026-10-26",
+    });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "invalid_status_change",
+      code: "SUSPENDED_UNTIL_INVALID",
+    });
+    expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+  });
+
+  it("plans a suspension for a later start without suspending them now", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      startDate: "2026-11-10",
+      returnDate: "2026-11-20",
+    });
+
+    await expect(result).resolves.toMatchObject({ kind: "updated" });
+    expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+    expect(deps.endAccess).not.toHaveBeenCalled();
+    expect(deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plannedStatus: "suspended",
+        plannedFrom: "2026-11-10",
+        plannedUntil: "2026-11-20",
+        plannedAbsenceTypeId: null,
+      }),
+    );
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "employee.suspension_planned" }),
+    );
+  });
+
+  it("starts today's suspension now, even with a start date of today", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      startDate: "2026-10-26",
+    });
+
+    await expect(result).resolves.toMatchObject({ kind: "updated" });
+    expect(deps.updateEmployeeSuspension).toHaveBeenCalled();
+    expect(deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+
+  it("refuses a planned suspension with no account, an end before its start, or for the only super admin", async () => {
+    const noAccount = run(employee({ userId: null }), {
+      action: "suspend",
+      startDate: "2026-11-10",
+    });
+    await expect(noAccount.result).resolves.toMatchObject({ code: "NO_ACCOUNT" });
+
+    const early = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      startDate: "2026-11-10",
+      returnDate: "2026-11-10",
+    });
+    await expect(early.result).resolves.toMatchObject({ code: "SUSPENDED_UNTIL_INVALID" });
+
+    const only = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      startDate: "2026-11-10",
+    });
+    only.deps.fetchActiveMembershipOrgRole.mockResolvedValue("super_admin" as never);
+    only.deps.countActiveSuperAdmins.mockResolvedValue(1);
+    await expect(only.result).resolves.toMatchObject({ kind: "cannot_remove_last_super_admin" });
+    expect(only.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+
+  it("moves and cancels a planned suspension, for someone not on the schedule too", async () => {
+    const planned = employee({
+      userId: "user-9",
+      focusAreaIds: [],
+      plannedStatus: "suspended",
+      plannedFrom: "2026-11-10",
+      plannedUntil: null,
+    });
+    const moved = run(planned, {
+      action: "setPlannedChange",
+      startDate: "2026-11-12",
+      returnDate: "2026-11-30",
+    });
+    await expect(moved.result).resolves.toMatchObject({ kind: "updated" });
+    expect(moved.deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plannedStatus: "suspended",
+        plannedFrom: "2026-11-12",
+        plannedUntil: "2026-11-30",
+      }),
+    );
+    expect(moved.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "employee.suspension_plan_changed" }),
+    );
+
+    const cancelled = run(planned, { action: "cancelPlannedChange" });
+    await expect(cancelled.result).resolves.toMatchObject({ kind: "updated" });
+    expect(cancelled.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "employee.suspension_plan_cancelled" }),
+    );
+  });
+
+  it("sets and clears a suspended person's end date, and refuses someone not suspended", async () => {
+    const suspended = employee({
+      userId: "user-9",
+      suspendedAt: "2026-10-20T00:00:00Z",
+      suspendedUntil: "2026-11-20",
+    });
+    const cleared = run(suspended, { action: "setSuspendedUntil", returnDate: null });
+    await expect(cleared.result).resolves.toMatchObject({ kind: "updated" });
+    expect(cleared.deps.updateEmployeeSuspendedUntil).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ suspendedUntil: null }),
+    );
+    expect(cleared.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.suspension_end_changed",
+        details: {
+          fromSuspendedUntil: "2026-11-20",
+          toSuspendedUntil: null,
+          changedFields: ["suspended_until"],
+        },
+      }),
+    );
+    expect(cleared.deps.endAccess).not.toHaveBeenCalled();
+
+    const active = run(employee(), { action: "setSuspendedUntil", returnDate: "2026-11-20" });
+    await expect(active.result).resolves.toMatchObject({ code: "NOT_SUSPENDED" });
   });
 });

@@ -187,8 +187,21 @@ export function StatusCards({
   const suggested = plain ? null : suggestedStatusChoice(person);
   const available = availableStatusChoices(person);
   const away = person.status === "inactive" && !person.archivedAt;
+  const suspended = person.status === "active" && !person.archivedAt && Boolean(person.suspendedAt);
   const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested
     ? [
+        ...(suspended
+          ? [
+              {
+                key: "details",
+                label: describeStatusAction("setSuspendedUntil", "", {
+                  currentReturnDate: person.suspendedUntil ?? null,
+                  returnDate: person.suspendedUntil ?? null,
+                }).label,
+                opening: { focus: "plan" as const },
+              },
+            ]
+          : []),
         ...(away
           ? [
               {

@@ -1121,7 +1121,7 @@
     - [x] 51g2. **Last day** - "Leaving Nov 8": shifts after it come off in
           the draft, nobody can schedule them past it, and the job archives
           them the day after.
-    - [ ] 51g3. **Suspended until** - an optional end date on a suspension,
+    - [x] 51g3. **Suspended until** - an optional end date on a suspension,
           from today or a later start; the job reinstates them on it.
     - [ ] 51g4. **First day** - a new hire can't be scheduled before their
           first day, and shows "Starts Nov 10" until then.

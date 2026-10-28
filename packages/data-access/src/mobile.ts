@@ -35,7 +35,7 @@ const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_order, arc
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_ids, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
@@ -238,7 +238,8 @@ export interface MobilePeopleQueryRow {
   away_until: string | null;
   away_absence_type_id: number | null;
   suspended_at: string | null;
-  planned_status: "away" | null;
+  suspended_until: string | null;
+  planned_status: "away" | "removed" | "suspended" | null;
   planned_from: string | null;
   planned_until: string | null;
   planned_absence_type_id: number | null;
@@ -1390,7 +1391,7 @@ export async function fetchMobilePeopleRows(
     const { data, error } = await serviceClient
       .from("employees")
       .select(
-        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
+        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
       )
       .eq("org_id", orgId)
       .order("first_name", { ascending: true })
@@ -1547,6 +1548,8 @@ export async function updateMobileEmployeeSuspensionRow(
     employeeId: string;
     expectedVersion: number;
     suspended: boolean;
+    /** Suspending: the first day with access again (51g3), or null. */
+    suspendedUntil?: string | null;
     updatedBy: string;
   },
 ): Promise<DbEmployee | null> {
@@ -1556,7 +1559,39 @@ export async function updateMobileEmployeeSuspensionRow(
     .update({
       suspended_at: input.suspended ? now : null,
       suspended_by: input.suspended ? input.updatedBy : null,
+      suspended_until: input.suspended ? (input.suspendedUntil ?? null) : null,
       status_changed_at: now,
+      updated_by: input.updatedBy,
+      version: input.expectedVersion + 1,
+    })
+    .eq("id", input.employeeId)
+    .eq("org_id", input.orgId)
+    .eq("version", input.expectedVersion)
+    .select(EMPLOYEE_COLS)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as DbEmployee | null | undefined) ?? null;
+}
+
+/** Sets, moves or clears (null) a suspended person's end date (51g3). */
+export async function updateMobileEmployeeSuspendedUntilRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    suspendedUntil: string | null;
+    updatedBy: string;
+  },
+): Promise<DbEmployee | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .update({
+      suspended_until: input.suspendedUntil,
       updated_by: input.updatedBy,
       version: input.expectedVersion + 1,
     })
@@ -1612,7 +1647,7 @@ export async function updateMobileEmployeePlannedChangeRow(
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | "removed" | null;
+    plannedStatus: "away" | "removed" | "suspended" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;

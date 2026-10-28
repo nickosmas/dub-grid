@@ -713,6 +713,155 @@ describe("last day (51g2)", () => {
   });
 });
 
+describe("suspended until (51g3)", () => {
+  // Suspended from Tue, Nov 10, until Fri, Nov 20.
+  const planned = {
+    status: "active" as const,
+    plannedStatus: "suspended" as const,
+    plannedFrom: "2026-11-10",
+    plannedUntil: "2026-11-20",
+  };
+  const suspended = {
+    status: "active" as const,
+    suspendedAt: "2026-10-26T12:00:00Z",
+    suspendedUntil: "2026-11-20",
+  };
+
+  it("names the end on the pill, the box and the card", () => {
+    expect(describeEmploymentStatus("active", null, suspended.suspendedAt, "2026-11-20")).toBe(
+      "Suspended until Nov 20",
+    );
+    expect(describeEmploymentStatus("active", null, suspended.suspendedAt)).toBe("Suspended");
+    expect(describeCurrentStatus(suspended).text).toBe("Suspended until Fri, Nov 20");
+    expect(describeStatusCard(suspended).current).toMatchObject({
+      kind: "suspended",
+      title: "Suspended until Fri, Nov 20",
+    });
+  });
+
+  it("keeps a planned suspension schedulable on every day", () => {
+    for (const day of ["2026-11-09", "2026-11-10", "2026-11-19", "2026-11-20"]) {
+      expect(isSchedulableOn(planned, day)).toBe(true);
+    }
+  });
+
+  it("says what's planned beside the Active pill, in the box and on the card", () => {
+    expect(describePlannedChange(planned)).toBe("Suspended from Nov 10");
+    expect(describePlannedChangeInFull(planned)).toBe("Suspended from Nov 10, until Nov 20");
+    expect(describePlannedChangeInFull({ ...planned, plannedUntil: null })).toBe(
+      "Suspended from Nov 10",
+    );
+    expect(describeCurrentStatus({ ...planned, focusAreaIds: [] }).detail).toBe(
+      "Suspended from Tue, Nov 10, until Fri, Nov 20.",
+    );
+    expect(describeStatusCard(planned).planned).toEqual({
+      title: "Suspended from Tue, Nov 10",
+      detail: "Until Fri, Nov 20.",
+    });
+    expect(describeStatusCard({ ...planned, plannedUntil: null }).planned?.detail).toBe(
+      "No end date.",
+    );
+    expect(statusMark(planned)).toMatchObject({ kind: "planned" });
+  });
+
+  it("suspends now with an end, within the dialog rules", () => {
+    const copy = describeStatusAction("suspend", "Ana Diaz", { returnDate: "2026-11-20" });
+    expect(copy).toMatchObject({
+      label: "Suspend",
+      title: "Suspend Ana Diaz?",
+      message: "They get access back on Fri, Nov 20.",
+      done: "Suspended",
+    });
+    expect(copy.points).toEqual([
+      "They're signed out on every device and can't sign in.",
+      "Open requests they're part of are closed, and pickups they claimed go back up for others.",
+    ]);
+    expect(copy.message).not.toMatch(/Ana/);
+  });
+
+  it("schedules a suspension for a later start", () => {
+    const copy = describeStatusAction("suspend", "Ana", {
+      startDate: "2026-11-10",
+      returnDate: "2026-11-20",
+      plannedFrom: "2026-11-02",
+      plannedStatus: "away",
+    });
+    expect(copy).toMatchObject({
+      label: "Schedule suspension",
+      message: "They keep their access until Tue, Nov 10.",
+      done: "Suspension scheduled",
+    });
+    expect(copy.points).toEqual([
+      "On Nov 10 they're signed out on every device and can't sign in.",
+      "Open requests they're part of are closed then, and pickups they claimed go back up for others.",
+      "They get access back on Nov 20.",
+      "The away planned from Nov 2 is cancelled.",
+    ]);
+    expect(copy.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
+  });
+
+  it("sets, changes and clears a suspension's end", () => {
+    expect(
+      describeStatusAction("setSuspendedUntil", "Ana", { returnDate: "2026-11-20" }),
+    ).toMatchObject({
+      label: "Set end date",
+      title: "Set an end date for Ana's suspension?",
+      message: "They get access back on Fri, Nov 20.",
+      done: "End date set",
+    });
+    expect(
+      describeStatusAction("setSuspendedUntil", "Ana", {
+        returnDate: null,
+        currentReturnDate: "2026-11-20",
+      }),
+    ).toMatchObject({
+      label: "Change end date",
+      title: "Change when Ana's suspension ends?",
+      message: "They stay suspended until someone reinstates them.",
+      done: "End date cleared",
+    });
+  });
+
+  it("changes and cancels a planned suspension, and another change says it's cancelled", () => {
+    expect(
+      describeStatusAction("setPlannedChange", "Ana", {
+        plannedStatus: "suspended",
+        startDate: "2026-11-12",
+        returnDate: null,
+      }),
+    ).toMatchObject({
+      label: "Save changes",
+      title: "Change Ana's planned suspension?",
+      message: "Suspended from Thu, Nov 12.",
+      done: "Planned suspension changed",
+    });
+    expect(
+      describeStatusAction("cancelPlannedChange", "Ana", { plannedStatus: "suspended" }),
+    ).toMatchObject({
+      label: "Cancel planned suspension",
+      title: "Cancel Ana's planned suspension?",
+      message: "They keep their access.",
+      done: "Planned suspension cancelled",
+    });
+    expect(
+      describeStatusAction("markAway", "Ana", {
+        plannedFrom: "2026-11-10",
+        plannedStatus: "suspended",
+      }).points,
+    ).toContain("The suspension planned from Nov 10 is cancelled.");
+  });
+
+  it("lists Suspended disabled while one is planned, pointing at Edit plan", () => {
+    const suspend = statusChoices({ ...planned, focusAreaIds: [1] }).find(
+      (c) => c.kind === "suspended",
+    );
+    expect(suspend).toMatchObject({
+      available: false,
+      unavailableReason: "Planned from Tue, Nov 10. Change it with Edit plan.",
+    });
+  });
+});
+
 describe("isValidPlannedStart", () => {
   it("takes a day after today up to a year ahead", () => {
     expect(isValidPlannedStart("2026-10-27", "2026-10-27")).toBe(false);

@@ -11,11 +11,14 @@ import {
 
 /**
  * The status pill a People row shows for anyone not Active: "Away until Jan 4",
- * "Away", "Suspended" or "Offboarded". Active people show none.
+ * "Away", "Suspended until Nov 20", "Suspended" or "Offboarded". Active people show none.
  */
 export function getMobileStatusPill(
   mobileColors: MobileColors,
-  person: Pick<MobilePerson, "status" | "awayUntil"> & { suspendedAt?: string | null },
+  person: Pick<MobilePerson, "status" | "awayUntil"> & {
+    suspendedAt?: string | null;
+    suspendedUntil?: string | null;
+  },
 ) {
   const suspended = person.status === "active" && Boolean(person.suspendedAt);
   if (person.status === "active" && !suspended) return null;
@@ -38,7 +41,12 @@ export function getMobileStatusPill(
           text: mobileColors.textSecondary,
         };
   return {
-    label: describeEmploymentStatus(person.status, person.awayUntil, person.suspendedAt),
+    label: describeEmploymentStatus(
+      person.status,
+      person.awayUntil,
+      person.suspendedAt,
+      person.suspendedUntil,
+    ),
     containerStyle: {
       ...mobilePillOverflow.displayContainer,
       alignItems: "center" as const,

@@ -222,6 +222,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
         {
           error: formatClientErrorMessage(error, "We could not finish signing you in right now."),
           ...(error.code ? { code: error.code } : {}),
+          ...error.details,
         },
         { status: error.status },
       );

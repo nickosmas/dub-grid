@@ -85,18 +85,22 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       // A Gridmaster taking a staff record out, suspending it or planning it
       // away needs fresh proof before any read or write (F-96, 51c, 51g1).
       /if \(\s*isGridmaster &&\s*\(action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
-      // Suspension signs only the suspended person out (51c).
-      /if \(action === "suspend" && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+      // Suspension signs only the suspended person out (51c), and only once
+      // it starts: a planned one (51g3) waits for the daily job.
+      /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
     ],
   },
   // The daily job offboards someone the day after the last day a manager with
-  // the employees permission set (51g2), with that Offboard's follow-up. Only
-  // the cron secret reaches it.
+  // the employees permission set (51g2), and starts a suspension one planned
+  // (51g3), each with its manual follow-up. Only the cron secret reaches it.
   "apps/web/src/app/api/cron/return-from-away/route.ts": {
     policy: "authorized-target-revocation",
     assertions: [
       /if \(!bearerMatchesSecret\(req\.headers\.get\("authorization"\), secret\)\)/,
       /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?endMembership: await canEndMembership\(db, row\.org_id, row\.planned_by\),/,
+      // It starts a suspension a manager planned (51g3) with that Suspend's
+      // follow-up, signing out only the suspended person.
+      /\.eq\("planned_status", "suspended"\)[\s\S]*?await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)[\s\S]*?await endUserSessions\(row\.user_id\);/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {

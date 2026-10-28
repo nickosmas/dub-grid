@@ -29,6 +29,7 @@ function makeRow(n: number): MobilePeopleQueryRow {
     away_until: null,
     away_absence_type_id: null,
     suspended_at: null,
+    suspended_until: null,
     planned_status: null,
     planned_from: null,
     planned_until: null,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { PlannedChange } from "@/features/employees/client";
+import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, type WheelEvent, useCallback, useMemo, useState } from "react";
@@ -130,7 +130,9 @@ interface StaffViewProps {
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   onAdd: () => void;
@@ -175,6 +177,7 @@ export default function StaffView({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
   onAdd,
   orgId,
@@ -373,6 +376,7 @@ export default function StaffView({
             onActivate={onActivate}
             onReinstate={onReinstate}
             onSuspend={onSuspend}
+            onSetSuspendedUntil={onSetSuspendedUntil}
             onSetPlannedChange={onSetPlannedChange}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}

@@ -1511,6 +1511,142 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("suspends until an end date, and schedules a suspension for later (51g3)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+      fireEvent.click(screen.getByRole("button", { name: "Ends, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(`They get access back on ${formatReturnDate(day(3), { weekday: true })}.`),
+      ).toBeInTheDocument();
+      confirm("Suspend");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        copyAction: "suspend",
+        returnDate: day(3),
+        startDate: undefined,
+      });
+      cleanup();
+
+      const later = renderWithStatusMutation();
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(2));
+      expect(
+        screen.getByText(
+          `They keep their access until ${formatReturnDate(day(2), { weekday: true })}.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Schedule suspension");
+      expect(later.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        startDate: day(2),
+        returnDate: undefined,
+      });
+    });
+
+    it("changes a suspended person's end date from the card's menu", async () => {
+      const mutate = renderWithStatusMutation({
+        suspendedAt: "2026-10-26T12:00:00Z",
+        suspendedUntil: day(9),
+      });
+
+      expect(
+        screen.getByText(`Suspended until ${formatReturnDate(day(9), { weekday: true })}`),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Change end date" }));
+      await waitFor(() =>
+        expect(screen.getByText("Change when Mina Diaz's suspension ends?")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
+      fireEvent.click(screen.getByRole("button", { name: "No end date" }));
+      confirm("Save changes");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setSuspendedUntil",
+        copyAction: "setSuspendedUntil",
+        returnDate: null,
+      });
+    });
+
+    it("moves, cancels and starts a planned suspension from Edit plan", () => {
+      const planned = {
+        plannedStatus: "suspended" as const,
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      };
+      const mutate = renderWithStatusMutation(planned);
+
+      expect(
+        screen.getAllByText(`Suspended from ${formatReturnDate(day(5), { weekday: true })}`).length,
+      ).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Clear it to suspend them today.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
+      choose(day(12));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        startDate: day(5),
+        returnDate: day(12),
+        fromPlannedStatus: "suspended",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(planned);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned suspension" }));
+      confirm("Cancel planned suspension");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(planned);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Today" }));
+      expect(screen.getByText("Suspend Mina Diaz?")).toBeInTheDocument();
+      confirm("Suspend");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        startDate: undefined,
+        returnDate: day(9),
+      });
+    });
+
+    it("lists Suspended disabled, pointing at Edit plan, while a suspension is planned", () => {
+      renderWithStatusMutation({ plannedStatus: "suspended", plannedFrom: day(5) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      const suspend = screen.getByRole("radio", { name: /^Suspended/ });
+      expect(suspend).toHaveAttribute("aria-disabled", "true");
+      expect(suspend.getAttribute("aria-label")).toBe(
+        `Suspended. Planned from ${formatReturnDate(day(5), { weekday: true })}. Change it with Edit plan.`,
+      );
+    });
+
+    it("offers Starts and Last day no further than a year ahead", () => {
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      fireEvent.click(screen.getByRole("button", { name: "Last day, none" }));
+      for (let month = 0; month < 12; month++) {
+        fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+      }
+
+      expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", {
+          name: `Choose ${formatReturnDate(day(366), { weekday: true })}`,
+        }),
+      ).toBeDisabled();
+    });
+
     it("sets a last day through Offboard (51g2)", () => {
       const mutate = renderWithStatusMutation();
 

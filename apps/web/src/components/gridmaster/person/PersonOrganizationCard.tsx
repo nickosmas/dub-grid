@@ -128,8 +128,13 @@ function StaffFacts({
         label="Status"
         value={
           employee.statusChangedAt
-            ? `${describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)} since ${formatDay(employee.statusChangedAt)}`
-            : describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)
+            ? `${describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt, employee.suspendedUntil)} since ${formatDay(employee.statusChangedAt)}`
+            : describeEmploymentStatus(
+                employee.status,
+                employee.awayUntil,
+                employee.suspendedAt,
+                employee.suspendedUntil,
+              )
         }
       />
       {employee.status === "active" && describePlannedChangeInFull(employee) ? (

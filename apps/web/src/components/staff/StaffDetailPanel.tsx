@@ -1,5 +1,5 @@
 "use client";
-import type { PlannedChange } from "@/features/employees/client";
+import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
 import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -76,7 +76,9 @@ interface StaffDetailPanelProps {
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
@@ -118,6 +120,7 @@ export function StaffDetailPanel({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
   statusStepUpOpen = false,
   onClose,
@@ -229,6 +232,7 @@ export function StaffDetailPanel({
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
+      onSetSuspendedUntil={onSetSuspendedUntil}
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
@@ -248,6 +252,7 @@ export function StaffDetailPanel({
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
+      onSetSuspendedUntil={onSetSuspendedUntil}
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}

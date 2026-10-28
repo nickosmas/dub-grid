@@ -176,7 +176,12 @@ function StaffRowCells({
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil, emp.suspendedAt);
+  const statusLabel = describeEmploymentStatus(
+    emp.status,
+    emp.awayUntil,
+    emp.suspendedAt,
+    emp.suspendedUntil,
+  );
   const plannedLabel = emp.status === "active" ? describePlannedChange(emp) : null;
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {

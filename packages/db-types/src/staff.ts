@@ -13,7 +13,8 @@ export interface DbEmployee {
   away_until?: string | null;
   away_absence_type_id?: number | null;
   suspended_at?: string | null;
-  planned_status?: "away" | "removed" | null;
+  suspended_until?: string | null;
+  planned_status?: "away" | "removed" | "suspended" | null;
   planned_from?: string | null;
   planned_until?: string | null;
   planned_absence_type_id?: number | null;

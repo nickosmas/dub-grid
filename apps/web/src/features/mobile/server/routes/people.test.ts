@@ -270,6 +270,7 @@ describe("mobile people route", () => {
         awayUntil: null,
         awayAbsenceTypeId: null,
         suspendedAt: null,
+        suspendedUntil: null,
         plannedStatus: null,
         plannedFrom: null,
         plannedUntil: null,

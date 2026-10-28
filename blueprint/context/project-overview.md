@@ -394,8 +394,12 @@ Item 51 is split:
     the day after the way a manual Offboard does. One plan per person: a
     last day replaces a planned away, and any other change cancels it
     (migration 104).
-  - **51g3 - Suspended until:** an optional end date on a suspension; the
-    job reinstates them on it.
+  - **51g3 - Suspended until:** shipped; Suspend takes an optional Ends
+    date and a Starts date up to a year ahead (web and mobile). "Suspended
+    until Nov 20" shows on pills, the card and the record, and sign-in names
+    the day; a later start shows "Suspended from Nov 10" as the plan and
+    locks no day. The daily job reinstates them on the end and starts a
+    planned suspension the way a manual Suspend does (migration 105).
   - **51g4 - First day:** a new hire can't be scheduled before their first
     day, and shows "Starts Nov 10" until then.
 - **51h - Bulk status changes:** the People list bulk bar: Mark away,
@@ -614,7 +618,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `104`.
+  checksum-locked through `105`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

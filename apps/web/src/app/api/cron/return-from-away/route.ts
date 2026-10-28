@@ -9,6 +9,9 @@ import { isFeatureEnabled } from "@/lib/feature-flags";
 import { serverEnv } from "@/lib/env.server";
 import { bearerMatchesSecret } from "@/lib/cron-auth";
 import { endOffboardedAccess } from "@/features/employees/server/offboard-access";
+import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
+import { endUserSessions } from "@/lib/auth/revocation";
+import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +21,11 @@ export const dynamic = "force-dynamic";
 // plan's return date and absence; their days were already cleared when it
 // was planned. Next anyone whose last day (51g2) has passed is offboarded
 // the way a manual Offboard does it; the days after it were cleared when it
-// was planned. Then anyone Away whose return date has come is set back to
-// Active. Their recurring schedules were kept while they were away and the
-// fills already start from the return date, so nothing else changes.
+// was planned. Next anyone whose suspension ends today (51g3) is reinstated,
+// and anyone whose planned suspension starts today is suspended the way a
+// manual Suspend does it. Then anyone Away whose return date has come is set
+// back to Active. Their recurring schedules were kept while they were away and
+// the fills already start from the return date, so nothing else changes.
 //
 // Auth: Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`.
 
@@ -44,6 +49,25 @@ interface LastDayRow {
   user_id: string | null;
   planned_from: string;
   planned_note: string | null;
+  planned_by: string | null;
+  version: number;
+  organization: { timezone: string | null } | null;
+}
+
+interface SuspendedRow {
+  id: string;
+  org_id: string;
+  suspended_until: string;
+  version: number;
+  organization: { timezone: string | null } | null;
+}
+
+interface PlannedSuspensionRow {
+  id: string;
+  org_id: string;
+  user_id: string | null;
+  planned_from: string;
+  planned_until: string | null;
   planned_by: string | null;
   version: number;
   organization: { timezone: string | null } | null;
@@ -90,6 +114,18 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "return-from-away: offboarding after last days failed");
   }
+  let reinstated = 0;
+  try {
+    reinstated = await reinstateEndedSuspensions(db, now, latestToday);
+  } catch (error) {
+    logger.error({ error }, "return-from-away: reinstating ended suspensions failed");
+  }
+  let suspended = 0;
+  try {
+    suspended = await startPlannedSuspensions(db, now, latestToday);
+  } catch (error) {
+    logger.error({ error }, "return-from-away: starting planned suspensions failed");
+  }
 
   const { data, error } = await db
     .from("employees")
@@ -108,7 +144,7 @@ export async function GET(req: NextRequest) {
     (row) => row.away_until <= getIsoDateInTimeZone(now, row.organization?.timezone ?? null),
   );
   if (due.length === 0) {
-    return NextResponse.json({ ok: true, started, offboarded, returned: 0 });
+    return NextResponse.json({ ok: true, started, offboarded, reinstated, suspended, returned: 0 });
   }
 
   const statusChangedAt = now.toISOString();
@@ -169,6 +205,8 @@ export async function GET(req: NextRequest) {
     ok: true,
     started,
     offboarded,
+    reinstated,
+    suspended,
     returned: returned.length,
     skipped: due.length - returned.length,
   });
@@ -403,6 +441,176 @@ async function offboardAfterLastDays(
     );
     if (auditError) {
       logger.error({ error: auditError }, "return-from-away: offboard audit log write failed");
+    }
+    await cacheDel(...new Set(done.map((row) => CacheKey.employees(row.org_id))));
+  }
+  return done.length;
+}
+
+/**
+ * Reinstates everyone whose suspension ends today or earlier in their
+ * organization's timezone (51g3), clearing the columns a manual Reinstate
+ * clears, in one version-guarded update each. Returns how many.
+ */
+async function reinstateEndedSuspensions(
+  db: ServiceClient,
+  now: Date,
+  latestToday: string,
+): Promise<number> {
+  const { data, error } = await db
+    .from("employees")
+    .select("id, org_id, suspended_until, version, organization:organizations(timezone)")
+    .eq("status", "active")
+    .is("archived_at", null)
+    .not("suspended_at", "is", null)
+    .not("suspended_until", "is", null)
+    .lte("suspended_until", latestToday);
+  if (error) throw error;
+
+  const due = ((data ?? []) as unknown as SuspendedRow[]).filter(
+    (row) => row.suspended_until <= getIsoDateInTimeZone(now, row.organization?.timezone ?? null),
+  );
+  const at = now.toISOString();
+  const done: SuspendedRow[] = [];
+  for (const row of due) {
+    const { data: updated, error: updateError } = await db
+      .from("employees")
+      .update({
+        suspended_at: null,
+        suspended_by: null,
+        status_changed_at: at,
+        version: row.version + 1,
+      })
+      .eq("id", row.id)
+      .eq("org_id", row.org_id)
+      .eq("version", row.version)
+      .select("id")
+      .maybeSingle();
+    if (updateError) {
+      logger.error({ error: updateError, empId: row.id }, "return-from-away: reinstate failed");
+      continue;
+    }
+    if (updated) done.push(row);
+  }
+
+  if (done.length > 0) {
+    const { error: auditError } = await db.from("audit_log").insert(
+      done.map((row) => ({
+        org_id: row.org_id,
+        actor_id: null,
+        actor_email: null,
+        action: "employee.reinstated",
+        resource_type: "employee",
+        resource_id: row.id,
+        details: { suspendedUntil: row.suspended_until, changedFields: ["suspended_at"] },
+      })),
+    );
+    if (auditError) {
+      logger.error({ error: auditError }, "return-from-away: reinstate audit log write failed");
+    }
+    await cacheDel(...new Set(done.map((row) => CacheKey.employees(row.org_id))));
+  }
+  return done.length;
+}
+
+/**
+ * Suspends everyone whose planned suspension (51g3) starts today or earlier
+ * in their organization's timezone, through the update and follow-up a
+ * manual Suspend makes, credited to whoever planned it: signed out
+ * everywhere, push off, the notice email and the Super Admin alert; 102
+ * closes their requests. A plan whose end has come, or whose person no
+ * longer has an account, is dropped; the org's only Super Admin is left as
+ * they are, plan and all, as the status route refuses them. Returns how many.
+ */
+async function startPlannedSuspensions(
+  db: ServiceClient,
+  now: Date,
+  latestToday: string,
+): Promise<number> {
+  const { data, error } = await db
+    .from("employees")
+    .select(
+      "id, org_id, user_id, planned_from, planned_until, planned_by, version, organization:organizations(timezone)",
+    )
+    .eq("status", "active")
+    .is("archived_at", null)
+    .is("suspended_at", null)
+    .eq("planned_status", "suspended")
+    .lte("planned_from", latestToday);
+  if (error) throw error;
+
+  const due = ((data ?? []) as unknown as PlannedSuspensionRow[]).flatMap((row) => {
+    const today = getIsoDateInTimeZone(now, row.organization?.timezone ?? null);
+    return row.planned_from <= today ? [{ row, today }] : [];
+  });
+  const at = now.toISOString();
+  const done: PlannedSuspensionRow[] = [];
+  // One at a time: two Super Admins suspended the same day must not both pass
+  // the only-Super-Admin check before either is suspended.
+  for (const { row, today } of due) {
+    const drop = !row.user_id || (row.planned_until !== null && row.planned_until <= today);
+    if (!drop && (await isOnlySuperAdmin(db, row.org_id, row.user_id))) {
+      logger.warn(
+        { empId: row.id, orgId: row.org_id },
+        "return-from-away: planned suspension due for the only super admin; left as they are",
+      );
+      continue;
+    }
+    const { data: updated, error: updateError } = await db
+      .from("employees")
+      .update(
+        drop
+          ? { planned_status: null, version: row.version + 1 }
+          : {
+              suspended_at: at,
+              suspended_by: row.planned_by,
+              suspended_until: row.planned_until,
+              status_changed_at: at,
+              updated_by: row.planned_by,
+              version: row.version + 1,
+            },
+      )
+      .eq("id", row.id)
+      .eq("org_id", row.org_id)
+      .eq("version", row.version)
+      .select("id")
+      .maybeSingle();
+    if (updateError) {
+      logger.error({ error: updateError, empId: row.id }, "return-from-away: suspend failed");
+      continue;
+    }
+    if (!updated || drop || !row.user_id) continue;
+    try {
+      await endUserSessions(row.user_id);
+      await disableMobilePushTokensForOrg(db, { userId: row.user_id, orgId: row.org_id });
+    } catch (sessionError) {
+      logger.error(
+        { error: sessionError, empId: row.id, orgId: row.org_id },
+        "return-from-away: ending sessions or push after a planned suspension failed",
+      );
+    }
+    scheduleSuspensionNotice({ orgId: row.org_id, empId: row.id, actorId: row.planned_by ?? "" });
+    done.push(row);
+  }
+
+  if (done.length > 0) {
+    const { error: auditError } = await db.from("audit_log").insert(
+      done.map((row) => ({
+        org_id: row.org_id,
+        actor_id: null,
+        actor_email: null,
+        action: "employee.suspended",
+        resource_type: "employee",
+        resource_id: row.id,
+        details: {
+          plannedFrom: row.planned_from,
+          ...(row.planned_until ? { suspendedUntil: row.planned_until } : {}),
+          changedFields: ["suspended_at"],
+        },
+      })),
+    );
+    if (auditError) {
+      logger.error({ error: auditError }, "return-from-away: suspend audit log write failed");
     }
     await cacheDel(...new Set(done.map((row) => CacheKey.employees(row.org_id))));
   }

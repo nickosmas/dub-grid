@@ -1188,7 +1188,13 @@ function PersonRow({
   /** A staff record's status; a pill names it unless they're Active. */
   staffStatus?: Pick<
     MobilePerson,
-    "status" | "awayUntil" | "suspendedAt" | "plannedStatus" | "plannedFrom" | "plannedUntil"
+    | "status"
+    | "awayUntil"
+    | "suspendedAt"
+    | "suspendedUntil"
+    | "plannedStatus"
+    | "plannedFrom"
+    | "plannedUntil"
   >;
   subtitle: string;
   isLast: boolean;

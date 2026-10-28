@@ -319,6 +319,7 @@ async function updateEmployeeStatus(
       | "setReturnDate"
       | "reinstate"
       | "suspend"
+      | "setSuspendedUntil"
       | "setPlannedChange"
       | "cancelPlannedChange";
     expectedVersion: number;
@@ -434,7 +435,11 @@ export function plannedChangeToast(
   plan: PlannedChange | null,
   plannedStatus: Employee["plannedStatus"],
 ): string {
-  if (plan) return "lastDay" in plan ? "Last day changed" : "Planned away changed";
+  if (plan && "lastDay" in plan) return "Last day changed";
+  if (plannedStatus === "suspended") {
+    return plan ? "Planned suspension changed" : "Planned suspension cancelled";
+  }
+  if (plan) return "Planned away changed";
   return plannedStatus === "removed" ? "Last day cancelled" : "Planned away cancelled";
 }
 
@@ -488,14 +493,50 @@ export function setEmployeeReturnDate(
   });
 }
 
+/**
+ * A suspension's dates (51g3): a first day after today plans it for then, and
+ * `until` is the first day they have access again.
+ */
+export interface SuspensionDates {
+  startDate?: string | null;
+  until?: string | null;
+}
+
 /** Suspends someone's access (51c); a Gridmaster passes fresh proof as the token. */
 export function suspendEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
   accessToken?: string,
+  { startDate = null, until = null }: SuspensionDates = {},
 ): Promise<Employee> {
-  return updateEmployeeStatus({ empId, orgId, action: "suspend", expectedVersion }, accessToken);
+  return updateEmployeeStatus(
+    {
+      empId,
+      orgId,
+      action: "suspend",
+      expectedVersion,
+      ...(startDate ? { startDate } : {}),
+      ...(until ? { returnDate: until } : {}),
+    },
+    accessToken,
+  );
+}
+
+/** Sets, moves or clears (null) a suspended person's end date (51g3). */
+export function setEmployeeSuspendedUntil(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+  until: string | null,
+): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "setSuspendedUntil",
+    expectedVersion,
+    returnDate: until,
+  });
 }
 
 /** Gives a suspended person (51c) their access back. */

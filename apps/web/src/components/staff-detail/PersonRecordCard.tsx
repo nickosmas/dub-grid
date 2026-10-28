@@ -61,6 +61,7 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             employee.status,
             employee.awayUntil,
             employee.suspendedAt,
+            employee.suspendedUntil,
           )}
         />
         {employee.status === "active" && describePlannedChangeInFull(employee) ? (

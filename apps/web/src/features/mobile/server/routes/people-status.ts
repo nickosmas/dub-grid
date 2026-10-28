@@ -15,6 +15,7 @@ import {
   updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
   updateMobileEmployeePlannedChangeRow,
+  updateMobileEmployeeSuspendedUntilRow,
   updateMobileEmployeeSuspensionRow,
 } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
@@ -84,6 +85,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           const row = await updateMobileEmployeeSuspensionRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
         },
+        updateEmployeeSuspendedUntil: async (serviceClient, input) => {
+          const row = await updateMobileEmployeeSuspendedUntilRow(serviceClient, input);
+          return row ? rowToEmployee(row) : null;
+        },
         updateEmployeePlannedChange: async (serviceClient, input) => {
           const row = await updateMobileEmployeePlannedChangeRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
@@ -111,7 +116,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     );
 
     if (result.kind === "updated") {
-      if (parsed.data.action === "suspend") {
+      // A suspension planned for a later date (51g3) sends nothing until the job starts it.
+      if (parsed.data.action === "suspend" && result.person.suspendedAt) {
         scheduleSuspensionNotice({ orgId: auth.currentOrg.id, empId: id, actorId: auth.user.id });
       }
       return NextResponse.json(

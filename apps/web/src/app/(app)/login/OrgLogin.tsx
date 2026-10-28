@@ -246,7 +246,8 @@ export default function OrgLogin({
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
-  const [accessSuspended, setAccessSuspended] = useState(false);
+  // A suspended sign-in (51c), with the day they get access back when it has one (51g3).
+  const [accessSuspended, setAccessSuspended] = useState<{ until: string | null } | null>(null);
   const [gridmasterPortalRequired, setGridmasterPortalRequired] = useState(false);
   const [handoffActive, setHandoffActive] = useState(false);
   const [handoffFailed, setHandoffFailed] = useState(false);
@@ -345,7 +346,9 @@ export default function OrgLogin({
           return;
         }
         if (res.status === 403 && result?.code === ACCOUNT_SUSPENDED_CODE) {
-          setAccessSuspended(true);
+          setAccessSuspended({
+            until: typeof result?.suspendedUntil === "string" ? result.suspendedUntil : null,
+          });
           setPassword("");
           setLoading(false);
           return;
@@ -657,7 +660,12 @@ export default function OrgLogin({
           </Card>
         </div>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
-        {accessSuspended && <AccessSuspendedModal onClose={() => setAccessSuspended(false)} />}
+        {accessSuspended && (
+          <AccessSuspendedModal
+            until={accessSuspended.until}
+            onClose={() => setAccessSuspended(null)}
+          />
+        )}
       </PageShell>
     </PublicRoute>
   );

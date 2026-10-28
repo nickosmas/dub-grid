@@ -394,6 +394,7 @@ export function rowToEmployee(row: DbEmployee): Employee {
     awayUntil: row.away_until ?? null,
     awayAbsenceTypeId: row.away_absence_type_id ?? null,
     suspendedAt: row.suspended_at ?? null,
+    suspendedUntil: row.suspended_until ?? null,
     plannedStatus: row.planned_status ?? null,
     plannedFrom: row.planned_from ?? null,
     plannedUntil: row.planned_until ?? null,
@@ -427,6 +428,7 @@ export function employeeToRow(
   | "away_until"
   | "away_absence_type_id"
   | "suspended_at"
+  | "suspended_until"
   | "planned_status"
   | "planned_from"
   | "planned_until"

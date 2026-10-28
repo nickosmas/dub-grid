@@ -1303,6 +1303,167 @@ describe("POST /api/employees/status", () => {
       expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
     });
 
+    describe("with a start and an end (51g3)", () => {
+      // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+      function arrangeDated(row: Record<string, unknown>) {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+        orgTimezoneSingle.mockResolvedValue({
+          data: { timezone: "America/Los_Angeles" },
+          error: null,
+        });
+        arrange(row);
+      }
+
+      function postWith(body: Record<string, unknown>) {
+        return POST(
+          new NextRequest("http://localhost/api/employees/status", {
+            method: "POST",
+            body: JSON.stringify({ empId: EMP_ID, orgId: ORG_ID, expectedVersion: 1, ...body }),
+          }),
+        );
+      }
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("suspends now until an end date", async () => {
+        arrangeDated({});
+
+        const response = await postWith({ action: "suspend", returnDate: "2026-11-20" });
+
+        expect(response.status).toBe(200);
+        expect(employeeUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ suspended_until: "2026-11-20", suspended_by: USER_ID }),
+        );
+        expect(endUserSessions).toHaveBeenCalledWith(LINKED_USER_ID);
+        expect(auditInsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "employee.suspended",
+            details: { suspendedUntil: "2026-11-20", changedFields: ["suspended_at"] },
+          }),
+        );
+      });
+
+      it("refuses an end date on or before today", async () => {
+        arrangeDated({});
+
+        const response = await postWith({ action: "suspend", returnDate: "2026-10-26" });
+
+        expect(response.status).toBe(400);
+        expect((await response.json()).code).toBe("SUSPENDED_UNTIL_INVALID");
+        expect(employeeUpdate).not.toHaveBeenCalled();
+      });
+
+      it("plans a suspension for a later start without signing them out", async () => {
+        arrangeDated({});
+
+        const response = await postWith({
+          action: "suspend",
+          startDate: "2026-11-10",
+          returnDate: "2026-11-20",
+        });
+
+        expect(response.status).toBe(200);
+        const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+        expect(update).toMatchObject({
+          planned_status: "suspended",
+          planned_from: "2026-11-10",
+          planned_until: "2026-11-20",
+          planned_absence_type_id: null,
+          planned_by: USER_ID,
+        });
+        expect(update).not.toHaveProperty("suspended_at");
+        expect(update).not.toHaveProperty("status_changed_at");
+        expect(endUserSessions).not.toHaveBeenCalled();
+        expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
+        expect(auditInsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "employee.suspension_planned",
+            details: {
+              plannedFrom: "2026-11-10",
+              plannedUntil: "2026-11-20",
+              changedFields: ["planned_status"],
+            },
+          }),
+        );
+      });
+
+      it("refuses a planned suspension with no account, or an end before its start", async () => {
+        arrangeDated({ user_id: null });
+        expect(
+          (await (await postWith({ action: "suspend", startDate: "2026-11-10" })).json()).code,
+        ).toBe("NO_ACCOUNT");
+
+        arrangeDated({});
+        const early = await postWith({
+          action: "suspend",
+          startDate: "2026-11-10",
+          returnDate: "2026-11-09",
+        });
+        expect(await early.json()).toEqual({
+          error: "Choose an end date after the start date.",
+          code: "SUSPENDED_UNTIL_INVALID",
+        });
+        expect(employeeUpdate).not.toHaveBeenCalled();
+      });
+
+      it("moves and cancels a planned suspension", async () => {
+        const planned = { planned_status: "suspended", planned_from: "2026-11-10" };
+        arrangeDated({ ...planned, focus_area_ids: [] });
+
+        const moved = await postWith({
+          action: "setPlannedChange",
+          startDate: "2026-11-12",
+          returnDate: null,
+        });
+        expect(moved.status).toBe(200);
+        expect(employeeUpdate).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            planned_status: "suspended",
+            planned_from: "2026-11-12",
+            planned_until: null,
+          }),
+        );
+        expect(auditInsert).toHaveBeenLastCalledWith(
+          expect.objectContaining({ action: "employee.suspension_plan_changed" }),
+        );
+
+        arrangeDated(planned);
+        expect((await postWith({ action: "cancelPlannedChange" })).status).toBe(200);
+        expect(auditInsert).toHaveBeenLastCalledWith(
+          expect.objectContaining({ action: "employee.suspension_plan_cancelled" }),
+        );
+      });
+
+      it("sets a suspended person's end date, and refuses someone not suspended", async () => {
+        arrangeDated({ suspended_at: "2026-10-20T00:00:00Z" });
+
+        const response = await postWith({ action: "setSuspendedUntil", returnDate: "2026-11-20" });
+
+        expect(response.status).toBe(200);
+        const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+        expect(update).toMatchObject({ suspended_until: "2026-11-20" });
+        expect(update).not.toHaveProperty("status_changed_at");
+        expect(endUserSessions).not.toHaveBeenCalled();
+        expect(auditInsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "employee.suspension_end_changed",
+            details: {
+              fromSuspendedUntil: null,
+              toSuspendedUntil: "2026-11-20",
+              changedFields: ["suspended_until"],
+            },
+          }),
+        );
+
+        arrangeDated({});
+        const notSuspended = await postWith({ action: "setSuspendedUntil", returnDate: null });
+        expect((await notSuspended.json()).code).toBe("NOT_SUSPENDED");
+      });
+    });
+
     it("refuses to reinstate someone who isn't suspended", async () => {
       arrange({});
 

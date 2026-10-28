@@ -1,6 +1,6 @@
 "use client";
 
-import type { PlannedChange } from "@/features/employees/client";
+import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
 import {
   EMPLOYMENT_STATUS_LABELS,
   describeEmploymentStatus,
@@ -170,7 +170,9 @@ export interface MembersSectionProps {
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   onAdd: () => void;
@@ -209,6 +211,7 @@ export function MembersSection({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
   onAdd,
   canViewEmployeeDetails,
@@ -272,6 +275,15 @@ export function MembersSection({
         employees
           .filter((employee) => employee.suspendedAt)
           .map((employee) => [employee.id, employee.suspendedAt ?? null]),
+      ),
+    [employees],
+  );
+  const suspendedUntilByEmployeeId = useMemo(
+    () =>
+      new Map(
+        employees
+          .filter((employee) => employee.suspendedAt && employee.suspendedUntil)
+          .map((employee) => [employee.id, employee.suspendedUntil ?? null]),
       ),
     [employees],
   );
@@ -1921,6 +1933,9 @@ export function MembersSection({
                             person.employeeId
                               ? suspendedAtByEmployeeId.get(person.employeeId)
                               : null,
+                            person.employeeId
+                              ? suspendedUntilByEmployeeId.get(person.employeeId)
+                              : null,
                           );
                       const isSuspended =
                         !!person.employeeId && suspendedAtByEmployeeId.has(person.employeeId);
@@ -2226,6 +2241,7 @@ export function MembersSection({
           onActivate={(employeeId) => onActivate(employeeId)}
           onReinstate={onReinstate}
           onSuspend={onSuspend}
+          onSetSuspendedUntil={onSetSuspendedUntil}
           onSetPlannedChange={onSetPlannedChange}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
