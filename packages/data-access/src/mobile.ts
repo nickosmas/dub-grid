@@ -2219,6 +2219,24 @@ export async function fetchMobileActiveMembershipOrgRole(
   return (data?.org_role as string | null | undefined) ?? null;
 }
 
+/** Their role in the organization, whether or not the membership is archived (51k). */
+export async function fetchMobileMembershipOrgRole(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select("org_role")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return (data?.org_role as string | null | undefined) ?? null;
+}
+
 export async function countMobileActiveSuperAdmins(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -2233,39 +2251,6 @@ export async function countMobileActiveSuperAdmins(
   if (error) throw error;
 
   return count ?? 0;
-}
-
-export async function archiveMobileOrganizationMembership(
-  serviceClient: SupabaseClient,
-  input: {
-    orgId: string;
-    userId: string;
-    archivedByUserId: string;
-    archivedAt: string;
-  },
-): Promise<void> {
-  const { error } = await serviceClient
-    .from("organization_memberships")
-    .update({ archived_at: input.archivedAt, archived_by: input.archivedByUserId })
-    .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
-    .is("archived_at", null);
-
-  if (error) throw error;
-}
-
-export async function restoreMobileOrganizationMembership(
-  serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string },
-): Promise<void> {
-  const { error } = await serviceClient
-    .from("organization_memberships")
-    .update({ archived_at: null, archived_by: null })
-    .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
-    .not("archived_at", "is", null);
-
-  if (error) throw error;
 }
 
 export async function insertMobileAuditLogEntry(

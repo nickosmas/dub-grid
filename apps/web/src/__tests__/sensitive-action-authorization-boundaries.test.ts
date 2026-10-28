@@ -100,7 +100,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "authorized-target-revocation",
     assertions: [
       /if \(!bearerMatchesSecret\(req\.headers\.get\("authorization"\), secret\)\)/,
-      /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?endMembership: await canEndMembership\(db, row\.org_id, row\.planned_by\),/,
+      /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?userId: row\.user_id,/,
       // It starts a suspension a manager planned (51g3) with that Suspend's
       // follow-up, signing out only the suspended person.
       /\.eq\("planned_status", "suspended"\)[\s\S]*?await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)[\s\S]*?await endUserSessions\(row\.user_id\);/,
@@ -270,6 +270,8 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
       /export async function DELETE[\s\S]*?revokeAllUserSessions/,
+      // Their staff record is offboarded after the membership, by the shared change (51k).
+      /export async function DELETE[\s\S]*?if \(!updatedMembership\)[\s\S]*?await offboardRemovedMember\(/,
       // A Gridmaster's removal needs fresh proof before the membership is read (F-96).
       /export async function DELETE[\s\S]*?if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const currentUser = await fetchOrganizationUser/,
       /if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
@@ -371,7 +373,10 @@ const SHARED_STATUS_CHANGE_ASSERTIONS: RegExp[] = [
   /export function statusChangeNeedsFreshProof\(action: StatusChangeAction\): boolean \{\s*return \(\s*action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\s*\);/,
   // Removal signs the person out everywhere; marking inactive (Away) doesn't
   // (51a), and nor does setting a last day, until the day after it (51g2).
-  /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,[\s\S]*?endMembership: isGridmaster \|\| isSuperAdmin,/,
+  /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,/,
+  // Offboarding and Restore change the membership whoever acts (51k), so an
+  // Admin never reaches a Super Admin: the tier guard runs before any write.
+  /if \(\(offboarding \|\| restoring\) && !isGridmaster && !isSuperAdmin && currentEmployee\.userId\) \{[\s\S]*?if \(!canOffboardAtTier\(actor, targetMembership\?\.org_role\)\) \{[\s\S]*?\{ status: 403 \}[\s\S]*?\.from\("employees"\)\s*\.update\(update\)/,
   // Suspension signs only the suspended person out (51c), and only once
   // it starts: a planned one (51g3) waits for the daily job.
   /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,

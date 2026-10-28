@@ -6,6 +6,7 @@ import type {
   SuspensionDates,
 } from "@/features/employees/client";
 import {
+  canOffboardAtTier,
   EMPLOYMENT_STATUS_LABELS,
   describeBulkStatusAction,
   describeEmploymentStatus,
@@ -1553,6 +1554,12 @@ export function MembersSection({
                 setInviteQueue(employeesToInvite.slice(1));
               }}
               onBulkStatus={onBulkStatusChange ? openBulkStatus : undefined}
+              canOffboard={(employee) =>
+                canOffboardAtTier(
+                  { isSuperAdmin: !!isSuperAdmin, isGridmaster: !!isGridmaster },
+                  effectiveOrgRoleByEmployeeId.get(employee.id),
+                )
+              }
               currentUserId={currentUserId}
               onClearSelection={clearSelection}
               isReordering={isReordering}

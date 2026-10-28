@@ -64,6 +64,8 @@ interface StaffContextBarProps {
   onBulkStatus?: (plan: BulkStatusPlan<Employee>) => void;
   /** The manager's own account, never changed by a bulk status change. */
   currentUserId?: string | null;
+  /** False for someone this manager may not offboard or restore (51k); skipped with the reason. */
+  canOffboard?: (employee: Employee) => boolean;
   onClearSelection: () => void;
   // Reorder
   isReordering: boolean;
@@ -116,6 +118,7 @@ export function StaffContextBar({
   onBulkInvite,
   onBulkStatus,
   currentUserId = null,
+  canOffboard,
   onClearSelection,
   isReordering,
   isDirty,
@@ -179,8 +182,11 @@ export function StaffContextBar({
   // Each change shows only when it reaches someone, with how many (51h).
   const statusPlans: BulkStatusPlan<Employee>[] = onBulkStatus
     ? BULK_STATUS_ACTIONS.map((action: BulkStatusAction) =>
-        planBulkStatusChange(action, selectedEmployees, (employee) =>
-          isSelfAction(currentUserId, employee.userId),
+        planBulkStatusChange(
+          action,
+          selectedEmployees,
+          (employee) => isSelfAction(currentUserId, employee.userId),
+          canOffboard,
         ),
       ).filter((plan) => plan.eligible.length > 0)
     : [];

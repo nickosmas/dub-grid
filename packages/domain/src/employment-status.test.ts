@@ -17,6 +17,9 @@ import {
   describePlannedChangeInFull,
   describeStatusAction,
   statusChoices,
+  canOffboardAtTier,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
   availableStatusChoices,
   NO_ACCOUNT_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
@@ -331,6 +334,24 @@ describe("describeStatusAction reinstate", () => {
   });
 });
 
+describe("canOffboardAtTier (51k)", () => {
+  const admin = { isSuperAdmin: false, isGridmaster: false };
+  it("lets a Super Admin or Gridmaster reach every role", () => {
+    for (const role of ["super_admin", "admin", "user", null]) {
+      expect(canOffboardAtTier({ isSuperAdmin: true, isGridmaster: false }, role)).toBe(true);
+      expect(canOffboardAtTier({ isSuperAdmin: false, isGridmaster: true }, role)).toBe(true);
+    }
+  });
+
+  it("lets an Admin reach everyone but a Super Admin", () => {
+    expect(canOffboardAtTier(admin, "user")).toBe(true);
+    expect(canOffboardAtTier(admin, "admin")).toBe(true);
+    expect(canOffboardAtTier(admin, null)).toBe(true);
+    expect(canOffboardAtTier(admin, undefined)).toBe(true);
+    expect(canOffboardAtTier(admin, "super_admin")).toBe(false);
+  });
+});
+
 describe("statusChoices", () => {
   const onSchedule = { focusAreaIds: [7] };
   const kinds = (state: Parameters<typeof statusChoices>[0]) =>
@@ -348,6 +369,24 @@ describe("statusChoices", () => {
       "Suspended:suspend",
       "Offboarded:archive",
     ]);
+  });
+
+  it("lists Offboard and Restore disabled when the manager can't reach them (51k)", () => {
+    const active = { status: "active" as const, ...onSchedule };
+    const offboarded = { status: "removed" as const, ...onSchedule };
+    const activeChoices = statusChoices(active, { canOffboard: false });
+    expect(activeChoices.find((option) => option.action === "archive")).toMatchObject({
+      available: false,
+      unavailableReason: OFFBOARD_OUT_OF_REACH_MESSAGE,
+    });
+    expect(activeChoices.find((option) => option.action === "suspend")?.available).toBe(true);
+    expect(
+      statusChoices(offboarded, { canOffboard: false }).find(
+        (option) => option.action === "restore",
+      ),
+    ).toMatchObject({ available: false, unavailableReason: RESTORE_OUT_OF_REACH_MESSAGE });
+    expect(suggestedStatusChoice(offboarded, { canOffboard: false })).toBeNull();
+    expect(suggestedStatusChoice(offboarded)?.action).toBe("restore");
   });
 
   it("lists Away, disabled with a reason, for someone not on the schedule", () => {

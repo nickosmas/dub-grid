@@ -22,6 +22,7 @@ import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import { cacheDel, CacheKey } from "@/lib/cache";
+import { offboardRemovedMember, requestInfo } from "@/features/employees/server/status-change";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { READ_ONLY_PERMS } from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -514,6 +515,21 @@ export async function DELETE(req: NextRequest) {
     // so the next navigation asks the database. Other isolates' memos lapse in
     // seconds.
     await cacheDel(CacheKey.mwOrgVisible(userId, orgId));
+
+    await offboardRemovedMember(
+      {
+        serviceClient,
+        orgId,
+        actor: {
+          id: user.id,
+          email: user.email ?? null,
+          isGridmaster: allowed.isGridmaster,
+          isSuperAdmin: !allowed.isGridmaster,
+        },
+        request: requestInfo(req),
+      },
+      userId,
+    );
 
     await writeAuditEntry({
       orgId,

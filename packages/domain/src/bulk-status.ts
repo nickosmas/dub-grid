@@ -58,6 +58,8 @@ const BACK_TO_ACTIVE: Partial<Record<BulkStatusAction, { from: StatusChoiceKind;
 export interface BulkStatusOptions {
   /** True when the person is the manager making the change. */
   isSelf?: boolean;
+  /** False when the manager may not offboard or restore this person (51k). */
+  canOffboard?: boolean;
 }
 
 /**
@@ -68,14 +70,15 @@ export interface BulkStatusOptions {
 export function bulkStatusSkipReason(
   action: BulkStatusAction,
   person: CurrentStatusState,
-  { isSelf = false }: BulkStatusOptions = {},
+  { isSelf = false, canOffboard = true }: BulkStatusOptions = {},
 ): string | null {
   if (isSelf) return SELF_STATUS_SKIP_REASON;
   const kind = currentStatusKind(person);
   if (kind === TARGET_KIND[action]) return `Already ${KIND_LABELS[kind]}.`;
   const backToActive = BACK_TO_ACTIVE[action];
-  if (backToActive) return kind === backToActive.from ? null : backToActive.only;
-  const option = statusChoices(person).find((choice) => choice.action === action);
+  if (backToActive && kind !== backToActive.from) return backToActive.only;
+  if (backToActive && action !== "restore") return null;
+  const option = statusChoices(person, { canOffboard }).find((choice) => choice.action === action);
   return option?.unavailableReason ?? null;
 }
 
@@ -97,10 +100,14 @@ export function planBulkStatusChange<P extends CurrentStatusState>(
   action: BulkStatusAction,
   people: readonly P[],
   isSelf: (person: P) => boolean = () => false,
+  canOffboard: (person: P) => boolean = () => true,
 ): BulkStatusPlan<P> {
   const plan: BulkStatusPlan<P> = { action, eligible: [], skipped: [] };
   for (const person of people) {
-    const reason = bulkStatusSkipReason(action, person, { isSelf: isSelf(person) });
+    const reason = bulkStatusSkipReason(action, person, {
+      isSelf: isSelf(person),
+      canOffboard: canOffboard(person),
+    });
     if (reason === null) plan.eligible.push(person);
     else plan.skipped.push({ person, reason });
   }

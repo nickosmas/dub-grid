@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { requireCredentialAssurance } from "@/features/account/client";
@@ -170,7 +171,7 @@ export function PersonMembershipActions({
       {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={`Remove this person from ${organization.org.name}?`}
-          message="They lose access to it now, and their staff record stays."
+          message={REMOVE_FROM_ORGANIZATION_MESSAGE}
           confirmLabel="Remove"
           variant="danger"
           isLoading={busy}

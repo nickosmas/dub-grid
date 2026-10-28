@@ -1058,7 +1058,7 @@
         card.
   - [x] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.
-- [ ] 51. **Staff statuses** - every person is Active, Away, Suspended or
+- [x] 51. **Staff statuses** - every person is Active, Away, Suspended or
       Archived, with an optional last day and return date. Away keeps
       sign-in, role and management access but takes them off the schedule;
       Suspended can't sign in but keeps their shifts and can still be
@@ -1136,7 +1136,7 @@
         stop them (Suspended keeps its one notice email); restoring access
         restores delivery. Settles whether in-app alerts are still created
         for them.
-  - [ ] 51k. **One Archive** - archiving ends the membership whoever does
+  - [x] 51k. **One Archive** - archiving ends the membership whoever does
         it, so an Admin's and a Super Admin's archive leave the same record,
         and Restore works the same after either.
 - [x] 52. **Absence runs in the grid** - a whole-day absence on days in a

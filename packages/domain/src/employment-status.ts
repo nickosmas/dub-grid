@@ -102,6 +102,29 @@ export const SUSPENDED_UNTIL_INVALID_MESSAGE = "Choose an end date after today."
 
 export const PLANNED_SUSPENSION_END_INVALID_MESSAGE = "Choose an end date after the start date.";
 
+export const OFFBOARD_OUT_OF_REACH_CODE = "OFFBOARD_OUT_OF_REACH";
+
+export const OFFBOARD_OUT_OF_REACH_MESSAGE = "Only a Super Admin can offboard a Super Admin.";
+
+export const RESTORE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can restore a Super Admin.";
+
+/** Gridmaster's Remove from organization confirmation: it offboards their staff record too (51k). */
+export const REMOVE_FROM_ORGANIZATION_MESSAGE =
+  "They're offboarded there: they lose access now, and their upcoming shifts come off the schedule in the draft. Their staff record stays, and the organization can restore them.";
+
+/**
+ * Whether this manager may offboard or restore someone with `targetOrgRole`
+ * (51k). Offboarding ends their membership and Restore reopens it, so the
+ * Super Admin tier stays with Super Admins and Gridmasters, as when it's
+ * given (`canAssignOrgRole`); an Admin who can manage staff reaches the rest.
+ */
+export function canOffboardAtTier(
+  actor: { isSuperAdmin: boolean; isGridmaster: boolean },
+  targetOrgRole: string | null | undefined,
+): boolean {
+  return actor.isSuperAdmin || actor.isGridmaster || targetOrgRole !== "super_admin";
+}
+
 export const FIRST_DAY_INVALID_CODE = "FIRST_DAY_INVALID";
 
 export const FIRST_DAY_INVALID_MESSAGE = "Choose a first day no more than a year ahead.";
@@ -692,7 +715,8 @@ export function describeStatusAction(
         message: "",
         points: [
           ...(account ? ["They can no longer sign in."] : []),
-          ...leavingSchedule,
+          ...leavingSchedule.slice(0, 2),
+          "Open requests they're part of are closed, and pickups they claimed go back up for others.",
           ...cancelsPlan,
         ],
         unchanged: ["Past records stay, and you can restore them later."],
@@ -774,6 +798,14 @@ export interface CurrentStatusState extends StatusState {
   focusAreaIds: readonly number[];
 }
 
+export interface StatusChoiceOptions {
+  /**
+   * False when the manager may not offboard or restore this person
+   * (`canOffboardAtTier`): both stay listed, disabled with the reason (51k).
+   */
+  canOffboard?: boolean;
+}
+
 const AWAY_DETAIL = "Keeps sign-in. Not scheduled while away.";
 const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
 const ARCHIVED_DETAIL = "No longer on staff. Can't sign in or be scheduled.";
@@ -816,7 +848,10 @@ const EDIT_PLAN_HINT = "Change it with Edit plan.";
  * dialog lists them. One that can't be picked right now stays in the list
  * with `available` false and a reason, so the list never silently shrinks.
  */
-export function statusChoices(state: CurrentStatusState): StatusChoice[] {
+export function statusChoices(
+  state: CurrentStatusState,
+  { canOffboard = true }: StatusChoiceOptions = {},
+): StatusChoice[] {
   const account = hasAccount(state);
   const kind = currentKind(state);
   const plannedAwayFrom = state.plannedStatus === "away" ? (state.plannedFrom ?? null) : null;
@@ -871,9 +906,11 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
         ? "They'll be Offboarded: no longer on staff, and they can't sign in or be scheduled."
         : "They'll be Offboarded: no longer on staff, and they can't be scheduled.",
     },
-    lastDay
-      ? `${LEAVING_LABEL} ${formatReturnDate(lastDay, { weekday: true })}. ${EDIT_PLAN_HINT}`
-      : null,
+    !canOffboard
+      ? OFFBOARD_OUT_OF_REACH_MESSAGE
+      : lastDay
+        ? `${LEAVING_LABEL} ${formatReturnDate(lastDay, { weekday: true })}. ${EDIT_PLAN_HINT}`
+        : null,
   );
   switch (kind) {
     case "active":
@@ -906,17 +943,20 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
       ];
     case "archived":
       return [
-        choice({
-          kind: "active",
-          action: "restore",
-          label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: account
-            ? "Back on staff. Can sign in and be scheduled."
-            : "Back on staff. Can be scheduled.",
-          outcome: account
-            ? "They'll be Active again: back on staff, and they can sign in and be scheduled."
-            : "They'll be Active again: back on staff, and they can be scheduled.",
-        }),
+        choice(
+          {
+            kind: "active",
+            action: "restore",
+            label: EMPLOYMENT_STATUS_LABELS.active,
+            detail: account
+              ? "Back on staff. Can sign in and be scheduled."
+              : "Back on staff. Can be scheduled.",
+            outcome: account
+              ? "They'll be Active again: back on staff, and they can sign in and be scheduled."
+              : "They'll be Active again: back on staff, and they can be scheduled.",
+          },
+          canOffboard ? null : RESTORE_OUT_OF_REACH_MESSAGE,
+        ),
         away,
         suspended,
       ];
@@ -924,8 +964,11 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
 }
 
 /** The changes that can be made right now, for buttons and menus that name one. */
-export function availableStatusChoices(state: CurrentStatusState): StatusChoice[] {
-  return statusChoices(state).filter((option) => option.available);
+export function availableStatusChoices(
+  state: CurrentStatusState,
+  options: StatusChoiceOptions = {},
+): StatusChoice[] {
+  return statusChoices(state, options).filter((option) => option.available);
 }
 
 /**
@@ -933,9 +976,12 @@ export function availableStatusChoices(state: CurrentStatusState): StatusChoice[
  * card's main button: Reinstate, Mark active or Restore. Active has none, so
  * its card offers Change status alone.
  */
-export function suggestedStatusChoice(state: CurrentStatusState): StatusChoice | null {
+export function suggestedStatusChoice(
+  state: CurrentStatusState,
+  options: StatusChoiceOptions = {},
+): StatusChoice | null {
   if (currentKind(state) === "active") return null;
-  return availableStatusChoices(state).find((option) => option.kind === "active") ?? null;
+  return availableStatusChoices(state, options).find((option) => option.kind === "active") ?? null;
 }
 
 export type StatusTone = "success" | "warning" | "danger" | "neutral";

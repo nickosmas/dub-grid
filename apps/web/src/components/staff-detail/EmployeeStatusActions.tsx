@@ -30,6 +30,11 @@ export interface EmployeeStatusActionsProps {
   canEdit: boolean;
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
+  /**
+   * False when this manager may not offboard or restore them (51k,
+   * `canOffboardAtTier`): both stay listed, disabled with the reason.
+   */
+  canOffboard?: boolean;
   onDeactivate: (
     empId: string,
     note?: string,
@@ -396,6 +401,7 @@ export function EmployeeStatusActions({
   employee,
   canEdit,
   isSelf = false,
+  canOffboard = true,
   onDeactivate,
   onActivate,
   onRemove,
@@ -478,7 +484,7 @@ export function EmployeeStatusActions({
   const suspendsNow = hasSuspensionPlan && !cancellingPlan && !startDate && focus !== "status";
   // Every other status is listed, an unavailable one disabled with its reason;
   // only a change this surface has no handler for is left out.
-  const choices = statusChoices(employee).filter(
+  const choices = statusChoices(employee, { canOffboard }).filter(
     (option) =>
       option.action !== excludeChoice &&
       (!(option.action in handlers) || Boolean(handlers[option.action])),
@@ -949,9 +955,10 @@ export function StatusCardActions(
   const offered = (action: StatusAction) =>
     (action !== "reinstate" || Boolean(props.onReinstate)) &&
     (action !== "suspend" || Boolean(props.onSuspend));
-  const likely = suggestedStatusChoice(props.employee);
+  const reach = { canOffboard: props.canOffboard ?? true };
+  const likely = suggestedStatusChoice(props.employee, reach);
   const suggested = likely && offered(likely.action) ? likely : null;
-  const available = availableStatusChoices(props.employee).filter((option) =>
+  const available = availableStatusChoices(props.employee, reach).filter((option) =>
     offered(option.action),
   );
   if (!suggested) {

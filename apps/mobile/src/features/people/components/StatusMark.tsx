@@ -148,6 +148,8 @@ interface StatusCardsProps {
   absenceTypes: readonly { id: number; name?: string | null; label: string }[];
   /** Opens Change status; left off for someone who can't change it. */
   onChangeStatus?: (opening: StatusSheetOpening) => void;
+  /** False when this manager may not offboard or restore them (51k). */
+  canOffboard?: boolean;
   disabled?: boolean;
   /**
    * Tinted like their pill on the profile; the sheet draws it plain, since the
@@ -164,6 +166,7 @@ export function StatusCards({
   person,
   absenceTypes,
   onChangeStatus,
+  canOffboard = true,
   disabled = false,
   plain = false,
 }: StatusCardsProps) {
@@ -186,8 +189,8 @@ export function StatusCards({
   // and for someone Away their return date. Every one opens a confirmation
   // for that change alone. Someone Active gets Change status, or a button
   // named for the one change left, or none when nothing can change now.
-  const suggested = plain ? null : suggestedStatusChoice(person);
-  const available = availableStatusChoices(person);
+  const suggested = plain ? null : suggestedStatusChoice(person, { canOffboard });
+  const available = availableStatusChoices(person, { canOffboard });
   const away = person.status === "inactive" && !person.archivedAt;
   const suspended = person.status === "active" && !person.archivedAt && Boolean(person.suspendedAt);
   const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested

@@ -5,13 +5,12 @@ import {
 } from "@dubgrid/contracts";
 import { MobileApiAuthorizationError, updateMobilePersonStatus } from "@dubgrid/mobile-api-core";
 import {
-  archiveMobileOrganizationMembership,
   countMobileActiveSuperAdmins,
   disableMobilePushTokensForOrg,
   fetchMobileActiveMembershipOrgRole,
   fetchMobileEmployeeRowById,
+  fetchMobileMembershipOrgRole,
   insertMobileAuditLogEntry,
-  restoreMobileOrganizationMembership,
   updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
   updateMobileEmployeePlannedChangeRow,
@@ -21,6 +20,10 @@ import {
 import logger from "@/lib/logger";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { endUserSessions } from "@/lib/auth/revocation";
+import {
+  endOffboardedAccess,
+  reopenRestoredAccess,
+} from "@/features/employees/server/offboard-access";
 import { requireMobileAuth } from "@/features/mobile/server";
 import { mapEmployeeToMobilePerson } from "./people";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -110,8 +113,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         mapEmployeeToMobilePerson,
         fetchActiveMembershipOrgRole: fetchMobileActiveMembershipOrgRole,
         countActiveSuperAdmins: countMobileActiveSuperAdmins,
-        archiveOrganizationMembership: archiveMobileOrganizationMembership,
-        restoreOrganizationMembership: restoreMobileOrganizationMembership,
+        fetchMembershipOrgRole: fetchMobileMembershipOrgRole,
+        // The same follow-ups as web, so an Offboard from the app leaves the same record (51k).
+        endOffboardedAccess,
+        reopenRestoredAccess,
       },
     );
 
@@ -140,6 +145,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     }
 
     if (
+      result.kind === "out_of_reach" ||
       result.kind === "self_action_forbidden" ||
       result.kind === "invalid_return_date" ||
       result.kind === "invalid_status_change"

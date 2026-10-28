@@ -11,6 +11,8 @@ import {
   NO_ACCOUNT_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
   NOT_SUSPENDABLE_MESSAGE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
 } from "./employment-status";
 
 function person(overrides: Partial<BulkStatusPerson> = {}): BulkStatusPerson {
@@ -38,6 +40,30 @@ describe("bulkStatusSkipReason", () => {
     expect(bulkStatusSkipReason("restore", offboarded)).toBeNull();
     expect(bulkStatusSkipReason("archive", suspended)).toBeNull();
     expect(bulkStatusSkipReason("markAway", suspended)).toBeNull();
+  });
+
+  it("skips a Super Admin the manager can't offboard or restore (51k)", () => {
+    expect(bulkStatusSkipReason("archive", active, { canOffboard: false })).toBe(
+      OFFBOARD_OUT_OF_REACH_MESSAGE,
+    );
+    expect(bulkStatusSkipReason("restore", offboarded, { canOffboard: false })).toBe(
+      RESTORE_OUT_OF_REACH_MESSAGE,
+    );
+    expect(bulkStatusSkipReason("suspend", active, { canOffboard: false })).toBeNull();
+    expect(bulkStatusSkipReason("markActive", away, { canOffboard: false })).toBeNull();
+    const plan = planBulkStatusChange(
+      "archive",
+      [active, person({ name: "Sam Super" })],
+      () => false,
+      (candidate) => candidate.name !== "Sam Super",
+    );
+    expect(plan.eligible.map((candidate) => candidate.name)).toEqual(["Jamie Rivera"]);
+    expect(plan.skipped).toEqual([
+      {
+        person: expect.objectContaining({ name: "Sam Super" }),
+        reason: OFFBOARD_OUT_OF_REACH_MESSAGE,
+      },
+    ]);
   });
 
   it("skips someone already in that status", () => {

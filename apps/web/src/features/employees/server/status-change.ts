@@ -1,18 +1,22 @@
 import type { getServiceClient } from "@/lib/supabase-service";
 import { endUserSessions } from "@/lib/auth/revocation";
-import { endOffboardedAccess } from "@/features/employees/server/offboard-access";
+import {
+  endOffboardedAccess,
+  reopenRestoredAccess,
+} from "@/features/employees/server/offboard-access";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
-import { EMPLOYEE_COLS, cacheDel, CacheKey } from "@/lib/db/shared";
+import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import {
   AWAY_ABSENCE_INVALID_CODE,
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
   bulkStatusSkipReason,
   canMarkInactive,
+  canOffboardAtTier,
   isAwayAbsenceRefusal,
   isValidLastDay,
   isValidPlannedStart,
@@ -23,6 +27,9 @@ import {
   plannedLastDay,
   NO_PLANNED_CHANGE_CODE,
   NO_PLANNED_CHANGE_MESSAGE,
+  OFFBOARD_OUT_OF_REACH_CODE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_CODE,
@@ -242,6 +249,31 @@ export async function applyStatusChange(
   const skipReason = bulkAction ? bulkStatusSkipReason(bulkAction, currentEmployee) : null;
   if (skipReason) {
     return respond({ error: skipReason, code: STATUS_NOT_APPLICABLE_CODE }, { status: 400 });
+  }
+
+  // Offboarding ends their membership and Restore reopens it (51k), so only
+  // a Super Admin or Gridmaster reaches a Super Admin, as when the role is given.
+  const restoring = action === "activate" && currentEmployee.status === "removed";
+  const offboarding =
+    action === "remove" ||
+    (action === "setPlannedChange" && currentEmployee.plannedStatus === "removed");
+  if ((offboarding || restoring) && !isGridmaster && !isSuperAdmin && currentEmployee.userId) {
+    const { data: targetMembership, error: targetError } = await serviceClient
+      .from("organization_memberships")
+      .select("org_role")
+      .eq("user_id", currentEmployee.userId)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (targetError) throw targetError;
+    if (!canOffboardAtTier(actor, targetMembership?.org_role)) {
+      return respond(
+        {
+          error: restoring ? RESTORE_OUT_OF_REACH_MESSAGE : OFFBOARD_OUT_OF_REACH_MESSAGE,
+          code: OFFBOARD_OUT_OF_REACH_CODE,
+        },
+        { status: 403 },
+      );
+    }
   }
 
   // A start date after today plans an Away (51g1) or a suspension (51g3)
@@ -651,47 +683,21 @@ export async function applyStatusChange(
     scheduleSuspensionNotice({ orgId, empId, actorId: actor.id });
   }
 
-  // Remove/activate a linked user's org membership in lockstep with their
-  // employees.status, in the same request that already committed the status
-  // change — not as a second, separately-triggered client call — so the two
-  // can't diverge (e.g. the status update fails but access is revoked
-  // anyway, or status flips back to active while access stays revoked).
-  // Gated to gridmaster/super_admin — the same tier required by
-  // DELETE /api/organizations/access — so a plain admin with only
-  // canManageEmployees can't use Remove/Activate as a side door to change
-  // org access they aren't allowed to touch directly.
+  // The membership follows the employee row in the same request, whoever
+  // acts (51k): Offboard archives it and ends their sessions, Restore reopens
+  // it. The tier guard above keeps Super Admins to Super Admins.
   if (action === "remove" && !planning) {
     await endOffboardedAccess(serviceClient, {
       orgId,
       empId,
       userId: currentEmployee.userId,
       actorId: actor.id,
-      endMembership: isGridmaster || isSuperAdmin,
       at: now,
     });
   }
 
-  if (action === "activate" && currentEmployee.userId && (isGridmaster || isSuperAdmin)) {
-    const { error: membershipError } = await serviceClient
-      .from("organization_memberships")
-      .update({ archived_at: null, archived_by: null })
-      .eq("user_id", currentEmployee.userId)
-      .eq("org_id", orgId)
-      .not("archived_at", "is", null);
-
-    if (membershipError) {
-      logger.error(
-        { error: membershipError, orgId, empId, userId: currentEmployee.userId, action },
-        "Failed to sync organization membership with employee status change",
-      );
-    } else {
-      await cacheDel(
-        CacheKey.orgUsers(orgId),
-        CacheKey.orgDirectory(orgId),
-        CacheKey.employees(orgId),
-        CacheKey.allUsers(),
-      );
-    }
+  if (restoring) {
+    await reopenRestoredAccess(serviceClient, { orgId, empId, userId: currentEmployee.userId });
   }
 
   const { error: auditError } = await serviceClient.from("audit_log").insert({
@@ -727,4 +733,47 @@ export async function applyStatusChange(
   }
 
   return respond({ success: true, employee: updatedEmployee });
+}
+
+/**
+ * Gridmaster's Remove from organization (51k): once the membership is
+ * archived, their staff record there is offboarded through the same change,
+ * so the removal leaves the record an Offboard does and Restore brings both
+ * back. Never throws: the removal has already committed.
+ */
+export async function offboardRemovedMember(
+  context: StatusChangeContext,
+  userId: string,
+): Promise<void> {
+  const { serviceClient, orgId } = context;
+  try {
+    const { data, error } = await serviceClient
+      .from("employees")
+      .select("id, version")
+      .eq("org_id", orgId)
+      .eq("user_id", userId)
+      .neq("status", "removed");
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: string; version: number }[]) {
+      const result = await applyStatusChange(context, {
+        empId: row.id,
+        action: "remove",
+        expectedVersion: row.version,
+        returnDate: null,
+        startDate: null,
+        lastDay: null,
+      });
+      if (result.status !== 200) {
+        logger.warn(
+          { orgId, empId: row.id, userId, status: result.status, body: result.body },
+          "Staff record not offboarded after removing them from the organization",
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(
+      { error: err, orgId, userId },
+      "Failed to offboard the staff record after removing them from the organization",
+    );
+  }
 }

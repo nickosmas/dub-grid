@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped, and so is 52. Items 40 and 51 are in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 52 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -85,7 +85,7 @@ shipped, and so is 52. Items 40 and 51 are in progress.
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
-| 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
+| 51   | Shipped     | People are Active, Away, Suspended or Offboarded, with a last day and return date; managers see who takes a seat.               |
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 
 Item 40 is split:
@@ -338,7 +338,7 @@ a left-early absence the person takes no more work that day, and an
 arrived-late one blocks only shifts that overlap it (owner decisions,
 2026-10-24). Design reference: the "Absence beside a shift" canvas.
 
-Item 51 is split:
+Item 51 is split, and every part has shipped:
 
 - **51a - Away keeps access:** shipped; an inactive (Away) person keeps
   sign-in, role and management powers on web, mobile and in the database,
@@ -427,8 +427,12 @@ Item 51 is split:
   Reinstate or Restore brings delivery back with nothing stored. A
   Suspended person's in-app alerts still collect; nothing is written for
   the others. Security alerts follow the account. No migration.
-- **51k - One Archive:** archiving ends the membership whoever does it, and
-  Restore works the same after either.
+- **51k - One Offboard:** shipped; an Offboard ends the membership and
+  sessions whoever makes it (web, app, bulk, the last-day job), Restore
+  reopens it for anyone alike, and only a Super Admin offboards or restores
+  a Super Admin. Gridmaster's Remove from organization offboards the staff
+  record too, a pickup an offboarded person claimed goes back up, and
+  memberships left live for offboarded people are closed (migration 108).
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
 `inactive` and `removed`, and suspension, the return date and a planned
@@ -635,7 +639,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `107`.
+  checksum-locked through `108`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

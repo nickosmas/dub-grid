@@ -12,6 +12,7 @@ const checkRateLimit = vi.fn();
 const canManageEmployees = vi.fn();
 const endUserSessions = vi.fn();
 const endOffboardedAccess = vi.fn();
+const reopenRestoredAccess = vi.fn();
 const scheduleSuspensionNotice = vi.fn();
 const captureException = vi.fn();
 let failUpdateFor: string | null = null;
@@ -49,6 +50,10 @@ function query(table: string) {
     },
     eq: (col: string, value: unknown) => {
       filters.push((row) => row[col] === value);
+      return builder;
+    },
+    neq: (col: string, value: unknown) => {
+      filters.push((row) => row[col] !== value);
       return builder;
     },
     is: (col: string, value: unknown) => {
@@ -132,6 +137,7 @@ vi.mock("@/lib/auth/revocation", () => ({
 vi.mock("@dubgrid/data-access", () => ({ disableMobilePushTokensForOrg: vi.fn() }));
 vi.mock("@/features/employees/server/offboard-access", () => ({
   endOffboardedAccess: (...args: unknown[]) => endOffboardedAccess(...args),
+  reopenRestoredAccess: (...args: unknown[]) => reopenRestoredAccess(...args),
 }));
 vi.mock("@/features/employees/server/suspension-notice", () => ({
   scheduleSuspensionNotice: (...args: unknown[]) => scheduleSuspensionNotice(...args),
@@ -310,6 +316,30 @@ describe("POST /api/employees/status/bulk", () => {
     expect(list.map((r) => r.ok)).toEqual([false, true]);
     expect(list[0].error).toBe("Only someone offboarded can be restored.");
     expect(tables.employees[1]).toMatchObject({ status: "active", archived_at: null });
+    expect(reopenRestoredAccess).toHaveBeenCalledTimes(1);
+    expect(reopenRestoredAccess).toHaveBeenCalledWith(expect.anything(), {
+      orgId: ORG,
+      empId: id(2),
+      userId: user(2),
+    });
+  });
+
+  it("lets an Admin offboard Users and Admins but not a Super Admin (51k)", async () => {
+    tables.organization_memberships = [
+      { user_id: ME, org_id: ORG, org_role: "admin", archived_at: null },
+      { user_id: user(1), org_id: ORG, org_role: "user", archived_at: null },
+      { user_id: user(2), org_id: ORG, org_role: "admin", archived_at: null },
+      { user_id: user(3), org_id: ORG, org_role: "super_admin", archived_at: null },
+    ];
+    tables.employees = [employee(1), employee(2), employee(3)];
+
+    const list = await results(await POST(request({ action: "archive", people: people(1, 2, 3) })));
+
+    expect(list.map((r) => r.ok)).toEqual([true, true, false]);
+    expect(list[2].error).toBe("Only a Super Admin can offboard a Super Admin.");
+    expect(list[2].code).toBe("OFFBOARD_OUT_OF_REACH");
+    expect(endOffboardedAccess).toHaveBeenCalledTimes(2);
+    expect(tables.employees.map((row) => row.status)).toEqual(["removed", "removed", "active"]);
   });
 
   it("suspends and offboards each person with the single route's follow-ups", async () => {
@@ -336,6 +366,44 @@ describe("POST /api/employees/status/bulk", () => {
       ),
     );
     expect(endOffboardedAccess).toHaveBeenCalledTimes(2);
+  });
+
+  it("offboards the staff record of someone removed from the organization (51k)", async () => {
+    const { offboardRemovedMember } = await import("@/features/employees/server/status-change");
+    const { getServiceClient } = await import("@/lib/supabase-service");
+    tables.organization_memberships = [
+      { user_id: user(1), org_id: ORG, org_role: "user", archived_at: "2026-10-28" },
+    ];
+    tables.employees = [employee(1, { version: 4 }), employee(2, { status: "removed" })];
+
+    await offboardRemovedMember(
+      {
+        serviceClient: getServiceClient(),
+        orgId: ORG,
+        actor: { id: ME, email: null, isGridmaster: true, isSuperAdmin: false },
+        request: { ipAddress: null, userAgent: null },
+      },
+      user(1),
+    );
+    await offboardRemovedMember(
+      {
+        serviceClient: getServiceClient(),
+        orgId: ORG,
+        actor: { id: ME, email: null, isGridmaster: true, isSuperAdmin: false },
+        request: { ipAddress: null, userAgent: null },
+      },
+      user(2),
+    );
+
+    expect(tables.employees[0]).toMatchObject({ status: "removed", version: 5, updated_by: ME });
+    expect(endOffboardedAccess).toHaveBeenCalledTimes(1);
+    expect(endOffboardedAccess).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ empId: id(1), userId: user(1), actorId: ME }),
+    );
+    expect(tables.audit_log).toEqual([
+      expect.objectContaining({ action: "employee.removed", resource_id: id(1) }),
+    ]);
   });
 
   it("never suspends every Super Admin, even one after another", async () => {

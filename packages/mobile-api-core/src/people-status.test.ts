@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
-import type { Employee } from "@dubgrid/domain";
+import {
+  OFFBOARD_OUT_OF_REACH_CODE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
+  type Employee,
+} from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { updateMobilePersonStatus } from "./people-status";
 
@@ -33,7 +38,14 @@ function employee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expectedVersion">) {
+function run(
+  current: Employee,
+  body: Omit<MobilePersonStatusUpdateBody, "expectedVersion">,
+  {
+    isSuperAdmin = true,
+    targetRole = null,
+  }: { isSuperAdmin?: boolean; targetRole?: string | null } = {},
+) {
   const deps = {
     fetchEmployeeById: vi.fn(async () => current),
     updateEmployeeStatus: vi.fn(
@@ -112,13 +124,14 @@ function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expect
     ),
     fetchActiveMembershipOrgRole: vi.fn(async () => null),
     countActiveSuperAdmins: vi.fn(async () => 2),
-    archiveOrganizationMembership: vi.fn(async () => undefined),
-    restoreOrganizationMembership: vi.fn(async () => undefined),
+    fetchMembershipOrgRole: vi.fn(async () => targetRole),
+    endOffboardedAccess: vi.fn(async () => undefined),
+    reopenRestoredAccess: vi.fn(async () => undefined),
   };
   const result = updateMobilePersonStatus(
     {
       currentOrg: { id: ORG_ID, timezone: "America/Los_Angeles" },
-      permissions: { canManageEmployees: true, isSuperAdmin: true },
+      permissions: { canManageEmployees: true, isSuperAdmin },
       serviceClient: {} as SupabaseClient,
       user: { id: "manager-1", email: "manager@example.test" },
     },
@@ -472,7 +485,7 @@ describe("updateMobilePersonStatus with a last day (51g2)", () => {
 
     expect(await result).toMatchObject({ kind: "updated", status: 200 });
     expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
-    expect(deps.archiveOrganizationMembership).not.toHaveBeenCalled();
+    expect(deps.endOffboardedAccess).not.toHaveBeenCalled();
     expect(deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -726,5 +739,84 @@ describe("updateMobilePersonStatus with a suspension's start and end (51g3)", ()
 
     const active = run(employee(), { action: "setSuspendedUntil", returnDate: "2026-11-20" });
     await expect(active.result).resolves.toMatchObject({ code: "NOT_SUSPENDED" });
+  });
+});
+
+describe("updateMobilePersonStatus offboarding and restoring (51k)", () => {
+  it("ends access whoever offboards them, an Admin included", async () => {
+    const { deps, result } = run(
+      employee({ userId: "user-9" }),
+      { action: "remove" },
+      { isSuperAdmin: false, targetRole: "admin" },
+    );
+
+    expect(await result).toMatchObject({ kind: "updated", status: 200 });
+    expect(deps.endOffboardedAccess).toHaveBeenCalledWith(expect.anything(), {
+      orgId: ORG_ID,
+      empId: EMP_ID,
+      userId: "user-9",
+      actorId: "manager-1",
+      at: expect.any(String),
+    });
+  });
+
+  it("reopens access on Restore, and not on Mark active from Away", async () => {
+    const restored = run(
+      employee({ userId: "user-9", status: "removed", archivedAt: "2026-10-01T00:00:00Z" }),
+      { action: "activate" },
+      { isSuperAdmin: false, targetRole: "user" },
+    );
+    expect(await restored.result).toMatchObject({ kind: "updated" });
+    expect(restored.deps.reopenRestoredAccess).toHaveBeenCalledWith(expect.anything(), {
+      orgId: ORG_ID,
+      empId: EMP_ID,
+      userId: "user-9",
+    });
+
+    const back = run(employee({ userId: "user-9", status: "inactive" }), { action: "activate" });
+    expect(await back.result).toMatchObject({ kind: "updated" });
+    expect(back.deps.reopenRestoredAccess).not.toHaveBeenCalled();
+  });
+
+  it("refuses an Admin offboarding, planning a last day for or restoring a Super Admin", async () => {
+    const offboard = run(
+      employee({ userId: "user-9" }),
+      { action: "remove" },
+      { isSuperAdmin: false, targetRole: "super_admin" },
+    );
+    expect(await offboard.result).toEqual({
+      kind: "out_of_reach",
+      error: OFFBOARD_OUT_OF_REACH_MESSAGE,
+      code: OFFBOARD_OUT_OF_REACH_CODE,
+      status: 403,
+    });
+    expect(offboard.deps.updateEmployeeStatus).not.toHaveBeenCalled();
+    expect(offboard.deps.endOffboardedAccess).not.toHaveBeenCalled();
+
+    const lastDay = run(
+      employee({ userId: "user-9" }),
+      { action: "remove", lastDay: "2026-12-01" },
+      { isSuperAdmin: false, targetRole: "super_admin" },
+    );
+    expect(await lastDay.result).toMatchObject({ kind: "out_of_reach" });
+    expect(lastDay.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+
+    const restore = run(
+      employee({ userId: "user-9", status: "removed", archivedAt: "2026-10-01T00:00:00Z" }),
+      { action: "activate" },
+      { isSuperAdmin: false, targetRole: "super_admin" },
+    );
+    expect(await restore.result).toMatchObject({
+      kind: "out_of_reach",
+      error: RESTORE_OUT_OF_REACH_MESSAGE,
+    });
+    expect(restore.deps.reopenRestoredAccess).not.toHaveBeenCalled();
+  });
+
+  it("lets a Super Admin offboard without reading the role", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), { action: "remove" });
+
+    expect(await result).toMatchObject({ kind: "updated" });
+    expect(deps.fetchMembershipOrgRole).not.toHaveBeenCalled();
   });
 });

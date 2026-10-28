@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:e270ad2407f8296a86b4d6df06b4cefdd92a1177ab206c8a722becf2465a1a82",
+  "sourceDigest": "sha256:26b156b82daf830aa9bc1258615cbd1af5eef96e7e491552d7065b364bd435db",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4873,6 +4873,16 @@
       "sha256": "6b80d776278a71f65c105f1c507f3f5949f6f4a436766e6a3cbd50c4bbe162f7",
       "source": {
         "path": "supabase/migrations/107_focus_area_shifts.sql"
+      }
+    },
+    {
+      "id": "migration:108_one_offboard.sql",
+      "version": "108",
+      "name": "one_offboard",
+      "file": "108_one_offboard.sql",
+      "sha256": "cdc647840a2acbce6302dcac2b98e50d56ba32259ec09fd556883fb381580e14",
+      "source": {
+        "path": "supabase/migrations/108_one_offboard.sql"
       }
     }
   ],

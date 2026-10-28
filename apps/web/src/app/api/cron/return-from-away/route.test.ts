@@ -433,7 +433,6 @@ describe("GET /api/cron/return-from-away", () => {
       empId: "emp-la",
       userId: "user-emp-la",
       actorId: "manager-1",
-      endMembership: true,
       at: "2026-10-27T01:00:00.000Z",
     });
     expect(auditInsert).toHaveBeenCalledWith([
@@ -446,7 +445,7 @@ describe("GET /api/cron/return-from-away", () => {
     ]);
   });
 
-  it("keeps the membership when an admin set the last day, and ends it for a Gridmaster", async () => {
+  it("ends the membership whoever planned the last day (51k)", async () => {
     orgRoles.set("manager-1:org-la", "admin");
     platformRoles.set("gm-1", "gridmaster");
     rows(
@@ -460,10 +459,10 @@ describe("GET /api/cron/return-from-away", () => {
 
     await GET(makeReq());
 
-    expect(endOffboardedAccess.mock.calls.map((call) => call[1].endMembership)).toEqual([
-      false,
+    expect(endOffboardedAccess.mock.calls.map((call) => call[1].empId)).toEqual(["emp-1", "emp-2"]);
+    expect(endOffboardedAccess.mock.calls.every((call) => !("endMembership" in call[1]))).toBe(
       true,
-    ]);
+    );
   });
 
   it("waits while their last day is still today in the organization's timezone", async () => {

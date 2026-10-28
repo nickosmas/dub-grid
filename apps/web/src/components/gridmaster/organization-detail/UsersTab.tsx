@@ -1,5 +1,6 @@
 import { User } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
@@ -541,6 +542,7 @@ export function UsersTab({
       {removeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={`Remove ${removeConfirm.email ?? removeConfirm.id} from this organization?`}
+          message={REMOVE_FROM_ORGANIZATION_MESSAGE}
           confirmLabel="Remove"
           variant="danger"
           isLoading={removing}

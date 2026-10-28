@@ -73,7 +73,11 @@ const ABSENCE_TYPES: AbsenceType[] = [
   },
 ];
 
-function renderActions(employee: Employee, absenceTypes: AbsenceType[] = []) {
+function renderActions(
+  employee: Employee,
+  absenceTypes: AbsenceType[] = [],
+  { canOffboard = true }: { canOffboard?: boolean } = {},
+) {
   const handlers = {
     onDeactivate: vi.fn(),
     onActivate: vi.fn(),
@@ -88,6 +92,7 @@ function renderActions(employee: Employee, absenceTypes: AbsenceType[] = []) {
     <EmployeeStatusActions
       employee={employee}
       canEdit
+      canOffboard={canOffboard}
       variant="page"
       absenceTypes={absenceTypes}
       {...handlers}
@@ -405,6 +410,32 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
 
     expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", "2099-01-05", 135);
+  });
+
+  it("lists Offboarded and Restore disabled for a Super Admin an Admin can't reach (51k)", async () => {
+    const user = userEvent.setup();
+    renderActions(makeEmployee(), [], { canOffboard: false });
+
+    const dialog = await openDialog(user);
+    const offboard = within(dialog).getByRole("radio", { name: /^Offboarded/ });
+    expect(offboard).toHaveAttribute("aria-disabled", "true");
+    expect(offboard).toHaveTextContent("Only a Super Admin can offboard a Super Admin.");
+    expect(within(dialog).getByRole("radio", { name: /^Suspended/ })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("says offboarding puts a pickup they claimed back up (51k)", async () => {
+    const user = userEvent.setup();
+    renderActions(makeEmployee());
+
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
+
+    expect(dialog).toHaveTextContent(
+      "Open requests they're part of are closed, and pickups they claimed go back up for others.",
+    );
   });
 
   it("restores an archived person", async () => {

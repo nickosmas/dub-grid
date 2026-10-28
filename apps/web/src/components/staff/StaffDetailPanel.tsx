@@ -12,7 +12,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { AbsenceType, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
-import { isSelfAction } from "@dubgrid/domain";
+import { canOffboardAtTier, isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
@@ -221,11 +221,16 @@ export function StaffDetailPanel({
   // one dropped the promise, so the same operation had two different buttons.
   const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
 
+  const canOffboard = canOffboardAtTier(
+    { isSuperAdmin: Boolean(canManageManagementAccess), isGridmaster: false },
+    orgRole,
+  );
   const statusActions = (label: string) => (
     <EmployeeStatusActions
       employee={employee}
       canEdit={canManageEmployees}
       isSelf={false}
+      canOffboard={canOffboard}
       onDeactivate={onDeactivate}
       onSetReturnDate={onSetReturnDate}
       absenceTypes={absenceTypes}
@@ -246,6 +251,7 @@ export function StaffDetailPanel({
       employee={employee}
       canEdit={canManageEmployees}
       isSelf={false}
+      canOffboard={canOffboard}
       onDeactivate={onDeactivate}
       onSetReturnDate={onSetReturnDate}
       absenceTypes={absenceTypes}

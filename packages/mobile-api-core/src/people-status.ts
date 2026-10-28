@@ -5,6 +5,7 @@ import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
+  canOffboardAtTier,
   isAwayAbsenceRefusal,
   isSelfAction,
   isValidLastDay,
@@ -27,6 +28,9 @@ import {
   NO_ACCOUNT_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
+  OFFBOARD_OUT_OF_REACH_CODE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
   PLANNED_RETURN_INVALID_MESSAGE,
@@ -52,10 +56,7 @@ type PeopleStatusContext = {
   };
   permissions: {
     canManageEmployees: boolean;
-    // Gates syncing organization_memberships alongside employees.status —
-    // mirrors the tier DELETE /api/organizations/access requires on web, so
-    // a plain admin with only canManageEmployees can't use remove/activate as
-    // a side door to change org access they aren't allowed to touch directly.
+    // Only a Super Admin offboards or restores a Super Admin (51k), as on web.
     // Gridmaster mobile access is blocked entirely at auth resolution, so
     // super_admin is the only tier that needs checking here.
     isSuperAdmin: boolean;
@@ -171,14 +172,22 @@ type FetchActiveMembershipOrgRole = (
 
 type CountActiveSuperAdmins = (serviceClient: SupabaseClient, orgId: string) => Promise<number>;
 
-type ArchiveOrganizationMembership = (
+type FetchMembershipOrgRole = (
   serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string; archivedByUserId: string; archivedAt: string },
+  orgId: string,
+  userId: string,
+) => Promise<string | null>;
+
+/** After an Offboard: their sessions end and their membership is archived, never throwing. */
+type EndOffboardedAccess = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; empId: string; userId: string; actorId: string; at: string },
 ) => Promise<void>;
 
-type RestoreOrganizationMembership = (
+/** After a Restore: their archived membership is reopened, never throwing. */
+type ReopenRestoredAccess = (
   serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string },
+  input: { orgId: string; empId: string; userId: string },
 ) => Promise<void>;
 
 type PeopleStatusResult =
@@ -198,6 +207,12 @@ type PeopleStatusResult =
       kind: "self_action_forbidden";
       error: string;
       code: typeof SELF_ACTION_FORBIDDEN_CODE;
+      status: 403;
+    }
+  | {
+      kind: "out_of_reach";
+      error: string;
+      code: typeof OFFBOARD_OUT_OF_REACH_CODE;
       status: 403;
     }
   | {
@@ -263,8 +278,9 @@ export async function updateMobilePersonStatus(
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
     fetchActiveMembershipOrgRole: FetchActiveMembershipOrgRole;
     countActiveSuperAdmins: CountActiveSuperAdmins;
-    archiveOrganizationMembership: ArchiveOrganizationMembership;
-    restoreOrganizationMembership: RestoreOrganizationMembership;
+    fetchMembershipOrgRole: FetchMembershipOrgRole;
+    endOffboardedAccess: EndOffboardedAccess;
+    reopenRestoredAccess: ReopenRestoredAccess;
   },
 ): Promise<PeopleStatusResult> {
   if (!auth.permissions.canManageEmployees) {
@@ -305,6 +321,9 @@ export async function updateMobilePersonStatus(
       status: 409,
     };
   }
+
+  const outOfReach = await tierRefusal(auth, input.body.action, currentEmployee, deps);
+  if (outOfReach) return outOfReach;
 
   // A planned last day (51g2) or suspension (51g3) is edited through the same
   // action as a planned Away.
@@ -437,6 +456,36 @@ export async function updateMobilePersonStatus(
     if (isAwayAbsenceRefusal(error)) return awayAbsenceInvalid(AWAY_ABSENCE_UNKNOWN_MESSAGE);
     throw error;
   }
+}
+
+/**
+ * Offboarding ends a membership and Restore reopens one (51k), so only a
+ * Super Admin offboards, plans a last day for or restores a Super Admin.
+ */
+async function tierRefusal(
+  auth: PeopleStatusContext,
+  action: MobilePersonStatusUpdateBody["action"],
+  employee: Employee,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult | null> {
+  const restoring = action === "activate" && employee.status === "removed";
+  const offboarding =
+    action === "remove" || (action === "setPlannedChange" && employee.plannedStatus === "removed");
+  if (!(offboarding || restoring) || auth.permissions.isSuperAdmin || !employee.userId) {
+    return null;
+  }
+  const role = await deps.fetchMembershipOrgRole(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    employee.userId,
+  );
+  if (canOffboardAtTier({ isSuperAdmin: false, isGridmaster: false }, role)) return null;
+  return {
+    kind: "out_of_reach",
+    error: restoring ? RESTORE_OUT_OF_REACH_MESSAGE : OFFBOARD_OUT_OF_REACH_MESSAGE,
+    code: OFFBOARD_OUT_OF_REACH_CODE,
+    status: 403,
+  };
 }
 
 /** A suspension planned for later (51g3) needs what Suspend needs: an account, and someone suspendable. */
@@ -773,30 +822,28 @@ async function changeStatus(
     };
   }
 
-  // Remove/activate a linked user's org membership in lockstep with their
-  // employees.status, in the same request that already committed the status
-  // change — not a second, separately-triggered call — so the two can't
-  // diverge. Gated to super_admin (gridmaster mobile access is blocked
-  // entirely at auth resolution) — the same tier DELETE
-  // /api/organizations/access requires on web.
+  // The membership follows the employee row in the same request, whoever
+  // acts (51k): Offboard ends their sessions and archives it, Restore
+  // reopens it.
+  if (currentEmployee.userId && input.body.action === "remove") {
+    await deps.endOffboardedAccess(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      empId: input.employeeId,
+      userId: currentEmployee.userId,
+      actorId: auth.user.id,
+      at: now,
+    });
+  }
   if (
-    (input.body.action === "remove" || input.body.action === "activate") &&
     currentEmployee.userId &&
-    auth.permissions.isSuperAdmin
+    input.body.action === "activate" &&
+    currentEmployee.status === "removed"
   ) {
-    if (input.body.action === "remove") {
-      await deps.archiveOrganizationMembership(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        userId: currentEmployee.userId,
-        archivedByUserId: auth.user.id,
-        archivedAt: now,
-      });
-    } else {
-      await deps.restoreOrganizationMembership(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        userId: currentEmployee.userId,
-      });
-    }
+    await deps.reopenRestoredAccess(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      empId: input.employeeId,
+      userId: currentEmployee.userId,
+    });
   }
 
   await deps.insertAuditLog(auth.serviceClient, {

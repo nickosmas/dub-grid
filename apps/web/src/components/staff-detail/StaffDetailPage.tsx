@@ -22,6 +22,7 @@ import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
+  canOffboardAtTier,
   isSelfAction,
   removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
@@ -969,11 +970,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ],
   );
 
+  const canOffboard = canOffboardAtTier(perms, effectiveOrgRole);
   const statusActions = (person: Employee, label?: string) =>
     label ? (
       <EmployeeStatusActions
         employee={person}
         canEdit={perms.canManageEmployees}
+        canOffboard={canOffboard}
         isSelf={isSelfAction(currentUser?.id, person.userId)}
         onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
           runStatusChange((token) =>
@@ -1005,6 +1008,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <StatusCardActions
         employee={person}
         canEdit={perms.canManageEmployees}
+        canOffboard={canOffboard}
         isSelf={isSelfAction(currentUser?.id, person.userId)}
         onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
           runStatusChange((token) =>

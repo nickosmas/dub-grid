@@ -6,6 +6,7 @@ import {
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
   formatFirstDay,
+  canOffboardAtTier,
   statusChoices,
   type StatusAction,
 } from "@dubgrid/domain";
@@ -944,6 +945,13 @@ export default function PersonDetailScreen() {
   // role until it is accepted, and reading `orgRole` alone showed a pending
   // Admin as "User".
   const orgRole = getPersonOrgRole(person);
+  // Only a Super Admin offboards or restores a Super Admin (51k); the server enforces it too.
+  const reach = {
+    canOffboard: canOffboardAtTier(
+      { isSuperAdmin: bootstrapQuery.data?.effectiveRole === "super_admin", isGridmaster: false },
+      orgRole,
+    ),
+  };
   // The editor's Access row is the role control, the way web's Access column
   // is. It only exists where there is something to write to: a membership, or
   // an invitation carrying the role until it is accepted. Someone with neither
@@ -1105,8 +1113,9 @@ export default function PersonDetailScreen() {
     setStatusOpening(opening);
     // A button that named its change has nothing to pick; Change status always opens the list.
     const picked =
-      statusChoices(person).find((choice) => choice.available && choice.action === opening.only)
-        ?.action ?? null;
+      statusChoices(person, reach).find(
+        (choice) => choice.available && choice.action === opening.only,
+      )?.action ?? null;
     setStatusChoice(picked);
     setOpenedChoice(picked);
     setInactiveNote("");
@@ -1206,7 +1215,9 @@ export default function PersonDetailScreen() {
     />
   );
   // Every other status is listed, an unavailable one disabled with its reason.
-  const choices = statusChoices(person).filter((choice) => choice.action !== statusOpening.exclude);
+  const choices = statusChoices(person, reach).filter(
+    (choice) => choice.action !== statusOpening.exclude,
+  );
   const onlyChoice =
     statusOpening.focus === "plan" || !statusOpening.only
       ? null
@@ -1481,6 +1492,7 @@ export default function PersonDetailScreen() {
         <StatusCards
           absenceTypes={absenceTypes}
           disabled={statusMutation.isPending}
+          canOffboard={reach.canOffboard}
           onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
           person={person}
         />
@@ -1854,7 +1866,12 @@ export default function PersonDetailScreen() {
         }
       >
         <View style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}>
-          <StatusCards absenceTypes={absenceTypes} person={person} plain />
+          <StatusCards
+            absenceTypes={absenceTypes}
+            canOffboard={reach.canOffboard}
+            person={person}
+            plain
+          />
           {isAway && !statusChoice ? (
             <>
               <ReturnDateField

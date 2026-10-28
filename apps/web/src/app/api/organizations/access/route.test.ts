@@ -57,6 +57,11 @@ vi.mock("@/features/notifications/server/events", () => ({
 vi.mock("@/lib/auth/revocation", () => ({
   revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
 }));
+const offboardRemovedMember = vi.fn();
+vi.mock("@/features/employees/server/status-change", () => ({
+  offboardRemovedMember: (...args: unknown[]) => offboardRemovedMember(...args),
+  requestInfo: () => ({ ipAddress: null, userAgent: null }),
+}));
 vi.mock("@/lib/cache", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/cache")>()),
   cacheDel: (...keys: string[]) => cacheDel(...keys),
@@ -200,6 +205,17 @@ describe("DELETE /api/organizations/access", () => {
       expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
     );
     expect(body.success).toBe(true);
+    // Their staff record there is offboarded too, the record an Offboard leaves (51k).
+    expect(offboardRemovedMember).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: SANDBOX_ORG_ID,
+        actor: expect.objectContaining({ id: ACTOR_ID, isGridmaster: false, isSuperAdmin: true }),
+      }),
+      TARGET_USER_ID,
+    );
+    expect(offboardRemovedMember.mock.invocationCallOrder[0]).toBeGreaterThan(
+      membershipUpdateEq3.mock.invocationCallOrder[0],
+    );
     // An organization's own admin is never asked for fresh proof (F-96).
     expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
   });

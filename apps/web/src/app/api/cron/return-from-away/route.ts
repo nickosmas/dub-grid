@@ -308,26 +308,6 @@ async function startPlannedAways(
   return startedRows.length;
 }
 
-/** Whether `userId` may change who has access to the organization: a Gridmaster or its Super Admin. */
-async function canEndMembership(
-  db: ServiceClient,
-  orgId: string,
-  userId: string | null,
-): Promise<boolean> {
-  if (!userId) return false;
-  const [{ data: profile }, { data: membership }] = await Promise.all([
-    db.from("profiles").select("platform_role").eq("id", userId).maybeSingle(),
-    db
-      .from("organization_memberships")
-      .select("org_role")
-      .eq("user_id", userId)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .maybeSingle(),
-  ]);
-  return profile?.platform_role === "gridmaster" || membership?.org_role === "super_admin";
-}
-
 /** Whether offboarding `userId` would leave the organization with no Super Admin. */
 async function isOnlySuperAdmin(
   db: ServiceClient,
@@ -415,7 +395,6 @@ async function offboardAfterLastDays(
       empId: row.id,
       userId: row.user_id,
       actorId: row.planned_by,
-      endMembership: await canEndMembership(db, row.org_id, row.planned_by),
       at,
     });
     done.push(row);

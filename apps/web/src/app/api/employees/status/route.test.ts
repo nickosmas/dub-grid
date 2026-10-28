@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import {
+  OFFBOARD_OUT_OF_REACH_CODE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
+} from "@dubgrid/domain";
 
 const requireAuthenticatedUser = vi.fn();
 const validateCsrfOrigin = vi.fn();
@@ -15,6 +20,7 @@ const employeeUpdate = vi.fn();
 const membershipRestoreUpdate = vi.fn();
 const membershipArchiveUpdate = vi.fn();
 const targetMembershipMaybeSingle = vi.fn();
+const tierMembershipMaybeSingle = vi.fn();
 const superAdminCountIs = vi.fn();
 const auditInsert = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
@@ -74,6 +80,7 @@ vi.mock("@/lib/cache", () => ({
     orgDirectory: (orgId: string) => `dg:org:${orgId}:orgDirectory`,
     employees: (orgId: string) => `dg:org:${orgId}:employees`,
     allUsers: () => "dg:gm:allUsers",
+    mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
   },
   cacheThrough: (_key: string, _ttl: number, fetcher: () => unknown) => fetcher(),
   TTL: { MODERATE: 60 },
@@ -100,12 +107,16 @@ vi.mock("@/lib/supabase-service", () => ({
               };
             }
             if (cols === "org_role") {
+              // With .is(): the last-super-admin lookup of a live membership.
+              // Without: the Offboard and Restore tier guard (51k), which reads
+              // an archived membership too.
               return {
                 eq: vi.fn(() => ({
                   eq: vi.fn(() => ({
                     is: vi.fn(() => ({
                       maybeSingle: targetMembershipMaybeSingle,
                     })),
+                    maybeSingle: tierMembershipMaybeSingle,
                   })),
                 })),
               };
@@ -207,6 +218,7 @@ describe("POST /api/employees/status", () => {
     validateCsrfOrigin.mockReturnValue(null);
     resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
     canManageEmployees.mockResolvedValue(true);
+    tierMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
   });
 
   it("denies a caller canManageEmployees refuses", async () => {
@@ -930,6 +942,7 @@ describe("POST /api/employees/status", () => {
       `dg:org:${ORG_ID}:orgDirectory`,
       `dg:org:${ORG_ID}:employees`,
       "dg:gm:allUsers",
+      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${ORG_ID}`,
     );
   });
 
@@ -989,6 +1002,7 @@ describe("POST /api/employees/status", () => {
       `dg:org:${ORG_ID}:orgDirectory`,
       `dg:org:${ORG_ID}:employees`,
       "dg:gm:allUsers",
+      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${ORG_ID}`,
     );
   });
 
@@ -1052,6 +1066,7 @@ describe("POST /api/employees/status", () => {
       `dg:org:${SANDBOX_ORG_ID}:orgDirectory`,
       `dg:org:${SANDBOX_ORG_ID}:employees`,
       "dg:gm:allUsers",
+      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${SANDBOX_ORG_ID}`,
     );
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
   });
@@ -1100,54 +1115,108 @@ describe("POST /api/employees/status", () => {
     expect(employeeUpdateMaybeSingle).not.toHaveBeenCalled();
   });
 
-  it("does not touch organization membership when a non-super-admin reactivates a linked employee", async () => {
+  describe("an Admin offboarding and restoring (51k)", () => {
     const EMPLOYEE_USER_ID = "66666666-6666-4666-8666-666666666666";
 
-    membershipMaybeSingle.mockResolvedValue({
-      data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
-      error: null,
-    });
-    profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
-    employeeCurrentSingle.mockResolvedValue({
-      data: {
-        id: EMP_ID,
-        org_id: ORG_ID,
-        status: "removed",
-        version: 1,
-        user_id: EMPLOYEE_USER_ID,
-      },
-      error: null,
-    });
-    employeeUpdateMaybeSingle.mockResolvedValue({
-      data: {
-        id: EMP_ID,
-        org_id: ORG_ID,
-        status: "active",
-        version: 2,
-        user_id: EMPLOYEE_USER_ID,
-      },
-      error: null,
-    });
-    auditInsert.mockResolvedValue({ error: null });
+    function arrange(status: "active" | "removed", targetRole: string) {
+      membershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+        error: null,
+      });
+      profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
+      employeeCurrentSingle.mockResolvedValue({
+        data: { id: EMP_ID, org_id: ORG_ID, status, version: 1, user_id: EMPLOYEE_USER_ID },
+        error: null,
+      });
+      employeeUpdateMaybeSingle.mockResolvedValue({
+        data: {
+          id: EMP_ID,
+          org_id: ORG_ID,
+          status: status === "active" ? "removed" : "active",
+          version: 2,
+          user_id: EMPLOYEE_USER_ID,
+        },
+        error: null,
+      });
+      tierMembershipMaybeSingle.mockResolvedValue({ data: { org_role: targetRole }, error: null });
+      targetMembershipMaybeSingle.mockResolvedValue({
+        data: { org_role: targetRole },
+        error: null,
+      });
+      membershipArchiveUpdate.mockResolvedValue({ error: null });
+      membershipRestoreUpdate.mockResolvedValue({ error: null });
+      auditInsert.mockResolvedValue({ error: null });
+    }
 
-    const request = new NextRequest("http://localhost/api/employees/status", {
-      method: "POST",
-      body: JSON.stringify({
-        empId: EMP_ID,
-        orgId: ORG_ID,
-        action: "activate",
-        expectedVersion: 1,
-      }),
+    it("ends a User's membership and sessions, as a Super Admin's Offboard does", async () => {
+      arrange("active", "user");
+
+      const response = await POST(makeRequest("remove"));
+
+      expect(response.status).toBe(200);
+      expect(membershipArchiveUpdate).toHaveBeenCalled();
+      expect(revokeAllUserSessions).toHaveBeenCalledWith(EMPLOYEE_USER_ID);
     });
 
-    const response = await POST(request);
+    it("reopens a User's membership on Restore", async () => {
+      arrange("removed", "user");
 
-    expect(response.status).toBe(200);
-    // Only gridmaster/super_admin may change org membership access — the same
-    // tier required by DELETE /api/organizations/access — so a plain admin
-    // with canManageEmployees can't use Activate as a side door to restore it.
-    expect(membershipRestoreUpdate).not.toHaveBeenCalled();
-    expect(membershipArchiveUpdate).not.toHaveBeenCalled();
+      const response = await POST(makeRequest("activate"));
+
+      expect(response.status).toBe(200);
+      expect(membershipRestoreUpdate).toHaveBeenCalled();
+    });
+
+    it("offboards an Admin", async () => {
+      arrange("active", "admin");
+
+      const response = await POST(makeRequest("remove"));
+
+      expect(response.status).toBe(200);
+      expect(membershipArchiveUpdate).toHaveBeenCalled();
+    });
+
+    it.each(["super_admin"])("refuses to offboard a %s, and changes nothing", async (role) => {
+      arrange("active", role);
+
+      const response = await POST(makeRequest("remove"));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: OFFBOARD_OUT_OF_REACH_MESSAGE,
+        code: OFFBOARD_OUT_OF_REACH_CODE,
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+      expect(membershipArchiveUpdate).not.toHaveBeenCalled();
+    });
+
+    it.each(["super_admin"])("refuses to restore a %s, and changes nothing", async (role) => {
+      arrange("removed", role);
+
+      const response = await POST(makeRequest("activate"));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: RESTORE_OUT_OF_REACH_MESSAGE,
+        code: OFFBOARD_OUT_OF_REACH_CODE,
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+      expect(membershipRestoreUpdate).not.toHaveBeenCalled();
+    });
+
+    it("lets a Super Admin offboard without the tier read", async () => {
+      arrange("active", "admin");
+      membershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "super_admin", admin_permissions: null },
+        error: null,
+      });
+
+      const response = await POST(makeRequest("remove"));
+
+      expect(response.status).toBe(200);
+      expect(tierMembershipMaybeSingle).not.toHaveBeenCalled();
+      expect(membershipArchiveUpdate).toHaveBeenCalled();
+    });
   });
 
   describe("suspension", () => {

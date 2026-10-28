@@ -158,6 +158,7 @@ describe("PersonDetailScreen", () => {
     });
     useBootstrap.mockReturnValue({
       data: {
+        effectiveRole: "super_admin",
         currentOrg: {
           labels: {
             focusArea: "Focus Areas",
@@ -1377,6 +1378,23 @@ describe("PersonDetailScreen", () => {
       );
     });
 
+    it("lists Offboarded disabled when an Admin looks at a Super Admin (51k)", () => {
+      const manager = useBootstrap();
+      useBootstrap.mockReturnValue({
+        ...manager,
+        data: { ...manager.data, effectiveRole: "admin" },
+      });
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      const offboard = screen.getByRole("radio", { name: /^Offboarded/ });
+      expect(offboard).toHaveAttribute("aria-disabled", "true");
+      expect(offboard).toHaveAccessibleName(
+        "Offboarded. Only a Super Admin can offboard a Super Admin.",
+      );
+    });
+
     it("names the picked change in the title and keeps what stays apart", () => {
       renderWithStatusMutation();
 
@@ -1910,6 +1928,7 @@ describe("PersonDetailScreen", () => {
     function renderAsManager(person: Record<string, unknown>) {
       useBootstrap.mockReturnValue({
         data: {
+          effectiveRole: "super_admin",
           currentOrg: {
             labels: {
               focusArea: "Focus Areas",
