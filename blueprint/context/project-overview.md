@@ -403,7 +403,8 @@ Item 51 is split, and every part has shipped:
     planned suspension the way a manual Suspend does (migration 105).
   - **51g4 - First day:** shipped; Add Staff Members takes an optional
     First day, from today up to a year ahead (web and mobile), and the
-    person form offers it only while it's ahead (owner, 2026-10-28). Nobody
+    person form offers it only while it's ahead, or as Set first day to
+    someone Active who hasn't worked a shift yet (owner, 2026-10-28). Nobody
     can schedule them before it, and setting it later clears those draft
     days and closes their requests; they show "Starts Nov 10" in the People
     list, on a dashed card and in the grid until then, keep sign-in and a

@@ -1130,3 +1130,65 @@ describe("POST /api/employees/manage fetchEmployeeShifts", () => {
     expect(tables).not.toContain("schedule_cells");
   });
 });
+
+describe("POST /api/employees/manage fetchEmployeeHasStarted", () => {
+  function cellsClient(rows: unknown[]) {
+    const calls: Array<[string, unknown[]]> = [];
+    const query: Record<string, unknown> = {};
+    for (const method of ["select", "eq", "lte", "limit"]) {
+      query[method] = (...args: unknown[]) => {
+        calls.push([method, args]);
+        return query;
+      };
+    }
+    query.then = (resolve: (value: unknown) => unknown) =>
+      Promise.resolve({ data: rows, error: null }).then(resolve);
+    return { calls, client: { from: () => query } };
+  }
+
+  async function ask(rows: unknown[]) {
+    const { client, calls } = cellsClient(rows);
+    requireOrgPermissions.mockResolvedValue({
+      permissions: { isGridmaster: false, isSuperAdmin: false, canManageEmployees: true },
+      serviceClient: client,
+      actor: { id: VIEWER_USER_ID },
+      orgId: ORG_ID,
+    });
+    const response = await POST(
+      new NextRequest("http://localhost/api/employees/manage", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "fetchEmployeeHasStarted",
+          orgId: ORG_ID,
+          employeeId: EMPLOYEE_ID,
+        }),
+      }),
+    );
+    return { response, calls };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    validateCsrfOrigin.mockReturnValue(null);
+    requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
+    resolveEffectiveOrgId.mockResolvedValue(ORG_ID);
+    fetchOrgToday.mockResolvedValue("2026-10-28");
+  });
+
+  it("says started once they have a worked shift on or before today", async () => {
+    const { response, calls } = await ask([{ id: "cell-1" }]);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ started: true });
+    expect(calls).toContainEqual(["lte", ["date", "2026-10-28"]]);
+    expect(String(calls.find(([method]) => method === "select")?.[1][0])).toContain(
+      "schedule_cell_segments!inner",
+    );
+  });
+
+  it("says not started when nothing is worked yet", async () => {
+    const { response } = await ask([]);
+
+    expect(await response.json()).toEqual({ started: false });
+  });
+});

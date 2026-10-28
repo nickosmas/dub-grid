@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1abfc34abceb6863f505e3d152b2209eaaa65a88885b4bf977c8ca5493b7986b"
+      "evidenceFingerprint": "sha256:b1fd5ebe2eb9386c9ce090384ae145322bc7f8b9a0edc2044753395cfd5a0ead"
     },
     {
       "id": "person-detail",
@@ -819,7 +819,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c8333a712d812f68a53c2011be968d660e14ecc6e9ab388ddf348ab830558bf8"
+      "evidenceFingerprint": "sha256:aa72dff2a946abfcd363190cdbf16a3b1377c4c7ddb58bd93dce780f6efb5133"
     },
     {
       "id": "invitations",

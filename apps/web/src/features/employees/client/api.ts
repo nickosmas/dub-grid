@@ -334,6 +334,15 @@ export function fetchEmployeeShifts(
   }).then((data) => data.shifts);
 }
 
+/** Whether they've worked a shift on or before today, so a first day no longer applies. */
+export function fetchEmployeeHasStarted(orgId: string, employeeId: string): Promise<boolean> {
+  return requestEmployeeAction<{ started: boolean }>({
+    action: "fetchEmployeeHasStarted",
+    orgId,
+    employeeId,
+  }).then((data) => data.started);
+}
+
 export function fetchEmployeeInvitations(orgId: string, employeeId: string): Promise<Invitation[]> {
   return requestEmployeeAction<{ invitations: Invitation[] }>({
     action: "fetchEmployeeInvitations",
