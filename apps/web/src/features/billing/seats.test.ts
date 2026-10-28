@@ -86,15 +86,11 @@ describe("breakdownBillableSeats", () => {
       status: "inactive",
       archived_at: null,
       user_id: "u-lee",
-      first_name: "Lee",
-      last_name: "Wong",
     },
     {
       status: "inactive",
       archived_at: null,
       user_id: "u-amy",
-      first_name: "Amy",
-      last_name: "Diaz",
     },
     { status: "inactive", archived_at: null, user_id: "u-away" },
     { status: "inactive", archived_at: null, user_id: null },
@@ -113,9 +109,7 @@ describe("breakdownBillableSeats", () => {
     expect(breakdownBillableSeats(employees, memberships)).toEqual({
       activeStaff: 2,
       suspended: 0,
-      suspendedNames: [],
       awayManaging: 2,
-      awayManagingNames: ["Amy Diaz", "Lee Wong"],
       managementOnly: 1,
       awayNotBilled: 2,
       archived: 2,
@@ -130,16 +124,12 @@ describe("breakdownBillableSeats", () => {
           status: "active",
           archived_at: null,
           user_id: "u-1",
-          first_name: "Ada",
-          last_name: "Ray",
         },
         {
           status: "active",
           archived_at: null,
           suspended_at: "2026-10-26T00:00:00Z",
           user_id: "u-2",
-          first_name: "Carol",
-          last_name: "Henderson",
         },
       ],
       [],
@@ -147,7 +137,6 @@ describe("breakdownBillableSeats", () => {
     expect(breakdown).toMatchObject({
       activeStaff: 1,
       suspended: 1,
-      suspendedNames: ["Carol Henderson"],
       total: 2,
     });
   });
@@ -162,7 +151,6 @@ describe("breakdownBillableSeats", () => {
     const internal = new Set(["u-lee", "u-away", "u-gone", "m-1"]);
     expect(breakdownBillableSeats(employees, memberships, internal)).toMatchObject({
       awayManaging: 1,
-      awayManagingNames: ["Amy Diaz"],
       managementOnly: 0,
       awayNotBilled: 1,
       archived: 1,
@@ -176,7 +164,6 @@ describe("breakdownBillableSeats", () => {
       [{ user_id: "u-x", org_role: "admin" }],
     );
     expect(result.awayManaging).toBe(1);
-    expect(result.awayManagingNames).toEqual([]);
   });
 });
 
@@ -184,9 +171,7 @@ describe("describeSeatBreakdown", () => {
   const base = {
     activeStaff: 42,
     suspended: 0,
-    suspendedNames: [],
     awayManaging: 0,
-    awayManagingNames: [],
     managementOnly: 0,
     awayNotBilled: 0,
     archived: 0,
@@ -200,43 +185,32 @@ describe("describeSeatBreakdown", () => {
     });
   });
 
-  it("names the Away people who take a seat and says why", () => {
+  it("counts the Away people who take a seat and says why, without names", () => {
     const { billed } = describeSeatBreakdown({
       ...base,
       awayManaging: 1,
-      awayManagingNames: ["Lee Wong"],
       total: 43,
     });
     expect(billed[1]).toEqual({
       key: "away-managing",
       label: "Away, can manage",
       count: 1,
-      detail: "Lee Wong. Away people take a seat only while they keep management access.",
+      detail: "Away people take a seat only while they keep management access.",
     });
   });
 
-  it("shows suspended people as their own billed group, named, after active staff", () => {
+  it("shows suspended people as their own billed group after active staff, without names", () => {
     const { billed } = describeSeatBreakdown({
       ...base,
       suspended: 1,
-      suspendedNames: ["Carol Henderson"],
       total: 43,
     });
     expect(billed[1]).toEqual({
       key: "suspended",
       label: "Suspended",
       count: 1,
-      detail: "Carol Henderson. Suspended people keep their seat while they can't sign in.",
+      detail: "Suspended people keep their seat while they can't sign in.",
     });
-  });
-
-  it("joins two or three names with and, and shortens a longer list", () => {
-    const detail = (names: string[]) =>
-      describeSeatBreakdown({ ...base, awayManaging: names.length, awayManagingNames: names })
-        .billed[1].detail;
-    expect(detail(["A B", "C D"])).toMatch(/^A B and C D\. /);
-    expect(detail(["A B", "C D", "E F"])).toMatch(/^A B, C D and E F\. /);
-    expect(detail(["A B", "C D", "E F", "G H"])).toMatch(/^A B, C D and 2 others\. /);
   });
 
   it("lists managers without a staff record, then Away and Offboarded as not billed", () => {

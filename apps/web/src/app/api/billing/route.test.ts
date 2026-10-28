@@ -232,9 +232,7 @@ describe("GET /api/billing", () => {
       seatBreakdown: {
         activeStaff: 6,
         suspended: 0,
-        suspendedNames: [],
         awayManaging: 0,
-        awayManagingNames: [],
         managementOnly: 1,
         awayNotBilled: 1,
         archived: 0,

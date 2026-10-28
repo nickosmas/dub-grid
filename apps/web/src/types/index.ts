@@ -639,10 +639,8 @@ export interface SeatBreakdown {
   activeStaff: number;
   /** Suspended staff: they can't sign in but always take a seat. */
   suspended: number;
-  suspendedNames: string[];
   /** Away staff whose live membership can still manage (Admin or Super Admin). */
   awayManaging: number;
-  awayManagingNames: string[];
   /** Live members linked to no staff record. */
   managementOnly: number;
   /** Not billed. */

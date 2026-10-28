@@ -267,7 +267,7 @@ export async function loadSeatBreakdown(
   ] = await Promise.all([
     serviceClient
       .from("employees")
-      .select("status, archived_at, suspended_at, user_id, first_name, last_name")
+      .select("status, archived_at, suspended_at, user_id")
       .eq("org_id", orgId),
     serviceClient
       .from("organization_memberships")
