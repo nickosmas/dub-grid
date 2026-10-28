@@ -4,7 +4,7 @@ import type { AbsencePillLayout } from "@/lib/absence-pill";
 import type React from "react";
 
 import { formatDateKey } from "@/lib/utils";
-import { isOnScheduleGrid } from "./awayRuns";
+import { isOnScheduleGrid, type AwayRange } from "./awayRuns";
 import type { ScheduleNoteMark } from "./noteDots";
 import type {
   AbsenceType,
@@ -110,6 +110,8 @@ export interface ScheduleGridModel {
   spanWeeks: 1 | 2;
   activeFocusArea: number | null;
   todayKey: string;
+  /** Each away person's range, dated in the organization's timezone. */
+  awayRanges?: ReadonlyMap<string, AwayRange>;
   columns: GridColumnMeta[];
   week1: Date[];
   week2: Date[];
@@ -195,6 +197,8 @@ export interface BuildScheduleGridModelInput {
    * here, since a device-local Date passed through UTC formatting can land
    * on the wrong side of midnight (see schedule-core's dates.ts comment). */
   todayKey: string;
+  /** Each away person's range, as the page counts coverage with it. */
+  awayRanges?: ReadonlyMap<string, AwayRange>;
   focusAreas: FocusArea[];
   departments: Department[];
   assignments: AssignmentDefinition[];
@@ -236,6 +240,7 @@ export function buildScheduleGridModel({
   week2,
   spanWeeks,
   todayKey,
+  awayRanges,
   focusAreas,
   departments,
   assignments,
@@ -264,10 +269,10 @@ export function buildScheduleGridModel({
 }: BuildScheduleGridModelInput): ScheduleGridModel {
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
   const period = { lastDateKey: formatDateKey(allDates[allDates.length - 1]), todayKey };
-  const filteredEmployees = filteredEmployeesInput.filter((employee) =>
-    isOnScheduleGrid(employee, period),
-  );
-  const allEmployees = allEmployeesInput.filter((employee) => isOnScheduleGrid(employee, period));
+  const onGrid = (employee: Employee) =>
+    isOnScheduleGrid(employee, period, awayRanges?.get(employee.id)?.since);
+  const filteredEmployees = filteredEmployeesInput.filter(onGrid);
+  const allEmployees = allEmployeesInput.filter(onGrid);
   const columns = allDates.map((date, columnIndex): GridColumnMeta => ({
     columnIndex,
     date,
@@ -436,6 +441,7 @@ export function buildScheduleGridModel({
     spanWeeks,
     activeFocusArea,
     todayKey,
+    awayRanges,
     columns,
     week1,
     week2,

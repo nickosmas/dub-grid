@@ -93,3 +93,38 @@ describe("withoutAwayDays with a planned away", () => {
     });
   });
 });
+
+describe("the day someone went away", () => {
+  it("dates it in the organization's timezone", () => {
+    // 2:30 AM UTC on Oct 21 is still Oct 20 in Los Angeles.
+    const ben = person({
+      id: "ben",
+      status: "inactive",
+      awayUntil: "2026-11-09",
+      statusChangedAt: "2026-10-21T02:30:00Z",
+    });
+    expect(awayRangesById([ben], "America/Los_Angeles").get("ben")).toEqual({
+      from: null,
+      until: "2026-11-09",
+      since: "2026-10-20",
+    });
+    expect(awayRangesById([ben], "UTC").get("ben")?.since).toBe("2026-10-21");
+  });
+
+  it("counts the shifts they worked before it", () => {
+    const shifts: ShiftMap = {
+      "ben_2026-10-19": cell("D"),
+      "ben_2026-10-21": cell("D"),
+      "ben_2026-11-09": cell("E"),
+    };
+    expect(
+      withoutAwayDays(
+        shifts,
+        new Map([["ben", { from: null, until: "2026-11-09", since: "2026-10-21" }]]),
+      ),
+    ).toEqual({
+      "ben_2026-10-19": shifts["ben_2026-10-19"],
+      "ben_2026-11-09": shifts["ben_2026-11-09"],
+    });
+  });
+});

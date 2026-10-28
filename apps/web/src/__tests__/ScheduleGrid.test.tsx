@@ -16,6 +16,7 @@ import {
 } from "@/components/schedule-grid/badges";
 import { formatPublishedMetadata, GRID_CELL_HEIGHT } from "@/components/schedule-grid/gridHelpers";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import type { AwayRange } from "@/components/schedule-grid/awayRuns";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
@@ -215,6 +216,7 @@ beforeEach(() => {
 });
 
 interface RenderGridOptions {
+  awayRanges?: ReadonlyMap<string, AwayRange>;
   filteredEmployees?: Employee[];
   allEmployees?: Employee[];
   week1?: Date[];
@@ -386,6 +388,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     week2: options.week2 ?? week2,
     spanWeeks: options.spanWeeks ?? 2,
     todayKey: options.todayKey ?? formatDateKey(week1[0]),
+    awayRanges: options.awayRanges,
     focusAreas: options.focusAreas ?? focusAreas,
     departments: options.departments ?? departments,
     assignments: resolvedAssignmentDefinitions,
@@ -2593,6 +2596,57 @@ describe("ScheduleGrid", () => {
       renderAway({ todayKey: "2024-01-21" });
       expect(cellsOf("emp-away")).toHaveLength(0);
       expect(cellsOf("emp-1")).toHaveLength(14);
+    });
+
+    // Jamie went away on Thu, Jan 4, before today (Tue, Jan 9).
+    const since = { from: null, until: "2024-01-17", since: "2024-01-04" };
+
+    it("draws the bar from the day they went away, the same before and after today", () => {
+      observedWidth = 1600;
+      renderAway({ awayRanges: new Map([["emp-away", since]]) });
+
+      const cells = cellsOf("emp-away");
+      expect(cells.map((cell) => cell.dataset.awayRun)).toEqual([
+        "start",
+        "middle",
+        "middle",
+        "middle",
+        "middle",
+        "middle",
+        "end",
+        "start",
+        "middle",
+        "end",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      expect(screen.getAllByText("Away")).toHaveLength(2);
+    });
+
+    it("keeps a past period they went away in, with earlier days shown and locked", () => {
+      observedWidth = 1600;
+      // Away from Wed, Jan 10 until Feb 1, viewed on Sun, Jan 21.
+      const longer = { ...jamie, awayUntil: "2024-02-01" };
+      renderAway({
+        filteredEmployees: [employees[0], longer],
+        allEmployees: [employees[0], longer],
+        awayRanges: new Map([
+          ["emp-away", { from: null, until: "2024-02-01", since: "2024-01-10" }],
+        ]),
+        todayKey: "2024-01-21",
+      });
+
+      const cells = cellsOf("emp-away");
+      expect(cells).toHaveLength(14);
+      expect(cells[0].dataset.awayRun).toBeUndefined();
+      expect(cells[0].dataset.awayLocked).toBe("true");
+      expect(cells[0].querySelector('[data-shift-pill="single"]')?.textContent).toBe("D");
+      expect(cells[0].getAttribute("title")).toBe(
+        "Away since Wed, Jan 10. Days before they went away can't be changed while they're away.",
+      );
+      expect(cells[3].dataset.awayRun).toBe("start");
     });
   });
 

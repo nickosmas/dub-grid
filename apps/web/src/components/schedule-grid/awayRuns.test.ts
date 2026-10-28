@@ -5,6 +5,7 @@ import {
   awayReturnDate,
   awayRunLabel,
   buildRowAwayDays,
+  isAwayOn,
   isInAwayRange,
   isOnScheduleGrid,
   LEAVING_RUN_LABEL,
@@ -224,5 +225,76 @@ describe("first day in the grid (51g4)", () => {
     expect(awayLockedHint(range, "2026-11-07")).toBe(
       "Last day Fri, Nov 6. Change the last day on their record to change these days.",
     );
+  });
+});
+
+describe("the day someone went away", () => {
+  // Away since Tue, Oct 27 until Mon, Nov 9; today is Mon, Nov 2.
+  const range = { from: null, until: "2026-11-09", since: "2026-10-27" };
+  const twoWeeks = [
+    "2026-10-25",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30",
+    "2026-10-31",
+    ...week,
+  ];
+
+  it("dates the range from when they were marked away", () => {
+    expect(
+      awayRangeOf({
+        status: "inactive",
+        awayUntil: "2026-11-09",
+        statusChangedAt: "2026-10-27T15:00:00Z",
+      }),
+    ).toEqual(range);
+  });
+
+  it("draws one bar per week from that day, through today", () => {
+    const away = buildRowAwayDays(range, twoWeeks, period.todayKey, 7);
+    expect(away?.locked.every(Boolean)).toBe(true);
+    expect(away?.runs.slice(0, 2)).toEqual([null, null]);
+    expect(away?.runs[2]).toMatchObject({ runIndex: 0, start: 2, length: 5, position: "start" });
+    expect(away?.runs[7]).toMatchObject({ runIndex: 1, start: 7, length: 7, position: "start" });
+    expect(away?.runs[8]).toMatchObject({ runIndex: 1, position: "middle" });
+  });
+
+  it("draws a past week on its own", () => {
+    const away = buildRowAwayDays(range, twoWeeks.slice(0, 7), "2026-11-02");
+    expect(away?.runs[2]).toMatchObject({ runIndex: 0, start: 2, length: 5 });
+  });
+
+  it("draws from today when the day isn't known", () => {
+    const away = buildRowAwayDays({ from: null, until: "2026-11-09" }, twoWeeks, "2026-11-02", 7);
+    expect(away?.runs.slice(0, 8).every((day) => day === null)).toBe(true);
+    expect(away?.runs[8]).toMatchObject({ start: 8, length: 6 });
+  });
+
+  it("counts them away only from that day, though earlier days stay locked", () => {
+    expect(isInAwayRange(range, "2026-10-26")).toBe(true);
+    expect(isAwayOn(range, "2026-10-26")).toBe(false);
+    expect(isAwayOn(range, "2026-10-27")).toBe(true);
+    expect(isAwayOn({ from: null, until: "2026-11-09" }, "2026-10-26")).toBe(true);
+  });
+
+  it("says why a day before it is locked", () => {
+    expect(awayLockedHint(range, "2026-10-26")).toBe(
+      "Away since Tue, Oct 27. Days before they went away can't be changed while they're away.",
+    );
+    expect(awayLockedHint(range, "2026-11-03")).toBe(
+      "Away until Mon, Nov 9. Change the return date on their record to change these days.",
+    );
+  });
+
+  it("puts them on the grid for a past period that reaches that day", () => {
+    const away = { status: "inactive" as const, awayUntil: "2026-11-09" };
+    const lastWeek = { lastDateKey: "2026-10-31", todayKey: "2026-11-02" };
+    expect(isOnScheduleGrid(away, lastWeek, "2026-10-27")).toBe(true);
+    expect(isOnScheduleGrid(away, { ...lastWeek, lastDateKey: "2026-10-24" }, "2026-10-27")).toBe(
+      false,
+    );
+    expect(isOnScheduleGrid(away, lastWeek)).toBe(false);
   });
 });
