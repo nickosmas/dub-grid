@@ -19,9 +19,12 @@ import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
+import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
+  canOffboardAtTier,
   isSelfAction,
+  removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
 } from "@dubgrid/domain";
@@ -30,9 +33,11 @@ import {
   activateEmployee,
   reinstateEmployee,
   suspendEmployee,
+  setEmployeeSuspendedUntil,
   setEmployeePlannedChange,
   plannedChangeToast,
   type PlannedChange,
+  type SuspensionDates,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -44,6 +49,7 @@ import {
   EmployeeAccessDeniedError,
   EmployeeContactConflictError,
   EmployeeProfileConflictError,
+  FocusAreaShiftsCancelledError,
   EmployeeStatusConflictError,
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -371,6 +377,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [orgId, queryClient],
   );
 
+  const { optionsFor: focusAreaSaveOptions, dialog: focusAreaDialog } =
+    useFocusAreaShiftsQuestion();
+
   const handleSaveEmployee = useCallback(
     async (updatedEmployee: Employee) => {
       if (!orgId || !employee) return;
@@ -379,12 +388,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         pendingInvite && (previousEmployee.email || "") !== (updatedEmployee.email || "")
           ? pendingInvite.email
           : null;
-      setEmployee(updatedEmployee);
+      // A save that may ask about their shifts waits for the answer, so Cancel
+      // leaves the form as it was edited.
+      if (
+        removedFocusAreaIds(previousEmployee.focusAreaIds, updatedEmployee.focusAreaIds).length ===
+        0
+      ) {
+        setEmployee(updatedEmployee);
+      }
       try {
         const savedEmployee = await updateEmployee(
           updatedEmployee,
           orgId,
           previousEmployee.version,
+          focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
         );
         syncEmployeeCaches(savedEmployee);
         toast.success(
@@ -405,6 +422,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         setEmployee(previousEmployee);
+        // Closing the question about their shifts leaves the form open, unsaved.
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(
           err instanceof EmployeeContactConflictError
             ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
@@ -412,7 +431,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         );
       }
     },
-    [employee, orgId, pendingInvite, refreshDirectory, refreshInvitations, syncEmployeeCaches],
+    [
+      employee,
+      focusAreaSaveOptions,
+      orgId,
+      pendingInvite,
+      refreshDirectory,
+      refreshInvitations,
+      syncEmployeeCaches,
+    ],
   );
 
   // Chosen from EditEmployeePanel's confirm dialog when the admin picks
@@ -424,11 +451,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     async (updatedEmployee: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId || !employee) return;
       const previousEmployee = employee;
-      setEmployee(updatedEmployee);
+      // A save that may ask about their shifts waits for the answer, so Cancel
+      // leaves the form as it was edited.
+      if (
+        removedFocusAreaIds(previousEmployee.focusAreaIds, updatedEmployee.focusAreaIds).length ===
+        0
+      ) {
+        setEmployee(updatedEmployee);
+      }
 
       let savedEmployee: Employee;
       try {
-        savedEmployee = await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+        savedEmployee = await updateEmployee(
+          updatedEmployee,
+          orgId,
+          previousEmployee.version,
+          focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
+        );
         syncEmployeeCaches(savedEmployee);
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
@@ -439,6 +478,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         setEmployee(previousEmployee);
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(
           err instanceof EmployeeContactConflictError
             ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
@@ -486,7 +526,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         void refreshInvitations();
       }
     },
-    [employee, orgId, org?.name, refreshDirectory, refreshInvitations, syncEmployeeCaches],
+    [
+      employee,
+      focusAreaSaveOptions,
+      orgId,
+      org?.name,
+      refreshDirectory,
+      refreshInvitations,
+      syncEmployeeCaches,
+    ],
   );
 
   // ── Status action handlers ──────────────────────────────────────────────────
@@ -569,8 +617,26 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleActivate = useCallback(
-    async (empId: string) => {
+    async (empId: string, startDate?: string) => {
       if (!orgId || !employee) return;
+      if (startDate) {
+        try {
+          syncEmployeeCaches(await activateEmployee(empId, orgId, employee.version, startDate));
+          toast.success("Restore scheduled");
+        } catch (err) {
+          if (err instanceof EmployeeStatusConflictError) {
+            syncEmployeeCaches(err.latestEmployee);
+            toast.error(
+              "Employee status changed elsewhere. Review the latest values and try again.",
+            );
+            return;
+          }
+          toast.error(
+            formatClientErrorMessage(err, "We couldn't schedule the restore. Try again."),
+          );
+        }
+        return;
+      }
       const prevStatus = employee?.status;
       setEmployee((prev) =>
         prev
@@ -605,11 +671,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleSuspend = useCallback(
-    async (empId: string, accessToken?: string) => {
+    async (empId: string, accessToken?: string, dates?: SuspensionDates) => {
       if (!orgId || !employee) return false;
       try {
-        syncEmployeeCaches(await suspendEmployee(empId, orgId, employee.version, accessToken));
-        toast.success("Suspended");
+        const updated = await suspendEmployee(empId, orgId, employee.version, accessToken, dates);
+        syncEmployeeCaches(updated);
+        toast.success(updated.suspendedAt ? "Suspended" : "Suspension scheduled");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -643,6 +710,24 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         if (getStepUpMethod(err)) throw err;
         toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
         return false;
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
+  const handleSetSuspendedUntil = useCallback(
+    async (empId: string, until: string | null) => {
+      if (!orgId || !employee) return;
+      try {
+        syncEmployeeCaches(await setEmployeeSuspendedUntil(empId, orgId, employee.version, until));
+        toast.success(until ? "End date saved" : "End date cleared");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the end date. Try again."));
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -903,11 +988,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ],
   );
 
+  const canOffboard = canOffboardAtTier(perms, effectiveOrgRole);
   const statusActions = (person: Employee, label?: string) =>
     label ? (
       <EmployeeStatusActions
         employee={person}
         canEdit={perms.canManageEmployees}
+        canOffboard={canOffboard}
         isSelf={isSelfAction(currentUser?.id, person.userId)}
         onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
           runStatusChange((token) =>
@@ -919,7 +1006,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onActivate={handleActivate}
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
-        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSuspend={(empId, dates) => runStatusChange((token) => handleSuspend(empId, token, dates))}
+        onSetSuspendedUntil={handleSetSuspendedUntil}
         onSetPlannedChange={(empId, plan) =>
           runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }
@@ -938,6 +1026,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <StatusCardActions
         employee={person}
         canEdit={perms.canManageEmployees}
+        canOffboard={canOffboard}
         isSelf={isSelfAction(currentUser?.id, person.userId)}
         onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
           runStatusChange((token) =>
@@ -949,7 +1038,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onActivate={handleActivate}
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
-        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSuspend={(empId, dates) => runStatusChange((token) => handleSuspend(empId, token, dates))}
+        onSetSuspendedUntil={handleSetSuspendedUntil}
         onSetPlannedChange={(empId, plan) =>
           runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }
@@ -989,6 +1079,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     <>
       <ProgressBar loading={isLoading} />
       {statusStepUp.dialog}
+      {focusAreaDialog}
 
       {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
           the rendered profile in place; only a first load shows nothing. */}

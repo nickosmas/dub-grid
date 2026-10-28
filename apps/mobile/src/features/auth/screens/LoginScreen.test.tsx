@@ -968,6 +968,43 @@ describe("LoginScreen", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
+  it("names the day a suspended person gets access back (51g3)", async () => {
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockRejectedValue(
+      new ApiResponseError(
+        "Your access has been suspended. Contact your organization admin.",
+        403,
+        {
+          code: "ACCOUNT_SUSPENDED",
+          suspendedUntil: "2026-11-20",
+        },
+      ),
+    );
+
+    await renderLogin();
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "right-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByText(
+        "Your organization has suspended your access to the app until Fri, Nov 20. Contact an administrator there if you have questions.",
+      ),
+    ).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
   it("does not duplicate an active credential submission", async () => {
     lookupOrganization.mockResolvedValue({
       organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },

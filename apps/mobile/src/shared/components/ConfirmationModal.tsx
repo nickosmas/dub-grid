@@ -105,6 +105,7 @@ export function ConfirmationModal({
   loading,
   onCancel,
   onConfirm,
+  secondaryAction,
   presentation = "modal",
 }: {
   visible: boolean;
@@ -135,6 +136,12 @@ export function ConfirmationModal({
   loading?: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<unknown>;
+  /**
+   * A second answer beside the confirm, such as Keep shifts beside Clear
+   * shifts. It takes the plain Cancel button's place; closing the popup from
+   * its corner or the backdrop still cancels.
+   */
+  secondaryAction?: { label: string; onPress: () => void | Promise<unknown> };
   /**
    * `"inline"` draws the same backdrop and card as an absolute overlay in
    * the parent instead of its own Modal, for a confirmation raised inside
@@ -282,12 +289,21 @@ export function ConfirmationModal({
                   />
                 }
               >
-                <Button
-                  disabled={isBusy}
-                  label={cancelLabel}
-                  onPress={handleDismiss}
-                  tone="plain"
-                />
+                {secondaryAction ? (
+                  <Button
+                    disabled={isBusy}
+                    label={secondaryAction.label}
+                    onPress={secondaryAction.onPress}
+                    tone="neutral"
+                  />
+                ) : (
+                  <Button
+                    disabled={isBusy}
+                    label={cancelLabel}
+                    onPress={handleDismiss}
+                    tone="plain"
+                  />
+                )}
               </ActionButtons>
             </View>
           </Animated.View>

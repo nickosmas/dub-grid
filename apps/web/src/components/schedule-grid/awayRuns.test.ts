@@ -5,8 +5,10 @@ import {
   awayReturnDate,
   awayRunLabel,
   buildRowAwayDays,
+  isInAwayRange,
   isOnScheduleGrid,
   LEAVING_RUN_LABEL,
+  startsRunLabel,
 } from "./awayRuns";
 
 const period = { lastDateKey: "2026-11-07", todayKey: "2026-11-02" };
@@ -164,5 +166,63 @@ describe("last day in the grid (51g2)", () => {
 
   it("leaves someone already offboarded off it", () => {
     expect(awayRangeOf({ ...leaving, archivedAt: "2026-11-05T08:00:00Z" })).toBeNull();
+  });
+});
+
+describe("first day in the grid (51g4)", () => {
+  it("locks the days before the first day, alone or beside a planned change", () => {
+    const alone = awayRangeOf({ status: "active", firstDay: "2026-11-04" });
+    expect(alone).toEqual({ from: "2026-11-04", until: "2026-11-04", firstDay: "2026-11-04" });
+    expect(isInAwayRange(alone!, "2026-11-03")).toBe(true);
+    expect(isInAwayRange(alone!, "2026-11-04")).toBe(false);
+    expect(isInAwayRange(alone!, "2026-12-01")).toBe(false);
+
+    const withLastDay = awayRangeOf({
+      status: "active",
+      firstDay: "2026-11-04",
+      plannedStatus: "removed",
+      plannedFrom: "2026-12-01",
+    });
+    expect(isInAwayRange(withLastDay!, "2026-11-03")).toBe(true);
+    expect(isInAwayRange(withLastDay!, "2026-11-20")).toBe(false);
+    expect(isInAwayRange(withLastDay!, "2026-12-01")).toBe(true);
+  });
+
+  it("leaves someone offboarded or with no first day alone", () => {
+    expect(awayRangeOf({ status: "active", firstDay: null })).toBeNull();
+    expect(
+      awayRangeOf({
+        status: "removed",
+        archivedAt: "2026-10-01T00:00:00Z",
+        firstDay: "2026-11-04",
+      }),
+    ).toBeNull();
+  });
+
+  it("draws the days before it from today and names the day", () => {
+    const range = awayRangeOf({ status: "active", firstDay: "2026-11-04" })!;
+    const days = buildRowAwayDays(range, week, "2026-11-02");
+    expect(days?.locked).toEqual([true, true, true, false, false, false, false]);
+    expect(days?.runs.filter(Boolean).length).toBeGreaterThan(0);
+    expect(days?.runs[0]).toBeNull();
+    expect(startsRunLabel("2026-11-04")).toBe("Starts Nov 4");
+    expect(awayLockedHint(range, "2026-11-03")).toBe(
+      "Starts Wed, Nov 4. Change their first day on their record to change these days.",
+    );
+    expect(awayLockedHint(range)).toBe(
+      "Starts Wed, Nov 4. Change their first day on their record to change these days.",
+    );
+  });
+
+  it("names a planned change's own days after the first day", () => {
+    const range = awayRangeOf({
+      status: "active",
+      firstDay: "2026-11-04",
+      plannedStatus: "removed",
+      plannedFrom: "2026-11-07",
+    })!;
+    expect(awayLockedHint(range, "2026-11-07")).toBe(
+      "Last day Fri, Nov 6. Change the last day on their record to change these days.",
+    );
   });
 });

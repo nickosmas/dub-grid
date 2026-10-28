@@ -111,6 +111,7 @@ const DETAIL_LABELS: Record<string, string> = {
   endDate: "End date",
   end_date: "End date",
   existingStatus: "Previous status",
+  firstDay: "First day",
   frequency: "Repeats",
   fromRole: "Previous role",
   from_role: "Previous role",

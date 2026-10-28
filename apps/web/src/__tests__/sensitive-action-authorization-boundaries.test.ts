@@ -74,29 +74,36 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /recoveryCompletion && !hasFreshRecoveryProof\(auth\.claims\)[\s\S]*?\brevokeBulkSessions\s*\(/,
     ],
   },
+  // Both status routes check the caller, then ask a Gridmaster for fresh
+  // proof before the shared change reads or writes anyone (F-96, 51c, 51g1,
+  // 51h); the revocations themselves live in the shared change below.
   "apps/web/src/app/api/employees/status/route.ts": {
     policy: "authorized-target-revocation",
     assertions: [
       /\brequireAuthenticatedUser\s*\(/,
       /\bcanManageEmployees\s*\(/,
-      // Removal signs the person out everywhere; marking inactive (Away) doesn't
-      // (51a), and nor does setting a last day, until the day after it (51g2).
-      /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,[\s\S]*?endMembership: isGridmaster \|\| isSuperAdmin,/,
-      // A Gridmaster taking a staff record out, suspending it or planning it
-      // away needs fresh proof before any read or write (F-96, 51c, 51g1).
-      /if \(\s*isGridmaster &&\s*\(action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
-      // Suspension signs only the suspended person out (51c).
-      /if \(action === "suspend" && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+      /if \(isGridmaster && statusChangeNeedsFreshProof\(action\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const result = await applyStatusChange\(/,
+    ],
+  },
+  "apps/web/src/app/api/employees/status/bulk/route.ts": {
+    policy: "authorized-target-revocation",
+    assertions: [
+      /\brequireAuthenticatedUser\s*\(/,
+      /\bcanManageEmployees\s*\(/,
+      /if \(isGridmaster && statusChangeNeedsFreshProof\(action\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}[\s\S]*?await applyStatusChange\(/,
     ],
   },
   // The daily job offboards someone the day after the last day a manager with
-  // the employees permission set (51g2), with that Offboard's follow-up. Only
-  // the cron secret reaches it.
+  // the employees permission set (51g2), and starts a suspension one planned
+  // (51g3), each with its manual follow-up. Only the cron secret reaches it.
   "apps/web/src/app/api/cron/return-from-away/route.ts": {
     policy: "authorized-target-revocation",
     assertions: [
       /if \(!bearerMatchesSecret\(req\.headers\.get\("authorization"\), secret\)\)/,
-      /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?endMembership: await canEndMembership\(db, row\.org_id, row\.planned_by\),/,
+      /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?userId: row\.user_id,/,
+      // It starts a suspension a manager planned (51g3) with that Suspend's
+      // follow-up, signing out only the suspended person.
+      /\.eq\("planned_status", "suspended"\)[\s\S]*?await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)[\s\S]*?await endUserSessions\(row\.user_id\);/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {
@@ -263,6 +270,8 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
       /export async function DELETE[\s\S]*?revokeAllUserSessions/,
+      // Their staff record is offboarded after the membership, by the shared change (51k).
+      /export async function DELETE[\s\S]*?if \(!updatedMembership\)[\s\S]*?await offboardRemovedMember\(/,
       // A Gridmaster's removal needs fresh proof before the membership is read (F-96).
       /export async function DELETE[\s\S]*?if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;\s*\}\s*const currentUser = await fetchOrganizationUser/,
       /if \(allowed\.isGridmaster\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
@@ -356,6 +365,23 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   ],
 };
 
+// The one status change both status routes run (51h): who it signs out and when.
+const SHARED_STATUS_CHANGE = "apps/web/src/features/employees/server/status-change.ts";
+const SHARED_STATUS_CHANGE_ASSERTIONS: RegExp[] = [
+  // Taking a staff record out, suspending it or planning it away needs a
+  // Gridmaster's fresh proof; bringing someone back doesn't.
+  /export function statusChangeNeedsFreshProof\(action: StatusChangeAction\): boolean \{\s*return \(\s*action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\s*\);/,
+  // Removal signs the person out everywhere; marking inactive (Away) doesn't
+  // (51a), and nor does setting a last day, until the day after it (51g2).
+  /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,/,
+  // Offboarding and Restore change the membership whoever acts (51k), so an
+  // Admin never reaches a Super Admin: the tier guard runs before any write.
+  /if \(\(offboarding \|\| restoring\) && !isGridmaster && !isSuperAdmin && currentEmployee\.userId\) \{[\s\S]*?if \(!canOffboardAtTier\(actor, targetMembership\?\.org_role\)\) \{[\s\S]*?\{ status: 403 \}[\s\S]*?\.from\("employees"\)\s*\.update\(update\)/,
+  // Suspension signs only the suspended person out (51c), and only once
+  // it starts: a planned one (51g3) waits for the daily job.
+  /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+];
+
 // Also catches a file by what it changes, not only by the gate it calls, so a
 // credential or authority change without a gate is found rather than missed:
 // password-reset sends, Gridmaster role changes, provider-session endings and
@@ -363,7 +389,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
 // and mobile handlers only, so a new helper that makes such a change belongs
 // in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|endOffboardedAccess|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|endOffboardedAccess|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail|applyStatusChange)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 
@@ -403,6 +429,15 @@ describe("sensitive action authorization boundaries", () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it("keeps the shared status change's sign-outs where the status routes expect them", () => {
+    const source = readFileSync(path.join(repoRoot, SHARED_STATUS_CHANGE), "utf8");
+    expect(
+      SHARED_STATUS_CHANGE_ASSERTIONS.filter((assertion) => !assertion.test(source)).map(
+        (assertion) => assertion.source,
+      ),
+    ).toEqual([]);
   });
 
   it("classifies every mobile handler that makes such a change", () => {

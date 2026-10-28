@@ -10,7 +10,14 @@ const state = {
   dedupeHits: 0,
   orgName: null as string | null,
   prefs: null as Record<string, { in_app?: boolean; email?: boolean }> | null,
+  profile: { platform_role: "none", deactivated_at: null, terminated_at: null } as Record<
+    string,
+    unknown
+  > | null,
+  membership: true,
+  employee: { status: "active", suspended_at: null } as Record<string, unknown> | null,
 };
+const inAppInserts: unknown[] = [];
 
 type Op = [string, ...unknown[]];
 
@@ -19,6 +26,16 @@ function has(ops: Op[], ...op: unknown[]) {
 }
 
 function resolve(table: string, ops: Op[]) {
+  if (table === "profiles") return { data: state.profile, error: null };
+  if (table === "organization_memberships") {
+    return { data: state.membership ? { user_id: "user-1" } : null, error: null };
+  }
+  if (table === "employees") return { data: state.employee, error: null };
+  if (table === "notifications" && has(ops, "insert")) {
+    const row = ops.find(([name]) => name === "insert")?.[1] as { channel?: string };
+    if (row?.channel === "in_app") inAppInserts.push(row);
+    return { data: { id: "notification-1" }, error: null };
+  }
   if (table === "notifications" && has(ops, "select", "*")) {
     return {
       count: has(ops, "eq", "category", "security")
@@ -41,7 +58,7 @@ function resolve(table: string, ops: Op[]) {
 function builder(table: string) {
   const ops: Op[] = [];
   const chain: Record<string, unknown> = {};
-  for (const name of ["select", "eq", "neq", "gte", "limit", "insert"]) {
+  for (const name of ["select", "eq", "neq", "gte", "limit", "insert", "is"]) {
     chain[name] = (...args: unknown[]) => {
       ops.push([name, ...args]);
       return chain;
@@ -100,6 +117,10 @@ describe("sendNotification email", () => {
     state.dedupeHits = 0;
     state.orgName = null;
     state.prefs = null;
+    state.profile = { platform_role: "none", deactivated_at: null, terminated_at: null };
+    state.membership = true;
+    state.employee = { status: "active", suspended_at: null };
+    inAppInserts.length = 0;
     sendResendEmail.mockResolvedValue({ id: "email-1" });
     pushEligible.mockReturnValue(false);
   });
@@ -239,5 +260,136 @@ describe("sendNotification email", () => {
     const message = sendResendEmail.mock.calls[0]?.[0] as { subject: string; html: string };
     expect(message.subject).toBe("Title");
     expect(message.html).toContain("While signed in to Calm Haven");
+  });
+});
+
+// Item 51j: push and email reach only someone who can still sign in.
+describe("sendNotification reaches only people who can sign in", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.securityEmailsThisHour = 0;
+    state.otherEmailsThisHour = 0;
+    state.dedupeHits = 0;
+    state.orgName = null;
+    state.prefs = {
+      schedule: { email: true },
+      shift_requests: { email: true },
+      billing: { email: true },
+    };
+    state.profile = { platform_role: "none", deactivated_at: null, terminated_at: null };
+    state.membership = true;
+    state.employee = { status: "active", suspended_at: null };
+    inAppInserts.length = 0;
+    sendResendEmail.mockResolvedValue({ id: "email-1" });
+    pushEligible.mockReturnValue(true);
+  });
+
+  function alert(type: string) {
+    return sendNotification("user-1", "org-1", type as never, "Title", "Message");
+  }
+
+  const families = ["shift_change", "shift_request_approved", "billing_access_locked"];
+
+  it.each(families)("pushes, emails and keeps %s for an active or Away person", async (type) => {
+    await alert(type);
+    state.employee = { status: "inactive", suspended_at: null };
+    await alert(type);
+
+    expect(inAppInserts).toHaveLength(2);
+    expect(sendMobilePushNotifications).toHaveBeenCalledTimes(2);
+    expect(sendResendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(families)(
+    "keeps %s in the app for a Suspended person, without push or email",
+    async (type) => {
+      state.employee = { status: "active", suspended_at: "2026-10-28T00:00:00Z" };
+
+      await alert(type);
+
+      expect(inAppInserts).toHaveLength(1);
+      expect(sendMobilePushNotifications).not.toHaveBeenCalled();
+      expect(sendResendEmail).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["Offboarded", () => (state.employee = { status: "removed", suspended_at: null })],
+    ["removed from the organization", () => (state.membership = false)],
+    [
+      "deactivated",
+      () =>
+        (state.profile = {
+          platform_role: "none",
+          deactivated_at: "2026-10-01T00:00:00Z",
+          terminated_at: null,
+        }),
+    ],
+    [
+      "terminated",
+      () =>
+        (state.profile = {
+          platform_role: "none",
+          deactivated_at: null,
+          terminated_at: "2026-10-01T00:00:00Z",
+        }),
+    ],
+  ])("sends and writes nothing for someone %s", async (_label, apply) => {
+    apply();
+
+    for (const type of families) await alert(type);
+
+    expect(inAppInserts).toHaveLength(0);
+    expect(sendMobilePushNotifications).not.toHaveBeenCalled();
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("delivers again once they're reinstated or restored, with nothing to switch back on", async () => {
+    state.employee = { status: "active", suspended_at: "2026-10-28T00:00:00Z" };
+    await alert("shift_change");
+    state.employee = { status: "active", suspended_at: null };
+    await alert("shift_change");
+    state.employee = { status: "removed", suspended_at: null };
+    await alert("shift_change");
+    state.employee = { status: "active", suspended_at: null };
+    await alert("shift_change");
+
+    expect(sendMobilePushNotifications).toHaveBeenCalledTimes(2);
+    expect(sendResendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("still sends a security alert to a Suspended or Offboarded person's account", async () => {
+    state.employee = { status: "removed", suspended_at: "2026-10-28T00:00:00Z" };
+    state.membership = false;
+
+    await alert("security_new_device");
+
+    expect(sendMobilePushNotifications).toHaveBeenCalledTimes(1);
+    expect(sendResendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no security alert to a deactivated account", async () => {
+    state.profile = {
+      platform_role: "none",
+      deactivated_at: "2026-10-01T00:00:00Z",
+      terminated_at: null,
+    };
+
+    await alert("security_new_device");
+
+    expect(inAppInserts).toHaveLength(0);
+    expect(sendMobilePushNotifications).not.toHaveBeenCalled();
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
+  it("reaches a Gridmaster about an organization they don't belong to", async () => {
+    state.profile = { platform_role: "gridmaster", deactivated_at: null, terminated_at: null };
+    state.membership = false;
+    state.employee = null;
+
+    await alert("shift_change");
+
+    expect(sendMobilePushNotifications).toHaveBeenCalledTimes(1);
+    expect(sendResendEmail).toHaveBeenCalledTimes(1);
   });
 });

@@ -38,7 +38,7 @@ describe("the live access token hook keeps minting every claim the app gates on"
   });
 
   it("resolves the newest definition rather than a fixed migration", () => {
-    expect(hook.file).toBe("101_suspended_access.sql");
+    expect(hook.file).toBe("105_suspended_until.sql");
   });
 });
 

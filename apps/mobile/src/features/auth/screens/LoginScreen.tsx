@@ -4,7 +4,7 @@ import { ApiResponseError } from "@dubgrid/api-client";
 import { isRetryableAuthRecoveryError } from "@dubgrid/client-errors";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import {
-  ACCESS_SUSPENDED_BODY,
+  accessSuspendedBody,
   ACCESS_SUSPENDED_TITLE,
   ACCOUNT_DISABLED_CODE,
   ACCOUNT_DISABLED_MESSAGE,
@@ -390,8 +390,10 @@ export default function LoginScreen() {
         typeof loginError.payload === "object" &&
         (loginError.payload as { code?: unknown }).code === ACCOUNT_SUSPENDED_CODE
       ) {
-        setError(ACCESS_SUSPENDED_BODY);
-        pushToast({ title: ACCESS_SUSPENDED_TITLE, message: ACCESS_SUSPENDED_BODY, tone: "info" });
+        const until = (loginError.payload as { suspendedUntil?: unknown }).suspendedUntil;
+        const body = accessSuspendedBody(typeof until === "string" ? until : null);
+        setError(body);
+        pushToast({ title: ACCESS_SUSPENDED_TITLE, message: body, tone: "info" });
         setPassword("");
         return;
       }

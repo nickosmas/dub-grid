@@ -8,6 +8,12 @@ import {
 import { loadMobilePeoplePayload, MobileApiAuthorizationError } from "@dubgrid/mobile-api-core";
 import { insertMobileAuditLogEntry } from "@dubgrid/data-access";
 import {
+  FIRST_DAY_INVALID_CODE,
+  FIRST_DAY_INVALID_MESSAGE,
+  isValidFirstDay,
+} from "@dubgrid/domain";
+import { fetchOrgToday } from "@/features/employees/server/org-today";
+import {
   fetchMobileHiddenPeople,
   fetchMobilePeople,
   requireMobileAuth,
@@ -47,10 +53,12 @@ type MobilePersonSource = Pick<
   | "awayUntil"
   | "awayAbsenceTypeId"
   | "suspendedAt"
+  | "suspendedUntil"
   | "plannedStatus"
   | "plannedFrom"
   | "plannedUntil"
   | "plannedAbsenceTypeId"
+  | "firstDay"
   | "userId"
   | "version"
 > & {
@@ -92,10 +100,12 @@ export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
     awayUntil: person.awayUntil ?? null,
     awayAbsenceTypeId: person.awayAbsenceTypeId ?? null,
     suspendedAt: person.suspendedAt ?? null,
+    suspendedUntil: person.suspendedUntil ?? null,
     plannedStatus: person.plannedStatus ?? null,
     plannedFrom: person.plannedFrom ?? null,
     plannedUntil: person.plannedUntil ?? null,
     plannedAbsenceTypeId: person.plannedAbsenceTypeId ?? null,
+    firstDay: person.firstDay ?? null,
     userId: person.userId,
     version: person.version,
     membershipUpdatedAt: person.membershipUpdatedAt ?? null,
@@ -178,6 +188,16 @@ export async function POST(req: NextRequest) {
   if (Object.keys(referenceErrors).length > 0) {
     return buildStaffValidationErrorResponse(referenceErrors);
   }
+  const firstDay = parsed.data.firstDay ?? null;
+  if (
+    firstDay &&
+    !isValidFirstDay(firstDay, await fetchOrgToday(auth.serviceClient, auth.currentOrg.id))
+  ) {
+    return NextResponse.json(
+      { error: FIRST_DAY_INVALID_MESSAGE, code: FIRST_DAY_INVALID_CODE },
+      { status: 400 },
+    );
+  }
 
   const { data: maxSeniorityRow } = await auth.serviceClient
     .from("employees")
@@ -204,6 +224,7 @@ export async function POST(req: NextRequest) {
             focusAreaIds: parsed.data.focusAreaIds,
             phone: "",
             email: parsed.data.email,
+            firstDay,
             contactNotes: "",
             departmentIds: [],
             deptAdminIds: [],
@@ -246,6 +267,7 @@ export async function POST(req: NextRequest) {
     details: {
       firstName: employee.firstName,
       lastName: employee.lastName,
+      ...(firstDay ? { firstDay } : {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers.get("user-agent"),

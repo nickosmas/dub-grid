@@ -1,6 +1,11 @@
 "use client";
 
-import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
+import {
+  describeEmploymentStatus,
+  describePlannedChangeInFull,
+  plannedReturn,
+  formatFirstDay,
+} from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
@@ -128,17 +133,26 @@ function StaffFacts({
         label="Status"
         value={
           employee.statusChangedAt
-            ? `${describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)} since ${formatDay(employee.statusChangedAt)}`
-            : describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt)
+            ? `${describeEmploymentStatus(employee.status, employee.awayUntil, employee.suspendedAt, employee.suspendedUntil)} since ${formatDay(employee.statusChangedAt)}`
+            : describeEmploymentStatus(
+                employee.status,
+                employee.awayUntil,
+                employee.suspendedAt,
+                employee.suspendedUntil,
+              )
         }
       />
-      {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+      {(employee.status === "active" || plannedReturn(employee)) &&
+      describePlannedChangeInFull(employee) ? (
         <PersonField label="Planned" value={describePlannedChangeInFull(employee) ?? ""} tabular />
       ) : null}
       <PersonField
         label="Employment"
         value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
       />
+      {employee.firstDay ? (
+        <PersonField label="First day" value={formatFirstDay(employee.firstDay)} tabular />
+      ) : null}
       {employee.statusNote ? (
         <PersonField label="Status note" value={employee.statusNote} wide />
       ) : null}

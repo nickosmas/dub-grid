@@ -21,7 +21,7 @@ const PROFILE_COLUMNS =
 const MEMBERSHIP_COLUMNS =
   "id, org_id, org_role, admin_permissions, joined_at, schedule_last_viewed_at, archived_at, archived_by, department_ids, dept_admin_ids, phone, onboarding_completed_at, tooltip_tours_completed, updated_at";
 const EMPLOYEE_COLUMNS =
-  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at, created_by, updated_by, updated_at";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at, created_by, updated_by, updated_at";
 const INVITATION_COLUMNS =
   "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 

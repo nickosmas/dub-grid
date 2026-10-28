@@ -44,6 +44,7 @@ vi.mock("@/features/employees/client", () => ({
   EmployeeContactConflictError: class extends Error {},
   EmployeeProfileConflictError: class extends Error {},
   EmployeeStatusConflictError: class extends Error {},
+  FocusAreaShiftsCancelledError: class extends Error {},
 }));
 
 vi.mock("@/features/schedule/client", () => ({

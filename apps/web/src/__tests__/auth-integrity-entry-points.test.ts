@@ -37,6 +37,7 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/employees/check-phone/route.ts",
   "apps/web/src/app/api/employees/identity/route.ts",
   "apps/web/src/app/api/employees/manage/route.ts",
+  "apps/web/src/app/api/employees/status/bulk/route.ts",
   "apps/web/src/app/api/employees/status/route.ts",
   "apps/web/src/app/api/gridmaster/accounts/route.ts",
   "apps/web/src/app/api/gridmaster/audit-log/export/route.ts",

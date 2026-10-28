@@ -208,6 +208,8 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
       return reason.until ? `away until ${lookups.formatDate(reason.until)}` : "away";
     case "leaving":
       return `last day ${lookups.formatDate(reason.lastDay)}`;
+    case "notStarted":
+      return `starts ${lookups.formatDate(reason.firstDay)}`;
   }
 }
 

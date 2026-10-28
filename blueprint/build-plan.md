@@ -1058,7 +1058,7 @@
         card.
   - [x] 50g. **Requests and availability** - the unavailable rule follows
         the absence's span; pasting a mixed cell copies only its shifts.
-- [ ] 51. **Staff statuses** - every person is Active, Away, Suspended or
+- [x] 51. **Staff statuses** - every person is Active, Away, Suspended or
       Archived, with an optional last day and return date. Away keeps
       sign-in, role and management access but takes them off the schedule;
       Suspended can't sign in but keeps their shifts and can still be
@@ -1110,7 +1110,7 @@
         replacing shifts, published with the period; those days are locked
         in the grid with an explanation, and changing the dates rewrites
         them.
-  - [ ] 51g. **Dated status changes** - a status change can start on a
+  - [x] 51g. **Dated status changes** - a status change can start on a
         later date; until then the person stays as they are, the days it
         covers are locked and changed in the draft, and a daily job applies
         it on the day in the organization's timezone.
@@ -1121,24 +1121,28 @@
     - [x] 51g2. **Last day** - "Leaving Nov 8": shifts after it come off in
           the draft, nobody can schedule them past it, and the job archives
           them the day after.
-    - [ ] 51g3. **Suspended until** - an optional end date on a suspension,
+    - [x] 51g3. **Suspended until** - an optional end date on a suspension,
           from today or a later start; the job reinstates them on it.
-    - [ ] 51g4. **First day** - a new hire can't be scheduled before their
+    - [x] 51g4. **First day** - a new hire can't be scheduled before their
           first day, and shows "Starts Nov 10" until then.
-  - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
+  - [x] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
-  - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks
+  - [x] 51i. **Losing a focus area** - taking someone off a focus area asks
         whether to clear their upcoming shifts there, in the draft, or keep
         them; today nothing acts on them.
-  - [ ] 51j. **No contact without sign-in** - push and schedule emails go
+  - [x] 51j. **No contact without sign-in** - push and schedule emails go
         only to people who can still sign in, so Suspended, Archived,
         Gridmaster's Remove access and a deactivated or terminated account
         stop them (Suspended keeps its one notice email); restoring access
         restores delivery. Settles whether in-app alerts are still created
         for them.
-  - [ ] 51k. **One Archive** - archiving ends the membership whoever does
+  - [x] 51k. **One Archive** - archiving ends the membership whoever does
         it, so an Admin's and a Super Admin's archive leave the same record,
         and Restore works the same after either.
+  - [x] 51l. **Restore on a date** - an Offboarded person can be restored
+        on a later date: Restore takes a Starts date, they stay Offboarded
+        until then ("Returns Nov 10"), and the daily job restores them on
+        the day.
 - [x] 52. **Absence runs in the grid** - a whole-day absence on days in a
       row draws as one bar per week in the Week and 2 Weeks grid, with no
       lines between its days, labeled with the name and a count ("Vacation

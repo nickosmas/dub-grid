@@ -99,8 +99,10 @@ vi.mock("@/features/employees/client", () => {
     }
   }
   class MockEmployeeAccessDeniedError extends Error {}
+  class MockFocusAreaShiftsCancelledError extends Error {}
   return {
     EmployeeAccessDeniedError: MockEmployeeAccessDeniedError,
+    FocusAreaShiftsCancelledError: MockFocusAreaShiftsCancelledError,
     EmployeeContactConflictError: MockEmployeeContactConflictError,
     EmployeeProfileConflictError: MockEmployeeProfileConflictError,
     EmployeeStatusConflictError: MockEmployeeStatusConflictError,
@@ -704,6 +706,7 @@ describe("StaffDetailPage", () => {
       expect.objectContaining({ email: "new.address@example.com" }),
       "org-1",
       expect.anything(),
+      expect.objectContaining({ askFocusAreaShifts: expect.any(Function) }),
     );
     expect(mockedCreateOrganizationInvitation).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -28,6 +28,10 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import {
+  FocusAreaShiftsCancelledError,
+  useFocusAreaShiftsQuestion,
+} from "../../../shared/hooks/useFocusAreaShiftsQuestion";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
@@ -198,6 +202,7 @@ export default function ProfileWorkScreen() {
   // Only the save confirmation now: the discard half belongs to the guard,
   // which has to answer to back navigation as well as to the Cancel button.
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const focusAreaQuestion = useFocusAreaShiftsQuestion();
   const [saveError, setSaveError] = useState<string | null>(null);
   const stepUp = useMobileStepUpAction();
   const profileQuery = useQuery({
@@ -315,6 +320,7 @@ export default function ProfileWorkScreen() {
         await requireMobileCredentialAssurance(actionAccessToken);
       }
 
+      let focusAreaShiftsNotCleared: string | null = null;
       if (canEditProfileDirectly) {
         if (nameChanged) {
           await updateProfileAccount(accessToken, {
@@ -337,7 +343,16 @@ export default function ProfileWorkScreen() {
             roleIds: draft.roleIds,
             departmentIds: draft.departmentIds,
           };
-          await updateMobilePerson(accessToken, linkedEmployee.id, body);
+          const saved = await focusAreaQuestion.saveAsking(
+            normalizedFirst,
+            (focusAreaShifts) =>
+              updateMobilePerson(accessToken, linkedEmployee.id, {
+                ...body,
+                ...(focusAreaShifts ? { focusAreaShifts } : {}),
+              }),
+            { self: true, beforeAsk: () => setShowSaveConfirmation(false) },
+          );
+          focusAreaShiftsNotCleared = saved.focusAreaShiftsNotCleared ?? null;
         }
       } else {
         if (phoneChanged && linkedEmployee) {
@@ -379,6 +394,7 @@ export default function ProfileWorkScreen() {
       return {
         emailChanged,
         emailFailure,
+        focusAreaShiftsNotCleared,
         nameChanged,
         requestedNameChange: !canEditProfileDirectly && nameChanged,
       };
@@ -386,6 +402,8 @@ export default function ProfileWorkScreen() {
     onMutate: () => setSaveError(null),
     onError: (error) => {
       if (getMobileStepUpMethod(error)) return;
+      // Closing the question about your shifts keeps the form open, unsaved.
+      if (error instanceof FocusAreaShiftsCancelledError) return;
       setSaveError(
         getClientFriendlyErrorMessage(error, "We couldn't save your profile right now."),
       );
@@ -401,6 +419,14 @@ export default function ProfileWorkScreen() {
       if (profileResult.data) {
         draftTouchedRef.current = false;
         setDraft(makeDraft(profileResult.data, profileResult.data.linkedEmployee ?? null));
+      }
+      if (result.focusAreaShiftsNotCleared) {
+        pushToast({
+          tone: "warning",
+          title: "Profile updated",
+          message: result.focusAreaShiftsNotCleared,
+        });
+        return;
       }
       if (result.emailFailure) {
         pushToast({
@@ -676,6 +702,7 @@ export default function ProfileWorkScreen() {
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}
+      {focusAreaQuestion.modal}
       <ConfirmationModal {...guard.confirmationProps} />
       {canManageManagementAccess && managementSubject ? (
         <ManagementAccessSheet

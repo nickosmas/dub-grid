@@ -980,9 +980,9 @@ async function dispatchNotificationEventInternal(
       const removedName = (await getUserName(event.removedUserId)) ?? "A member";
       const removedByName = await getActorName(actorUserId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
+      // The removed person can no longer sign in here, so they get nothing (51j).
       const recipients = new Set<string>(superAdmins);
-      // The removed user themselves always gets notified (they need to know).
-      recipients.add(event.removedUserId);
+      recipients.delete(event.removedUserId);
       recipients.delete(actorUserId);
       await Promise.all(
         [...recipients].map((userId) =>
@@ -990,12 +990,8 @@ async function dispatchNotificationEventInternal(
             userId,
             event.orgId,
             "membership_removed" as NotificationType,
-            userId === event.removedUserId
-              ? "You were removed from an organization"
-              : "Member removed",
-            userId === event.removedUserId
-              ? `${removedByName} removed your access to ${orgName}.`
-              : `${removedByName} removed ${removedName} from ${orgName}.`,
+            "Member removed",
+            `${removedByName} removed ${removedName} from ${orgName}.`,
             { removedUserId: event.removedUserId },
           ),
         ),

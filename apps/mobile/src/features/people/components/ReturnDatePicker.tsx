@@ -25,15 +25,18 @@ export const RETURN_DATE_HINT =
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_SIZE = 36;
 
-/** One month of days to pick a return date from; days before `minDate` are off. */
+/** One month of days to pick a return date from; days outside `minDate` to `maxDate` are off. */
 export function ReturnDateCalendar({
   value,
   minDate,
+  maxDate = null,
   onChange,
 }: {
   value: string | null;
   /** The earliest return date (YYYY-MM-DD), the organization's tomorrow. */
   minDate: string;
+  /** The latest day offered (YYYY-MM-DD), such as a year ahead for a planned start. */
+  maxDate?: string | null;
   onChange: (date: string) => void;
 }) {
   const mobileColors = useMobileColors();
@@ -41,6 +44,7 @@ export function ReturnDateCalendar({
   const [month, setMonth] = useState(() => getScheduleMonthStartDate(value ?? minDate));
   const weeks = useMemo(() => buildScheduleMonthDays(month, value ?? ""), [month, value]);
   const canGoBack = month > getScheduleMonthStartDate(minDate);
+  const canGoForward = !maxDate || month < getScheduleMonthStartDate(maxDate);
   const monthLabel = formatDate(month, { month: "long", year: "numeric" });
 
   return (
@@ -63,9 +67,11 @@ export function ReturnDateCalendar({
         <Pressable
           accessibilityLabel="Next month"
           accessibilityRole="button"
+          accessibilityState={{ disabled: !canGoForward }}
+          disabled={!canGoForward}
           hitSlop={8}
           onPress={() => setMonth(addMonthsToIsoDate(month, 1))}
-          style={styles.monthButton}
+          style={[styles.monthButton, !canGoForward && styles.dayDisabled]}
         >
           <Ionicons color={mobileColors.textSecondary} name="chevron-forward" size={20} />
         </Pressable>
@@ -80,7 +86,7 @@ export function ReturnDateCalendar({
       {weeks.map((week) => (
         <View key={week[0]?.date} style={styles.week}>
           {week.map((day) => {
-            const disabled = day.date < minDate;
+            const disabled = day.date < minDate || (maxDate !== null && day.date > maxDate);
             return (
               <Pressable
                 accessibilityLabel={`Choose ${formatReturnDate(day.date, { weekday: true })}`}
@@ -121,6 +127,7 @@ export function ReturnDateCalendar({
 export function ReturnDateField({
   value,
   minDate,
+  maxDate = null,
   onChange,
   disabled = false,
   initiallyOpen = false,
@@ -130,6 +137,8 @@ export function ReturnDateField({
 }: {
   value: string | null;
   minDate: string;
+  /** The latest day offered; Starts and Last day stop a year ahead. */
+  maxDate?: string | null;
   onChange: (date: string | null) => void;
   disabled?: boolean;
   initiallyOpen?: boolean;
@@ -168,7 +177,12 @@ export function ReturnDateField({
       </Pressable>
       {open ? (
         <>
-          <ReturnDateCalendar minDate={minDate} onChange={(date) => onChange(date)} value={value} />
+          <ReturnDateCalendar
+            maxDate={maxDate}
+            minDate={minDate}
+            onChange={(date) => onChange(date)}
+            value={value}
+          />
           {value ? (
             <Button
               compact

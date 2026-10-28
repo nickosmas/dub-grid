@@ -1,11 +1,16 @@
 "use client";
 
-import type { PlannedChange } from "@/features/employees/client";
+import type {
+  BulkStatusChangeHandler,
+  PlannedChange,
+  SuspensionDates,
+} from "@/features/employees/client";
 import {
+  canOffboardAtTier,
   EMPLOYMENT_STATUS_LABELS,
+  describeBulkStatusAction,
   describeEmploymentStatus,
-  describeStatusAction,
-  type StatusAction,
+  type BulkStatusPlan,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -99,6 +104,11 @@ import { useStepUpAction, type StepUpRun } from "@/hooks/useStepUpAction";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
 import { SortIcon } from "./SortIcon";
 import { StaffContextBar } from "./StaffContextBar";
+import {
+  BulkStatusDialog,
+  describeBulkStatusFailures,
+  type BulkStatusDialogState,
+} from "./BulkStatusDialog";
 import { StaffDetailPanel } from "./StaffDetailPanel";
 import { StaffReadOnlyDetailPanel } from "./StaffReadOnlyDetailPanel";
 import { AccessInsignia } from "./AccessInsignia";
@@ -115,22 +125,10 @@ import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import ScrollableTabs from "@/components/ScrollableTabs";
-import { mapInBatches } from "@/lib/async-batch";
 
 const REORDER_SETTLE_MS = 220;
 
 const getEmployeeId = (employee: Employee) => employee.id;
-
-type BulkStaffAction = "deactivate" | "activate" | "restore" | "remove";
-
-const BULK_STATUS_ACTIONS: Record<BulkStaffAction, StatusAction> = {
-  deactivate: "markAway",
-  activate: "markActive",
-  restore: "restore",
-  remove: "archive",
-};
-
-const BULK_STATUS_CONCURRENCY = 3;
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -166,13 +164,18 @@ export interface MembersSectionProps {
   /** Live absence types, offered for an Away person's days. */
   absenceTypes?: readonly AbsenceType[];
   statusStepUpOpen?: boolean;
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
+  /** The bulk bar's status changes (51h); absent, the bar offers none. */
+  onBulkStatusChange?: BulkStatusChangeHandler;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -209,7 +212,9 @@ export function MembersSection({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
+  onBulkStatusChange,
   onAdd,
   canViewEmployeeDetails,
   canManageEmployees,
@@ -272,6 +277,15 @@ export function MembersSection({
         employees
           .filter((employee) => employee.suspendedAt)
           .map((employee) => [employee.id, employee.suspendedAt ?? null]),
+      ),
+    [employees],
+  );
+  const suspendedUntilByEmployeeId = useMemo(
+    () =>
+      new Map(
+        employees
+          .filter((employee) => employee.suspendedAt && employee.suspendedUntil)
+          .map((employee) => [employee.id, employee.suspendedUntil ?? null]),
       ),
     [employees],
   );
@@ -445,7 +459,8 @@ export function MembersSection({
     };
   }, [filterOpen]);
 
-  const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } = useStaffSelection();
+  const { selectedIds, toggleSelect, toggleSelectAll, clearSelection, selectOnly } =
+    useStaffSelection();
   const reorder = useStaffReorder({ sorted, onSave });
   const {
     isReordering,
@@ -494,12 +509,8 @@ export function MembersSection({
   const [inviteEmployee, setInviteEmployee] = useState<Employee | null>(null);
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [, setRevokingId] = useState<string | null>(null);
-  const [bulkConfirm, setBulkConfirm] = useState<{
-    action: BulkStaffAction;
-    employeeIds: string[];
-  } | null>(null);
-  const [bulkNote, setBulkNote] = useState("");
-  const [isBulkActionRunning, setIsBulkActionRunning] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<BulkStatusDialogState | null>(null);
+  const [bulkStatusRunning, setBulkStatusRunning] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(false);
 
   const replacePendingInvitationRole = (
@@ -683,77 +694,54 @@ export function MembersSection({
     }
   }
 
-  async function handleConfirmBulkAction() {
-    if (!bulkConfirm || isBulkActionRunning) return;
-
-    const pendingAction = bulkConfirm;
-    const trimmedNote = bulkNote.trim() || undefined;
-
-    // Pre-filter the actor's own employee row. The backend rejects self-actions
-    // with a 403; dropping the id up front avoids the predictable failure and
-    // lets us run the rest in parallel without a noisy "1 failed" toast.
-    const cachedEmployees = orgId
-      ? queryClient.getQueryData<Employee[]>(queryKeys.employees.all(orgId))
-      : null;
-    const targetIds = pendingAction.employeeIds.filter((employeeId) => {
-      const emp = cachedEmployees?.find((e) => e.id === employeeId) ?? null;
-      return !emp || !isSelfAction(currentUserId, emp.userId);
+  function openBulkStatus(plan: BulkStatusPlan<Employee>) {
+    setBulkStatus({
+      action: plan.action,
+      eligible: plan.eligible.map((employee) => ({
+        ...employee,
+        name: getEmployeeDisplayName(employee),
+      })),
+      skipped: plan.skipped.map(({ person, reason }) => ({
+        id: person.id,
+        name: getEmployeeDisplayName(person),
+        reason,
+      })),
+      note: "",
+      returnDate: "",
+      result: null,
     });
-    const droppedSelfCount = pendingAction.employeeIds.length - targetIds.length;
+  }
 
-    if (targetIds.length === 0) {
-      toast.error("You can't run that action on your own account.");
-      setBulkConfirm(null);
-      setBulkNote("");
-      return;
-    }
-
-    setIsBulkActionRunning(true);
+  async function handleConfirmBulkStatus() {
+    if (!bulkStatus || bulkStatusRunning || !onBulkStatusChange) return;
+    const { action, eligible, note, returnDate } = bulkStatus;
+    setBulkStatusRunning(true);
     try {
-      const change = (employeeId: string): unknown => {
-        if (pendingAction.action === "deactivate") return onDeactivate(employeeId, trimmedNote);
-        if (pendingAction.action === "activate" || pendingAction.action === "restore") {
-          return onActivate(employeeId);
-        }
-        return onRemove(employeeId, trimmedNote);
-      };
-      // Three at a time keeps a large bulk inside the status route's rate limit (F-103).
-      const results = await mapInBatches(
-        targetIds,
-        BULK_STATUS_CONCURRENCY,
-        (employeeId): Promise<PromiseSettledResult<unknown>> =>
-          Promise.resolve()
-            .then(() => change(employeeId))
-            .then(
-              (value) => ({ status: "fulfilled", value }),
-              (reason: unknown) => ({ status: "rejected", reason }),
-            ),
+      const outcomes = await onBulkStatusChange(
+        action,
+        eligible.map((person) => person.id),
+        {
+          ...(note.trim() ? { note: note.trim() } : {}),
+          ...(action === "markAway" && returnDate ? { returnDate } : {}),
+        },
       );
-      // A handler resolves false for a change it could not make or a cancelled prompt.
-      const succeeded = results.filter((r) => r.status === "fulfilled" && r.value !== false).length;
-      const failed = results.length - succeeded;
-
-      if (failed === 0 && droppedSelfCount === 0) {
-        toast.success(`${succeeded} ${succeeded === 1 ? "person" : "people"} updated`);
-      } else if (failed === 0) {
-        toast.success(
-          `${succeeded} updated. Your own account was skipped (you can't run that action on yourself).`,
-        );
-      } else if (succeeded === 0) {
-        toast.error(
-          `Couldn't update ${failed} ${failed === 1 ? "person" : "people"}. Refresh and try again.`,
-        );
-      } else {
-        toast.error(
-          `${succeeded} updated, ${failed} failed. Refresh and retry the ones that didn't go through.`,
-        );
+      // Cancelled or refused as a whole (already reported): stay open to retry.
+      if (!outcomes) return;
+      const notChanged = describeBulkStatusFailures(outcomes, eligible);
+      if (notChanged.length === 0) {
+        toast.success(describeBulkStatusAction(action, eligible).done);
+        setBulkStatus(null);
+        clearSelection();
+        return;
       }
-
-      setBulkConfirm(null);
-      setBulkNote("");
-      clearSelection();
+      // Only the people still to deal with stay selected.
+      selectOnly(notChanged.map((person) => person.id));
+      setBulkStatus({
+        ...bulkStatus,
+        result: { changed: eligible.length - notChanged.length, notChanged },
+      });
     } finally {
-      setIsBulkActionRunning(false);
+      setBulkStatusRunning(false);
     }
   }
 
@@ -1566,22 +1554,14 @@ export function MembersSection({
                 setInviteEmployee(employeesToInvite[0]);
                 setInviteQueue(employeesToInvite.slice(1));
               }}
-              onBulkDeactivate={(employeeIds) => {
-                setBulkNote("");
-                setBulkConfirm({ action: "deactivate", employeeIds });
-              }}
-              onBulkRestore={(employeeIds) => {
-                setBulkNote("");
-                setBulkConfirm({ action: "restore", employeeIds });
-              }}
-              onBulkActivate={(employeeIds) => {
-                setBulkNote("");
-                setBulkConfirm({ action: "activate", employeeIds });
-              }}
-              onBulkRemove={(employeeIds) => {
-                setBulkNote("");
-                setBulkConfirm({ action: "remove", employeeIds });
-              }}
+              onBulkStatus={onBulkStatusChange ? openBulkStatus : undefined}
+              canOffboard={(employee) =>
+                canOffboardAtTier(
+                  { isSuperAdmin: !!isSuperAdmin, isGridmaster: !!isGridmaster },
+                  effectiveOrgRoleByEmployeeId.get(employee.id),
+                )
+              }
+              currentUserId={currentUserId}
               onClearSelection={clearSelection}
               isReordering={isReordering}
               isDirty={isDirty}
@@ -1921,6 +1901,9 @@ export function MembersSection({
                             person.employeeId
                               ? suspendedAtByEmployeeId.get(person.employeeId)
                               : null,
+                            person.employeeId
+                              ? suspendedUntilByEmployeeId.get(person.employeeId)
+                              : null,
                           );
                       const isSuspended =
                         !!person.employeeId && suspendedAtByEmployeeId.has(person.employeeId);
@@ -2223,9 +2206,10 @@ export function MembersSection({
           onDeactivate={onDeactivate}
           onSetReturnDate={onSetReturnDate}
           absenceTypes={absenceTypes}
-          onActivate={(employeeId) => onActivate(employeeId)}
+          onActivate={(employeeId, startDate) => onActivate(employeeId, startDate)}
           onReinstate={onReinstate}
           onSuspend={onSuspend}
+          onSetSuspendedUntil={onSetSuspendedUntil}
           onSetPlannedChange={onSetPlannedChange}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
@@ -2552,70 +2536,17 @@ export function MembersSection({
           );
         })()}
 
-      {bulkConfirm && !statusStepUpOpen
-        ? (() => {
-            const count = bulkConfirm.employeeIds.length;
-            const showReason =
-              bulkConfirm.action === "deactivate" || bulkConfirm.action === "remove";
-            const only =
-              count === 1
-                ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
-                    (employee) => employee.id === bulkConfirm.employeeIds[0],
-                  )
-                : undefined;
-            const copy = only
-              ? describeStatusAction(
-                  BULK_STATUS_ACTIONS[bulkConfirm.action],
-                  getEmployeeDisplayName(only),
-                  {
-                    hasAccount: Boolean(only.userId),
-                    plannedFrom: only.plannedFrom ?? null,
-                    plannedStatus: only.plannedStatus ?? null,
-                  },
-                )
-              : describeStatusAction(
-                  BULK_STATUS_ACTIONS[bulkConfirm.action],
-                  count === 1 ? "1 person" : `${count} people`,
-                  {
-                    group: count !== 1,
-                  },
-                );
-            return (
-              <ConfirmDialog
-                title={copy.title}
-                message={
-                  showReason ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                      {copy.message ? <span>{copy.message}</span> : null}
-                      <input
-                        className="dg-input"
-                        value={bulkNote}
-                        onChange={(e) => setBulkNote(e.target.value)}
-                        disabled={isBulkActionRunning}
-                        placeholder="Reason (optional, applies to all selected)"
-                        aria-label="Reason (optional)"
-                        style={{ fontSize: "var(--dg-fs-label)", width: "100%" }}
-                      />
-                    </div>
-                  ) : (
-                    copy.message || undefined
-                  )
-                }
-                summary={{ points: [...copy.points, ...copy.unchanged] }}
-                confirmLabel={copy.label}
-                variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
-                isLoading={isBulkActionRunning}
-                onConfirm={handleConfirmBulkAction}
-                onCancel={() => {
-                  if (!isBulkActionRunning) {
-                    setBulkConfirm(null);
-                    setBulkNote("");
-                  }
-                }}
-              />
-            );
-          })()
-        : null}
+      {bulkStatus && !statusStepUpOpen ? (
+        <BulkStatusDialog
+          state={bulkStatus}
+          onChange={setBulkStatus}
+          onConfirm={handleConfirmBulkStatus}
+          running={bulkStatusRunning}
+          onClose={() => {
+            if (!bulkStatusRunning) setBulkStatus(null);
+          }}
+        />
+      ) : null}
 
       {exportConfirm ? (
         <ConfirmDialog

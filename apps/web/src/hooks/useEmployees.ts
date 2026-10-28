@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
+  changeEmployeeStatuses,
   reinstateEmployee,
   suspendEmployee,
+  setEmployeeSuspendedUntil,
   deactivateEmployee,
   EmployeeProfileConflictError,
   EmployeeStatusConflictError,
+  FocusAreaShiftsCancelledError,
   fetchEmployees,
   insertEmployee,
   removeEmployee,
@@ -14,12 +17,20 @@ import {
   plannedChangeToast,
   setEmployeeReturnDate,
   updateEmployee,
+  type BulkStatusOutcome,
   type PlannedChange,
+  type SuspensionDates,
+  type UpdateEmployeeOptions,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import { toast } from "sonner";
-import { SELF_ACTION_FORBIDDEN_MESSAGE, SelfActionForbiddenError } from "@dubgrid/domain";
+import {
+  removedFocusAreaIds,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+  SelfActionForbiddenError,
+  type BulkStatusAction,
+} from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -74,11 +85,33 @@ export interface EmployeesData {
     plan: PlannedChange | null,
     accessToken?: string,
   ) => Promise<boolean>;
-  handleActivateEmployee: (empId: string) => Promise<void>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  handleActivateEmployee: (empId: string, startDate?: string) => Promise<void>;
   /** Gives a suspended person their access back (51c). */
   handleReinstateEmployee: (empId: string) => Promise<void>;
-  /** A step-up refusal is rethrown for the caller to prompt. */
-  handleSuspendEmployee: (empId: string, accessToken?: string) => Promise<boolean>;
+  /**
+   * Suspends someone now or from a later start, until an end date when given
+   * (51g3). A step-up refusal is rethrown for the caller to prompt.
+   */
+  handleSuspendEmployee: (
+    empId: string,
+    accessToken?: string,
+    dates?: SuspensionDates,
+  ) => Promise<boolean>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  handleSetSuspendedUntil: (empId: string, until: string | null) => Promise<boolean>;
+  /**
+   * One status change for several people (51h): saved rows and refreshed
+   * conflicts go into the list, with no toast per person. Resolves each
+   * person's outcome; throws when the whole request was refused, a step-up
+   * prompt included, for the caller to handle.
+   */
+  handleBulkStatusChange: (
+    action: BulkStatusAction,
+    empIds: readonly string[],
+    options?: { note?: string; returnDate?: string | null },
+    accessToken?: string,
+  ) => Promise<BulkStatusOutcome[]>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   handleSetEmployeeReturnDate: (
     empId: string,
@@ -98,8 +131,22 @@ export function employeesQueryOptions(orgId: string) {
   });
 }
 
-export function useEmployees(orgId: string | null): EmployeesData {
+function mayAskAboutShifts(rows: readonly Employee[], emp: Employee): boolean {
+  const previous = rows.find((row) => row.id === emp.id);
+  return previous ? removedFocusAreaIds(previous.focusAreaIds, emp.focusAreaIds).length > 0 : false;
+}
+
+export interface UseEmployeesOptions {
+  /** How a save of this person asks about their shifts in focus areas they come off (51i). */
+  saveOptionsFor?: (emp: Employee) => UpdateEmployeeOptions;
+}
+
+export function useEmployees(
+  orgId: string | null,
+  options: UseEmployeesOptions = {},
+): EmployeesData {
   const queryClient = useQueryClient();
+  const saveOptionsForRef = useLatestRef(options.saveOptionsFor);
 
   // Subscribe to org-wide CDC so adds/edits made elsewhere (e.g. /people in
   // another tab, or another step in the onboarding wizard) invalidate this
@@ -193,9 +240,18 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // rollback could fire with the closure variable still at its initial
       // value and wipe the list instead of restoring it.
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      // A save that may ask about their shifts waits for the answer: showing it
+      // early and rolling it back on Cancel would reset the open form.
+      if (!mayAskAboutShifts(prevAll, emp)) {
+        setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      }
       try {
-        const savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        const savedEmployee = await updateEmployee(
+          emp,
+          orgId,
+          emp.version,
+          saveOptionsForRef.current?.(emp),
+        );
         setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         // One id, so a reorder's many saves show one toast.
         toast.success("Employee saved", { id: "employee-saved" });
@@ -216,6 +272,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         if (previous) {
           setAllLocal((prev) => prev.map((row) => (row.id === emp.id ? previous : row)));
         }
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
         return false;
@@ -228,11 +285,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
     async (emp: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      // A save that may ask about their shifts waits for the answer: showing it
+      // early and rolling it back on Cancel would reset the open form.
+      if (!mayAskAboutShifts(prevAll, emp)) {
+        setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      }
 
       let savedEmployee: Employee;
       try {
-        savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        savedEmployee = await updateEmployee(
+          emp,
+          orgId,
+          emp.version,
+          saveOptionsForRef.current?.(emp),
+        );
         setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         invalidateEmployees();
       } catch (err) {
@@ -242,6 +308,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           return false;
         }
         setAllLocal(prevAll);
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
         return false;
@@ -430,7 +497,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleSuspendEmployee = useCallback(
-    async (empId: string, accessToken?: string) => {
+    async (empId: string, accessToken?: string, dates?: SuspensionDates) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
       try {
@@ -439,9 +506,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
           orgId,
           targetEmployee.version,
           accessToken,
+          dates,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Suspended");
+        toast.success(updatedEmployee.suspendedAt ? "Suspended" : "Suspension scheduled");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -452,6 +520,35 @@ export function useEmployees(orgId: string | null): EmployeesData {
         }
         if (getStepUpMethod(err)) throw err;
         toast.error(formatClientErrorMessage(err, "We couldn't suspend them. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleSetSuspendedUntil = useCallback(
+    async (empId: string, until: string | null) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return false;
+      try {
+        const updatedEmployee = await setEmployeeSuspendedUntil(
+          empId,
+          orgId,
+          targetEmployee.version,
+          until,
+        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+        toast.success(until ? "End date saved" : "End date cleared");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        toast.error(formatClientErrorMessage(err, "We couldn't save the end date. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -482,9 +579,34 @@ export function useEmployees(orgId: string | null): EmployeesData {
   );
 
   const handleActivateEmployee = useCallback(
-    async (empId: string) => {
+    async (empId: string, startDate?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return;
+      if (startDate) {
+        try {
+          const updatedEmployee = await activateEmployee(
+            empId,
+            orgId,
+            targetEmployee.version,
+            startDate,
+          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+          toast.success("Restore scheduled");
+          invalidateEmployees();
+        } catch (err) {
+          if (err instanceof EmployeeStatusConflictError) {
+            setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+            toast.error(
+              "Employee status changed elsewhere. Review the latest values and try again.",
+            );
+            return;
+          }
+          toast.error(
+            formatClientErrorMessage(err, "We couldn't schedule the restore. Try again."),
+          );
+        }
+        return;
+      }
 
       const now = new Date().toISOString();
       const prevAll = allEmployeesRef.current;
@@ -520,6 +642,34 @@ export function useEmployees(orgId: string | null): EmployeesData {
         toast.error("We couldn't change their status. Try again.");
         Sentry.captureException(err);
       }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleBulkStatusChange = useCallback(
+    async (
+      action: BulkStatusAction,
+      empIds: readonly string[],
+      options: { note?: string; returnDate?: string | null } = {},
+      accessToken?: string,
+    ) => {
+      if (!orgId) return [];
+      const people = empIds.flatMap((empId) => {
+        const employee = allEmployeesRef.current.find((e) => e.id === empId);
+        return employee ? [{ empId, expectedVersion: employee.version }] : [];
+      });
+      if (people.length === 0) return [];
+      const outcomes = await changeEmployeeStatuses(
+        { orgId, action, people, ...options },
+        accessToken,
+      );
+      // A conflict carries the latest row, so the list shows what changed elsewhere.
+      const rows = outcomes.flatMap((outcome) => (outcome.employee ? [outcome.employee] : []));
+      if (rows.length > 0) {
+        setAllLocal((prev) => rows.reduce((list, row) => replaceEmployeeRow(list, row), prev));
+        invalidateEmployees();
+      }
+      return outcomes;
     },
     [orgId, invalidateEmployees],
   );
@@ -567,7 +717,9 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleActivateEmployee,
     handleReinstateEmployee,
     handleSuspendEmployee,
+    handleSetSuspendedUntil,
     handleSetEmployeeReturnDate,
     handleSetPlannedChange,
+    handleBulkStatusChange,
   };
 }

@@ -93,8 +93,11 @@ vi.mock("../../profile/hooks/useMobileStepUpAction", () => ({
   useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
 
+const updateMobilePerson = vi.fn();
+
 vi.mock("../../../shared/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/lib/api")>()),
+  updateMobilePerson: (...args: unknown[]) => updateMobilePerson(...args),
   requireMobileCredentialAssurance: (accessToken: string) =>
     requireMobileCredentialAssurance(accessToken),
 }));
@@ -155,6 +158,7 @@ describe("PersonDetailScreen", () => {
     });
     useBootstrap.mockReturnValue({
       data: {
+        effectiveRole: "super_admin",
         currentOrg: {
           labels: {
             focusArea: "Focus Areas",
@@ -287,6 +291,42 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Super Admin Access")).not.toBeInTheDocument();
     expect(screen.queryByText("·")).not.toBeInTheDocument();
+  });
+
+  it("shows a new hire's first day on a dashed card and the record (51g4)", () => {
+    const firstDay = addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), 12);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ firstDay }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    const card = within(screen.getByTestId("starts-card"));
+    expect(card.getByText("First day")).toBeInTheDocument();
+    expect(
+      card.getByText(`Starts ${formatReturnDate(firstDay, { weekday: true })}`),
+    ).toBeInTheDocument();
+    expect(card.getByText("Can't be scheduled before then.")).toBeInTheDocument();
+    expect(screen.getByLabelText(`Starts ${formatReturnDate(firstDay)}`)).toBeInTheDocument();
+  });
+
+  it("keeps a past first day on the record without the card (51g4)", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ firstDay: "2019-03-04" }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.queryByTestId("starts-card")).not.toBeInTheDocument();
+    expect(screen.getByText("Mar 4, 2019")).toBeInTheDocument();
   });
 
   // The avatar's corner used to carry a status dot. The tier's insignia sits
@@ -1338,6 +1378,23 @@ describe("PersonDetailScreen", () => {
       );
     });
 
+    it("lists Offboarded disabled when an Admin looks at a Super Admin (51k)", () => {
+      const manager = useBootstrap();
+      useBootstrap.mockReturnValue({
+        ...manager,
+        data: { ...manager.data, effectiveRole: "admin" },
+      });
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      const offboard = screen.getByRole("radio", { name: /^Offboarded/ });
+      expect(offboard).toHaveAttribute("aria-disabled", "true");
+      expect(offboard).toHaveAccessibleName(
+        "Offboarded. Only a Super Admin can offboard a Super Admin.",
+      );
+    });
+
     it("names the picked change in the title and keeps what stays apart", () => {
       renderWithStatusMutation();
 
@@ -1509,6 +1566,142 @@ describe("PersonDetailScreen", () => {
         action: "cancelPlannedChange",
         copyAction: "cancelPlannedChange",
       });
+    });
+
+    it("suspends until an end date, and schedules a suspension for later (51g3)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+      fireEvent.click(screen.getByRole("button", { name: "Ends, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(`They get access back on ${formatReturnDate(day(3), { weekday: true })}.`),
+      ).toBeInTheDocument();
+      confirm("Suspend");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        copyAction: "suspend",
+        returnDate: day(3),
+        startDate: undefined,
+      });
+      cleanup();
+
+      const later = renderWithStatusMutation();
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(2));
+      expect(
+        screen.getByText(
+          `They keep their access until ${formatReturnDate(day(2), { weekday: true })}.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Schedule suspension");
+      expect(later.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        startDate: day(2),
+        returnDate: undefined,
+      });
+    });
+
+    it("changes a suspended person's end date from the card's menu", async () => {
+      const mutate = renderWithStatusMutation({
+        suspendedAt: "2026-10-26T12:00:00Z",
+        suspendedUntil: day(9),
+      });
+
+      expect(
+        screen.getByText(`Suspended until ${formatReturnDate(day(9), { weekday: true })}`),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Change end date" }));
+      await waitFor(() =>
+        expect(screen.getByText("Change when Mina Diaz's suspension ends?")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
+      fireEvent.click(screen.getByRole("button", { name: "No end date" }));
+      confirm("Save changes");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setSuspendedUntil",
+        copyAction: "setSuspendedUntil",
+        returnDate: null,
+      });
+    });
+
+    it("moves, cancels and starts a planned suspension from Edit plan", () => {
+      const planned = {
+        plannedStatus: "suspended" as const,
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      };
+      const mutate = renderWithStatusMutation(planned);
+
+      expect(
+        screen.getAllByText(`Suspended from ${formatReturnDate(day(5), { weekday: true })}`).length,
+      ).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Clear it to suspend them today.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
+      choose(day(12));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        startDate: day(5),
+        returnDate: day(12),
+        fromPlannedStatus: "suspended",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(planned);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned suspension" }));
+      confirm("Cancel planned suspension");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(planned);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Today" }));
+      expect(screen.getByText("Suspend Mina Diaz?")).toBeInTheDocument();
+      confirm("Suspend");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        startDate: undefined,
+        returnDate: day(9),
+      });
+    });
+
+    it("lists Suspended disabled, pointing at Edit plan, while a suspension is planned", () => {
+      renderWithStatusMutation({ plannedStatus: "suspended", plannedFrom: day(5) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      const suspend = screen.getByRole("radio", { name: /^Suspended/ });
+      expect(suspend).toHaveAttribute("aria-disabled", "true");
+      expect(suspend.getAttribute("aria-label")).toBe(
+        `Suspended. Planned from ${formatReturnDate(day(5), { weekday: true })}. Change it with Edit plan.`,
+      );
+    });
+
+    it("offers Starts and Last day no further than a year ahead", () => {
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      fireEvent.click(screen.getByRole("button", { name: "Last day, none" }));
+      for (let month = 0; month < 12; month++) {
+        fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+      }
+
+      expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", {
+          name: `Choose ${formatReturnDate(day(366), { weekday: true })}`,
+        }),
+      ).toBeDisabled();
     });
 
     it("sets a last day through Offboard (51g2)", () => {
@@ -1729,12 +1922,75 @@ describe("PersonDetailScreen", () => {
         copyAction: "restore",
       });
     });
+
+    it("restores on a later date (51l)", () => {
+      const mutate = renderWithStatusMutation({ status: "removed" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      expect(screen.getByText("Leave it empty to restore them today.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(
+          `They stay Offboarded until ${formatReturnDate(day(3), { weekday: true })}.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Schedule restore");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "activate",
+        copyAction: "restore",
+        startDate: day(3),
+      });
+    });
+
+    it("moves, cancels and clears a planned return from Edit plan (51l)", () => {
+      const returning = {
+        status: "removed" as const,
+        plannedStatus: "active" as const,
+        plannedFrom: day(5),
+      };
+      const mutate = renderWithStatusMutation(returning);
+
+      expect(
+        screen.getByText(`Returns ${formatReturnDate(day(5), { weekday: true })}`),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Change Mina Diaz's planned return?")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      choose(day(7));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        copyAction: "setPlannedChange",
+        startDate: day(7),
+        fromPlannedStatus: "active",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(returning);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned return" }));
+      confirm("Cancel planned return");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(returning);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Today" }));
+      expect(screen.getByText("Restore Mina Diaz?")).toBeInTheDocument();
+      confirm("Restore");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({ action: "activate", startDate: undefined });
+    });
   });
 
   describe("page layout", () => {
     function renderAsManager(person: Record<string, unknown>) {
       useBootstrap.mockReturnValue({
         data: {
+          effectiveRole: "super_admin",
           currentOrg: {
             labels: {
               focusArea: "Focus Areas",
@@ -2288,6 +2544,129 @@ describe("PersonDetailScreen", () => {
         pathname: "/person/[id]/schedule",
         params: { id: "emp-1" },
       });
+    });
+  });
+  describe("losing a focus area (51i)", () => {
+    const refusal = new ApiResponseError("Choose", 409, {
+      code: "FOCUS_AREA_SHIFTS_DECISION",
+      error: "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+      focusAreaShifts: [
+        {
+          focusAreaId: 5,
+          focusAreaName: "East Wing",
+          count: 2,
+          firstDate: "2026-11-03",
+          lastDate: "2026-11-05",
+        },
+      ],
+    });
+
+    function renderEditing() {
+      // The save runs for real through the mutation, so the question it asks is on screen.
+      useMutation.mockImplementation(
+        (options: {
+          mutationFn: (variables: unknown) => Promise<unknown>;
+          onSuccess?: (result: unknown) => unknown;
+          onError?: (error: unknown) => void;
+        }) => ({
+          error: null,
+          isPending: false,
+          mutate: vi.fn(),
+          mutateAsync: async (variables: unknown) => {
+            try {
+              const result = await options.mutationFn(variables);
+              await options.onSuccess?.(result);
+              return result;
+            } catch (error) {
+              options.onError?.(error);
+            }
+          },
+        }),
+      );
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [
+            { id: 2, name: "Skilled Nursing", departmentId: 4 },
+            { id: 5, name: "East Wing", departmentId: 4 },
+          ],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [{ id: 4, name: "North Wing" }],
+          permissions: { canManageEmployees: true, canViewEmployeeDetails: true },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      const person = makePerson({ focusAreaIds: [2, 5] });
+      useQuery.mockReturnValue({
+        data: { person },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      render(<PersonDetailScreen />);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "East Wing" }));
+      return person;
+    }
+
+    beforeEach(() => {
+      updateMobilePerson.mockReset();
+    });
+
+    it("asks before saving, and sends the save again with Keep shifts", async () => {
+      const person = renderEditing();
+      updateMobilePerson.mockImplementation(
+        async (_token, _id, body: { focusAreaShifts?: string }) => {
+          if (!body.focusAreaShifts) throw refusal;
+          return { success: true, person: { ...person, focusAreaIds: [2], version: 8 } };
+        },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(
+        await screen.findByText(
+          `Clear ${person.firstName} ${person.lastName}'s upcoming shifts in East Wing?`,
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Keep shifts" }));
+
+      await waitFor(() => expect(updateMobilePerson).toHaveBeenCalledTimes(2));
+      expect(updateMobilePerson.mock.calls[0]![2]).not.toHaveProperty("focusAreaShifts");
+      expect(updateMobilePerson.mock.calls[1]![2]).toMatchObject({
+        focusAreaIds: [2],
+        focusAreaShifts: "keep",
+      });
+      await waitFor(() =>
+        expect(pushToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Person saved" })),
+      );
+    });
+
+    it("keeps the form open, unsaved, when the question is closed", async () => {
+      renderEditing();
+      updateMobilePerson.mockRejectedValue(refusal);
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await screen.findByText(/upcoming shifts in East Wing\?$/);
+      fireEvent.click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
+
+      await waitFor(() =>
+        expect(screen.queryByText(/upcoming shifts in East Wing\?$/)).not.toBeInTheDocument(),
+      );
+      expect(updateMobilePerson).toHaveBeenCalledTimes(1);
+      expect(pushToast).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     });
   });
 });

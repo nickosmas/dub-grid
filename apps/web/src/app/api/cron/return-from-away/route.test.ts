@@ -7,6 +7,10 @@ const updateMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
 const cacheDel = vi.fn();
 const endOffboardedAccess = vi.fn();
+const reopenRestoredAccess = vi.fn();
+const endUserSessions = vi.fn();
+const disablePush = vi.fn();
+const scheduleSuspensionNotice = vi.fn();
 /** org_role by "<userId>:<orgId>", and platform_role by user id. */
 const orgRoles = new Map<string, string>();
 const platformRoles = new Map<string, string>();
@@ -14,6 +18,19 @@ const superAdminCount = vi.fn(() => 2);
 
 vi.mock("@/features/employees/server/offboard-access", () => ({
   endOffboardedAccess: (...args: unknown[]) => endOffboardedAccess(...args),
+  reopenRestoredAccess: (...args: unknown[]) => reopenRestoredAccess(...args),
+}));
+
+vi.mock("@/features/employees/server/suspension-notice", () => ({
+  scheduleSuspensionNotice: (...args: unknown[]) => scheduleSuspensionNotice(...args),
+}));
+
+vi.mock("@/lib/auth/revocation", () => ({
+  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
+}));
+
+vi.mock("@dubgrid/data-access", () => ({
+  disableMobilePushTokensForOrg: (...args: unknown[]) => disablePush(...args),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -123,10 +140,34 @@ function planned(id: string, orgId: string, from: string, until: string | null, 
   };
 }
 
-/** The planned-away read gets `plans`, the last-day read `lastDays`, the return read `aways`. */
-function rows(plans: unknown[], aways: unknown[] = [], lastDays: unknown[] = []) {
+/**
+ * The planned-away read gets `plans`, the last-day read `lastDays`, the
+ * return read `aways`, the ended-suspension read `ending`, the
+ * planned-suspension read `suspensions` and the planned-return read `returns`.
+ */
+function rows(
+  plans: unknown[],
+  aways: unknown[] = [],
+  lastDays: unknown[] = [],
+  {
+    ending = [],
+    suspensions = [],
+    returns = [],
+  }: { ending?: unknown[]; suspensions?: unknown[]; returns?: unknown[] } = {},
+) {
   selectLte.mockImplementation(async (column: string, _bound: string, plannedStatus: unknown) => ({
-    data: column !== "planned_from" ? aways : plannedStatus === "removed" ? lastDays : plans,
+    data:
+      column === "suspended_until"
+        ? ending
+        : column !== "planned_from"
+          ? aways
+          : plannedStatus === "removed"
+            ? lastDays
+            : plannedStatus === "suspended"
+              ? suspensions
+              : plannedStatus === "active"
+                ? returns
+                : plans,
     error: null,
   }));
 }
@@ -215,6 +256,9 @@ describe("GET /api/cron/return-from-away", () => {
       ok: true,
       started: 0,
       offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });
@@ -261,6 +305,9 @@ describe("GET /api/cron/return-from-away", () => {
       ok: true,
       started: 0,
       offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });
@@ -271,7 +318,15 @@ describe("GET /api/cron/return-from-away", () => {
   it("does nothing when nobody is due", async () => {
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 0, offboarded: 0, returned: 0 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 0,
+      offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
+      returned: 0,
+    });
     expect(updateEmployee).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
@@ -289,6 +344,9 @@ describe("GET /api/cron/return-from-away", () => {
       ok: true,
       started: 0,
       offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
       returned: 0,
       skipped: 1,
     });
@@ -300,7 +358,15 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, started: 1, offboarded: 0, returned: 0 });
+    expect(await res.json()).toEqual({
+      ok: true,
+      started: 1,
+      offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
+      returned: 0,
+    });
     expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28", "away");
     expect(updateEmployee).toHaveBeenCalledWith(
       {
@@ -380,7 +446,6 @@ describe("GET /api/cron/return-from-away", () => {
       empId: "emp-la",
       userId: "user-emp-la",
       actorId: "manager-1",
-      endMembership: true,
       at: "2026-10-27T01:00:00.000Z",
     });
     expect(auditInsert).toHaveBeenCalledWith([
@@ -393,7 +458,7 @@ describe("GET /api/cron/return-from-away", () => {
     ]);
   });
 
-  it("keeps the membership when an admin set the last day, and ends it for a Gridmaster", async () => {
+  it("ends the membership whoever planned the last day (51k)", async () => {
     orgRoles.set("manager-1:org-la", "admin");
     platformRoles.set("gm-1", "gridmaster");
     rows(
@@ -407,10 +472,10 @@ describe("GET /api/cron/return-from-away", () => {
 
     await GET(makeReq());
 
-    expect(endOffboardedAccess.mock.calls.map((call) => call[1].endMembership)).toEqual([
-      false,
+    expect(endOffboardedAccess.mock.calls.map((call) => call[1].empId)).toEqual(["emp-1", "emp-2"]);
+    expect(endOffboardedAccess.mock.calls.every((call) => !("endMembership" in call[1]))).toBe(
       true,
-    ]);
+    );
   });
 
   it("waits while their last day is still today in the organization's timezone", async () => {
@@ -445,6 +510,263 @@ describe("GET /api/cron/return-from-away", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
+  describe("planned returns (51l)", () => {
+    function returning(id: string, from: string, timezone: string) {
+      return {
+        id,
+        org_id: "org-la",
+        user_id: `user-${id}`,
+        planned_from: from,
+        planned_by: "manager-1",
+        version: 7,
+        organization: { timezone },
+      };
+    }
+
+    it("restores someone whose return is today, as a manual Restore does", async () => {
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(1);
+      expect(updateEmployee).toHaveBeenCalledWith(
+        {
+          status: "active",
+          status_note: "",
+          away_until: null,
+          archived_at: null,
+          status_changed_at: "2026-10-27T01:00:00.000Z",
+          updated_by: "manager-1",
+          version: 8,
+        },
+        [
+          ["id", "emp-la"],
+          ["org_id", "org-la"],
+          ["version", 7],
+        ],
+      );
+      expect(reopenRestoredAccess).toHaveBeenCalledWith(expect.anything(), {
+        orgId: "org-la",
+        empId: "emp-la",
+        userId: "user-emp-la",
+      });
+      expect(auditInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          action: "employee.activated",
+          actor_id: null,
+          resource_id: "emp-la",
+          details: expect.objectContaining({
+            fromStatus: "removed",
+            toStatus: "active",
+            returnDate: "2026-10-26",
+          }),
+        }),
+      ]);
+      expect(cacheDel).toHaveBeenCalledWith("dg:org:org-la:employees");
+    });
+
+    it("waits while their return is still tomorrow in the organization's timezone", async () => {
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-27", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(0);
+      expect(updateEmployee).not.toHaveBeenCalled();
+      expect(reopenRestoredAccess).not.toHaveBeenCalled();
+    });
+
+    it("restores where the organization's day has already turned", async () => {
+      rows([], [], [], { returns: [returning("emp-tk", "2026-10-27", "Asia/Tokyo")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(1);
+    });
+
+    it("leaves someone a manager changed meanwhile alone", async () => {
+      updateMaybeSingle.mockResolvedValue({ data: null, error: null });
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(0);
+      expect(reopenRestoredAccess).not.toHaveBeenCalled();
+      expect(auditInsert).not.toHaveBeenCalled();
+    });
+
+    it("restores nobody with the flag off", async () => {
+      isFeatureEnabled.mockResolvedValue(false);
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      await GET(makeReq());
+
+      expect(updateEmployee).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("suspensions with a start and an end (51g3)", () => {
+    function ending(id: string, orgId: string, until: string, timezone: string) {
+      return { id, org_id: orgId, suspended_until: until, version: 7, organization: { timezone } };
+    }
+
+    function plannedSuspension(
+      id: string,
+      orgId: string,
+      from: string,
+      until: string | null,
+      timezone: string,
+      extra: Record<string, unknown> = {},
+    ) {
+      return {
+        id,
+        org_id: orgId,
+        user_id: `user-${id}`,
+        planned_from: from,
+        planned_until: until,
+        planned_by: "manager-1",
+        version: 4,
+        organization: { timezone },
+        ...extra,
+      };
+    }
+
+    it("reinstates someone whose suspension ends today, as a manual Reinstate does", async () => {
+      rows([], [], [], {
+        ending: [
+          ending("emp-la", "org-la", "2026-10-26", "America/Los_Angeles"),
+          ending("emp-later", "org-la", "2026-10-27", "America/Los_Angeles"),
+        ],
+      });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).reinstated).toBe(1);
+      expect(selectLte).toHaveBeenCalledWith("suspended_until", "2026-10-28", undefined);
+      expect(updateEmployee).toHaveBeenCalledTimes(1);
+      expect(updateEmployee).toHaveBeenCalledWith(
+        {
+          suspended_at: null,
+          suspended_by: null,
+          status_changed_at: "2026-10-27T01:00:00.000Z",
+          version: 8,
+        },
+        [
+          ["id", "emp-la"],
+          ["org_id", "org-la"],
+          ["version", 7],
+        ],
+      );
+      expect(auditInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          action: "employee.reinstated",
+          actor_id: null,
+          resource_id: "emp-la",
+          details: { suspendedUntil: "2026-10-26", changedFields: ["suspended_at"] },
+        }),
+      ]);
+    });
+
+    it("suspends someone whose planned suspension starts today, with its end, and follows up", async () => {
+      rows([], [], [], {
+        suspensions: [
+          plannedSuspension("emp-la", "org-la", "2026-10-26", "2026-11-20", "America/Los_Angeles"),
+          plannedSuspension("emp-later", "org-la", "2026-10-27", null, "America/Los_Angeles"),
+        ],
+      });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).suspended).toBe(1);
+      expect(updateEmployee).toHaveBeenCalledTimes(1);
+      expect(updateEmployee).toHaveBeenCalledWith(
+        {
+          suspended_at: "2026-10-27T01:00:00.000Z",
+          suspended_by: "manager-1",
+          suspended_until: "2026-11-20",
+          status_changed_at: "2026-10-27T01:00:00.000Z",
+          updated_by: "manager-1",
+          version: 5,
+        },
+        [
+          ["id", "emp-la"],
+          ["org_id", "org-la"],
+          ["version", 4],
+        ],
+      );
+      expect(endUserSessions).toHaveBeenCalledWith("user-emp-la");
+      expect(disablePush).toHaveBeenCalledWith(expect.anything(), {
+        userId: "user-emp-la",
+        orgId: "org-la",
+      });
+      expect(scheduleSuspensionNotice).toHaveBeenCalledWith({
+        orgId: "org-la",
+        empId: "emp-la",
+        actorId: "manager-1",
+      });
+      expect(auditInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          action: "employee.suspended",
+          actor_id: null,
+          details: {
+            plannedFrom: "2026-10-26",
+            suspendedUntil: "2026-11-20",
+            changedFields: ["suspended_at"],
+          },
+        }),
+      ]);
+    });
+
+    it("drops a plan whose end has come or whose person has no account", async () => {
+      rows([], [], [], {
+        suspensions: [
+          plannedSuspension("emp-1", "org-la", "2026-10-20", "2026-10-26", "America/Los_Angeles"),
+          plannedSuspension("emp-2", "org-la", "2026-10-26", null, "America/Los_Angeles", {
+            user_id: null,
+          }),
+        ],
+      });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).suspended).toBe(0);
+      expect(updateEmployee.mock.calls.map((call) => call[0])).toEqual([
+        { planned_status: null, version: 5 },
+        { planned_status: null, version: 5 },
+      ]);
+      expect(endUserSessions).not.toHaveBeenCalled();
+      expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
+    });
+
+    it("leaves the organization's only Super Admin with their plan", async () => {
+      orgRoles.set("user-emp-la:org-la", "super_admin");
+      superAdminCount.mockReturnValue(1);
+      rows([], [], [], {
+        suspensions: [
+          plannedSuspension("emp-la", "org-la", "2026-10-26", null, "America/Los_Angeles"),
+        ],
+      });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).suspended).toBe(0);
+      expect(updateEmployee).not.toHaveBeenCalled();
+    });
+
+    it("still suspends when signing out fails, which the hook backs up", async () => {
+      endUserSessions.mockRejectedValueOnce(new Error("redis down"));
+      rows([], [], [], {
+        suspensions: [
+          plannedSuspension("emp-la", "org-la", "2026-10-26", null, "America/Los_Angeles"),
+        ],
+      });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).suspended).toBe(1);
+      expect(scheduleSuspensionNotice).toHaveBeenCalled();
+    });
+  });
+
   it("still returns people when starting plans fails", async () => {
     selectLte.mockImplementation(async (column: string) =>
       column === "planned_from"
@@ -458,6 +780,9 @@ describe("GET /api/cron/return-from-away", () => {
       ok: true,
       started: 0,
       offboarded: 0,
+      reinstated: 0,
+      suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });

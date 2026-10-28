@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
 import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
-import { ACCESS_SUSPENDED_BODY, ACCESS_SUSPENDED_TITLE } from "@dubgrid/domain";
+import { ACCESS_SUSPENDED_TITLE, accessSuspendedBody } from "@dubgrid/domain";
 
 export { POST_LOGIN_DESTINATION };
 
@@ -107,10 +107,17 @@ export function useSessionInvalidToast() {
 
 // Shown for code ACCOUNT_SUSPENDED (51c): the hook refuses a suspended
 // employee in this organization. Calm, since nothing is wrong with the account.
-export function AccessSuspendedModal({ onClose }: { onClose: () => void }) {
+export function AccessSuspendedModal({
+  until = null,
+  onClose,
+}: {
+  /** The first day they have access again (51g3), when the suspension has an end. */
+  until?: string | null;
+  onClose: () => void;
+}) {
   return (
     <Modal title={ACCESS_SUSPENDED_TITLE} onClose={onClose} className="dg-modal--account-disabled">
-      <p className="dg-auth-modal-copy">{ACCESS_SUSPENDED_BODY}</p>
+      <p className="dg-auth-modal-copy">{accessSuspendedBody(until)}</p>
       <Button
         type="button"
         onClick={onClose}

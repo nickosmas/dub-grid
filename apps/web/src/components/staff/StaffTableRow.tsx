@@ -1,5 +1,5 @@
 "use client";
-import { describeEmploymentStatus, describePlannedChange } from "@dubgrid/domain";
+import { describeEmploymentStatus, describeUpcomingStatus } from "@dubgrid/domain";
 import { ChevronRight } from "lucide-react";
 
 import { useId, type CSSProperties, type ReactNode } from "react";
@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
+import { formatDateKey } from "@/lib/utils";
 import {
   getInitials,
   getCertAbbr,
@@ -176,8 +177,13 @@ function StaffRowCells({
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil, emp.suspendedAt);
-  const plannedLabel = emp.status === "active" ? describePlannedChange(emp) : null;
+  const statusLabel = describeEmploymentStatus(
+    emp.status,
+    emp.awayUntil,
+    emp.suspendedAt,
+    emp.suspendedUntil,
+  );
+  const plannedLabel = describeUpcomingStatus(emp, formatDateKey(new Date()));
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",

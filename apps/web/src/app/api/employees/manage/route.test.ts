@@ -14,6 +14,8 @@ const requireSensitiveActionAuth = vi.fn();
 const updateUserById = vi.fn();
 const followUpLinkedLoginEmailChange = vi.fn();
 const employeeUpdatePayloads: unknown[] = [];
+const insertPayloads: unknown[] = [];
+const fetchOrgToday = vi.fn();
 const membershipReads: Array<Array<[string, unknown]>> = [];
 let membershipJoinedAt: string | null = null;
 
@@ -31,6 +33,17 @@ vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (...args: unknown[]) => requireAuthenticatedUser(...args),
   forbidIfSandboxCookie: (...args: unknown[]) => forbidIfSandboxCookie(...args),
   requireSensitiveActionAuth: (...args: unknown[]) => requireSensitiveActionAuth(...args),
+}));
+
+vi.mock("@/features/employees/server/org-today", () => ({
+  fetchOrgToday: (...args: unknown[]) => fetchOrgToday(...args),
+}));
+
+const planFocusAreaShifts = vi.fn();
+const clearFocusAreaShiftsAfterSave = vi.fn();
+vi.mock("@/features/employees/server/focus-area-shifts", () => ({
+  planFocusAreaShifts: (...args: unknown[]) => planFocusAreaShifts(...args),
+  clearFocusAreaShiftsAfterSave: (...args: unknown[]) => clearFocusAreaShiftsAfterSave(...args),
 }));
 
 vi.mock("@/features/employees/server/login-email-follow-up", () => ({
@@ -69,9 +82,13 @@ const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 
 function makeServiceClient() {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit", "insert"]) {
+  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit"]) {
     chain[method] = vi.fn(() => chain);
   }
+  chain.insert = vi.fn((payload: unknown) => {
+    insertPayloads.push(payload);
+    return chain;
+  });
   chain.update = vi.fn((payload: unknown) => {
     employeeUpdatePayloads.push(payload);
     return chain;
@@ -169,10 +186,14 @@ function fetchEmployeeByIdRequest() {
   });
 }
 
-function updateEmployeeRequest(overrides: Record<string, unknown> = {}) {
+function updateEmployeeRequest(
+  overrides: Record<string, unknown> = {},
+  body: Record<string, unknown> = {},
+) {
   return new NextRequest("http://localhost/api/employees/manage", {
     method: "POST",
     body: JSON.stringify({
+      ...body,
       action: "updateEmployee",
       orgId: ORG_ID,
       employee: {
@@ -204,6 +225,8 @@ describe("POST /api/employees/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     employeeUpdatePayloads.length = 0;
+    insertPayloads.length = 0;
+    fetchOrgToday.mockResolvedValue("2026-10-28");
     membershipReads.length = 0;
     membershipJoinedAt = null;
     validateCsrfOrigin.mockReturnValue(null);
@@ -216,6 +239,8 @@ describe("POST /api/employees/manage", () => {
     forbidIfSandboxCookie.mockReturnValue(null);
     requireSensitiveActionAuth.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
     updateUserById.mockResolvedValue({ error: null });
+    planFocusAreaShifts.mockResolvedValue({ clear: [] });
+    clearFocusAreaShiftsAfterSave.mockResolvedValue({ cleared: 0 });
   });
 
   it("rejects CSRF failures before parsing or auth", async () => {
@@ -416,6 +441,153 @@ describe("POST /api/employees/manage", () => {
 
       expect(response.status).toBe(200);
       expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+    });
+
+    describe("focus area shifts (51i)", () => {
+      const eastWing = {
+        focusAreaId: 3,
+        focusAreaName: "East Wing",
+        count: 2,
+        firstDate: "2026-11-03",
+        lastDate: "2026-11-05",
+      };
+
+      it("asks the plan with the focus areas before and after and the decision", async () => {
+        mockAuth({ canManageEmployees: true });
+        rowToEmployee.mockReturnValue(makeEmployee({ focusAreaIds: [3, 4] }));
+
+        await POST(updateEmployeeRequest({ focusAreaIds: [4] }, { focusAreaShifts: "keep" }));
+
+        expect(planFocusAreaShifts).toHaveBeenCalledWith(expect.anything(), {
+          orgId: ORG_ID,
+          employeeId: EMPLOYEE_ID,
+          before: [3, 4],
+          after: [4],
+          decision: "keep",
+        });
+      });
+
+      it("refuses a save the plan refuses, before writing anything", async () => {
+        mockAuth({ canManageEmployees: true });
+        const refusal = {
+          error: "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+          code: "FOCUS_AREA_SHIFTS_DECISION",
+          focusAreaShifts: [eastWing],
+        };
+        planFocusAreaShifts.mockResolvedValue({ refuse: refusal });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [4], email: "new@dubgrid.com" }),
+        );
+
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual(refusal);
+        expect(employeeUpdatePayloads).toHaveLength(0);
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(clearFocusAreaShiftsAfterSave).not.toHaveBeenCalled();
+      });
+
+      it("clears the planned areas after the save", async () => {
+        mockAuth({ canManageEmployees: true });
+        planFocusAreaShifts.mockResolvedValue({ clear: [eastWing] });
+        clearFocusAreaShiftsAfterSave.mockResolvedValue({ cleared: 2 });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [4] }, { focusAreaShifts: "clear" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+        expect(clearFocusAreaShiftsAfterSave).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            orgId: ORG_ID,
+            employeeId: EMPLOYEE_ID,
+            firstName: "Mina",
+            lastName: "Diaz",
+            areas: [eastWing],
+            actor: { id: VIEWER_USER_ID, email: null },
+          }),
+        );
+        const payload = await response.json();
+        expect(payload).not.toHaveProperty("focusAreaShiftsNotCleared");
+      });
+
+      it("keeps the save and says so when the clear fails", async () => {
+        mockAuth({ canManageEmployees: true });
+        planFocusAreaShifts.mockResolvedValue({ clear: [eastWing] });
+        clearFocusAreaShiftsAfterSave.mockResolvedValue({ notCleared: "Saved, but not cleared." });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [4] }, { focusAreaShifts: "clear" }),
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+          focusAreaShiftsNotCleared: "Saved, but not cleared.",
+        });
+      });
+
+      it("refuses an answer it doesn't know", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [4] }, { focusAreaShifts: "later" }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+    });
+
+    describe("first day (51g4)", () => {
+      const firstDayAudit = () =>
+        insertPayloads.find(
+          (payload) => (payload as { action?: string }).action === "employee.updated",
+        ) as { details: { changedFields: string[]; from: object; to: object } } | undefined;
+
+      it("refuses a new first day more than a year ahead, before writing", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2027-10-29" }),
+        );
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({
+          error: "Choose a first day no more than a year ahead.",
+          code: "FIRST_DAY_INVALID",
+        });
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("takes a past first day and records the change", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2019-03-04" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(firstDayAudit()?.details).toMatchObject({
+          changedFields: expect.arrayContaining(["firstDay"]),
+          from: { firstDay: null },
+          to: { firstDay: "2019-03-04" },
+        });
+      });
+
+      it("never re-checks a first day the save leaves as it was", async () => {
+        mockAuth({ canManageEmployees: true });
+        rowToEmployee.mockReturnValue(makeEmployee({ firstDay: "2030-01-01", focusAreaIds: [3] }));
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2030-01-01" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(fetchOrgToday).not.toHaveBeenCalled();
+        expect(firstDayAudit()?.details.changedFields ?? []).not.toContain("firstDay");
+      });
     });
 
     describe("login email", () => {

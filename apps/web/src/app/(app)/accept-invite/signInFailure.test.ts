@@ -41,6 +41,17 @@ describe("describeSignInFailure", () => {
     );
   });
 
+  it("names a suspension's end when the hook gives one (51g3)", () => {
+    expect(
+      describeSignInFailure(
+        { message: `${ACCOUNT_SUSPENDED_MESSAGE} Until 2026-11-20.` },
+        "existing",
+      ),
+    ).toBe(
+      "Your organization has suspended your access to the app until Fri, Nov 20. Contact an administrator there if you have questions.",
+    );
+  });
+
   it("keeps the generic wording for a freshly created account", () => {
     expect(describeSignInFailure({ status: 400 }, "created")).toBe(
       "Unable to sign in. Please try again or contact support.",

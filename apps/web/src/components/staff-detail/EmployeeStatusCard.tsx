@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { CalendarDays } from "lucide-react";
 import { describeStatusCard } from "@dubgrid/domain";
 import type { AbsenceType, Employee } from "@/types";
+import { formatDateKey } from "@/lib/utils";
 import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusIconCircle } from "./StatusMarkIcon";
 
 interface EmployeeStatusCardProps {
@@ -57,8 +58,8 @@ function CardText({
 
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
- * tinted like their pill, white while Active, with a dashed second card for
- * an Away planned for later.
+ * tinted like their pill, white while Active, with a dashed card for a first
+ * day still ahead (51g4) and one for a change planned for later.
  */
 export function EmployeeStatusCard({
   employee,
@@ -69,7 +70,10 @@ export function EmployeeStatusCard({
   const absenceId =
     employee.status === "inactive" ? employee.awayAbsenceTypeId : employee.plannedAbsenceTypeId;
   const absenceName = absenceTypes.find((absenceType) => absenceType.id === absenceId)?.name;
-  const { current, planned } = describeStatusCard(employee, { absenceName });
+  const { current, planned, starts } = describeStatusCard(employee, {
+    absenceName,
+    today: formatDateKey(new Date()),
+  });
   const active = current.kind === "active";
   const colors = STATUS_TONE_COLORS[current.tone];
   const cardStyle = {
@@ -103,6 +107,25 @@ export function EmployeeStatusCard({
         />
         {action ? <div className="shrink-0">{action}</div> : null}
       </section>
+      {starts ? (
+        <section
+          aria-label="First day"
+          data-status="starts"
+          style={{
+            ...cardStyle,
+            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+            background: "var(--dg-color-surface)",
+          }}
+        >
+          <StatusIconCircle icon={CalendarDays} tone="warning" />
+          <CardText
+            eyebrow="First day"
+            title={starts.title}
+            detail={starts.detail}
+            color={STATUS_TONE_COLORS.warning.text}
+          />
+        </section>
+      ) : null}
       {planned ? (
         <section
           aria-label="Planned"

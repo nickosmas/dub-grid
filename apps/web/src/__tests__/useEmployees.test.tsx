@@ -11,6 +11,7 @@ const mockUpdateEmployee = vi.fn();
 const mockRemoveEmployee = vi.fn();
 const mockDeactivateEmployee = vi.fn();
 const mockActivateEmployee = vi.fn();
+const mockChangeEmployeeStatuses = vi.fn();
 const mockCreateOrganizationInvitation = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -30,8 +31,11 @@ vi.mock("@/features/employees/client", () => {
       this.name = "EmployeeStatusConflictError";
     }
   }
+  class MockFocusAreaShiftsCancelledError extends Error {}
   return {
+    FocusAreaShiftsCancelledError: MockFocusAreaShiftsCancelledError,
     activateEmployee: (...args: unknown[]) => mockActivateEmployee(...args),
+    changeEmployeeStatuses: (...args: unknown[]) => mockChangeEmployeeStatuses(...args),
     deactivateEmployee: (...args: unknown[]) => mockDeactivateEmployee(...args),
     EmployeeProfileConflictError: MockEmployeeProfileConflictError,
     EmployeeStatusConflictError: MockEmployeeStatusConflictError,
@@ -81,7 +85,7 @@ const OLD_INVITATION: Invitation = {
   deptAdminIds: [11],
 };
 
-function renderReady() {
+function renderReady(options: Parameters<typeof useEmployees>[1] = {}) {
   // A fresh QueryWrapper-style component recreates its QueryClient on every
   // re-render (no memoization), which wipes useQuery's cache mid-test the
   // instant a handler under test calls setState. Build the client once and
@@ -90,7 +94,7 @@ function renderReady() {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  const { result } = renderHook(() => useEmployees("org-1"), { wrapper });
+  const { result } = renderHook(() => useEmployees("org-1", options), { wrapper });
   return waitFor(() => expect(result.current.employees.length).toBeGreaterThan(0)).then(
     () => result,
   );
@@ -141,7 +145,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     });
 
     expect(saved).toBe(true);
-    expect(mockUpdateEmployee).toHaveBeenCalledWith(updated, "org-1", updated.version);
+    expect(mockUpdateEmployee).toHaveBeenCalledWith(updated, "org-1", updated.version, undefined);
     expect(mockCreateOrganizationInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "new@example.com",
@@ -242,6 +246,28 @@ describe("useEmployees — rollback keeps the full list on failure (not just the
     mockFetchEmployees.mockResolvedValue([EMPLOYEE]);
   });
 
+  it("handleSaveEmployee asks through the caller's options and stays quiet when the question is closed (51i)", async () => {
+    const { FocusAreaShiftsCancelledError } = await import("@/features/employees/client");
+    mockUpdateEmployee.mockRejectedValueOnce(new FocusAreaShiftsCancelledError());
+    const saveOptions = { askFocusAreaShifts: vi.fn() };
+    const result = await renderReady({ saveOptionsFor: () => saveOptions });
+
+    let saved = true;
+    await act(async () => {
+      saved = await result.current.handleSaveEmployee({ ...EMPLOYEE, focusAreaIds: [] });
+    });
+
+    expect(mockUpdateEmployee).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "emp-1", focusAreaIds: [] }),
+      "org-1",
+      3,
+      saveOptions,
+    );
+    expect(saved).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(result.current.employees).toEqual([EMPLOYEE]);
+  });
+
   it("handleSaveEmployee restores the pre-edit list on failure", async () => {
     mockUpdateEmployee.mockRejectedValueOnce(new Error("db unavailable"));
     const result = await renderReady();
@@ -337,5 +363,66 @@ describe("useEmployees — rollback keeps the full list on failure (not just the
     });
 
     expect(result.current.employees).toEqual([EMPLOYEE]);
+  });
+});
+
+describe("useEmployees - handleBulkStatusChange (51h)", () => {
+  const ONE = makeEmployee({ id: "emp-1", version: 3 });
+  const TWO = makeEmployee({ id: "emp-2", version: 5 });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchEmployees.mockResolvedValue([ONE, TWO]);
+  });
+
+  it("sends each person's version once and applies saved and latest rows without a toast", async () => {
+    mockChangeEmployeeStatuses.mockResolvedValue([
+      { empId: "emp-1", ok: true, employee: { ...ONE, status: "inactive", version: 4 } },
+      {
+        empId: "emp-2",
+        ok: false,
+        code: "EMPLOYEE_STATUS_CONFLICT",
+        employee: { ...TWO, status: "removed", version: 6 },
+      },
+    ]);
+    const result = await renderReady();
+
+    let outcomes: unknown;
+    await act(async () => {
+      outcomes = await result.current.handleBulkStatusChange(
+        "markAway",
+        ["emp-1", "emp-2", "missing"],
+        { note: "Unit closed" },
+        "token",
+      );
+    });
+
+    expect(mockChangeEmployeeStatuses).toHaveBeenCalledWith(
+      {
+        orgId: "org-1",
+        action: "markAway",
+        people: [
+          { empId: "emp-1", expectedVersion: 3 },
+          { empId: "emp-2", expectedVersion: 5 },
+        ],
+        note: "Unit closed",
+      },
+      "token",
+    );
+    expect(outcomes).toHaveLength(2);
+    expect(result.current.inactiveEmployees.map((e) => e.id)).toEqual(["emp-1"]);
+    expect(result.current.removedEmployees.map((e) => e.id)).toEqual(["emp-2"]);
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("rethrows a refusal of the whole request for the caller", async () => {
+    mockChangeEmployeeStatuses.mockRejectedValue(
+      Object.assign(new Error("step up"), { status: 401, code: "STEP_UP_REQUIRED" }),
+    );
+    const result = await renderReady();
+    await expect(
+      act(() => result.current.handleBulkStatusChange("archive", ["emp-1"])),
+    ).rejects.toThrow("step up");
   });
 });

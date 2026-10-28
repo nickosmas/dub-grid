@@ -35,7 +35,7 @@ const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_order, arc
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_ids, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
@@ -238,10 +238,12 @@ export interface MobilePeopleQueryRow {
   away_until: string | null;
   away_absence_type_id: number | null;
   suspended_at: string | null;
-  planned_status: "away" | null;
+  suspended_until: string | null;
+  planned_status: "away" | "removed" | "suspended" | "active" | null;
   planned_from: string | null;
   planned_until: string | null;
   planned_absence_type_id: number | null;
+  first_day: string | null;
   certification_id: number | null;
   role_ids: number[] | null;
   seniority: number | null;
@@ -1390,7 +1392,7 @@ export async function fetchMobilePeopleRows(
     const { data, error } = await serviceClient
       .from("employees")
       .select(
-        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
+        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
       )
       .eq("org_id", orgId)
       .order("first_name", { ascending: true })
@@ -1547,6 +1549,8 @@ export async function updateMobileEmployeeSuspensionRow(
     employeeId: string;
     expectedVersion: number;
     suspended: boolean;
+    /** Suspending: the first day with access again (51g3), or null. */
+    suspendedUntil?: string | null;
     updatedBy: string;
   },
 ): Promise<DbEmployee | null> {
@@ -1556,7 +1560,39 @@ export async function updateMobileEmployeeSuspensionRow(
     .update({
       suspended_at: input.suspended ? now : null,
       suspended_by: input.suspended ? input.updatedBy : null,
+      suspended_until: input.suspended ? (input.suspendedUntil ?? null) : null,
       status_changed_at: now,
+      updated_by: input.updatedBy,
+      version: input.expectedVersion + 1,
+    })
+    .eq("id", input.employeeId)
+    .eq("org_id", input.orgId)
+    .eq("version", input.expectedVersion)
+    .select(EMPLOYEE_COLS)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as DbEmployee | null | undefined) ?? null;
+}
+
+/** Sets, moves or clears (null) a suspended person's end date (51g3). */
+export async function updateMobileEmployeeSuspendedUntilRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    suspendedUntil: string | null;
+    updatedBy: string;
+  },
+): Promise<DbEmployee | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .update({
+      suspended_until: input.suspendedUntil,
       updated_by: input.updatedBy,
       version: input.expectedVersion + 1,
     })
@@ -1612,7 +1648,7 @@ export async function updateMobileEmployeePlannedChangeRow(
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | "removed" | null;
+    plannedStatus: "away" | "removed" | "suspended" | "active" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;
@@ -2183,6 +2219,24 @@ export async function fetchMobileActiveMembershipOrgRole(
   return (data?.org_role as string | null | undefined) ?? null;
 }
 
+/** Their role in the organization, whether or not the membership is archived (51k). */
+export async function fetchMobileMembershipOrgRole(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select("org_role")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return (data?.org_role as string | null | undefined) ?? null;
+}
+
 export async function countMobileActiveSuperAdmins(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -2197,39 +2251,6 @@ export async function countMobileActiveSuperAdmins(
   if (error) throw error;
 
   return count ?? 0;
-}
-
-export async function archiveMobileOrganizationMembership(
-  serviceClient: SupabaseClient,
-  input: {
-    orgId: string;
-    userId: string;
-    archivedByUserId: string;
-    archivedAt: string;
-  },
-): Promise<void> {
-  const { error } = await serviceClient
-    .from("organization_memberships")
-    .update({ archived_at: input.archivedAt, archived_by: input.archivedByUserId })
-    .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
-    .is("archived_at", null);
-
-  if (error) throw error;
-}
-
-export async function restoreMobileOrganizationMembership(
-  serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string },
-): Promise<void> {
-  const { error } = await serviceClient
-    .from("organization_memberships")
-    .update({ archived_at: null, archived_by: null })
-    .eq("user_id", input.userId)
-    .eq("org_id", input.orgId)
-    .not("archived_at", "is", null);
-
-  if (error) throw error;
 }
 
 export async function insertMobileAuditLogEntry(

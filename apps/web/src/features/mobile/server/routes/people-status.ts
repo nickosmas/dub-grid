@@ -5,21 +5,25 @@ import {
 } from "@dubgrid/contracts";
 import { MobileApiAuthorizationError, updateMobilePersonStatus } from "@dubgrid/mobile-api-core";
 import {
-  archiveMobileOrganizationMembership,
   countMobileActiveSuperAdmins,
   disableMobilePushTokensForOrg,
   fetchMobileActiveMembershipOrgRole,
   fetchMobileEmployeeRowById,
+  fetchMobileMembershipOrgRole,
   insertMobileAuditLogEntry,
-  restoreMobileOrganizationMembership,
   updateMobileEmployeeReturnDateRow,
   updateMobileEmployeeStatusRow,
   updateMobileEmployeePlannedChangeRow,
+  updateMobileEmployeeSuspendedUntilRow,
   updateMobileEmployeeSuspensionRow,
 } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { endUserSessions } from "@/lib/auth/revocation";
+import {
+  endOffboardedAccess,
+  reopenRestoredAccess,
+} from "@/features/employees/server/offboard-access";
 import { requireMobileAuth } from "@/features/mobile/server";
 import { mapEmployeeToMobilePerson } from "./people";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -84,6 +88,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           const row = await updateMobileEmployeeSuspensionRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
         },
+        updateEmployeeSuspendedUntil: async (serviceClient, input) => {
+          const row = await updateMobileEmployeeSuspendedUntilRow(serviceClient, input);
+          return row ? rowToEmployee(row) : null;
+        },
         updateEmployeePlannedChange: async (serviceClient, input) => {
           const row = await updateMobileEmployeePlannedChangeRow(serviceClient, input);
           return row ? rowToEmployee(row) : null;
@@ -105,13 +113,16 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         mapEmployeeToMobilePerson,
         fetchActiveMembershipOrgRole: fetchMobileActiveMembershipOrgRole,
         countActiveSuperAdmins: countMobileActiveSuperAdmins,
-        archiveOrganizationMembership: archiveMobileOrganizationMembership,
-        restoreOrganizationMembership: restoreMobileOrganizationMembership,
+        fetchMembershipOrgRole: fetchMobileMembershipOrgRole,
+        // The same follow-ups as web, so an Offboard from the app leaves the same record (51k).
+        endOffboardedAccess,
+        reopenRestoredAccess,
       },
     );
 
     if (result.kind === "updated") {
-      if (parsed.data.action === "suspend") {
+      // A suspension planned for a later date (51g3) sends nothing until the job starts it.
+      if (parsed.data.action === "suspend" && result.person.suspendedAt) {
         scheduleSuspensionNotice({ orgId: auth.currentOrg.id, empId: id, actorId: auth.user.id });
       }
       return NextResponse.json(
@@ -134,6 +145,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     }
 
     if (
+      result.kind === "out_of_reach" ||
       result.kind === "self_action_forbidden" ||
       result.kind === "invalid_return_date" ||
       result.kind === "invalid_status_change"

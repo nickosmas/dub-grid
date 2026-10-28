@@ -5,11 +5,11 @@ import logger from "@/lib/logger";
 
 /**
  * What follows an Offboard once the employee row is `removed`: their live
- * tokens are cut, and, when whoever offboards them may change organization
- * access (a Super Admin or a Gridmaster), their membership is archived too.
- * Shared by the status route and the daily job that offboards someone after
- * their last day (51g2), so both leave the same record. Never throws: the
- * status change has already committed.
+ * tokens are cut and their membership is archived, whoever offboards them
+ * (51k). Shared by the web and mobile status routes, bulk, Gridmaster's
+ * removal and the daily job that offboards someone after their last day, so
+ * all leave the same record. Never throws: the status change has already
+ * committed.
  */
 export async function endOffboardedAccess(
   serviceClient: SupabaseClient,
@@ -18,7 +18,6 @@ export async function endOffboardedAccess(
     empId: string;
     userId: string | null;
     actorId: string | null;
-    endMembership: boolean;
     at: string;
   },
 ): Promise<void> {
@@ -37,7 +36,6 @@ export async function endOffboardedAccess(
     );
   }
 
-  if (!input.endMembership) return;
   const { error } = await serviceClient
     .from("organization_memberships")
     .update({ archived_at: input.at, archived_by: actorId })
@@ -51,10 +49,42 @@ export async function endOffboardedAccess(
     );
     return;
   }
+  await clearMembershipCaches(orgId, userId);
+}
+
+/**
+ * What follows a Restore once the employee row is back to `active`: the
+ * membership their Offboard archived is reopened with the role it had, whoever
+ * restores them (51k), so they can sign in again. Never throws.
+ */
+export async function reopenRestoredAccess(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; empId: string; userId: string | null },
+): Promise<void> {
+  const { orgId, empId, userId } = input;
+  if (!userId) return;
+  const { error } = await serviceClient
+    .from("organization_memberships")
+    .update({ archived_at: null, archived_by: null })
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .not("archived_at", "is", null);
+  if (error) {
+    logger.error(
+      { error, orgId, empId, userId },
+      "Failed to reopen organization membership after restoring",
+    );
+    return;
+  }
+  await clearMembershipCaches(orgId, userId);
+}
+
+async function clearMembershipCaches(orgId: string, userId: string): Promise<void> {
   await cacheDel(
     CacheKey.orgUsers(orgId),
     CacheKey.orgDirectory(orgId),
     CacheKey.employees(orgId),
     CacheKey.allUsers(),
+    CacheKey.mwOrgVisible(userId, orgId),
   );
 }

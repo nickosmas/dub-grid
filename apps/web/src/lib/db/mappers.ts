@@ -394,10 +394,12 @@ export function rowToEmployee(row: DbEmployee): Employee {
     awayUntil: row.away_until ?? null,
     awayAbsenceTypeId: row.away_absence_type_id ?? null,
     suspendedAt: row.suspended_at ?? null,
+    suspendedUntil: row.suspended_until ?? null,
     plannedStatus: row.planned_status ?? null,
     plannedFrom: row.planned_from ?? null,
     plannedUntil: row.planned_until ?? null,
     plannedAbsenceTypeId: row.planned_absence_type_id ?? null,
+    firstDay: row.first_day ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority,
@@ -427,6 +429,7 @@ export function employeeToRow(
   | "away_until"
   | "away_absence_type_id"
   | "suspended_at"
+  | "suspended_until"
   | "planned_status"
   | "planned_from"
   | "planned_until"
@@ -450,6 +453,8 @@ export function employeeToRow(
     contact_notes: emp.contactNotes,
     department_ids: emp.departmentIds ?? [],
     dept_admin_ids: emp.deptAdminIds ?? [],
+    // Left out, a save keeps the first day it has (a caller that never reads it).
+    ...(emp.firstDay !== undefined ? { first_day: emp.firstDay } : {}),
   };
 }
 

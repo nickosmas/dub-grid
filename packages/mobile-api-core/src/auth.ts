@@ -19,6 +19,7 @@ import {
   evaluateBillingAccessWithPolicy,
   isAccountDisabledMessage,
   isAccountSuspendedMessage,
+  suspendedUntilFromMessage,
 } from "@dubgrid/domain";
 import { createClient, type Factor, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { findMobileOrganizationBySlug, type MobileOrganizationLookup } from "./organization";
@@ -91,12 +92,20 @@ export interface ResolvedMobileAuthContext<
 export class MobileApiRequestError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /** Extra fields for the response body, such as a suspension's end. */
+  readonly details: Record<string, string>;
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(
+    status: number,
+    message: string,
+    code: string | null = null,
+    details: Record<string, string> = {},
+  ) {
     super(message);
     this.name = "MobileApiRequestError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -177,7 +186,14 @@ async function signInMobileUser(
     throw new MobileApiRequestError(403, ACCOUNT_DISABLED_MESSAGE, ACCOUNT_DISABLED_CODE);
   }
   if (authError && isAccountSuspendedMessage(authError.message)) {
-    throw new MobileApiRequestError(403, ACCOUNT_SUSPENDED_MESSAGE, ACCOUNT_SUSPENDED_CODE);
+    // The hook names a suspension's end (105), for "until Fri, Nov 20".
+    const suspendedUntil = suspendedUntilFromMessage(authError.message);
+    throw new MobileApiRequestError(
+      403,
+      ACCOUNT_SUSPENDED_MESSAGE,
+      ACCOUNT_SUSPENDED_CODE,
+      suspendedUntil ? { suspendedUntil } : {},
+    );
   }
 
   if (

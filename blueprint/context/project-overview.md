@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 50 are
-shipped, and so is 52. Items 40 and 51 are in progress.
+Items appear in build-plan order. Items 1 through 39 and 41 through 52 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -85,7 +85,7 @@ shipped, and so is 52. Items 40 and 51 are in progress.
 | 48   | Shipped     | Coverage Check becomes the Schedule Builder, which fills and explains the draft for a period in one undoable change.            |
 | 49   | Shipped     | Auto-build stays responsive, reads clearly, limits five days in a row, pairs days off, and follows shift preferences.           |
 | 50   | Shipped     | An absence beside a shift covers the scheduled time that wasn't worked, before or after the work.                               |
-| 51   | In progress | People are Active, Away, Suspended or Archived, with a last day and return date; managers see who takes a seat.                 |
+| 51   | Shipped     | People are Active, Away, Suspended or Offboarded, with a last day and return date; managers see who takes a seat.               |
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 
 Item 40 is split:
@@ -338,7 +338,7 @@ a left-early absence the person takes no more work that day, and an
 arrived-late one blocks only shifts that overlap it (owner decisions,
 2026-10-24). Design reference: the "Absence beside a shift" canvas.
 
-Item 51 is split:
+Item 51 is split, and every part has shipped:
 
 - **51a - Away keeps access:** shipped; an inactive (Away) person keeps
   sign-in, role and management powers on web, mobile and in the database,
@@ -375,10 +375,10 @@ Item 51 is split:
   publishes with the period. The grid's bar reads "Away · Vacation" and a
   locked day says why; moving the date, changing or clearing the absence, or
   marking them active early rewrites the days (migration 100).
-- **51g - Dated status changes:** a status change can start on a later
-  date; until then the person stays as they are, the days it covers are
-  locked and changed in the draft, and a daily job applies it on the day in
-  the organization's timezone.
+- **51g - Dated status changes:** shipped; a status change can start on a
+  later date; until then the person stays as they are, the days it covers
+  are locked and changed in the draft, and a daily job applies it on the day
+  in the organization's timezone.
   - **51g1 - Away from a date:** shipped; Change status takes a Starts
     date up to a year ahead beside the return date (web and mobile), and
     **Schedule away** plans it: they stay Active until then, the days from
@@ -394,20 +394,52 @@ Item 51 is split:
     the day after the way a manual Offboard does. One plan per person: a
     last day replaces a planned away, and any other change cancels it
     (migration 104).
-  - **51g3 - Suspended until:** an optional end date on a suspension; the
-    job reinstates them on it.
-  - **51g4 - First day:** a new hire can't be scheduled before their first
-    day, and shows "Starts Nov 10" until then.
-- **51h - Bulk status changes:** the People list bulk bar: Mark away,
-  Suspend, Archive and Mark active.
-- **51i - Losing a focus area:** taking someone off a focus area asks
-  whether to clear their upcoming shifts there, in the draft, or keep them.
-- **51j - No contact without sign-in:** push and schedule emails go only to
-  people who can still sign in (Suspended keeps its one notice email), and
-  restoring access restores delivery; settles whether in-app alerts are
-  still created for them.
-- **51k - One Archive:** archiving ends the membership whoever does it, and
-  Restore works the same after either.
+  - **51g3 - Suspended until:** shipped; Suspend takes an optional Ends
+    date and a Starts date up to a year ahead (web and mobile). "Suspended
+    until Nov 20" shows on pills, the card and the record, and sign-in names
+    the day; a later start shows "Suspended from Nov 10" as the plan and
+    locks no day. The daily job reinstates them on the end and starts a
+    planned suspension the way a manual Suspend does (migration 105).
+  - **51g4 - First day:** shipped; Add Staff Members and the person form
+    take an optional First day (any past day, up to a year ahead; mobile Add
+    person from today). Nobody can schedule them before it, and setting it
+    later clears those draft days and closes their requests; they show
+    "Starts Nov 10" in the People list, on a dashed card and in the grid
+    until then, keep sign-in and a seat, and the date stays on the record.
+    No job step (migration 106).
+- **51h - Bulk status changes:** shipped; the web People list's bulk bar
+  offers Mark active, Reinstate, Restore, Mark away, Suspend and Offboard,
+  each with how many selected people it reaches. One confirmation names who
+  it skips and why (Change status's reasons), Mark away takes one return
+  date, and one request changes each person with the single route's checks
+  and audit row; anyone not changed is listed with why and stays selected.
+  Web only. No migration.
+- **51i - Losing a focus area:** shipped; saving someone without a focus
+  area they have shifts in from today on asks first, with the count and
+  dates (web and mobile): Clear shifts takes them off in the draft and
+  closes their open requests, Keep shifts leaves them, closing saves
+  nothing. The server refuses the save until it's answered; the clear runs
+  after the save in one transaction (migration 107).
+- **51j - No contact without sign-in:** shipped; every alert's push and
+  email goes only to someone who can still sign in to its organization, so
+  Suspended, Offboarded, removed from the organization and a deactivated or
+  terminated account get none (Suspended keeps its one notice email), and
+  Reinstate or Restore brings delivery back with nothing stored. A
+  Suspended person's in-app alerts still collect; nothing is written for
+  the others. Security alerts follow the account. No migration.
+- **51k - One Offboard:** shipped; an Offboard ends the membership and
+  sessions whoever makes it (web, app, bulk, the last-day job), Restore
+  reopens it for anyone alike, and only a Super Admin offboards or restores
+  a Super Admin. Gridmaster's Remove from organization offboards the staff
+  record too, a pickup an offboarded person claimed goes back up, and
+  memberships left live for offboarded people are closed (migration 108).
+- **51l - Restore on a date:** shipped; Restore takes a Starts date up to a
+  year ahead (web and mobile, **Schedule restore**), the person stays
+  Offboarded until then with "Returns Nov 10" on the dashed planned card,
+  People list and record, Edit plan moves, cancels or clears it, and the
+  daily job restores them on the day in the organization's timezone, their
+  membership reopened. They can't be drafted before the day; bulk Restore
+  stays now-only (migration 109).
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
 `inactive` and `removed`, and suspension, the return date and a planned
@@ -482,8 +514,8 @@ endpoints remain internal.
 - department or focus-area assignment, role, and certifications
 - `employment_status` - active, inactive, or removed; only active staff can be
   scheduled and count toward billing. Item 51 names them Active, Away and
-  Archived and adds suspended access, a return date and a planned status
-  change with its dates (51g); an Away
+  Archived and adds suspended access, a return date, a planned status
+  change with its dates (51g) and a first day (`first_day`, 51g4); an Away
   person keeps sign-in and counts toward billing only while they can manage,
   and a Suspended one stays active and schedulable but can't sign in
 - scheduling and management access are independent capabilities
@@ -614,7 +646,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `104`.
+  checksum-locked through `108`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

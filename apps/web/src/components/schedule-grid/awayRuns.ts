@@ -1,4 +1,5 @@
 import {
+  describeFirstDay,
   EMPLOYMENT_STATUS_LABELS,
   formatReturnDate,
   isPlannedAwayOn,
@@ -17,26 +18,48 @@ export function awayRunLabel(absenceName: string | null): string {
   return absenceName ? `${AWAY_RUN_LABEL} · ${absenceName}` : AWAY_RUN_LABEL;
 }
 
+/** The bar over the days before someone's first day (51g4): "Starts Nov 10". */
+export function startsRunLabel(firstDay: string): string {
+  return describeFirstDay(firstDay);
+}
+
 /**
  * The days someone is away and can't be scheduled: from `from` (or always,
  * when null) up to the day before `until` (or onward, when null). With
- * `lastDay`, they're the days after someone's last day (51g2) instead.
+ * `lastDay`, they're the days after someone's last day (51g2) instead. With
+ * `firstDay`, every day before it is locked too (51g4); a range with only a
+ * first day has `from` equal to `until`, which holds no day of its own.
  */
 export interface AwayRange {
   from: string | null;
   until: string | null;
   lastDay?: string | null;
+  firstDay?: string | null;
+}
+
+/** Whether `dateKey` is before the range's first day (51g4). */
+export function isBeforeRangeFirstDay(range: AwayRange, dateKey: string): boolean {
+  return !!range.firstDay && dateKey < range.firstDay;
 }
 
 export function isInAwayRange(range: AwayRange, dateKey: string): boolean {
   return (
-    (range.from === null || dateKey >= range.from) &&
-    (range.until === null || dateKey < range.until)
+    isBeforeRangeFirstDay(range, dateKey) ||
+    ((range.from === null || dateKey >= range.from) &&
+      (range.until === null || dateKey < range.until))
   );
 }
 
-/** Why a locked away day can't be selected, and where to change it. */
-export function awayLockedHint(range: AwayRange): string {
+/**
+ * Why a locked away day can't be selected, and where to change it. A day
+ * before their first day says so; give `dateKey` to tell which.
+ */
+export function awayLockedHint(range: AwayRange, dateKey?: string): string {
+  const beforeFirstDay =
+    dateKey === undefined ? range.from === range.until : isBeforeRangeFirstDay(range, dateKey);
+  if (range.firstDay && beforeFirstDay) {
+    return `${describeFirstDay(range.firstDay, { weekday: true })}. Change their first day on their record to change these days.`;
+  }
   if (range.lastDay) {
     return `Last day ${formatReturnDate(range.lastDay, { weekday: true })}. Change the last day on their record to change these days.`;
   }
@@ -51,14 +74,22 @@ export function awayLockedHint(range: AwayRange): string {
 
 type AwayFields = Pick<Employee, "status" | "awayUntil" | "archivedAt">;
 
-type RangeFields = AwayFields & Pick<Employee, "plannedStatus" | "plannedFrom" | "plannedUntil">;
+type RangeFields = AwayFields &
+  Pick<Employee, "plannedStatus" | "plannedFrom" | "plannedUntil" | "firstDay">;
 
 /**
- * Someone's away days: until their return date when Away until a date (51e),
- * from the start of a planned Away (51g1), or after a planned last day (51g2).
- * Null for anyone else.
+ * Someone's locked days: until their return date when Away until a date
+ * (51e), from the start of a planned Away (51g1), after a planned last day
+ * (51g2), and before their first day (51g4). Null for anyone else.
  */
 export function awayRangeOf(employee: RangeFields): AwayRange | null {
+  const range = statusRangeOf(employee);
+  const firstDay = employee.archivedAt ? null : (employee.firstDay ?? null);
+  if (!firstDay) return range;
+  return range ? { ...range, firstDay } : { from: firstDay, until: firstDay, firstDay };
+}
+
+function statusRangeOf(employee: RangeFields): AwayRange | null {
   const until = awayReturnDate(employee);
   if (until) return { from: null, until };
   const lastDay = plannedLastDay(employee);

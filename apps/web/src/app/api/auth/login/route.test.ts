@@ -258,6 +258,27 @@ describe("POST /api/auth/login", () => {
     );
   });
 
+  it("passes on a suspension's end from the hook's refusal (51g3)", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message:
+          "Your access has been suspended. Contact your organization admin. Until 2026-11-20.",
+        status: 403,
+      },
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      success: false,
+      code: "ACCOUNT_SUSPENDED",
+      error: "Your access has been suspended. Contact your organization admin.",
+      suspendedUntil: "2026-11-20",
+    });
+  });
+
   it("returns 403 ACCOUNT_SUSPENDED when the JWT hook refuses a suspended employee", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: null,

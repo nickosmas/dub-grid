@@ -1,4 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { formatReturnDate } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -187,11 +189,37 @@ describe("AddPersonSheet", () => {
         certificationId: null,
         focusAreaIds: [2],
         email: "",
+        firstDay: null,
       });
     });
     expect(createMobilePersonInvitation).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(onDismiss).toHaveBeenCalled();
+    });
+  });
+
+  it("sends the first day picked for a new hire (51g4)", async () => {
+    createMobilePerson.mockResolvedValue({ success: true, person: { id: "emp-1" } });
+    renderWithMutation();
+    const tomorrow = addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), 1);
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    fireEvent.click(screen.getByRole("button", { name: "First day, none" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Choose ${formatReturnDate(tomorrow, { weekday: true })}`,
+      }),
+    );
+    expect(screen.getByText("They can't be scheduled before this day.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+    await waitFor(() => {
+      expect(createMobilePerson).toHaveBeenCalledWith(
+        "token-123",
+        expect.objectContaining({ firstDay: tomorrow }),
+      );
     });
   });
 

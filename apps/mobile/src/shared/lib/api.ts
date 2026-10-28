@@ -75,6 +75,7 @@ import {
   createHeaders,
   createJsonApiRequest,
 } from "@dubgrid/api-client";
+import { parseFocusAreaShiftsQuestion, type FocusAreaUpcomingShifts } from "@dubgrid/domain";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
@@ -401,6 +402,12 @@ const CONTACT_CONFLICT_FIELDS: Record<string, MobileStaffField> = {
   phone: "phone",
   name: "firstName",
 };
+
+/** The focus areas a person save was refused for, until it says whether to clear or keep their shifts there (51i). */
+export function parseFocusAreaShiftsRefusal(error: unknown): FocusAreaUpcomingShifts[] | null {
+  if (!(error instanceof ApiResponseError) || error.status !== 409) return null;
+  return parseFocusAreaShiftsQuestion(error.payload);
+}
 
 /**
  * A save the server rejected for a duplicate email, phone or name, mapped back

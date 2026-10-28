@@ -32,6 +32,7 @@ function makeDeps(currentEmployee: Employee) {
     updateEmployeeStatus: vi.fn(),
     updateEmployeeReturnDate: vi.fn(),
     updateEmployeeSuspension: vi.fn(),
+    updateEmployeeSuspendedUntil: vi.fn(),
     updateEmployeePlannedChange: vi.fn(),
     endAccess: vi.fn(),
     insertAuditLog: vi.fn(),
@@ -47,8 +48,9 @@ function makeDeps(currentEmployee: Employee) {
     // deps shape requires them.
     fetchActiveMembershipOrgRole: vi.fn().mockResolvedValue(null),
     countActiveSuperAdmins: vi.fn().mockResolvedValue(0),
-    archiveOrganizationMembership: vi.fn(),
-    restoreOrganizationMembership: vi.fn(),
+    fetchMembershipOrgRole: vi.fn().mockResolvedValue("user"),
+    endOffboardedAccess: vi.fn(),
+    reopenRestoredAccess: vi.fn(),
   };
 }
 

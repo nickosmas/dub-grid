@@ -1,6 +1,11 @@
 "use client";
 
-import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
+import {
+  describeEmploymentStatus,
+  describePlannedChangeInFull,
+  plannedReturn,
+  formatFirstDay,
+} from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -55,15 +60,20 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             tabular={Boolean(employee.joinedAt)}
           />
         ) : null}
+        {employee.firstDay ? (
+          <RecordField label="First day" value={formatFirstDay(employee.firstDay)} tabular />
+        ) : null}
         <RecordField
           label="Status"
           value={describeEmploymentStatus(
             employee.status,
             employee.awayUntil,
             employee.suspendedAt,
+            employee.suspendedUntil,
           )}
         />
-        {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+        {(employee.status === "active" || plannedReturn(employee)) &&
+        describePlannedChangeInFull(employee) ? (
           <RecordField
             label="Planned"
             value={describePlannedChangeInFull(employee) ?? ""}

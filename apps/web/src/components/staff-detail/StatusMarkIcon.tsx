@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarDays, Check, Lock, Moon, UserMinus, type LucideIcon } from "lucide-react";
+import { formatDateKey } from "@/lib/utils";
 import {
   statusMark,
   type StatusChoiceKind,
@@ -63,7 +64,7 @@ export function StatusMarkIcon({
   size?: number;
   only?: readonly StatusMarkKind[];
 }) {
-  const mark = statusMark(person);
+  const mark = statusMark(person, formatDateKey(new Date()));
   if (!mark || (only && !only.includes(mark.kind))) return null;
   const Icon = STATUS_MARK_ICONS[mark.kind];
   return (

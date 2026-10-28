@@ -295,7 +295,7 @@ export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_ord
 export const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_ids, required_certification_ids, sort_order, archived_at";
 export const EMPLOYEE_COLS =
-  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 export const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 export const ABSENCE_TYPE_COLS =

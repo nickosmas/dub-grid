@@ -146,9 +146,12 @@ export function PersonStaffActions({
     employee.status === "active" ? ["deactivate", "remove"] : ["activate", "remove"];
   const plannedFrom =
     employee.plannedStatus === "away" && employee.plannedFrom ? employee.plannedFrom : null;
-  // Any change here replaces a planned last day (51g2), and says so.
+  // Any change here replaces a planned last day (51g2) or suspension (51g3), and says so.
   const plannedLastDayFrom =
-    employee.plannedStatus === "removed" && employee.plannedFrom ? employee.plannedFrom : null;
+    (employee.plannedStatus === "removed" || employee.plannedStatus === "suspended") &&
+    employee.plannedFrom
+      ? employee.plannedFrom
+      : null;
   const available = statusOptions.filter(
     (option) =>
       !(option === "remove" && employee.status === "removed") &&

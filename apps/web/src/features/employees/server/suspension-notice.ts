@@ -23,7 +23,12 @@ async function emailSuspendedPerson(orgId: string, empId: string): Promise<void>
   if (!config) return;
   const db = getServiceClient();
   const [{ data: employee }, { data: org }] = await Promise.all([
-    db.from("employees").select("user_id").eq("id", empId).eq("org_id", orgId).maybeSingle(),
+    db
+      .from("employees")
+      .select("user_id, suspended_until")
+      .eq("id", empId)
+      .eq("org_id", orgId)
+      .maybeSingle(),
     db.from("organizations").select("name").eq("id", orgId).maybeSingle(),
   ]);
   // Without an account there's nobody to email.
@@ -39,7 +44,11 @@ async function emailSuspendedPerson(orgId: string, empId: string): Promise<void>
     to: email,
     subject: accessSuspendedSubject(organizationName),
     html: await render(
-      createElement(AccessSuspendedEmail, { logoUrl: emailBaseUrl(), organizationName }),
+      createElement(AccessSuspendedEmail, {
+        logoUrl: emailBaseUrl(),
+        organizationName,
+        suspendedUntil: (employee?.suspended_until as string | null | undefined) ?? null,
+      }),
     ),
   });
 }

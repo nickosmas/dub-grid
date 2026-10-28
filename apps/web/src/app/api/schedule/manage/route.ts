@@ -1959,7 +1959,7 @@ export async function POST(req: NextRequest) {
           auth.serviceClient
             .from("recurring_shifts")
             .select(
-              `${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at, away_until, planned_status, planned_from, planned_until)`,
+              `${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at, away_until, planned_status, planned_from, planned_until, first_day)`,
             )
             .eq("org_id", data.orgId)
             .is("archived_at", null)
@@ -1984,9 +1984,10 @@ export async function POST(req: NextRequest) {
                 status: EmployeeStatus;
                 archived_at: string | null;
                 away_until: string | null;
-                planned_status: "away" | null;
+                planned_status: "away" | "removed" | "suspended" | "active" | null;
                 planned_from: string | null;
                 planned_until: string | null;
+                first_day: string | null;
               } | null;
             }
           >
@@ -1998,6 +1999,7 @@ export async function POST(req: NextRequest) {
                 status: row.employee.status,
                 archivedAt: row.employee.archived_at,
                 awayUntil: row.employee.away_until,
+                firstDay: row.employee.first_day,
               },
               data.endDate,
             ),
@@ -2013,6 +2015,7 @@ export async function POST(req: NextRequest) {
               plannedStatus: row.employee?.planned_status ?? null,
               plannedFrom: row.employee?.planned_from ?? null,
               plannedUntil: row.employee?.planned_until ?? null,
+              firstDay: row.employee?.first_day ?? null,
             },
           ]),
         );

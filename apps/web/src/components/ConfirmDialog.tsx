@@ -48,6 +48,8 @@ interface ConfirmDialogProps {
   secondaryConfirmLabel?: string;
   onSecondaryConfirm?: () => void | Promise<unknown>;
   isSecondaryLoading?: boolean;
+  /** `neutral` draws the second confirm like Cancel, for a choice that changes nothing extra. */
+  secondaryConfirmTone?: "confirm" | "neutral";
   maxWidth?: number;
   wrapActions?: boolean;
   confirmDisabled?: boolean;
@@ -68,6 +70,7 @@ export default function ConfirmDialog({
   secondaryConfirmLabel,
   onSecondaryConfirm,
   isSecondaryLoading,
+  secondaryConfirmTone = "confirm",
   maxWidth = 420,
   wrapActions = false,
   confirmDisabled = false,
@@ -163,8 +166,10 @@ export default function ConfirmDialog({
         </Button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <Button
-            className={confirmClass}
-            style={confirmButtonStyle}
+            className={
+              secondaryConfirmTone === "neutral" ? "dg-btn dg-btn-secondary" : confirmClass
+            }
+            style={secondaryConfirmTone === "neutral" ? undefined : confirmButtonStyle}
             onClick={secondaryConfirm.run}
             disabled={actionDisabled || secondaryConfirmDisabled}
           >

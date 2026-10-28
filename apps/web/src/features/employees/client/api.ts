@@ -2,7 +2,14 @@
 
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { SELF_ACTION_FORBIDDEN_CODE, SelfActionForbiddenError } from "@dubgrid/domain";
+import {
+  parseFocusAreaShiftsQuestion,
+  SELF_ACTION_FORBIDDEN_CODE,
+  SelfActionForbiddenError,
+  type BulkStatusAction,
+  type FocusAreaShiftsDecision,
+  type FocusAreaUpcomingShifts,
+} from "@dubgrid/domain";
 import type {
   Employee,
   EmployeeActivityEntry,
@@ -203,29 +210,64 @@ export function insertEmployee(employee: Omit<Employee, "id">, orgId: string): P
   }).then((data) => data.employee);
 }
 
+/** The manager closed the question about their shifts, so nothing was saved. */
+export class FocusAreaShiftsCancelledError extends Error {
+  constructor() {
+    super("The save was cancelled.");
+    this.name = "FocusAreaShiftsCancelledError";
+  }
+}
+
+export interface UpdateEmployeeOptions {
+  /**
+   * Asks what to do with their upcoming shifts in the focus areas they come
+   * off, when the server needs to know (51i). Resolves null to cancel the
+   * save. Without it the server's refusal is thrown as an ordinary error.
+   */
+  askFocusAreaShifts?: (
+    areas: FocusAreaUpcomingShifts[],
+  ) => Promise<FocusAreaShiftsDecision | null>;
+  /** Told when the save went through but clearing their shifts didn't. */
+  onFocusAreaShiftsNotCleared?: (message: string) => void;
+}
+
 export async function updateEmployee(
   employee: Employee,
   orgId: string,
   expectedVersion?: number,
+  options: UpdateEmployeeOptions = {},
 ): Promise<Employee> {
-  const response = await fetch(resolveClientUrl("/api/employees/manage"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "updateEmployee",
-      orgId,
-      employee,
-      expectedVersion,
-    }),
-  });
-
-  const body = (await response.json().catch(() => null)) as {
+  const send = (focusAreaShifts?: FocusAreaShiftsDecision) =>
+    fetch(resolveClientUrl("/api/employees/manage"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "updateEmployee",
+        orgId,
+        employee,
+        expectedVersion,
+        ...(focusAreaShifts ? { focusAreaShifts } : {}),
+      }),
+    });
+  type Body = {
     code?: string;
     error?: string;
     employee?: Employee;
     field?: "email" | "phone";
     message?: string;
+    focusAreaShiftsNotCleared?: string;
   } | null;
+
+  let response = await send();
+  let body = (await response.json().catch(() => null)) as Body;
+
+  const areas = response.status === 409 ? parseFocusAreaShiftsQuestion(body) : null;
+  if (areas && options.askFocusAreaShifts) {
+    const decision = await options.askFocusAreaShifts(areas);
+    if (!decision) throw new FocusAreaShiftsCancelledError();
+    response = await send(decision);
+    body = (await response.json().catch(() => null)) as Body;
+  }
 
   if (
     response.status === 409 &&
@@ -250,6 +292,9 @@ export async function updateEmployee(
 
   if (!body?.employee) {
     throw new Error("The server saved the employee but did not return the updated profile.");
+  }
+  if (body.focusAreaShiftsNotCleared) {
+    options.onFocusAreaShiftsNotCleared?.(body.focusAreaShiftsNotCleared);
   }
   return body.employee;
 }
@@ -319,6 +364,7 @@ async function updateEmployeeStatus(
       | "setReturnDate"
       | "reinstate"
       | "suspend"
+      | "setSuspendedUntil"
       | "setPlannedChange"
       | "cancelPlannedChange";
     expectedVersion: number;
@@ -365,6 +411,79 @@ async function updateEmployeeStatus(
   }
 
   return body.employee;
+}
+
+/** One person's outcome in a bulk status change (51h). */
+export interface BulkStatusOutcome {
+  empId: string;
+  ok: boolean;
+  /** The saved row, or the latest one when it changed elsewhere. */
+  employee?: Employee;
+  /** Why it didn't go through. */
+  error?: string;
+  code?: string;
+}
+
+export interface BulkStatusChangeInput {
+  orgId: string;
+  action: BulkStatusAction;
+  people: { empId: string; expectedVersion: number }[];
+  /** Mark away and Offboard: the reason, the same for everyone. */
+  note?: string;
+  /** Mark away: the first day back, the same for everyone. */
+  returnDate?: string | null;
+}
+
+/**
+ * Runs a bulk status change for the People list: each person's outcome, or
+ * null when it didn't run (a cancelled prompt or a refused request, already
+ * reported).
+ */
+export type BulkStatusChangeHandler = (
+  action: BulkStatusAction,
+  empIds: readonly string[],
+  options: { note?: string; returnDate?: string | null },
+) => Promise<BulkStatusOutcome[] | null>;
+
+/**
+ * One status change for several people (51h), answered per person. Throws
+ * only when nobody was changed: a refusal of the whole request (permission,
+ * rate limit, a step-up prompt the caller answers, a bad date).
+ */
+export async function changeEmployeeStatuses(
+  { orgId, action, people, note, returnDate }: BulkStatusChangeInput,
+  accessToken?: string,
+): Promise<BulkStatusOutcome[]> {
+  const response = await fetch(resolveClientUrl("/api/employees/status/bulk"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      orgId,
+      action,
+      people,
+      ...(note ? { note } : {}),
+      ...(returnDate ? { returnDate } : {}),
+    }),
+  });
+  const body = (await response.json().catch(() => null)) as {
+    results?: BulkStatusOutcome[];
+    error?: string;
+    code?: string;
+    method?: string;
+  } | null;
+  if (!response.ok || !body?.results) {
+    // Status, code and method let step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new Error(
+        formatClientErrorMessage(body?.error, "We couldn't change their status. Try again."),
+      ),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
+  }
+  return body.results;
 }
 
 /** Offboards someone now, or with `lastDay` (51g2) the day after it. */
@@ -426,7 +545,10 @@ export interface PlannedLastDay {
   lastDay: string;
 }
 
-/** A status change planned for a later date (51g). */
+/**
+ * A status change planned for a later date (51g). A planned return (51l) is
+ * moved as a `PlannedAway` with its new day as `startDate` and no return date.
+ */
 export type PlannedChange = PlannedAway | PlannedLastDay;
 
 /** The toast once a planned change is saved or cancelled. */
@@ -434,7 +556,13 @@ export function plannedChangeToast(
   plan: PlannedChange | null,
   plannedStatus: Employee["plannedStatus"],
 ): string {
-  if (plan) return "lastDay" in plan ? "Last day changed" : "Planned away changed";
+  if (plan && "lastDay" in plan) return "Last day changed";
+  if (plannedStatus === "active")
+    return plan ? "Planned return changed" : "Planned return cancelled";
+  if (plannedStatus === "suspended") {
+    return plan ? "Planned suspension changed" : "Planned suspension cancelled";
+  }
+  if (plan) return "Planned away changed";
   return plannedStatus === "removed" ? "Last day cancelled" : "Planned away cancelled";
 }
 
@@ -488,14 +616,50 @@ export function setEmployeeReturnDate(
   });
 }
 
+/**
+ * A suspension's dates (51g3): a first day after today plans it for then, and
+ * `until` is the first day they have access again.
+ */
+export interface SuspensionDates {
+  startDate?: string | null;
+  until?: string | null;
+}
+
 /** Suspends someone's access (51c); a Gridmaster passes fresh proof as the token. */
 export function suspendEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
   accessToken?: string,
+  { startDate = null, until = null }: SuspensionDates = {},
 ): Promise<Employee> {
-  return updateEmployeeStatus({ empId, orgId, action: "suspend", expectedVersion }, accessToken);
+  return updateEmployeeStatus(
+    {
+      empId,
+      orgId,
+      action: "suspend",
+      expectedVersion,
+      ...(startDate ? { startDate } : {}),
+      ...(until ? { returnDate: until } : {}),
+    },
+    accessToken,
+  );
+}
+
+/** Sets, moves or clears (null) a suspended person's end date (51g3). */
+export function setEmployeeSuspendedUntil(
+  empId: string,
+  orgId: string,
+  expectedVersion: number,
+  until: string | null,
+): Promise<Employee> {
+  return updateEmployeeStatus({
+    empId,
+    orgId,
+    action: "setSuspendedUntil",
+    expectedVersion,
+    returnDate: until,
+  });
 }
 
 /** Gives a suspended person (51c) their access back. */
@@ -507,15 +671,18 @@ export function reinstateEmployee(
   return updateEmployeeStatus({ empId, orgId, action: "reinstate", expectedVersion });
 }
 
+/** Marks someone active or restores them now; for someone Offboarded, `startDate` restores them then (51l). */
 export function activateEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
+  startDate?: string | null,
 ): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
     orgId,
     action: "activate",
     expectedVersion,
+    ...(startDate ? { startDate } : {}),
   });
 }

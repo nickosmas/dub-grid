@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b1d9cf9bd5aa2f954ca6568acc2f6a6dec7550cf08cbdf8472bb906b62396376",
+  "sourceDigest": "sha256:28486ea21282b9709d617bb8e154c2bd1b0c28d459921fb60d6ffbce743cc381",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2436,6 +2436,15 @@
       }
     },
     {
+      "id": "http:POST:/api/employees/status/bulk",
+      "method": "POST",
+      "path": "/api/employees/status/bulk",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/status/bulk/route.ts"
+      }
+    },
+    {
       "id": "http:POST:/api/gridmaster/accounts",
       "method": "POST",
       "path": "/api/gridmaster/accounts",
@@ -4834,6 +4843,56 @@
       "sha256": "2ac37eb1506e1e045d5961c8ed39de34d6a1f6765085a1f8f581113b4e1cb5ef",
       "source": {
         "path": "supabase/migrations/104_planned_last_day.sql"
+      }
+    },
+    {
+      "id": "migration:105_suspended_until.sql",
+      "version": "105",
+      "name": "suspended_until",
+      "file": "105_suspended_until.sql",
+      "sha256": "b7c2166e662af86c98dffbc43175a4d77346ea3a634d7450f21d3b634a9eb6a0",
+      "source": {
+        "path": "supabase/migrations/105_suspended_until.sql"
+      }
+    },
+    {
+      "id": "migration:106_first_day.sql",
+      "version": "106",
+      "name": "first_day",
+      "file": "106_first_day.sql",
+      "sha256": "fea43700651d8e8621c6a7b01c9eb6ef3c603a4ff48bf9b954d20ebad3afed53",
+      "source": {
+        "path": "supabase/migrations/106_first_day.sql"
+      }
+    },
+    {
+      "id": "migration:107_focus_area_shifts.sql",
+      "version": "107",
+      "name": "focus_area_shifts",
+      "file": "107_focus_area_shifts.sql",
+      "sha256": "6b80d776278a71f65c105f1c507f3f5949f6f4a436766e6a3cbd50c4bbe162f7",
+      "source": {
+        "path": "supabase/migrations/107_focus_area_shifts.sql"
+      }
+    },
+    {
+      "id": "migration:108_one_offboard.sql",
+      "version": "108",
+      "name": "one_offboard",
+      "file": "108_one_offboard.sql",
+      "sha256": "cdc647840a2acbce6302dcac2b98e50d56ba32259ec09fd556883fb381580e14",
+      "source": {
+        "path": "supabase/migrations/108_one_offboard.sql"
+      }
+    },
+    {
+      "id": "migration:109_planned_restore.sql",
+      "version": "109",
+      "name": "planned_restore",
+      "file": "109_planned_restore.sql",
+      "sha256": "14271b924f16c2b647966ce926e16d5c17e17d27b1430d9fc2e1c7bca7ccadcc",
+      "source": {
+        "path": "supabase/migrations/109_planned_restore.sql"
       }
     }
   ],

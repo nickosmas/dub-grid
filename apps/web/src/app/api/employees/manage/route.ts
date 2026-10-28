@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canMarkInactive, NOT_ON_SCHEDULE_CODE, NOT_ON_SCHEDULE_MESSAGE } from "@dubgrid/domain";
+import {
+  canMarkInactive,
+  FIRST_DAY_INVALID_CODE,
+  FIRST_DAY_INVALID_MESSAGE,
+  isValidFirstDay,
+  NOT_ON_SCHEDULE_CODE,
+  NOT_ON_SCHEDULE_MESSAGE,
+} from "@dubgrid/domain";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbEmployee, DbInvitation, DbScheduleCell } from "@dubgrid/db-types";
@@ -32,6 +39,12 @@ import {
   syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
 import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
+import { fetchOrgToday } from "@/features/employees/server/org-today";
+import {
+  clearFocusAreaShiftsAfterSave,
+  planFocusAreaShifts,
+  type FocusAreaShiftsPlan,
+} from "@/features/employees/server/focus-area-shifts";
 import { apiErrorResponse } from "@/lib/error-handling";
 import logger from "@/lib/logger";
 import {
@@ -112,7 +125,24 @@ const employeeSchema = z.object({
   departmentIds: z.array(z.number().int()),
   deptAdminIds: z.array(z.number().int()),
   version: z.number().int().nonnegative(),
+  /** Their first day (51g4); left out, a save keeps the one they have. */
+  firstDay: z.string().date().nullable().optional(),
 });
+
+/** A new or changed first day must be no more than a year ahead (51g4). */
+async function refuseInvalidFirstDay(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  firstDay: string | null | undefined,
+): Promise<NextResponse | null> {
+  if (!firstDay || isValidFirstDay(firstDay, await fetchOrgToday(serviceClient, orgId))) {
+    return null;
+  }
+  return NextResponse.json(
+    { error: FIRST_DAY_INVALID_MESSAGE, code: FIRST_DAY_INVALID_CODE },
+    { status: 400 },
+  );
+}
 
 const employeeCreateSchema = employeeSchema.omit({ id: true });
 
@@ -132,6 +162,8 @@ const requestSchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     employee: employeeSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
+    /** What to do with their upcoming shifts in focus areas they come off (51i). */
+    focusAreaShifts: z.enum(["clear", "keep"]).optional(),
   }),
   z.object({
     action: z.literal("fetchEmployeeById"),
@@ -603,6 +635,12 @@ export async function POST(req: NextRequest) {
         if (Object.keys(referenceErrors).length > 0) {
           return buildStaffValidationErrorResponse(referenceErrors);
         }
+        const firstDayRefusal = await refuseInvalidFirstDay(
+          auth.serviceClient,
+          data.orgId,
+          data.employee.firstDay,
+        );
+        if (firstDayRefusal) return firstDayRefusal;
 
         const { data: row, error } = await auth.serviceClient
           .from("employees")
@@ -630,6 +668,7 @@ export async function POST(req: NextRequest) {
           details: {
             firstName: data.employee.firstName,
             lastName: data.employee.lastName,
+            ...(data.employee.firstDay ? { firstDay: data.employee.firstDay } : {}),
           },
           ip_address: getRequestIp(req),
           user_agent: req.headers.get("user-agent"),
@@ -707,6 +746,17 @@ export async function POST(req: NextRequest) {
         const changedProfileFields = previousRow
           ? diffEmployeeProfileFields(previousRow, nextEmployee)
           : [];
+        const firstDayChanged =
+          nextEmployee.firstDay !== undefined &&
+          (nextEmployee.firstDay ?? null) !== (previousRow?.firstDay ?? null);
+        if (firstDayChanged) {
+          const firstDayRefusal = await refuseInvalidFirstDay(
+            auth.serviceClient,
+            data.orgId,
+            nextEmployee.firstDay,
+          );
+          if (firstDayRefusal) return firstDayRefusal;
+        }
 
         if (
           nextEmployee.status === "inactive" &&
@@ -717,6 +767,20 @@ export async function POST(req: NextRequest) {
             { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
             { status: 400 },
           );
+        }
+
+        // Asked before anything is written, the login email change included.
+        const focusAreaShiftsPlan: FocusAreaShiftsPlan = previousRow
+          ? await planFocusAreaShifts(auth.serviceClient, {
+              orgId: data.orgId,
+              employeeId: nextEmployee.id,
+              before: previousRow.focusAreaIds,
+              after: nextEmployee.focusAreaIds,
+              decision: data.focusAreaShifts,
+            })
+          : { clear: [] };
+        if (focusAreaShiftsPlan.refuse) {
+          return NextResponse.json(focusAreaShiftsPlan.refuse, { status: 409 });
         }
 
         // The staff email is the login email. Changing it for a linked
@@ -857,9 +921,11 @@ export async function POST(req: NextRequest) {
           }
 
           const statusChanged = previousRow.status !== nextEmployee.status;
-          const changedFields = statusChanged
-            ? [...changedProfileFields, "status"]
-            : changedProfileFields;
+          const changedFields = [
+            ...changedProfileFields,
+            ...(statusChanged ? ["status"] : []),
+            ...(firstDayChanged ? ["firstDay"] : []),
+          ];
 
           if (changedFields.length > 0) {
             const from: Record<string, unknown> = { ...referenceAuditValues.from };
@@ -897,6 +963,10 @@ export async function POST(req: NextRequest) {
               from.status = previousRow.status;
               to.status = nextEmployee.status;
             }
+            if (firstDayChanged) {
+              from.firstDay = previousRow.firstDay ?? null;
+              to.firstDay = nextEmployee.firstDay ?? null;
+            }
 
             const { error: updateAuditError } = await auth.serviceClient.from("audit_log").insert({
               org_id: data.orgId,
@@ -924,8 +994,23 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // After the update's own audit row, so the activity log reads in order.
+        const focusAreaShiftsResult = await clearFocusAreaShiftsAfterSave(auth.serviceClient, {
+          orgId: data.orgId,
+          employeeId: nextEmployee.id,
+          firstName: nextEmployee.firstName,
+          lastName: nextEmployee.lastName,
+          areas: focusAreaShiftsPlan.clear,
+          actor: { id: auth.actor.id, email: auth.actor.email ?? null },
+          ipAddress: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+
         return NextResponse.json({
           employee: rowToEmployee(updatedRow as DbEmployee),
+          ...(focusAreaShiftsResult.notCleared
+            ? { focusAreaShiftsNotCleared: focusAreaShiftsResult.notCleared }
+            : {}),
         });
       }
 

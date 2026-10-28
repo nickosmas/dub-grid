@@ -14,6 +14,7 @@ import {
   type StatusState,
   type StatusTone,
 } from "@dubgrid/domain";
+import { formatLocalDateKey } from "@dubgrid/schedule-core";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
@@ -88,7 +89,7 @@ export function statusToneColors(mobileColors: MobileColors, tone: StatusTone) {
  */
 export function StatusMarkIcon({ person, size = 14 }: { person: StatusState; size?: number }) {
   const mobileColors = useMobileColors();
-  const mark = statusMark(person);
+  const mark = statusMark(person, formatLocalDateKey(new Date()));
   if (!mark) return null;
   return (
     <View accessible accessibilityLabel={mark.label} accessibilityRole="image" testID="status-mark">
@@ -147,6 +148,8 @@ interface StatusCardsProps {
   absenceTypes: readonly { id: number; name?: string | null; label: string }[];
   /** Opens Change status; left off for someone who can't change it. */
   onChangeStatus?: (opening: StatusSheetOpening) => void;
+  /** False when this manager may not offboard or restore them (51k). */
+  canOffboard?: boolean;
   disabled?: boolean;
   /**
    * Tinted like their pill on the profile; the sheet draws it plain, since the
@@ -163,6 +166,7 @@ export function StatusCards({
   person,
   absenceTypes,
   onChangeStatus,
+  canOffboard = true,
   disabled = false,
   plain = false,
 }: StatusCardsProps) {
@@ -173,8 +177,9 @@ export function StatusCards({
   const absenceId =
     person.status === "inactive" ? person.awayAbsenceTypeId : person.plannedAbsenceTypeId;
   const absence = absenceTypes.find((absenceType) => absenceType.id === absenceId);
-  const { current, planned } = describeStatusCard(person, {
+  const { current, planned, starts } = describeStatusCard(person, {
     absenceName: absence ? (absence.name ?? absence.label) : null,
+    today: formatLocalDateKey(new Date()),
   });
   const quiet = plain || current.kind === "active";
   const colors = statusToneColors(mobileColors, current.tone);
@@ -184,11 +189,24 @@ export function StatusCards({
   // and for someone Away their return date. Every one opens a confirmation
   // for that change alone. Someone Active gets Change status, or a button
   // named for the one change left, or none when nothing can change now.
-  const suggested = plain ? null : suggestedStatusChoice(person);
-  const available = availableStatusChoices(person);
+  const suggested = plain ? null : suggestedStatusChoice(person, { canOffboard });
+  const available = availableStatusChoices(person, { canOffboard });
   const away = person.status === "inactive" && !person.archivedAt;
+  const suspended = person.status === "active" && !person.archivedAt && Boolean(person.suspendedAt);
   const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested
     ? [
+        ...(suspended
+          ? [
+              {
+                key: "details",
+                label: describeStatusAction("setSuspendedUntil", "", {
+                  currentReturnDate: person.suspendedUntil ?? null,
+                  returnDate: person.suspendedUntil ?? null,
+                }).label,
+                opening: { focus: "plan" as const },
+              },
+            ]
+          : []),
         ...(away
           ? [
               {
@@ -277,6 +295,27 @@ export function StatusCards({
         </View>
         {actions}
       </View>
+      {starts ? (
+        <View
+          accessibilityLabel={`First day: ${starts.title}. ${starts.detail}`}
+          accessibilityRole="summary"
+          style={[
+            styles.card,
+            styles.dashed,
+            { backgroundColor: mobileColors.surface, borderColor: warning.border },
+          ]}
+          testID="starts-card"
+        >
+          <View style={styles.row}>
+            <StatusIconCircle name="calendar" tone="warning" />
+            <View style={styles.copy}>
+              <Text style={styles.eyebrow}>First day</Text>
+              <Text style={[styles.title, { color: warning.text }]}>{starts.title}</Text>
+              <Text style={styles.detail}>{starts.detail}</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
       {planned ? (
         <View
           accessibilityLabel={`Planned: ${planned.title}. ${planned.detail}`}

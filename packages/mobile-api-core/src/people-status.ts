@@ -5,6 +5,7 @@ import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
+  canOffboardAtTier,
   isAwayAbsenceRefusal,
   isSelfAction,
   isValidLastDay,
@@ -27,11 +28,17 @@ import {
   NO_ACCOUNT_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
+  OFFBOARD_OUT_OF_REACH_CODE,
+  OFFBOARD_OUT_OF_REACH_MESSAGE,
+  RESTORE_OUT_OF_REACH_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
   PLANNED_RETURN_INVALID_MESSAGE,
   PLANNED_START_INVALID_CODE,
   PLANNED_START_INVALID_MESSAGE,
+  PLANNED_SUSPENSION_END_INVALID_MESSAGE,
+  SUSPENDED_UNTIL_INVALID_CODE,
+  SUSPENDED_UNTIL_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
@@ -49,10 +56,7 @@ type PeopleStatusContext = {
   };
   permissions: {
     canManageEmployees: boolean;
-    // Gates syncing organization_memberships alongside employees.status —
-    // mirrors the tier DELETE /api/organizations/access requires on web, so
-    // a plain admin with only canManageEmployees can't use remove/activate as
-    // a side door to change org access they aren't allowed to touch directly.
+    // Only a Super Admin offboards or restores a Super Admin (51k), as on web.
     // Gridmaster mobile access is blocked entirely at auth resolution, so
     // super_admin is the only tier that needs checking here.
     isSuperAdmin: boolean;
@@ -105,6 +109,19 @@ type UpdateEmployeeSuspension = (
     employeeId: string;
     expectedVersion: number;
     suspended: boolean;
+    /** Suspending: the first day with access again (51g3), or null. */
+    suspendedUntil?: string | null;
+    updatedBy: string;
+  },
+) => Promise<Employee | null>;
+
+type UpdateEmployeeSuspendedUntil = (
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    suspendedUntil: string | null;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -115,7 +132,7 @@ type UpdateEmployeePlannedChange = (
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | "removed" | null;
+    plannedStatus: "away" | "removed" | "suspended" | "active" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;
@@ -155,14 +172,22 @@ type FetchActiveMembershipOrgRole = (
 
 type CountActiveSuperAdmins = (serviceClient: SupabaseClient, orgId: string) => Promise<number>;
 
-type ArchiveOrganizationMembership = (
+type FetchMembershipOrgRole = (
   serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string; archivedByUserId: string; archivedAt: string },
+  orgId: string,
+  userId: string,
+) => Promise<string | null>;
+
+/** After an Offboard: their sessions end and their membership is archived, never throwing. */
+type EndOffboardedAccess = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; empId: string; userId: string; actorId: string; at: string },
 ) => Promise<void>;
 
-type RestoreOrganizationMembership = (
+/** After a Restore: their archived membership is reopened, never throwing. */
+type ReopenRestoredAccess = (
   serviceClient: SupabaseClient,
-  input: { orgId: string; userId: string },
+  input: { orgId: string; empId: string; userId: string },
 ) => Promise<void>;
 
 type PeopleStatusResult =
@@ -182,6 +207,12 @@ type PeopleStatusResult =
       kind: "self_action_forbidden";
       error: string;
       code: typeof SELF_ACTION_FORBIDDEN_CODE;
+      status: 403;
+    }
+  | {
+      kind: "out_of_reach";
+      error: string;
+      code: typeof OFFBOARD_OUT_OF_REACH_CODE;
       status: 403;
     }
   | {
@@ -212,6 +243,7 @@ type PeopleStatusResult =
         | typeof NO_PLANNED_CHANGE_CODE
         | typeof PLANNED_START_INVALID_CODE
         | typeof LAST_DAY_INVALID_CODE
+        | typeof SUSPENDED_UNTIL_INVALID_CODE
         | typeof RETURN_DATE_INVALID_CODE;
       status: 400;
     }
@@ -239,14 +271,16 @@ export async function updateMobilePersonStatus(
     updateEmployeeStatus: UpdateEmployeeStatus;
     updateEmployeeReturnDate: UpdateEmployeeReturnDate;
     updateEmployeeSuspension: UpdateEmployeeSuspension;
+    updateEmployeeSuspendedUntil: UpdateEmployeeSuspendedUntil;
     updateEmployeePlannedChange: UpdateEmployeePlannedChange;
     endAccess: EndAccess;
     insertAuditLog: InsertAuditLog;
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
     fetchActiveMembershipOrgRole: FetchActiveMembershipOrgRole;
     countActiveSuperAdmins: CountActiveSuperAdmins;
-    archiveOrganizationMembership: ArchiveOrganizationMembership;
-    restoreOrganizationMembership: RestoreOrganizationMembership;
+    fetchMembershipOrgRole: FetchMembershipOrgRole;
+    endOffboardedAccess: EndOffboardedAccess;
+    reopenRestoredAccess: ReopenRestoredAccess;
   },
 ): Promise<PeopleStatusResult> {
   if (!auth.permissions.canManageEmployees) {
@@ -288,12 +322,23 @@ export async function updateMobilePersonStatus(
     };
   }
 
-  // A planned last day (51g2) is edited through the same action as a planned Away.
+  const outOfReach = await tierRefusal(auth, input.body.action, currentEmployee, deps);
+  if (outOfReach) return outOfReach;
+
+  // A planned last day (51g2) or suspension (51g3) is edited through the same
+  // action as a planned Away.
   const editingLastDay =
     input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "removed";
+  const editingSuspension =
+    input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "suspended";
+  const editingReturn =
+    input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "active";
   if (
     (input.body.action === "deactivate" ||
-      (input.body.action === "setPlannedChange" && !editingLastDay)) &&
+      (input.body.action === "setPlannedChange" &&
+        !editingLastDay &&
+        !editingSuspension &&
+        !editingReturn)) &&
     !canMarkInactive(currentEmployee.focusAreaIds)
   ) {
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
@@ -303,13 +348,21 @@ export async function updateMobilePersonStatus(
   const today = getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null);
   const startDate = input.body.startDate ?? null;
   const lastDay = input.body.lastDay ?? null;
-  // A start date after today plans the Away rather than starting it (51g1),
-  // and a last day plans the Offboard for the day after it (51g2).
+  // A start date after today plans an Away (51g1), a suspension (51g3) or a
+  // return (51l) rather than starting it, and a last day plans the Offboard
+  // for the day after it (51g2).
+  const laterStart = startDate !== null && startDate !== today;
   const planningLastDay = (input.body.action === "remove" && lastDay !== null) || editingLastDay;
+  const planningSuspension = (input.body.action === "suspend" && laterStart) || editingSuspension;
+  const planningReturn =
+    (input.body.action === "activate" && currentEmployee.status === "removed" && laterStart) ||
+    editingReturn;
   const planning =
     planningLastDay ||
+    planningSuspension ||
+    planningReturn ||
     input.body.action === "setPlannedChange" ||
-    (input.body.action === "deactivate" && startDate !== null && startDate !== today);
+    (input.body.action === "deactivate" && laterStart);
   if (
     returnDate !== null &&
     (input.body.action === "deactivate" || input.body.action === "setReturnDate") &&
@@ -337,13 +390,40 @@ export async function updateMobilePersonStatus(
   if (planning || input.body.action === "cancelPlannedChange") {
     const refusal = planningLastDay
       ? lastDayRefusal(currentEmployee, lastDay, today)
-      : planRefusal(currentEmployee, input.body.action, planning, startDate, returnDate, today);
+      : planningReturn
+        ? returnRefusal(currentEmployee, startDate, today)
+        : (suspensionRefusal(currentEmployee, input.body.action) ??
+          planRefusal(currentEmployee, input.body.action, planning, startDate, returnDate, today, {
+            suspension: planningSuspension,
+          }));
     if (refusal) return refusal;
     if (input.body.action === "remove") {
       const lastSuperAdmin = await lastSuperAdminRefusal(auth, currentEmployee, deps);
       if (lastSuperAdmin) return lastSuperAdmin;
     }
+    if (input.body.action === "suspend") {
+      const lastSuperAdmin = await lastSuperAdminSuspensionRefusal(auth, currentEmployee, deps);
+      if (lastSuperAdmin) return lastSuperAdmin;
+    }
     try {
+      if (planningSuspension) {
+        return await changePlan(
+          auth,
+          input,
+          currentEmployee,
+          { kind: "suspension", startDate: startDate as string, until: returnDate },
+          deps,
+        );
+      }
+      if (planningReturn) {
+        return await changePlan(
+          auth,
+          input,
+          currentEmployee,
+          { kind: "return", startDate: startDate as string },
+          deps,
+        );
+      }
       if (planningLastDay) {
         return await changePlan(
           auth,
@@ -366,8 +446,25 @@ export async function updateMobilePersonStatus(
     }
   }
 
+  if (
+    returnDate !== null &&
+    (input.body.action === "suspend" || input.body.action === "setSuspendedUntil") &&
+    !isValidReturnDate(returnDate, today)
+  ) {
+    return {
+      kind: "invalid_status_change",
+      error: SUSPENDED_UNTIL_INVALID_MESSAGE,
+      code: SUSPENDED_UNTIL_INVALID_CODE,
+      status: 400,
+    };
+  }
+
+  if (input.body.action === "setSuspendedUntil") {
+    return setSuspendedUntil(auth, input, currentEmployee, returnDate, deps);
+  }
+
   if (input.body.action === "suspend" || input.body.action === "reinstate") {
-    return changeSuspension(auth, input, currentEmployee, deps);
+    return changeSuspension(auth, input, currentEmployee, returnDate, deps);
   }
 
   try {
@@ -381,6 +478,65 @@ export async function updateMobilePersonStatus(
   }
 }
 
+/**
+ * Offboarding ends a membership and Restore reopens one (51k), so only a
+ * Super Admin offboards, plans a last day for or restores a Super Admin.
+ */
+async function tierRefusal(
+  auth: PeopleStatusContext,
+  action: MobilePersonStatusUpdateBody["action"],
+  employee: Employee,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult | null> {
+  // Planning, moving or cancelling a return (51l) reaches the same tier as Restore.
+  const restoring =
+    (action === "activate" && employee.status === "removed") ||
+    ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      employee.plannedStatus === "active");
+  const offboarding =
+    action === "remove" || (action === "setPlannedChange" && employee.plannedStatus === "removed");
+  if (!(offboarding || restoring) || auth.permissions.isSuperAdmin || !employee.userId) {
+    return null;
+  }
+  const role = await deps.fetchMembershipOrgRole(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    employee.userId,
+  );
+  if (canOffboardAtTier({ isSuperAdmin: false, isGridmaster: false }, role)) return null;
+  return {
+    kind: "out_of_reach",
+    error: restoring ? RESTORE_OUT_OF_REACH_MESSAGE : OFFBOARD_OUT_OF_REACH_MESSAGE,
+    code: OFFBOARD_OUT_OF_REACH_CODE,
+    status: 403,
+  };
+}
+
+/** A suspension planned for later (51g3) needs what Suspend needs: an account, and someone suspendable. */
+function suspensionRefusal(
+  employee: Employee,
+  action: MobilePersonStatusUpdateBody["action"],
+): PeopleStatusResult | null {
+  if (action !== "suspend") return null;
+  if (employee.status !== "active" || employee.archivedAt || employee.suspendedAt) {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_SUSPENDABLE_MESSAGE,
+      code: NOT_SUSPENDABLE_CODE,
+      status: 400,
+    };
+  }
+  if (!employee.userId) {
+    return {
+      kind: "invalid_status_change",
+      error: NO_ACCOUNT_MESSAGE,
+      code: NO_ACCOUNT_CODE,
+      status: 400,
+    };
+  }
+  return null;
+}
+
 function planRefusal(
   employee: Employee,
   action: MobilePersonStatusUpdateBody["action"],
@@ -388,6 +544,7 @@ function planRefusal(
   startDate: string | null,
   returnDate: string | null,
   today: string,
+  { suspension = false }: { suspension?: boolean } = {},
 ): PeopleStatusResult | null {
   const refuse = (
     error: string,
@@ -395,6 +552,7 @@ function planRefusal(
       | typeof NOT_PLANNABLE_CODE
       | typeof NO_PLANNED_CHANGE_CODE
       | typeof PLANNED_START_INVALID_CODE
+      | typeof SUSPENDED_UNTIL_INVALID_CODE
       | typeof RETURN_DATE_INVALID_CODE,
   ): PeopleStatusResult => ({ kind: "invalid_status_change", error, code, status: 400 });
   if (planning && (employee.status !== "active" || employee.archivedAt || employee.suspendedAt)) {
@@ -410,7 +568,34 @@ function planRefusal(
     return refuse(PLANNED_START_INVALID_MESSAGE, PLANNED_START_INVALID_CODE);
   }
   if (planning && returnDate !== null && startDate !== null && returnDate <= startDate) {
-    return refuse(PLANNED_RETURN_INVALID_MESSAGE, RETURN_DATE_INVALID_CODE);
+    return suspension
+      ? refuse(PLANNED_SUSPENSION_END_INVALID_MESSAGE, SUSPENDED_UNTIL_INVALID_CODE)
+      : refuse(PLANNED_RETURN_INVALID_MESSAGE, RETURN_DATE_INVALID_CODE);
+  }
+  return null;
+}
+
+/** A return (51l) is the one plan an Offboarded person holds, from tomorrow up to a year ahead. */
+function returnRefusal(
+  employee: Employee,
+  startDate: string | null,
+  today: string,
+): PeopleStatusResult | null {
+  if (employee.status !== "removed") {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_PLANNABLE_MESSAGE,
+      code: NOT_PLANNABLE_CODE,
+      status: 400,
+    };
+  }
+  if (startDate === null || !isValidPlannedStart(startDate, today)) {
+    return {
+      kind: "invalid_status_change",
+      error: PLANNED_START_INVALID_MESSAGE,
+      code: PLANNED_START_INVALID_CODE,
+      status: 400,
+    };
   }
   return null;
 }
@@ -471,6 +656,8 @@ async function lastSuperAdminRefusal(
 type PlanChange =
   | { kind: "away"; startDate: string | null; returnDate: string | null }
   | { kind: "lastDay"; lastDay: string }
+  | { kind: "suspension"; startDate: string; until: string | null }
+  | { kind: "return"; startDate: string }
   | null;
 
 /**
@@ -491,14 +678,27 @@ async function changePlan(
 ): Promise<PeopleStatusResult> {
   const action = input.body.action;
   const away = plan?.kind === "away" ? plan : null;
+  const suspension = plan?.kind === "suspension" ? plan : null;
+  const returning = plan?.kind === "return" ? plan : null;
   const updatedEmployee = await deps.updateEmployeePlannedChange(auth.serviceClient, {
     orgId: auth.currentOrg.id,
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
-    plannedStatus: plan?.kind === "lastDay" ? "removed" : away ? "away" : null,
+    plannedStatus:
+      plan?.kind === "lastDay"
+        ? "removed"
+        : suspension
+          ? "suspended"
+          : returning
+            ? "active"
+            : away
+              ? "away"
+              : null,
     plannedFrom:
-      plan?.kind === "lastDay" ? plannedFromForLastDay(plan.lastDay) : (away?.startDate ?? null),
-    plannedUntil: away?.returnDate ?? null,
+      plan?.kind === "lastDay"
+        ? plannedFromForLastDay(plan.lastDay)
+        : (suspension?.startDate ?? returning?.startDate ?? away?.startDate ?? null),
+    plannedUntil: suspension ? suspension.until : (away?.returnDate ?? null),
     plannedAbsenceTypeId: away?.returnDate ? (input.body.absenceTypeId ?? null) : null,
     ...(action === "deactivate" || action === "remove" || input.body.note !== undefined
       ? { plannedNote: input.body.note ?? "" }
@@ -529,12 +729,45 @@ async function changePlan(
   }
 
   const wasLastDay = currentEmployee.plannedStatus === "removed";
+  const wasSuspension = currentEmployee.plannedStatus === "suspended";
+  const wasReturn = currentEmployee.plannedStatus === "active";
+  if (returning || (!plan && wasReturn)) {
+    await deps.insertAuditLog(auth.serviceClient, {
+      org_id: auth.currentOrg.id,
+      actor_id: auth.user.id,
+      actor_email: auth.user.email ?? null,
+      action: !returning
+        ? "employee.restore_plan_cancelled"
+        : action === "activate"
+          ? "employee.restore_planned"
+          : "employee.restore_plan_changed",
+      resource_type: "employee",
+      resource_id: input.employeeId,
+      details: {
+        ...(returning && action === "setPlannedChange"
+          ? { fromReturnDate: currentEmployee.plannedFrom ?? null }
+          : {}),
+        returnDate: returning ? returning.startDate : (currentEmployee.plannedFrom ?? null),
+        changedFields: ["planned_status"],
+      },
+      ip_address: input.requestIp,
+      user_agent: input.userAgent,
+    });
+    return {
+      kind: "updated",
+      person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+      status: 200,
+    };
+  }
   await deps.insertAuditLog(auth.serviceClient, {
     org_id: auth.currentOrg.id,
     actor_id: auth.user.id,
     actor_email: auth.user.email ?? null,
-    action:
-      plan?.kind === "lastDay"
+    action: suspension
+      ? action === "suspend"
+        ? "employee.suspension_planned"
+        : "employee.suspension_plan_changed"
+      : plan?.kind === "lastDay"
         ? action === "remove"
           ? "employee.last_day_set"
           : "employee.last_day_changed"
@@ -544,11 +777,24 @@ async function changePlan(
             ? "employee.away_plan_changed"
             : wasLastDay
               ? "employee.last_day_cancelled"
-              : "employee.away_plan_cancelled",
+              : wasSuspension
+                ? "employee.suspension_plan_cancelled"
+                : "employee.away_plan_cancelled",
     resource_type: "employee",
     resource_id: input.employeeId,
-    details:
-      plan?.kind === "lastDay"
+    details: suspension
+      ? {
+          ...(action === "setPlannedChange"
+            ? {
+                fromPlannedFrom: currentEmployee.plannedFrom ?? null,
+                fromPlannedUntil: currentEmployee.plannedUntil ?? null,
+              }
+            : {}),
+          plannedFrom: suspension.startDate,
+          plannedUntil: suspension.until,
+          changedFields: ["planned_status"],
+        }
+      : plan?.kind === "lastDay"
         ? {
             ...(action === "setPlannedChange"
               ? { fromLastDay: plannedLastDay(currentEmployee) }
@@ -664,30 +910,28 @@ async function changeStatus(
     };
   }
 
-  // Remove/activate a linked user's org membership in lockstep with their
-  // employees.status, in the same request that already committed the status
-  // change — not a second, separately-triggered call — so the two can't
-  // diverge. Gated to super_admin (gridmaster mobile access is blocked
-  // entirely at auth resolution) — the same tier DELETE
-  // /api/organizations/access requires on web.
+  // The membership follows the employee row in the same request, whoever
+  // acts (51k): Offboard ends their sessions and archives it, Restore
+  // reopens it.
+  if (currentEmployee.userId && input.body.action === "remove") {
+    await deps.endOffboardedAccess(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      empId: input.employeeId,
+      userId: currentEmployee.userId,
+      actorId: auth.user.id,
+      at: now,
+    });
+  }
   if (
-    (input.body.action === "remove" || input.body.action === "activate") &&
     currentEmployee.userId &&
-    auth.permissions.isSuperAdmin
+    input.body.action === "activate" &&
+    currentEmployee.status === "removed"
   ) {
-    if (input.body.action === "remove") {
-      await deps.archiveOrganizationMembership(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        userId: currentEmployee.userId,
-        archivedByUserId: auth.user.id,
-        archivedAt: now,
-      });
-    } else {
-      await deps.restoreOrganizationMembership(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        userId: currentEmployee.userId,
-      });
-    }
+    await deps.reopenRestoredAccess(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      empId: input.employeeId,
+      userId: currentEmployee.userId,
+    });
   }
 
   await deps.insertAuditLog(auth.serviceClient, {
@@ -809,9 +1053,114 @@ async function setReturnDate(
   };
 }
 
+/** Suspending the org's only super_admin would lock the org out, now or on a later start. */
+async function lastSuperAdminSuspensionRefusal(
+  auth: PeopleStatusContext,
+  currentEmployee: Employee,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult | null> {
+  if (!currentEmployee.userId) return null;
+  const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    currentEmployee.userId,
+  );
+  if (
+    targetOrgRole === "super_admin" &&
+    (await deps.countActiveSuperAdmins(auth.serviceClient, auth.currentOrg.id)) <= 1
+  ) {
+    return {
+      kind: "cannot_remove_last_super_admin",
+      error: "Cannot suspend the only super admin. Transfer ownership first.",
+      status: 400,
+    };
+  }
+  return null;
+}
+
+/** Sets, moves or clears a suspended person's end date (51g3); they stay suspended. */
+async function setSuspendedUntil(
+  auth: PeopleStatusContext,
+  input: {
+    employeeId: string;
+    body: MobilePersonStatusUpdateBody;
+    requestIp: string | null;
+    userAgent: string | null;
+  },
+  currentEmployee: Employee,
+  suspendedUntil: string | null,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
+  if (!currentEmployee.suspendedAt) {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_SUSPENDED_MESSAGE,
+      code: NOT_SUSPENDED_CODE,
+      status: 400,
+    };
+  }
+  const updatedEmployee = await deps.updateEmployeeSuspendedUntil(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: input.employeeId,
+    expectedVersion: input.body.expectedVersion,
+    suspendedUntil,
+    updatedBy: auth.user.id,
+  });
+  if (!updatedEmployee) return conflictOrMissing(auth, input.employeeId, deps);
+
+  await deps.insertAuditLog(auth.serviceClient, {
+    org_id: auth.currentOrg.id,
+    actor_id: auth.user.id,
+    actor_email: auth.user.email ?? null,
+    action: "employee.suspension_end_changed",
+    resource_type: "employee",
+    resource_id: input.employeeId,
+    details: {
+      fromSuspendedUntil: currentEmployee.suspendedUntil ?? null,
+      toSuspendedUntil: suspendedUntil,
+      changedFields: ["suspended_until"],
+    },
+    ip_address: input.requestIp,
+    user_agent: input.userAgent,
+  });
+  return {
+    kind: "updated",
+    person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+    status: 200,
+  };
+}
+
+/** The latest row after a version-guarded update matched nothing. */
+async function conflictOrMissing(
+  auth: PeopleStatusContext,
+  employeeId: string,
+  deps: Parameters<typeof updateMobilePersonStatus>[2],
+): Promise<PeopleStatusResult> {
+  const latestEmployee = await deps.fetchEmployeeById(
+    auth.serviceClient,
+    auth.currentOrg.id,
+    employeeId,
+  );
+  if (!latestEmployee) {
+    return {
+      kind: "latest_unavailable",
+      error: "We couldn't load the latest employee state.",
+      status: 500,
+    };
+  }
+  return {
+    kind: "conflict",
+    error: STATUS_CONFLICT_MESSAGE,
+    code: "EMPLOYEE_STATUS_CONFLICT",
+    person: deps.mapEmployeeToMobilePerson(latestEmployee),
+    status: 409,
+  };
+}
+
 /**
  * Suspends someone (51c), signing them out everywhere and stopping their
- * push, or reinstates them. They stay Active either way.
+ * push, until `suspendedUntil` when set (51g3), or reinstates them. They stay
+ * Active either way.
  */
 async function changeSuspension(
   auth: PeopleStatusContext,
@@ -822,6 +1171,7 @@ async function changeSuspension(
     userAgent: string | null;
   },
   currentEmployee: Employee,
+  suspendedUntil: string | null,
   deps: Parameters<typeof updateMobilePersonStatus>[2],
 ): Promise<PeopleStatusResult> {
   const suspending = input.body.action === "suspend";
@@ -855,22 +1205,9 @@ async function changeSuspension(
     };
   }
 
-  if (suspending && currentEmployee.userId) {
-    const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
-      auth.serviceClient,
-      auth.currentOrg.id,
-      currentEmployee.userId,
-    );
-    if (
-      targetOrgRole === "super_admin" &&
-      (await deps.countActiveSuperAdmins(auth.serviceClient, auth.currentOrg.id)) <= 1
-    ) {
-      return {
-        kind: "cannot_remove_last_super_admin",
-        error: "Cannot suspend the only super admin. Transfer ownership first.",
-        status: 400,
-      };
-    }
+  if (suspending) {
+    const refusal = await lastSuperAdminSuspensionRefusal(auth, currentEmployee, deps);
+    if (refusal) return refusal;
   }
 
   const updatedEmployee = await deps.updateEmployeeSuspension(auth.serviceClient, {
@@ -878,6 +1215,7 @@ async function changeSuspension(
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
     suspended: suspending,
+    ...(suspending ? { suspendedUntil } : {}),
     updatedBy: auth.user.id,
   });
 
@@ -917,7 +1255,10 @@ async function changeSuspension(
     action: suspending ? "employee.suspended" : "employee.reinstated",
     resource_type: "employee",
     resource_id: input.employeeId,
-    details: { changedFields: ["suspended_at"] },
+    details: {
+      ...(suspending && suspendedUntil ? { suspendedUntil } : {}),
+      changedFields: ["suspended_at"],
+    },
     ip_address: input.requestIp,
     user_agent: input.userAgent,
   });

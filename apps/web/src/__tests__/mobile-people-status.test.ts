@@ -38,6 +38,7 @@ function makeDeps(
     updateEmployeeStatus: vi.fn(),
     updateEmployeeReturnDate: vi.fn(),
     updateEmployeeSuspension: vi.fn(),
+    updateEmployeeSuspendedUntil: vi.fn(),
     updateEmployeePlannedChange: vi.fn(),
     endAccess: vi.fn(),
     insertAuditLog: vi.fn(),
@@ -51,8 +52,9 @@ function makeDeps(
     fetchActiveMembershipOrgRole:
       overrides.fetchActiveMembershipOrgRole ?? vi.fn().mockResolvedValue("user"),
     countActiveSuperAdmins: overrides.countActiveSuperAdmins ?? vi.fn().mockResolvedValue(0),
-    archiveOrganizationMembership: vi.fn(),
-    restoreOrganizationMembership: vi.fn(),
+    fetchMembershipOrgRole: vi.fn().mockResolvedValue("user"),
+    endOffboardedAccess: vi.fn(),
+    reopenRestoredAccess: vi.fn(),
   };
 }
 
@@ -91,11 +93,11 @@ describe("updateMobilePersonStatus organization membership sync", () => {
       expect.anything(),
       expect.objectContaining({ status: "removed", updatedBy: "user-actor" }),
     );
-    expect(deps.archiveOrganizationMembership).toHaveBeenCalledWith(
+    expect(deps.endOffboardedAccess).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ orgId: "org-1", userId: "user-other" }),
     );
-    expect(deps.restoreOrganizationMembership).not.toHaveBeenCalled();
+    expect(deps.reopenRestoredAccess).not.toHaveBeenCalled();
   });
 
   it("restores the organization membership when a super_admin reactivates a removed employee", async () => {
@@ -119,14 +121,14 @@ describe("updateMobilePersonStatus organization membership sync", () => {
     );
 
     expect(result.kind).toBe("updated");
-    expect(deps.restoreOrganizationMembership).toHaveBeenCalledWith(
+    expect(deps.reopenRestoredAccess).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ orgId: "org-1", userId: "user-other" }),
     );
-    expect(deps.archiveOrganizationMembership).not.toHaveBeenCalled();
+    expect(deps.endOffboardedAccess).not.toHaveBeenCalled();
   });
 
-  it("does not touch organization membership when a non-super-admin removes a linked employee", async () => {
+  it("ends access when an Admin offboards a linked employee too (51k)", async () => {
     const employee = makeEmployee({ status: "active", userId: "user-other" });
     const deps = makeDeps(employee);
     deps.updateEmployeeStatus.mockResolvedValue({
@@ -146,10 +148,11 @@ describe("updateMobilePersonStatus organization membership sync", () => {
       deps,
     );
 
-    // Status still changes — only the org-access side effect is gated to
-    // super_admin, mirroring DELETE /api/organizations/access on web.
     expect(result.kind).toBe("updated");
-    expect(deps.archiveOrganizationMembership).not.toHaveBeenCalled();
+    expect(deps.endOffboardedAccess).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ orgId: "org-1", userId: "user-other", actorId: "user-actor" }),
+    );
   });
 
   it("refuses to remove the org's only super_admin", async () => {

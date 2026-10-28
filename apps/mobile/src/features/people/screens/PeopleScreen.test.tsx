@@ -1,4 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { formatReturnDate } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
@@ -1207,6 +1209,23 @@ describe("PeopleScreen", () => {
     // One pill each: the dated one for June, and Owen's plain Away beside the filter's own row.
     expect(screen.getAllByText("Away until Jan 4")).toHaveLength(1);
     expect(screen.getAllByText("Away")).toHaveLength(2);
+  });
+
+  it("says when a new hire starts beside their name (51g4)", () => {
+    const firstDay = addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), 12);
+    useQuery.mockReturnValue({
+      data: {
+        people: [buildPerson({ id: "emp-2", firstName: "June", lastName: "Patel", firstDay })],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.getByText(`Starts ${formatReturnDate(firstDay)}`)).toBeInTheDocument();
   });
 
   it("filters admins out of the staff directory by access level", () => {

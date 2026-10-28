@@ -1,5 +1,5 @@
 "use client";
-import type { PlannedChange } from "@/features/employees/client";
+import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
 import { ChevronRight } from "lucide-react";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -12,7 +12,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { AbsenceType, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
-import { isSelfAction } from "@dubgrid/domain";
+import { canOffboardAtTier, isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
@@ -72,11 +72,14 @@ interface StaffDetailPanelProps {
   ) => void | Promise<unknown>;
   /** Live absence types, offered for an Away person's days. */
   absenceTypes?: readonly AbsenceType[];
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   statusStepUpOpen?: boolean;
@@ -118,6 +121,7 @@ export function StaffDetailPanel({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
   statusStepUpOpen = false,
   onClose,
@@ -218,17 +222,23 @@ export function StaffDetailPanel({
   // one dropped the promise, so the same operation had two different buttons.
   const handleFooterSave = useCallback(() => editorRef.current?.save(), []);
 
+  const canOffboard = canOffboardAtTier(
+    { isSuperAdmin: Boolean(canManageManagementAccess), isGridmaster: false },
+    orgRole,
+  );
   const statusActions = (label: string) => (
     <EmployeeStatusActions
       employee={employee}
       canEdit={canManageEmployees}
       isSelf={false}
+      canOffboard={canOffboard}
       onDeactivate={onDeactivate}
       onSetReturnDate={onSetReturnDate}
       absenceTypes={absenceTypes}
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
+      onSetSuspendedUntil={onSetSuspendedUntil}
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
@@ -242,12 +252,14 @@ export function StaffDetailPanel({
       employee={employee}
       canEdit={canManageEmployees}
       isSelf={false}
+      canOffboard={canOffboard}
       onDeactivate={onDeactivate}
       onSetReturnDate={onSetReturnDate}
       absenceTypes={absenceTypes}
       onActivate={onActivate}
       onReinstate={onReinstate}
       onSuspend={onSuspend}
+      onSetSuspendedUntil={onSetSuspendedUntil}
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}

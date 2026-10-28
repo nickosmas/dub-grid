@@ -1,6 +1,10 @@
 "use client";
 
-import type { PlannedChange } from "@/features/employees/client";
+import type {
+  BulkStatusChangeHandler,
+  PlannedChange,
+  SuspensionDates,
+} from "@/features/employees/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, type WheelEvent, useCallback, useMemo, useState } from "react";
@@ -126,13 +130,18 @@ interface StaffViewProps {
   ) => void | Promise<unknown>;
   /** A status change is waiting on the step-up prompt, so bulk confirmations stay hidden. */
   statusStepUpOpen?: boolean;
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
-  onSuspend?: (empId: string) => void | Promise<unknown>;
+  onSuspend?: (empId: string, dates?: SuspensionDates) => void | Promise<unknown>;
+  /** Sets, moves or clears (null) a suspended person's end date (51g3). */
+  onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
+  /** The People list's bulk status changes (51h). */
+  onBulkStatusChange?: BulkStatusChangeHandler;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];
@@ -175,7 +184,9 @@ export default function StaffView({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetSuspendedUntil,
   onSetPlannedChange,
+  onBulkStatusChange,
   onAdd,
   orgId,
   assignments,
@@ -373,7 +384,9 @@ export default function StaffView({
             onActivate={onActivate}
             onReinstate={onReinstate}
             onSuspend={onSuspend}
+            onSetSuspendedUntil={onSetSuspendedUntil}
             onSetPlannedChange={onSetPlannedChange}
+            onBulkStatusChange={onBulkStatusChange}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
             canManageEmployees={canManageEmployees ?? false}
