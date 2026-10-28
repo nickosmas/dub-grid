@@ -54,9 +54,8 @@ import {
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
-import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import { fetchOrgToday } from "@/features/employees/server/org-today";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -99,16 +98,6 @@ const bodySchema = z.object({
    */
   lastDay: z.string().date().nullable().optional(),
 });
-
-async function fetchOrgToday(serviceClient: SupabaseClient, orgId: string): Promise<string> {
-  const { data, error } = await serviceClient
-    .from("organizations")
-    .select("timezone")
-    .eq("id", orgId)
-    .single();
-  if (error) throw error;
-  return getIsoDateInTimeZone(new Date(), (data as { timezone: string | null }).timezone);
-}
 
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(

@@ -7,6 +7,8 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
+import { FIRST_DAY_FIELD_HINT, PLANNED_START_MAX_DAYS } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
   BottomSheetModal,
   SheetActions,
@@ -29,6 +31,7 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { PersonFormSkeleton } from "./PersonFormSkeleton";
+import { ReturnDateField } from "./ReturnDatePicker";
 import { EMAIL_CONFLICT_MESSAGES } from "../lib/contactConflicts";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -72,6 +75,7 @@ export function AddPersonSheet({
   const [employmentType, setEmploymentType] = useState<"full_time" | "part_time">("full_time");
   const [certificationId, setCertificationId] = useState<number | null>(null);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>([]);
+  const [firstDay, setFirstDay] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
   /**
    * Field errors only the server can find, chiefly a duplicate email. Kept apart
@@ -98,9 +102,12 @@ export function AddPersonSheet({
     email.trim() !== "" ||
     employmentType !== "full_time" ||
     certificationId !== null ||
-    focusAreaIds.length > 0;
+    focusAreaIds.length > 0 ||
+    firstDay !== null;
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  // A new hire's first day (51g4) is today or later here; an earlier one is set on the web.
+  const today = getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null);
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
@@ -178,6 +185,7 @@ export function AddPersonSheet({
         certificationId,
         focusAreaIds,
         email: normalizedEmail,
+        firstDay,
       });
 
       let invitationSent = true;
@@ -252,6 +260,7 @@ export function AddPersonSheet({
     setEmploymentType("full_time");
     setCertificationId(null);
     setFocusAreaIds([]);
+    setFirstDay(null);
     setServerFieldErrors({});
   }
 
@@ -397,6 +406,15 @@ export function AddPersonSheet({
               selection="single"
               selectedIds={[employmentType === "part_time" ? 1 : 0]}
               onToggle={(id) => setEmploymentType(id === 1 ? "part_time" : "full_time")}
+            />
+            <ReturnDateField
+              emptyLabel="Not set"
+              hint={FIRST_DAY_FIELD_HINT}
+              label="First day"
+              maxDate={addDaysToIsoDate(today, PLANNED_START_MAX_DAYS)}
+              minDate={today}
+              onChange={setFirstDay}
+              value={firstDay}
             />
             <ProfileChoiceGroup
               items={[

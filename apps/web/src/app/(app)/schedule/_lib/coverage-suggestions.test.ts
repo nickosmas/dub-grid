@@ -179,6 +179,23 @@ describe("availabilityFromShifts", () => {
     });
   });
 
+  it("is out before a first day and free from it (51g4)", () => {
+    const input = {
+      shifts: {},
+      assignments,
+      shiftCategories,
+      loadedDateKeys: LOADED,
+      awayRanges: new Map([
+        ["ana", { from: "2026-10-27", until: "2026-10-27", firstDay: "2026-10-27" }],
+      ]),
+    };
+    expect(availabilityFromShifts(input, "ana", "2026-10-26", DAY)).toEqual({
+      kind: "notStarted",
+      firstDay: "2026-10-27",
+    });
+    expect(availabilityFromShifts(input, "ana", "2026-10-27", DAY)).toEqual({ kind: "free" });
+  });
+
   it("is free beside work that does not overlap", () => {
     expect(availability({ "ana_2026-10-26": worked([EVENING]) })).toEqual({ kind: "free" });
   });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeFirstDay,
+  describeUpcomingChange,
+  formatFirstDay,
+  isBeforeFirstDay,
+  isValidFirstDay,
+  upcomingFirstDay,
   suggestedStatusChoice,
   describeStatusCard,
   statusMark,
@@ -925,6 +931,7 @@ describe("describeStatusCard", () => {
         title: "Away from Tue, Nov 10",
         detail: "Back Mon, Jan 4. Vacation on those days.",
       },
+      starts: null,
     });
   });
 
@@ -1008,5 +1015,95 @@ describe("someone with no account", () => {
         (choice) => choice.action,
       ),
     ).toContain("suspend");
+  });
+});
+
+describe("first day (51g4)", () => {
+  const today = "2026-10-28";
+  const newHire = { status: "active" as const, firstDay: "2026-11-10" };
+
+  it("refuses every day before it and nothing from it on", () => {
+    expect(isBeforeFirstDay(newHire, "2026-11-09")).toBe(true);
+    expect(isBeforeFirstDay(newHire, "2026-11-10")).toBe(false);
+    expect(isSchedulableOn(newHire, "2026-11-09")).toBe(false);
+    expect(isSchedulableOn(newHire, "2026-11-10")).toBe(true);
+    expect(isSchedulableOn({ status: "active", firstDay: null }, "2026-11-09")).toBe(true);
+    expect(
+      isSchedulableOn(
+        { status: "inactive", awayUntil: "2026-11-01", firstDay: "2026-11-10" },
+        "2026-11-05",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a planned away's own days locked after it", () => {
+    const person = {
+      ...newHire,
+      plannedStatus: "away" as const,
+      plannedFrom: "2026-12-01",
+      plannedUntil: "2026-12-08",
+    };
+    expect(isSchedulableOn(person, "2026-11-20")).toBe(true);
+    expect(isSchedulableOn(person, "2026-12-02")).toBe(false);
+  });
+
+  it("is upcoming only while it is after today", () => {
+    expect(upcomingFirstDay(newHire, today)).toBe("2026-11-10");
+    expect(upcomingFirstDay(newHire, "2026-11-10")).toBeNull();
+    expect(upcomingFirstDay({ firstDay: null }, today)).toBeNull();
+  });
+
+  it("accepts any past day and up to a year ahead", () => {
+    expect(isValidFirstDay("2019-03-04", today)).toBe(true);
+    expect(isValidFirstDay("2027-10-28", today)).toBe(true);
+    expect(isValidFirstDay("2027-10-29", today)).toBe(false);
+    expect(isValidFirstDay("2026-02-30", today)).toBe(false);
+    expect(isValidFirstDay("Nov 10", today)).toBe(false);
+  });
+
+  it("reads Starts Nov 10, and a full date on a record", () => {
+    expect(describeFirstDay("2026-11-10")).toBe("Starts Nov 10");
+    expect(describeFirstDay("2026-11-10", { weekday: true })).toBe("Starts Tue, Nov 10");
+    expect(formatFirstDay("2026-11-10")).toBe("Nov 10, 2026");
+  });
+
+  it("comes before a planned change in the People list's muted text", () => {
+    expect(describeUpcomingChange(newHire, today)).toBe("Starts Nov 10");
+    expect(
+      describeUpcomingChange(
+        { ...newHire, plannedStatus: "removed", plannedFrom: "2027-01-01" },
+        today,
+      ),
+    ).toBe("Starts Nov 10");
+    expect(
+      describeUpcomingChange(
+        { firstDay: "2026-10-01", plannedStatus: "removed", plannedFrom: "2027-01-01" },
+        today,
+      ),
+    ).toBe("Leaving Dec 31");
+    expect(describeUpcomingChange({ firstDay: "2026-10-01" }, today)).toBeNull();
+  });
+
+  it("puts a dashed First day card beside the status card while it is ahead", () => {
+    expect(describeStatusCard(newHire, { today }).starts).toEqual({
+      title: "Starts Tue, Nov 10",
+      detail: "Can't be scheduled before then.",
+    });
+    expect(describeStatusCard(newHire, { today: "2026-11-10" }).starts).toBeNull();
+    expect(describeStatusCard(newHire).starts).toBeNull();
+    expect(describeStatusCard({ ...newHire, status: "removed" }, { today }).starts).toBeNull();
+  });
+
+  it("marks their name until then, unless a change is planned", () => {
+    expect(statusMark(newHire, today)).toEqual({
+      kind: "planned",
+      label: "Starts Nov 10",
+      tone: "warning",
+    });
+    expect(statusMark(newHire)).toBeNull();
+    expect(statusMark(newHire, "2026-11-10")).toBeNull();
+    expect(
+      statusMark({ ...newHire, plannedStatus: "removed", plannedFrom: "2027-01-01" }, today)?.label,
+    ).toBe("Leaving Dec 31");
   });
 });

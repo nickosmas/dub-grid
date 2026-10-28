@@ -144,7 +144,9 @@ import {
   awayLockedHint,
   awayRangeOf,
   buildRowAwayDays,
+  isBeforeRangeFirstDay,
   LEAVING_RUN_LABEL,
+  startsRunLabel,
 } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
@@ -2136,7 +2138,6 @@ const SectionBlock = memo(function SectionBlock({
                 todayKey,
                 splitAtIndex,
               );
-              const rowAwayHint = rowAwayRange ? awayLockedHint(rowAwayRange) : undefined;
               const rowAwayAbsenceTypeId =
                 rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
               const rowAwayAbsence =
@@ -2565,6 +2566,13 @@ const SectionBlock = memo(function SectionBlock({
                       const awayRunDay = rowAwayDays?.runs[index] ?? null;
                       // Before the return date nothing can be scheduled for them.
                       const isAwayLocked = !!rowAwayDays?.locked[index];
+                      const awayHint =
+                        isAwayLocked && rowAwayRange
+                          ? awayLockedHint(rowAwayRange, dateKey)
+                          : undefined;
+                      // Days before a first day (51g4) carry its own label and no absence.
+                      const awayRunBeforeFirstDay =
+                        !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
                       const isDayInteractive = isCellInteractive && !isAwayLocked;
                       const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                       // The row above paints its own bottom stroke inside its
@@ -2647,8 +2655,8 @@ const SectionBlock = memo(function SectionBlock({
                           data-absence-run-index={absenceRunDay?.runIndex}
                           data-away-run={awayRunDay?.position}
                           data-away-locked={isAwayLocked ? "true" : undefined}
-                          title={isAwayLocked ? rowAwayHint : undefined}
-                          aria-description={isAwayLocked ? rowAwayHint : undefined}
+                          title={awayHint}
+                          aria-description={awayHint}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2733,9 +2741,15 @@ const SectionBlock = memo(function SectionBlock({
                             {awayRunDay?.position === "start" && (
                               <AwayRunBar
                                 runIndex={awayRunDay.runIndex}
-                                label={rowAwayRange?.lastDay ? LEAVING_RUN_LABEL : undefined}
+                                label={
+                                  awayRunBeforeFirstDay && rowAwayRange?.firstDay
+                                    ? startsRunLabel(rowAwayRange.firstDay)
+                                    : rowAwayRange?.lastDay
+                                      ? LEAVING_RUN_LABEL
+                                      : undefined
+                                }
                                 absenceName={
-                                  rowAwayAbsence
+                                  rowAwayAbsence && !awayRunBeforeFirstDay
                                     ? rowAwayAbsence.name || rowAwayAbsence.label
                                     : null
                                 }

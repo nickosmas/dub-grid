@@ -355,6 +355,9 @@ export function availabilityFromShifts(
 ): CoverageAvailability {
   const away = input.awayRanges?.get(employeeId);
   if (away && isInAwayRange(away, dateKey)) {
+    if (away.firstDay && dateKey < away.firstDay) {
+      return { kind: "notStarted", firstDay: away.firstDay };
+    }
     return away.lastDay
       ? { kind: "leaving", lastDay: away.lastDay }
       : { kind: "away", until: away.until };

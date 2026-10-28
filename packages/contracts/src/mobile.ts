@@ -1003,6 +1003,8 @@ export const mobilePersonSchema = z.object({
   plannedUntil: z.string().date().nullable().default(null),
   /** The absence a planned Away's days hold, or null. */
   plannedAbsenceTypeId: z.number().int().nullable().default(null),
+  /** Their first day (YYYY-MM-DD, 51g4): no day before it can be scheduled; null when not set. */
+  firstDay: z.string().date().nullable().default(null),
   userId: z.string().uuid().nullable().default(null),
   version: z.number().int().nonnegative().default(0),
   /**
@@ -1061,6 +1063,8 @@ export const mobilePersonCreateBodySchema = z.object({
   certificationId: z.number().int().nullable(),
   focusAreaIds: z.array(z.number().int()).min(1),
   email: optionalStaffEmailSchema,
+  /** Their first day (YYYY-MM-DD, 51g4); no day before it can be scheduled. */
+  firstDay: z.string().date().nullable().optional(),
 });
 
 export const mobilePersonCreateResponseSchema = z.object({

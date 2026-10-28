@@ -216,7 +216,9 @@ export type CoverageAvailability =
   /** The person is away until `until`, their first day back (YYYY-MM-DD). */
   | { kind: "away"; until: string | null }
   /** The day is after the person's last day (YYYY-MM-DD), when they're offboarded. */
-  | { kind: "leaving"; lastDay: string };
+  | { kind: "leaving"; lastDay: string }
+  /** The day is before the person's first day (YYYY-MM-DD, 51g4). */
+  | { kind: "notStarted"; firstDay: string };
 
 /** A person's shift preference: flexible ("prefers") or strict ("only"). */
 export interface CoverageShiftPreference {

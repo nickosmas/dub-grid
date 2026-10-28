@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:573de6a51cebdb3a2ecceaaa3f9d14e140ad4336e7cc59b73086751c10a14c82",
+  "sourceDigest": "sha256:c5e6f3eb24ed2ea688422a33a827ea17dc69a5898a57f2005d2121a69444646e",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4844,6 +4844,16 @@
       "sha256": "b7c2166e662af86c98dffbc43175a4d77346ea3a634d7450f21d3b634a9eb6a0",
       "source": {
         "path": "supabase/migrations/105_suspended_until.sql"
+      }
+    },
+    {
+      "id": "migration:106_first_day.sql",
+      "version": "106",
+      "name": "first_day",
+      "file": "106_first_day.sql",
+      "sha256": "fea43700651d8e8621c6a7b01c9eb6ef3c603a4ff48bf9b954d20ebad3afed53",
+      "source": {
+        "path": "supabase/migrations/106_first_day.sql"
       }
     }
   ],

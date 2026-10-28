@@ -46,6 +46,17 @@ describe("PersonRecordCard", () => {
     expect(screen.getByText("Last active")).toBeInTheDocument();
   });
 
+  it("keeps a first day on the record, past or ahead (51g4)", () => {
+    render(
+      <PersonRecordCard
+        employee={makeEmployee({ firstDay: "2019-03-04" })}
+        accountState={{ kind: "not-invited" }}
+      />,
+    );
+
+    expect(fieldValue("First day")).toBe("Mar 4, 2019");
+  });
+
   it("names an Away person's return date in their status", () => {
     render(
       <PersonRecordCard

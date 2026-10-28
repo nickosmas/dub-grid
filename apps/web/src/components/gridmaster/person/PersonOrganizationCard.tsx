@@ -1,6 +1,10 @@
 "use client";
 
-import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
+import {
+  describeEmploymentStatus,
+  describePlannedChangeInFull,
+  formatFirstDay,
+} from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
@@ -144,6 +148,9 @@ function StaffFacts({
         label="Employment"
         value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
       />
+      {employee.firstDay ? (
+        <PersonField label="First day" value={formatFirstDay(employee.firstDay)} tabular />
+      ) : null}
       {employee.statusNote ? (
         <PersonField label="Status note" value={employee.statusNote} wide />
       ) : null}

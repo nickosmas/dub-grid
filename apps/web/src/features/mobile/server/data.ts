@@ -185,6 +185,7 @@ type MobilePeopleRow = Pick<
   | "plannedFrom"
   | "plannedUntil"
   | "plannedAbsenceTypeId"
+  | "firstDay"
   | "certificationId"
   | "roleIds"
   | "seniority"
@@ -2073,6 +2074,7 @@ export async function fetchMobilePeople(
     plannedFrom: row.planned_from ?? null,
     plannedUntil: row.planned_until ?? null,
     plannedAbsenceTypeId: row.planned_absence_type_id ?? null,
+    firstDay: row.first_day ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority ?? 0,

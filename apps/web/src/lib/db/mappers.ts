@@ -399,6 +399,7 @@ export function rowToEmployee(row: DbEmployee): Employee {
     plannedFrom: row.planned_from ?? null,
     plannedUntil: row.planned_until ?? null,
     plannedAbsenceTypeId: row.planned_absence_type_id ?? null,
+    firstDay: row.first_day ?? null,
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority,
@@ -452,6 +453,8 @@ export function employeeToRow(
     contact_notes: emp.contactNotes,
     department_ids: emp.departmentIds ?? [],
     dept_admin_ids: emp.deptAdminIds ?? [],
+    // Left out, a save keeps the first day it has (a caller that never reads it).
+    ...(emp.firstDay !== undefined ? { first_day: emp.firstDay } : {}),
   };
 }
 

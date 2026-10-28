@@ -33,6 +33,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { satisfiesCertificationRequirement } from "@/lib/credential-requirements";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
+import { FirstDayField } from "@/components/staff/FirstDayField";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -121,6 +122,8 @@ type EditForm = {
   phone: string;
   email: string;
   contactNotes: string;
+  /** Their first day (YYYY-MM-DD, 51g4), or empty for none. */
+  firstDay: string;
 };
 
 function buildEditForm(employee: Employee): EditForm {
@@ -135,6 +138,7 @@ function buildEditForm(employee: Employee): EditForm {
     phone: employee.phone || "",
     email: employee.email || "",
     contactNotes: employee.contactNotes || "",
+    firstDay: employee.firstDay ?? "",
   };
 }
 
@@ -275,6 +279,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         (form.phone || "") !== (employee.phone || "") ||
         (form.email || "") !== (employee.email || "") ||
         (form.contactNotes || "") !== (employee.contactNotes || "") ||
+        form.firstDay !== (employee.firstDay ?? "") ||
         form.focusAreaIds.length !== employee.focusAreaIds.length ||
         form.focusAreaIds.some((id) => !employee.focusAreaIds.includes(id)) ||
         form.roleIds.length !== employee.roleIds.length ||
@@ -353,6 +358,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         phone: normalizeOptionalUsPhone(form.phone),
         email: normalizeOptionalStaffEmail(form.email),
         contactNotes: normalizeStaffNotes(form.contactNotes),
+        firstDay: form.firstDay || null,
       };
 
       // Changing the email while a pending invitation exists will silently
@@ -582,22 +588,37 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 )}
 
                 {showScheduleAssignments && (
-                  <div>
-                    <label style={fieldLabel}>Employment</label>
-                    <CustomSelect
-                      value={form.employmentType}
-                      options={[
-                        { value: "full_time", label: "Full-time" },
-                        { value: "part_time", label: "Part-time" },
-                      ]}
-                      onChange={(v) =>
-                        setForm((p) => ({
-                          ...p,
-                          employmentType: v === "part_time" ? "part_time" : "full_time",
-                        }))
-                      }
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gap: 10,
+                      alignItems: "start",
+                    }}
+                  >
+                    <div>
+                      <label style={fieldLabel}>Employment</label>
+                      <CustomSelect
+                        value={form.employmentType}
+                        options={[
+                          { value: "full_time", label: "Full-time" },
+                          { value: "part_time", label: "Part-time" },
+                        ]}
+                        onChange={(v) =>
+                          setForm((p) => ({
+                            ...p,
+                            employmentType: v === "part_time" ? "part_time" : "full_time",
+                          }))
+                        }
+                        disabled={readOnly}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+                    <FirstDayField
+                      value={form.firstDay}
+                      onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
+                      labelStyle={{ ...fieldLabel, marginBottom: 0 }}
                       disabled={readOnly}
-                      style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
                     />
                   </div>
                 )}

@@ -29,6 +29,11 @@ vi.mock("@dubgrid/data-access", async (importOriginal) => ({
   insertMobileAuditLogEntry: (...args: unknown[]) => insertMobileAuditLogEntry(...args),
 }));
 
+const fetchOrgToday = vi.fn();
+vi.mock("@/features/employees/server/org-today", () => ({
+  fetchOrgToday: (...args: unknown[]) => fetchOrgToday(...args),
+}));
+
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
@@ -275,6 +280,7 @@ describe("mobile people route", () => {
         plannedFrom: null,
         plannedUntil: null,
         plannedAbsenceTypeId: null,
+        firstDay: null,
         userId: null,
         version: 7,
         membershipUpdatedAt: null,
@@ -534,6 +540,55 @@ describe("POST mobile people route (create)", () => {
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,
       expect.objectContaining({ action: "employee_created", orgId: ORG_ID }),
+    );
+  });
+
+  it("refuses a first day more than a year ahead before creating anyone (51g4)", async () => {
+    const auth = makeCreateAuth();
+    requireMobileAuth.mockResolvedValue(auth);
+    fetchOrgToday.mockResolvedValue("2026-10-28");
+
+    const { POST } = await import("./people");
+    const response = await POST(
+      makeRequest({
+        firstName: "Nia",
+        lastName: "Torres",
+        focusAreaIds: [1],
+        certificationId: null,
+        email: "",
+        firstDay: "2027-10-29",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "FIRST_DAY_INVALID" });
+    expect(insertMobileAuditLogEntry).not.toHaveBeenCalled();
+  });
+
+  it("records a new hire's first day (51g4)", async () => {
+    const auth = makeCreateAuth();
+    requireMobileAuth.mockResolvedValue(auth);
+    fetchOrgToday.mockResolvedValue("2026-10-28");
+
+    const { POST } = await import("./people");
+    const response = await POST(
+      makeRequest({
+        firstName: "Nia",
+        lastName: "Torres",
+        focusAreaIds: [1],
+        certificationId: null,
+        email: "",
+        firstDay: "2026-11-10",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
+      auth.serviceClient,
+      expect.objectContaining({
+        action: "employee.created",
+        details: expect.objectContaining({ firstDay: "2026-11-10" }),
+      }),
     );
   });
 

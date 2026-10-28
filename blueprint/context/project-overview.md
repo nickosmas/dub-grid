@@ -375,10 +375,10 @@ Item 51 is split:
   publishes with the period. The grid's bar reads "Away · Vacation" and a
   locked day says why; moving the date, changing or clearing the absence, or
   marking them active early rewrites the days (migration 100).
-- **51g - Dated status changes:** a status change can start on a later
-  date; until then the person stays as they are, the days it covers are
-  locked and changed in the draft, and a daily job applies it on the day in
-  the organization's timezone.
+- **51g - Dated status changes:** shipped; a status change can start on a
+  later date; until then the person stays as they are, the days it covers
+  are locked and changed in the draft, and a daily job applies it on the day
+  in the organization's timezone.
   - **51g1 - Away from a date:** shipped; Change status takes a Starts
     date up to a year ahead beside the return date (web and mobile), and
     **Schedule away** plans it: they stay Active until then, the days from
@@ -400,8 +400,13 @@ Item 51 is split:
     the day; a later start shows "Suspended from Nov 10" as the plan and
     locks no day. The daily job reinstates them on the end and starts a
     planned suspension the way a manual Suspend does (migration 105).
-  - **51g4 - First day:** a new hire can't be scheduled before their first
-    day, and shows "Starts Nov 10" until then.
+  - **51g4 - First day:** shipped; Add Staff Members and the person form
+    take an optional First day (any past day, up to a year ahead; mobile Add
+    person from today). Nobody can schedule them before it, and setting it
+    later clears those draft days and closes their requests; they show
+    "Starts Nov 10" in the People list, on a dashed card and in the grid
+    until then, keep sign-in and a seat, and the date stays on the record.
+    No job step (migration 106).
 - **51h - Bulk status changes:** the People list bulk bar: Mark away,
   Suspend, Archive and Mark active.
 - **51i - Losing a focus area:** taking someone off a focus area asks
@@ -486,8 +491,8 @@ endpoints remain internal.
 - department or focus-area assignment, role, and certifications
 - `employment_status` - active, inactive, or removed; only active staff can be
   scheduled and count toward billing. Item 51 names them Active, Away and
-  Archived and adds suspended access, a return date and a planned status
-  change with its dates (51g); an Away
+  Archived and adds suspended access, a return date, a planned status
+  change with its dates (51g) and a first day (`first_day`, 51g4); an Away
   person keeps sign-in and counts toward billing only while they can manage,
   and a Suspended one stays active and schedulable but can't sign in
 - scheduling and management access are independent capabilities
@@ -618,7 +623,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `105`.
+  checksum-locked through `106`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

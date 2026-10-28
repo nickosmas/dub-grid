@@ -1110,7 +1110,7 @@
         replacing shifts, published with the period; those days are locked
         in the grid with an explanation, and changing the dates rewrites
         them.
-  - [ ] 51g. **Dated status changes** - a status change can start on a
+  - [x] 51g. **Dated status changes** - a status change can start on a
         later date; until then the person stays as they are, the days it
         covers are locked and changed in the draft, and a daily job applies
         it on the day in the organization's timezone.
@@ -1123,7 +1123,7 @@
           them the day after.
     - [x] 51g3. **Suspended until** - an optional end date on a suspension,
           from today or a later start; the job reinstates them on it.
-    - [ ] 51g4. **First day** - a new hire can't be scheduled before their
+    - [x] 51g4. **First day** - a new hire can't be scheduled before their
           first day, and shows "Starts Nov 10" until then.
   - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.

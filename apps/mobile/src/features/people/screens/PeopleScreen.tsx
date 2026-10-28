@@ -17,11 +17,12 @@ import type {
 import {
   EMPLOYMENT_STATUS_LABELS,
   ORG_ROLE_PRIVILEGE_ORDER,
-  describePlannedChange,
+  describeUpcomingChange,
   getEffectiveOrgRole,
   type EmployeeStatus,
   getOrgRolePrivilegeRank,
 } from "@dubgrid/domain";
+import { formatLocalDateKey } from "@dubgrid/schedule-core";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -1195,6 +1196,7 @@ function PersonRow({
     | "plannedStatus"
     | "plannedFrom"
     | "plannedUntil"
+    | "firstDay"
   >;
   subtitle: string;
   isLast: boolean;
@@ -1207,8 +1209,12 @@ function PersonRow({
   const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const statusPill = staffStatus ? getMobileStatusPill(mobileColors, staffStatus) : null;
-  // An Away planned for later (51g1) leaves them Active, so it reads beside the name.
-  const plannedLabel = staffStatus?.status === "active" ? describePlannedChange(staffStatus) : null;
+  // A change planned for later (51g) or a first day still ahead (51g4) leaves
+  // them Active, so it reads beside the name.
+  const plannedLabel =
+    staffStatus?.status === "active"
+      ? describeUpcomingChange(staffStatus, formatLocalDateKey(new Date()))
+      : null;
   const initials =
     name
       .split(" ")

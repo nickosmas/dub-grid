@@ -216,6 +216,7 @@ describe("mobile people status route", () => {
         plannedFrom: null,
         plannedUntil: null,
         plannedAbsenceTypeId: null,
+        firstDay: null,
         userId: null,
         version: 8,
         membershipUpdatedAt: null,

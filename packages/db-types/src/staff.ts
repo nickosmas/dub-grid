@@ -18,6 +18,7 @@ export interface DbEmployee {
   planned_from?: string | null;
   planned_until?: string | null;
   planned_absence_type_id?: number | null;
+  first_day?: string | null;
   certification_id: number | null;
   role_ids: number[];
   seniority: number;

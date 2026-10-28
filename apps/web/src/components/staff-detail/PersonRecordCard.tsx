@@ -1,6 +1,10 @@
 "use client";
 
-import { describeEmploymentStatus, describePlannedChangeInFull } from "@dubgrid/domain";
+import {
+  describeEmploymentStatus,
+  describePlannedChangeInFull,
+  formatFirstDay,
+} from "@dubgrid/domain";
 import type { Employee } from "@/types";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
@@ -54,6 +58,9 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             value={employee.joinedAt ? formatDay(employee.joinedAt) : "Not joined"}
             tabular={Boolean(employee.joinedAt)}
           />
+        ) : null}
+        {employee.firstDay ? (
+          <RecordField label="First day" value={formatFirstDay(employee.firstDay)} tabular />
         ) : null}
         <RecordField
           label="Status"

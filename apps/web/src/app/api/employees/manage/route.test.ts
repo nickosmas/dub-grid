@@ -14,6 +14,8 @@ const requireSensitiveActionAuth = vi.fn();
 const updateUserById = vi.fn();
 const followUpLinkedLoginEmailChange = vi.fn();
 const employeeUpdatePayloads: unknown[] = [];
+const insertPayloads: unknown[] = [];
+const fetchOrgToday = vi.fn();
 const membershipReads: Array<Array<[string, unknown]>> = [];
 let membershipJoinedAt: string | null = null;
 
@@ -31,6 +33,10 @@ vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (...args: unknown[]) => requireAuthenticatedUser(...args),
   forbidIfSandboxCookie: (...args: unknown[]) => forbidIfSandboxCookie(...args),
   requireSensitiveActionAuth: (...args: unknown[]) => requireSensitiveActionAuth(...args),
+}));
+
+vi.mock("@/features/employees/server/org-today", () => ({
+  fetchOrgToday: (...args: unknown[]) => fetchOrgToday(...args),
 }));
 
 vi.mock("@/features/employees/server/login-email-follow-up", () => ({
@@ -69,9 +75,13 @@ const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 
 function makeServiceClient() {
   const chain: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit", "insert"]) {
+  for (const method of ["select", "eq", "in", "is", "gte", "order", "limit"]) {
     chain[method] = vi.fn(() => chain);
   }
+  chain.insert = vi.fn((payload: unknown) => {
+    insertPayloads.push(payload);
+    return chain;
+  });
   chain.update = vi.fn((payload: unknown) => {
     employeeUpdatePayloads.push(payload);
     return chain;
@@ -204,6 +214,8 @@ describe("POST /api/employees/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     employeeUpdatePayloads.length = 0;
+    insertPayloads.length = 0;
+    fetchOrgToday.mockResolvedValue("2026-10-28");
     membershipReads.length = 0;
     membershipJoinedAt = null;
     validateCsrfOrigin.mockReturnValue(null);
@@ -416,6 +428,56 @@ describe("POST /api/employees/manage", () => {
 
       expect(response.status).toBe(200);
       expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
+    });
+
+    describe("first day (51g4)", () => {
+      const firstDayAudit = () =>
+        insertPayloads.find(
+          (payload) => (payload as { action?: string }).action === "employee.updated",
+        ) as { details: { changedFields: string[]; from: object; to: object } } | undefined;
+
+      it("refuses a new first day more than a year ahead, before writing", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2027-10-29" }),
+        );
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({
+          error: "Choose a first day no more than a year ahead.",
+          code: "FIRST_DAY_INVALID",
+        });
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("takes a past first day and records the change", async () => {
+        mockAuth({ canManageEmployees: true });
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2019-03-04" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(firstDayAudit()?.details).toMatchObject({
+          changedFields: expect.arrayContaining(["firstDay"]),
+          from: { firstDay: null },
+          to: { firstDay: "2019-03-04" },
+        });
+      });
+
+      it("never re-checks a first day the save leaves as it was", async () => {
+        mockAuth({ canManageEmployees: true });
+        rowToEmployee.mockReturnValue(makeEmployee({ firstDay: "2030-01-01", focusAreaIds: [3] }));
+
+        const response = await POST(
+          updateEmployeeRequest({ focusAreaIds: [3], firstDay: "2030-01-01" }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(fetchOrgToday).not.toHaveBeenCalled();
+        expect(firstDayAudit()?.details.changedFields ?? []).not.toContain("firstDay");
+      });
     });
 
     describe("login email", () => {

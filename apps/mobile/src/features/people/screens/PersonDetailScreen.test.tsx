@@ -289,6 +289,42 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("·")).not.toBeInTheDocument();
   });
 
+  it("shows a new hire's first day on a dashed card and the record (51g4)", () => {
+    const firstDay = addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), 12);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ firstDay }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    const card = within(screen.getByTestId("starts-card"));
+    expect(card.getByText("First day")).toBeInTheDocument();
+    expect(
+      card.getByText(`Starts ${formatReturnDate(firstDay, { weekday: true })}`),
+    ).toBeInTheDocument();
+    expect(card.getByText("Can't be scheduled before then.")).toBeInTheDocument();
+    expect(screen.getByLabelText(`Starts ${formatReturnDate(firstDay)}`)).toBeInTheDocument();
+  });
+
+  it("keeps a past first day on the record without the card (51g4)", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ firstDay: "2019-03-04" }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.queryByTestId("starts-card")).not.toBeInTheDocument();
+    expect(screen.getByText("Mar 4, 2019")).toBeInTheDocument();
+  });
+
   // The avatar's corner used to carry a status dot. The tier's insignia sits
   // beside the name now, and an Away person reads as away from the Mark active
   // button rather than from a chip.

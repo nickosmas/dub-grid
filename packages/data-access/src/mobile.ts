@@ -35,7 +35,7 @@ const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_order, arc
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_ids, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff, max_staff";
 const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
@@ -243,6 +243,7 @@ export interface MobilePeopleQueryRow {
   planned_from: string | null;
   planned_until: string | null;
   planned_absence_type_id: number | null;
+  first_day: string | null;
   certification_id: number | null;
   role_ids: number[] | null;
   seniority: number | null;
@@ -1391,7 +1392,7 @@ export async function fetchMobilePeopleRows(
     const { data, error } = await serviceClient
       .from("employees")
       .select(
-        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
+        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, away_until, away_absence_type_id, suspended_at, suspended_until, planned_status, planned_from, planned_until, planned_absence_type_id, first_day, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
       )
       .eq("org_id", orgId)
       .order("first_name", { ascending: true })

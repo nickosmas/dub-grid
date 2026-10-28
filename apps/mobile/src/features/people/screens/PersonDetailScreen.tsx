@@ -5,6 +5,7 @@ import {
   describeStatusAction,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
+  formatFirstDay,
   statusChoices,
   type StatusAction,
 } from "@dubgrid/domain";
@@ -1580,6 +1581,13 @@ export default function PersonDetailScreen() {
                     iconName="briefcase-outline"
                     label="Employment"
                     value={employmentLabel}
+                  />
+                ) : null}
+                {canViewEmployeeDetails && person.firstDay ? (
+                  <ProfileInfoRow
+                    iconName="calendar-outline"
+                    label="First day"
+                    value={formatFirstDay(person.firstDay)}
                   />
                 ) : null}
                 {showCertificationRow ? (

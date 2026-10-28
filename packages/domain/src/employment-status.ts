@@ -102,6 +102,10 @@ export const SUSPENDED_UNTIL_INVALID_MESSAGE = "Choose an end date after today."
 
 export const PLANNED_SUSPENSION_END_INVALID_MESSAGE = "Choose an end date after the start date.";
 
+export const FIRST_DAY_INVALID_CODE = "FIRST_DAY_INVALID";
+
+export const FIRST_DAY_INVALID_MESSAGE = "Choose a first day no more than a year ahead.";
+
 /** How far ahead a status change can be planned, in days. */
 export const PLANNED_START_MAX_DAYS = 365;
 
@@ -139,6 +143,16 @@ export function isValidLastDay(lastDay: string, today: string): boolean {
   return lastDay >= today && lastDay <= shiftDateKey(today, PLANNED_START_MAX_DAYS);
 }
 
+/** A first day (YYYY-MM-DD, 51g4): any real past day, or up to a year after `today`. */
+export function isValidFirstDay(firstDay: string, today: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDay)) return false;
+  const parsed = new Date(`${firstDay}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== firstDay) {
+    return false;
+  }
+  return firstDay <= shiftDateKey(today, PLANNED_START_MAX_DAYS);
+}
+
 /**
  * A planned last day is stored as the day they're offboarded, the day after
  * it, so every planned change starts on `plannedFrom`.
@@ -161,10 +175,47 @@ export interface PlannedChangeState {
   plannedUntil?: string | null;
 }
 
-export interface SchedulableState extends PlannedChangeState {
+/** Someone's first day (51g4), which no earlier day can be scheduled before. */
+export interface FirstDayState {
+  firstDay?: string | null;
+}
+
+export interface SchedulableState extends PlannedChangeState, FirstDayState {
   status: EmployeeStatus;
   archivedAt?: string | null;
   awayUntil?: string | null;
+}
+
+/** Whether `dateKey` comes before someone's first day (51g4). */
+export function isBeforeFirstDay(person: FirstDayState, dateKey: string): boolean {
+  return !!person.firstDay && dateKey < person.firstDay;
+}
+
+/** Their first day while it is still after `today` (YYYY-MM-DD), else null. */
+export function upcomingFirstDay(person: FirstDayState, today: string): string | null {
+  return person.firstDay && person.firstDay > today ? person.firstDay : null;
+}
+
+/** The word for someone who hasn't started yet: "Starts Nov 10" (51g4). */
+export const STARTS_LABEL = "Starts";
+
+/** "Starts Nov 10", or "Starts Mon, Nov 10" with `weekday`. */
+export function describeFirstDay(firstDay: string, { weekday = false } = {}): string {
+  return `${STARTS_LABEL} ${formatReturnDate(firstDay, { weekday })}`;
+}
+
+const FULL_DAY = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** A first day on a record, with its year: "Nov 10, 2026". */
+export function formatFirstDay(firstDay: string): string {
+  const date = new Date(`${firstDay}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return firstDay;
+  return FULL_DAY.format(date);
 }
 
 /** Whether a planned Away covers `dateKey`: from its first day up to the day they're back. */
@@ -185,12 +236,12 @@ export function isAfterPlannedLastDay(person: PlannedChangeState, dateKey: strin
 }
 
 /**
- * The database's `employee_schedulable_on`: active outside any planned Away
- * and up to any planned last day, or Away with a return date on or before
- * `dateKey` (YYYY-MM-DD).
+ * The database's `employee_schedulable_on`: from their first day on, active
+ * outside any planned Away and up to any planned last day, or Away with a
+ * return date on or before `dateKey` (YYYY-MM-DD).
  */
 export function isSchedulableOn(person: SchedulableState, dateKey: string): boolean {
-  if (person.archivedAt) return false;
+  if (person.archivedAt || isBeforeFirstDay(person, dateKey)) return false;
   if (person.status === "active") {
     return !isPlannedAwayOn(person, dateKey) && !isAfterPlannedLastDay(person, dateKey);
   }
@@ -708,7 +759,7 @@ export interface StatusChoice {
   unavailableReason: string | null;
 }
 
-export interface StatusState extends PlannedChangeState {
+export interface StatusState extends PlannedChangeState, FirstDayState {
   status: EmployeeStatus;
   /** Their linked account; null for someone who can't sign in at all. Left out, they have one. */
   userId?: string | null;
@@ -966,6 +1017,18 @@ export function describePlannedChange(state: PlannedChangeState): string | null 
   return `${EMPLOYMENT_STATUS_LABELS.inactive} from ${formatReturnDate(state.plannedFrom)}`;
 }
 
+/**
+ * The muted text beside an Active pill: "Starts Nov 10" while their first day
+ * is ahead of `today` (51g4), else any planned change's.
+ */
+export function describeUpcomingChange(
+  state: PlannedChangeState & FirstDayState,
+  today: string,
+): string | null {
+  const firstDay = upcomingFirstDay(state, today);
+  return firstDay ? describeFirstDay(firstDay) : describePlannedChange(state);
+}
+
 /** The icon beside a person's name; Active with nothing planned has none. */
 export type StatusMarkKind = "suspended" | "away" | "planned" | "archived";
 
@@ -976,8 +1039,12 @@ export interface StatusMark {
   tone: StatusTone;
 }
 
-/** Which status icon sits after someone's name, and what it says. */
-export function statusMark(state: StatusState): StatusMark | null {
+/**
+ * Which status icon sits after someone's name, and what it says. With
+ * `today`, an Active person with nothing planned who hasn't started yet gets
+ * "Starts Nov 10" (51g4).
+ */
+export function statusMark(state: StatusState, today?: string): StatusMark | null {
   switch (currentKind(state)) {
     case "archived":
       return { kind: "archived", label: EMPLOYMENT_STATUS_LABELS.removed, tone: "neutral" };
@@ -987,7 +1054,11 @@ export function statusMark(state: StatusState): StatusMark | null {
       return { kind: "away", label: describeCurrentStatus(state).text, tone: "warning" };
     case "active": {
       const planned = describePlannedChangeInFull(state);
-      return planned ? { kind: "planned", label: planned, tone: "warning" } : null;
+      if (planned) return { kind: "planned", label: planned, tone: "warning" };
+      const firstDay = today ? upcomingFirstDay(state, today) : null;
+      return firstDay
+        ? { kind: "planned", label: describeFirstDay(firstDay), tone: "warning" }
+        : null;
     }
   }
 }
@@ -997,7 +1068,15 @@ export interface StatusCardCopy {
   current: { kind: StatusChoiceKind; title: string; detail: string; tone: StatusTone };
   /** A second, dashed card for an Away, a suspension or a last day planned for later. */
   planned: { title: string; detail: string } | null;
+  /** A dashed card for a first day still ahead (51g4), with `today` given. */
+  starts: { title: string; detail: string } | null;
 }
+
+/** Can't be scheduled before their first day. */
+export const FIRST_DAY_CARD_DETAIL = "Can't be scheduled before then.";
+
+/** The hint under a First day field, on web and mobile. */
+export const FIRST_DAY_FIELD_HINT = "They can't be scheduled before this day.";
 
 /**
  * The status card at the top of a person's profile, in the same words as the
@@ -1005,7 +1084,7 @@ export interface StatusCardCopy {
  */
 export function describeStatusCard(
   state: StatusState,
-  { absenceName = null }: { absenceName?: string | null } = {},
+  { absenceName = null, today = null }: { absenceName?: string | null; today?: string | null } = {},
 ): StatusCardCopy {
   const kind = currentKind(state);
   const current = describeCurrentStatus(state);
@@ -1013,7 +1092,11 @@ export function describeStatusCard(
   const plannedFrom = state.plannedStatus === "away" ? state.plannedFrom : null;
   const suspendFrom = state.plannedStatus === "suspended" ? state.plannedFrom : null;
   const lastDay = plannedLastDay(state);
+  const firstDay = today && kind !== "archived" ? upcomingFirstDay(state, today) : null;
   return {
+    starts: firstDay
+      ? { title: describeFirstDay(firstDay, { weekday: true }), detail: FIRST_DAY_CARD_DETAIL }
+      : null,
     current: {
       kind,
       title: current.text,

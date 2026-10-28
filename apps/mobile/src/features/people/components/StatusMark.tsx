@@ -14,6 +14,7 @@ import {
   type StatusState,
   type StatusTone,
 } from "@dubgrid/domain";
+import { formatLocalDateKey } from "@dubgrid/schedule-core";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
@@ -88,7 +89,7 @@ export function statusToneColors(mobileColors: MobileColors, tone: StatusTone) {
  */
 export function StatusMarkIcon({ person, size = 14 }: { person: StatusState; size?: number }) {
   const mobileColors = useMobileColors();
-  const mark = statusMark(person);
+  const mark = statusMark(person, formatLocalDateKey(new Date()));
   if (!mark) return null;
   return (
     <View accessible accessibilityLabel={mark.label} accessibilityRole="image" testID="status-mark">
@@ -173,8 +174,9 @@ export function StatusCards({
   const absenceId =
     person.status === "inactive" ? person.awayAbsenceTypeId : person.plannedAbsenceTypeId;
   const absence = absenceTypes.find((absenceType) => absenceType.id === absenceId);
-  const { current, planned } = describeStatusCard(person, {
+  const { current, planned, starts } = describeStatusCard(person, {
     absenceName: absence ? (absence.name ?? absence.label) : null,
+    today: formatLocalDateKey(new Date()),
   });
   const quiet = plain || current.kind === "active";
   const colors = statusToneColors(mobileColors, current.tone);
@@ -290,6 +292,27 @@ export function StatusCards({
         </View>
         {actions}
       </View>
+      {starts ? (
+        <View
+          accessibilityLabel={`First day: ${starts.title}. ${starts.detail}`}
+          accessibilityRole="summary"
+          style={[
+            styles.card,
+            styles.dashed,
+            { backgroundColor: mobileColors.surface, borderColor: warning.border },
+          ]}
+          testID="starts-card"
+        >
+          <View style={styles.row}>
+            <StatusIconCircle name="calendar" tone="warning" />
+            <View style={styles.copy}>
+              <Text style={styles.eyebrow}>First day</Text>
+              <Text style={[styles.title, { color: warning.text }]}>{starts.title}</Text>
+              <Text style={styles.detail}>{starts.detail}</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
       {planned ? (
         <View
           accessibilityLabel={`Planned: ${planned.title}. ${planned.detail}`}

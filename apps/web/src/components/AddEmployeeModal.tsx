@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
+import { FirstDayField } from "@/components/staff/FirstDayField";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MOBILE, useMediaQuery } from "@/hooks";
@@ -25,6 +26,8 @@ type RowEntry = {
   employmentType: Employee["employmentType"];
   certificationId: number | null;
   focusAreaIds: number[];
+  /** Their first day (YYYY-MM-DD, 51g4), or empty for none. */
+  firstDay: string;
 };
 
 type RowDraft = Omit<RowEntry, "_id">;
@@ -38,6 +41,7 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
     employmentType: "full_time",
     certificationId,
     focusAreaIds,
+    firstDay: "",
   };
 }
 
@@ -98,6 +102,7 @@ export default function AddEmployeeModal({
           employmentType: "full_time",
           certificationId: defaultCertId,
           focusAreaIds: [...defaultFocusAreaIds],
+          firstDay: "",
         })),
       ),
     [defaultCertId, defaultFocusAreaIds],
@@ -111,6 +116,7 @@ export default function AddEmployeeModal({
         employmentType: row.employmentType,
         certificationId: row.certificationId,
         focusAreaIds: row.focusAreaIds,
+        firstDay: row.firstDay,
       })),
     ) !== initialRowsSnapshot;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -193,6 +199,7 @@ export default function AddEmployeeModal({
         roleIds: [],
         phone: "",
         email: normalizeOptionalStaffEmail(r.email),
+        firstDay: r.firstDay || null,
         contactNotes: "",
         status: "active" as const,
         statusChangedAt: null,
@@ -522,35 +529,53 @@ export default function AddEmployeeModal({
                       </div>
                     </div>
 
-                    {/* Email (optional). Admins can leave blank to schedule
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile
+                          ? "1fr"
+                          : "minmax(0, 1fr) minmax(220px, 0.6fr)",
+                        gap: 12,
+                        alignItems: "start",
+                      }}
+                    >
+                      {/* Email (optional). Admins can leave blank to schedule
                       a new hire before they're onboarded; the invitation
                       flow fills it in later. */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={fieldLabelStyle}>
-                        Email{" "}
-                        <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
-                          (optional)
-                        </span>
-                      </label>
-                      <input
-                        className="dg-input"
-                        type="email"
-                        value={row.email}
-                        onChange={(e) => updateRow(row._id, { email: e.target.value })}
-                        placeholder="name@example.com"
-                        style={errors.email ? { borderColor: "var(--dg-color-danger)" } : undefined}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={fieldLabelStyle}>
+                          Email{" "}
+                          <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
+                            (optional)
+                          </span>
+                        </label>
+                        <input
+                          className="dg-input"
+                          type="email"
+                          value={row.email}
+                          onChange={(e) => updateRow(row._id, { email: e.target.value })}
+                          placeholder="name@example.com"
+                          style={
+                            errors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
+                          }
+                        />
+                        {errors.email ? (
+                          <div
+                            role="alert"
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                            }}
+                          >
+                            {errors.email}
+                          </div>
+                        ) : null}
+                      </div>
+                      <FirstDayField
+                        value={row.firstDay}
+                        onChange={(firstDay) => updateRow(row._id, { firstDay })}
+                        labelStyle={fieldLabelStyle}
                       />
-                      {errors.email ? (
-                        <div
-                          role="alert"
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                          }}
-                        >
-                          {errors.email}
-                        </div>
-                      ) : null}
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

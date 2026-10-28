@@ -33,6 +33,8 @@ export interface Employee {
   plannedUntil?: string | null;
   /** The absence a planned Away's days hold, or null. */
   plannedAbsenceTypeId?: number | null;
+  /** Their first day (YYYY-MM-DD, 51g4): no day before it can be scheduled. Null when not set. */
+  firstDay?: string | null;
   certificationId: number | null;
   roleIds: number[];
   seniority: number;
