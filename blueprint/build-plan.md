@@ -1188,7 +1188,7 @@
         row, and sends no alert or broadcast. It also stops the cell-save
         function from writing published cells for anyone who can only edit
         shifts.
-  - [ ] 53b. **Past days in the grid** - the Light tint on past days; drag,
+  - [x] 53b. **Past days in the grid** - the Light tint on past days; drag,
         paste, clear, bulk delete, Auto-build, Fill from Recurring Schedules
         and import skip them, and the server refuses a draft for a past
         date. Clicking a past cell opens Correct this day, built on 53a. Auto-build's

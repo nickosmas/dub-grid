@@ -29,7 +29,7 @@ import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
-import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
+import { isNewShiftChange, isPastDateKey, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
@@ -1783,6 +1783,7 @@ const SectionBlock = memo(function SectionBlock({
                 {weekDates.map((date, index) => {
                   const key = formatDateKey(date);
                   const isToday = key === todayKey;
+                  const isPastDay = isPastDateKey(key, todayKey);
                   return (
                     <div
                       key={key}
@@ -1794,6 +1795,7 @@ const SectionBlock = memo(function SectionBlock({
                       }
                       data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
                       data-today={isToday ? "true" : undefined}
+                      data-past={isPastDay ? "true" : undefined}
                       style={{
                         position: "relative",
                         zIndex: 2,
@@ -1804,11 +1806,14 @@ const SectionBlock = memo(function SectionBlock({
                         // "0 1px 0 0" box-shadow draws 1px below the box's own
                         // edge, while this draws flush at it, so mixing the two
                         // techniques put them a pixel apart vertically.
-                        backgroundImage:
-                          "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
-                        backgroundPosition: "0 100%",
+                        // The header stays opaque while it sticks, so a past day's
+                        // wash is a layer over its background, not a fill.
+                        backgroundImage: isPastDay
+                          ? "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong)), linear-gradient(var(--dg-color-past-wash), var(--dg-color-past-wash))"
+                          : "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
+                        backgroundPosition: isPastDay ? "0 100%, 0 0" : "0 100%",
                         backgroundRepeat: "no-repeat",
-                        backgroundSize: "100% 1px",
+                        backgroundSize: isPastDay ? "100% 1px, 100% 100%" : "100% 1px",
                       }}
                     >
                       <div className="dg-grid-slot__chrome" aria-hidden="true" />
@@ -2578,6 +2583,9 @@ const SectionBlock = memo(function SectionBlock({
                       const awayRunBeforeFirstDay =
                         !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
                       const isDayInteractive = isCellInteractive && !isAwayLocked;
+                      // A past day is finished (53b): it opens for a correction,
+                      // and nothing moves into or out of it.
+                      const isPastDay = isPastDateKey(dateKey, todayKey);
                       const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                       // The row above paints its own bottom stroke inside its
                       // own box — the header cells and the open-shifts row both
@@ -2595,6 +2603,7 @@ const SectionBlock = memo(function SectionBlock({
                         canDragShifts &&
                         !bulkDeleteMode &&
                         !isAwayLocked &&
+                        !isPastDay &&
                         !!shiftLabel &&
                         shiftLabel !== "OFF" &&
                         draftKind !== "deleted";
@@ -2626,7 +2635,7 @@ const SectionBlock = memo(function SectionBlock({
                           data={{
                             cellId,
                           }}
-                          disabled={!isDayInteractive || bulkDeleteMode}
+                          disabled={!isDayInteractive || bulkDeleteMode || isPastDay}
                           className="dg-grid-cell"
                           role="gridcell"
                           aria-label={
@@ -2654,6 +2663,7 @@ const SectionBlock = memo(function SectionBlock({
                           }
                           data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
                           data-today={isToday ? "true" : undefined}
+                          data-past={isPastDay ? "true" : undefined}
                           data-top-divider={topDivider}
                           data-absence-run={absenceRunDay?.position}
                           data-absence-run-index={absenceRunDay?.runIndex}
@@ -2670,7 +2680,9 @@ const SectionBlock = memo(function SectionBlock({
                               ? "var(--dg-color-brand-bg)"
                               : showDiffCellTint
                                 ? rowBg
-                                : undefined,
+                                : isPastDay
+                                  ? "var(--dg-color-past-wash)"
+                                  : undefined,
                             // A run's bar crosses into the next cells, so none of
                             // them may stack its own background above it.
                             zIndex: showDiffCellTint
@@ -2693,7 +2705,7 @@ const SectionBlock = memo(function SectionBlock({
                             if (!isAwayLocked) triggerCellActivation(emp, date, "click");
                           }}
                           onContextMenu={(event) => {
-                            if (isAwayLocked) return;
+                            if (isAwayLocked || isPastDay) return;
                             triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
                           }}
                           onKeyDown={(event) => {
@@ -2702,7 +2714,7 @@ const SectionBlock = memo(function SectionBlock({
                               event.preventDefault();
                               triggerCellActivation(emp, date, "keyboard");
                             }
-                            if (event.shiftKey && event.key === "F10") {
+                            if (event.shiftKey && event.key === "F10" && !isPastDay) {
                               triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
                             }
                           }}

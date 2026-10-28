@@ -18,7 +18,7 @@ import type {
   ShiftRequestType,
   SeriesFrequency,
 } from "@/types";
-import type { ShiftRequestDraftCell } from "@dubgrid/domain";
+import type { CorrectionReason, ShiftRequestDraftCell } from "@dubgrid/domain";
 import type { CoverageJobPreference, CoverageShiftPreference } from "@dubgrid/schedule-core";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
@@ -659,6 +659,29 @@ export function upsertShift(
     expectedVersion,
     echo: serializeEcho(echo),
     clearNotes,
+  });
+}
+
+/** Corrects one person's published past day with a reason (53a); no draft, no alert. */
+export function correctShift(
+  employeeId: string,
+  date: string,
+  input: ScheduleCellInput,
+  orgId: string,
+  correction: { reason: CorrectionReason; note: string },
+  expectedVersion?: number,
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
+    action: "correctShift",
+    orgId,
+    employeeId,
+    date,
+    input,
+    expectedVersion,
+    reason: correction.reason,
+    note: correction.note || undefined,
+    echo: serializeEcho(echo),
   });
 }
 

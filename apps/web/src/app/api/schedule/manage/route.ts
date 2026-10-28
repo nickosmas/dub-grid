@@ -353,6 +353,12 @@ function isAbsenceTimesRefusal(error: unknown): boolean {
   );
 }
 
+/** 111 refuses a draft for a day before the organization's today. */
+function isPastDayDraftRefusal(error: unknown): boolean {
+  const message = error && typeof error === "object" && "message" in error ? error.message : null;
+  return typeof message === "string" && message.includes("Past days are corrected, not drafted");
+}
+
 type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
@@ -2468,6 +2474,13 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    if (isPastDayDraftRefusal(error)) {
+      return NextResponse.json(
+        { error: "This day has passed. Open it to correct it instead.", code: "PAST_DAY" },
+        { status: 422 },
+      );
+    }
+
     if (isAbsenceTimesRefusal(error)) {
       return NextResponse.json(
         {

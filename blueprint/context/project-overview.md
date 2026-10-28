@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 46ae31997488017e77a794f32b9efef8434d29b8886b8af5a7d4487f1e26e2b8 -->
+<!-- blueprint:source-hash c312e886b3db1d19fdc0cbd96f2a604dee306f2f2a62c085102e55414614ba40 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -497,7 +497,7 @@ Item 53 is split:
   record the correction and an activity-log row, and send no alert. It also
   stops the cell-save function writing published cells for people who can
   only edit shifts.
-- **53b - Past days in the grid:** planned; the Light tint, every bulk and
+- **53b - Past days in the grid:** shipped; the Light tint, every bulk and
   fill path skipping past days, the server refusing past drafts, and the
   Correct this day panel.
 - **53c - Corrected everywhere:** planned; the Corrected mark, the activity
@@ -684,7 +684,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `110`.
+  checksum-locked through `111`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

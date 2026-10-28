@@ -151,4 +151,26 @@ describe("POST /api/schedule/manage correctShift", () => {
     });
     expect(auditInsert).not.toHaveBeenCalled();
   });
+
+  it("answers a past day's draft refused by the database in plain words", async () => {
+    userRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Past days are corrected, not drafted" },
+    });
+    const response = await POST(
+      new NextRequest("http://localhost/api/schedule/manage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "upsertShift",
+          orgId,
+          employeeId,
+          date: "2026-10-27",
+          input: { kind: "absence", segments: [], absenceTypeId: 7 },
+        }),
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "PAST_DAY" });
+  });
 });

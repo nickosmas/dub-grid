@@ -6,6 +6,7 @@ import {
   getTimeZoneOffsetMinutes,
   getZonedDayRangeUtc,
   getZonedMidnightUtc,
+  isPastDateKey,
   parseLocalDateKey,
   timesOverlap,
 } from "./dates";
@@ -165,5 +166,14 @@ describe("timesOverlap", () => {
     expect(
       timesOverlap([{ start: "07:00", end: "15:00" }], [{ start: "15:00", end: "23:00" }]),
     ).toBe(false);
+  });
+});
+
+describe("isPastDateKey", () => {
+  it("is true only for a day before today", () => {
+    expect(isPastDateKey("2026-10-27", "2026-10-28")).toBe(true);
+    expect(isPastDateKey("2026-10-28", "2026-10-28")).toBe(false);
+    expect(isPastDateKey("2026-10-29", "2026-10-28")).toBe(false);
+    expect(isPastDateKey("2025-12-31", "2026-01-01")).toBe(true);
   });
 });

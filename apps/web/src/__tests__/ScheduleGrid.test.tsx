@@ -2435,6 +2435,51 @@ describe("ScheduleGrid", () => {
     });
   });
 
+  describe("past days (53b)", () => {
+    it("washes days before today, still opens them, and takes no drag or menu there", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      const onOpenCellMenu = vi.fn();
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        canDragShifts: true,
+        onActivateCell,
+        onOpenCellMenu,
+      });
+
+      const cells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === "emp-1",
+      );
+      expect(cells.slice(0, 5).map((cell) => cell.dataset.past)).toEqual([
+        "true",
+        "true",
+        "true",
+        undefined,
+        undefined,
+      ]);
+      const headers = (screen.getAllByRole("columnheader") as HTMLElement[]).filter(
+        (header) => header.dataset.dateKey,
+      );
+      expect(headers[2].dataset.past).toBe("true");
+      expect(headers[3].dataset.past).toBeUndefined();
+
+      expect(cells[1].querySelector(".dg-draggable-shift")).toBeNull();
+      expect(cells[4].querySelector(".dg-draggable-shift")).not.toBeNull();
+
+      fireEvent.contextMenu(cells[1]);
+      expect(onOpenCellMenu).not.toHaveBeenCalled();
+      fireEvent.contextMenu(cells[4]);
+      expect(onOpenCellMenu).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(cells[1]);
+      expect(onActivateCell).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cellId: expect.objectContaining({ dateKey: formatDateKey(week1[1]) }),
+        }),
+      );
+    });
+  });
+
   describe("away until a date (51e)", () => {
     const jamie: Employee = {
       ...employees[0],
