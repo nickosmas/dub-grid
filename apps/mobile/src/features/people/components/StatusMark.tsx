@@ -34,7 +34,7 @@ export const STATUS_MARK_ICONS: Record<StatusMarkKind, IconName> = {
   suspended: "lock-closed",
   away: "moon",
   planned: "calendar",
-  archived: "archive",
+  archived: "person-remove",
 };
 
 /** The icon for each status a person can be in or be moved to. */
@@ -42,7 +42,7 @@ export const STATUS_KIND_ICONS: Record<StatusChoiceKind, IconName> = {
   active: "checkmark",
   away: "moon",
   suspended: "lock-closed",
-  archived: "archive",
+  archived: "person-remove",
 };
 
 /** The tint of the status each choice leads to. */
@@ -84,7 +84,7 @@ export function statusToneColors(mobileColors: MobileColors, tone: StatusTone) {
 
 /**
  * The status icon right after a person's name: a lock for Suspended, a moon
- * for Away, a calendar for a planned away, an archive box for Offboarded.
+ * for Away, a calendar for a planned away, a person with a minus for Offboarded.
  */
 export function StatusMarkIcon({ person, size = 14 }: { person: StatusState; size?: number }) {
   const mobileColors = useMobileColors();

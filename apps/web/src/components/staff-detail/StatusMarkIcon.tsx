@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, CalendarDays, Check, Lock, Moon, type LucideIcon } from "lucide-react";
+import { CalendarDays, Check, Lock, Moon, UserMinus, type LucideIcon } from "lucide-react";
 import {
   statusMark,
   type StatusChoiceKind,
@@ -14,7 +14,7 @@ export const STATUS_MARK_ICONS: Record<StatusMarkKind, LucideIcon> = {
   suspended: Lock,
   away: Moon,
   planned: CalendarDays,
-  archived: Archive,
+  archived: UserMinus,
 };
 
 /** The icon for each status a person can be in or be moved to. */
@@ -22,7 +22,7 @@ export const STATUS_KIND_ICONS: Record<StatusChoiceKind, LucideIcon> = {
   active: Check,
   away: Moon,
   suspended: Lock,
-  archived: Archive,
+  archived: UserMinus,
 };
 
 export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string; text: string }> =
@@ -51,7 +51,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
- * moon for Away, a calendar for a planned away, an archive box for Offboarded.
+ * moon for Away, a calendar for a planned away, a person with a minus for Offboarded.
  * `only` limits it to some kinds, as the grid does.
  */
 export function StatusMarkIcon({
