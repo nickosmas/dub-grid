@@ -147,7 +147,7 @@ describe("EmployeeStatusActions", () => {
     expect(choices(dialog)).toEqual([
       "AwayKeeps sign-in. Not scheduled while away.",
       "SuspendedCan't sign in. Stays on the schedule.",
-      "ArchivedOff staff. Can't sign in or be scheduled.",
+      "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
     // Nothing is picked yet, so there's nothing to confirm.
     expect(within(dialog).getByRole("button", { name: "Change status" })).toBeDisabled();
@@ -158,9 +158,9 @@ describe("EmployeeStatusActions", () => {
     renderActions(makeEmployee());
 
     const dialog = await openDialog(user);
-    await user.click(within(dialog).getByRole("radio", { name: /^Archived/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
 
-    expect(dialog).toHaveAccessibleName("Archive Alice Smith?");
+    expect(dialog).toHaveAccessibleName("Offboard Alice Smith?");
     const changes = within(dialog).getByRole("region", { name: "Changes" });
     expect(changes).toHaveTextContent("They can no longer sign in.");
     expect(within(dialog).getByRole("region", { name: "Stays the same" })).toHaveTextContent(
@@ -214,9 +214,9 @@ describe("EmployeeStatusActions", () => {
     const { onRemove } = renderActions(makeEmployee({ userId: "user-1" }));
 
     const dialog = await openDialog(user);
-    await user.click(within(dialog).getByRole("radio", { name: /^Archived/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
     await user.type(within(dialog).getByPlaceholderText(/Reason \(optional\)/), " Left ");
-    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+    await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
 
     expect(onRemove).toHaveBeenCalledWith("emp-1", "Left");
   });
@@ -400,7 +400,7 @@ describe("EmployeeStatusActions", () => {
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
       "SuspendedCan't sign in. Stays on the schedule.",
-      "ArchivedOff staff. Can't sign in or be scheduled.",
+      "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
   });
 
@@ -500,12 +500,12 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: "More status changes" }));
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "Mark away",
-      "Archive",
+      "Offboard",
     ]);
-    await user.click(screen.getByRole("menuitem", { name: "Archive" }));
-    const dialog = screen.getByRole("dialog", { name: "Archive Alice Smith?" });
+    await user.click(screen.getByRole("menuitem", { name: "Offboard" }));
+    const dialog = screen.getByRole("dialog", { name: "Offboard Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+    await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
     expect(onRemove).toHaveBeenCalledWith("emp-1", undefined);
   });
 
@@ -526,7 +526,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: "More status changes" }));
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "Change return date",
-      "Archive",
+      "Offboard",
     ]);
     await user.click(screen.getByRole("menuitem", { name: "Change return date" }));
     const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's return date?" });
@@ -558,10 +558,10 @@ describe("EmployeeStatusActions", () => {
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
       "AwayNot scheduled while away.",
-      "ArchivedOff staff. Can't be scheduled.",
+      "OffboardedNo longer on staff. Can't be scheduled.",
     ]);
     expect(within(dialog).getByRole("status")).toHaveTextContent("ActiveCan be scheduled.");
-    await user.click(within(dialog).getByRole("radio", { name: /^Archived/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
     expect(dialog).not.toHaveTextContent(/sign in/i);
   });
 

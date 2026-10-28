@@ -1,3 +1,4 @@
+import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import type { SeatBreakdown } from "@/types";
 
 export interface SeatEmployee {
@@ -130,7 +131,11 @@ export function describeSeatBreakdown(breakdown: SeatBreakdown): {
     notBilled.push({ key: "away", label: "Away", count: breakdown.awayNotBilled });
   }
   if (breakdown.archived > 0) {
-    notBilled.push({ key: "archived", label: "Archived", count: breakdown.archived });
+    notBilled.push({
+      key: "archived",
+      label: EMPLOYMENT_STATUS_LABELS.removed,
+      count: breakdown.archived,
+    });
   }
   return { billed, notBilled };
 }

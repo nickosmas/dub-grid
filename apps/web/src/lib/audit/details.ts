@@ -219,7 +219,7 @@ export function formatScalar(key: string, value: unknown): string | null {
     if (!trimmed) return null;
     if (isUuid(trimmed)) return null;
     if (key === "report") return REPORT_LABELS[trimmed] ?? titleCase(trimmed);
-    // A staff status change records the stored values; people know them as Away and Archived.
+    // A staff status change records the stored values; people know them as Away and Offboarded.
     if (key === "fromStatus" || key === "toStatus") return describeEmploymentStatus(trimmed);
     if (DATE_ONLY_RE.test(trimmed)) return formatShortDate(trimmed);
     if (DATE_TIME_RE.test(trimmed)) return formatDateTime(trimmed) ?? null;

@@ -217,7 +217,7 @@ describe("StaffTableRow column gating", () => {
         "Away from Nov 10, back Jan 4",
         "planned",
       ],
-      [{ status: "removed" }, "Archived", "archived"],
+      [{ status: "removed" }, "Offboarded", "archived"],
     ] as const) {
       const { getByRole, unmount } = renderRow(true, true, state);
       expect(getByRole("img", { name })).toHaveAttribute("data-status-mark", kind);

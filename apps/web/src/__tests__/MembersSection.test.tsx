@@ -1287,9 +1287,9 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
     });
     await settleInvitations();
     await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: /^Archive\b(?!d)/ }));
+    await user.click(screen.getByRole("button", { name: /^Offboard\b(?!d)/ }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Archive Jamie Rivera?" });
+    const dialog = await screen.findByRole("dialog", { name: "Offboard Jamie Rivera?" });
     expect(dialog).toHaveTextContent("The away planned from Jan 5 is cancelled.");
     expect(dialog).not.toHaveTextContent(/sign in/i);
   });

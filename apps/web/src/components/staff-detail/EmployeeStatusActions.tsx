@@ -683,7 +683,7 @@ export function EmployeeStatusActions({
 /**
  * The status card's buttons: the change most people want next (Reinstate,
  * Mark active, Restore) as a button, and a menu naming each other change
- * (Mark away, Archive, and for someone Away, Change return date). Every one
+ * (Mark away, Offboard, and for someone Away, Change return date). Every one
  * opens a confirmation for that change alone. Active people get Change status.
  */
 export function StatusCardActions(

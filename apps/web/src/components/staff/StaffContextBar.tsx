@@ -291,7 +291,7 @@ export function StaffContextBar({
                 onClick={() => onBulkRemove(removableIds)}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                Archive{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
+                Offboard{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
               </Button>
             )}
             <Button onClick={onClearSelection} className="dg-btn dg-btn-ghost dg-btn-sm">

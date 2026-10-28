@@ -17,7 +17,7 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "No active employees"
       : activeTab === "inactive"
         ? "No one is away"
-        : "No one is archived";
+        : "No one is offboarded";
 
   const description = hasFilters
     ? "Try adjusting your search or filters."
@@ -25,7 +25,7 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       ? "Get started by adding your first staff member."
       : activeTab === "inactive"
         ? "People you mark away will appear here."
-        : "People you archive will appear here.";
+        : "People you offboard will appear here.";
 
   return (
     <EmptyState

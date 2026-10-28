@@ -84,7 +84,7 @@ export function statusToneColors(mobileColors: MobileColors, tone: StatusTone) {
 
 /**
  * The status icon right after a person's name: a lock for Suspended, a moon
- * for Away, a calendar for a planned away, an archive box for Archived.
+ * for Away, a calendar for a planned away, an archive box for Offboarded.
  */
 export function StatusMarkIcon({ person, size = 14 }: { person: StatusState; size?: number }) {
   const mobileColors = useMobileColors();

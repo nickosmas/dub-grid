@@ -708,7 +708,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           accessToken,
         );
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Archived");
+        toast.success("Offboarded");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -722,7 +722,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't archive them. Try again.");
+        toast.error("We couldn't offboard them. Try again.");
         return false;
       }
     },

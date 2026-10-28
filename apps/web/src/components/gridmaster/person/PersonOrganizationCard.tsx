@@ -186,7 +186,7 @@ function StaffFacts({
         value={stamp(record, employee.updatedAt, employee.updatedBy)}
       />
       <PersonField
-        label="Record archived"
+        label="Offboarded"
         value={employee.archivedAt ? formatDay(employee.archivedAt) : null}
         empty="No"
       />

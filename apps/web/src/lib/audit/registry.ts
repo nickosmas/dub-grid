@@ -555,7 +555,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.removed": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Offboarded ${who(d, ctx, "a team member")}`,
   },
   // Historical keys from before the bench→deactivate / terminate→remove rename.
   // Old rows still carry them, so they render with the current copy.
@@ -571,7 +571,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.archived": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Offboarded ${who(d, ctx, "a team member")}`,
   },
 
   // ── Schedule ───────────────────────────────────────────────────────────────

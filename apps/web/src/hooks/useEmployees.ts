@@ -304,7 +304,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Archived");
+        toast.success("Offboarded");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -319,7 +319,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't archive them. Try again.");
+        toast.error("We couldn't offboard them. Try again.");
         Sentry.captureException(err);
         return false;
       }

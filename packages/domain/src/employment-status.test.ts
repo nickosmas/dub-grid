@@ -69,7 +69,7 @@ describe("describeEmploymentStatus", () => {
   it("names each stored status the way people see it", () => {
     expect(describeEmploymentStatus("active")).toBe("Active");
     expect(describeEmploymentStatus("inactive")).toBe("Away");
-    expect(describeEmploymentStatus("removed")).toBe("Archived");
+    expect(describeEmploymentStatus("removed")).toBe("Offboarded");
   });
 
   it("names an Away person's return date, and only theirs", () => {
@@ -80,7 +80,7 @@ describe("describeEmploymentStatus", () => {
 
   it("names a suspended person Suspended, though they are stored active", () => {
     expect(describeEmploymentStatus("active", null, "2026-10-27T05:00:00Z")).toBe("Suspended");
-    expect(describeEmploymentStatus("removed", null, "2026-10-27T05:00:00Z")).toBe("Archived");
+    expect(describeEmploymentStatus("removed", null, "2026-10-27T05:00:00Z")).toBe("Offboarded");
   });
 
   it("formats a return date as a short day, with the weekday on request", () => {
@@ -96,7 +96,7 @@ describe("describeEmploymentStatus", () => {
 });
 
 describe("statusUndoAction", () => {
-  it("brings Away back with Mark active and Archived back with Restore", () => {
+  it("brings Away back with Mark active and Offboarded back with Restore", () => {
     expect(statusUndoAction("inactive")).toBe("markActive");
     expect(statusUndoAction("removed")).toBe("restore");
     expect(statusUndoAction("active")).toBeNull();
@@ -111,9 +111,9 @@ describe("describeStatusAction", () => {
       done: "Marked away",
     });
     expect(describeStatusAction("archive", "Ana Torres")).toMatchObject({
-      label: "Archive",
-      title: "Archive Ana Torres?",
-      done: "Archived",
+      label: "Offboard",
+      title: "Offboard Ana Torres?",
+      done: "Offboarded",
     });
     expect(describeStatusAction("markActive", "Ana Torres")).toMatchObject({
       label: "Mark active",
@@ -127,7 +127,7 @@ describe("describeStatusAction", () => {
     });
   });
 
-  it("tells the manager that Away keeps sign-in and Archive ends it", () => {
+  it("tells the manager that Away keeps sign-in and Offboard ends it", () => {
     expect(describeStatusAction("markAway", "Ana").unchanged).toEqual([
       "They can still sign in and keep their role.",
     ]);
@@ -322,38 +322,38 @@ describe("statusChoices", () => {
   const kinds = (state: Parameters<typeof statusChoices>[0]) =>
     statusChoices(state).map((choice) => `${choice.label}:${choice.action}`);
 
-  it("offers an active person Away, Suspended and Archived", () => {
+  it("offers an active person Away, Suspended and Offboarded", () => {
     expect(kinds({ status: "active", ...onSchedule })).toEqual([
       "Away:markAway",
       "Suspended:suspend",
-      "Archived:archive",
+      "Offboarded:archive",
     ]);
   });
 
   it("leaves Away out for someone not on the schedule", () => {
     expect(kinds({ status: "active", focusAreaIds: [] })).toEqual([
       "Suspended:suspend",
-      "Archived:archive",
+      "Offboarded:archive",
     ]);
   });
 
   it("brings a suspended person back with Reinstate", () => {
     expect(kinds({ status: "active", suspendedAt: "2026-10-26T12:00:00Z", ...onSchedule })).toEqual(
-      ["Active:reinstate", "Away:markAway", "Archived:archive"],
+      ["Active:reinstate", "Away:markAway", "Offboarded:archive"],
     );
   });
 
   it("brings an Away person back with Mark active, and offers no suspension", () => {
     expect(kinds({ status: "inactive", ...onSchedule })).toEqual([
       "Active:markActive",
-      "Archived:archive",
+      "Offboarded:archive",
     ]);
   });
 
   it("offers no second Away to someone with an away planned", () => {
     expect(
       kinds({ status: "active", plannedStatus: "away", plannedFrom: "2026-11-10", ...onSchedule }),
-    ).toEqual(["Suspended:suspend", "Archived:archive"]);
+    ).toEqual(["Suspended:suspend", "Offboarded:archive"]);
   });
 
   it("only restores an archived person", () => {
@@ -419,7 +419,7 @@ describe("describeCurrentStatus", () => {
       detail: "Can sign in and be scheduled.",
       tone: "success",
     });
-    expect(describeCurrentStatus({ status: "removed", focusAreaIds: [] }).text).toBe("Archived");
+    expect(describeCurrentStatus({ status: "removed", focusAreaIds: [] }).text).toBe("Offboarded");
   });
 });
 
@@ -528,7 +528,7 @@ describe("isValidPlannedStart", () => {
 });
 
 describe("statusMark", () => {
-  it("marks Suspended, Away, a planned away and Archived, and leaves Active bare", () => {
+  it("marks Suspended, Away, a planned away and Offboarded, and leaves Active bare", () => {
     expect(statusMark({ status: "active" })).toBeNull();
     expect(statusMark({ status: "active", suspendedAt: "2026-10-26T12:00:00Z" })).toEqual({
       kind: "suspended",
@@ -551,7 +551,7 @@ describe("statusMark", () => {
     ).toEqual({ kind: "planned", label: "Away from Nov 10, back Jan 4", tone: "warning" });
     expect(statusMark({ status: "removed" })).toEqual({
       kind: "archived",
-      label: "Archived",
+      label: "Offboarded",
       tone: "neutral",
     });
   });
@@ -650,7 +650,7 @@ describe("someone with no account", () => {
     ).toBe("They'll be Active again: back on staff, and they can be scheduled.");
   });
 
-  it("confirms Away and Archive without mentioning sign-in", () => {
+  it("confirms Away and Offboard without mentioning sign-in", () => {
     for (const action of ["markAway", "archive"] as const) {
       const copy = describeStatusAction(action, "Ana", { hasAccount: false });
       expect([...copy.points, ...copy.unchanged].join(" ")).not.toMatch(/sign in/i);

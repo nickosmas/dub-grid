@@ -51,7 +51,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
- * moon for Away, a calendar for a planned away, an archive box for Archived.
+ * moon for Away, a calendar for a planned away, an archive box for Offboarded.
  * `only` limits it to some kinds, as the grid does.
  */
 export function StatusMarkIcon({

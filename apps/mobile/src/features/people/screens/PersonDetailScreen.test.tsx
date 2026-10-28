@@ -1237,7 +1237,7 @@ describe("PersonDetailScreen", () => {
             .getAllByRole("button")
             .map((button) => button.getAttribute("aria-label") ?? button.textContent),
         ).toEqual(buttons);
-        for (const old of ["Mark away", "Archive", "Suspend"]) {
+        for (const old of ["Mark away", "Offboard", "Suspend"]) {
           expect(screen.queryByRole("button", { name: old })).not.toBeInTheDocument();
         }
         cleanup();
@@ -1250,7 +1250,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
 
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
-        ["Away. Not scheduled while away.", "Archived. Off staff. Can't be scheduled."],
+        ["Away. Not scheduled while away.", "Offboarded. No longer on staff. Can't be scheduled."],
       );
     });
 
@@ -1259,10 +1259,10 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
       expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-      await waitFor(() => expect(screen.getByText("Archive Mina Diaz?")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+      await waitFor(() => expect(screen.getByText("Offboard Mina Diaz?")).toBeInTheDocument());
       expect(screen.queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
-      confirm("Archive");
+      confirm("Offboard");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ copyAction: "archive" });
     });
@@ -1280,7 +1280,7 @@ describe("PersonDetailScreen", () => {
         [
           "Away. Keeps sign-in. Not scheduled while away.",
           "Suspended. Can't sign in. Stays on the schedule.",
-          "Archived. Off staff. Can't sign in or be scheduled.",
+          "Offboarded. No longer on staff. Can't sign in or be scheduled.",
         ],
       );
     });
@@ -1387,7 +1387,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
           "Suspended. Can't sign in. Stays on the schedule.",
-          "Archived. Off staff. Can't sign in or be scheduled.",
+          "Offboarded. No longer on staff. Can't sign in or be scheduled.",
         ],
       );
       expect(screen.queryByRole("button", { name: /^Starts, / })).not.toBeInTheDocument();
@@ -1475,9 +1475,9 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation();
 
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
-      pick(/^Archived/);
+      pick(/^Offboarded/);
       fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Left" } });
-      confirm("Archive");
+      confirm("Offboard");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "remove", note: "Left" });
     });
@@ -1522,7 +1522,7 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
 
       await fromMore("Change return date", "Change Mina Diaz's return date?");
-      expect(screen.queryByRole("radio", { name: /^Archived/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: /^Offboarded/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
       choose(day(2));

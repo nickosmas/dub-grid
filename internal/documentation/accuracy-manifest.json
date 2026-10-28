@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c207c1669520c1324c91b8af8999c490f5cf8b06b5cc787cfdc8787a7286425d"
+      "evidenceFingerprint": "sha256:e38a36012ea7251c5940729d0a8dad9e5993e1770bc314a0d4969f1e424b14fa"
     },
     {
       "id": "draft-publish",
@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:be199c4cad833db41be067286946ad35c6cbf774c4f467e9aec61434dc3f5757"
+      "evidenceFingerprint": "sha256:7c9c6b6ac84ca1c7e5049732caf0a6a71150429b20326ab75b3dc717804b2174"
     },
     {
       "id": "person-detail",
@@ -819,7 +819,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:259841cbe76d614f6ecf6f439c6af98c610a0a9f000d2d94cb1b30933afa2eba"
+      "evidenceFingerprint": "sha256:f627756b0c8e7d1ad244721b2b9bbb6dfe95a7e0a10a8c3e91da62ea87a87dab"
     },
     {
       "id": "invitations",
@@ -1091,7 +1091,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a20b679c8504beccd80e1281890c58aa2ab44b2a7293f0f14aeaa3d7e7e8d114"
+      "evidenceFingerprint": "sha256:4a3ad732dcc5858130548ac5d0278a24ab02e86c0b4f7fa0c39c5a103f6e4098"
     },
     {
       "id": "admin-permissions",
@@ -1193,7 +1193,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:6df587c2308320e740080d1e1e9c351946b9c57abbfae999d62f476051c30275"
+      "evidenceFingerprint": "sha256:fef8ef2037b0249e52e2cca921e793ea26110d35ef520c2ce4aae79aa37f7c02"
     },
     {
       "id": "mobile-navigation",
@@ -1277,7 +1277,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:501b9a0afe3aa1daf3e24dbafb26a57624d70b1ce1c996fe80355b45dfafff4a"
+      "evidenceFingerprint": "sha256:4e12f1c78eb712cf626cba837891fad4b617871ac7908f19e99b386f45a58c2c"
     },
     {
       "id": "alerts",
@@ -1765,7 +1765,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b3d9f546cd05d81bb30630a21c00d8703761984fd2929ae1a8ee3a054e116ae5"
+      "evidenceFingerprint": "sha256:6b8c1762b320b27d3f6906b0ca6ce80482feca0bc123aa3793dba044b5c2324f"
     },
     {
       "id": "departments-focus-areas",

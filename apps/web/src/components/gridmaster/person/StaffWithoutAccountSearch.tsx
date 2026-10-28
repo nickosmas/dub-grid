@@ -90,7 +90,7 @@ export function StaffWithoutAccountSearch({ onOpen }: { onOpen: (employeeId: str
                   {staff.status !== "active" || staff.archivedAt ? (
                     <StatusPill tone="neutral">
                       {staff.archivedAt
-                        ? "Archived"
+                        ? EMPLOYMENT_STATUS_LABELS.removed
                         : (STATUS_LABELS[staff.status] ?? staff.status)}
                     </StatusPill>
                   ) : null}

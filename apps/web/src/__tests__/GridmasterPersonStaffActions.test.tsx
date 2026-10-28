@@ -145,7 +145,7 @@ describe("PersonStaffActions", () => {
     render(<PersonStaffActions employee={staff()} onChanged={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Offboard" })).toBeInTheDocument();
   });
 
   it("offers no second Mark away for someone with an away planned", () => {
@@ -162,9 +162,9 @@ describe("PersonStaffActions", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
     expect(
-      within(screen.getByRole("dialog", { name: "Archive Ada Lovelace?" })).getByText(
+      within(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).getByText(
         "The away planned from Jan 5 is cancelled.",
       ),
     ).toBeInTheDocument();
@@ -173,8 +173,8 @@ describe("PersonStaffActions", () => {
   it("says nothing of sign-in when archiving someone with no account", () => {
     render(<PersonStaffActions employee={staff({ userId: null })} onChanged={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-    expect(screen.getByRole("dialog", { name: "Archive Ada Lovelace?" })).not.toHaveTextContent(
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+    expect(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).not.toHaveTextContent(
       /sign in/i,
     );
   });
@@ -203,8 +203,8 @@ describe("PersonStaffActions", () => {
     const onChanged = vi.fn();
     render(<PersonStaffActions employee={staff()} onChanged={onChanged} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-    confirm("Archive Ada Lovelace?", "Archive");
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+    confirm("Offboard Ada Lovelace?", "Offboard");
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(

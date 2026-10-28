@@ -191,7 +191,7 @@ describe("describeSeatBreakdown", () => {
     expect(detail(["A B", "C D", "E F", "G H"])).toMatch(/^A B, C D and 2 others\. /);
   });
 
-  it("lists managers without a staff record, then Away and Archived as not billed", () => {
+  it("lists managers without a staff record, then Away and Offboarded as not billed", () => {
     expect(
       describeSeatBreakdown({ ...base, managementOnly: 2, awayNotBilled: 2, archived: 12 }),
     ).toEqual({
@@ -201,7 +201,7 @@ describe("describeSeatBreakdown", () => {
       ],
       notBilled: [
         { key: "away", label: "Away", count: 2 },
-        { key: "archived", label: "Archived", count: 12 },
+        { key: "archived", label: "Offboarded", count: 12 },
       ],
     });
   });

@@ -149,7 +149,7 @@ export function isSchedulableOn(person: SchedulableState, dateKey: string): bool
 export const EMPLOYMENT_STATUS_LABELS: Readonly<Record<EmployeeStatus, string>> = {
   active: "Active",
   inactive: "Away",
-  removed: "Archived",
+  removed: "Offboarded",
 };
 
 const RETURN_DAY = new Intl.DateTimeFormat("en-US", {
@@ -441,8 +441,8 @@ export function describeStatusAction(
       return describeSetReturnDate(name, returnDate, currentReturnDate, absenceName);
     case "archive":
       return {
-        label: "Archive",
-        title: `Archive ${name}?`,
+        label: "Offboard",
+        title: `Offboard ${name}?`,
         message: "",
         points: [
           ...(account ? ["They can no longer sign in."] : []),
@@ -450,7 +450,7 @@ export function describeStatusAction(
           ...cancelsPlan,
         ],
         unchanged: ["Past records stay, and you can restore them later."],
-        done: "Archived",
+        done: "Offboarded",
       };
     case "markActive":
       return {
@@ -524,7 +524,7 @@ export interface CurrentStatusState extends StatusState {
 
 const AWAY_DETAIL = "Keeps sign-in. Not scheduled while away.";
 const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
-const ARCHIVED_DETAIL = "Off staff. Can't sign in or be scheduled.";
+const ARCHIVED_DETAIL = "No longer on staff. Can't sign in or be scheduled.";
 const ACTIVE_DETAIL = "Can sign in and be scheduled.";
 
 /** Someone with no account never signs in, so their lines say nothing of it. */
@@ -535,7 +535,7 @@ function hasAccount(state: { userId?: string | null }): boolean {
 const NO_ACCOUNT_DETAILS = {
   active: "Can be scheduled.",
   away: "Not scheduled while away.",
-  archived: "Off staff. Can't be scheduled.",
+  archived: "No longer on staff. Can't be scheduled.",
 } as const;
 
 function currentKind(state: StatusState): StatusChoiceKind {
@@ -565,8 +565,8 @@ export function statusChoices(state: CurrentStatusState): StatusChoice[] {
     label: EMPLOYMENT_STATUS_LABELS.removed,
     detail: account ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
     outcome: account
-      ? "They'll be Archived: off staff, and they can't sign in or be scheduled."
-      : "They'll be Archived: off staff, and they can't be scheduled.",
+      ? "They'll be Offboarded: no longer on staff, and they can't sign in or be scheduled."
+      : "They'll be Offboarded: no longer on staff, and they can't be scheduled.",
   };
   // A planned away is edited through its own dates, so Away isn't offered twice.
   const canBeAway =
