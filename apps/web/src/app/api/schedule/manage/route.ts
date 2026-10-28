@@ -1984,7 +1984,7 @@ export async function POST(req: NextRequest) {
                 status: EmployeeStatus;
                 archived_at: string | null;
                 away_until: string | null;
-                planned_status: "away" | "removed" | "suspended" | null;
+                planned_status: "away" | "removed" | "suspended" | "active" | null;
                 planned_from: string | null;
                 planned_until: string | null;
                 first_day: string | null;

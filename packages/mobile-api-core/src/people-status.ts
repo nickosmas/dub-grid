@@ -132,7 +132,7 @@ type UpdateEmployeePlannedChange = (
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | "removed" | "suspended" | null;
+    plannedStatus: "away" | "removed" | "suspended" | "active" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;
@@ -331,9 +331,14 @@ export async function updateMobilePersonStatus(
     input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "removed";
   const editingSuspension =
     input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "suspended";
+  const editingReturn =
+    input.body.action === "setPlannedChange" && currentEmployee.plannedStatus === "active";
   if (
     (input.body.action === "deactivate" ||
-      (input.body.action === "setPlannedChange" && !editingLastDay && !editingSuspension)) &&
+      (input.body.action === "setPlannedChange" &&
+        !editingLastDay &&
+        !editingSuspension &&
+        !editingReturn)) &&
     !canMarkInactive(currentEmployee.focusAreaIds)
   ) {
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
@@ -343,15 +348,19 @@ export async function updateMobilePersonStatus(
   const today = getIsoDateInTimeZone(new Date(), auth.currentOrg.timezone ?? null);
   const startDate = input.body.startDate ?? null;
   const lastDay = input.body.lastDay ?? null;
-  // A start date after today plans an Away (51g1) or a suspension (51g3)
-  // rather than starting it, and a last day plans the Offboard for the day
-  // after it (51g2).
+  // A start date after today plans an Away (51g1), a suspension (51g3) or a
+  // return (51l) rather than starting it, and a last day plans the Offboard
+  // for the day after it (51g2).
   const laterStart = startDate !== null && startDate !== today;
   const planningLastDay = (input.body.action === "remove" && lastDay !== null) || editingLastDay;
   const planningSuspension = (input.body.action === "suspend" && laterStart) || editingSuspension;
+  const planningReturn =
+    (input.body.action === "activate" && currentEmployee.status === "removed" && laterStart) ||
+    editingReturn;
   const planning =
     planningLastDay ||
     planningSuspension ||
+    planningReturn ||
     input.body.action === "setPlannedChange" ||
     (input.body.action === "deactivate" && laterStart);
   if (
@@ -381,10 +390,12 @@ export async function updateMobilePersonStatus(
   if (planning || input.body.action === "cancelPlannedChange") {
     const refusal = planningLastDay
       ? lastDayRefusal(currentEmployee, lastDay, today)
-      : (suspensionRefusal(currentEmployee, input.body.action) ??
-        planRefusal(currentEmployee, input.body.action, planning, startDate, returnDate, today, {
-          suspension: planningSuspension,
-        }));
+      : planningReturn
+        ? returnRefusal(currentEmployee, startDate, today)
+        : (suspensionRefusal(currentEmployee, input.body.action) ??
+          planRefusal(currentEmployee, input.body.action, planning, startDate, returnDate, today, {
+            suspension: planningSuspension,
+          }));
     if (refusal) return refusal;
     if (input.body.action === "remove") {
       const lastSuperAdmin = await lastSuperAdminRefusal(auth, currentEmployee, deps);
@@ -401,6 +412,15 @@ export async function updateMobilePersonStatus(
           input,
           currentEmployee,
           { kind: "suspension", startDate: startDate as string, until: returnDate },
+          deps,
+        );
+      }
+      if (planningReturn) {
+        return await changePlan(
+          auth,
+          input,
+          currentEmployee,
+          { kind: "return", startDate: startDate as string },
           deps,
         );
       }
@@ -468,7 +488,11 @@ async function tierRefusal(
   employee: Employee,
   deps: Parameters<typeof updateMobilePersonStatus>[2],
 ): Promise<PeopleStatusResult | null> {
-  const restoring = action === "activate" && employee.status === "removed";
+  // Planning, moving or cancelling a return (51l) reaches the same tier as Restore.
+  const restoring =
+    (action === "activate" && employee.status === "removed") ||
+    ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      employee.plannedStatus === "active");
   const offboarding =
     action === "remove" || (action === "setPlannedChange" && employee.plannedStatus === "removed");
   if (!(offboarding || restoring) || auth.permissions.isSuperAdmin || !employee.userId) {
@@ -551,6 +575,31 @@ function planRefusal(
   return null;
 }
 
+/** A return (51l) is the one plan an Offboarded person holds, from tomorrow up to a year ahead. */
+function returnRefusal(
+  employee: Employee,
+  startDate: string | null,
+  today: string,
+): PeopleStatusResult | null {
+  if (employee.status !== "removed") {
+    return {
+      kind: "invalid_status_change",
+      error: NOT_PLANNABLE_MESSAGE,
+      code: NOT_PLANNABLE_CODE,
+      status: 400,
+    };
+  }
+  if (startDate === null || !isValidPlannedStart(startDate, today)) {
+    return {
+      kind: "invalid_status_change",
+      error: PLANNED_START_INVALID_MESSAGE,
+      code: PLANNED_START_INVALID_CODE,
+      status: 400,
+    };
+  }
+  return null;
+}
+
 function lastDayRefusal(
   employee: Employee,
   lastDay: string | null,
@@ -608,6 +657,7 @@ type PlanChange =
   | { kind: "away"; startDate: string | null; returnDate: string | null }
   | { kind: "lastDay"; lastDay: string }
   | { kind: "suspension"; startDate: string; until: string | null }
+  | { kind: "return"; startDate: string }
   | null;
 
 /**
@@ -629,16 +679,25 @@ async function changePlan(
   const action = input.body.action;
   const away = plan?.kind === "away" ? plan : null;
   const suspension = plan?.kind === "suspension" ? plan : null;
+  const returning = plan?.kind === "return" ? plan : null;
   const updatedEmployee = await deps.updateEmployeePlannedChange(auth.serviceClient, {
     orgId: auth.currentOrg.id,
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
     plannedStatus:
-      plan?.kind === "lastDay" ? "removed" : suspension ? "suspended" : away ? "away" : null,
+      plan?.kind === "lastDay"
+        ? "removed"
+        : suspension
+          ? "suspended"
+          : returning
+            ? "active"
+            : away
+              ? "away"
+              : null,
     plannedFrom:
       plan?.kind === "lastDay"
         ? plannedFromForLastDay(plan.lastDay)
-        : (suspension?.startDate ?? away?.startDate ?? null),
+        : (suspension?.startDate ?? returning?.startDate ?? away?.startDate ?? null),
     plannedUntil: suspension ? suspension.until : (away?.returnDate ?? null),
     plannedAbsenceTypeId: away?.returnDate ? (input.body.absenceTypeId ?? null) : null,
     ...(action === "deactivate" || action === "remove" || input.body.note !== undefined
@@ -671,6 +730,35 @@ async function changePlan(
 
   const wasLastDay = currentEmployee.plannedStatus === "removed";
   const wasSuspension = currentEmployee.plannedStatus === "suspended";
+  const wasReturn = currentEmployee.plannedStatus === "active";
+  if (returning || (!plan && wasReturn)) {
+    await deps.insertAuditLog(auth.serviceClient, {
+      org_id: auth.currentOrg.id,
+      actor_id: auth.user.id,
+      actor_email: auth.user.email ?? null,
+      action: !returning
+        ? "employee.restore_plan_cancelled"
+        : action === "activate"
+          ? "employee.restore_planned"
+          : "employee.restore_plan_changed",
+      resource_type: "employee",
+      resource_id: input.employeeId,
+      details: {
+        ...(returning && action === "setPlannedChange"
+          ? { fromReturnDate: currentEmployee.plannedFrom ?? null }
+          : {}),
+        returnDate: returning ? returning.startDate : (currentEmployee.plannedFrom ?? null),
+        changedFields: ["planned_status"],
+      },
+      ip_address: input.requestIp,
+      user_agent: input.userAgent,
+    });
+    return {
+      kind: "updated",
+      person: deps.mapEmployeeToMobilePerson(updatedEmployee),
+      status: 200,
+    };
+  }
   await deps.insertAuditLog(auth.serviceClient, {
     org_id: auth.currentOrg.id,
     actor_id: auth.user.id,

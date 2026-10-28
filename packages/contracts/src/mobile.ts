@@ -996,7 +996,7 @@ export const mobilePersonSchema = z.object({
   /** A suspended person's first day with access again (YYYY-MM-DD, 51g3), or null. */
   suspendedUntil: z.string().date().nullable().default(null),
   /** A status change planned for a later date (51g), or null. */
-  plannedStatus: z.enum(["away", "removed", "suspended"]).nullable().default(null),
+  plannedStatus: z.enum(["away", "removed", "suspended", "active"]).nullable().default(null),
   /** The planned change's first day (YYYY-MM-DD); for a last day, the day after it. */
   plannedFrom: z.string().date().nullable().default(null),
   /** The first day back from a planned Away or suspension (YYYY-MM-DD), or null. */
@@ -1123,8 +1123,9 @@ export const mobilePersonStatusUpdateBodySchema = z.object({
   /** The absence their away days hold, or null; left out of setReturnDate, it stays. */
   absenceTypeId: z.number().int().positive().nullable().optional(),
   /**
-   * Mark away, Suspend and setPlannedChange: the first day. A day after today
-   * plans the change (51g1, 51g3); today or left out starts it now.
+   * Mark away, Suspend, Restore (`activate` for someone Offboarded) and
+   * setPlannedChange: the first day. A day after today plans the change
+   * (51g1, 51g3, 51l); today or left out starts it now.
    */
   startDate: z.string().date().nullable().optional(),
   /**

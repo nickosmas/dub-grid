@@ -191,6 +191,19 @@ export function plannedLastDay(person: PlannedChangeState): string | null {
     : null;
 }
 
+/** An Offboarded person's planned return day (YYYY-MM-DD, 51l), or null when none is planned. */
+export function plannedReturn(person: PlannedChangeState): string | null {
+  return person.plannedStatus === "active" && person.plannedFrom ? person.plannedFrom : null;
+}
+
+/** The word for an Offboarded person coming back on a planned day: "Returns Nov 10" (51l). */
+export const RETURNS_LABEL = "Returns";
+
+/** "Returns Nov 10", or "Returns Tue, Nov 10" with `weekday`. */
+export function describeReturn(returnDay: string, { weekday = false } = {}): string {
+  return `${RETURNS_LABEL} ${formatReturnDate(returnDay, { weekday })}`;
+}
+
 /** A status change set for a later date (51g). */
 export interface PlannedChangeState {
   plannedStatus?: PlannedStatus | null;
@@ -377,13 +390,17 @@ export interface StatusActionOptions {
   /** With a return date: the absence their away days hold (51f), by name. */
   absenceName?: string | null;
   /**
-   * Mark away, Suspend or Save changes: a first day after today (YYYY-MM-DD)
-   * plans the change for then instead of starting it (51g1, 51g3).
+   * Mark away, Suspend, Restore or Save changes: a first day after today
+   * (YYYY-MM-DD) plans the change for then instead of starting it (51g1,
+   * 51g3, 51l).
    */
   startDate?: string | null;
   /** The first day of a change they already have planned, which this action cancels. */
   plannedFrom?: string | null;
-  /** Which change is planned: an Away (the default), a last day (51g2) or a suspension (51g3). */
+  /**
+   * Which change is planned: an Away (the default), a last day (51g2), a
+   * suspension (51g3) or a return (`active`, 51l).
+   */
   plannedStatus?: PlannedStatus | null;
   /**
    * Offboard, Save changes or Cancel last day: the last day (YYYY-MM-DD).
@@ -535,6 +552,22 @@ function suspensionPoints(startDate: string | null, until: string | null): strin
   ];
 }
 
+/** "They stay Offboarded until Tue, Nov 10." (51l) */
+function staysOffboardedSentence(returnDay: string): string {
+  return `They stay ${EMPLOYMENT_STATUS_LABELS.removed} until ${formatReturnDate(returnDay, { weekday: true })}.`;
+}
+
+/** What a planned return does on its day, one full sentence each (51l). */
+function plannedReturnPoints(returnDay: string, account: boolean): string[] {
+  const day = formatReturnDate(returnDay);
+  return [
+    account
+      ? `On ${day} they're back to Active and can sign in again.`
+      : `On ${day} they're back to Active.`,
+    `They can be scheduled from ${day}, not before.`,
+  ];
+}
+
 function describeSetSuspendedUntil(
   name: string,
   until: string | null,
@@ -632,6 +665,16 @@ export function describeStatusAction(
         done: "Marked away",
       };
     case "setPlannedChange":
+      if (plannedStatus === "active") {
+        return {
+          label: "Save changes",
+          title: `Change ${name}'s planned return?`,
+          message: startDate ? staysOffboardedSentence(startDate) : "",
+          points: startDate ? plannedReturnPoints(startDate, account) : [],
+          unchanged: [],
+          done: "Planned return changed",
+        };
+      }
       if (plannedStatus === "suspended") {
         return {
           label: "Save changes",
@@ -661,6 +704,16 @@ export function describeStatusAction(
         done: "Planned away changed",
       };
     case "cancelPlannedChange":
+      if (plannedStatus === "active") {
+        return {
+          label: "Cancel planned return",
+          title: `Cancel ${name}'s planned return?`,
+          message: `They stay ${EMPLOYMENT_STATUS_LABELS.removed} until someone restores them.`,
+          points: [],
+          unchanged: [],
+          done: "Planned return cancelled",
+        };
+      }
       if (plannedStatus === "suspended") {
         return {
           label: "Cancel planned suspension",
@@ -754,6 +807,16 @@ export function describeStatusAction(
         done: "Reinstated",
       };
     case "restore":
+      if (startDate) {
+        return {
+          label: "Schedule restore",
+          title: `Restore ${name}?`,
+          message: staysOffboardedSentence(startDate),
+          points: plannedReturnPoints(startDate, account),
+          unchanged: [],
+          done: "Restore scheduled",
+        };
+      }
       return {
         label: "Restore",
         title: `Restore ${name}?`,
@@ -955,7 +1018,11 @@ export function statusChoices(
               ? "They'll be Active again: back on staff, and they can sign in and be scheduled."
               : "They'll be Active again: back on staff, and they can be scheduled.",
           },
-          canOffboard ? null : RESTORE_OUT_OF_REACH_MESSAGE,
+          !canOffboard
+            ? RESTORE_OUT_OF_REACH_MESSAGE
+            : plannedReturn(state)
+              ? `${describeReturn(plannedReturn(state) as string, { weekday: true })}. ${EDIT_PLAN_HINT}`
+              : null,
         ),
         away,
         suspended,
@@ -1054,12 +1121,15 @@ export function describePlannedChangeInFull(state: PlannedChangeState): string |
 export const LEAVING_LABEL = "Leaving";
 
 /**
- * The muted text beside an Active pill when a change is planned: "Away from
- * Nov 10", "Suspended from Nov 10", or "Leaving Nov 8" on a last day.
+ * The muted text beside a pill when a change is planned: "Away from Nov 10",
+ * "Suspended from Nov 10", "Leaving Nov 8" on a last day, or "Returns
+ * Nov 10" for an Offboarded person coming back (51l).
  */
 export function describePlannedChange(state: PlannedChangeState): string | null {
   const lastDay = plannedLastDay(state);
   if (lastDay) return `${LEAVING_LABEL} ${formatReturnDate(lastDay)}`;
+  const returnDay = plannedReturn(state);
+  if (returnDay) return describeReturn(returnDay);
   if (!state.plannedFrom) return null;
   if (state.plannedStatus === "suspended") {
     return `${SUSPENDED_LABEL} from ${formatReturnDate(state.plannedFrom)}`;
@@ -1080,6 +1150,22 @@ export function describeUpcomingChange(
   return firstDay ? describeFirstDay(firstDay) : describePlannedChange(state);
 }
 
+/**
+ * The muted text beside a person's pill in a list: an Active or Suspended
+ * person's first day or planned change, or an Offboarded person's planned
+ * return (51l).
+ */
+export function describeUpcomingStatus(state: StatusState, today: string): string | null {
+  switch (currentKind(state)) {
+    case "archived":
+      return plannedReturn(state) ? describePlannedChange(state) : null;
+    case "away":
+      return null;
+    default:
+      return describeUpcomingChange(state, today);
+  }
+}
+
 /** The icon beside a person's name; Active with nothing planned has none. */
 export type StatusMarkKind = "suspended" | "away" | "planned" | "archived";
 
@@ -1097,8 +1183,16 @@ export interface StatusMark {
  */
 export function statusMark(state: StatusState, today?: string): StatusMark | null {
   switch (currentKind(state)) {
-    case "archived":
-      return { kind: "archived", label: EMPLOYMENT_STATUS_LABELS.removed, tone: "neutral" };
+    case "archived": {
+      const returnDay = plannedReturn(state);
+      return {
+        kind: "archived",
+        label: returnDay
+          ? `${EMPLOYMENT_STATUS_LABELS.removed}, returns ${formatReturnDate(returnDay)}`
+          : EMPLOYMENT_STATUS_LABELS.removed,
+        tone: "neutral",
+      };
+    }
     case "suspended":
       return { kind: "suspended", label: SUSPENDED_SCHEDULE_NOTE, tone: "danger" };
     case "away":
@@ -1117,7 +1211,10 @@ export function statusMark(state: StatusState, today?: string): StatusMark | nul
 export interface StatusCardCopy {
   /** The status card: where they stand now. */
   current: { kind: StatusChoiceKind; title: string; detail: string; tone: StatusTone };
-  /** A second, dashed card for an Away, a suspension or a last day planned for later. */
+  /**
+   * A second, dashed card for an Away, a suspension or a last day planned for
+   * later, or an Offboarded person's planned return (51l).
+   */
   planned: { title: string; detail: string } | null;
   /** A dashed card for a first day still ahead (51g4), with `today` given. */
   starts: { title: string; detail: string } | null;
@@ -1143,6 +1240,7 @@ export function describeStatusCard(
   const plannedFrom = state.plannedStatus === "away" ? state.plannedFrom : null;
   const suspendFrom = state.plannedStatus === "suspended" ? state.plannedFrom : null;
   const lastDay = plannedLastDay(state);
+  const returnDay = kind === "archived" ? plannedReturn(state) : null;
   const firstDay = today && kind !== "archived" ? upcomingFirstDay(state, today) : null;
   return {
     starts: firstDay
@@ -1161,8 +1259,14 @@ export function describeStatusCard(
             : current.detail,
       tone: current.tone,
     },
-    planned:
-      kind === "active" && lastDay
+    planned: returnDay
+      ? {
+          title: describeReturn(returnDay, { weekday: true }),
+          detail: hasAccount(state)
+            ? "Back to Active then: they can sign in and be scheduled."
+            : "Back to Active then, and can be scheduled.",
+        }
+      : kind === "active" && lastDay
         ? {
             title: `${LEAVING_LABEL} ${formatReturnDate(lastDay, { weekday: true })}`,
             detail: `Offboarded on ${formatReturnDate(plannedFromForLastDay(lastDay), { weekday: true })}.`,

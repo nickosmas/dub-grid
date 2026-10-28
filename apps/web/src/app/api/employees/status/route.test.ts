@@ -394,7 +394,7 @@ describe("POST /api/employees/status", () => {
     const TODAY = "2026-10-26";
 
     function arrange(
-      status: "active" | "inactive",
+      status: "active" | "inactive" | "removed",
       awayUntil: string | null = null,
       awayAbsenceTypeId: number | null = null,
       extra: Record<string, unknown> = {},
@@ -782,6 +782,108 @@ describe("POST /api/employees/status", () => {
           details: expect.objectContaining({ lastDay: "2026-11-08" }),
         }),
       );
+    });
+
+    describe("a planned return (51l)", () => {
+      const OFFBOARDED = {
+        archived_at: "2026-10-01T00:00:00Z",
+        user_id: "55555555-5555-4555-8555-555555555555",
+      };
+
+      it("plans a return without restoring them now", async () => {
+        arrange("removed", null, null, OFFBOARDED);
+
+        const response = await post({ action: "activate", startDate: "2026-11-10" });
+
+        expect(response.status).toBe(200);
+        const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+        expect(update).toMatchObject({
+          planned_status: "active",
+          planned_from: "2026-11-10",
+          planned_until: null,
+          planned_absence_type_id: null,
+          planned_by: USER_ID,
+        });
+        expect(update).not.toHaveProperty("status");
+        expect(update).not.toHaveProperty("archived_at");
+        expect(update).not.toHaveProperty("status_changed_at");
+        expect(membershipRestoreUpdate).not.toHaveBeenCalled();
+        expect(auditInsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "employee.restore_planned",
+            details: { returnDate: "2026-11-10", changedFields: ["planned_status"] },
+          }),
+        );
+      });
+
+      it("restores them now with a start of today", async () => {
+        arrange("removed", null, null, OFFBOARDED);
+        membershipRestoreUpdate.mockResolvedValue({ error: null });
+
+        const response = await post({ action: "activate", startDate: TODAY });
+
+        expect(response.status).toBe(200);
+        expect(employeeUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ status: "active", archived_at: null }),
+        );
+        expect(membershipRestoreUpdate).toHaveBeenCalled();
+      });
+
+      it.each([
+        ["more than a year ahead", "2027-10-27"],
+        ["in the past", "2026-10-20"],
+      ])("refuses a return %s", async (_label, startDate) => {
+        arrange("removed", null, null, OFFBOARDED);
+
+        const response = await post({ action: "activate", startDate });
+
+        expect(response.status).toBe(400);
+        expect((await response.json()).code).toBe("PLANNED_START_INVALID");
+        expect(employeeUpdate).not.toHaveBeenCalled();
+      });
+
+      it("moves a planned return and cancels one", async () => {
+        const returning = { ...OFFBOARDED, planned_status: "active", planned_from: "2026-11-10" };
+        arrange("removed", null, null, returning);
+
+        const moved = await post({ action: "setPlannedChange", startDate: "2026-11-12" });
+        expect(moved.status).toBe(200);
+        expect(employeeUpdate).toHaveBeenLastCalledWith(
+          expect.objectContaining({ planned_status: "active", planned_from: "2026-11-12" }),
+        );
+        expect(auditInsert).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            action: "employee.restore_plan_changed",
+            details: expect.objectContaining({
+              fromReturnDate: "2026-11-10",
+              returnDate: "2026-11-12",
+            }),
+          }),
+        );
+
+        arrange("removed", null, null, returning);
+        const cancelled = await post({ action: "cancelPlannedChange" });
+        expect(cancelled.status).toBe(200);
+        expect(employeeUpdate).toHaveBeenLastCalledWith(
+          expect.objectContaining({ planned_status: null }),
+        );
+        expect(auditInsert).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            action: "employee.restore_plan_cancelled",
+            details: expect.objectContaining({ returnDate: "2026-11-10" }),
+          }),
+        );
+        expect(membershipRestoreUpdate).not.toHaveBeenCalled();
+      });
+
+      it("plans no return for someone who isn't Offboarded", async () => {
+        arrange("active");
+
+        const response = await post({ action: "activate", startDate: "2026-11-10" });
+
+        expect(response.status).toBe(200);
+        expect(employeeUpdate.mock.calls[0][0]).not.toHaveProperty("planned_status");
+      });
     });
 
     it("replaces a planned away with a last day", async () => {
@@ -1202,6 +1304,45 @@ describe("POST /api/employees/status", () => {
       });
       expect(employeeUpdate).not.toHaveBeenCalled();
       expect(membershipRestoreUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to plan, move or cancel a Super Admin's return (51l)", async () => {
+      for (const [action, extra] of [
+        ["activate", {}],
+        ["setPlannedChange", { planned_status: "active", planned_from: "2026-11-10" }],
+        ["cancelPlannedChange", { planned_status: "active", planned_from: "2026-11-10" }],
+      ] as const) {
+        arrange("removed", "super_admin");
+        employeeCurrentSingle.mockResolvedValue({
+          data: {
+            id: EMP_ID,
+            org_id: ORG_ID,
+            status: "removed",
+            version: 1,
+            user_id: EMPLOYEE_USER_ID,
+            ...extra,
+          },
+          error: null,
+        });
+        const response = await POST(
+          new NextRequest("http://localhost/api/employees/status", {
+            method: "POST",
+            body: JSON.stringify({
+              empId: EMP_ID,
+              orgId: ORG_ID,
+              action,
+              expectedVersion: 1,
+              startDate: "2026-12-01",
+            }),
+          }),
+        );
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toEqual({
+          error: RESTORE_OUT_OF_REACH_MESSAGE,
+          code: OFFBOARD_OUT_OF_REACH_CODE,
+        });
+      }
+      expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
     it("lets a Super Admin offboard without the tier read", async () => {

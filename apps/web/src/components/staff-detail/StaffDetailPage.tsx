@@ -617,8 +617,26 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleActivate = useCallback(
-    async (empId: string) => {
+    async (empId: string, startDate?: string) => {
       if (!orgId || !employee) return;
+      if (startDate) {
+        try {
+          syncEmployeeCaches(await activateEmployee(empId, orgId, employee.version, startDate));
+          toast.success("Restore scheduled");
+        } catch (err) {
+          if (err instanceof EmployeeStatusConflictError) {
+            syncEmployeeCaches(err.latestEmployee);
+            toast.error(
+              "Employee status changed elsewhere. Review the latest values and try again.",
+            );
+            return;
+          }
+          toast.error(
+            formatClientErrorMessage(err, "We couldn't schedule the restore. Try again."),
+          );
+        }
+        return;
+      }
       const prevStatus = employee?.status;
       setEmployee((prev) =>
         prev

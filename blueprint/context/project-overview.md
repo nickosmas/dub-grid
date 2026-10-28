@@ -433,6 +433,13 @@ Item 51 is split, and every part has shipped:
   a Super Admin. Gridmaster's Remove from organization offboards the staff
   record too, a pickup an offboarded person claimed goes back up, and
   memberships left live for offboarded people are closed (migration 108).
+- **51l - Restore on a date:** shipped; Restore takes a Starts date up to a
+  year ahead (web and mobile, **Schedule restore**), the person stays
+  Offboarded until then with "Returns Nov 10" on the dashed planned card,
+  People list and record, Edit plan moves, cancels or clears it, and the
+  daily job restores them on the day in the organization's timezone, their
+  membership reopened. They can't be drafted before the day; bulk Restore
+  stays now-only (migration 109).
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
 `inactive` and `removed`, and suspension, the return date and a planned

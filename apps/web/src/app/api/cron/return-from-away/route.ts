@@ -8,7 +8,10 @@ import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { serverEnv } from "@/lib/env.server";
 import { bearerMatchesSecret } from "@/lib/cron-auth";
-import { endOffboardedAccess } from "@/features/employees/server/offboard-access";
+import {
+  endOffboardedAccess,
+  reopenRestoredAccess,
+} from "@/features/employees/server/offboard-access";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { endUserSessions } from "@/lib/auth/revocation";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
@@ -23,7 +26,9 @@ export const dynamic = "force-dynamic";
 // the way a manual Offboard does it; the days after it were cleared when it
 // was planned. Next anyone whose suspension ends today (51g3) is reinstated,
 // and anyone whose planned suspension starts today is suspended the way a
-// manual Suspend does it. Then anyone Away whose return date has come is set
+// manual Suspend does it. Next anyone Offboarded whose planned return (51l)
+// has come is restored the way a manual Restore does it. Then anyone Away
+// whose return date has come is set
 // back to Active. Their recurring schedules were kept while they were away and
 // the fills already start from the return date, so nothing else changes.
 //
@@ -68,6 +73,16 @@ interface PlannedSuspensionRow {
   user_id: string | null;
   planned_from: string;
   planned_until: string | null;
+  planned_by: string | null;
+  version: number;
+  organization: { timezone: string | null } | null;
+}
+
+interface ReturnRow {
+  id: string;
+  org_id: string;
+  user_id: string | null;
+  planned_from: string;
   planned_by: string | null;
   version: number;
   organization: { timezone: string | null } | null;
@@ -126,6 +141,12 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "return-from-away: starting planned suspensions failed");
   }
+  let restored = 0;
+  try {
+    restored = await restorePlannedReturns(db, now, latestToday);
+  } catch (error) {
+    logger.error({ error }, "return-from-away: restoring planned returns failed");
+  }
 
   const { data, error } = await db
     .from("employees")
@@ -144,7 +165,15 @@ export async function GET(req: NextRequest) {
     (row) => row.away_until <= getIsoDateInTimeZone(now, row.organization?.timezone ?? null),
   );
   if (due.length === 0) {
-    return NextResponse.json({ ok: true, started, offboarded, reinstated, suspended, returned: 0 });
+    return NextResponse.json({
+      ok: true,
+      started,
+      offboarded,
+      reinstated,
+      suspended,
+      restored,
+      returned: 0,
+    });
   }
 
   const statusChangedAt = now.toISOString();
@@ -207,6 +236,7 @@ export async function GET(req: NextRequest) {
     offboarded,
     reinstated,
     suspended,
+    restored,
     returned: returned.length,
     skipped: due.length - returned.length,
   });
@@ -590,6 +620,85 @@ async function startPlannedSuspensions(
     );
     if (auditError) {
       logger.error({ error: auditError }, "return-from-away: suspend audit log write failed");
+    }
+    await cacheDel(...new Set(done.map((row) => CacheKey.employees(row.org_id))));
+  }
+  return done.length;
+}
+
+/**
+ * Restores everyone Offboarded whose planned return (51l) is today or earlier
+ * in their organization's timezone, through the update and follow-up a manual
+ * Restore makes, credited to whoever planned it: back to Active and their
+ * membership reopened. The tier was checked when the return was planned.
+ * Returns how many.
+ */
+async function restorePlannedReturns(
+  db: ServiceClient,
+  now: Date,
+  latestToday: string,
+): Promise<number> {
+  const { data, error } = await db
+    .from("employees")
+    .select(
+      "id, org_id, user_id, planned_from, planned_by, version, organization:organizations(timezone)",
+    )
+    .eq("status", "removed")
+    .eq("planned_status", "active")
+    .lte("planned_from", latestToday);
+  if (error) throw error;
+
+  const due = ((data ?? []) as unknown as ReturnRow[]).filter(
+    (row) => row.planned_from <= getIsoDateInTimeZone(now, row.organization?.timezone ?? null),
+  );
+  const at = now.toISOString();
+  const done: ReturnRow[] = [];
+  for (const row of due) {
+    // 109's guard ends the plan once they're Active.
+    const { data: updated, error: updateError } = await db
+      .from("employees")
+      .update({
+        status: "active",
+        status_note: "",
+        away_until: null,
+        archived_at: null,
+        status_changed_at: at,
+        updated_by: row.planned_by,
+        version: row.version + 1,
+      })
+      .eq("id", row.id)
+      .eq("org_id", row.org_id)
+      .eq("version", row.version)
+      .select("id")
+      .maybeSingle();
+    if (updateError) {
+      logger.error({ error: updateError, empId: row.id }, "return-from-away: restore failed");
+      continue;
+    }
+    if (!updated) continue;
+    await reopenRestoredAccess(db, { orgId: row.org_id, empId: row.id, userId: row.user_id });
+    done.push(row);
+  }
+
+  if (done.length > 0) {
+    const { error: auditError } = await db.from("audit_log").insert(
+      done.map((row) => ({
+        org_id: row.org_id,
+        actor_id: null,
+        actor_email: null,
+        action: "employee.activated",
+        resource_type: "employee",
+        resource_id: row.id,
+        details: {
+          fromStatus: "removed",
+          toStatus: "active",
+          returnDate: row.planned_from,
+          changedFields: ["status"],
+        },
+      })),
+    );
+    if (auditError) {
+      logger.error({ error: auditError }, "return-from-away: restore audit log write failed");
     }
     await cacheDel(...new Set(done.map((row) => CacheKey.employees(row.org_id))));
   }

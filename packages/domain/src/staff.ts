@@ -3,9 +3,10 @@ export type EmployeeEmploymentType = "full_time" | "part_time";
 /**
  * The statuses a change can be planned for (51g): Away from a date (51g1),
  * Offboarded after a last day (51g2), whose `plannedFrom` is the day after it,
- * and Suspended from a date (51g3).
+ * Suspended from a date (51g3), and Active again on a return day, held by an
+ * Offboarded person (51l).
  */
-export type PlannedStatus = "away" | "removed" | "suspended";
+export type PlannedStatus = "away" | "removed" | "suspended" | "active";
 
 export interface Employee {
   id: string;

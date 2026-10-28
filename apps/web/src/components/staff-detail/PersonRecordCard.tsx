@@ -3,6 +3,7 @@
 import {
   describeEmploymentStatus,
   describePlannedChangeInFull,
+  plannedReturn,
   formatFirstDay,
 } from "@dubgrid/domain";
 import type { Employee } from "@/types";
@@ -71,7 +72,8 @@ export function PersonRecordCard({ employee, accountState, lastSignInAt }: Perso
             employee.suspendedUntil,
           )}
         />
-        {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+        {(employee.status === "active" || plannedReturn(employee)) &&
+        describePlannedChangeInFull(employee) ? (
           <RecordField
             label="Planned"
             value={describePlannedChangeInFull(employee) ?? ""}

@@ -164,7 +164,8 @@ export interface MembersSectionProps {
   /** Live absence types, offered for an Away person's days. */
   absenceTypes?: readonly AbsenceType[];
   statusStepUpOpen?: boolean;
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
@@ -2205,7 +2206,7 @@ export function MembersSection({
           onDeactivate={onDeactivate}
           onSetReturnDate={onSetReturnDate}
           absenceTypes={absenceTypes}
-          onActivate={(employeeId) => onActivate(employeeId)}
+          onActivate={(employeeId, startDate) => onActivate(employeeId, startDate)}
           onReinstate={onReinstate}
           onSuspend={onSuspend}
           onSetSuspendedUntil={onSetSuspendedUntil}

@@ -545,7 +545,10 @@ export interface PlannedLastDay {
   lastDay: string;
 }
 
-/** A status change planned for a later date (51g). */
+/**
+ * A status change planned for a later date (51g). A planned return (51l) is
+ * moved as a `PlannedAway` with its new day as `startDate` and no return date.
+ */
 export type PlannedChange = PlannedAway | PlannedLastDay;
 
 /** The toast once a planned change is saved or cancelled. */
@@ -554,6 +557,8 @@ export function plannedChangeToast(
   plannedStatus: Employee["plannedStatus"],
 ): string {
   if (plan && "lastDay" in plan) return "Last day changed";
+  if (plannedStatus === "active")
+    return plan ? "Planned return changed" : "Planned return cancelled";
   if (plannedStatus === "suspended") {
     return plan ? "Planned suspension changed" : "Planned suspension cancelled";
   }
@@ -666,15 +671,18 @@ export function reinstateEmployee(
   return updateEmployeeStatus({ empId, orgId, action: "reinstate", expectedVersion });
 }
 
+/** Marks someone active or restores them now; for someone Offboarded, `startDate` restores them then (51l). */
 export function activateEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
+  startDate?: string | null,
 ): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
     orgId,
     action: "activate",
     expectedVersion,
+    ...(startDate ? { startDate } : {}),
   });
 }

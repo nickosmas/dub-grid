@@ -239,7 +239,7 @@ export interface MobilePeopleQueryRow {
   away_absence_type_id: number | null;
   suspended_at: string | null;
   suspended_until: string | null;
-  planned_status: "away" | "removed" | "suspended" | null;
+  planned_status: "away" | "removed" | "suspended" | "active" | null;
   planned_from: string | null;
   planned_until: string | null;
   planned_absence_type_id: number | null;
@@ -1648,7 +1648,7 @@ export async function updateMobileEmployeePlannedChangeRow(
     orgId: string;
     employeeId: string;
     expectedVersion: number;
-    plannedStatus: "away" | "removed" | "suspended" | null;
+    plannedStatus: "away" | "removed" | "suspended" | "active" | null;
     plannedFrom: string | null;
     plannedUntil: string | null;
     plannedAbsenceTypeId: number | null;

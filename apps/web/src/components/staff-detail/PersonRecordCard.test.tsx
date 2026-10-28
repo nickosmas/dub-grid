@@ -57,6 +57,23 @@ describe("PersonRecordCard", () => {
     expect(fieldValue("First day")).toBe("Mar 4, 2019");
   });
 
+  it("shows an Offboarded person's planned return (51l)", () => {
+    render(
+      <PersonRecordCard
+        employee={makeEmployee({
+          status: "removed",
+          archivedAt: CHANGED,
+          plannedStatus: "active",
+          plannedFrom: "2026-11-10",
+        })}
+        accountState={{ kind: "not-invited" }}
+      />,
+    );
+
+    expect(fieldValue("Status")).toBe("Offboarded");
+    expect(fieldValue("Planned")).toBe("Returns Nov 10");
+  });
+
   it("names an Away person's return date in their status", () => {
     render(
       <PersonRecordCard

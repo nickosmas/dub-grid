@@ -501,14 +501,48 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "people",
     severity: "create",
     headline: (d, ctx) => {
-      if (d.text("fromStatus") === "removed") return `Restored ${who(d, ctx, "a team member")}`;
+      if (d.text("fromStatus") === "removed") {
+        // The daily job restores someone on their planned return day (51l), with no actor.
+        const returned = d.date("returnDate");
+        return returned
+          ? `${who(d, ctx, "A team member")} was restored on their return date, ${returned}`
+          : `Restored ${who(d, ctx, "a team member")}`;
+      }
       // The return-from-away job writes the date they came back on, and no actor.
       const back = d.date("awayUntil");
       return back
         ? `${who(d, ctx, "A team member")} came back from away on ${back}`
         : `Marked ${who(d, ctx, "a team member")} active`;
     },
-    suppressKeys: ["awayUntil"],
+    suppressKeys: ["awayUntil", "returnDate"],
+  },
+  "employee.restore_planned": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const returnDate = d.date("returnDate");
+      const name = who(d, ctx, "a team member");
+      return returnDate ? `Planned ${name}'s return on ${returnDate}` : `Planned ${name}'s return`;
+    },
+    suppressKeys: ["returnDate"],
+  },
+  "employee.restore_plan_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const returnDate = d.date("returnDate");
+      const name = who(d, ctx, "a team member");
+      return returnDate
+        ? `Moved ${name}'s return to ${returnDate}`
+        : `Changed ${name}'s planned return`;
+    },
+    suppressKeys: ["fromReturnDate", "returnDate"],
+  },
+  "employee.restore_plan_cancelled": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned return`,
+    suppressKeys: ["returnDate"],
   },
   "employee.away_planned": {
     category: "people",

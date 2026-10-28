@@ -28,7 +28,7 @@ export interface BulkStatusDialogPerson {
   focusAreaIds: readonly number[];
   suspendedAt?: string | null;
   archivedAt?: string | null;
-  plannedStatus?: "away" | "removed" | "suspended" | null;
+  plannedStatus?: "away" | "removed" | "suspended" | "active" | null;
   plannedFrom?: string | null;
 }
 

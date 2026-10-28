@@ -17,6 +17,7 @@ import {
   describeStatusCard,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
+  plannedReturn,
   availableStatusChoices,
   statusChoices,
   suggestedStatusChoice,
@@ -42,7 +43,8 @@ export interface EmployeeStatusActionsProps {
     absenceTypeId?: number | null,
     startDate?: string,
   ) => void | Promise<unknown>;
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /**
    * Sets, moves or clears (null) an Away person's return date and the absence
    * their days hold; hidden when absent.
@@ -62,8 +64,8 @@ export interface EmployeeStatusActionsProps {
   /** Sets, moves or clears (null) a suspended person's end date (51g3); hidden when absent. */
   onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /**
-   * Moves or changes a planned Away (51g1) or last day (51g2), or cancels it
-   * (null); not offered when absent.
+   * Moves or changes a planned Away (51g1), last day (51g2) or return (51l),
+   * or cancels it (null); not offered when absent.
    */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   /** Live absence types; with a return date, one can fill the away days (51f). */
@@ -441,7 +443,10 @@ export function EmployeeStatusActions({
   const initialUntil =
     (isSuspended ? employee.suspendedUntil : hasSuspensionPlan ? employee.plannedUntil : null) ??
     "";
-  const initialStartDate = hasPlan || hasSuspensionPlan ? (employee.plannedFrom ?? "") : "";
+  // An Offboarded person's planned return (51l) is edited here too.
+  const returnDay = employee.status === "removed" ? plannedReturn(employee) : null;
+  const initialStartDate =
+    hasPlan || hasSuspensionPlan ? (employee.plannedFrom ?? "") : (returnDay ?? "");
   const [open, setOpen] = useState(startOpen);
   const [choice, setChoice] = useState<StatusAction | null>(
     startOpen ? (initialChoice ?? null) : null,
@@ -482,6 +487,10 @@ export function EmployeeStatusActions({
     (laterStart !== employee.plannedFrom || (until || null) !== (employee.plannedUntil ?? null));
   // Clearing a planned suspension's start date suspends them today instead.
   const suspendsNow = hasSuspensionPlan && !cancellingPlan && !startDate && focus !== "status";
+  const returnPlanChanged =
+    !!returnDay && !cancellingPlan && !!laterStart && laterStart !== returnDay;
+  // Clearing a planned return's date restores them today instead.
+  const restoresNow = !!returnDay && !cancellingPlan && !laterStart && focus !== "status";
   // Every other status is listed, an unavailable one disabled with its reason;
   // only a change this surface has no handler for is left out.
   const choices = statusChoices(employee, { canOffboard }).filter(
@@ -564,7 +573,16 @@ export function EmployeeStatusActions({
     try {
       switch (choice) {
         case null:
-          if (plannedLeave) {
+          if (returnDay) {
+            await (restoresNow
+              ? onActivate(employee.id)
+              : onSetPlannedChange?.(
+                  employee.id,
+                  cancellingPlan || !laterStart
+                    ? null
+                    : { startDate: laterStart, returnDate: null, absenceTypeId: null },
+                ));
+          } else if (plannedLeave) {
             await (offboardsNow
               ? onRemove(employee.id)
               : onSetPlannedChange?.(employee.id, cancellingPlan ? null : { lastDay }));
@@ -624,6 +642,9 @@ export function EmployeeStatusActions({
         case "reinstate":
           await onReinstate?.(employee.id);
           break;
+        case "restore":
+          await (laterStart ? onActivate(employee.id, laterStart) : onActivate(employee.id));
+          break;
         default:
           await onActivate(employee.id);
       }
@@ -639,7 +660,8 @@ export function EmployeeStatusActions({
         returnDate:
           choice === "markAway" ? returnDate || null : choice === "suspend" ? until || null : null,
         absenceName: choice === "markAway" ? chosenAbsenceName : null,
-        startDate: choice === "markAway" || choice === "suspend" ? laterStart : null,
+        startDate:
+          choice === "markAway" || choice === "suspend" || choice === "restore" ? laterStart : null,
         lastDay: choice === "archive" && canPlanLastDay ? lastDay || null : null,
         // Any other change replaces the plan, and says so.
         plannedFrom:
@@ -648,58 +670,70 @@ export function EmployeeStatusActions({
             : null,
         plannedStatus: employee.plannedStatus ?? null,
       })
-    : suspendsNow
-      ? describeStatusAction("suspend", displayName, { returnDate: until || null })
-      : hasSuspensionPlan && cancellingPlan
-        ? describeStatusAction("cancelPlannedChange", displayName, { plannedStatus: "suspended" })
-        : suspensionPlanChanged
+    : restoresNow
+      ? describeStatusAction("restore", displayName)
+      : returnDay && cancellingPlan
+        ? describeStatusAction("cancelPlannedChange", displayName, { plannedStatus: "active" })
+        : returnPlanChanged
           ? describeStatusAction("setPlannedChange", displayName, {
-              plannedStatus: "suspended",
+              plannedStatus: "active",
               startDate: laterStart,
-              returnDate: until || null,
+              hasAccount: Boolean(employee.userId),
             })
-          : suspensionEndChanged
-            ? describeStatusAction("setSuspendedUntil", displayName, {
-                returnDate: until || null,
-                currentReturnDate: employee.suspendedUntil ?? null,
-              })
-            : offboardsNow
-              ? describeStatusAction("archive", displayName, {
-                  hasAccount: Boolean(employee.userId),
+          : suspendsNow
+            ? describeStatusAction("suspend", displayName, { returnDate: until || null })
+            : hasSuspensionPlan && cancellingPlan
+              ? describeStatusAction("cancelPlannedChange", displayName, {
+                  plannedStatus: "suspended",
                 })
-              : plannedLeave && cancellingPlan
-                ? describeStatusAction("cancelPlannedChange", displayName, {
-                    plannedStatus: "removed",
+              : suspensionPlanChanged
+                ? describeStatusAction("setPlannedChange", displayName, {
+                    plannedStatus: "suspended",
+                    startDate: laterStart,
+                    returnDate: until || null,
                   })
-                : lastDayChanged
-                  ? describeStatusAction("setPlannedChange", displayName, {
-                      plannedStatus: "removed",
-                      lastDay,
-                      hasAccount: Boolean(employee.userId),
+                : suspensionEndChanged
+                  ? describeStatusAction("setSuspendedUntil", displayName, {
+                      returnDate: until || null,
+                      currentReturnDate: employee.suspendedUntil ?? null,
                     })
-                  : startsNow
-                    ? describeStatusAction("markAway", displayName, {
+                  : offboardsNow
+                    ? describeStatusAction("archive", displayName, {
                         hasAccount: Boolean(employee.userId),
-                        returnDate: returnDate || null,
-                        absenceName: chosenAbsenceName,
                       })
-                    : cancellingPlan
+                    : plannedLeave && cancellingPlan
                       ? describeStatusAction("cancelPlannedChange", displayName, {
-                          absenceName: plannedAbsenceName,
+                          plannedStatus: "removed",
                         })
-                      : planChanged
+                      : lastDayChanged
                         ? describeStatusAction("setPlannedChange", displayName, {
-                            startDate: laterStart,
-                            returnDate: returnDate || null,
-                            absenceName: chosenAbsenceName,
+                            plannedStatus: "removed",
+                            lastDay,
+                            hasAccount: Boolean(employee.userId),
                           })
-                        : awayDetailsChanged
-                          ? describeStatusAction("setReturnDate", displayName, {
+                        : startsNow
+                          ? describeStatusAction("markAway", displayName, {
+                              hasAccount: Boolean(employee.userId),
                               returnDate: returnDate || null,
-                              currentReturnDate: employee.awayUntil ?? null,
                               absenceName: chosenAbsenceName,
                             })
-                          : null;
+                          : cancellingPlan
+                            ? describeStatusAction("cancelPlannedChange", displayName, {
+                                absenceName: plannedAbsenceName,
+                              })
+                            : planChanged
+                              ? describeStatusAction("setPlannedChange", displayName, {
+                                  startDate: laterStart,
+                                  returnDate: returnDate || null,
+                                  absenceName: chosenAbsenceName,
+                                })
+                              : awayDetailsChanged
+                                ? describeStatusAction("setReturnDate", displayName, {
+                                    returnDate: returnDate || null,
+                                    currentReturnDate: employee.awayUntil ?? null,
+                                    absenceName: chosenAbsenceName,
+                                  })
+                                : null;
   const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
 
   const untilMinDate = returnMinDate;
@@ -727,6 +761,24 @@ export function EmployeeStatusActions({
             onClick={() => setCancellingPlan((value) => !value)}
           >
             {cancellingPlan ? "Keep planned suspension" : "Cancel planned suspension"}
+          </Button>
+        </div>
+      ) : null}
+      {returnDay && !choice && onSetPlannedChange && focus !== "status" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {cancellingPlan ? null : (
+            <StartDateField
+              value={startDate}
+              onChange={setStartDate}
+              hint="Clear it to restore them today."
+            />
+          )}
+          <Button
+            className="dg-btn dg-btn-ghost dg-btn-xs"
+            style={{ alignSelf: "flex-start" }}
+            onClick={() => setCancellingPlan((value) => !value)}
+          >
+            {cancellingPlan ? "Keep planned return" : "Cancel planned return"}
           </Button>
         </div>
       ) : null}
@@ -787,11 +839,13 @@ export function EmployeeStatusActions({
               ? `Change ${displayName}'s return date?`
               : isSuspended
                 ? `Change when ${displayName}'s suspension ends?`
-                : hasSuspensionPlan
-                  ? `Change ${displayName}'s planned suspension?`
-                  : plannedLeave
-                    ? `Change ${displayName}'s last day?`
-                    : `Change ${displayName}'s planned away?`
+                : returnDay
+                  ? `Change ${displayName}'s planned return?`
+                  : hasSuspensionPlan
+                    ? `Change ${displayName}'s planned suspension?`
+                    : plannedLeave
+                      ? `Change ${displayName}'s last day?`
+                      : `Change ${displayName}'s planned away?`
             : `Change ${displayName}'s status?`)
         }
         message={
@@ -867,6 +921,13 @@ export function EmployeeStatusActions({
                 <SuspensionEndField value={until} minDate={untilMinDate} onChange={setUntil} />
               </>
             ) : null}
+            {choice === "restore" && onSetPlannedChange ? (
+              <StartDateField
+                value={startDate}
+                onChange={setStartDate}
+                hint="Leave it empty to restore them today."
+              />
+            ) : null}
             {choice === "archive" && canPlanLastDay && onSetPlannedChange ? (
               <LastDayField value={lastDay} onChange={setLastDay} hint={LAST_DAY_HINT} />
             ) : null}
@@ -880,11 +941,11 @@ export function EmployeeStatusActions({
           </div>
         }
         confirmLabel={
-          choice || cancellingPlan || startsNow || offboardsNow || suspendsNow
+          choice || cancellingPlan || startsNow || offboardsNow || suspendsNow || restoresNow
             ? (copy?.label ?? "")
             : (isAway && onSetReturnDate) ||
                 (isSuspended && onSetSuspendedUntil) ||
-                ((hasPlan || plannedLeave || hasSuspensionPlan) &&
+                ((hasPlan || plannedLeave || hasSuspensionPlan || returnDay) &&
                   onSetPlannedChange &&
                   focus !== "status")
               ? "Save changes"
@@ -897,12 +958,20 @@ export function EmployeeStatusActions({
           !lastDayChanged &&
           !suspensionEndChanged &&
           !suspensionPlanChanged &&
+          !returnPlanChanged &&
+          !restoresNow &&
           !cancellingPlan &&
           !startsNow &&
           !offboardsNow &&
           !suspendsNow
         }
-        variant={choice === "archive" || offboardsNow ? "danger" : ordinary ? "info" : "warning"}
+        variant={
+          choice === "archive" || offboardsNow
+            ? "danger"
+            : ordinary || (returnDay && !cancellingPlan)
+              ? "info"
+              : "warning"
+        }
         onConfirm={confirm}
         onCancel={close}
       />

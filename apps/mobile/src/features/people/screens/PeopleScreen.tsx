@@ -17,7 +17,7 @@ import type {
 import {
   EMPLOYMENT_STATUS_LABELS,
   ORG_ROLE_PRIVILEGE_ORDER,
-  describeUpcomingChange,
+  describeUpcomingStatus,
   getEffectiveOrgRole,
   type EmployeeStatus,
   getOrgRolePrivilegeRank,
@@ -1210,11 +1210,11 @@ function PersonRow({
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const statusPill = staffStatus ? getMobileStatusPill(mobileColors, staffStatus) : null;
   // A change planned for later (51g) or a first day still ahead (51g4) leaves
-  // them Active, so it reads beside the name.
-  const plannedLabel =
-    staffStatus?.status === "active"
-      ? describeUpcomingChange(staffStatus, formatLocalDateKey(new Date()))
-      : null;
+  // them Active, and a planned return (51l) leaves them Offboarded, so it
+  // reads beside the name.
+  const plannedLabel = staffStatus
+    ? describeUpcomingStatus(staffStatus, formatLocalDateKey(new Date()))
+    : null;
   const initials =
     name
       .split(" ")

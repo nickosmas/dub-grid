@@ -72,7 +72,8 @@ interface StaffDetailPanelProps {
   ) => void | Promise<unknown>;
   /** Live absence types, offered for an Away person's days. */
   absenceTypes?: readonly AbsenceType[];
-  onActivate: (empId: string) => void | Promise<unknown>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  onActivate: (empId: string, startDate?: string) => void | Promise<unknown>;
   /** Gives a suspended person their access back (51c). */
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */

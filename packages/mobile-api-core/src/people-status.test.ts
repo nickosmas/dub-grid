@@ -96,7 +96,7 @@ function run(
       async (
         _client: SupabaseClient,
         input: {
-          plannedStatus: "away" | "removed" | "suspended" | null;
+          plannedStatus: "away" | "removed" | "suspended" | "active" | null;
           plannedFrom: string | null;
           plannedUntil: string | null;
           plannedAbsenceTypeId: number | null;
@@ -818,5 +818,118 @@ describe("updateMobilePersonStatus offboarding and restoring (51k)", () => {
 
     expect(await result).toMatchObject({ kind: "updated" });
     expect(deps.fetchMembershipOrgRole).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateMobilePersonStatus with a planned return (51l)", () => {
+  const offboarded = (overrides: Partial<Employee> = {}) =>
+    employee({
+      userId: "user-9",
+      status: "removed",
+      archivedAt: "2026-10-01T00:00:00Z",
+      ...overrides,
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+    vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plans a return without restoring them now", async () => {
+    const { deps, result } = run(offboarded(), { action: "activate", startDate: "2026-11-10" });
+
+    expect(await result).toMatchObject({ kind: "updated", status: 200 });
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
+    expect(deps.reopenRestoredAccess).not.toHaveBeenCalled();
+    expect(deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plannedStatus: "active",
+        plannedFrom: "2026-11-10",
+        plannedUntil: null,
+        plannedAbsenceTypeId: null,
+      }),
+    );
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.restore_planned",
+        details: { returnDate: "2026-11-10", changedFields: ["planned_status"] },
+      }),
+    );
+  });
+
+  it("restores now with a start of today, and refuses a far start", async () => {
+    const now = run(offboarded(), { action: "activate", startDate: "2026-10-26" });
+    expect(await now.result).toMatchObject({ kind: "updated" });
+    expect(now.deps.reopenRestoredAccess).toHaveBeenCalled();
+    expect(now.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+
+    const far = run(offboarded(), { action: "activate", startDate: "2027-10-27" });
+    expect(await far.result).toMatchObject({ status: 400, code: "PLANNED_START_INVALID" });
+    expect(far.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+
+  it("moves and cancels a planned return", async () => {
+    const returning = offboarded({ plannedStatus: "active", plannedFrom: "2026-11-10" });
+    const moved = run(returning, { action: "setPlannedChange", startDate: "2026-11-12" });
+    expect(await moved.result).toMatchObject({ kind: "updated" });
+    expect(moved.deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ plannedStatus: "active", plannedFrom: "2026-11-12" }),
+    );
+    expect(moved.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.restore_plan_changed",
+        details: expect.objectContaining({
+          fromReturnDate: "2026-11-10",
+          returnDate: "2026-11-12",
+        }),
+      }),
+    );
+
+    const cancelled = run(returning, { action: "cancelPlannedChange" });
+    expect(await cancelled.result).toMatchObject({ kind: "updated" });
+    expect(cancelled.deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ plannedStatus: null }),
+    );
+    expect(cancelled.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.restore_plan_cancelled",
+        details: expect.objectContaining({ returnDate: "2026-11-10" }),
+      }),
+    );
+  });
+
+  it("refuses an Admin planning, moving or cancelling a Super Admin's return", async () => {
+    for (const [current, body] of [
+      [offboarded(), { action: "activate", startDate: "2026-11-10" }],
+      [
+        offboarded({ plannedStatus: "active", plannedFrom: "2026-11-10" }),
+        { action: "setPlannedChange", startDate: "2026-11-12" },
+      ],
+      [
+        offboarded({ plannedStatus: "active", plannedFrom: "2026-11-10" }),
+        { action: "cancelPlannedChange" },
+      ],
+    ] as const) {
+      const { deps, result } = run(current, body, {
+        isSuperAdmin: false,
+        targetRole: "super_admin",
+      });
+      expect(await result).toMatchObject({
+        kind: "out_of_reach",
+        error: RESTORE_OUT_OF_REACH_MESSAGE,
+      });
+      expect(deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+    }
   });
 });

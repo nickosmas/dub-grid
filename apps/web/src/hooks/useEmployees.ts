@@ -85,7 +85,8 @@ export interface EmployeesData {
     plan: PlannedChange | null,
     accessToken?: string,
   ) => Promise<boolean>;
-  handleActivateEmployee: (empId: string) => Promise<void>;
+  /** Restores or marks them active now, or with `startDate` (51l) restores them on that day. */
+  handleActivateEmployee: (empId: string, startDate?: string) => Promise<void>;
   /** Gives a suspended person their access back (51c). */
   handleReinstateEmployee: (empId: string) => Promise<void>;
   /**
@@ -578,9 +579,34 @@ export function useEmployees(
   );
 
   const handleActivateEmployee = useCallback(
-    async (empId: string) => {
+    async (empId: string, startDate?: string) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return;
+      if (startDate) {
+        try {
+          const updatedEmployee = await activateEmployee(
+            empId,
+            orgId,
+            targetEmployee.version,
+            startDate,
+          );
+          setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+          toast.success("Restore scheduled");
+          invalidateEmployees();
+        } catch (err) {
+          if (err instanceof EmployeeStatusConflictError) {
+            setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+            toast.error(
+              "Employee status changed elsewhere. Review the latest values and try again.",
+            );
+            return;
+          }
+          toast.error(
+            formatClientErrorMessage(err, "We couldn't schedule the restore. Try again."),
+          );
+        }
+        return;
+      }
 
       const now = new Date().toISOString();
       const prevAll = allEmployeesRef.current;

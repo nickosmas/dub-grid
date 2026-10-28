@@ -252,8 +252,14 @@ export async function applyStatusChange(
   }
 
   // Offboarding ends their membership and Restore reopens it (51k), so only
-  // a Super Admin or Gridmaster reaches a Super Admin, as when the role is given.
-  const restoring = action === "activate" && currentEmployee.status === "removed";
+  // a Super Admin or Gridmaster reaches a Super Admin, as when the role is
+  // given; that includes planning, moving or cancelling their return (51l).
+  const restoringFromOffboard = action === "activate" && currentEmployee.status === "removed";
+  const editingReturn = action === "setPlannedChange" && currentEmployee.plannedStatus === "active";
+  const restoring =
+    restoringFromOffboard ||
+    ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      currentEmployee.plannedStatus === "active");
   const offboarding =
     action === "remove" ||
     (action === "setPlannedChange" && currentEmployee.plannedStatus === "removed");
@@ -276,9 +282,9 @@ export async function applyStatusChange(
     }
   }
 
-  // A start date after today plans an Away (51g1) or a suspension (51g3)
-  // rather than starting it, and a last day plans the Offboard for the day
-  // after it (51g2).
+  // A start date after today plans an Away (51g1), a suspension (51g3) or a
+  // return (51l) rather than starting it, and a last day plans the Offboard
+  // for the day after it (51g2).
   let today: string | null = null;
   const orgToday = async () => (today ??= await fetchOrgToday(serviceClient, orgId));
   const editingLastDay =
@@ -288,16 +294,13 @@ export async function applyStatusChange(
   const planningLastDay = (action === "remove" && lastDay !== null) || editingLastDay;
   const laterStart = async () => startDate !== null && startDate !== (await orgToday());
   const planningSuspension = (action === "suspend" && (await laterStart())) || editingSuspension;
-  const planningAway =
-    (action === "setPlannedChange" && !editingLastDay && !editingSuspension) ||
-    (action === "deactivate" && (await laterStart()));
-  const planning = planningAway || planningLastDay || planningSuspension;
+  const planningReturn = (restoringFromOffboard && (await laterStart())) || editingReturn;
+  const editingAway =
+    action === "setPlannedChange" && !editingLastDay && !editingSuspension && !editingReturn;
+  const planningAway = editingAway || (action === "deactivate" && (await laterStart()));
+  const planning = planningAway || planningLastDay || planningSuspension || planningReturn;
 
-  if (
-    (action === "deactivate" ||
-      (action === "setPlannedChange" && !editingLastDay && !editingSuspension)) &&
-    !canMarkInactive(currentEmployee.focusAreaIds)
-  ) {
+  if ((action === "deactivate" || editingAway) && !canMarkInactive(currentEmployee.focusAreaIds)) {
     return respond({ error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE }, { status: 400 });
   }
 
@@ -325,11 +328,14 @@ export async function applyStatusChange(
     return respond({ error: NOT_AWAY_MESSAGE, code: NOT_AWAY_CODE }, { status: 400 });
   }
 
+  // A return is the one plan an Offboarded person holds; every other needs someone Active.
   if (
-    planning &&
-    (currentEmployee.status !== "active" ||
-      currentEmployee.archivedAt ||
-      currentEmployee.suspendedAt)
+    planningReturn
+      ? currentEmployee.status !== "removed"
+      : planning &&
+        (currentEmployee.status !== "active" ||
+          currentEmployee.archivedAt ||
+          currentEmployee.suspendedAt)
   ) {
     return respond({ error: NOT_PLANNABLE_MESSAGE, code: NOT_PLANNABLE_CODE }, { status: 400 });
   }
@@ -352,7 +358,7 @@ export async function applyStatusChange(
   }
 
   if (
-    (planningAway || planningSuspension) &&
+    (planningAway || planningSuspension || planningReturn) &&
     (startDate === null || !isValidPlannedStart(startDate, await orgToday()))
   ) {
     return respond(
@@ -466,10 +472,24 @@ export async function applyStatusChange(
       ? "planLastDay"
       : planningSuspension
         ? "planSuspension"
-        : planning
-          ? "plan"
-          : action
+        : planningReturn
+          ? "planReturn"
+          : planning
+            ? "plan"
+            : action
   ) {
+    case "planReturn":
+      update.planned_status = "active";
+      update.planned_from = startDate;
+      update.planned_until = null;
+      update.planned_absence_type_id = null;
+      update.planned_by = actor.id;
+      auditAction = editingReturn ? "employee.restore_plan_changed" : "employee.restore_planned";
+      auditDetails = {
+        ...(editingReturn ? { fromReturnDate: currentEmployee.plannedFrom ?? null } : {}),
+        returnDate: startDate,
+      };
+      break;
     case "planSuspension":
       update.planned_status = "suspended";
       update.planned_from = startDate;
@@ -527,6 +547,11 @@ export async function applyStatusChange(
       break;
     case "cancelPlannedChange":
       update.planned_status = null;
+      if (currentEmployee.plannedStatus === "active") {
+        auditAction = "employee.restore_plan_cancelled";
+        auditDetails = { returnDate: currentEmployee.plannedFrom ?? null };
+        break;
+      }
       if (currentEmployee.plannedStatus === "suspended") {
         auditAction = "employee.suspension_plan_cancelled";
         auditDetails = {
@@ -696,7 +721,7 @@ export async function applyStatusChange(
     });
   }
 
-  if (restoring) {
+  if (restoringFromOffboard && !planning) {
     await reopenRestoredAccess(serviceClient, { orgId, empId, userId: currentEmployee.userId });
   }
 

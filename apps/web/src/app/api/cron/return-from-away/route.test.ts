@@ -7,6 +7,7 @@ const updateMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
 const cacheDel = vi.fn();
 const endOffboardedAccess = vi.fn();
+const reopenRestoredAccess = vi.fn();
 const endUserSessions = vi.fn();
 const disablePush = vi.fn();
 const scheduleSuspensionNotice = vi.fn();
@@ -17,6 +18,7 @@ const superAdminCount = vi.fn(() => 2);
 
 vi.mock("@/features/employees/server/offboard-access", () => ({
   endOffboardedAccess: (...args: unknown[]) => endOffboardedAccess(...args),
+  reopenRestoredAccess: (...args: unknown[]) => reopenRestoredAccess(...args),
 }));
 
 vi.mock("@/features/employees/server/suspension-notice", () => ({
@@ -140,14 +142,18 @@ function planned(id: string, orgId: string, from: string, until: string | null, 
 
 /**
  * The planned-away read gets `plans`, the last-day read `lastDays`, the
- * return read `aways`, the ended-suspension read `ending` and the
- * planned-suspension read `suspensions`.
+ * return read `aways`, the ended-suspension read `ending`, the
+ * planned-suspension read `suspensions` and the planned-return read `returns`.
  */
 function rows(
   plans: unknown[],
   aways: unknown[] = [],
   lastDays: unknown[] = [],
-  { ending = [], suspensions = [] }: { ending?: unknown[]; suspensions?: unknown[] } = {},
+  {
+    ending = [],
+    suspensions = [],
+    returns = [],
+  }: { ending?: unknown[]; suspensions?: unknown[]; returns?: unknown[] } = {},
 ) {
   selectLte.mockImplementation(async (column: string, _bound: string, plannedStatus: unknown) => ({
     data:
@@ -159,7 +165,9 @@ function rows(
             ? lastDays
             : plannedStatus === "suspended"
               ? suspensions
-              : plans,
+              : plannedStatus === "active"
+                ? returns
+                : plans,
     error: null,
   }));
 }
@@ -250,6 +258,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });
@@ -298,6 +307,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });
@@ -314,6 +324,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 0,
     });
     expect(updateEmployee).not.toHaveBeenCalled();
@@ -335,6 +346,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 0,
       skipped: 1,
     });
@@ -352,6 +364,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 0,
     });
     expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28", "away");
@@ -495,6 +508,100 @@ describe("GET /api/cron/return-from-away", () => {
     expect((await res.json()).offboarded).toBe(0);
     expect(endOffboardedAccess).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  describe("planned returns (51l)", () => {
+    function returning(id: string, from: string, timezone: string) {
+      return {
+        id,
+        org_id: "org-la",
+        user_id: `user-${id}`,
+        planned_from: from,
+        planned_by: "manager-1",
+        version: 7,
+        organization: { timezone },
+      };
+    }
+
+    it("restores someone whose return is today, as a manual Restore does", async () => {
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(1);
+      expect(updateEmployee).toHaveBeenCalledWith(
+        {
+          status: "active",
+          status_note: "",
+          away_until: null,
+          archived_at: null,
+          status_changed_at: "2026-10-27T01:00:00.000Z",
+          updated_by: "manager-1",
+          version: 8,
+        },
+        [
+          ["id", "emp-la"],
+          ["org_id", "org-la"],
+          ["version", 7],
+        ],
+      );
+      expect(reopenRestoredAccess).toHaveBeenCalledWith(expect.anything(), {
+        orgId: "org-la",
+        empId: "emp-la",
+        userId: "user-emp-la",
+      });
+      expect(auditInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          action: "employee.activated",
+          actor_id: null,
+          resource_id: "emp-la",
+          details: expect.objectContaining({
+            fromStatus: "removed",
+            toStatus: "active",
+            returnDate: "2026-10-26",
+          }),
+        }),
+      ]);
+      expect(cacheDel).toHaveBeenCalledWith("dg:org:org-la:employees");
+    });
+
+    it("waits while their return is still tomorrow in the organization's timezone", async () => {
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-27", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(0);
+      expect(updateEmployee).not.toHaveBeenCalled();
+      expect(reopenRestoredAccess).not.toHaveBeenCalled();
+    });
+
+    it("restores where the organization's day has already turned", async () => {
+      rows([], [], [], { returns: [returning("emp-tk", "2026-10-27", "Asia/Tokyo")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(1);
+    });
+
+    it("leaves someone a manager changed meanwhile alone", async () => {
+      updateMaybeSingle.mockResolvedValue({ data: null, error: null });
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      const res = await GET(makeReq());
+
+      expect((await res.json()).restored).toBe(0);
+      expect(reopenRestoredAccess).not.toHaveBeenCalled();
+      expect(auditInsert).not.toHaveBeenCalled();
+    });
+
+    it("restores nobody with the flag off", async () => {
+      isFeatureEnabled.mockResolvedValue(false);
+      rows([], [], [], { returns: [returning("emp-la", "2026-10-26", "America/Los_Angeles")] });
+
+      await GET(makeReq());
+
+      expect(updateEmployee).not.toHaveBeenCalled();
+    });
   });
 
   describe("suspensions with a start and an end (51g3)", () => {
@@ -675,6 +782,7 @@ describe("GET /api/cron/return-from-away", () => {
       offboarded: 0,
       reinstated: 0,
       suspended: 0,
+      restored: 0,
       returned: 1,
       skipped: 0,
     });

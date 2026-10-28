@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeReturn,
+  describeUpcomingStatus,
+  plannedReturn,
   describeFirstDay,
   describeUpcomingChange,
   formatFirstDay,
@@ -1144,5 +1147,117 @@ describe("first day (51g4)", () => {
     expect(
       statusMark({ ...newHire, plannedStatus: "removed", plannedFrom: "2027-01-01" }, today)?.label,
     ).toBe("Leaving Dec 31");
+  });
+});
+
+describe("a planned return (51l)", () => {
+  const onSchedule = { focusAreaIds: [1] };
+  const returning = {
+    status: "removed" as const,
+    archivedAt: "2026-10-01T00:00:00Z",
+    plannedStatus: "active" as const,
+    plannedFrom: "2026-11-10",
+    ...onSchedule,
+  };
+
+  it("reads the return day", () => {
+    expect(plannedReturn(returning)).toBe("2026-11-10");
+    expect(plannedReturn({ plannedStatus: "removed", plannedFrom: "2026-11-10" })).toBeNull();
+    expect(describeReturn("2026-11-10")).toBe("Returns Nov 10");
+    expect(describeReturn("2026-11-10", { weekday: true })).toBe("Returns Tue, Nov 10");
+  });
+
+  it("names it in lists, on records and beside the name", () => {
+    expect(describePlannedChange(returning)).toBe("Returns Nov 10");
+    expect(describePlannedChangeInFull(returning)).toBe("Returns Nov 10");
+    expect(describeUpcomingStatus(returning, "2026-10-28")).toBe("Returns Nov 10");
+    expect(
+      describeUpcomingStatus({ status: "removed", archivedAt: "2026-10-01" }, "2026-10-28"),
+    ).toBeNull();
+    expect(
+      describeUpcomingStatus(
+        { status: "active", plannedStatus: "removed", plannedFrom: "2026-11-09" },
+        "2026-10-28",
+      ),
+    ).toBe("Leaving Nov 8");
+    expect(statusMark(returning)).toEqual({
+      kind: "archived",
+      label: "Offboarded, returns Nov 10",
+      tone: "neutral",
+    });
+  });
+
+  it("shows a dashed planned card on the Offboarded status card", () => {
+    const card = describeStatusCard(returning, { today: "2026-10-28" });
+    expect(card.current.kind).toBe("archived");
+    expect(card.planned).toEqual({
+      title: "Returns Tue, Nov 10",
+      detail: "Back to Active then: they can sign in and be scheduled.",
+    });
+    expect(describeStatusCard({ ...returning, userId: null }).planned?.detail).toBe(
+      "Back to Active then, and can be scheduled.",
+    );
+  });
+
+  it("disables Restore while a return is planned, so the card offers Edit plan alone", () => {
+    const restore = statusChoices(returning).find((option) => option.action === "restore");
+    expect(restore).toMatchObject({
+      available: false,
+      unavailableReason: "Returns Tue, Nov 10. Change it with Edit plan.",
+    });
+    expect(availableStatusChoices(returning)).toEqual([]);
+    expect(suggestedStatusChoice(returning)).toBeNull();
+    expect(
+      statusChoices(returning, { canOffboard: false }).find((option) => option.action === "restore")
+        ?.unavailableReason,
+    ).toBe(RESTORE_OUT_OF_REACH_MESSAGE);
+  });
+
+  it("describes Restore on a later date", () => {
+    expect(describeStatusAction("restore", "Ana Torres", { startDate: "2026-11-10" })).toEqual({
+      label: "Schedule restore",
+      title: "Restore Ana Torres?",
+      message: "They stay Offboarded until Tue, Nov 10.",
+      points: [
+        "On Nov 10 they're back to Active and can sign in again.",
+        "They can be scheduled from Nov 10, not before.",
+      ],
+      unchanged: [],
+      done: "Restore scheduled",
+    });
+    expect(
+      describeStatusAction("restore", "Ana Torres", {
+        startDate: "2026-11-10",
+        hasAccount: false,
+      }).points[0],
+    ).toBe("On Nov 10 they're back to Active.");
+    expect(describeStatusAction("restore", "Ana Torres").label).toBe("Restore");
+  });
+
+  it("describes moving and cancelling a planned return", () => {
+    expect(
+      describeStatusAction("setPlannedChange", "Ana Torres", {
+        plannedStatus: "active",
+        startDate: "2026-11-12",
+      }),
+    ).toMatchObject({
+      label: "Save changes",
+      title: "Change Ana Torres's planned return?",
+      message: "They stay Offboarded until Thu, Nov 12.",
+      done: "Planned return changed",
+    });
+    expect(
+      describeStatusAction("cancelPlannedChange", "Ana Torres", { plannedStatus: "active" }),
+    ).toMatchObject({
+      label: "Cancel planned return",
+      title: "Cancel Ana Torres's planned return?",
+      message: "They stay Offboarded until someone restores them.",
+      done: "Planned return cancelled",
+    });
+  });
+
+  it("keeps them unschedulable until the job restores them", () => {
+    expect(isSchedulableOn(returning, "2026-11-10")).toBe(false);
+    expect(isSchedulableOn(returning, "2026-12-01")).toBe(false);
   });
 });

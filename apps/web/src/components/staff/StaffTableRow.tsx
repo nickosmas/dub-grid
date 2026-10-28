@@ -1,5 +1,5 @@
 "use client";
-import { describeEmploymentStatus, describeUpcomingChange } from "@dubgrid/domain";
+import { describeEmploymentStatus, describeUpcomingStatus } from "@dubgrid/domain";
 import { ChevronRight } from "lucide-react";
 
 import { useId, type CSSProperties, type ReactNode } from "react";
@@ -183,10 +183,7 @@ function StaffRowCells({
     emp.suspendedAt,
     emp.suspendedUntil,
   );
-  const plannedLabel =
-    emp.status === "active" && !emp.archivedAt
-      ? describeUpcomingChange(emp, formatDateKey(new Date()))
-      : null;
+  const plannedLabel = describeUpcomingStatus(emp, formatDateKey(new Date()));
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",

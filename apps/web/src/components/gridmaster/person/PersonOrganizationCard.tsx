@@ -3,6 +3,7 @@
 import {
   describeEmploymentStatus,
   describePlannedChangeInFull,
+  plannedReturn,
   formatFirstDay,
 } from "@dubgrid/domain";
 import type { ReactNode } from "react";
@@ -141,7 +142,8 @@ function StaffFacts({
               )
         }
       />
-      {employee.status === "active" && describePlannedChangeInFull(employee) ? (
+      {(employee.status === "active" || plannedReturn(employee)) &&
+      describePlannedChangeInFull(employee) ? (
         <PersonField label="Planned" value={describePlannedChangeInFull(employee) ?? ""} tabular />
       ) : null}
       <PersonField

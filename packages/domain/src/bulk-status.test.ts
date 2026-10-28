@@ -42,6 +42,17 @@ describe("bulkStatusSkipReason", () => {
     expect(bulkStatusSkipReason("markAway", suspended)).toBeNull();
   });
 
+  it("skips someone with a return planned, whose plan is edited on their page (51l)", () => {
+    const returning = {
+      ...offboarded,
+      plannedStatus: "active" as const,
+      plannedFrom: "2026-11-10",
+    };
+    expect(bulkStatusSkipReason("restore", returning)).toBe(
+      "Returns Tue, Nov 10. Change it with Edit plan.",
+    );
+  });
+
   it("skips a Super Admin the manager can't offboard or restore (51k)", () => {
     expect(bulkStatusSkipReason("archive", active, { canOffboard: false })).toBe(
       OFFBOARD_OUT_OF_REACH_MESSAGE,

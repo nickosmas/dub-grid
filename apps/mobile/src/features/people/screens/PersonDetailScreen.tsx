@@ -5,6 +5,7 @@ import {
   describeStatusAction,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
+  plannedReturn,
   formatFirstDay,
   canOffboardAtTier,
   statusChoices,
@@ -551,7 +552,7 @@ export default function PersonDetailScreen() {
       startDate?: string | null;
       lastDay?: string | null;
       /** The plan the person had, which names the toast for a last day. */
-      fromPlannedStatus: "away" | "removed" | "suspended" | null;
+      fromPlannedStatus: "away" | "removed" | "suspended" | "active" | null;
       expectedVersion: number;
       fromReturnDate: string | null;
     }) =>
@@ -710,6 +711,7 @@ export default function PersonDetailScreen() {
     person?.status === "active" && person.plannedStatus === "away" && !!person.plannedFrom;
   const plannedSuspension =
     person?.status === "active" && person.plannedStatus === "suspended" && !!person.plannedFrom;
+  const plannedReturnDay = person?.status === "removed" ? plannedReturn(person) : null;
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
       confirmAction === "status" &&
@@ -727,7 +729,8 @@ export default function PersonDetailScreen() {
             : plannedAway
               ? (person.plannedAbsenceTypeId ?? null)
               : null) ||
-        startDate !== (plannedAway || plannedSuspension ? (person?.plannedFrom ?? null) : null) ||
+        startDate !==
+          (plannedAway || plannedSuspension ? (person?.plannedFrom ?? null) : plannedReturnDay) ||
         suspensionEnd !==
           (person?.suspendedAt
             ? (person.suspendedUntil ?? null)
@@ -1025,6 +1028,13 @@ export default function PersonDetailScreen() {
   // Clearing a planned suspension's start date suspends them today instead.
   const suspendsNow =
     hasSuspensionPlan && !cancellingPlan && !startDate && statusOpening.focus !== "status";
+  // An Offboarded person's planned return (51l) is edited in the sheet too.
+  const returnDay = person.status === "removed" ? plannedReturn(person) : null;
+  const returnPlanChanged =
+    !!returnDay && !cancellingPlan && !!laterStart && laterStart !== returnDay;
+  // Clearing a planned return's date restores them today instead.
+  const restoresNow =
+    !!returnDay && !cancellingPlan && !laterStart && statusOpening.focus !== "status";
   // Starts and Last day reach a year ahead, as the server allows.
   const latestPlannedDay = addDaysToIsoDate(orgToday, PLANNED_START_MAX_DAYS);
 
@@ -1032,27 +1042,33 @@ export default function PersonDetailScreen() {
     if (confirmAction !== "status" || !person) return;
     const choice: StatusAction =
       statusChoice ??
-      (plannedLeave
-        ? offboardsNow
-          ? "archive"
+      (returnDay
+        ? restoresNow
+          ? "restore"
           : cancellingPlan
             ? "cancelPlannedChange"
             : "setPlannedChange"
-        : hasSuspensionPlan
-          ? suspendsNow
-            ? "suspend"
+        : plannedLeave
+          ? offboardsNow
+            ? "archive"
             : cancellingPlan
               ? "cancelPlannedChange"
               : "setPlannedChange"
-          : isSuspended
-            ? "setSuspendedUntil"
-            : startsNow
-              ? "markAway"
-              : hasPlan
-                ? cancellingPlan
-                  ? "cancelPlannedChange"
-                  : "setPlannedChange"
-                : "setReturnDate");
+          : hasSuspensionPlan
+            ? suspendsNow
+              ? "suspend"
+              : cancellingPlan
+                ? "cancelPlannedChange"
+                : "setPlannedChange"
+            : isSuspended
+              ? "setSuspendedUntil"
+              : startsNow
+                ? "markAway"
+                : hasPlan
+                  ? cancellingPlan
+                    ? "cancelPlannedChange"
+                    : "setPlannedChange"
+                  : "setReturnDate");
     // A suspension's dates (51g3) travel as a start date and a return date.
     if (
       choice === "suspend" ||
@@ -1092,7 +1108,8 @@ export default function PersonDetailScreen() {
       absenceTypeId:
         choice === "setReturnDate" || (dated && returnDate) ? chosenAbsenceTypeId : undefined,
       startDate:
-        (choice === "setPlannedChange" && !plannedLeave) || (choice === "markAway" && laterStart)
+        (choice === "setPlannedChange" && !plannedLeave) ||
+        ((choice === "markAway" || choice === "restore") && laterStart)
           ? laterStart
           : undefined,
       lastDay:
@@ -1129,7 +1146,7 @@ export default function PersonDetailScreen() {
           ? (person.plannedAbsenceTypeId ?? null)
           : null,
     );
-    setStartDate(hasPlan || hasSuspensionPlan ? (person.plannedFrom ?? null) : null);
+    setStartDate(hasPlan || hasSuspensionPlan ? (person.plannedFrom ?? null) : returnDay);
     setLastDay(plannedLeave);
     setSuspensionEnd(
       isSuspended
@@ -1205,7 +1222,11 @@ export default function PersonDetailScreen() {
           ? "Clear it to start their time away today."
           : hasSuspensionPlan && !statusChoice
             ? "Clear it to suspend them today."
-            : null
+            : returnDay && !statusChoice
+              ? "Clear it to restore them today."
+              : statusChoice === "restore"
+                ? "Leave it empty to restore them today."
+                : null
       }
       label="Starts"
       maxDate={latestPlannedDay}
@@ -1248,7 +1269,10 @@ export default function PersonDetailScreen() {
               ? suspensionEnd
               : null,
         absenceName: statusChoice === "markAway" ? chosenAbsenceName : null,
-        startDate: statusChoice === "markAway" || statusChoice === "suspend" ? laterStart : null,
+        startDate:
+          statusChoice === "markAway" || statusChoice === "suspend" || statusChoice === "restore"
+            ? laterStart
+            : null,
         lastDay: statusChoice === "archive" && canPlanLastDay ? lastDay : null,
         // Any other change replaces the plan, and says so.
         plannedFrom:
@@ -1259,62 +1283,74 @@ export default function PersonDetailScreen() {
             : null,
         plannedStatus: person.plannedStatus ?? null,
       })
-    : suspendsNow
-      ? describeStatusAction("suspend", getFullName(person), { returnDate: suspensionEnd })
-      : hasSuspensionPlan && cancellingPlan
+    : restoresNow
+      ? describeStatusAction("restore", getFullName(person))
+      : returnDay && cancellingPlan
         ? describeStatusAction("cancelPlannedChange", getFullName(person), {
-            plannedStatus: "suspended",
+            plannedStatus: "active",
           })
-        : suspensionPlanChanged
+        : returnPlanChanged
           ? describeStatusAction("setPlannedChange", getFullName(person), {
-              plannedStatus: "suspended",
+              plannedStatus: "active",
               startDate: laterStart,
-              returnDate: suspensionEnd,
+              hasAccount: Boolean(person.userId),
             })
-          : suspensionEndChanged
-            ? describeStatusAction("setSuspendedUntil", getFullName(person), {
-                returnDate: suspensionEnd,
-                currentReturnDate: person.suspendedUntil ?? null,
-              })
-            : offboardsNow
-              ? describeStatusAction("archive", getFullName(person), {
-                  hasAccount: Boolean(person.userId),
+          : suspendsNow
+            ? describeStatusAction("suspend", getFullName(person), { returnDate: suspensionEnd })
+            : hasSuspensionPlan && cancellingPlan
+              ? describeStatusAction("cancelPlannedChange", getFullName(person), {
+                  plannedStatus: "suspended",
                 })
-              : plannedLeave && cancellingPlan
-                ? describeStatusAction("cancelPlannedChange", getFullName(person), {
-                    plannedStatus: "removed",
+              : suspensionPlanChanged
+                ? describeStatusAction("setPlannedChange", getFullName(person), {
+                    plannedStatus: "suspended",
+                    startDate: laterStart,
+                    returnDate: suspensionEnd,
                   })
-                : lastDayChanged
-                  ? describeStatusAction("setPlannedChange", getFullName(person), {
-                      plannedStatus: "removed",
-                      lastDay,
-                      hasAccount: Boolean(person.userId),
+                : suspensionEndChanged
+                  ? describeStatusAction("setSuspendedUntil", getFullName(person), {
+                      returnDate: suspensionEnd,
+                      currentReturnDate: person.suspendedUntil ?? null,
                     })
-                  : startsNow
-                    ? describeStatusAction("markAway", getFullName(person), {
+                  : offboardsNow
+                    ? describeStatusAction("archive", getFullName(person), {
                         hasAccount: Boolean(person.userId),
-                        returnDate,
-                        absenceName: chosenAbsenceName,
                       })
-                    : cancellingPlan
+                    : plannedLeave && cancellingPlan
                       ? describeStatusAction("cancelPlannedChange", getFullName(person), {
-                          absenceName: plannedAbsence
-                            ? (plannedAbsence.name ?? plannedAbsence.label)
-                            : null,
+                          plannedStatus: "removed",
                         })
-                      : planChanged
+                      : lastDayChanged
                         ? describeStatusAction("setPlannedChange", getFullName(person), {
-                            startDate: laterStart,
-                            returnDate,
-                            absenceName: chosenAbsenceName,
+                            plannedStatus: "removed",
+                            lastDay,
+                            hasAccount: Boolean(person.userId),
                           })
-                        : awayDetailsChanged
-                          ? describeStatusAction("setReturnDate", getFullName(person), {
+                        : startsNow
+                          ? describeStatusAction("markAway", getFullName(person), {
+                              hasAccount: Boolean(person.userId),
                               returnDate,
-                              currentReturnDate: person.awayUntil,
                               absenceName: chosenAbsenceName,
                             })
-                          : null;
+                          : cancellingPlan
+                            ? describeStatusAction("cancelPlannedChange", getFullName(person), {
+                                absenceName: plannedAbsence
+                                  ? (plannedAbsence.name ?? plannedAbsence.label)
+                                  : null,
+                              })
+                            : planChanged
+                              ? describeStatusAction("setPlannedChange", getFullName(person), {
+                                  startDate: laterStart,
+                                  returnDate,
+                                  absenceName: chosenAbsenceName,
+                                })
+                              : awayDetailsChanged
+                                ? describeStatusAction("setReturnDate", getFullName(person), {
+                                    returnDate,
+                                    currentReturnDate: person.awayUntil,
+                                    absenceName: chosenAbsenceName,
+                                  })
+                                : null;
   // A return date is the first day back, so the organization's tomorrow at the
   // earliest, or the day after a planned Away's start.
   const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
@@ -1796,11 +1832,13 @@ export default function PersonDetailScreen() {
                   ? `Change ${getFullName(person)}'s return date?`
                   : isSuspended
                     ? `Change when ${getFullName(person)}'s suspension ends?`
-                    : hasSuspensionPlan
-                      ? `Change ${getFullName(person)}'s planned suspension?`
-                      : plannedLeave
-                        ? `Change ${getFullName(person)}'s last day?`
-                        : `Change ${getFullName(person)}'s planned away?`
+                    : returnDay
+                      ? `Change ${getFullName(person)}'s planned return?`
+                      : hasSuspensionPlan
+                        ? `Change ${getFullName(person)}'s planned suspension?`
+                        : plannedLeave
+                          ? `Change ${getFullName(person)}'s last day?`
+                          : `Change ${getFullName(person)}'s planned away?`
                 : `Change ${getFullName(person)}'s status?`)
             }
           />
@@ -1825,17 +1863,24 @@ export default function PersonDetailScreen() {
                     !lastDayChanged &&
                     !suspensionEndChanged &&
                     !suspensionPlanChanged &&
+                    !returnPlanChanged &&
+                    !restoresNow &&
                     !cancellingPlan &&
                     !startsNow &&
                     !offboardsNow &&
                     !suspendsNow
                   }
                   label={
-                    statusChoice || cancellingPlan || startsNow || offboardsNow || suspendsNow
+                    statusChoice ||
+                    cancellingPlan ||
+                    startsNow ||
+                    offboardsNow ||
+                    suspendsNow ||
+                    restoresNow
                       ? (statusCopy?.label ?? "")
                       : isAway ||
                           isSuspended ||
-                          ((hasPlan || plannedLeave || hasSuspensionPlan) &&
+                          ((hasPlan || plannedLeave || hasSuspensionPlan || returnDay) &&
                             statusOpening.focus !== "status")
                         ? "Save changes"
                         : "Change status"
@@ -1914,6 +1959,18 @@ export default function PersonDetailScreen() {
                 compact
                 disabled={statusMutation.isPending}
                 label={cancellingPlan ? "Keep planned suspension" : "Cancel planned suspension"}
+                onPress={() => setCancellingPlan((value) => !value)}
+                tone="plain"
+              />
+            </>
+          ) : null}
+          {returnDay && !statusChoice && statusOpening.focus !== "status" ? (
+            <>
+              {cancellingPlan ? null : startField}
+              <Button
+                compact
+                disabled={statusMutation.isPending}
+                label={cancellingPlan ? "Keep planned return" : "Cancel planned return"}
                 onPress={() => setCancellingPlan((value) => !value)}
                 tone="plain"
               />
@@ -2022,6 +2079,7 @@ export default function PersonDetailScreen() {
             {awayAbsenceChoices}
           </>
         ) : null}
+        {statusChoice === "restore" ? startField : null}
         {statusChoice === "suspend" ? (
           <>
             {startField}

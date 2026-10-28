@@ -1922,6 +1922,68 @@ describe("PersonDetailScreen", () => {
         copyAction: "restore",
       });
     });
+
+    it("restores on a later date (51l)", () => {
+      const mutate = renderWithStatusMutation({ status: "removed" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      expect(screen.getByText("Leave it empty to restore them today.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(
+          `They stay Offboarded until ${formatReturnDate(day(3), { weekday: true })}.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Schedule restore");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "activate",
+        copyAction: "restore",
+        startDate: day(3),
+      });
+    });
+
+    it("moves, cancels and clears a planned return from Edit plan (51l)", () => {
+      const returning = {
+        status: "removed" as const,
+        plannedStatus: "active" as const,
+        plannedFrom: day(5),
+      };
+      const mutate = renderWithStatusMutation(returning);
+
+      expect(
+        screen.getByText(`Returns ${formatReturnDate(day(5), { weekday: true })}`),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Change Mina Diaz's planned return?")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      choose(day(7));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        copyAction: "setPlannedChange",
+        startDate: day(7),
+        fromPlannedStatus: "active",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(returning);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned return" }));
+      confirm("Cancel planned return");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(returning);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Today" }));
+      expect(screen.getByText("Restore Mina Diaz?")).toBeInTheDocument();
+      confirm("Restore");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({ action: "activate", startDate: undefined });
+    });
   });
 
   describe("page layout", () => {

@@ -38,9 +38,9 @@ const bodySchema = z.object({
    */
   absenceTypeId: z.number().int().positive().nullable().optional(),
   /**
-   * Mark away, Suspend and setPlannedChange: the first day. A day after today
-   * plans the change (51g1, 51g3) instead of starting it; today or left out
-   * starts it.
+   * Mark away, Suspend, Restore (`activate` for someone Offboarded) and
+   * setPlannedChange: the first day. A day after today plans the change
+   * (51g1, 51g3, 51l) instead of starting it; today or left out starts it.
    */
   startDate: z.string().date().nullable().optional(),
   /**

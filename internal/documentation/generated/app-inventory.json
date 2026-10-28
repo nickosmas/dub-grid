@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:26b156b82daf830aa9bc1258615cbd1af5eef96e7e491552d7065b364bd435db",
+  "sourceDigest": "sha256:28486ea21282b9709d617bb8e154c2bd1b0c28d459921fb60d6ffbce743cc381",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4883,6 +4883,16 @@
       "sha256": "cdc647840a2acbce6302dcac2b98e50d56ba32259ec09fd556883fb381580e14",
       "source": {
         "path": "supabase/migrations/108_one_offboard.sql"
+      }
+    },
+    {
+      "id": "migration:109_planned_restore.sql",
+      "version": "109",
+      "name": "planned_restore",
+      "file": "109_planned_restore.sql",
+      "sha256": "14271b924f16c2b647966ce926e16d5c17e17d27b1430d9fc2e1c7bca7ccadcc",
+      "source": {
+        "path": "supabase/migrations/109_planned_restore.sql"
       }
     }
   ],

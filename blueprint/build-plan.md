@@ -1139,6 +1139,10 @@
   - [x] 51k. **One Archive** - archiving ends the membership whoever does
         it, so an Admin's and a Super Admin's archive leave the same record,
         and Restore works the same after either.
+  - [x] 51l. **Restore on a date** - an Offboarded person can be restored
+        on a later date: Restore takes a Starts date, they stay Offboarded
+        until then ("Returns Nov 10"), and the daily job restores them on
+        the day.
 - [x] 52. **Absence runs in the grid** - a whole-day absence on days in a
       row draws as one bar per week in the Week and 2 Weeks grid, with no
       lines between its days, labeled with the name and a count ("Vacation
