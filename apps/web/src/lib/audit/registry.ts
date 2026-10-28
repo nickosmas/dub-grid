@@ -562,6 +562,23 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     suppressKeys: ["fromLastDay", "lastDay"],
   },
+  "employee.focus_area_shifts_cleared": {
+    category: "people",
+    severity: "delete",
+    headline: (d, ctx) => {
+      const count = d.number("count");
+      const shifts = count ? pluralize(count, "upcoming shift") : "upcoming shifts";
+      const areas = d.list("focusAreas");
+      const where =
+        areas.length > 1
+          ? ` in ${areas.slice(0, -1).join(", ")} and ${areas[areas.length - 1]}`
+          : areas.length === 1
+            ? ` in ${areas[0]}`
+            : "";
+      return `Cleared ${shifts} for ${who(d, ctx, "a team member")}${where}`;
+    },
+    suppressKeys: ["count", "focusAreas"],
+  },
   "employee.last_day_cancelled": {
     category: "people",
     severity: "update",

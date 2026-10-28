@@ -3,9 +3,12 @@
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
+  parseFocusAreaShiftsQuestion,
   SELF_ACTION_FORBIDDEN_CODE,
   SelfActionForbiddenError,
   type BulkStatusAction,
+  type FocusAreaShiftsDecision,
+  type FocusAreaUpcomingShifts,
 } from "@dubgrid/domain";
 import type {
   Employee,
@@ -207,29 +210,64 @@ export function insertEmployee(employee: Omit<Employee, "id">, orgId: string): P
   }).then((data) => data.employee);
 }
 
+/** The manager closed the question about their shifts, so nothing was saved. */
+export class FocusAreaShiftsCancelledError extends Error {
+  constructor() {
+    super("The save was cancelled.");
+    this.name = "FocusAreaShiftsCancelledError";
+  }
+}
+
+export interface UpdateEmployeeOptions {
+  /**
+   * Asks what to do with their upcoming shifts in the focus areas they come
+   * off, when the server needs to know (51i). Resolves null to cancel the
+   * save. Without it the server's refusal is thrown as an ordinary error.
+   */
+  askFocusAreaShifts?: (
+    areas: FocusAreaUpcomingShifts[],
+  ) => Promise<FocusAreaShiftsDecision | null>;
+  /** Told when the save went through but clearing their shifts didn't. */
+  onFocusAreaShiftsNotCleared?: (message: string) => void;
+}
+
 export async function updateEmployee(
   employee: Employee,
   orgId: string,
   expectedVersion?: number,
+  options: UpdateEmployeeOptions = {},
 ): Promise<Employee> {
-  const response = await fetch(resolveClientUrl("/api/employees/manage"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "updateEmployee",
-      orgId,
-      employee,
-      expectedVersion,
-    }),
-  });
-
-  const body = (await response.json().catch(() => null)) as {
+  const send = (focusAreaShifts?: FocusAreaShiftsDecision) =>
+    fetch(resolveClientUrl("/api/employees/manage"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "updateEmployee",
+        orgId,
+        employee,
+        expectedVersion,
+        ...(focusAreaShifts ? { focusAreaShifts } : {}),
+      }),
+    });
+  type Body = {
     code?: string;
     error?: string;
     employee?: Employee;
     field?: "email" | "phone";
     message?: string;
+    focusAreaShiftsNotCleared?: string;
   } | null;
+
+  let response = await send();
+  let body = (await response.json().catch(() => null)) as Body;
+
+  const areas = response.status === 409 ? parseFocusAreaShiftsQuestion(body) : null;
+  if (areas && options.askFocusAreaShifts) {
+    const decision = await options.askFocusAreaShifts(areas);
+    if (!decision) throw new FocusAreaShiftsCancelledError();
+    response = await send(decision);
+    body = (await response.json().catch(() => null)) as Body;
+  }
 
   if (
     response.status === 409 &&
@@ -254,6 +292,9 @@ export async function updateEmployee(
 
   if (!body?.employee) {
     throw new Error("The server saved the employee but did not return the updated profile.");
+  }
+  if (body.focusAreaShiftsNotCleared) {
+    options.onFocusAreaShiftsNotCleared?.(body.focusAreaShiftsNotCleared);
   }
   return body.employee;
 }

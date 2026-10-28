@@ -20,6 +20,13 @@ vi.mock("@/features/employees/server/login-email-follow-up", () => ({
   followUpLinkedLoginEmailChange: (...args: unknown[]) => followUpLinkedLoginEmailChange(...args),
 }));
 
+const planFocusAreaShifts = vi.fn();
+const clearFocusAreaShiftsAfterSave = vi.fn();
+vi.mock("@/features/employees/server/focus-area-shifts", () => ({
+  planFocusAreaShifts: (...args: unknown[]) => planFocusAreaShifts(...args),
+  clearFocusAreaShiftsAfterSave: (...args: unknown[]) => clearFocusAreaShiftsAfterSave(...args),
+}));
+
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   requireMobileSensitiveActionAuth,
@@ -112,6 +119,8 @@ describe("mobile person route", () => {
     validateStaffOrgReferences.mockResolvedValue({});
     requireMobileSensitiveActionAuth.mockResolvedValue(makeAuth());
     updateUserById.mockResolvedValue({ error: null });
+    planFocusAreaShifts.mockResolvedValue({ clear: [] });
+    clearFocusAreaShiftsAfterSave.mockResolvedValue({ cleared: 0 });
   });
 
   it("rejects users without staff visibility", async () => {
@@ -338,6 +347,73 @@ describe("mobile person route", () => {
       });
 
       expect(response.status).toBe(200);
+    });
+
+    describe("focus area shifts (51i)", () => {
+      const eastWing = {
+        focusAreaId: 2,
+        focusAreaName: "East Wing",
+        count: 2,
+        firstDate: "2026-11-03",
+        lastDate: "2026-11-05",
+      };
+      const params = { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) };
+
+      it("refuses a save the plan refuses, before writing anything", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        const refusal = {
+          error: "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+          code: "FOCUS_AREA_SHIFTS_DECISION",
+          focusAreaShifts: [eastWing],
+        };
+        planFocusAreaShifts.mockResolvedValue({ refuse: refusal });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual(refusal);
+        expect(planFocusAreaShifts).toHaveBeenCalledWith(expect.anything(), {
+          orgId: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+          employeeId: "d660d308-4e0d-4daf-84fd-6753405e6740",
+          before: [2],
+          after: [],
+          decision: undefined,
+        });
+        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
+        expect(updateUserById).not.toHaveBeenCalled();
+      });
+
+      it("clears after the save and says when the clear fails", async () => {
+        requireMobileAuth.mockResolvedValue(makeAuth());
+        updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
+        planFocusAreaShifts.mockResolvedValue({ clear: [eastWing] });
+        clearFocusAreaShiftsAfterSave.mockResolvedValue({ notCleared: "Saved, but not cleared." });
+
+        const { PATCH } = await import("./person");
+        const response = await PATCH(patchRequest({ focusAreaShifts: "clear" }), params);
+
+        expect(response.status).toBe(200);
+        expect(planFocusAreaShifts).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ decision: "clear" }),
+        );
+        expect(clearFocusAreaShiftsAfterSave).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            employeeId: "d660d308-4e0d-4daf-84fd-6753405e6740",
+            areas: [eastWing],
+            actor: { id: VIEWER_USER_ID, email: null },
+          }),
+        );
+        expect(updateMobileEmployeeDetailsRow.mock.invocationCallOrder[0]).toBeLessThan(
+          clearFocusAreaShiftsAfterSave.mock.invocationCallOrder[0]!,
+        );
+        expect(await response.json()).toMatchObject({
+          success: true,
+          focusAreaShiftsNotCleared: "Saved, but not cleared.",
+        });
+      });
     });
 
     it("records only a certification change with its before and after values", async () => {

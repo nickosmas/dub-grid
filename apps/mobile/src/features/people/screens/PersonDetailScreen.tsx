@@ -47,6 +47,10 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
+import {
+  FocusAreaShiftsCancelledError,
+  useFocusAreaShiftsQuestion,
+} from "../../../shared/hooks/useFocusAreaShiftsQuestion";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
@@ -312,6 +316,7 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const focusAreaQuestion = useFocusAreaShiftsQuestion();
   const [invitationError, setInvitationError] = useState<string | null>(null);
   const handoffInvitation = useModalHandoff();
   // Shared by the active editor or status task; only the visible surface renders it.
@@ -485,9 +490,20 @@ export default function PersonDetailScreen() {
       actionAccessToken,
       ...body
     }: MobilePersonUpdateBody & { actionAccessToken?: string }) =>
-      updateMobilePerson(actionAccessToken ?? accessToken!, personId!, body),
+      focusAreaQuestion.saveAsking(
+        `${body.firstName} ${body.lastName}`,
+        (focusAreaShifts) =>
+          updateMobilePerson(actionAccessToken ?? accessToken!, personId!, {
+            ...body,
+            ...(focusAreaShifts ? { focusAreaShifts } : {}),
+          }),
+        // The email confirmation closes before the question about their shifts opens.
+        { beforeAsk: () => setShowSaveConfirmation(false) },
+      ),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
+      // Closing the question about their shifts keeps the form open, unsaved.
+      if (error instanceof FocusAreaShiftsCancelledError) return;
       // A rejection the server pinned to a field belongs on that field, not in
       // a banner: the confirmation closes, the input goes red, and Save stays
       // disabled until it changes.
@@ -516,11 +532,11 @@ export default function PersonDetailScreen() {
       setServerFieldErrors({});
       setDraft(makeDraft(result.person));
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
-      pushToast({
-        tone: "success",
-        title: "Person saved",
-        message: "Staff details were updated.",
-      });
+      pushToast(
+        result.focusAreaShiftsNotCleared
+          ? { tone: "warning", title: "Person saved", message: result.focusAreaShiftsNotCleared }
+          : { tone: "success", title: "Person saved", message: "Staff details were updated." },
+      );
     },
   });
   const statusMutation = useMutation({
@@ -1754,6 +1770,7 @@ export default function PersonDetailScreen() {
         visible={showSaveConfirmation && !stepUp.active}
       />
       {stepUp.sheet}
+      {focusAreaQuestion.modal}
       <ConfirmationModal {...guard.confirmationProps} />
       <BottomSheetModal
         debugName="Change status"

@@ -40,6 +40,11 @@ import {
 } from "@/features/employees/server/login-email";
 import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import { fetchOrgToday } from "@/features/employees/server/org-today";
+import {
+  clearFocusAreaShiftsAfterSave,
+  planFocusAreaShifts,
+  type FocusAreaShiftsPlan,
+} from "@/features/employees/server/focus-area-shifts";
 import { apiErrorResponse } from "@/lib/error-handling";
 import logger from "@/lib/logger";
 import {
@@ -157,6 +162,8 @@ const requestSchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     employee: employeeSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
+    /** What to do with their upcoming shifts in focus areas they come off (51i). */
+    focusAreaShifts: z.enum(["clear", "keep"]).optional(),
   }),
   z.object({
     action: z.literal("fetchEmployeeById"),
@@ -762,6 +769,20 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        // Asked before anything is written, the login email change included.
+        const focusAreaShiftsPlan: FocusAreaShiftsPlan = previousRow
+          ? await planFocusAreaShifts(auth.serviceClient, {
+              orgId: data.orgId,
+              employeeId: nextEmployee.id,
+              before: previousRow.focusAreaIds,
+              after: nextEmployee.focusAreaIds,
+              decision: data.focusAreaShifts,
+            })
+          : { clear: [] };
+        if (focusAreaShiftsPlan.refuse) {
+          return NextResponse.json(focusAreaShiftsPlan.refuse, { status: 409 });
+        }
+
         // The staff email is the login email. Changing it for a linked
         // account is a sensitive action: step-up first, never from a sandbox
         // (its clone keeps the owner's own user_id), and never to nothing.
@@ -973,8 +994,23 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // After the update's own audit row, so the activity log reads in order.
+        const focusAreaShiftsResult = await clearFocusAreaShiftsAfterSave(auth.serviceClient, {
+          orgId: data.orgId,
+          employeeId: nextEmployee.id,
+          firstName: nextEmployee.firstName,
+          lastName: nextEmployee.lastName,
+          areas: focusAreaShiftsPlan.clear,
+          actor: { id: auth.actor.id, email: auth.actor.email ?? null },
+          ipAddress: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+
         return NextResponse.json({
           employee: rowToEmployee(updatedRow as DbEmployee),
+          ...(focusAreaShiftsResult.notCleared
+            ? { focusAreaShiftsNotCleared: focusAreaShiftsResult.notCleared }
+            : {}),
         });
       }
 

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiResponseError } from "@dubgrid/api-client";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 import {
   navigatedActions,
@@ -52,7 +53,9 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
-vi.mock("../../../shared/lib/api", () => ({
+vi.mock("../../../shared/lib/api", async (importOriginal) => ({
+  parseFocusAreaShiftsRefusal: (await importOriginal<typeof import("../../../shared/lib/api")>())
+    .parseFocusAreaShiftsRefusal,
   createProfileChangeRequest: vi.fn(),
   getProfile: vi.fn(),
   requireMobileCredentialAssurance,
@@ -347,6 +350,45 @@ describe("ProfileWorkScreen", () => {
         "d660d308-4e0d-4daf-84fd-6753405e6740",
         expect.objectContaining({ focusAreaIds: [] }),
       );
+    });
+  });
+
+  it("asks about your shifts in a focus area you leave, then saves with the answer (51i)", async () => {
+    updateMobilePerson.mockImplementation(
+      async (_token: string, _id: string, body: { focusAreaShifts?: string }) => {
+        if (!body.focusAreaShifts) {
+          throw new ApiResponseError("Choose", 409, {
+            code: "FOCUS_AREA_SHIFTS_DECISION",
+            error: "Choose whether to clear or keep their 1 upcoming shift in ICU.",
+            focusAreaShifts: [
+              {
+                focusAreaId: 2,
+                focusAreaName: "ICU",
+                count: 1,
+                firstDate: "2026-11-03",
+                lastDate: "2026-11-03",
+              },
+            ],
+          });
+        }
+        return { success: true, person: profileData.linkedEmployee };
+      },
+    );
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Clear your upcoming shifts in ICU?")).toBeInTheDocument();
+    expect(
+      screen.getByText("You have 1 upcoming shift in ICU, on Tue, Nov 3."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear shifts" }));
+
+    await waitFor(() => expect(updateMobilePerson).toHaveBeenCalledTimes(2));
+    expect(updateMobilePerson.mock.calls[1]![2]).toMatchObject({
+      focusAreaIds: [],
+      focusAreaShifts: "clear",
     });
   });
 

@@ -1049,11 +1049,15 @@ export const mobilePersonUpdateBodySchema = z.object({
   focusAreaIds: z.array(z.number().int()),
   roleIds: z.array(z.number().int()),
   departmentIds: z.array(z.number().int()),
+  /** What to do with their upcoming shifts in focus areas they come off (51i). */
+  focusAreaShifts: z.enum(["clear", "keep"]).optional(),
 });
 
 export const mobilePersonUpdateResponseSchema = z.object({
   success: z.literal(true),
   person: mobilePersonSchema,
+  /** Set when the save went through but clearing their shifts didn't. */
+  focusAreaShiftsNotCleared: z.string().optional(),
 });
 
 export const mobilePersonCreateBodySchema = z.object({

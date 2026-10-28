@@ -93,8 +93,11 @@ vi.mock("../../profile/hooks/useMobileStepUpAction", () => ({
   useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
 
+const updateMobilePerson = vi.fn();
+
 vi.mock("../../../shared/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/lib/api")>()),
+  updateMobilePerson: (...args: unknown[]) => updateMobilePerson(...args),
   requireMobileCredentialAssurance: (accessToken: string) =>
     requireMobileCredentialAssurance(accessToken),
 }));
@@ -2460,6 +2463,129 @@ describe("PersonDetailScreen", () => {
         pathname: "/person/[id]/schedule",
         params: { id: "emp-1" },
       });
+    });
+  });
+  describe("losing a focus area (51i)", () => {
+    const refusal = new ApiResponseError("Choose", 409, {
+      code: "FOCUS_AREA_SHIFTS_DECISION",
+      error: "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+      focusAreaShifts: [
+        {
+          focusAreaId: 5,
+          focusAreaName: "East Wing",
+          count: 2,
+          firstDate: "2026-11-03",
+          lastDate: "2026-11-05",
+        },
+      ],
+    });
+
+    function renderEditing() {
+      // The save runs for real through the mutation, so the question it asks is on screen.
+      useMutation.mockImplementation(
+        (options: {
+          mutationFn: (variables: unknown) => Promise<unknown>;
+          onSuccess?: (result: unknown) => unknown;
+          onError?: (error: unknown) => void;
+        }) => ({
+          error: null,
+          isPending: false,
+          mutate: vi.fn(),
+          mutateAsync: async (variables: unknown) => {
+            try {
+              const result = await options.mutationFn(variables);
+              await options.onSuccess?.(result);
+              return result;
+            } catch (error) {
+              options.onError?.(error);
+            }
+          },
+        }),
+      );
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [
+            { id: 2, name: "Skilled Nursing", departmentId: 4 },
+            { id: 5, name: "East Wing", departmentId: 4 },
+          ],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [{ id: 4, name: "North Wing" }],
+          permissions: { canManageEmployees: true, canViewEmployeeDetails: true },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      const person = makePerson({ focusAreaIds: [2, 5] });
+      useQuery.mockReturnValue({
+        data: { person },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      render(<PersonDetailScreen />);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "East Wing" }));
+      return person;
+    }
+
+    beforeEach(() => {
+      updateMobilePerson.mockReset();
+    });
+
+    it("asks before saving, and sends the save again with Keep shifts", async () => {
+      const person = renderEditing();
+      updateMobilePerson.mockImplementation(
+        async (_token, _id, body: { focusAreaShifts?: string }) => {
+          if (!body.focusAreaShifts) throw refusal;
+          return { success: true, person: { ...person, focusAreaIds: [2], version: 8 } };
+        },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(
+        await screen.findByText(
+          `Clear ${person.firstName} ${person.lastName}'s upcoming shifts in East Wing?`,
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Keep shifts" }));
+
+      await waitFor(() => expect(updateMobilePerson).toHaveBeenCalledTimes(2));
+      expect(updateMobilePerson.mock.calls[0]![2]).not.toHaveProperty("focusAreaShifts");
+      expect(updateMobilePerson.mock.calls[1]![2]).toMatchObject({
+        focusAreaIds: [2],
+        focusAreaShifts: "keep",
+      });
+      await waitFor(() =>
+        expect(pushToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Person saved" })),
+      );
+    });
+
+    it("keeps the form open, unsaved, when the question is closed", async () => {
+      renderEditing();
+      updateMobilePerson.mockRejectedValue(refusal);
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await screen.findByText(/upcoming shifts in East Wing\?$/);
+      fireEvent.click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
+
+      await waitFor(() =>
+        expect(screen.queryByText(/upcoming shifts in East Wing\?$/)).not.toBeInTheDocument(),
+      );
+      expect(updateMobilePerson).toHaveBeenCalledTimes(1);
+      expect(pushToast).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     });
   });
 });

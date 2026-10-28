@@ -414,8 +414,12 @@ Item 51 is split:
   date, and one request changes each person with the single route's checks
   and audit row; anyone not changed is listed with why and stays selected.
   Web only. No migration.
-- **51i - Losing a focus area:** taking someone off a focus area asks
-  whether to clear their upcoming shifts there, in the draft, or keep them.
+- **51i - Losing a focus area:** shipped; saving someone without a focus
+  area they have shifts in from today on asks first, with the count and
+  dates (web and mobile): Clear shifts takes them off in the draft and
+  closes their open requests, Keep shifts leaves them, closing saves
+  nothing. The server refuses the save until it's answered; the clear runs
+  after the save in one transaction (migration 107).
 - **51j - No contact without sign-in:** push and schedule emails go only to
   people who can still sign in (Suspended keeps its one notice email), and
   restoring access restores delivery; settles whether in-app alerts are
@@ -628,7 +632,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `106`.
+  checksum-locked through `107`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

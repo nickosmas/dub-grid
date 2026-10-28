@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:9f80ac7c6d28307bef762a18750631fc659181aeb1e39caf42967baec5d609cb",
+  "sourceDigest": "sha256:e270ad2407f8296a86b4d6df06b4cefdd92a1177ab206c8a722becf2465a1a82",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4863,6 +4863,16 @@
       "sha256": "fea43700651d8e8621c6a7b01c9eb6ef3c603a4ff48bf9b954d20ebad3afed53",
       "source": {
         "path": "supabase/migrations/106_first_day.sql"
+      }
+    },
+    {
+      "id": "migration:107_focus_area_shifts.sql",
+      "version": "107",
+      "name": "focus_area_shifts",
+      "file": "107_focus_area_shifts.sql",
+      "sha256": "6b80d776278a71f65c105f1c507f3f5949f6f4a436766e6a3cbd50c4bbe162f7",
+      "source": {
+        "path": "supabase/migrations/107_focus_area_shifts.sql"
       }
     }
   ],

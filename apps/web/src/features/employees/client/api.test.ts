@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Employee } from "@/types";
-import { changeEmployeeStatuses, EmployeeProfileConflictError, updateEmployee } from "./api";
+import {
+  changeEmployeeStatuses,
+  EmployeeProfileConflictError,
+  FocusAreaShiftsCancelledError,
+  updateEmployee,
+} from "./api";
 
 const employee: Employee = {
   id: "emp-1",
@@ -61,6 +66,86 @@ describe("updateEmployee", () => {
 
     expect(error).toBeInstanceOf(EmployeeProfileConflictError);
     expect(error.latestEmployee).toEqual(latestEmployee);
+  });
+});
+
+describe("updateEmployee and focus area shifts (51i)", () => {
+  const eastWing = {
+    focusAreaId: 2,
+    focusAreaName: "East Wing",
+    count: 2,
+    firstDate: "2026-11-03",
+    lastDate: "2026-11-05",
+  };
+  const refusal = {
+    ok: false,
+    status: 409,
+    json: async () => ({
+      code: "FOCUS_AREA_SHIFTS_DECISION",
+      error: "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+      focusAreaShifts: [eastWing],
+    }),
+  };
+  const saved = (extra: Record<string, unknown> = {}) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ employee: { ...employee, focusAreaIds: [], version: 4 }, ...extra }),
+  });
+  const sentBodies = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string));
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks, then sends the save again with the answer", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(refusal).mockResolvedValueOnce(saved());
+    vi.stubGlobal("fetch", fetchMock);
+    const ask = vi.fn().mockResolvedValue("clear");
+
+    const result = await updateEmployee({ ...employee, focusAreaIds: [] }, "org-1", 3, {
+      askFocusAreaShifts: ask,
+    });
+
+    expect(ask).toHaveBeenCalledWith([eastWing]);
+    expect(result.version).toBe(4);
+    const [first, second] = sentBodies(fetchMock);
+    expect(first).not.toHaveProperty("focusAreaShifts");
+    expect(second).toMatchObject({ action: "updateEmployee", focusAreaShifts: "clear" });
+  });
+
+  it("saves nothing when the question is closed", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(refusal);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const error = await updateEmployee(employee, "org-1", 3, {
+      askFocusAreaShifts: vi.fn().mockResolvedValue(null),
+    }).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(FocusAreaShiftsCancelledError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws the server's words when nobody can ask", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(refusal));
+
+    await expect(updateEmployee(employee, "org-1", 3)).rejects.toThrow(
+      "Choose whether to clear or keep their 2 upcoming shifts in East Wing.",
+    );
+  });
+
+  it("passes on a clear that didn't go through", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(saved({ focusAreaShiftsNotCleared: "Saved, but not cleared." })),
+    );
+    const notCleared = vi.fn();
+
+    await updateEmployee(employee, "org-1", 3, { onFocusAreaShiftsNotCleared: notCleared });
+
+    expect(notCleared).toHaveBeenCalledWith("Saved, but not cleared.");
   });
 });
 

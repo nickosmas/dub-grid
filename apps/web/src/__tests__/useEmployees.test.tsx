@@ -31,7 +31,9 @@ vi.mock("@/features/employees/client", () => {
       this.name = "EmployeeStatusConflictError";
     }
   }
+  class MockFocusAreaShiftsCancelledError extends Error {}
   return {
+    FocusAreaShiftsCancelledError: MockFocusAreaShiftsCancelledError,
     activateEmployee: (...args: unknown[]) => mockActivateEmployee(...args),
     changeEmployeeStatuses: (...args: unknown[]) => mockChangeEmployeeStatuses(...args),
     deactivateEmployee: (...args: unknown[]) => mockDeactivateEmployee(...args),
@@ -83,7 +85,7 @@ const OLD_INVITATION: Invitation = {
   deptAdminIds: [11],
 };
 
-function renderReady() {
+function renderReady(options: Parameters<typeof useEmployees>[1] = {}) {
   // A fresh QueryWrapper-style component recreates its QueryClient on every
   // re-render (no memoization), which wipes useQuery's cache mid-test the
   // instant a handler under test calls setState. Build the client once and
@@ -92,7 +94,7 @@ function renderReady() {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  const { result } = renderHook(() => useEmployees("org-1"), { wrapper });
+  const { result } = renderHook(() => useEmployees("org-1", options), { wrapper });
   return waitFor(() => expect(result.current.employees.length).toBeGreaterThan(0)).then(
     () => result,
   );
@@ -143,7 +145,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     });
 
     expect(saved).toBe(true);
-    expect(mockUpdateEmployee).toHaveBeenCalledWith(updated, "org-1", updated.version);
+    expect(mockUpdateEmployee).toHaveBeenCalledWith(updated, "org-1", updated.version, undefined);
     expect(mockCreateOrganizationInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "new@example.com",
@@ -242,6 +244,28 @@ describe("useEmployees — rollback keeps the full list on failure (not just the
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchEmployees.mockResolvedValue([EMPLOYEE]);
+  });
+
+  it("handleSaveEmployee asks through the caller's options and stays quiet when the question is closed (51i)", async () => {
+    const { FocusAreaShiftsCancelledError } = await import("@/features/employees/client");
+    mockUpdateEmployee.mockRejectedValueOnce(new FocusAreaShiftsCancelledError());
+    const saveOptions = { askFocusAreaShifts: vi.fn() };
+    const result = await renderReady({ saveOptionsFor: () => saveOptions });
+
+    let saved = true;
+    await act(async () => {
+      saved = await result.current.handleSaveEmployee({ ...EMPLOYEE, focusAreaIds: [] });
+    });
+
+    expect(mockUpdateEmployee).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "emp-1", focusAreaIds: [] }),
+      "org-1",
+      3,
+      saveOptions,
+    );
+    expect(saved).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(result.current.employees).toEqual([EMPLOYEE]);
   });
 
   it("handleSaveEmployee restores the pre-edit list on failure", async () => {

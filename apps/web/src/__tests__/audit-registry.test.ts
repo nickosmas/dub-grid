@@ -303,6 +303,20 @@ describe("audit copy never leaks implementation detail", () => {
     ]);
   });
 
+  it("names how many shifts a lost focus area cleared, and where (51i)", () => {
+    const headline = (details: Record<string, unknown>) =>
+      describeAuditAction("employee.focus_area_shifts_cleared", details, {
+        targetLabel: "Barbara Trent",
+      });
+    expect(headline({ count: 3, focusAreas: ["East Wing"] })).toBe(
+      "Cleared 3 upcoming shifts for Barbara Trent in East Wing",
+    );
+    expect(headline({ count: 1, focusAreas: ["East Wing", "West Wing", "North"] })).toBe(
+      "Cleared 1 upcoming shift for Barbara Trent in East Wing, West Wing and North",
+    );
+    expect(headline({})).toBe("Cleared upcoming shifts for Barbara Trent");
+  });
+
   it("renders a change list as before/after rows using its own labels", () => {
     const rows = formatDetails({
       action: "org.updated",

@@ -9,6 +9,7 @@ import {
   deactivateEmployee,
   EmployeeProfileConflictError,
   EmployeeStatusConflictError,
+  FocusAreaShiftsCancelledError,
   fetchEmployees,
   insertEmployee,
   removeEmployee,
@@ -19,11 +20,13 @@ import {
   type BulkStatusOutcome,
   type PlannedChange,
   type SuspensionDates,
+  type UpdateEmployeeOptions,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import { toast } from "sonner";
 import {
+  removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
   type BulkStatusAction,
@@ -127,8 +130,22 @@ export function employeesQueryOptions(orgId: string) {
   });
 }
 
-export function useEmployees(orgId: string | null): EmployeesData {
+function mayAskAboutShifts(rows: readonly Employee[], emp: Employee): boolean {
+  const previous = rows.find((row) => row.id === emp.id);
+  return previous ? removedFocusAreaIds(previous.focusAreaIds, emp.focusAreaIds).length > 0 : false;
+}
+
+export interface UseEmployeesOptions {
+  /** How a save of this person asks about their shifts in focus areas they come off (51i). */
+  saveOptionsFor?: (emp: Employee) => UpdateEmployeeOptions;
+}
+
+export function useEmployees(
+  orgId: string | null,
+  options: UseEmployeesOptions = {},
+): EmployeesData {
   const queryClient = useQueryClient();
+  const saveOptionsForRef = useLatestRef(options.saveOptionsFor);
 
   // Subscribe to org-wide CDC so adds/edits made elsewhere (e.g. /people in
   // another tab, or another step in the onboarding wizard) invalidate this
@@ -222,9 +239,18 @@ export function useEmployees(orgId: string | null): EmployeesData {
       // rollback could fire with the closure variable still at its initial
       // value and wipe the list instead of restoring it.
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      // A save that may ask about their shifts waits for the answer: showing it
+      // early and rolling it back on Cancel would reset the open form.
+      if (!mayAskAboutShifts(prevAll, emp)) {
+        setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      }
       try {
-        const savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        const savedEmployee = await updateEmployee(
+          emp,
+          orgId,
+          emp.version,
+          saveOptionsForRef.current?.(emp),
+        );
         setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         // One id, so a reorder's many saves show one toast.
         toast.success("Employee saved", { id: "employee-saved" });
@@ -245,6 +271,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         if (previous) {
           setAllLocal((prev) => prev.map((row) => (row.id === emp.id ? previous : row)));
         }
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
         return false;
@@ -257,11 +284,20 @@ export function useEmployees(orgId: string | null): EmployeesData {
     async (emp: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      // A save that may ask about their shifts waits for the answer: showing it
+      // early and rolling it back on Cancel would reset the open form.
+      if (!mayAskAboutShifts(prevAll, emp)) {
+        setAllLocal((prev) => replaceEmployeeRow(prev, emp));
+      }
 
       let savedEmployee: Employee;
       try {
-        savedEmployee = await updateEmployee(emp, orgId, emp.version);
+        savedEmployee = await updateEmployee(
+          emp,
+          orgId,
+          emp.version,
+          saveOptionsForRef.current?.(emp),
+        );
         setAllLocal((prev) => replaceEmployeeRow(prev, savedEmployee));
         invalidateEmployees();
       } catch (err) {
@@ -271,6 +307,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           return false;
         }
         setAllLocal(prevAll);
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
         return false;

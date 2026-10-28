@@ -19,9 +19,11 @@ import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
+import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
   isSelfAction,
+  removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
 } from "@dubgrid/domain";
@@ -46,6 +48,7 @@ import {
   EmployeeAccessDeniedError,
   EmployeeContactConflictError,
   EmployeeProfileConflictError,
+  FocusAreaShiftsCancelledError,
   EmployeeStatusConflictError,
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -373,6 +376,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [orgId, queryClient],
   );
 
+  const { optionsFor: focusAreaSaveOptions, dialog: focusAreaDialog } =
+    useFocusAreaShiftsQuestion();
+
   const handleSaveEmployee = useCallback(
     async (updatedEmployee: Employee) => {
       if (!orgId || !employee) return;
@@ -381,12 +387,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         pendingInvite && (previousEmployee.email || "") !== (updatedEmployee.email || "")
           ? pendingInvite.email
           : null;
-      setEmployee(updatedEmployee);
+      // A save that may ask about their shifts waits for the answer, so Cancel
+      // leaves the form as it was edited.
+      if (
+        removedFocusAreaIds(previousEmployee.focusAreaIds, updatedEmployee.focusAreaIds).length ===
+        0
+      ) {
+        setEmployee(updatedEmployee);
+      }
       try {
         const savedEmployee = await updateEmployee(
           updatedEmployee,
           orgId,
           previousEmployee.version,
+          focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
         );
         syncEmployeeCaches(savedEmployee);
         toast.success(
@@ -407,6 +421,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         setEmployee(previousEmployee);
+        // Closing the question about their shifts leaves the form open, unsaved.
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(
           err instanceof EmployeeContactConflictError
             ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
@@ -414,7 +430,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         );
       }
     },
-    [employee, orgId, pendingInvite, refreshDirectory, refreshInvitations, syncEmployeeCaches],
+    [
+      employee,
+      focusAreaSaveOptions,
+      orgId,
+      pendingInvite,
+      refreshDirectory,
+      refreshInvitations,
+      syncEmployeeCaches,
+    ],
   );
 
   // Chosen from EditEmployeePanel's confirm dialog when the admin picks
@@ -426,11 +450,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     async (updatedEmployee: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
       if (!orgId || !employee) return;
       const previousEmployee = employee;
-      setEmployee(updatedEmployee);
+      // A save that may ask about their shifts waits for the answer, so Cancel
+      // leaves the form as it was edited.
+      if (
+        removedFocusAreaIds(previousEmployee.focusAreaIds, updatedEmployee.focusAreaIds).length ===
+        0
+      ) {
+        setEmployee(updatedEmployee);
+      }
 
       let savedEmployee: Employee;
       try {
-        savedEmployee = await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+        savedEmployee = await updateEmployee(
+          updatedEmployee,
+          orgId,
+          previousEmployee.version,
+          focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
+        );
         syncEmployeeCaches(savedEmployee);
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
@@ -441,6 +477,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return;
         }
         setEmployee(previousEmployee);
+        if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(
           err instanceof EmployeeContactConflictError
             ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
@@ -488,7 +525,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         void refreshInvitations();
       }
     },
-    [employee, orgId, org?.name, refreshDirectory, refreshInvitations, syncEmployeeCaches],
+    [
+      employee,
+      focusAreaSaveOptions,
+      orgId,
+      org?.name,
+      refreshDirectory,
+      refreshInvitations,
+      syncEmployeeCaches,
+    ],
   );
 
   // ── Status action handlers ──────────────────────────────────────────────────
@@ -1012,6 +1057,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     <>
       <ProgressBar loading={isLoading} />
       {statusStepUp.dialog}
+      {focusAreaDialog}
 
       {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
           the rendered profile in place; only a first load shows nothing. */}

@@ -50,6 +50,31 @@ describe("ConfirmationModal", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("puts a second answer in the plain Cancel button's place", () => {
+    const onCancel = vi.fn();
+    const onKeep = vi.fn();
+
+    render(
+      <ConfirmationModal
+        confirmLabel="Clear shifts"
+        onCancel={onCancel}
+        onConfirm={vi.fn()}
+        secondaryAction={{ label: "Keep shifts", onPress: onKeep }}
+        title="Clear Mina Diaz's upcoming shifts in East Wing?"
+        visible
+      />,
+    );
+
+    const dialog = within(screen.getByRole("alert"));
+    expect(dialog.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    fireEvent.click(dialog.getByRole("button", { name: "Keep shifts" }));
+    expect(onKeep).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.click(dialog.getByRole("button", { name: "Close" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("shows why the confirm failed, inside the confirmation that failed", () => {
     // A `<Modal>` is its own native window, so a toast pushed from the caller's
     // error handler renders behind it. Without this the button just stopped

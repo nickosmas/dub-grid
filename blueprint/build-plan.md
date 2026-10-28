@@ -1127,7 +1127,7 @@
           first day, and shows "Starts Nov 10" until then.
   - [x] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
-  - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks
+  - [x] 51i. **Losing a focus area** - taking someone off a focus area asks
         whether to clear their upcoming shifts there, in the draft, or keep
         them; today nothing acts on them.
   - [ ] 51j. **No contact without sign-in** - push and schedule emails go

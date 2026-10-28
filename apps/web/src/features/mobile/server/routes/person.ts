@@ -14,6 +14,10 @@ import {
   syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
 import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
+import {
+  clearFocusAreaShiftsAfterSave,
+  planFocusAreaShifts,
+} from "@/features/employees/server/focus-area-shifts";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { emailContactConflict, getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
@@ -275,6 +279,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   };
   const auditDetails = employeeUpdateAuditDetails(currentPerson, update);
 
+  // Asked before anything is written, the login email change included (51i).
+  const focusAreaShiftsPlan = await planFocusAreaShifts(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: id,
+    before: currentPerson.focusAreaIds,
+    after: update.focusAreaIds,
+    decision: parsed.data.focusAreaShifts,
+  });
+  if (focusAreaShiftsPlan.refuse) {
+    return NextResponse.json(focusAreaShiftsPlan.refuse, { status: 409 });
+  }
+
   // The staff email is the login email. Changing it for a linked account is a
   // sensitive action, and an account cannot be left without one.
   if (currentPerson.userId && !update.email) {
@@ -361,11 +377,25 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     );
   }
 
+  const focusAreaShiftsResult = await clearFocusAreaShiftsAfterSave(auth.serviceClient, {
+    orgId: auth.currentOrg.id,
+    employeeId: id,
+    firstName: update.firstName,
+    lastName: update.lastName,
+    areas: focusAreaShiftsPlan.clear,
+    actor: { id: auth.user.id, email: auth.user.email ?? null },
+    ipAddress: getRequestIp(req),
+    userAgent: req.headers?.get("user-agent") ?? null,
+  });
+
   const person = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonUpdateResponseSchema.parse({
       success: true,
       person,
+      ...(focusAreaShiftsResult.notCleared
+        ? { focusAreaShiftsNotCleared: focusAreaShiftsResult.notCleared }
+        : {}),
     }),
   );
 }

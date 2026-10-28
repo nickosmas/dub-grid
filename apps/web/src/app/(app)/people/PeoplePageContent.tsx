@@ -13,6 +13,7 @@ import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationB
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
+import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import type { BulkStatusChangeHandler, BulkStatusOutcome } from "@/features/employees/client";
 
 function PeopleContent() {
@@ -46,6 +47,7 @@ function PeopleContent() {
     setupStatus,
   } = useOrganizationData();
   const queryClient = useQueryClient();
+  const focusAreaQuestion = useFocusAreaShiftsQuestion();
   const retryOrganizationBootstrap = useCallback(async () => {
     await queryClient.resetQueries({ queryKey: queryKeys.org.bootstrap() });
   }, [queryClient]);
@@ -66,7 +68,9 @@ function PeopleContent() {
     handleSetEmployeeReturnDate,
     handleSetPlannedChange,
     handleBulkStatusChange,
-  } = useEmployees(orgId ?? org?.id ?? null);
+  } = useEmployees(orgId ?? org?.id ?? null, {
+    saveOptionsFor: (emp) => focusAreaQuestion.optionsFor(`${emp.firstName} ${emp.lastName}`),
+  });
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
   const statusStepUp = useSharedStepUp();
@@ -140,6 +144,7 @@ function PeopleContent() {
     <>
       <ProgressBar loading={isLoading} />
       {statusStepUp.dialog}
+      {focusAreaQuestion.dialog}
 
       {!isLoading && (
         <>
