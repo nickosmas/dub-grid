@@ -650,6 +650,27 @@ export interface SeatBreakdown {
   total: number;
 }
 
+/** One month of seat history: what was paid for and, when counted, what was in use. */
+export interface SeatHistoryMonth {
+  /** `YYYY-MM` in the organization's time zone. */
+  month: string;
+  /** Seats on the subscription at the month's end, or now for the current month. */
+  paidSeats: number | null;
+  /** People who took a seat; null when they weren't counted that month. */
+  seatsInUse: number | null;
+  /** Paid invoices that month, in the smallest currency unit. */
+  paidCents: number;
+  currency: string | null;
+  isCurrent: boolean;
+}
+
+export interface BillingPaymentSummary {
+  kind: "paid" | "failed";
+  amountCents: number;
+  currency: string;
+  occurredAt: string;
+}
+
 export interface OrganizationBillingSummary {
   orgId: string;
   orgName: string;
@@ -657,6 +678,7 @@ export interface OrganizationBillingSummary {
   status: BillingSubscriptionStatus | null;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
+  currentPeriodStart?: string | null;
   cancelAt: string | null;
   canceledAt: string | null;
   subscriptionSeats: number | null;
@@ -670,6 +692,16 @@ export interface OrganizationBillingSummary {
   canManageBilling: boolean;
   billingAccess: BillingAccessResult;
   recentOperations?: BillingOperationSummary[];
+  trialStartedAt?: string | null;
+  billingPausedAt?: string | null;
+  paymentGraceStartedAt?: string | null;
+  /** The organization's effective trial and grace lengths, in days. */
+  billingPolicy?: { trialDays: number; trialGraceDays: number; paymentGraceDays: number };
+  /** Oldest month first; empty until the subscription has history. */
+  seatHistory?: SeatHistoryMonth[];
+  lastPayment?: BillingPaymentSummary | null;
+  /** The latest failed payment, when it came after the latest paid one. */
+  outstandingPayment?: BillingPaymentSummary | null;
 }
 
 /** An organization user record for the user management panel. */

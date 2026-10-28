@@ -178,38 +178,34 @@ describe("describeSeatBreakdown", () => {
     total: 42,
   };
 
+  const ACTIVE = {
+    key: "active",
+    label: "Active staff",
+    count: 42,
+    detail: "Everyone on staff with an Active status, whether or not they have an account.",
+  };
+
   it("always lists active staff and leaves empty lines out", () => {
-    expect(describeSeatBreakdown(base)).toEqual({
-      billed: [{ key: "active", label: "Active staff", count: 42 }],
-      notBilled: [],
-    });
+    expect(describeSeatBreakdown(base)).toEqual({ billed: [ACTIVE], notBilled: [] });
   });
 
   it("counts the Away people who take a seat and says why, without names", () => {
-    const { billed } = describeSeatBreakdown({
-      ...base,
-      awayManaging: 1,
-      total: 43,
-    });
+    const { billed } = describeSeatBreakdown({ ...base, awayManaging: 1, total: 43 });
     expect(billed[1]).toEqual({
       key: "away-managing",
-      label: "Away, can manage",
+      label: "Away staff who can manage",
       count: 1,
-      detail: "Away people take a seat only while they keep management access.",
+      detail: "People who are away keep their seat while they still have management access.",
     });
   });
 
   it("shows suspended people as their own billed group after active staff, without names", () => {
-    const { billed } = describeSeatBreakdown({
-      ...base,
-      suspended: 1,
-      total: 43,
-    });
+    const { billed } = describeSeatBreakdown({ ...base, suspended: 1, total: 43 });
     expect(billed[1]).toEqual({
       key: "suspended",
-      label: "Suspended",
+      label: "Suspended staff",
       count: 1,
-      detail: "Suspended people keep their seat while they can't sign in.",
+      detail: "People who are suspended keep their seat, even though they can't sign in.",
     });
   });
 
@@ -218,12 +214,27 @@ describe("describeSeatBreakdown", () => {
       describeSeatBreakdown({ ...base, managementOnly: 2, awayNotBilled: 2, archived: 12 }),
     ).toEqual({
       billed: [
-        { key: "active", label: "Active staff", count: 42 },
-        { key: "management-only", label: "Managers without a staff record", count: 2 },
+        ACTIVE,
+        {
+          key: "management-only",
+          label: "Managers without a staff record",
+          count: 2,
+          detail: "People who can sign in to manage the organization but aren't on the schedule.",
+        },
       ],
       notBilled: [
-        { key: "away", label: "Away", count: 2 },
-        { key: "archived", label: "Offboarded", count: 12 },
+        {
+          key: "away",
+          label: "Away staff who can't manage",
+          count: 2,
+          detail: "They don't take a seat until they're back.",
+        },
+        {
+          key: "archived",
+          label: "Offboarded staff",
+          count: 12,
+          detail: "People who have been offboarded never take a seat.",
+        },
       ],
     });
   });

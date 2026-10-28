@@ -1,12 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchInternalUserIds } from "@dubgrid/data-access";
 import { isLiveSubscriptionStatus } from "@dubgrid/domain";
-import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
+import {
+  BILLING_ACCESS_SELECT,
+  evaluateOrgBillingAccess,
+  getOrgBillingPolicy,
+} from "@/lib/billing-policy";
 import type { BillingOperationSummary, OrganizationBillingSummary, SeatBreakdown } from "@/types";
 import { DUBGRID_SUPPORT_ACTOR_LABEL } from "@/lib/client-facing";
 import { clientEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
 import { breakdownBillableSeats, type SeatEmployee, type SeatMembership } from "./seats";
+import {
+  buildSeatHistory,
+  summarizePayments,
+  type InvoiceEventRow,
+  type SeatHistoryRow,
+} from "./seat-history";
 
 type QueryClient = Pick<SupabaseClient, "from">;
 
@@ -19,6 +29,10 @@ type OrganizationBillingRow = {
   trial_ends_at: string | null;
   subscription_seats: number | null;
   suspended_at: string | null;
+  trial_started_at: string | null;
+  timezone: string | null;
+  billing_paused_at: string | null;
+  payment_grace_started_at: string | null;
 };
 
 type SubscriptionBillingRow = {
@@ -26,6 +40,7 @@ type SubscriptionBillingRow = {
   stripe_customer_id: string | null;
   status: string | null;
   quantity: number | null;
+  current_period_start: string | null;
   current_period_end: string | null;
   cancel_at: string | null;
   canceled_at: string | null;
@@ -48,23 +63,6 @@ type BillingActorContext = {
   email?: string | null;
   user_metadata?: Record<string, unknown> | null;
 } | null;
-
-function actorDisplayName(actor: BillingActorContext): string | null {
-  if (!actor?.user_metadata) return null;
-  const metadata = actor.user_metadata;
-  const fullName =
-    typeof metadata.full_name === "string" && metadata.full_name.trim()
-      ? metadata.full_name.trim()
-      : typeof metadata.name === "string" && metadata.name.trim()
-        ? metadata.name.trim()
-        : null;
-  if (fullName) return fullName;
-
-  const firstName = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
-  const lastName = typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
-  const name = [firstName, lastName].filter(Boolean).join(" ").trim();
-  return name || null;
-}
 
 export function isStripeBillingConfigured(): boolean {
   return Boolean(
@@ -211,17 +209,17 @@ function actorLabelForBillingOperation(row: BillingAuditRow, actor: BillingActor
     return DUBGRID_SUPPORT_ACTOR_LABEL;
   }
   if (actor?.id && row.actor_id === actor.id) {
-    const name = actorDisplayName(actor);
-    return name ? `You (${name})` : "You";
+    return "You";
   }
   // Webhook rows also store "Stripe" as their actor email, so check first.
   if (initiatedBy === "stripe" || initiatedBy === "stripe_webhook") {
     return "Payment provider";
   }
-  if (typeof row.actor_email === "string" && row.actor_email.trim()) {
-    return row.actor_email;
+  // Billing pages never name the person: another member is described, not named.
+  if (row.actor_id || (typeof row.actor_email === "string" && row.actor_email.trim())) {
+    return "Someone in your organization";
   }
-  return "System";
+  return "DubGrid";
 }
 
 async function loadRecentBillingOperations(
@@ -236,7 +234,7 @@ async function loadRecentBillingOperations(
       .eq("org_id", orgId)
       .in("action", [...CUSTOMER_BILLING_ACTIONS])
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(20);
 
     if (error) return [];
 
@@ -286,6 +284,36 @@ export async function loadSeatBreakdown(
   );
 }
 
+async function loadBillingHistoryRows(
+  serviceClient: QueryClient,
+  orgId: string,
+): Promise<{ seats: SeatHistoryRow[]; invoices: InvoiceEventRow[] }> {
+  // History is a picture, not a gate: a failed read shows no chart.
+  try {
+    const [{ data: seats, error: seatsError }, { data: invoices, error: invoicesError }] =
+      await Promise.all([
+        serviceClient
+          .from("subscription_seat_history")
+          .select("seats, billable_app_users, recorded_at")
+          .eq("org_id", orgId)
+          .order("recorded_at", { ascending: true })
+          .limit(500),
+        serviceClient
+          .from("billing_invoice_events")
+          .select("kind, amount_cents, currency, occurred_at")
+          .eq("org_id", orgId)
+          .order("occurred_at", { ascending: false })
+          .limit(100),
+      ]);
+    return {
+      seats: seatsError ? [] : ((seats ?? []) as SeatHistoryRow[]),
+      invoices: invoicesError ? [] : ((invoices ?? []) as InvoiceEventRow[]),
+    };
+  } catch {
+    return { seats: [], invoices: [] };
+  }
+}
+
 export async function countBillableAppUsers(
   serviceClient: QueryClient,
   orgId: string,
@@ -298,25 +326,31 @@ export async function loadOrganizationBillingSummary(
   orgId: string,
   options: { canManageBilling: boolean; actor?: BillingActorContext },
 ): Promise<OrganizationBillingSummary> {
-  const [{ data: org, error: orgError }, { data: subscription }, seatBreakdown, recentOperations] =
-    await Promise.all([
-      serviceClient
-        .from("organizations")
-        .select(
-          `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, ${BILLING_ACCESS_SELECT}`,
-        )
-        .eq("id", orgId)
-        .single(),
-      serviceClient
-        .from("subscriptions")
-        .select(
-          "stripe_subscription_id, stripe_customer_id, status, quantity, current_period_end, cancel_at, canceled_at, trial_end",
-        )
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      loadSeatBreakdown(serviceClient, orgId),
-      loadRecentBillingOperations(serviceClient, orgId, options.actor ?? null),
-    ]);
+  const [
+    { data: org, error: orgError },
+    { data: subscription },
+    seatBreakdown,
+    recentOperations,
+    historyRows,
+  ] = await Promise.all([
+    serviceClient
+      .from("organizations")
+      .select(
+        `id, name, slug, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, suspended_at, trial_started_at, timezone, ${BILLING_ACCESS_SELECT}`,
+      )
+      .eq("id", orgId)
+      .single(),
+    serviceClient
+      .from("subscriptions")
+      .select(
+        "stripe_subscription_id, stripe_customer_id, status, quantity, current_period_start, current_period_end, cancel_at, canceled_at, trial_end",
+      )
+      .eq("org_id", orgId)
+      .maybeSingle(),
+    loadSeatBreakdown(serviceClient, orgId),
+    loadRecentBillingOperations(serviceClient, orgId, options.actor ?? null),
+    loadBillingHistoryRows(serviceClient, orgId),
+  ]);
 
   if (orgError || !org) {
     throw new Error("Organization not found");
@@ -327,6 +361,12 @@ export async function loadOrganizationBillingSummary(
   const appUserCount = seatBreakdown.total;
   const subscriptionSeats = orgRow.subscription_seats ?? subscriptionRow?.quantity ?? null;
   const seatDelta = subscriptionSeats == null ? null : subscriptionSeats - appUserCount;
+  const policy = await getOrgBillingPolicy(serviceClient, orgRow);
+  const seatHistory = buildSeatHistory(historyRows.seats, historyRows.invoices, {
+    now: new Date(),
+    timeZone: orgRow.timezone || "UTC",
+    current: { paidSeats: subscriptionSeats, seatsInUse: appUserCount },
+  });
 
   return {
     orgId: orgRow.id,
@@ -335,6 +375,7 @@ export async function loadOrganizationBillingSummary(
     status: orgRow.subscription_status ?? subscriptionRow?.status ?? null,
     trialEndsAt: orgRow.trial_ends_at ?? subscriptionRow?.trial_end ?? null,
     currentPeriodEnd: subscriptionRow?.current_period_end ?? null,
+    currentPeriodStart: subscriptionRow?.current_period_start ?? null,
     cancelAt: subscriptionRow?.cancel_at ?? null,
     canceledAt: subscriptionRow?.canceled_at ?? null,
     subscriptionSeats,
@@ -353,5 +394,15 @@ export async function loadOrganizationBillingSummary(
       trialEndsAt: orgRow.trial_ends_at ?? subscriptionRow?.trial_end ?? null,
     }),
     recentOperations,
+    trialStartedAt: orgRow.trial_started_at ?? null,
+    billingPausedAt: orgRow.billing_paused_at ?? null,
+    paymentGraceStartedAt: orgRow.payment_grace_started_at ?? null,
+    billingPolicy: {
+      trialDays: policy.values.trialDays,
+      trialGraceDays: policy.values.trialGraceDays,
+      paymentGraceDays: policy.values.paymentGraceDays,
+    },
+    seatHistory,
+    ...summarizePayments(historyRows.invoices),
   };
 }

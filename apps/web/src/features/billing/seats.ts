@@ -93,22 +93,27 @@ export function describeSeatBreakdown(breakdown: SeatBreakdown): {
   notBilled: SeatBreakdownLine[];
 } {
   const billed: SeatBreakdownLine[] = [
-    { key: "active", label: "Active staff", count: breakdown.activeStaff },
+    {
+      key: "active",
+      label: "Active staff",
+      count: breakdown.activeStaff,
+      detail: "Everyone on staff with an Active status, whether or not they have an account.",
+    },
   ];
   if (breakdown.suspended > 0) {
     billed.push({
       key: "suspended",
-      label: "Suspended",
+      label: "Suspended staff",
       count: breakdown.suspended,
-      detail: "Suspended people keep their seat while they can't sign in.",
+      detail: "People who are suspended keep their seat, even though they can't sign in.",
     });
   }
   if (breakdown.awayManaging > 0) {
     billed.push({
       key: "away-managing",
-      label: "Away, can manage",
+      label: "Away staff who can manage",
       count: breakdown.awayManaging,
-      detail: "Away people take a seat only while they keep management access.",
+      detail: "People who are away keep their seat while they still have management access.",
     });
   }
   if (breakdown.managementOnly > 0) {
@@ -116,17 +121,24 @@ export function describeSeatBreakdown(breakdown: SeatBreakdown): {
       key: "management-only",
       label: "Managers without a staff record",
       count: breakdown.managementOnly,
+      detail: "People who can sign in to manage the organization but aren't on the schedule.",
     });
   }
   const notBilled: SeatBreakdownLine[] = [];
   if (breakdown.awayNotBilled > 0) {
-    notBilled.push({ key: "away", label: "Away", count: breakdown.awayNotBilled });
+    notBilled.push({
+      key: "away",
+      label: "Away staff who can't manage",
+      count: breakdown.awayNotBilled,
+      detail: "They don't take a seat until they're back.",
+    });
   }
   if (breakdown.archived > 0) {
     notBilled.push({
       key: "archived",
-      label: EMPLOYMENT_STATUS_LABELS.removed,
+      label: `${EMPLOYMENT_STATUS_LABELS.removed} staff`,
       count: breakdown.archived,
+      detail: `People who have been ${EMPLOYMENT_STATUS_LABELS.removed.toLowerCase()} never take a seat.`,
     });
   }
   return { billed, notBilled };
