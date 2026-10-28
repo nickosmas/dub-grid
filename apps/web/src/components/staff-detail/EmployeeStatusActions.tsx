@@ -10,7 +10,7 @@ import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
-import { CalendarDays, Ellipsis } from "lucide-react";
+import { CalendarDays, CalendarX2, Ellipsis, Undo2 } from "lucide-react";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
@@ -319,7 +319,32 @@ const LABEL_STYLE = {
   color: "var(--dg-color-text-secondary)",
 } as const;
 
-/** Where they stand, at the top of the dialog: the profile's status card, without its tint. */
+/** Cancels a planned change, or takes the cancel back, inside the plan's dialog. */
+function PlanCancelToggle({
+  cancelling,
+  cancelLabel,
+  keepLabel,
+  onToggle,
+}: {
+  cancelling: boolean;
+  cancelLabel: string;
+  keepLabel: string;
+  onToggle: () => void;
+}) {
+  const Icon = cancelling ? Undo2 : CalendarX2;
+  return (
+    <Button
+      className="dg-btn dg-btn-secondary dg-btn-sm"
+      style={{ alignSelf: "flex-start" }}
+      onClick={onToggle}
+    >
+      <Icon size={14} aria-hidden />
+      {cancelling ? keepLabel : cancelLabel}
+    </Button>
+  );
+}
+
+/** Where they stand, above the Change status list: the profile's status card, without its tint. */
 function CurrentStatusCard({ card }: { card: StatusCardCopy }) {
   const { current, planned } = card;
   const titleColor =
@@ -755,13 +780,12 @@ export function EmployeeStatusActions({
               <SuspensionEndField value={until} minDate={untilMinDate} onChange={setUntil} />
             </>
           )}
-          <Button
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ alignSelf: "flex-start" }}
-            onClick={() => setCancellingPlan((value) => !value)}
-          >
-            {cancellingPlan ? "Keep planned suspension" : "Cancel planned suspension"}
-          </Button>
+          <PlanCancelToggle
+            cancelling={cancellingPlan}
+            cancelLabel="Cancel planned suspension"
+            keepLabel="Keep planned suspension"
+            onToggle={() => setCancellingPlan((value) => !value)}
+          />
         </div>
       ) : null}
       {returnDay && !choice && onSetPlannedChange && focus !== "status" ? (
@@ -773,13 +797,12 @@ export function EmployeeStatusActions({
               hint="Clear it to restore them today."
             />
           )}
-          <Button
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ alignSelf: "flex-start" }}
-            onClick={() => setCancellingPlan((value) => !value)}
-          >
-            {cancellingPlan ? "Keep planned return" : "Cancel planned return"}
-          </Button>
+          <PlanCancelToggle
+            cancelling={cancellingPlan}
+            cancelLabel="Cancel planned return"
+            keepLabel="Keep planned return"
+            onToggle={() => setCancellingPlan((value) => !value)}
+          />
         </div>
       ) : null}
       {plannedLeave && !choice && onSetPlannedChange && focus !== "status" ? (
@@ -791,13 +814,12 @@ export function EmployeeStatusActions({
               hint="Clear it to offboard them today."
             />
           )}
-          <Button
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ alignSelf: "flex-start" }}
-            onClick={() => setCancellingPlan((value) => !value)}
-          >
-            {cancellingPlan ? "Keep last day" : "Cancel last day"}
-          </Button>
+          <PlanCancelToggle
+            cancelling={cancellingPlan}
+            cancelLabel="Cancel last day"
+            keepLabel="Keep last day"
+            onToggle={() => setCancellingPlan((value) => !value)}
+          />
         </div>
       ) : null}
       {hasPlan && !choice && onSetPlannedChange && focus !== "status" ? (
@@ -812,13 +834,12 @@ export function EmployeeStatusActions({
               {datedFields}
             </>
           )}
-          <Button
-            className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ alignSelf: "flex-start" }}
-            onClick={() => setCancellingPlan((value) => !value)}
-          >
-            {cancellingPlan ? "Keep planned away" : "Cancel planned away"}
-          </Button>
+          <PlanCancelToggle
+            cancelling={cancellingPlan}
+            cancelLabel="Cancel planned away"
+            keepLabel="Keep planned away"
+            onToggle={() => setCancellingPlan((value) => !value)}
+          />
         </div>
       ) : null}
     </>
@@ -850,22 +871,23 @@ export function EmployeeStatusActions({
         }
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div
-              style={
-                !showList
-                  ? { display: "flex", flexDirection: "column", gap: 14 }
-                  : {
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 14,
-                      paddingBottom: 16,
-                      borderBottom: "1px solid var(--dg-color-border)",
-                    }
-              }
-            >
-              <CurrentStatusCard card={statusCard} />
-              {detailsAboveLine}
-            </div>
+            {showList ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                  paddingBottom: 16,
+                  borderBottom: "1px solid var(--dg-color-border)",
+                }}
+              >
+                <CurrentStatusCard card={statusCard} />
+                {detailsAboveLine}
+              </div>
+            ) : (
+              // A confirmation names its change in the title, so it skips where they stand.
+              detailsAboveLine
+            )}
             {onlyChoice ? (
               <span style={{ color: "var(--dg-color-text-primary)" }}>{onlyChoice.outcome}</span>
             ) : !showList ? null : (

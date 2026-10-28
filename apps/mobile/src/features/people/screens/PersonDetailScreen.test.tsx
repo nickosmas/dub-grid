@@ -1551,14 +1551,11 @@ describe("PersonDetailScreen", () => {
         plannedUntil: day(9),
       });
 
-      // The planned card's Edit plan opens the same sheet.
+      // The planned card's Edit plan opens the same sheet, without the card.
       fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
       expect(
         screen.getAllByText(`Away from ${formatReturnDate(day(5), { weekday: true })}`),
-      ).toHaveLength(2);
-      expect(
-        screen.getAllByText(`Back ${formatReturnDate(day(9), { weekday: true })}.`),
-      ).toHaveLength(2);
+      ).toHaveLength(1);
       fireEvent.click(screen.getByRole("button", { name: "Cancel planned away" }));
       confirm("Cancel planned away");
 
@@ -1894,7 +1891,7 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
 
       fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
-      expect(screen.getAllByText("Suspended since Oct 26")).toHaveLength(2);
+      expect(screen.getAllByText("Suspended since Oct 26")).toHaveLength(1);
       expect(
         screen.getByText("They'll be Active again and can sign in on the web and in the app."),
       ).toBeInTheDocument();

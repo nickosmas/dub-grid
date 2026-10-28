@@ -1256,6 +1256,12 @@ export default function PersonDetailScreen() {
       returnDate !== (person.plannedUntil ?? null) ||
       chosenAbsenceTypeId !== (person.plannedAbsenceTypeId ?? null));
   const showChoices = !onlyChoice && statusOpening.focus !== "plan";
+  const hasStatusTopFields =
+    !statusChoice &&
+    (isAway ||
+      isSuspended ||
+      (statusOpening.focus !== "status" &&
+        (hasSuspensionPlan || !!returnDay || !!plannedLeave || hasPlan)));
   const plannedAbsence = absenceTypes.find(
     (absenceType) => absenceType.id === person.plannedAbsenceTypeId,
   );
@@ -1910,119 +1916,126 @@ export default function PersonDetailScreen() {
           </>
         }
       >
-        <View style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}>
-          <StatusCards
-            absenceTypes={absenceTypes}
-            canOffboard={reach.canOffboard}
-            person={person}
-            plain
-          />
-          {isAway && !statusChoice ? (
-            <>
-              <ReturnDateField
-                disabled={statusMutation.isPending}
-                minDate={firstReturnDate}
-                onChange={setReturnDate}
-                value={returnDate}
+        {showChoices || hasStatusTopFields ? (
+          <View
+            style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}
+          >
+            {/* A confirmation names its change in the title, so it skips where they stand. */}
+            {showChoices ? (
+              <StatusCards
+                absenceTypes={absenceTypes}
+                canOffboard={reach.canOffboard}
+                person={person}
+                plain
               />
-              {awayAbsenceChoices}
-            </>
-          ) : null}
-          {isSuspended && !statusChoice ? (
-            <ReturnDateField
-              disabled={statusMutation.isPending}
-              emptyLabel="No end date"
-              hint={SUSPENSION_END_HINT}
-              label="Ends"
-              minDate={firstReturnDate}
-              onChange={setSuspensionEnd}
-              value={suspensionEnd}
-            />
-          ) : null}
-          {hasSuspensionPlan && !statusChoice && statusOpening.focus !== "status" ? (
-            <>
-              {cancellingPlan ? null : (
-                <>
-                  {startField}
-                  <ReturnDateField
-                    disabled={statusMutation.isPending}
-                    emptyLabel="No end date"
-                    hint={SUSPENSION_END_HINT}
-                    label="Ends"
-                    minDate={firstReturnDate}
-                    onChange={setSuspensionEnd}
-                    value={suspensionEnd}
-                  />
-                </>
-              )}
-              <Button
-                compact
-                disabled={statusMutation.isPending}
-                label={cancellingPlan ? "Keep planned suspension" : "Cancel planned suspension"}
-                onPress={() => setCancellingPlan((value) => !value)}
-                tone="plain"
-              />
-            </>
-          ) : null}
-          {returnDay && !statusChoice && statusOpening.focus !== "status" ? (
-            <>
-              {cancellingPlan ? null : startField}
-              <Button
-                compact
-                disabled={statusMutation.isPending}
-                label={cancellingPlan ? "Keep planned return" : "Cancel planned return"}
-                onPress={() => setCancellingPlan((value) => !value)}
-                tone="plain"
-              />
-            </>
-          ) : null}
-          {plannedLeave && !statusChoice && statusOpening.focus !== "status" ? (
-            <>
-              {cancellingPlan ? null : (
+            ) : null}
+            {isAway && !statusChoice ? (
+              <>
                 <ReturnDateField
                   disabled={statusMutation.isPending}
-                  emptyLabel="Offboard now"
-                  hint="Clear it to offboard them today."
-                  label="Last day"
-                  maxDate={latestPlannedDay}
-                  minDate={orgToday}
-                  onChange={setLastDay}
-                  value={lastDay}
+                  minDate={firstReturnDate}
+                  onChange={setReturnDate}
+                  value={returnDate}
                 />
-              )}
-              <Button
-                compact
+                {awayAbsenceChoices}
+              </>
+            ) : null}
+            {isSuspended && !statusChoice ? (
+              <ReturnDateField
                 disabled={statusMutation.isPending}
-                label={cancellingPlan ? "Keep last day" : "Cancel last day"}
-                onPress={() => setCancellingPlan((value) => !value)}
-                tone="plain"
+                emptyLabel="No end date"
+                hint={SUSPENSION_END_HINT}
+                label="Ends"
+                minDate={firstReturnDate}
+                onChange={setSuspensionEnd}
+                value={suspensionEnd}
               />
-            </>
-          ) : null}
-          {hasPlan && !statusChoice && statusOpening.focus !== "status" ? (
-            <>
-              {cancellingPlan ? null : (
-                <>
-                  {startField}
+            ) : null}
+            {hasSuspensionPlan && !statusChoice && statusOpening.focus !== "status" ? (
+              <>
+                {cancellingPlan ? null : (
+                  <>
+                    {startField}
+                    <ReturnDateField
+                      disabled={statusMutation.isPending}
+                      emptyLabel="No end date"
+                      hint={SUSPENSION_END_HINT}
+                      label="Ends"
+                      minDate={firstReturnDate}
+                      onChange={setSuspensionEnd}
+                      value={suspensionEnd}
+                    />
+                  </>
+                )}
+                <PlanCancelToggle
+                  cancelling={cancellingPlan}
+                  cancelLabel="Cancel planned suspension"
+                  disabled={statusMutation.isPending}
+                  keepLabel="Keep planned suspension"
+                  onToggle={() => setCancellingPlan((value) => !value)}
+                />
+              </>
+            ) : null}
+            {returnDay && !statusChoice && statusOpening.focus !== "status" ? (
+              <>
+                {cancellingPlan ? null : startField}
+                <PlanCancelToggle
+                  cancelling={cancellingPlan}
+                  cancelLabel="Cancel planned return"
+                  disabled={statusMutation.isPending}
+                  keepLabel="Keep planned return"
+                  onToggle={() => setCancellingPlan((value) => !value)}
+                />
+              </>
+            ) : null}
+            {plannedLeave && !statusChoice && statusOpening.focus !== "status" ? (
+              <>
+                {cancellingPlan ? null : (
                   <ReturnDateField
                     disabled={statusMutation.isPending}
-                    minDate={firstReturnDate}
-                    onChange={setReturnDate}
-                    value={returnDate}
+                    emptyLabel="Offboard now"
+                    hint="Clear it to offboard them today."
+                    label="Last day"
+                    maxDate={latestPlannedDay}
+                    minDate={orgToday}
+                    onChange={setLastDay}
+                    value={lastDay}
                   />
-                  {awayAbsenceChoices}
-                </>
-              )}
-              <Button
-                compact
-                disabled={statusMutation.isPending}
-                label={cancellingPlan ? "Keep planned away" : "Cancel planned away"}
-                onPress={() => setCancellingPlan((value) => !value)}
-                tone="plain"
-              />
-            </>
-          ) : null}
-        </View>
+                )}
+                <PlanCancelToggle
+                  cancelling={cancellingPlan}
+                  cancelLabel="Cancel last day"
+                  disabled={statusMutation.isPending}
+                  keepLabel="Keep last day"
+                  onToggle={() => setCancellingPlan((value) => !value)}
+                />
+              </>
+            ) : null}
+            {hasPlan && !statusChoice && statusOpening.focus !== "status" ? (
+              <>
+                {cancellingPlan ? null : (
+                  <>
+                    {startField}
+                    <ReturnDateField
+                      disabled={statusMutation.isPending}
+                      minDate={firstReturnDate}
+                      onChange={setReturnDate}
+                      value={returnDate}
+                    />
+                    {awayAbsenceChoices}
+                  </>
+                )}
+                <PlanCancelToggle
+                  cancelling={cancellingPlan}
+                  cancelLabel="Cancel planned away"
+                  disabled={statusMutation.isPending}
+                  keepLabel="Keep planned away"
+                  onToggle={() => setCancellingPlan((value) => !value)}
+                />
+              </>
+            ) : null}
+          </View>
+        ) : null}
         {onlyChoice ? (
           <Text style={styles.statusMessage}>{onlyChoice.outcome}</Text>
         ) : !showChoices ? null : (
@@ -2152,6 +2165,33 @@ export default function PersonDetailScreen() {
         visible={invitationConfirmAction != null}
       />
     </Screen>
+  );
+}
+
+/** Cancels a planned change, or takes the cancel back, inside the plan's sheet. */
+function PlanCancelToggle({
+  cancelling,
+  cancelLabel,
+  disabled,
+  keepLabel,
+  onToggle,
+}: {
+  cancelling: boolean;
+  cancelLabel: string;
+  disabled: boolean;
+  keepLabel: string;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      compact
+      disabled={disabled}
+      fullWidth={false}
+      icon={cancelling ? "arrow-undo-outline" : "close-circle-outline"}
+      label={cancelling ? keepLabel : cancelLabel}
+      onPress={onToggle}
+      tone="neutral"
+    />
   );
 }
 
