@@ -1,5 +1,6 @@
 "use client";
 
+import type { PlannedAway } from "@/features/employees/client";
 import {
   EMPLOYMENT_STATUS_LABELS,
   describeEmploymentStatus,
@@ -154,6 +155,7 @@ export interface MembersSectionProps {
     note?: string,
     returnDate?: string | null,
     absenceTypeId?: number | null,
+    startDate?: string | null,
   ) => void | Promise<boolean>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   onSetReturnDate?: (
@@ -169,6 +171,8 @@ export interface MembersSectionProps {
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
   onSuspend?: (empId: string) => void | Promise<unknown>;
+  /** Moves or changes a planned Away, or cancels it (null) (51g1). */
+  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -205,6 +209,7 @@ export function MembersSection({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetPlannedAway,
   onAdd,
   canViewEmployeeDetails,
   canManageEmployees,
@@ -2215,14 +2220,13 @@ export function MembersSection({
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}
-          onDeactivate={(employeeId, note, returnDate, absenceTypeId) =>
-            onDeactivate(employeeId, note, returnDate, absenceTypeId)
-          }
+          onDeactivate={onDeactivate}
           onSetReturnDate={onSetReturnDate}
           absenceTypes={absenceTypes}
           onActivate={(employeeId) => onActivate(employeeId)}
           onReinstate={onReinstate}
           onSuspend={onSuspend}
+          onSetPlannedAway={onSetPlannedAway}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
           onInvite={
@@ -2563,6 +2567,10 @@ export function MembersSection({
               ? describeStatusAction(
                   BULK_STATUS_ACTIONS[bulkConfirm.action],
                   getEmployeeDisplayName(only),
+                  {
+                    hasAccount: Boolean(only.userId),
+                    plannedFrom: only.plannedStatus === "away" ? (only.plannedFrom ?? null) : null,
+                  },
                 )
               : describeStatusAction(
                   BULK_STATUS_ACTIONS[bulkConfirm.action],
@@ -2592,7 +2600,7 @@ export function MembersSection({
                     copy.message || undefined
                   )
                 }
-                summary={{ points: copy.points }}
+                summary={{ points: [...copy.points, ...copy.unchanged] }}
                 confirmLabel={copy.label}
                 variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
                 isLoading={isBulkActionRunning}

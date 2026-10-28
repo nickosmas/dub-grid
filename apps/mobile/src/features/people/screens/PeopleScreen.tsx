@@ -17,6 +17,7 @@ import type {
 import {
   EMPLOYMENT_STATUS_LABELS,
   ORG_ROLE_PRIVILEGE_ORDER,
+  describePlannedChange,
   getEffectiveOrgRole,
   type EmployeeStatus,
   getOrgRolePrivilegeRank,
@@ -65,6 +66,7 @@ import {
   mobileElevation,
   mobileMotion,
   mobileRadii,
+  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -80,6 +82,7 @@ import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { StatusMarkIcon } from "../components/StatusMark";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -1183,7 +1186,10 @@ function PersonRow({
   navigable: boolean;
   orgRole: MobileOrgRole;
   /** A staff record's status; a pill names it unless they're Active. */
-  staffStatus?: Pick<MobilePerson, "status" | "awayUntil" | "suspendedAt">;
+  staffStatus?: Pick<
+    MobilePerson,
+    "status" | "awayUntil" | "suspendedAt" | "plannedStatus" | "plannedFrom" | "plannedUntil"
+  >;
   subtitle: string;
   isLast: boolean;
   onPress: () => void;
@@ -1195,6 +1201,8 @@ function PersonRow({
   const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const statusPill = staffStatus ? getMobileStatusPill(mobileColors, staffStatus) : null;
+  // An Away planned for later (51g1) leaves them Active, so it reads beside the name.
+  const plannedLabel = staffStatus?.status === "active" ? describePlannedChange(staffStatus) : null;
   const initials =
     name
       .split(" ")
@@ -1229,6 +1237,7 @@ function PersonRow({
             <Text numberOfLines={1} style={styles.personName}>
               {name}
             </Text>
+            {staffStatus ? <StatusMarkIcon person={staffStatus} /> : null}
             {orgRoleBadge ? (
               <View style={orgRoleBadge.containerStyle}>
                 <MaterialCommunityIcons
@@ -1247,6 +1256,11 @@ function PersonRow({
                   {statusPill.label}
                 </Text>
               </View>
+            ) : null}
+            {plannedLabel ? (
+              <Text fit="compact" numberOfLines={1} style={styles.personPlanned}>
+                {plannedLabel}
+              </Text>
             ) : null}
           </View>
           <Text numberOfLines={1} style={styles.personSubtitle}>
@@ -1381,5 +1395,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     personSubtitle: {
       ...mobileText.body,
       color: mobileColors.textMuted,
+    },
+    personPlanned: {
+      ...mobileText.caption,
+      ...mobileTabularText,
+      color: mobileColors.textMuted,
+      flexShrink: 1,
     },
   });

@@ -29,6 +29,7 @@ import {
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
 import { formatDateTimeLabel } from "@/lib/client-facing";
+import { Banner } from "@/components/ui/Banner";
 
 function SecurityCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
@@ -708,22 +709,12 @@ export default function GridmasterSecurityView({
       </h2>
 
       {securityQuery.error instanceof Error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {formatClientErrorMessage(
             securityQuery.error,
             "We couldn't load security oversight. Refresh and try again.",
           )}
-        </div>
+        </Banner>
       )}
 
       {security && (

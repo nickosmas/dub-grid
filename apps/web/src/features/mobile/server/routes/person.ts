@@ -233,7 +233,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
   if (currentPerson.status === "removed") {
-    return NextResponse.json({ error: "Archived people can't be edited." }, { status: 400 });
+    return NextResponse.json({ error: "Offboarded people can't be edited." }, { status: 400 });
   }
   if (currentPerson.version !== parsed.data.expectedVersion) {
     return NextResponse.json(

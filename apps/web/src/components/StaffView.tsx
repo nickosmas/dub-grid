@@ -1,5 +1,6 @@
 "use client";
 
+import type { PlannedAway } from "@/features/employees/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, type WheelEvent, useCallback, useMemo, useState } from "react";
@@ -115,6 +116,7 @@ interface StaffViewProps {
     note?: string,
     returnDate?: string | null,
     absenceTypeId?: number | null,
+    startDate?: string | null,
   ) => void | Promise<boolean>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   onSetReturnDate?: (
@@ -129,6 +131,8 @@ interface StaffViewProps {
   onReinstate?: (empId: string) => void | Promise<unknown>;
   /** Suspends someone's access (51c). */
   onSuspend?: (empId: string) => void | Promise<unknown>;
+  /** Moves or changes a planned Away, or cancels it (null) (51g1). */
+  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];
@@ -171,6 +175,7 @@ export default function StaffView({
   onActivate,
   onReinstate,
   onSuspend,
+  onSetPlannedAway,
   onAdd,
   orgId,
   assignments,
@@ -368,6 +373,7 @@ export default function StaffView({
             onActivate={onActivate}
             onReinstate={onReinstate}
             onSuspend={onSuspend}
+            onSetPlannedAway={onSetPlannedAway}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
             canManageEmployees={canManageEmployees ?? false}

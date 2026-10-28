@@ -17,7 +17,8 @@ import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import ProgressBar from "@/components/ProgressBar";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
-import { Inbox } from "lucide-react";
+import { Inbox, Trash2 } from "lucide-react";
+import { Banner } from "@/components/ui/Banner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 
@@ -204,15 +205,10 @@ function ProfileUpdateDetails({
 
 function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) {
   return (
-    <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-danger-border)] bg-[var(--dg-color-danger-bg)] p-3">
-      <div className="text-[13px] font-semibold text-[var(--dg-color-danger-text)]">
-        Account deletion request
-      </div>
-      <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--dg-color-danger-text)]">
-        Approving will permanently delete this user&apos;s account and remove them from your
-        organization. This can&apos;t be undone.
-      </p>
-    </div>
+    <Banner tone="danger" icon={Trash2} title="Account deletion request">
+      Approving will permanently delete this user&apos;s account and remove them from your
+      organization. This can&apos;t be undone.
+    </Banner>
   );
 }
 

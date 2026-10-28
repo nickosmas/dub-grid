@@ -281,7 +281,9 @@ describe("PersonDetailScreen", () => {
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
     expect(screen.queryByText("Super Admin")).not.toBeInTheDocument();
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    // The status is the card under the contact pair, not a pill in the hero.
+    expect(screen.getAllByText("Active")).toHaveLength(1);
+    expect(within(screen.getByTestId("status-card")).getByText("Active")).toBeInTheDocument();
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Super Admin Access")).not.toBeInTheDocument();
     expect(screen.queryByText("·")).not.toBeInTheDocument();
@@ -302,7 +304,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByLabelText("Super Admin")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark active" })).toBeInTheDocument();
   });
 
   // The page said nothing about management access: the only trace of it was
@@ -778,8 +780,8 @@ describe("PersonDetailScreen", () => {
     // where it says something, and "User" says nothing.
     expect(screen.queryByText("User")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("User")).not.toBeInTheDocument();
-    // Status is not part of the heading either.
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    // Status is not part of the heading either; Active draws no icon after the name.
+    expect(screen.queryByTestId("status-mark")).not.toBeInTheDocument();
   });
 
   it("omits the account access section even when the person still needs app access", () => {
@@ -1214,21 +1216,55 @@ describe("PersonDetailScreen", () => {
     const pick = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
     const confirm = (label: string) =>
       fireEvent.click(screen.getAllByRole("button", { name: label }).at(-1)!);
+    // The card's menu hands over to the status sheet once its own sheet has left.
+    const fromMore = async (label: string, sheetTitle: string) => {
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      await waitFor(() => expect(screen.getByText(sheetTitle)).toBeInTheDocument());
+    };
 
-    it("offers one Change status button for every status", () => {
-      for (const person of [
-        {},
-        { status: "inactive" },
-        { suspendedAt: "2026-10-26T12:00:00Z" },
-        { status: "removed" },
-      ]) {
+    it("offers the likely change first, and a menu for the rest", () => {
+      for (const [person, buttons] of [
+        [{}, ["Change status"]],
+        [{ status: "inactive" }, ["Mark active", "More status changes"]],
+        [{ suspendedAt: "2026-10-26T12:00:00Z" }, ["Reinstate", "More status changes"]],
+        [{ status: "removed" }, ["Restore"]],
+      ] as const) {
         renderWithStatusMutation(person);
-        expect(screen.getAllByRole("button", { name: "Change status" })).toHaveLength(1);
-        for (const old of ["Mark away", "Archive", "Mark active", "Restore", "Reinstate"]) {
+        const card = within(screen.getByTestId("status-card"));
+        expect(
+          card
+            .getAllByRole("button")
+            .map((button) => button.getAttribute("aria-label") ?? button.textContent),
+        ).toEqual(buttons);
+        for (const old of ["Mark away", "Offboard", "Suspend"]) {
           expect(screen.queryByRole("button", { name: old })).not.toBeInTheDocument();
         }
         cleanup();
       }
+    });
+
+    it("offers someone with no account no Suspend", () => {
+      renderWithStatusMutation({ userId: null });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        ["Away. Not scheduled while away.", "Offboarded. No longer on staff. Can't be scheduled."],
+      );
+    });
+
+    it("names each other change in a suspended person's menu, each with its own sheet", async () => {
+      const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+
+      fireEvent.click(screen.getByRole("button", { name: "More status changes" }));
+      expect(screen.getByRole("button", { name: "Mark away" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+      await waitFor(() => expect(screen.getByText("Offboard Mina Diaz?")).toBeInTheDocument());
+      expect(screen.queryByRole("radio", { name: /^Away/ })).not.toBeInTheDocument();
+      confirm("Offboard");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ copyAction: "archive" });
     });
 
     it("says where they stand and lists only where they can go", () => {
@@ -1237,14 +1273,41 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
 
       expect(screen.getByText("Change Mina Diaz's status?")).toBeInTheDocument();
-      expect(screen.getByText("Can sign in and be scheduled.")).toBeInTheDocument();
+      // The page's card and the sheet's both say it.
+      expect(screen.getAllByText("Can sign in and be scheduled.")).toHaveLength(2);
+      expect(screen.getByText("Change to")).toBeInTheDocument();
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
           "Away. Keeps sign-in. Not scheduled while away.",
           "Suspended. Can't sign in. Stays on the schedule.",
-          "Archived. Off staff. Can't sign in or be scheduled.",
+          "Offboarded. No longer on staff. Can't sign in or be scheduled.",
         ],
       );
+    });
+
+    it("names the picked change in the title and keeps what stays apart", () => {
+      renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Suspended/);
+
+      expect(screen.getByText("Suspend Mina Diaz?")).toBeInTheDocument();
+      expect(screen.getByLabelText("Changes")).toHaveTextContent(
+        "Open requests they're part of are closed, and pickups they claimed go back up for others.",
+      );
+      expect(screen.getByLabelText("Stays the same")).toHaveTextContent(
+        "Their shifts stay, and you can keep scheduling them.",
+      );
+    });
+
+    it("draws the status icon after the name", () => {
+      renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+      expect(
+        screen.getByRole("image", { name: "Suspended: won't see this in the app" }),
+      ).toBeInTheDocument();
+      cleanup();
+      renderWithStatusMutation({ status: "inactive", awayUntil: "2027-01-04" });
+      expect(screen.getByRole("image", { name: "Away until Mon, Jan 4" })).toBeInTheDocument();
     });
 
     it("marks someone away with a reason", () => {
@@ -1285,6 +1348,115 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("schedules an Away for a later start (51g1)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Away/);
+      fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      choose(day(1));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Starts, ${formatReturnDate(day(1), { weekday: true })}`,
+        }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
+      choose(day(2));
+      expect(
+        screen.getByText(`They stay Active until ${formatReturnDate(day(1), { weekday: true })}.`),
+      ).toBeInTheDocument();
+      confirm("Schedule away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "deactivate",
+        copyAction: "markAway",
+        startDate: day(1),
+        returnDate: day(2),
+      });
+    });
+
+    it("keeps a planned away's Change status to the list, with no second Away", () => {
+      renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        [
+          "Suspended. Can't sign in. Stays on the schedule.",
+          "Offboarded. No longer on staff. Can't sign in or be scheduled.",
+        ],
+      );
+      expect(screen.queryByRole("button", { name: /^Starts, / })).not.toBeInTheDocument();
+    });
+
+    it("starts a planned away today from Edit plan when its start is cleared", () => {
+      const mutate = renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.queryByRole("radio", { name: /^Suspended/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Clear it to start their time away today.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Today" }));
+      expect(screen.getByText("Mark Mina Diaz away?")).toBeInTheDocument();
+      confirm("Mark away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        copyAction: "markAway",
+        returnDate: day(9),
+        startDate: undefined,
+      });
+    });
+
+    it("closes a card button's own confirmation, or an untouched plan, without asking to discard", () => {
+      renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
+      fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Cancel" }).at(-1)!);
+      expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+      expect(screen.queryByText("Reinstate Mina Diaz?")).not.toBeInTheDocument();
+      cleanup();
+
+      renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Cancel" }).at(-1)!);
+      expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+    });
+
+    it("cancels a planned Away (51g1)", () => {
+      const mutate = renderWithStatusMutation({
+        plannedStatus: "away",
+        plannedFrom: day(5),
+        plannedUntil: day(9),
+      });
+
+      // The planned card's Edit plan opens the same sheet.
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(
+        screen.getAllByText(`Away from ${formatReturnDate(day(5), { weekday: true })}`),
+      ).toHaveLength(2);
+      expect(
+        screen.getAllByText(`Back ${formatReturnDate(day(9), { weekday: true })}.`),
+      ).toHaveLength(2);
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned away" }));
+      confirm("Cancel planned away");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "cancelPlannedChange",
+        copyAction: "cancelPlannedChange",
+      });
+    });
+
     it("never offers today as a return date", () => {
       renderWithStatusMutation();
 
@@ -1303,9 +1475,9 @@ describe("PersonDetailScreen", () => {
       const mutate = renderWithStatusMutation();
 
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
-      pick(/^Archived/);
+      pick(/^Offboarded/);
       fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Left" } });
-      confirm("Archive");
+      confirm("Offboard");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "remove", note: "Left" });
     });
@@ -1334,8 +1506,10 @@ describe("PersonDetailScreen", () => {
     it("brings an Away person back with Mark active", () => {
       const mutate = renderWithStatusMutation({ status: "inactive" });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
-      pick(/^Active/);
+      // The card's Mark active opens a confirmation for it alone.
+      fireEvent.click(screen.getByRole("button", { name: "Mark active" }));
+      expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+      expect(screen.getByText("Mark Mina Diaz active?")).toBeInTheDocument();
       confirm("Mark active");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
@@ -1344,10 +1518,11 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("changes an Away person's return date with nothing picked, as Save changes", () => {
+    it("changes an Away person's return date from the menu, as Save changes", async () => {
       const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      await fromMore("Change return date", "Change Mina Diaz's return date?");
+      expect(screen.queryByRole("radio", { name: /^Offboarded/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
       choose(day(2));
@@ -1360,14 +1535,14 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("changes only the absence on an Away person's days", () => {
+    it("changes only the absence on an Away person's days", async () => {
       const mutate = renderWithStatusMutation({
         status: "inactive",
         awayUntil: day(2),
         awayAbsenceTypeId: 134,
       });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      await fromMore("Change return date", "Change Mina Diaz's return date?");
       fireEvent.click(screen.getByRole("radio", { name: "Sick" }));
       confirm("Save changes");
 
@@ -1381,9 +1556,11 @@ describe("PersonDetailScreen", () => {
     it("reinstates a suspended person", () => {
       const mutate = renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
-      expect(screen.getByText("Suspended since Oct 26")).toBeInTheDocument();
-      pick(/^Active/);
+      fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
+      expect(screen.getAllByText("Suspended since Oct 26")).toHaveLength(2);
+      expect(
+        screen.getByText("They'll be Active again and can sign in on the web and in the app."),
+      ).toBeInTheDocument();
       confirm("Reinstate");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "reinstate", expectedVersion: 7 });
@@ -1392,8 +1569,15 @@ describe("PersonDetailScreen", () => {
     it("restores an archived person", () => {
       const mutate = renderWithStatusMutation({ status: "removed" });
 
-      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
-      pick(/^Active/);
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      // Restore is the only way on: no list to pick from, a sentence instead.
+      expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "They'll be Active again: back on staff, and they can sign in and be scheduled.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Restore Mina Diaz?")).toBeInTheDocument();
       confirm("Restore");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
@@ -1490,8 +1674,10 @@ describe("PersonDetailScreen", () => {
         "Revoke invite",
         "Add to schedule",
         "Add to management",
-        "Change status",
       ]);
+      // Change status sits in the status card, between the contact pair and the sections.
+      expect(names.indexOf("Change status")).toBeGreaterThan(names.indexOf("Email"));
+      expect(names.indexOf("Change status")).toBeLessThan(footStart);
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
       expect(

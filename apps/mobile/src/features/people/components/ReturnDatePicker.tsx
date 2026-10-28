@@ -124,12 +124,20 @@ export function ReturnDateField({
   onChange,
   disabled = false,
   initiallyOpen = false,
+  label = "Return date",
+  emptyLabel = "No return date",
+  hint = RETURN_DATE_HINT,
 }: {
   value: string | null;
   minDate: string;
   onChange: (date: string | null) => void;
   disabled?: boolean;
   initiallyOpen?: boolean;
+  /** The field's name; Starts for a planned Away's first day (51g1). */
+  label?: string;
+  /** What shows with no date, and the button that clears it. */
+  emptyLabel?: string;
+  hint?: string | null;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -137,10 +145,10 @@ export function ReturnDateField({
 
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>Return date</Text>
+      <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable
         accessibilityLabel={
-          value ? `Return date, ${formatReturnDate(value, { weekday: true })}` : "Return date, none"
+          value ? `${label}, ${formatReturnDate(value, { weekday: true })}` : `${label}, none`
         }
         accessibilityRole="button"
         accessibilityState={{ disabled, expanded: open }}
@@ -150,7 +158,7 @@ export function ReturnDateField({
       >
         <Ionicons color={mobileColors.textSubtle} name="calendar-outline" size={18} />
         <Text fit="compact" style={[styles.fieldValue, !value && styles.fieldPlaceholder]}>
-          {value ? formatReturnDate(value, { weekday: true }) : "No return date"}
+          {value ? formatReturnDate(value, { weekday: true }) : emptyLabel}
         </Text>
         <Ionicons
           color={mobileColors.textSubtle}
@@ -165,14 +173,14 @@ export function ReturnDateField({
             <Button
               compact
               disabled={disabled}
-              label="No return date"
+              label={emptyLabel}
               onPress={() => onChange(null)}
               tone="plain"
             />
           ) : null}
         </>
       ) : null}
-      <Text style={styles.hint}>{RETURN_DATE_HINT}</Text>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }

@@ -22,6 +22,7 @@ import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles
 import { type Organization } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Banner } from "@/components/ui/Banner";
 
 // Billing tab for the gridmaster OrganizationDetail view.
 
@@ -141,21 +142,12 @@ export function BillingTab({ organization }: { organization: Organization }) {
 
   if (billingQuery.error instanceof Error) {
     return (
-      <div
-        style={{
-          padding: "12px 16px",
-          background: "var(--dg-color-danger-bg)",
-          color: "var(--dg-color-danger-text)",
-          borderRadius: "var(--dg-radius-lg)",
-          fontSize: "var(--dg-fs-label)",
-          fontWeight: 600,
-        }}
-      >
+      <Banner tone="danger">
         {formatClientErrorMessage(
           billingQuery.error,
           "We couldn't load your billing details. Refresh and try again.",
         )}
-      </div>
+      </Banner>
     );
   }
 

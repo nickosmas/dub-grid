@@ -115,6 +115,7 @@ import { gridmasterDashboardQueryOptions } from "@/features/gridmaster/queries";
 import { queryKeys } from "@/lib/query-keys";
 import type { Organization } from "@/types";
 import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
+import { Banner } from "@/components/ui/Banner";
 
 type GridmasterView =
   | "dashboard"
@@ -1081,19 +1082,9 @@ export default function GridmasterPortal() {
               ceiling, so views stop hugging the left edge on wide displays. */}
           <div style={{ width: "100%", maxWidth: 1560, margin: "0 auto" }}>
             {error && (
-              <div
-                style={{
-                  padding: "12px 16px",
-                  background: "var(--dg-color-danger-bg)",
-                  color: "var(--dg-color-danger)",
-                  borderRadius: "var(--dg-radius-lg)",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  marginBottom: 20,
-                }}
-              >
+              <Banner tone="danger" className="mb-5">
                 {error}
-              </div>
+              </Banner>
             )}
 
             {view === "dashboard" && (

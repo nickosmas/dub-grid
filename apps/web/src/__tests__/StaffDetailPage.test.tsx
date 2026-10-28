@@ -741,7 +741,7 @@ describe("StaffDetailPage", () => {
 
   it.each([
     ["Mark away", /^Away/, deactivateEmployee],
-    ["Archive", /^Archived/, removeEmployee],
+    ["Offboard", /^Offboarded/, removeEmployee],
   ] as const)(
     "%s asks a Gridmaster for fresh proof and retries with the assured token",
     async (confirmLabel, choice, statusCall) => {

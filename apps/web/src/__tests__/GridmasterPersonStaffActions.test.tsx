@@ -145,7 +145,38 @@ describe("PersonStaffActions", () => {
     render(<PersonStaffActions employee={staff()} onChanged={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Offboard" })).toBeInTheDocument();
+  });
+
+  it("offers no second Mark away for someone with an away planned", () => {
+    render(
+      <PersonStaffActions
+        employee={staff({
+          focusAreaIds: [1],
+          plannedStatus: "away",
+          plannedFrom: "2099-01-05",
+          plannedUntil: "2099-01-12",
+        })}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+    expect(
+      within(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).getByText(
+        "The away planned from Jan 5 is cancelled.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing of sign-in when archiving someone with no account", () => {
+    render(<PersonStaffActions employee={staff({ userId: null })} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+    expect(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).not.toHaveTextContent(
+      /sign in/i,
+    );
   });
 
   it("restores an archived record", async () => {
@@ -172,8 +203,8 @@ describe("PersonStaffActions", () => {
     const onChanged = vi.fn();
     render(<PersonStaffActions employee={staff()} onChanged={onChanged} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-    confirm("Archive Ada Lovelace?", "Archive");
+    fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
+    confirm("Offboard Ada Lovelace?", "Offboard");
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(

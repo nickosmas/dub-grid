@@ -15,10 +15,7 @@ describe("ScheduleSessionDialogs", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent("2 other tabs or devices");
-    expect(screen.getByRole("alert").getAttribute("style")).toContain("var(--dg-color-danger-bg)");
-    expect(screen.getByRole("alert").getAttribute("style")).toContain(
-      "var(--dg-color-danger-border)",
-    );
+    expect(screen.getByRole("alert")).toHaveClass("dg-draft-banner--danger");
     expect(screen.getByText(/devices will stay signed in/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
     await act(async () => {

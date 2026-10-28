@@ -63,7 +63,10 @@ vi.mock("@/components/settings/SettingsShell", () => ({
 }));
 
 vi.mock("./StaffDetailHeader", () => ({ StaffDetailHeader: () => <div /> }));
-vi.mock("./EmployeeStatusActions", () => ({ EmployeeStatusActions: () => <div /> }));
+vi.mock("./EmployeeStatusActions", () => ({
+  EmployeeStatusActions: () => <div />,
+  StatusCardActions: () => <div />,
+}));
 vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
 vi.mock("./tabs/ActivityTab", () => ({ ActivityTab: () => <div /> }));
 vi.mock("./RecurringScheduleCard", () => ({ RecurringScheduleCard: () => <div /> }));

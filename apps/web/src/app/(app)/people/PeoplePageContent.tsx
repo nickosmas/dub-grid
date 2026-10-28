@@ -62,6 +62,7 @@ function PeopleContent() {
     handleReinstateEmployee,
     handleSuspendEmployee,
     handleSetEmployeeReturnDate,
+    handleSetPlannedAway,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
@@ -137,10 +138,17 @@ function PeopleContent() {
             onRemove={(empId, note) =>
               runStatusChange((token) => handleRemoveEmployee(empId, note, token))
             }
-            onDeactivate={(empId, note, returnDate, absenceTypeId) =>
+            onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
               runStatusChange((token) =>
-                returnDate
-                  ? handleDeactivateEmployee(empId, note, token, returnDate, absenceTypeId)
+                returnDate || startDate
+                  ? handleDeactivateEmployee(
+                      empId,
+                      note,
+                      token,
+                      returnDate,
+                      absenceTypeId,
+                      startDate,
+                    )
                   : handleDeactivateEmployee(empId, note, token),
               )
             }
@@ -149,6 +157,9 @@ function PeopleContent() {
             onActivate={handleActivateEmployee}
             onReinstate={handleReinstateEmployee}
             onSuspend={(empId) => runStatusChange((token) => handleSuspendEmployee(empId, token))}
+            onSetPlannedAway={(empId, plan) =>
+              runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+            }
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}
             assignments={assignments}

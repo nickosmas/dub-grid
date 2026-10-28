@@ -385,6 +385,7 @@ describe("POST /api/employees/status", () => {
       status: "active" | "inactive",
       awayUntil: string | null = null,
       awayAbsenceTypeId: number | null = null,
+      extra: Record<string, unknown> = {},
     ) {
       vi.useFakeTimers({ toFake: ["Date"] });
       // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
@@ -407,6 +408,7 @@ describe("POST /api/employees/status", () => {
         version: 1,
         user_id: null,
         focus_area_ids: [7],
+        ...extra,
       };
       employeeCurrentSingle.mockResolvedValue({ data: row, error: null });
       employeeUpdateMaybeSingle.mockImplementation(async () => ({
@@ -552,6 +554,130 @@ describe("POST /api/employees/status", () => {
         }),
       );
     });
+
+    it("plans an Away from a later date without changing their status", async () => {
+      arrange("active");
+
+      const response = await post({
+        action: "deactivate",
+        startDate: "2026-11-10",
+        returnDate: "2027-01-04",
+        absenceTypeId: 134,
+        note: "Leave",
+      });
+
+      expect(response.status).toBe(200);
+      const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
+      expect(update).toMatchObject({
+        planned_status: "away",
+        planned_from: "2026-11-10",
+        planned_until: "2027-01-04",
+        planned_absence_type_id: 134,
+        planned_note: "Leave",
+        planned_by: USER_ID,
+      });
+      expect(update).not.toHaveProperty("status");
+      expect(update).not.toHaveProperty("status_changed_at");
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.away_planned",
+          details: expect.objectContaining({
+            plannedFrom: "2026-11-10",
+            plannedUntil: "2027-01-04",
+            changedFields: ["planned_status"],
+          }),
+        }),
+      );
+    });
+
+    it("starts the Away now when the start date is today", async () => {
+      arrange("active");
+
+      await post({ action: "deactivate", startDate: TODAY });
+
+      expect(employeeUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "inactive" }));
+    });
+
+    it.each([
+      ["yesterday", { startDate: "2026-10-25" }, "PLANNED_START_INVALID"],
+      ["more than a year ahead", { startDate: "2027-10-27" }, "PLANNED_START_INVALID"],
+      [
+        "a return before the start",
+        { startDate: "2026-11-10", returnDate: "2026-11-10" },
+        "RETURN_DATE_INVALID",
+      ],
+      [
+        "an absence with no return date",
+        { startDate: "2026-11-10", absenceTypeId: 134 },
+        "AWAY_ABSENCE_INVALID",
+      ],
+    ])("refuses a plan with %s", async (_label, body, code) => {
+      arrange("active");
+
+      const response = await post({ action: "deactivate", ...body });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).code).toBe(code);
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to plan an Away for someone suspended", async () => {
+      arrange("active", null, null, { suspended_at: "2026-10-20T00:00:00Z" });
+
+      const response = await post({ action: "deactivate", startDate: "2026-11-10" });
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).code).toBe("NOT_PLANNABLE");
+    });
+
+    it("moves a planned Away and cancels one", async () => {
+      const planned = {
+        planned_status: "away",
+        planned_from: "2026-11-10",
+        planned_until: "2027-01-04",
+      };
+      arrange("active", null, null, planned);
+
+      const moved = await post({
+        action: "setPlannedChange",
+        startDate: "2026-11-12",
+        returnDate: "2027-01-04",
+      });
+      expect(moved.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ planned_from: "2026-11-12", planned_until: "2027-01-04" }),
+      );
+      expect(employeeUpdate.mock.calls.at(-1)?.[0]).not.toHaveProperty("planned_note");
+      expect(auditInsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: "employee.away_plan_changed",
+          details: expect.objectContaining({ fromPlannedFrom: "2026-11-10" }),
+        }),
+      );
+
+      arrange("active", null, null, planned);
+      const cancelled = await post({ action: "cancelPlannedChange" });
+      expect(cancelled.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ planned_status: null }),
+      );
+      expect(employeeUpdate.mock.calls.at(-1)?.[0]).not.toHaveProperty("status_changed_at");
+      expect(auditInsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({ action: "employee.away_plan_cancelled" }),
+      );
+    });
+
+    it.each(["setPlannedChange", "cancelPlannedChange"])(
+      "refuses %s when nothing is planned",
+      async (action) => {
+        arrange("active");
+
+        const response = await post({ action, startDate: "2026-11-10" });
+
+        expect(response.status).toBe(400);
+        expect((await response.json()).code).toBe("NO_PLANNED_CHANGE");
+      },
+    );
 
     it.each(["deactivate", "setReturnDate"])(
       "refuses an absence without a return date on %s",
@@ -1006,6 +1132,19 @@ describe("POST /api/employees/status", () => {
       });
       expect(employeeUpdate).not.toHaveBeenCalled();
       expect(endUserSessions).not.toHaveBeenCalled();
+    });
+
+    it("refuses to suspend someone with no account", async () => {
+      arrange({ user_id: null });
+
+      const response = await post("suspend");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Only someone with an account can be suspended.",
+        code: "NO_ACCOUNT",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
     it("refuses to suspend the only super admin", async () => {

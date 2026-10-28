@@ -101,6 +101,7 @@ import {
 } from "@/features/gridmaster/client";
 import { gmTdStyle } from "@/components/gridmaster/table-styles";
 import { formatDateTimeLabel } from "@/lib/client-facing";
+import { Banner } from "@/components/ui/Banner";
 
 export type OrganizationDetailTab =
   | "overview"
@@ -444,19 +445,9 @@ export default function OrganizationDetail({
       </div>
 
       {tabError && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {tabError}
-        </div>
+        </Banner>
       )}
 
       {tabLoading && (

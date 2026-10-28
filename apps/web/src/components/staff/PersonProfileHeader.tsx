@@ -21,6 +21,8 @@ interface PersonProfileHeaderProps {
   employmentType?: EmployeeEmploymentType;
   employeeNumber?: number | null;
   actions?: ReactNode;
+  /** Drawn right after the name, such as the status icon. */
+  nameAdornment?: ReactNode;
 }
 
 /** Identity header shared by a staff member's profile and your own profile. */
@@ -33,6 +35,7 @@ export function PersonProfileHeader({
   employmentType,
   employeeNumber,
   actions,
+  nameAdornment,
 }: PersonProfileHeaderProps) {
   const avatarTone = useAvatarTone(avatarSeed);
   const employmentLabel = employmentType
@@ -63,6 +66,7 @@ export function PersonProfileHeader({
               <h1 className="min-w-0 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                 {name}
               </h1>
+              {nameAdornment}
               <AccessInsignia orgRole={orgRole} size="lg" />
             </div>
           </div>

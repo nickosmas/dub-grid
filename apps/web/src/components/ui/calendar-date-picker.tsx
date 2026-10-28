@@ -57,6 +57,8 @@ export interface CalendarDatePickerProps {
   label: string;
   placeholder?: string;
   minDate?: string | null;
+  /** The last day that can be picked (YYYY-MM-DD). */
+  maxDate?: string | null;
   disabled?: boolean;
   allowClear?: boolean;
   style?: React.CSSProperties;
@@ -73,6 +75,7 @@ export default function CalendarDatePicker({
   label,
   placeholder = "No date selected",
   minDate = null,
+  maxDate = null,
   disabled = false,
   allowClear = false,
   style,
@@ -277,7 +280,9 @@ export default function CalendarDatePicker({
                 const isSelected = value === dateKey;
                 const isToday = dateKey === todayKey;
                 const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
-                const isDisabled = !!minDate && dateKey < minDate && !isSelected;
+                const isDisabled =
+                  ((!!minDate && dateKey < minDate) || (!!maxDate && dateKey > maxDate)) &&
+                  !isSelected;
 
                 return (
                   <Button

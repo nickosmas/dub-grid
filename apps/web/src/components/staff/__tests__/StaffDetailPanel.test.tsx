@@ -58,6 +58,7 @@ vi.mock("@/components/EditEmployeePanel", async () => {
 
 vi.mock("@/components/staff-detail/EmployeeStatusActions", () => ({
   EmployeeStatusActions: () => <div data-testid="employee-status-actions" />,
+  StatusCardActions: () => <div data-testid="employee-status-actions" />,
 }));
 
 const employee: Employee = {
@@ -199,7 +200,46 @@ describe("StaffDetailPanel access controls", () => {
     const row = manageButton.parentElement;
     expect(row).not.toBeNull();
     expect(row).not.toContainElement(screen.getByText("User"));
-    expect(row).toContainElement(screen.getByTestId("employee-status-actions"));
+    expect(row).not.toContainElement(screen.getByTestId("employee-status-actions"));
+  });
+
+  it("puts Change status in the status card under the name", () => {
+    renderPanel({ orgRole: "user" });
+
+    const card = screen.getByRole("region", { name: "Status" });
+    expect(card).toHaveTextContent("Active");
+    expect(card).toHaveTextContent("Can sign in and be scheduled.");
+    expect(card).toContainElement(screen.getByTestId("employee-status-actions"));
+    expect(document.querySelector('[data-slot="staff-panel-actions"]')).toBeNull();
+  });
+
+  it("shows the status card without its button to someone who can't change it", () => {
+    renderPanel({
+      canManageEmployees: false,
+      employee: { ...employee, status: "active", suspendedAt: "2026-10-26T12:00:00Z" },
+    });
+
+    const card = screen.getByRole("region", { name: "Status" });
+    expect(card).toHaveTextContent("Suspended since Oct 26");
+    expect(screen.queryByTestId("employee-status-actions")).toBeNull();
+    expect(screen.getByRole("img", { name: "Suspended: won't see this in the app" })).toBeTruthy();
+  });
+
+  it("adds a dashed planned card with its own Edit plan when an away is planned", () => {
+    renderPanel({
+      employee: {
+        ...employee,
+        plannedStatus: "away",
+        plannedFrom: "2026-11-10",
+        plannedUntil: "2027-01-04",
+      },
+    });
+
+    const planned = screen.getByRole("region", { name: "Planned" });
+    expect(planned).toHaveTextContent("Away from Tue, Nov 10");
+    expect(planned).toHaveTextContent("Back Mon, Jan 4.");
+    expect(planned).toContainElement(screen.getAllByTestId("employee-status-actions")[1]);
+    expect(screen.getByRole("img", { name: "Away from Nov 10, back Jan 4" })).toBeTruthy();
   });
 
   it("puts Send Invitation in the same row as Add to Management, not stacked above it", () => {
@@ -240,6 +280,8 @@ describe("StaffDetailPanel access controls", () => {
       orgId: "calm-haven",
       focusAreaLabel: "Wings",
       certificationLabel: "Credentials",
+      canManageManagementAccess: true,
+      onManageManagementAccess: vi.fn(),
     });
     const calmHavenContract = getPanelStructureContract();
 
@@ -249,6 +291,8 @@ describe("StaffDetailPanel access controls", () => {
       orgId: "arden-wood",
       focusAreaLabel: "Focus areas",
       certificationLabel: "Certifications",
+      canManageManagementAccess: true,
+      onManageManagementAccess: vi.fn(),
     });
 
     expect(getPanelStructureContract()).toEqual(calmHavenContract);

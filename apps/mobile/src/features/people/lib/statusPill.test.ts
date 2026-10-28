@@ -11,12 +11,12 @@ describe("getMobileStatusPill", () => {
     expect(pill?.textStyle.color).toBe(mobileColors.warningText);
   });
 
-  it("says Away without a date and Archived in a neutral tone", () => {
+  it("says Away without a date and Offboarded in a neutral tone", () => {
     expect(getMobileStatusPill(mobileColors, { status: "inactive", awayUntil: null })?.label).toBe(
       "Away",
     );
     const archived = getMobileStatusPill(mobileColors, { status: "removed", awayUntil: null });
-    expect(archived?.label).toBe("Archived");
+    expect(archived?.label).toBe("Offboarded");
     expect(archived?.textStyle.color).toBe(mobileColors.textSecondary);
   });
 

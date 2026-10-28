@@ -67,7 +67,7 @@ import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingM
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
-import { X } from "lucide-react";
+import { CalendarCheck, CalendarRange, Trash2, Unplug, X } from "lucide-react";
 
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
   ssr: false,
@@ -148,7 +148,7 @@ import {
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
-import { awayUntilById, withoutAwayDays } from "./_lib/away-coverage";
+import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -539,12 +539,16 @@ function SchedulerContent({
     () => [...employees, ...inactiveEmployees, ...removedEmployees],
     [employees, inactiveEmployees, removedEmployees],
   );
-  // Away people with a return date are scheduled again from it (51e), so the
-  // grid, coverage and Auto-build count them from that day on.
-  const awayUntil = useMemo(() => awayUntilById(inactiveEmployees), [inactiveEmployees]);
+  // Away people with a return date are scheduled again from it (51e), and an
+  // Away planned for later takes its days out from its start (51g1), so the
+  // grid, coverage and Auto-build count only the days in between.
+  const awayRanges = useMemo(
+    () => awayRangesById([...employees, ...inactiveEmployees]),
+    [employees, inactiveEmployees],
+  );
   const scheduleEmployees = useMemo(
-    () => [...employees, ...inactiveEmployees.filter((employee) => awayUntil.has(employee.id))],
-    [employees, inactiveEmployees, awayUntil],
+    () => [...employees, ...inactiveEmployees.filter((employee) => awayRanges.has(employee.id))],
+    [employees, inactiveEmployees, awayRanges],
   );
   // Who a peer's draft broadcast may touch on this grid; see readDraftChangedBroadcast.
   const visibleEmployeeIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
@@ -3139,7 +3143,7 @@ function SchedulerContent({
     [shifts],
   );
   // What coverage counts: someone away until a date only from that date.
-  const coverageShifts = useMemo(() => withoutAwayDays(shifts, awayUntil), [shifts, awayUntil]);
+  const coverageShifts = useMemo(() => withoutAwayDays(shifts, awayRanges), [shifts, awayRanges]);
   const coverageAssignmentIdsForKey = useCallback(
     (empId: string, date: Date): number[] =>
       coverageShifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
@@ -6773,7 +6777,7 @@ function SchedulerContent({
       // Counted as the matrix counts; an Away person is planned only from their return date.
       shifts: coverageShifts,
       employees: scheduleEmployees,
-      awayUntil,
+      awayRanges,
       assignments: Array.from(assignmentById.values()),
       shiftCategories,
       jobs,
@@ -6814,7 +6818,7 @@ function SchedulerContent({
     shiftPreferences,
     jobPreferences,
     canEditShifts,
-    awayUntil,
+    awayRanges,
     coverageBase,
     coverageMatrix,
     coverageShifts,
@@ -8232,7 +8236,7 @@ function SchedulerContent({
           >
             {isSessionEnded && (
               <div className="dg-draft-banner no-print" role="status">
-                <div className="dg-draft-banner-dot" />
+                <Unplug size={16} className="shrink-0" aria-hidden="true" />
                 <strong>Schedule session ended</strong>
                 <span>
                   This tab is read-only. Any unsaved schedule changes here were not saved.
@@ -8256,26 +8260,10 @@ function SchedulerContent({
               />
             )}
             {isBulkDeleteMode && (
-              <div
-                className="dg-draft-banner no-print"
-                style={{
-                  background: "var(--dg-color-danger-bg)",
-                  borderColor: "var(--dg-color-danger-border)",
-                  color: "var(--dg-color-danger-text)",
-                }}
-              >
-                <div
-                  className="dg-draft-banner-dot"
-                  style={{ background: "var(--dg-color-danger)" }}
-                />
+              <div className="dg-draft-banner dg-draft-banner--danger no-print">
+                <Trash2 size={16} className="shrink-0" aria-hidden="true" />
                 <span style={{ fontWeight: 700 }}>Bulk delete</span>
-                <span
-                  style={{
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-danger-text)",
-                    marginLeft: 4,
-                  }}
-                >
+                <span style={{ fontSize: "var(--dg-fs-caption)", marginLeft: 4 }}>
                   {`${bulkDeleteSelectedKeys.size} selected of ${visibleBulkDeleteTargets.length} removable visible entr${visibleBulkDeleteTargets.length === 1 ? "y" : "ies"}`}
                   {offscreenBulkDeleteCount > 0
                     ? ` (${offscreenBulkDeleteCount} in another period, not removed from here)`
@@ -8343,19 +8331,10 @@ function SchedulerContent({
               outOfWindowDraftGroups.length > 0 &&
               !outOfWindowDraftsDismissed && (
                 <div
-                  className="dg-draft-banner no-print"
+                  className="dg-draft-banner dg-draft-banner--info no-print"
                   data-tour="draft-banner-other-weeks"
-                  style={{
-                    background: "var(--dg-color-info-bg)",
-                    borderColor: "var(--dg-color-info-border)",
-                    color: "var(--dg-color-info-text)",
-                    flexWrap: "wrap",
-                  }}
                 >
-                  <div
-                    className="dg-draft-banner-dot"
-                    style={{ background: "var(--dg-color-info-text)" }}
-                  />
+                  <CalendarRange size={16} className="shrink-0" aria-hidden="true" />
                   <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
                   <span>
                     {(() => {
@@ -8433,19 +8412,8 @@ function SchedulerContent({
                 const noun =
                   spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
-                  <div
-                    className="dg-draft-banner no-print"
-                    style={{
-                      background: "var(--dg-color-info-bg)",
-                      borderColor: "var(--dg-color-info-border)",
-                      color: "var(--dg-color-info-text)",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div
-                      className="dg-draft-banner-dot"
-                      style={{ background: "var(--dg-color-info-text)" }}
-                    />
+                  <div className="dg-draft-banner dg-draft-banner--info no-print">
+                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span>
                       {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
@@ -8506,18 +8474,8 @@ function SchedulerContent({
               (() => {
                 const latest = inWindowPublishHistory[0];
                 return (
-                  <div
-                    className="dg-draft-banner no-print"
-                    style={{
-                      background: "var(--dg-color-info-bg)",
-                      borderColor: "var(--dg-color-info-border)",
-                      color: "var(--dg-color-info-text)",
-                    }}
-                  >
-                    <div
-                      className="dg-draft-banner-dot"
-                      style={{ background: "var(--dg-color-primary)" }}
-                    />
+                  <div className="dg-draft-banner dg-draft-banner--info no-print">
+                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
                     <span style={{ fontWeight: 600 }}>
                       Published{" "}
                       {(() => {

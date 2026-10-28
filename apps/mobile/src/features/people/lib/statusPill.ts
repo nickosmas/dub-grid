@@ -11,7 +11,7 @@ import {
 
 /**
  * The status pill a People row shows for anyone not Active: "Away until Jan 4",
- * "Away", "Suspended" or "Archived". Active people show none.
+ * "Away", "Suspended" or "Offboarded". Active people show none.
  */
 export function getMobileStatusPill(
   mobileColors: MobileColors,

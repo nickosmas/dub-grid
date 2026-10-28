@@ -25,6 +25,7 @@ import type { GridmasterBillingOrgSummary } from "@/types";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
 import { PlatformBillingPolicyCard } from "@/components/gridmaster/BillingPolicyCards";
 import { BillingHistoryCard } from "@/components/gridmaster/BillingHistoryCards";
+import { Banner } from "@/components/ui/Banner";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -407,22 +408,12 @@ export default function GridmasterBillingView({
       </div>
 
       {billingQuery.error instanceof Error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger-text)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {formatClientErrorMessage(
             billingQuery.error,
             "We couldn't load your billing details. Refresh and try again.",
           )}
-        </div>
+        </Banner>
       )}
 
       <ProgressBar loading={billingQuery.isLoading || !billing} />

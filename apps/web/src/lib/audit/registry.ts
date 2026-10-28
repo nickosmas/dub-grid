@@ -481,7 +481,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       const until = d.date("awayUntil");
       return `Marked ${who(d, ctx, "a team member")} away${until ? ` until ${until}` : ""}${note ? `: ${note}` : ""}`;
     },
-    suppressKeys: ["note", "awayUntil", "awayAbsenceTypeId"],
+    suppressKeys: ["note", "awayUntil", "awayAbsenceTypeId", "plannedFrom"],
   },
   "employee.return_date_changed": {
     category: "people",
@@ -510,6 +510,38 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     },
     suppressKeys: ["awayUntil"],
   },
+  "employee.away_planned": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const from = d.date("plannedFrom");
+      const until = d.date("plannedUntil");
+      const name = who(d, ctx, "a team member");
+      if (!from) return `Planned time away for ${name}`;
+      return until
+        ? `Planned ${name} away ${from} to ${until}`
+        : `Planned ${name} away from ${from}`;
+    },
+    suppressKeys: ["plannedFrom", "plannedUntil", "plannedAbsenceTypeId"],
+  },
+  "employee.away_plan_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Changed ${who(d, ctx, "a team member")}'s planned away`,
+    suppressKeys: [
+      "fromPlannedFrom",
+      "fromPlannedUntil",
+      "plannedFrom",
+      "plannedUntil",
+      "plannedAbsenceTypeId",
+    ],
+  },
+  "employee.away_plan_cancelled": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned away`,
+    suppressKeys: ["plannedFrom", "plannedUntil"],
+  },
   "employee.suspended": {
     category: "people",
     severity: "delete",
@@ -523,7 +555,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.removed": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Offboarded ${who(d, ctx, "a team member")}`,
   },
   // Historical keys from before the bench→deactivate / terminate→remove rename.
   // Old rows still carry them, so they render with the current copy.
@@ -539,7 +571,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.archived": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Archived ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => `Offboarded ${who(d, ctx, "a team member")}`,
   },
 
   // ── Schedule ───────────────────────────────────────────────────────────────

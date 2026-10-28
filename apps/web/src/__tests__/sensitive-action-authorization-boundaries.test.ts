@@ -81,9 +81,9 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bcanManageEmployees\s*\(/,
       // Removal signs the person out everywhere; marking inactive (Away) doesn't (51a).
       /if \(action === "remove" && currentEmployee\.userId\) \{\s*try \{\s*await revokeAllUserSessions\(/,
-      // A Gridmaster taking a staff record out or suspending it needs fresh
-      // proof before any read or write (F-96, 51c).
-      /if \(isGridmaster && \(action === "deactivate" \|\| action === "remove" \|\| action === "suspend"\)\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
+      // A Gridmaster taking a staff record out, suspending it or planning it
+      // away needs fresh proof before any read or write (F-96, 51c, 51g1).
+      /if \(\s*isGridmaster &&\s*\(action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
       // Suspension signs only the suspended person out (51c).
       /if \(action === "suspend" && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
     ],

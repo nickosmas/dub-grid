@@ -17,6 +17,7 @@ import { effectiveBillingStatus } from "@dubgrid/domain";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle } from "@/lib/styles";
 import { gmHeaderStyle, gmTableStyle, gmThStyle } from "@/components/gridmaster/table-styles";
+import { Banner } from "@/components/ui/Banner";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
 
@@ -451,41 +452,32 @@ export default function GridmasterDashboard({
 
       {/* Suspended orgs alert */}
       {suspendedOrgs.length > 0 && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-warning-bg)",
-            border: "1px solid var(--dg-color-warning)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            color: "var(--dg-color-warning)",
-            marginBottom: 20,
-          }}
-        >
-          {suspendedOrgs.length} organization{suspendedOrgs.length !== 1 ? "s" : ""} currently
-          suspended:{" "}
-          {suspendedOrgs.map((o, i) => (
-            <span key={o.id}>
-              {i > 0 && ", "}
-              <Button
-                onClick={() => onSelectOrg(o.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "inherit",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontFamily: "inherit",
-                  padding: 0,
-                  textDecoration: "underline",
-                }}
-              >
-                {o.name}
-              </Button>
-            </span>
-          ))}
-        </div>
+        <Banner tone="warning" className="mb-5">
+          <span>
+            {suspendedOrgs.length} organization{suspendedOrgs.length !== 1 ? "s" : ""} currently
+            suspended:{" "}
+            {suspendedOrgs.map((o, i) => (
+              <span key={o.id}>
+                {i > 0 && ", "}
+                <Button
+                  onClick={() => onSelectOrg(o.id)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "inherit",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontFamily: "inherit",
+                    padding: 0,
+                    textDecoration: "underline",
+                  }}
+                >
+                  {o.name}
+                </Button>
+              </span>
+            ))}
+          </span>
+        </Banner>
       )}
 
       {/* Platform Activity Trends */}

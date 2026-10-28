@@ -139,7 +139,7 @@ describe("availabilityFromShifts", () => {
       assignments,
       shiftCategories,
       loadedDateKeys: LOADED,
-      awayUntil: new Map([["ana", "2026-10-27"]]),
+      awayRanges: new Map([["ana", { from: null, until: "2026-10-27" }]]),
     };
     expect(availabilityFromShifts(input, "ana", "2026-10-26", DAY)).toEqual({
       kind: "away",
@@ -147,6 +147,21 @@ describe("availabilityFromShifts", () => {
     });
     expect(availabilityFromShifts(input, "ana", "2026-10-27", DAY)).toEqual({ kind: "free" });
     expect(availabilityWithPlanned(input, [])("ana", "2026-10-26", DAY).kind).toBe("away");
+  });
+
+  it("is away on a planned Away's days and free before them (51g1)", () => {
+    const input = {
+      shifts: {},
+      assignments,
+      shiftCategories,
+      loadedDateKeys: LOADED,
+      awayRanges: new Map([["ana", { from: "2026-10-27", until: null }]]),
+    };
+    expect(availabilityFromShifts(input, "ana", "2026-10-26", DAY)).toEqual({ kind: "free" });
+    expect(availabilityFromShifts(input, "ana", "2026-10-27", DAY)).toEqual({
+      kind: "away",
+      until: null,
+    });
   });
 
   it("is free beside work that does not overlap", () => {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Lock, Search, UserRound } from "lucide-react";
+import { Search, UserRound } from "lucide-react";
 import { SUSPENDED_SCHEDULE_NOTE } from "@dubgrid/domain";
+import { StatusIcon } from "@/components/staff-detail/StatusMarkIcon";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { SectionNotice } from "@/components/ui/SectionNotice";
@@ -224,7 +225,7 @@ export function OpenShiftStaffingModal({
                   </span>
                   {employee.suspendedAt ? (
                     <span className="dg-open-shift-staffing-suspended">
-                      <Lock aria-hidden="true" size={12} />
+                      <StatusIcon kind="suspended" size={12} />
                       {SUSPENDED_SCHEDULE_NOTE}
                     </span>
                   ) : null}

@@ -13,13 +13,16 @@ vi.mock("@/lib/supabase-service", () => ({
       if (table === "audit_log") return { insert: auditInsert };
       if (table !== "employees") throw new Error(`Unexpected table: ${table}`);
       return {
-        select: vi.fn(() => ({
-          eq: () => ({
-            is: () => ({
-              not: () => ({ lte: (...args: unknown[]) => selectLte(...args) }),
-            }),
-          }),
-        })),
+        // Both reads end in lte(column, bound); the column tells them apart.
+        select: vi.fn(() => {
+          const query = {
+            eq: () => query,
+            is: () => query,
+            not: () => query,
+            lte: (...args: unknown[]) => selectLte(...args),
+          };
+          return query;
+        }),
         update: (values: Record<string, unknown>) => {
           const filters: unknown[][] = [];
           const chain = {
@@ -61,6 +64,27 @@ const SECRET = "test-cron-secret";
 
 function makeReq(headers: Record<string, string> = { authorization: `Bearer ${SECRET}` }) {
   return new NextRequest("http://localhost/api/cron/return-from-away", { headers });
+}
+
+function planned(id: string, orgId: string, from: string, until: string | null, timezone: string) {
+  return {
+    id,
+    org_id: orgId,
+    planned_from: from,
+    planned_until: until,
+    planned_absence_type_id: until ? 134 : null,
+    planned_note: "Leave",
+    version: 3,
+    organization: { timezone },
+  };
+}
+
+/** The planned-away read gets `plans`, the return read `aways`. */
+function rows(plans: unknown[], aways: unknown[] = []) {
+  selectLte.mockImplementation(async (column: string) => ({
+    data: column === "planned_from" ? plans : aways,
+    error: null,
+  }));
 }
 
 function away(id: string, orgId: string, awayUntil: string, timezone: string) {
@@ -119,7 +143,7 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, returned: 1, skipped: 0 });
+    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
     // A day past UTC's today bounds every timezone.
     expect(selectLte).toHaveBeenCalledWith("away_until", "2026-10-28");
     expect(updateEmployee).toHaveBeenCalledWith(
@@ -159,7 +183,7 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, returned: 1, skipped: 0 });
+    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
     expect(updateEmployee).toHaveBeenCalledTimes(1);
     expect(updateEmployee.mock.calls[0][1]).toContainEqual(["id", "emp-tokyo"]);
   });
@@ -167,7 +191,7 @@ describe("GET /api/cron/return-from-away", () => {
   it("does nothing when nobody is due", async () => {
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, returned: 0 });
+    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 0 });
     expect(updateEmployee).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
@@ -181,7 +205,77 @@ describe("GET /api/cron/return-from-away", () => {
 
     const res = await GET(makeReq());
 
-    expect(await res.json()).toEqual({ ok: true, returned: 0, skipped: 1 });
+    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 0, skipped: 1 });
     expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("marks someone Away when their planned Away starts today, with its return date", async () => {
+    rows([planned("emp-la", "org-la", "2026-10-26", "2027-01-04", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect(await res.json()).toEqual({ ok: true, started: 1, returned: 0 });
+    expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28");
+    expect(updateEmployee).toHaveBeenCalledWith(
+      {
+        status: "inactive",
+        status_note: "Leave",
+        status_changed_at: "2026-10-27T01:00:00.000Z",
+        away_until: "2027-01-04",
+        away_absence_type_id: 134,
+        planned_status: null,
+        version: 4,
+      },
+      [
+        ["id", "emp-la"],
+        ["org_id", "org-la"],
+        ["version", 3],
+      ],
+    );
+    expect(auditInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        action: "employee.deactivated",
+        resource_id: "emp-la",
+        details: expect.objectContaining({ plannedFrom: "2026-10-26", awayUntil: "2027-01-04" }),
+      }),
+    ]);
+  });
+
+  it("starts a plan dated tomorrow only where tomorrow has already begun", async () => {
+    rows([
+      planned("emp-tokyo", "org-tokyo", "2026-10-27", null, "Asia/Tokyo"),
+      planned("emp-la", "org-la", "2026-10-27", null, "America/Los_Angeles"),
+    ]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).started).toBe(1);
+    expect(updateEmployee).toHaveBeenCalledTimes(1);
+    expect(updateEmployee.mock.calls[0][1]).toContainEqual(["id", "emp-tokyo"]);
+  });
+
+  it("drops a plan whose return date has already come, without marking them away", async () => {
+    rows([planned("emp-la", "org-la", "2026-10-20", "2026-10-26", "America/Los_Angeles")]);
+
+    const res = await GET(makeReq());
+
+    expect((await res.json()).started).toBe(0);
+    expect(updateEmployee).toHaveBeenCalledWith(
+      { planned_status: null, version: 4 },
+      expect.anything(),
+    );
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("still returns people when starting plans fails", async () => {
+    selectLte.mockImplementation(async (column: string) =>
+      column === "planned_from"
+        ? { data: null, error: new Error("read failed") }
+        : { data: [away("emp-la", "org-la", "2026-10-26", "America/Los_Angeles")], error: null },
+    );
+
+    const res = await GET(makeReq());
+
+    expect(await res.json()).toEqual({ ok: true, started: 0, returned: 1, skipped: 0 });
   });
 });

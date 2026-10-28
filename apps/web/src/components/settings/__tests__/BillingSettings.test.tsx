@@ -67,7 +67,7 @@ const billingSummary: OrganizationBillingSummary = {
       id: "42",
       action: "billing.subscription_canceled",
       label: "Subscription canceled",
-      actorLabel: "Stripe",
+      actorLabel: "Payment provider",
       resourceType: "billing",
       resourceId: "sub_123",
       details: {
@@ -91,7 +91,7 @@ const billingSummary: OrganizationBillingSummary = {
       id: "44",
       action: "billing.subscription_created",
       label: "Subscription started",
-      actorLabel: "You (Olivia Chen)",
+      actorLabel: "You",
       resourceType: "billing",
       resourceId: "sub_456",
       details: {},
@@ -106,6 +106,11 @@ const billingSummary: OrganizationBillingSummary = {
     daysUntilTrialEnd: 14,
     trialGraceEndsAt: "2026-05-19T12:00:00.000Z",
   },
+  trialStartedAt: "2026-05-02T12:00:00.000Z",
+  billingPolicy: { trialDays: 14, trialGraceDays: 3, paymentGraceDays: 7 },
+  seatHistory: [],
+  lastPayment: null,
+  outstandingPayment: null,
 };
 
 function renderBillingSettings() {
@@ -136,70 +141,44 @@ describe("BillingSettings", () => {
     vi.useRealTimers();
   });
 
-  it("shows explicit trial time left before the warning threshold", async () => {
+  it("counts down a running trial and lists billing history without names", async () => {
     renderBillingSettings();
 
-    expect(await screen.findByText("Trial time left")).toBeInTheDocument();
-    expect(screen.getByText("14 days")).toBeInTheDocument();
-    expect(screen.getByText("Billable users")).toBeInTheDocument();
-    expect(screen.getByText("6")).toBeInTheDocument();
-    expect(screen.queryByText("Active organization users")).not.toBeInTheDocument();
-    expect(screen.queryByText("Ends May 16, 2026")).not.toBeInTheDocument();
-    expect(screen.queryByText("Billed seats")).not.toBeInTheDocument();
-    expect(screen.queryByText("Seat difference")).not.toBeInTheDocument();
-    expect(screen.queryByText("Renewal")).not.toBeInTheDocument();
-    expect(screen.getByText("Trial ends")).toBeInTheDocument();
-    expect(screen.getByText("May 16, 2026")).toBeInTheDocument();
-    const trialEndsLabel = screen.getByText("Trial ends");
-    const operationsHeading = screen.getByText("Recent billing operations");
-    expect(operationsHeading).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Recent billing operations" })).toBeInTheDocument();
-    expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "When" })).toBeInTheDocument();
-    const activityTable = screen.getByRole("table");
-    expect(activityTable.parentElement).toHaveAttribute(
-      "data-settings-table-layout",
-      "distributed",
-    );
-    expect(activityTable.parentElement).toHaveStyle({ width: "100%", maxWidth: "100%" });
-    expect(activityTable).toHaveStyle({ width: "100%", minWidth: "680px" });
+    expect(await screen.findByText("Trial days left")).toBeInTheDocument();
     expect(
-      trialEndsLabel.compareDocumentPosition(operationsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(screen.getByText("Subscription canceled")).toBeInTheDocument();
-    expect(screen.getByText("Stripe")).toBeInTheDocument();
-    expect(screen.getByText("Trial extended")).toBeInTheDocument();
-    expect(screen.getByText("DubGrid Support")).toBeInTheDocument();
-    expect(screen.queryByText("gridmaster@example.com")).not.toBeInTheDocument();
-    expect(screen.getByText("Subscription started")).toBeInTheDocument();
-    expect(screen.getByText("You (Olivia Chen)")).toBeInTheDocument();
+      screen.getByRole("img", { name: "14 days: Left in your free trial" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Seats in use", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Billing history" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "By" })).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(table.parentElement).toHaveAttribute("data-settings-table-layout", "distributed");
+    expect(within(table).getByText("Subscription canceled.")).toBeInTheDocument();
+    expect(within(table).getByText("Payment provider")).toBeInTheDocument();
+    expect(within(table).getByText("Free trial extended.")).toBeInTheDocument();
+    expect(within(table).getByText("DubGrid Support")).toBeInTheDocument();
+    expect(within(table).getByText("You")).toBeInTheDocument();
+    expect(screen.queryByText(/Olivia/)).not.toBeInTheDocument();
+    expect(screen.queryByText("sub_123")).not.toBeInTheDocument();
   });
 
-  it("opens billing operation details from the activity table", async () => {
+  it("filters billing history by kind", async () => {
     renderBillingSettings();
 
-    const canceledRow = (await screen.findByText("Subscription canceled")).closest("tr");
-    expect(canceledRow).not.toBeNull();
-    fireEvent.click(within(canceledRow!).getByRole("button", { name: "View details" }));
-
-    expect(
-      await screen.findByRole("dialog", { name: "Billing activity details" }),
-    ).toBeInTheDocument();
-    // The Stripe payload is never flattened raw; a cancellation has no rows to add.
-    expect(screen.queryByText("Stripe Event Type")).not.toBeInTheDocument();
-    expect(screen.queryByText("Customer Subscription Deleted")).not.toBeInTheDocument();
-    expect(screen.getByText("Record type")).toBeInTheDocument();
-    expect(screen.queryByText("Billing sub_123")).not.toBeInTheDocument();
-    expect(screen.queryByText("sub_123")).not.toBeInTheDocument();
-    expect(screen.queryByText("billing.subscription_canceled")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Trial" }));
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Free trial extended.")).toBeInTheDocument();
+    expect(within(table).queryByText("Subscription canceled.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Payments" }));
+    expect(screen.getByText("There are no payments here yet.")).toBeInTheDocument();
   });
 
   it("explains a pending trial that has not started yet", async () => {
     vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
       ...billingSummary,
       trialEndsAt: null,
+      trialStartedAt: null,
       billingAccess: {
         ...billingSummary.billingAccess,
         state: "trial_pending",
@@ -210,19 +189,19 @@ describe("BillingSettings", () => {
 
     renderBillingSettings();
 
-    expect(await screen.findByText("Billable users")).toBeInTheDocument();
-    expect(screen.queryByText("Trial time left")).not.toBeInTheDocument();
+    expect(await screen.findByText("Your free trial hasn't started yet.")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Your trial starts the first time an administrator signs in. The countdown begins then. Refresh this page to see your trial end date.",
+        "Your 14-day free trial begins the first time a Super Admin signs in. You won't be charged until you start a subscription.",
       ),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Trial days left")).not.toBeInTheDocument();
   });
 
   it("does not show sign out while billing is available", async () => {
     renderBillingSettings();
 
-    expect(await screen.findByText("Billable users")).toBeInTheDocument();
+    expect(await screen.findByText("Trial days left")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
   });
 
@@ -287,14 +266,18 @@ describe("BillingSettings", () => {
     renderBillingSettings();
 
     expect(await screen.findByText("Suspended")).toBeInTheDocument();
+    expect(screen.getByText("Your organization is suspended.")).toBeInTheDocument();
     expect(
-      screen.getByText("Your organization is suspended. Contact DubGrid Support for help."),
+      screen.getByText(
+        "DubGrid Support suspended your organization. Contact DubGrid Support for help.",
+      ),
     ).toBeInTheDocument();
   });
 
   it("says billing is paused and lists the pause in the activity", async () => {
     vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
       ...billingSummary,
+      billingPausedAt: "2026-05-02T10:00:00.000Z",
       recentOperations: [
         {
           id: "50",
@@ -321,11 +304,12 @@ describe("BillingSettings", () => {
 
     expect(
       await screen.findByText(
-        "Billing is paused. Your organization stays open, and your trial days don't count down while it's paused.",
+        /Your organization stays open, and you won't be charged while billing is paused\. Your trial days don't count down while it's paused\./,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("9 days, paused")).toBeInTheDocument();
-    const row = screen.getAllByText("Billing paused").find((node) => node.closest("tr"));
+    expect(screen.getByText("They don't count down while billing is paused.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start subscription" })).not.toBeInTheDocument();
+    const row = screen.getAllByText("Billing paused.").find((node) => node.closest("tr"));
     expect(row?.closest("tr")).toHaveTextContent("DubGrid Support");
   });
 
@@ -341,7 +325,7 @@ describe("BillingSettings", () => {
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
   });
 
-  it("says how seats compare with billable users", async () => {
+  it("tells seats in use apart from paid seats", async () => {
     vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
       ...billingSummary,
       status: "active",
@@ -349,6 +333,15 @@ describe("BillingSettings", () => {
       seatDelta: -2,
       hasStripeCustomer: true,
       hasStripeSubscription: true,
+      seatBreakdown: {
+        activeStaff: 6,
+        suspended: 0,
+        awayManaging: 0,
+        managementOnly: 0,
+        awayNotBilled: 1,
+        archived: 2,
+        total: 6,
+      },
       billingAccess: {
         state: "active",
         reason: "active_subscription",
@@ -361,9 +354,14 @@ describe("BillingSettings", () => {
 
     renderBillingSettings();
 
-    expect(await screen.findByText("Seat difference")).toBeInTheDocument();
-    expect(screen.getByText("2 without a seat")).toBeInTheDocument();
-    expect(screen.getByText("Billed seats")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "2 seats in use aren't paid for yet. DubGrid Support updates your paid seats to match the seats in use, and the change is prorated on your next invoice.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage billing" })).toBeInTheDocument();
+    expect(screen.getByText("Offboarded staff")).toBeInTheDocument();
+    expect(screen.getByText("6 in use, 3 not billed")).toBeInTheDocument();
   });
 
   it("explains in plain words when online billing isn't set up", async () => {

@@ -1958,7 +1958,9 @@ export async function POST(req: NextRequest) {
         const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
-            .select(`${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at, away_until)`)
+            .select(
+              `${RECURRING_SHIFT_COLS}, employee:employees(status, archived_at, away_until, planned_status, planned_from, planned_until)`,
+            )
             .eq("org_id", data.orgId)
             .is("archived_at", null)
             .lte("effective_from", data.endDate)
@@ -1982,6 +1984,9 @@ export async function POST(req: NextRequest) {
                 status: EmployeeStatus;
                 archived_at: string | null;
                 away_until: string | null;
+                planned_status: "away" | null;
+                planned_from: string | null;
+                planned_until: string | null;
               } | null;
             }
           >
@@ -1997,8 +2002,19 @@ export async function POST(req: NextRequest) {
               data.endDate,
             ),
         );
-        const awayUntilByEmp = new Map(
-          activeTemplates.map((row) => [row.emp_id, row.employee?.away_until ?? null]),
+        // Away until a date (51e) or planned away (51g1): each day is asked.
+        const schedulableStateByEmp = new Map(
+          activeTemplates.map((row) => [
+            row.emp_id,
+            {
+              status: row.employee?.status ?? "active",
+              archivedAt: row.employee?.archived_at ?? null,
+              awayUntil: row.employee?.away_until ?? null,
+              plannedStatus: row.employee?.planned_status ?? null,
+              plannedFrom: row.employee?.planned_from ?? null,
+              plannedUntil: row.employee?.planned_until ?? null,
+            },
+          ]),
         );
 
         const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
@@ -2067,8 +2083,8 @@ export async function POST(req: NextRequest) {
             if (template.effective_until && template.effective_until < dateKey) {
               continue;
             }
-            const awayUntil = awayUntilByEmp.get(template.emp_id);
-            if (awayUntil && dateKey < awayUntil) {
+            const schedulableState = schedulableStateByEmp.get(template.emp_id);
+            if (schedulableState && !isSchedulableOn(schedulableState, dateKey)) {
               continue;
             }
 

@@ -10,8 +10,10 @@ import {
   fetchEmployees,
   insertEmployee,
   removeEmployee,
+  setEmployeePlannedAway,
   setEmployeeReturnDate,
   updateEmployee,
+  type PlannedAway,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
@@ -54,6 +56,17 @@ export interface EmployeesData {
     accessToken?: string,
     returnDate?: string | null,
     absenceTypeId?: number | null,
+    /** A day after today plans the Away for then (51g1). */
+    startDate?: string | null,
+  ) => Promise<boolean>;
+  /**
+   * Moves or changes a planned Away, or cancels it (null). A step-up refusal
+   * is rethrown for the caller to prompt.
+   */
+  handleSetPlannedAway: (
+    empId: string,
+    plan: PlannedAway | null,
+    accessToken?: string,
   ) => Promise<boolean>;
   handleActivateEmployee: (empId: string) => Promise<void>;
   /** Gives a suspended person their access back (51c). */
@@ -291,7 +304,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           accessToken,
         );
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Archived");
+        toast.success("Offboarded");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -306,7 +319,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't archive them. Try again.");
+        toast.error("We couldn't offboard them. Try again.");
         Sentry.captureException(err);
         return false;
       }
@@ -321,27 +334,30 @@ export function useEmployees(orgId: string | null): EmployeesData {
       accessToken?: string,
       returnDate?: string | null,
       absenceTypeId?: number | null,
+      startDate?: string | null,
     ) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
       if (!targetEmployee || !orgId) return false;
 
       const prevAll = allEmployeesRef.current;
-      setAllLocal((prev) =>
-        prev.map((e) =>
-          e.id === empId
-            ? {
-                ...e,
-                status: "inactive" as const,
-                statusNote: note ?? "",
-                awayUntil: returnDate ?? null,
-                awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
-                statusChangedAt: new Date().toISOString(),
-              }
-            : e,
-        ),
-      );
+      // A planned Away leaves them Active, so only the saved row shows it.
+      if (!startDate)
+        setAllLocal((prev) =>
+          prev.map((e) =>
+            e.id === empId
+              ? {
+                  ...e,
+                  status: "inactive" as const,
+                  statusNote: note ?? "",
+                  awayUntil: returnDate ?? null,
+                  awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
+                  statusChangedAt: new Date().toISOString(),
+                }
+              : e,
+          ),
+        );
       try {
-        const updatedEmployee = await (returnDate
+        const updatedEmployee = await (returnDate || startDate
           ? deactivateEmployee(
               empId,
               note,
@@ -350,10 +366,11 @@ export function useEmployees(orgId: string | null): EmployeesData {
               accessToken,
               returnDate,
               absenceTypeId,
+              startDate,
             )
           : deactivateEmployee(empId, note, orgId, targetEmployee.version, accessToken));
         setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
-        toast.success("Marked away");
+        toast.success(updatedEmployee.plannedStatus ? "Away scheduled" : "Marked away");
         invalidateEmployees();
         return true;
       } catch (err) {
@@ -369,6 +386,37 @@ export function useEmployees(orgId: string | null): EmployeesData {
           return false;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleSetPlannedAway = useCallback(
+    async (empId: string, plan: PlannedAway | null, accessToken?: string) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return false;
+      try {
+        const updatedEmployee = await setEmployeePlannedAway(
+          empId,
+          orgId,
+          targetEmployee.version,
+          plan,
+          accessToken,
+        );
+        setAllLocal((prev) => replaceEmployeeRow(prev, updatedEmployee));
+        toast.success(plan ? "Planned away changed" : "Planned away cancelled");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        if (getStepUpMethod(err)) throw err;
+        toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -515,5 +563,6 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleReinstateEmployee,
     handleSuspendEmployee,
     handleSetEmployeeReturnDate,
+    handleSetPlannedAway,
   };
 }

@@ -31,6 +31,8 @@ import {
 } from "./nav-config";
 import dynamic from "next/dynamic";
 import { SettingsShell } from "./SettingsShell";
+import { Banner } from "@/components/ui/Banner";
+import { Lock } from "lucide-react";
 
 function SettingsSectionSkeleton() {
   return (
@@ -283,36 +285,10 @@ export default function SettingsPage({
   // Permission notice for view-only users.
   const banner =
     canAccessSettings && !isSuperAdmin && !isGridmaster ? (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 14px",
-          background: "var(--dg-color-info-bg)",
-          borderRadius: "var(--dg-radius-sm)",
-          border: "1px solid var(--dg-color-info-border)",
-          fontSize: "var(--dg-fs-caption)",
-          color: "var(--dg-color-info-text)",
-        }}
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ flexShrink: 0 }}
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
+      <Banner tone="info" icon={Lock}>
         Some settings are read-only based on your permissions. Contact your super admin to request
         changes.
-      </div>
+      </Banner>
     ) : null;
 
   return (

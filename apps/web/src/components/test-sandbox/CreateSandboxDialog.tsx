@@ -4,6 +4,7 @@ import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { Banner } from "@/components/ui/Banner";
 
 interface CreateSandboxDialogProps {
   orgName?: string;
@@ -60,20 +61,9 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
         screen and everything is discarded.
       </p>
       {error ? (
-        <div
-          role="alert"
-          style={{
-            marginTop: 8,
-            padding: "8px 12px",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--dg-color-danger-border)",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            fontSize: "var(--dg-fs-caption)",
-          }}
-        >
+        <Banner tone="danger" role="alert" className="mt-2">
           {error}
-        </div>
+        </Banner>
       ) : null}
     </div>
   );

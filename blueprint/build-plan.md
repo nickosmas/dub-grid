@@ -1080,7 +1080,11 @@
       Design reference: the "Staff status across surfaces" canvas and the
       "Fine-grained removal in DubGrid" doc. Owner, 2026-10-26: marking
       someone away offers an absence type in the same confirmation (51f),
-      so build 51e and 51f next, before 51c.
+      so build 51e and 51f next, before 51c. Owner, 2026-10-27: dated
+      status changes are one item (51g) replacing a separate last day and
+      leave from a date: every status change can start on a later date,
+      Away and Suspended can also end on one, and a new hire can start on
+      their first day.
   - [x] 51a. **Away keeps access** - an Away person keeps sign-in, role and
         management powers on web, mobile and in the database, isn't signed
         out, and takes a seat only while they can manage.
@@ -1106,9 +1110,21 @@
         replacing shifts, published with the period; those days are locked
         in the grid with an explanation, and changing the dates rewrites
         them.
-  - [ ] 51g. **Last day** - "Leaving Nov 8", shifts after it come off in
-        the draft, nobody can schedule them past it, and a daily job
-        archives them the day after; the Suspend dialog can set one.
+  - [ ] 51g. **Dated status changes** - a status change can start on a
+        later date; until then the person stays as they are, the days it
+        covers are locked and changed in the draft, and a daily job applies
+        it on the day in the organization's timezone.
+    - [x] 51g1. **Away from a date** - the planned change itself (one per
+          person, shown as "Away from Nov 10", editable and cancellable), the
+          daily job, and Away as its first use: Change status takes a start
+          date beside the return date, on web and mobile.
+    - [ ] 51g2. **Last day** - "Leaving Nov 8": shifts after it come off in
+          the draft, nobody can schedule them past it, and the job archives
+          them the day after.
+    - [ ] 51g3. **Suspended until** - an optional end date on a suspension,
+          from today or a later start; the job reinstates them on it.
+    - [ ] 51g4. **First day** - a new hire can't be scheduled before their
+          first day, and shows "Starts Nov 10" until then.
   - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
   - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks

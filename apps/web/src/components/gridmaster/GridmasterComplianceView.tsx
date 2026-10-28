@@ -22,6 +22,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { Banner } from "@/components/ui/Banner";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -186,22 +187,12 @@ export default function GridmasterComplianceView({
       </div>
 
       {complianceQuery.error instanceof Error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {formatClientErrorMessage(
             complianceQuery.error,
             "We couldn't load compliance oversight right now.",
           )}
-        </div>
+        </Banner>
       )}
 
       <ProgressBar loading={complianceQuery.isLoading || !compliance} />

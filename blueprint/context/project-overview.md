@@ -375,9 +375,24 @@ Item 51 is split:
   publishes with the period. The grid's bar reads "Away · Vacation" and a
   locked day says why; moving the date, changing or clearing the absence, or
   marking them active early rewrites the days (migration 100).
-- **51g - Last day:** "Leaving Nov 8", shifts after it come off in the
-  draft, nobody can schedule them past it, and a daily job archives them the
-  day after; the Suspend dialog can set one.
+- **51g - Dated status changes:** a status change can start on a later
+  date; until then the person stays as they are, the days it covers are
+  locked and changed in the draft, and a daily job applies it on the day in
+  the organization's timezone.
+  - **51g1 - Away from a date:** shipped; Change status takes a Starts
+    date up to a year ahead beside the return date (web and mobile), and
+    **Schedule away** plans it: they stay Active until then, the days from
+    it are locked and cleared in the draft (under the absence when one is
+    picked), the plan shows as "Away from Nov 10" and can be changed or
+    cancelled, and the daily job marks them Away on the day (migration
+    103).
+  - **51g2 - Last day:** "Leaving Nov 8"; shifts after it come off in the
+    draft, nobody can schedule them past it, and the job archives them the
+    day after.
+  - **51g3 - Suspended until:** an optional end date on a suspension; the
+    job reinstates them on it.
+  - **51g4 - First day:** a new hire can't be scheduled before their first
+    day, and shows "Starts Nov 10" until then.
 - **51h - Bulk status changes:** the People list bulk bar: Mark away,
   Suspend, Archive and Mark active.
 - **51i - Losing a focus area:** taking someone off a focus area asks
@@ -390,8 +405,8 @@ Item 51 is split:
   Restore works the same after either.
 
 Statuses are named Active, Away, Suspended and Archived; code keeps
-`inactive` and `removed`, and suspension, the return date and the last day
-are new columns, so a Suspended person stays `active` and schedulable. An
+`inactive` and `removed`, and suspension, the return date and a planned
+status change are new columns, so a Suspended person stays `active` and schedulable. An
 Away person takes a seat only while they can manage; a Suspended one always
 does. Anyone who can change a status today can suspend, with the self and
 tier guards. Suspension stops push and schedule emails (one notice email,
@@ -401,7 +416,10 @@ publish with the period. Staff copy names only their state and its date and
 calls the product "the app", not DubGrid (owner decisions, 2026-10-26).
 A "requests only" state waits for a real need. Marking someone away offers
 an absence type in the same confirmation (51f), so 51e and 51f come next,
-before 51c (owner, 2026-10-26). Design reference: the "Staff
+before 51c (owner, 2026-10-26). Dated status changes are one item (51g)
+replacing a separate last day: any change can start on a later date, Away
+and Suspended can end on one, and a new hire can start on their first day
+(owner, 2026-10-27). Design reference: the "Staff
 status across surfaces" canvas and the "Fine-grained removal in DubGrid"
 doc.
 
@@ -459,7 +477,8 @@ endpoints remain internal.
 - department or focus-area assignment, role, and certifications
 - `employment_status` - active, inactive, or removed; only active staff can be
   scheduled and count toward billing. Item 51 names them Active, Away and
-  Archived and adds suspended access, a return date and a last day; an Away
+  Archived and adds suspended access, a return date and a planned status
+  change with its dates (51g); an Away
   person keeps sign-in and counts toward billing only while they can manage,
   and a Suspended one stays active and schedulable but can't sign in
 - scheduling and management access are independent capabilities
@@ -590,7 +609,7 @@ Main mobile surfaces:
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `102`.
+  checksum-locked through `103`.
 - **Production boundary:** migration `075` was recorded as applied to production
   on 2026-09-28. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.

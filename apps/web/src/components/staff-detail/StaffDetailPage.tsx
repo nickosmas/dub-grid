@@ -30,6 +30,8 @@ import {
   activateEmployee,
   reinstateEmployee,
   suspendEmployee,
+  setEmployeePlannedAway,
+  type PlannedAway,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -77,7 +79,8 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { EmployeeStatusActions } from "./EmployeeStatusActions";
+import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
+import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { RecurringScheduleCard } from "./RecurringScheduleCard";
@@ -500,22 +503,25 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       accessToken?: string,
       returnDate?: string,
       absenceTypeId?: number | null,
+      startDate?: string,
     ) => {
       if (!orgId || !employee) return false;
-      setEmployee((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "inactive" as const,
-              statusNote: note ?? "",
-              awayUntil: returnDate ?? null,
-              awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
-              statusChangedAt: new Date().toISOString(),
-            }
-          : prev,
-      );
+      // A planned Away (51g1) leaves them Active, so only the saved row shows it.
+      if (!startDate)
+        setEmployee((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "inactive" as const,
+                statusNote: note ?? "",
+                awayUntil: returnDate ?? null,
+                awayAbsenceTypeId: returnDate ? (absenceTypeId ?? null) : null,
+                statusChangedAt: new Date().toISOString(),
+              }
+            : prev,
+        );
       try {
-        const updatedEmployee = await (returnDate
+        const updatedEmployee = await (returnDate || startDate
           ? deactivateEmployee(
               empId,
               note,
@@ -524,10 +530,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               accessToken,
               returnDate,
               absenceTypeId,
+              startDate,
             )
           : deactivateEmployee(empId, note, orgId, employee.version, accessToken));
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Marked away");
+        toast.success(updatedEmployee.plannedStatus ? "Away scheduled" : "Marked away");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -536,17 +543,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           return false;
         }
         // Revert on failure
-        setEmployee((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: "active" as const,
-                statusNote: "",
-                awayUntil: null,
-                awayAbsenceTypeId: null,
-              }
-            : prev,
-        );
+        if (!startDate)
+          setEmployee((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: "active" as const,
+                  statusNote: "",
+                  awayUntil: null,
+                  awayAbsenceTypeId: null,
+                }
+              : prev,
+          );
         if (getStepUpMethod(err)) throw err;
         if (err instanceof SelfActionForbiddenError) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
@@ -616,6 +624,29 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
+  const handleSetPlannedAway = useCallback(
+    async (empId: string, plan: PlannedAway | null, accessToken?: string) => {
+      if (!orgId || !employee) return false;
+      try {
+        syncEmployeeCaches(
+          await setEmployeePlannedAway(empId, orgId, employee.version, plan, accessToken),
+        );
+        toast.success(plan ? "Planned away changed" : "Planned away cancelled");
+        return true;
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return false;
+        }
+        if (getStepUpMethod(err)) throw err;
+        toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
+        return false;
+      }
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
+
   const handleReinstate = useCallback(
     async (empId: string) => {
       if (!orgId || !employee) return;
@@ -677,7 +708,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           accessToken,
         );
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Archived");
+        toast.success("Offboarded");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -691,7 +722,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return false;
         }
-        toast.error("We couldn't archive them. Try again.");
+        toast.error("We couldn't offboard them. Try again.");
         return false;
       }
     },
@@ -872,6 +903,58 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ],
   );
 
+  const statusActions = (person: Employee, label?: string) =>
+    label ? (
+      <EmployeeStatusActions
+        employee={person}
+        canEdit={perms.canManageEmployees}
+        isSelf={isSelfAction(currentUser?.id, person.userId)}
+        onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
+          runStatusChange((token) =>
+            returnDate || startDate
+              ? handleDeactivate(empId, note, token, returnDate, absenceTypeId, startDate)
+              : handleDeactivate(empId, note, token),
+          )
+        }
+        onActivate={handleActivate}
+        onSetReturnDate={handleSetReturnDate}
+        onReinstate={handleReinstate}
+        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSetPlannedAway={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        }
+        absenceTypes={absenceTypes}
+        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        stepUpOpen={Boolean(statusStepUp.dialog)}
+        variant="card"
+        label={label}
+        focus="plan"
+      />
+    ) : (
+      <StatusCardActions
+        employee={person}
+        canEdit={perms.canManageEmployees}
+        isSelf={isSelfAction(currentUser?.id, person.userId)}
+        onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
+          runStatusChange((token) =>
+            returnDate || startDate
+              ? handleDeactivate(empId, note, token, returnDate, absenceTypeId, startDate)
+              : handleDeactivate(empId, note, token),
+          )
+        }
+        onActivate={handleActivate}
+        onSetReturnDate={handleSetReturnDate}
+        onReinstate={handleReinstate}
+        onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
+        onSetPlannedAway={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        }
+        absenceTypes={absenceTypes}
+        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        stepUpOpen={Boolean(statusStepUp.dialog)}
+      />
+    );
+
   const isLoading = loading || orgLoading || perms.isLoading;
 
   if (!perms.isLoading && !perms.canViewEmployeeDetails) {
@@ -914,6 +997,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           {activeSection === "profile" && (
             <div className="space-y-6">
               <StaffDetailHeader employee={employee} orgRole={effectiveOrgRole} />
+              <EmployeeStatusCard
+                employee={employee}
+                absenceTypes={absenceTypes}
+                action={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee)
+                    : undefined
+                }
+                planAction={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee, "Edit plan")
+                    : undefined
+                }
+              />
 
               {perms.canManageEmployees && pendingInvite && (
                 <PendingInvitationBanner
@@ -1146,28 +1243,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       Add to schedule
                     </Button>
                   ) : null}
-                  <EmployeeStatusActions
-                    employee={employee}
-                    canEdit={perms.canManageEmployees}
-                    isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                    onDeactivate={(empId, note, returnDate, absenceTypeId) =>
-                      runStatusChange((token) =>
-                        returnDate
-                          ? handleDeactivate(empId, note, token, returnDate, absenceTypeId)
-                          : handleDeactivate(empId, note, token),
-                      )
-                    }
-                    onActivate={handleActivate}
-                    onSetReturnDate={handleSetReturnDate}
-                    onReinstate={handleReinstate}
-                    onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
-                    absenceTypes={absenceTypes}
-                    onRemove={(empId, note) =>
-                      runStatusChange((token) => handleRemove(empId, note, token))
-                    }
-                    stepUpOpen={Boolean(statusStepUp.dialog)}
-                    variant="page"
-                  />
                 </div>
               )}
             </div>

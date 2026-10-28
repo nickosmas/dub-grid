@@ -1,5 +1,6 @@
 "use client";
 
+import { MonitorSmartphone } from "lucide-react";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import Modal from "@/components/Modal";
@@ -19,16 +20,8 @@ export function ScheduleSessionWarning({
     sessionCount === 1 ? "1 other tab or device" : `${sessionCount} other tabs or devices`;
 
   return (
-    <div
-      className="dg-draft-banner no-print"
-      role="alert"
-      style={{
-        background: "var(--dg-color-danger-bg)",
-        borderColor: "var(--dg-color-danger-border)",
-        color: "var(--dg-color-danger-text)",
-      }}
-    >
-      <div className="dg-draft-banner-dot" style={{ background: "var(--dg-color-danger)" }} />
+    <div className="dg-draft-banner dg-draft-banner--danger no-print" role="alert">
+      <MonitorSmartphone size={16} className="shrink-0" aria-hidden="true" />
       <strong>Schedule open elsewhere</strong>
       <span>
         Your account has this schedule open in {sessionLabel}. End those schedule sessions before

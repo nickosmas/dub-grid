@@ -86,15 +86,11 @@ describe("breakdownBillableSeats", () => {
       status: "inactive",
       archived_at: null,
       user_id: "u-lee",
-      first_name: "Lee",
-      last_name: "Wong",
     },
     {
       status: "inactive",
       archived_at: null,
       user_id: "u-amy",
-      first_name: "Amy",
-      last_name: "Diaz",
     },
     { status: "inactive", archived_at: null, user_id: "u-away" },
     { status: "inactive", archived_at: null, user_id: null },
@@ -112,12 +108,36 @@ describe("breakdownBillableSeats", () => {
   it("splits billed and unbilled people by status", () => {
     expect(breakdownBillableSeats(employees, memberships)).toEqual({
       activeStaff: 2,
+      suspended: 0,
       awayManaging: 2,
-      awayManagingNames: ["Amy Diaz", "Lee Wong"],
       managementOnly: 1,
       awayNotBilled: 2,
       archived: 2,
       total: 5,
+    });
+  });
+
+  it("counts suspended staff apart from active staff, and still bills them", () => {
+    const breakdown = breakdownBillableSeats(
+      [
+        {
+          status: "active",
+          archived_at: null,
+          user_id: "u-1",
+        },
+        {
+          status: "active",
+          archived_at: null,
+          suspended_at: "2026-10-26T00:00:00Z",
+          user_id: "u-2",
+        },
+      ],
+      [],
+    );
+    expect(breakdown).toMatchObject({
+      activeStaff: 1,
+      suspended: 1,
+      total: 2,
     });
   });
 
@@ -131,7 +151,6 @@ describe("breakdownBillableSeats", () => {
     const internal = new Set(["u-lee", "u-away", "u-gone", "m-1"]);
     expect(breakdownBillableSeats(employees, memberships, internal)).toMatchObject({
       awayManaging: 1,
-      awayManagingNames: ["Amy Diaz"],
       managementOnly: 0,
       awayNotBilled: 1,
       archived: 1,
@@ -145,63 +164,77 @@ describe("breakdownBillableSeats", () => {
       [{ user_id: "u-x", org_role: "admin" }],
     );
     expect(result.awayManaging).toBe(1);
-    expect(result.awayManagingNames).toEqual([]);
   });
 });
 
 describe("describeSeatBreakdown", () => {
   const base = {
     activeStaff: 42,
+    suspended: 0,
     awayManaging: 0,
-    awayManagingNames: [],
     managementOnly: 0,
     awayNotBilled: 0,
     archived: 0,
     total: 42,
   };
 
+  const ACTIVE = {
+    key: "active",
+    label: "Active staff",
+    count: 42,
+    detail: "Everyone on staff with an Active status, whether or not they have an account.",
+  };
+
   it("always lists active staff and leaves empty lines out", () => {
-    expect(describeSeatBreakdown(base)).toEqual({
-      billed: [{ key: "active", label: "Active staff", count: 42 }],
-      notBilled: [],
-    });
+    expect(describeSeatBreakdown(base)).toEqual({ billed: [ACTIVE], notBilled: [] });
   });
 
-  it("names the Away people who take a seat and says why", () => {
-    const { billed } = describeSeatBreakdown({
-      ...base,
-      awayManaging: 1,
-      awayManagingNames: ["Lee Wong"],
-      total: 43,
-    });
+  it("counts the Away people who take a seat and says why, without names", () => {
+    const { billed } = describeSeatBreakdown({ ...base, awayManaging: 1, total: 43 });
     expect(billed[1]).toEqual({
       key: "away-managing",
-      label: "Away, can manage",
+      label: "Away staff who can manage",
       count: 1,
-      detail: "Lee Wong. Away people take a seat only while they keep management access.",
+      detail: "People who are away keep their seat while they still have management access.",
     });
   });
 
-  it("joins two or three names with and, and shortens a longer list", () => {
-    const detail = (names: string[]) =>
-      describeSeatBreakdown({ ...base, awayManaging: names.length, awayManagingNames: names })
-        .billed[1].detail;
-    expect(detail(["A B", "C D"])).toMatch(/^A B and C D\. /);
-    expect(detail(["A B", "C D", "E F"])).toMatch(/^A B, C D and E F\. /);
-    expect(detail(["A B", "C D", "E F", "G H"])).toMatch(/^A B, C D and 2 others\. /);
+  it("shows suspended people as their own billed group after active staff, without names", () => {
+    const { billed } = describeSeatBreakdown({ ...base, suspended: 1, total: 43 });
+    expect(billed[1]).toEqual({
+      key: "suspended",
+      label: "Suspended staff",
+      count: 1,
+      detail: "People who are suspended keep their seat, even though they can't sign in.",
+    });
   });
 
-  it("lists managers without a staff record, then Away and Archived as not billed", () => {
+  it("lists managers without a staff record, then Away and Offboarded as not billed", () => {
     expect(
       describeSeatBreakdown({ ...base, managementOnly: 2, awayNotBilled: 2, archived: 12 }),
     ).toEqual({
       billed: [
-        { key: "active", label: "Active staff", count: 42 },
-        { key: "management-only", label: "Managers without a staff record", count: 2 },
+        ACTIVE,
+        {
+          key: "management-only",
+          label: "Managers without a staff record",
+          count: 2,
+          detail: "People who can sign in to manage the organization but aren't on the schedule.",
+        },
       ],
       notBilled: [
-        { key: "away", label: "Away", count: 2 },
-        { key: "archived", label: "Archived", count: 12 },
+        {
+          key: "away",
+          label: "Away staff who can't manage",
+          count: 2,
+          detail: "They don't take a seat until they're back.",
+        },
+        {
+          key: "archived",
+          label: "Offboarded staff",
+          count: 12,
+          detail: "People who have been offboarded never take a seat.",
+        },
       ],
     });
   });

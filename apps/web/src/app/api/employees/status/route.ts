@@ -21,17 +21,27 @@ import {
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
   canMarkInactive,
   isAwayAbsenceRefusal,
+  isValidPlannedStart,
   isValidReturnDate,
+  NO_PLANNED_CHANGE_CODE,
+  NO_PLANNED_CHANGE_MESSAGE,
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_CODE,
   NOT_ON_SCHEDULE_MESSAGE,
+  NOT_PLANNABLE_CODE,
+  NOT_PLANNABLE_MESSAGE,
   NOT_SUSPENDABLE_CODE,
   NOT_SUSPENDABLE_MESSAGE,
+  NO_ACCOUNT_CODE,
+  NO_ACCOUNT_MESSAGE,
   NOT_SUSPENDED_CODE,
   NOT_SUSPENDED_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
+  PLANNED_RETURN_INVALID_MESSAGE,
+  PLANNED_START_INVALID_CODE,
+  PLANNED_START_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
@@ -44,7 +54,16 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
-  action: z.enum(["deactivate", "activate", "remove", "setReturnDate", "suspend", "reinstate"]),
+  action: z.enum([
+    "deactivate",
+    "activate",
+    "remove",
+    "setReturnDate",
+    "suspend",
+    "reinstate",
+    "setPlannedChange",
+    "cancelPlannedChange",
+  ]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
   /** Mark away: an optional first day back. setReturnDate: the new one, or null to clear it. */
@@ -54,6 +73,11 @@ const bodySchema = z.object({
    * null for none. Left out of setReturnDate, the current one stays.
    */
   absenceTypeId: z.number().int().positive().nullable().optional(),
+  /**
+   * Mark away and setPlannedChange: the first day away. A day after today
+   * plans the Away (51g1) instead of starting it; today or left out starts it.
+   */
+  startDate: z.string().date().nullable().optional(),
 });
 
 async function fetchOrgToday(serviceClient: SupabaseClient, orgId: string): Promise<string> {
@@ -125,6 +149,7 @@ export async function POST(req: NextRequest) {
   const { empId, action, expectedVersion, note } = parsed.data;
   const returnDate = parsed.data.returnDate ?? null;
   const absenceTypeId = parsed.data.absenceTypeId;
+  const startDate = parsed.data.startDate ?? null;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -158,7 +183,13 @@ export async function POST(req: NextRequest) {
 
     // Taking a staff record out of the organization is an access removal, so a
     // Gridmaster needs fresh proof for it; reactivating does not (F-96).
-    if (isGridmaster && (action === "deactivate" || action === "remove" || action === "suspend")) {
+    if (
+      isGridmaster &&
+      (action === "deactivate" ||
+        action === "remove" ||
+        action === "suspend" ||
+        action === "setPlannedChange")
+    ) {
       const assurance = await requireSensitiveActionAuth(req);
       if ("response" in assurance) return assurance.response;
     }
@@ -187,7 +218,17 @@ export async function POST(req: NextRequest) {
       return buildConflictResponse(currentEmployee);
     }
 
-    if (action === "deactivate" && !canMarkInactive(currentEmployee.focusAreaIds)) {
+    // A start date after today plans the Away rather than starting it (51g1).
+    let today: string | null = null;
+    const orgToday = async () => (today ??= await fetchOrgToday(serviceClient, orgId));
+    const planning =
+      action === "setPlannedChange" ||
+      (action === "deactivate" && startDate !== null && startDate !== (await orgToday()));
+
+    if (
+      (action === "deactivate" || action === "setPlannedChange") &&
+      !canMarkInactive(currentEmployee.focusAreaIds)
+    ) {
       return NextResponse.json(
         { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
         { status: 400 },
@@ -202,6 +243,13 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: NOT_SUSPENDABLE_MESSAGE, code: NOT_SUSPENDABLE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (action === "suspend" && !currentEmployee.userId) {
+      return NextResponse.json(
+        { error: NO_ACCOUNT_MESSAGE, code: NO_ACCOUNT_CODE },
         { status: 400 },
       );
     }
@@ -221,9 +269,45 @@ export async function POST(req: NextRequest) {
     }
 
     if (
+      planning &&
+      (currentEmployee.status !== "active" ||
+        currentEmployee.archivedAt ||
+        currentEmployee.suspendedAt)
+    ) {
+      return NextResponse.json(
+        { error: NOT_PLANNABLE_MESSAGE, code: NOT_PLANNABLE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (
+      (action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      !currentEmployee.plannedStatus
+    ) {
+      return NextResponse.json(
+        { error: NO_PLANNED_CHANGE_MESSAGE, code: NO_PLANNED_CHANGE_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (planning && (startDate === null || !isValidPlannedStart(startDate, await orgToday()))) {
+      return NextResponse.json(
+        { error: PLANNED_START_INVALID_MESSAGE, code: PLANNED_START_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (planning && returnDate !== null && startDate !== null && returnDate <= startDate) {
+      return NextResponse.json(
+        { error: PLANNED_RETURN_INVALID_MESSAGE, code: RETURN_DATE_INVALID_CODE },
+        { status: 400 },
+      );
+    }
+
+    if (
       returnDate !== null &&
       (action === "deactivate" || action === "setReturnDate") &&
-      !isValidReturnDate(returnDate, await fetchOrgToday(serviceClient, orgId))
+      !isValidReturnDate(returnDate, await orgToday())
     ) {
       return NextResponse.json(
         { error: RETURN_DATE_INVALID_MESSAGE, code: RETURN_DATE_INVALID_CODE },
@@ -233,7 +317,7 @@ export async function POST(req: NextRequest) {
 
     if (
       absenceTypeId != null &&
-      (action === "deactivate" || action === "setReturnDate") &&
+      (action === "deactivate" || action === "setReturnDate" || action === "setPlannedChange") &&
       returnDate === null
     ) {
       return NextResponse.json(
@@ -285,14 +369,45 @@ export async function POST(req: NextRequest) {
       updated_by: user.id,
       version: expectedVersion + 1,
     };
-    if (action !== "setReturnDate") update.status_changed_at = now;
+    if (!planning && action !== "setReturnDate" && action !== "cancelPlannedChange") {
+      update.status_changed_at = now;
+    }
 
     let auditAction = "employee.updated";
     let auditDetails: Record<string, unknown> = {
       fromStatus: currentEmployee.status,
     };
 
-    switch (action) {
+    switch (planning ? "plan" : action) {
+      case "plan":
+        update.planned_status = "away";
+        update.planned_from = startDate;
+        update.planned_until = returnDate;
+        update.planned_absence_type_id = returnDate ? (absenceTypeId ?? null) : null;
+        if (action === "deactivate" || note !== undefined) update.planned_note = note ?? "";
+        update.planned_by = user.id;
+        auditAction =
+          action === "deactivate" ? "employee.away_planned" : "employee.away_plan_changed";
+        auditDetails = {
+          ...(action === "setPlannedChange"
+            ? {
+                fromPlannedFrom: currentEmployee.plannedFrom ?? null,
+                fromPlannedUntil: currentEmployee.plannedUntil ?? null,
+              }
+            : {}),
+          plannedFrom: startDate,
+          plannedUntil: returnDate,
+          ...(absenceTypeId ? { plannedAbsenceTypeId: absenceTypeId } : {}),
+        };
+        break;
+      case "cancelPlannedChange":
+        update.planned_status = null;
+        auditAction = "employee.away_plan_cancelled";
+        auditDetails = {
+          plannedFrom: currentEmployee.plannedFrom ?? null,
+          plannedUntil: currentEmployee.plannedUntil ?? null,
+        };
+        break;
       case "deactivate":
         update.status = "inactive";
         update.status_note = note ?? "";
@@ -486,11 +601,13 @@ export async function POST(req: NextRequest) {
       details: {
         ...auditDetails,
         changedFields: [
-          action === "setReturnDate"
-            ? "away_until"
-            : action === "suspend" || action === "reinstate"
-              ? "suspended_at"
-              : "status",
+          planning || action === "cancelPlannedChange"
+            ? "planned_status"
+            : action === "setReturnDate"
+              ? "away_until"
+              : action === "suspend" || action === "reinstate"
+                ? "suspended_at"
+                : "status",
         ],
       },
       ip_address: getRequestIp(req),

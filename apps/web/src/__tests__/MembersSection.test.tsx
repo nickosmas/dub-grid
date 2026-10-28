@@ -140,6 +140,13 @@ let lastStaffDetailPanelProps: {
   orgRole?: OrganizationRole | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
   onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+  onDeactivate?: (
+    empId: string,
+    note?: string,
+    returnDate?: string | null,
+    absenceTypeId?: number | null,
+    startDate?: string | null,
+  ) => unknown;
 } | null = null;
 
 vi.mock("@/components/staff/ManagementStaffPanel", () => ({
@@ -179,6 +186,13 @@ vi.mock("@/components/staff/StaffDetailPanel", () => ({
     orgRole?: OrganizationRole | null;
     onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
     onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
+    onDeactivate?: (
+      empId: string,
+      note?: string,
+      returnDate?: string | null,
+      absenceTypeId?: number | null,
+      startDate?: string | null,
+    ) => unknown;
   }) => {
     lastStaffDetailPanelProps = props;
     return <div data-testid="staff-detail-panel" />;
@@ -433,6 +447,31 @@ describe("MembersSection — management-only view access", () => {
     expect(screen.getByRole("dialog", { name: "Add to management" })).toBeInTheDocument();
     expect(screen.getByTestId("employee-management-access-editor")).toBeInTheDocument();
     expect(lastStaffDetailPanelProps).not.toHaveProperty("managementAccessEditor");
+  });
+
+  it("hands the panel's Schedule away on with its start date, so it plans rather than starts", async () => {
+    const user = userEvent.setup();
+    const onDeactivate = vi.fn();
+    renderMembersSection({
+      canManageEmployees: true,
+      employees: [makeEmployee({ id: "emp-1" })],
+      onDeactivate,
+    });
+
+    const row = screen.getByText("Pat Doe").closest("tr");
+    if (!row) throw new Error("Expected to find the employee row");
+    await user.click(row);
+    await act(async () => {
+      await lastStaffDetailPanelProps?.onDeactivate?.(
+        "emp-1",
+        undefined,
+        "2027-01-04",
+        134,
+        "2026-11-10",
+      );
+    });
+
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, "2027-01-04", 134, "2026-11-10");
   });
 
   it("keeps a management-only member (not on the schedule) on ManagementStaffPanel", async () => {
@@ -1228,6 +1267,32 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
     await screen.findByText(/^Mark \d+ people away\?$/);
     return { user, view };
   }
+
+  it("names a lone pick's planned away and leaves out sign-in when they have no account", async () => {
+    const user = userEvent.setup();
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: [
+        makeEmployee({
+          id: "emp-1",
+          firstName: "Jamie",
+          lastName: "Rivera",
+          userId: null,
+          plannedStatus: "away",
+          plannedFrom: "2099-01-05",
+        }),
+      ],
+    });
+    await settleInvitations();
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("button", { name: /^Offboard\b(?!d)/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Offboard Jamie Rivera?" });
+    expect(dialog).toHaveTextContent("The away planned from Jan 5 is cancelled.");
+    expect(dialog).not.toHaveTextContent(/sign in/i);
+  });
 
   it("hides the bulk confirmation while the step-up prompt is open", async () => {
     const { view } = await openBulkDeactivate({});

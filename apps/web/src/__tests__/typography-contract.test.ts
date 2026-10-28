@@ -181,7 +181,7 @@ const documentedUppercaseStyleCounts = {
   "components/MobileDayView.tsx": 2,
   "components/PillTimeEditor.tsx": 2,
   "components/ScheduleOperationModal.tsx": 1,
-  "components/ShiftEditPanel.tsx": 2,
+  "components/ShiftEditPanel.tsx": 1,
   "components/dashboard/UserDashboard.tsx": 3,
   "components/dashboard/expanded/ExpandedCoverage.tsx": 1,
   "components/gridmaster/AllUsersView.tsx": 2,
@@ -208,7 +208,7 @@ const documentedOpacityTextCounts = {
   "components/dashboard/MyScheduleRow.tsx": 1,
   "components/settings/DisplayMode.tsx": 1,
   "components/settings/Jobs.tsx": 1,
-  "components/staff/RecurringScheduleSection.tsx": 2,
+  "components/staff/RecurringScheduleSection.tsx": 1,
 };
 
 const globalsCss =
@@ -557,8 +557,8 @@ describe("productive typography contract", () => {
       "components/dashboard/CoverageBySectionCard.tsx",
       "components/activity/ActivityLogParts.tsx",
       "components/profile/SessionList.tsx",
-      "components/settings/BillingSettings.tsx",
       "components/settings/Coverage.tsx",
+      "components/settings/billing/BillingSeatsCard.tsx",
       "components/settings/Jobs.tsx",
       "components/staff/FilterPanelShell.tsx",
       "components/staff/ManagementStaffPanel.tsx",

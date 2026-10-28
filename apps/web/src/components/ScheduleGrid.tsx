@@ -20,14 +20,15 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, Lock, UserPen, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { formatReturnDate, SUSPENDED_SCHEDULE_NOTE } from "@dubgrid/domain";
+import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
+import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { isNewShiftChange, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
@@ -139,7 +140,7 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
-import { awayLockedHint, awayReturnDate, buildRowAwayDays } from "./schedule-grid/awayRuns";
+import { awayLockedHint, awayRangeOf, buildRowAwayDays } from "./schedule-grid/awayRuns";
 import {
   initialGridMount,
   nextGridMount,
@@ -431,6 +432,8 @@ interface ActiveOutlineRect {
   height: number;
 }
 
+/** Away days already draw as a bar in the row, so the row header marks only a suspension. */
+const GRID_STATUS_MARKS: readonly StatusMarkKind[] = ["suspended"];
 const ActiveCellContext = React.createContext<GridCellId | null>(null);
 
 /**
@@ -2118,19 +2121,21 @@ const SectionBlock = memo(function SectionBlock({
               // shift, or a pill whose notes' row sits below a second line) makes
               // the row as tall as its fullest cell needs. Read once here; the
               // cells below reuse them by index.
-              // Someone away until a date (51e) has an Away bar on those days
-              // from today on, and nothing else there.
-              const rowAwayUntil = awayReturnDate(emp);
+              // Someone away until a date (51e), or with an Away planned (51g1),
+              // has an Away bar on those days from today on, and nothing else there.
+              const rowAwayRange = awayRangeOf(emp);
               const rowAwayDays = buildRowAwayDays(
-                rowAwayUntil,
+                rowAwayRange,
                 weekDates.map((date) => formatDateKey(date)),
                 todayKey,
                 splitAtIndex,
               );
-              const rowAwayHint = rowAwayUntil ? awayLockedHint(rowAwayUntil) : undefined;
+              const rowAwayHint = rowAwayRange ? awayLockedHint(rowAwayRange) : undefined;
+              const rowAwayAbsenceTypeId =
+                rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
               const rowAwayAbsence =
-                emp.awayAbsenceTypeId != null
-                  ? (absenceTypeMap?.get(emp.awayAbsenceTypeId) ?? null)
+                rowAwayAbsenceTypeId != null
+                  ? (absenceTypeMap?.get(rowAwayAbsenceTypeId) ?? null)
                   : null;
               const rowShiftLabels = weekDates.map((date, index) =>
                 rowAwayDays?.runs[index] ? null : shiftForKey(emp.id, date),
@@ -2283,21 +2288,7 @@ const SectionBlock = memo(function SectionBlock({
                             {getEmployeeDisplayName(emp)}
                           </span>
                         </MaybeHint>
-                        {emp.suspendedAt ? (
-                          <MaybeHint content={SUSPENDED_SCHEDULE_NOTE} side="top">
-                            <span
-                              role="img"
-                              aria-label={SUSPENDED_SCHEDULE_NOTE}
-                              style={{
-                                display: "inline-flex",
-                                flexShrink: 0,
-                                color: "var(--dg-color-danger-text)",
-                              }}
-                            >
-                              <Lock aria-hidden="true" size={12} strokeWidth={2.4} />
-                            </span>
-                          </MaybeHint>
-                        ) : null}
+                        <StatusMarkIcon person={emp} size={12} only={GRID_STATUS_MARKS} />
                       </div>
                       {emp.roleIds.length > 0 && (
                         <EmployeeDetailHoverCard

@@ -1,5 +1,5 @@
 "use client";
-import { describeEmploymentStatus } from "@dubgrid/domain";
+import { describeEmploymentStatus, describePlannedChange } from "@dubgrid/domain";
 import { ChevronRight } from "lucide-react";
 
 import { useId, type CSSProperties, type ReactNode } from "react";
@@ -19,6 +19,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { MaybeHint } from "@/components/ui/hint";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
@@ -176,6 +177,7 @@ function StaffRowCells({
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
   const statusLabel = describeEmploymentStatus(emp.status, emp.awayUntil, emp.suspendedAt);
+  const plannedLabel = emp.status === "active" ? describePlannedChange(emp) : null;
   const joinedLabel = emp.joinedAt
     ? new Date(emp.joinedAt).toLocaleDateString(undefined, {
         year: "numeric",
@@ -268,6 +270,7 @@ function StaffRowCells({
                   {displayName}
                 </span>
               )}
+              {canViewEmployeeDetails ? <StatusMarkIcon person={emp} /> : null}
               <AccessInsignia orgRole={orgRole} />
               {isYou && (
                 <span className="shrink-0 rounded-full bg-[var(--dg-color-control-active-bg)] px-1.5 py-px text-[length:var(--dg-type-badge-size)] font-medium text-[var(--dg-color-control-active-text)]">
@@ -280,6 +283,11 @@ function StaffRowCells({
                 {emp.email || emp.phone}
               </div>
             )}
+            {canViewEmployeeDetails && plannedLabel ? (
+              <div className="dg-tabular-nums mt-0.5 truncate text-[12px] text-[var(--dg-color-text-muted)]">
+                {plannedLabel}
+              </div>
+            ) : null}
           </div>
         </div>
       </StaffCell>

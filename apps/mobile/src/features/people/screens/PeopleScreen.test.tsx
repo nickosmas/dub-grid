@@ -791,7 +791,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
     expect(screen.queryByText("Owen Lee")).not.toBeInTheDocument();
     expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^(Away|Archived)$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^(Away|Offboarded)$/)).not.toBeInTheDocument();
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
   });
@@ -1149,7 +1149,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
-  it("filters the staff directory by Active, Away or Archived", () => {
+  it("filters the staff directory by Active, Away or Offboarded", () => {
     useQuery.mockReturnValue({
       data: {
         people: [
@@ -1175,7 +1175,7 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Archived"));
+    fireEvent.click(screen.getByText("Offboarded"));
     expect(screen.getByText("Owen Lee")).toBeInTheDocument();
     expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
   });

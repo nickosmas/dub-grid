@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:1e7820cef4811c0257dab2c2e8e98e7670f8804c5b13d3720ba397c9bf3135c0",
+  "sourceDigest": "sha256:b0a93a6b5d3e9eeb7d36ac6f0c8762a96ec631de8531630bffdc9d036107caba",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4814,6 +4814,16 @@
       "sha256": "7920069a3fbb9a67e84f80d55a4f71dea5d87e8bfe1a842b2fa18f076549af9c",
       "source": {
         "path": "supabase/migrations/102_suspension_closes_requests.sql"
+      }
+    },
+    {
+      "id": "migration:103_planned_status_change.sql",
+      "version": "103",
+      "name": "planned_status_change",
+      "file": "103_planned_status_change.sql",
+      "sha256": "65534b7564855561d9cb002aa125b354c50eababb271f55c9a58a67adcbadc53",
+      "source": {
+        "path": "supabase/migrations/103_planned_status_change.sql"
       }
     }
   ],

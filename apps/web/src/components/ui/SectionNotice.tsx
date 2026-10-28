@@ -1,15 +1,8 @@
 "use client";
 
-import { DangerIconSolid } from "@/components/icons/NavIcons";
+import { Banner } from "@/components/ui/Banner";
 
-const BANNER_TONE_CLASSES = {
-  danger:
-    "border-[var(--dg-color-danger-border)] bg-[var(--dg-color-danger-bg)] text-[var(--dg-color-danger-text)]",
-  warning:
-    "border-[var(--dg-color-warning-border)] bg-[var(--dg-color-warning-bg)] text-[var(--dg-color-warning-text)]",
-} as const;
-
-type SectionNoticeTone = keyof typeof BANNER_TONE_CLASSES;
+type SectionNoticeTone = "danger" | "warning";
 
 /**
  * What saving this section would do: access removed, an invitation revoked, a
@@ -43,20 +36,10 @@ export function SectionNotice({
   if (messages.length === 0) return null;
 
   return (
-    <div
-      role="note"
-      className={`flex items-center gap-2.5 rounded-[var(--dg-radius-md)] border px-4 py-3 text-[13px] font-medium leading-[1.45] ${BANNER_TONE_CLASSES[tone]}`}
-    >
-      {/* Inherits the tone's text colour through currentColor, so the glyph
-          never has to be told which tone it is in. */}
-      <span className="shrink-0">
-        <DangerIconSolid />
-      </span>
-      <div className="flex flex-col gap-1">
-        {messages.map((message) => (
-          <span key={message}>{message}</span>
-        ))}
-      </div>
-    </div>
+    <Banner tone={tone}>
+      {messages.map((message) => (
+        <span key={message}>{message}</span>
+      ))}
+    </Banner>
   );
 }

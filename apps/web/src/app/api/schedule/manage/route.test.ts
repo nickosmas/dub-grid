@@ -1284,6 +1284,47 @@ describe("POST /api/schedule/manage", () => {
       ]);
     });
 
+    it("fills someone with an Away planned only before its start (51g1)", async () => {
+      const plannedEmpId = "66666666-6666-4666-8666-666666666666";
+      mockTables(
+        [],
+        [
+          {
+            ...recurringShiftRow(),
+            id: "rec-planned",
+            emp_id: plannedEmpId,
+            employee: {
+              status: "active",
+              archived_at: null,
+              away_until: null,
+              planned_status: "away",
+              planned_from: "2026-08-05",
+              planned_until: null,
+            },
+          },
+        ],
+      );
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: "2026-08-10",
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(
+        body.generated.map((fill: { empId: string; date: string }) => [fill.empId, fill.date]),
+      ).toEqual([
+        [empId, dateKey],
+        [plannedEmpId, dateKey],
+        [empId, "2026-08-10"],
+      ]);
+    });
+
     it("fills a genuinely empty cell from the recurring template", async () => {
       mockTables([]);
 

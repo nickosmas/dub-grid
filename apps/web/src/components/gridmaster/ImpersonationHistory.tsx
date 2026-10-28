@@ -17,6 +17,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { Banner } from "@/components/ui/Banner";
 
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -149,19 +150,9 @@ export default function ImpersonationHistory() {
       </p>
 
       {error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: "var(--dg-color-danger-bg)",
-            color: "var(--dg-color-danger)",
-            borderRadius: "var(--dg-radius-lg)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 600,
-            marginBottom: 16,
-          }}
-        >
+        <Banner tone="danger" className="mb-4">
           {error}
-        </div>
+        </Banner>
       )}
 
       {historyQuery.isLoading ? (

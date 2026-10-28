@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Banner } from "@/components/ui/Banner";
 
 export const revalidate = 86400; // 24 hours
 
@@ -270,32 +271,12 @@ export default function PrivacyPolicyPage() {
             secure; if we become aware of a security incident affecting your personal information,
             we will notify affected users and authorities as required by applicable law.
           </p>
-          <div
-            style={{
-              marginTop: "16px",
-              padding: "16px",
-              background: "var(--dg-color-warning-bg)",
-              borderLeft: "4px solid var(--dg-color-warning)",
-              borderRadius: "var(--dg-radius-xs)",
-            }}
+          <Banner
+            tone="warning"
+            title="PROHIBITION OF PROTECTED HEALTH INFORMATION (PHI)"
+            className="mt-4"
           >
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                fontWeight: 600,
-                color: "var(--dg-color-warning-text)",
-                marginBottom: "8px",
-              }}
-            >
-              PROHIBITION OF PROTECTED HEALTH INFORMATION (PHI)
-            </p>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                lineHeight: 1.5,
-                color: "var(--dg-color-warning-text)",
-              }}
-            >
+            <span>
               DubGrid is designed for operational staff scheduling and is <strong>not</strong> a
               HIPAA-compliant platform. The Service is not intended for the storage, transmission,
               or processing of Protected Health Information (PHI) as defined under the Health
@@ -304,8 +285,8 @@ export default function PrivacyPolicyPage() {
               health data into employee records, schedules, or free-form notes fields. Notes must be
               limited to operational scheduling coordination (for example, &quot;day shift needs
               coverage in Wing A&quot;).
-            </p>
-          </div>
+            </span>
+          </Banner>
         </section>
 
         <section style={{ marginBottom: "32px" }}>

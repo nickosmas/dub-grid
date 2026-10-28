@@ -354,6 +354,36 @@
   --dg-color-info-bg: #eff6ff;
   --dg-color-info-text: #1d4ed8;
   --dg-color-info-border: #bfdbfe;
+  /* Banners and notices (components/ui/Banner.tsx): a saturated fill, a
+     deeper border of the same hue, and dark text and icon of that hue. Text
+     clears 7:1 on every fill. */
+  --dg-color-banner-warning-bg: #fadba0;
+  --dg-color-banner-warning-border: #e9bc69;
+  --dg-color-banner-warning-text: #5a3a0c;
+  --dg-color-banner-danger-bg: #f9cfcb;
+  --dg-color-banner-danger-border: #eba59e;
+  --dg-color-banner-danger-text: #6a1c16;
+  --dg-color-banner-info-bg: #cde0fa;
+  --dg-color-banner-info-border: #9dc0ee;
+  --dg-color-banner-info-text: #16356a;
+  --dg-color-banner-success-bg: #cbead3;
+  --dg-color-banner-success-border: #93cca0;
+  --dg-color-banner-success-text: #16452b;
+  /* The sticky bars across the top of the page (Banner layout="bar") are
+     solid so they call for attention, and stay the same in dark mode. White
+     clears 4.8:1 on each fill; amber carries dark text at 7:1. */
+  --dg-color-banner-info-vivid-bg: #2563eb;
+  --dg-color-banner-info-vivid-border: #1d4ed8;
+  --dg-color-banner-info-vivid-text: #ffffff;
+  --dg-color-banner-success-vivid-bg: #15803d;
+  --dg-color-banner-success-vivid-border: #166534;
+  --dg-color-banner-success-vivid-text: #ffffff;
+  --dg-color-banner-warning-vivid-bg: #f59e0b;
+  --dg-color-banner-warning-vivid-border: #d97706;
+  --dg-color-banner-warning-vivid-text: #3b2100;
+  --dg-color-banner-danger-vivid-bg: #dc2626;
+  --dg-color-banner-danger-vivid-border: #b91c1c;
+  --dg-color-banner-danger-vivid-text: #ffffff;
   --dg-color-today-bg: #eff6ff;
   --dg-color-today-text: #1d4ed8;
   --dg-color-today-border: #93c5fd;
@@ -482,6 +512,20 @@
   --dg-color-info-bg: #152238;
   --dg-color-info-text: #93c5fd;
   --dg-color-info-border: #1e3a5f;
+  /* The same banners inverted: a deep fill of the hue, a lighter border, and
+     pale text of the hue, all over zinc surfaces. */
+  --dg-color-banner-warning-bg: #4a3412;
+  --dg-color-banner-warning-border: #6e4f1c;
+  --dg-color-banner-warning-text: #fbd99b;
+  --dg-color-banner-danger-bg: #4c1d1a;
+  --dg-color-banner-danger-border: #763029;
+  --dg-color-banner-danger-text: #fdcbc5;
+  --dg-color-banner-info-bg: #172d50;
+  --dg-color-banner-info-border: #284b7c;
+  --dg-color-banner-info-text: #c7dcfb;
+  --dg-color-banner-success-bg: #163b25;
+  --dg-color-banner-success-border: #245e3a;
+  --dg-color-banner-success-text: #bfe9cc;
   --dg-color-today-bg: #152238;
   --dg-color-today-text: #93c5fd;
   --dg-color-today-border: #2c5282;

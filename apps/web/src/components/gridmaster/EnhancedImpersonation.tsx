@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { VenetianMask } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchOrganizationUsers } from "@/features/organization/client";
@@ -25,6 +26,7 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { Banner } from "@/components/ui/Banner";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -240,63 +242,34 @@ export default function EnhancedImpersonation({
 
       {/* Active session */}
       {sessionId && (
-        <div
-          style={{
-            background: "var(--dg-color-info-bg)",
-            border: "1px solid var(--dg-color-info)",
-            borderRadius: "var(--dg-radius-lg)",
-            padding: "14px 20px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
+        <Banner
+          tone="info"
+          icon={VenetianMask}
+          title="Active Session"
+          className="mb-5"
+          action={
+            <Button
+              className="dg-btn dg-btn-danger"
+              onClick={() => setEndConfirm(true)}
+              disabled={loading}
+              style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
+            >
+              <ButtonLoading loading={loading} spinnerSize={14}>
+                End Session
+              </ButtonLoading>
+            </Button>
+          }
         >
-          <div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                color: "var(--dg-color-info)",
-              }}
-            >
-              Active Session
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 4,
-              }}
-            >
-              Impersonating <strong>{selectedUser?.email}</strong>
-              {selectedOrg && ` in ${selectedOrg.name}`}
-            </div>
-            {countdown && (
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-card-title)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-info)",
-                  marginTop: 6,
-                  fontFamily: "var(--font-dm-mono), monospace",
-                }}
-              >
-                {countdown}
-              </div>
-            )}
-          </div>
-          <Button
-            className="dg-btn dg-btn-danger"
-            onClick={() => setEndConfirm(true)}
-            disabled={loading}
-            style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
-          >
-            <ButtonLoading loading={loading} spinnerSize={14}>
-              End Session
-            </ButtonLoading>
-          </Button>
-        </div>
+          <span>
+            Impersonating <strong>{selectedUser?.email}</strong>
+            {selectedOrg && ` in ${selectedOrg.name}`}
+          </span>
+          {countdown && (
+            <span className="text-[length:var(--dg-fs-card-title)] font-bold [font-family:var(--font-dm-mono),monospace]">
+              {countdown}
+            </span>
+          )}
+        </Banner>
       )}
 
       {/* Organization selector (hidden when pre-selected from org detail) */}

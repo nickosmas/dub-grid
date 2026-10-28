@@ -1,9 +1,9 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { usePermissions, setUserViewActive } from "@/hooks";
 import { Button } from "@/components/Button";
-
-const BANNER_HEIGHT = 36;
+import { Banner } from "@/components/ui/Banner";
 
 export default function UserViewBanner() {
   const { isUserViewActive } = usePermissions();
@@ -11,53 +11,20 @@ export default function UserViewBanner() {
   if (!isUserViewActive) return null;
 
   return (
-    <div
-      style={{
-        height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, var(--dg-color-brand-light), var(--dg-color-brand))",
-        color: "var(--dg-color-text-inverse)",
-        padding: "0 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        fontSize: "var(--dg-fs-label, 13px)",
-        fontWeight: 600,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-      }}
-    >
-      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <Banner
+      icon={Eye}
+      layout="bar"
+      tone="info"
+      action={
+        <Button
+          onClick={() => setUserViewActive(false)}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
         >
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        Viewing as regular user
-      </span>
-      <Button
-        onClick={() => setUserViewActive(false)}
-        style={{
-          background: "rgba(255,255,255,0.2)",
-          color: "var(--dg-color-text-inverse)",
-          border: "1px solid rgba(255,255,255,0.4)",
-          borderRadius: "var(--dg-radius-sm)",
-          padding: "3px 10px",
-          fontSize: "var(--dg-fs-caption, 12px)",
-          fontWeight: 700,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
-        Exit
-      </Button>
-    </div>
+          Exit
+        </Button>
+      }
+    >
+      Viewing as regular user
+    </Banner>
   );
 }

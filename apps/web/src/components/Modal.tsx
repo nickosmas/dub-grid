@@ -88,7 +88,18 @@ export default function Modal({
         >
           <Dialog.Popup
             aria-modal={headerSafe ? undefined : true}
-            initialFocus={initialFocus ?? true}
+            initialFocus={
+              initialFocus
+                ? () => {
+                    // Without preventScroll, a button at the end of a long
+                    // dialog's scroll region scrolls it to the bottom on open.
+                    const element = initialFocus.current;
+                    if (!element) return true;
+                    element.focus({ preventScroll: true });
+                    return false;
+                  }
+                : true
+            }
             finalFocus={returnFocus ?? true}
             aria-label={subtitle ? `${title}, ${subtitle}` : title}
             aria-describedby={ariaDescribedby}

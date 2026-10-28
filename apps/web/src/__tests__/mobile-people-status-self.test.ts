@@ -32,6 +32,7 @@ function makeDeps(currentEmployee: Employee) {
     updateEmployeeStatus: vi.fn(),
     updateEmployeeReturnDate: vi.fn(),
     updateEmployeeSuspension: vi.fn(),
+    updateEmployeePlannedChange: vi.fn(),
     endAccess: vi.fn(),
     insertAuditLog: vi.fn(),
     mapEmployeeToMobilePerson: vi.fn((emp: Employee) => ({
