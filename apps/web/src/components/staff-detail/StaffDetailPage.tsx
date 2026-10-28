@@ -30,8 +30,9 @@ import {
   activateEmployee,
   reinstateEmployee,
   suspendEmployee,
-  setEmployeePlannedAway,
-  type PlannedAway,
+  setEmployeePlannedChange,
+  plannedChangeToast,
+  type PlannedChange,
   deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeActivity,
@@ -624,14 +625,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
-  const handleSetPlannedAway = useCallback(
-    async (empId: string, plan: PlannedAway | null, accessToken?: string) => {
+  const handleSetPlannedChange = useCallback(
+    async (empId: string, plan: PlannedChange | null, accessToken?: string) => {
       if (!orgId || !employee) return false;
       try {
         syncEmployeeCaches(
-          await setEmployeePlannedAway(empId, orgId, employee.version, plan, accessToken),
+          await setEmployeePlannedChange(empId, orgId, employee.version, plan, accessToken),
         );
-        toast.success(plan ? "Planned away changed" : "Planned away cancelled");
+        toast.success(plannedChangeToast(plan, employee.plannedStatus));
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -691,24 +692,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const handleRemove = useCallback(
-    async (empId: string, note?: string, accessToken?: string) => {
+    async (empId: string, note?: string, accessToken?: string, lastDay?: string) => {
       if (!orgId || !employee) return false;
       const prevStatus = employee?.status;
-      setEmployee((prev) =>
-        prev
-          ? { ...prev, status: "removed" as const, statusChangedAt: new Date().toISOString() }
-          : prev,
-      );
-      try {
-        const updatedEmployee = await removeEmployee(
-          empId,
-          orgId,
-          employee.version,
-          note,
-          accessToken,
+      // A last day keeps them as they are until the day after it (51g2).
+      if (!lastDay) {
+        setEmployee((prev) =>
+          prev
+            ? { ...prev, status: "removed" as const, statusChangedAt: new Date().toISOString() }
+            : prev,
         );
+      }
+      try {
+        const updatedEmployee = await (lastDay
+          ? removeEmployee(empId, orgId, employee.version, note, accessToken, lastDay)
+          : removeEmployee(empId, orgId, employee.version, note, accessToken));
         syncEmployeeCaches(updatedEmployee);
-        toast.success("Offboarded");
+        toast.success(lastDay ? "Last day set" : "Offboarded");
         return true;
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
@@ -920,11 +920,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
         onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
-        onSetPlannedAway={(empId, plan) =>
-          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        onSetPlannedChange={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }
         absenceTypes={absenceTypes}
-        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        onRemove={(empId, note, lastDay) =>
+          runStatusChange((token) =>
+            lastDay ? handleRemove(empId, note, token, lastDay) : handleRemove(empId, note, token),
+          )
+        }
         stepUpOpen={Boolean(statusStepUp.dialog)}
         variant="card"
         label={label}
@@ -946,11 +950,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         onSetReturnDate={handleSetReturnDate}
         onReinstate={handleReinstate}
         onSuspend={(empId) => runStatusChange((token) => handleSuspend(empId, token))}
-        onSetPlannedAway={(empId, plan) =>
-          runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+        onSetPlannedChange={(empId, plan) =>
+          runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
         }
         absenceTypes={absenceTypes}
-        onRemove={(empId, note) => runStatusChange((token) => handleRemove(empId, note, token))}
+        onRemove={(empId, note, lastDay) =>
+          runStatusChange((token) =>
+            lastDay ? handleRemove(empId, note, token, lastDay) : handleRemove(empId, note, token),
+          )
+        }
         stepUpOpen={Boolean(statusStepUp.dialog)}
       />
     );

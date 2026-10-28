@@ -62,7 +62,7 @@ function PeopleContent() {
     handleReinstateEmployee,
     handleSuspendEmployee,
     handleSetEmployeeReturnDate,
-    handleSetPlannedAway,
+    handleSetPlannedChange,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
@@ -135,8 +135,12 @@ function PeopleContent() {
             roles={orgRoles}
             onSave={handleSaveEmployee}
             onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-            onRemove={(empId, note) =>
-              runStatusChange((token) => handleRemoveEmployee(empId, note, token))
+            onRemove={(empId, note, lastDay) =>
+              runStatusChange((token) =>
+                lastDay
+                  ? handleRemoveEmployee(empId, note, token, lastDay)
+                  : handleRemoveEmployee(empId, note, token),
+              )
             }
             onDeactivate={(empId, note, returnDate, absenceTypeId, startDate) =>
               runStatusChange((token) =>
@@ -157,8 +161,8 @@ function PeopleContent() {
             onActivate={handleActivateEmployee}
             onReinstate={handleReinstateEmployee}
             onSuspend={(empId) => runStatusChange((token) => handleSuspendEmployee(empId, token))}
-            onSetPlannedAway={(empId, plan) =>
-              runStatusChange((token) => handleSetPlannedAway(empId, plan, token))
+            onSetPlannedChange={(empId, plan) =>
+              runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
             }
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}

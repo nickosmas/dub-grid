@@ -3,6 +3,7 @@ import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox"
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
+  plannedLastDay,
   statusChoices,
   type StatusAction,
 } from "@dubgrid/domain";
@@ -157,6 +158,9 @@ const STATUS_REQUEST: Record<StatusAction, StatusMutationAction> = {
   cancelPlannedChange: "cancelPlannedChange",
 };
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
+
+const LAST_DAY_HINT =
+  "They stay Active through this day and are offboarded the day after. Leave it empty to offboard them now.";
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
 const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -314,6 +318,8 @@ export default function PersonDetailScreen() {
   const [returnDate, setReturnDate] = useState<string | null>(null);
   /** The first day away; null means today, and a later day plans it (51g1). */
   const [startDate, setStartDate] = useState<string | null>(null);
+  // A last day (51g2): with Offboard it plans the offboarding for the day after.
+  const [lastDay, setLastDay] = useState<string | null>(null);
   const [cancellingPlan, setCancellingPlan] = useState(false);
   // The absence a return date's away days hold (51f); it goes when the date does.
   const [awayAbsenceTypeId, setAwayAbsenceTypeId] = useState<number | null>(null);
@@ -517,6 +523,9 @@ export default function PersonDetailScreen() {
       returnDate?: string | null;
       absenceTypeId?: number | null;
       startDate?: string | null;
+      lastDay?: string | null;
+      /** The plan the person had, which names the toast for a last day. */
+      fromPlannedStatus: "away" | "removed" | null;
       expectedVersion: number;
       fromReturnDate: string | null;
     }) =>
@@ -527,6 +536,7 @@ export default function PersonDetailScreen() {
         ...(input.returnDate !== undefined ? { returnDate: input.returnDate } : {}),
         ...(input.absenceTypeId !== undefined ? { absenceTypeId: input.absenceTypeId } : {}),
         ...(input.startDate ? { startDate: input.startDate } : {}),
+        ...(input.lastDay ? { lastDay: input.lastDay } : {}),
       }),
     onMutate: () => setConfirmationError(null),
     onError: (error) => {
@@ -542,6 +552,7 @@ export default function PersonDetailScreen() {
       setReturnDate(null);
       setAwayAbsenceTypeId(null);
       setStartDate(null);
+      setLastDay(null);
       setCancellingPlan(false);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
@@ -550,6 +561,8 @@ export default function PersonDetailScreen() {
           returnDate: variables.returnDate ?? null,
           currentReturnDate: variables.fromReturnDate,
           startDate: variables.startDate ?? null,
+          lastDay: variables.lastDay ?? null,
+          plannedStatus: variables.fromPlannedStatus,
         }).done,
         message: "Staff status was updated.",
       });
@@ -685,7 +698,8 @@ export default function PersonDetailScreen() {
             : plannedAway
               ? (person.plannedAbsenceTypeId ?? null)
               : null) ||
-        startDate !== (plannedAway ? (person.plannedFrom ?? null) : null)),
+        startDate !== (plannedAway ? (person.plannedFrom ?? null) : null) ||
+        lastDay !== (person?.status === "active" ? plannedLastDay(person) : null)),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
   });
@@ -947,18 +961,32 @@ export default function PersonDetailScreen() {
   const laterStart = startDate && startDate > orgToday ? startDate : null;
   // Clearing a planned away's start date starts it today instead.
   const startsNow = hasPlan && !cancellingPlan && !startDate && statusOpening.focus !== "status";
+  // A last day planned ahead (51g2) is edited in the sheet like a planned Away.
+  const plannedLeave = person.status === "active" ? plannedLastDay(person) : null;
+  // A plan needs someone Active and not suspended.
+  const canPlanLastDay = person.status === "active" && !person.suspendedAt;
+  const lastDayChanged = !!plannedLeave && !cancellingPlan && !!lastDay && lastDay !== plannedLeave;
+  // Clearing a planned last day offboards them today instead.
+  const offboardsNow =
+    !!plannedLeave && !cancellingPlan && !lastDay && statusOpening.focus !== "status";
 
   function confirmStatusAction(): Promise<void> | undefined {
     if (confirmAction !== "status" || !person) return;
     const choice: StatusAction =
       statusChoice ??
-      (startsNow
-        ? "markAway"
-        : hasPlan
-          ? cancellingPlan
+      (plannedLeave
+        ? offboardsNow
+          ? "archive"
+          : cancellingPlan
             ? "cancelPlannedChange"
             : "setPlannedChange"
-          : "setReturnDate");
+        : startsNow
+          ? "markAway"
+          : hasPlan
+            ? cancellingPlan
+              ? "cancelPlannedChange"
+              : "setPlannedChange"
+            : "setReturnDate");
     const dated =
       choice === "markAway" || choice === "setReturnDate" || choice === "setPlannedChange";
     const input = {
@@ -979,9 +1007,15 @@ export default function PersonDetailScreen() {
       absenceTypeId:
         choice === "setReturnDate" || (dated && returnDate) ? chosenAbsenceTypeId : undefined,
       startDate:
-        choice === "setPlannedChange" || (choice === "markAway" && laterStart)
+        (choice === "setPlannedChange" && !plannedLeave) || (choice === "markAway" && laterStart)
           ? laterStart
           : undefined,
+      lastDay:
+        (choice === "setPlannedChange" && plannedLeave) ||
+        (statusChoice === "archive" && canPlanLastDay)
+          ? lastDay
+          : undefined,
+      fromPlannedStatus: person.plannedStatus ?? null,
     };
     return new Promise<void>((resolve) => {
       statusMutation.mutate(input, { onSettled: () => resolve() });
@@ -1010,6 +1044,7 @@ export default function PersonDetailScreen() {
           : null,
     );
     setStartDate(hasPlan ? (person.plannedFrom ?? null) : null);
+    setLastDay(plannedLeave);
     setCancellingPlan(false);
     setConfirmationError(null);
     setConfirmAction("status");
@@ -1025,6 +1060,7 @@ export default function PersonDetailScreen() {
     setReturnDate(null);
     setAwayAbsenceTypeId(null);
     setStartDate(null);
+    setLastDay(null);
     setCancellingPlan(false);
   }
 
@@ -1107,32 +1143,51 @@ export default function PersonDetailScreen() {
         returnDate: statusChoice === "markAway" ? returnDate : null,
         absenceName: statusChoice === "markAway" ? chosenAbsenceName : null,
         startDate: statusChoice === "markAway" ? laterStart : null,
+        lastDay: statusChoice === "archive" && canPlanLastDay ? lastDay : null,
+        // Any other change replaces the plan, and says so.
         plannedFrom:
-          hasPlan && !(statusChoice === "markAway" && laterStart) ? person.plannedFrom : null,
+          plannedLeave || (hasPlan && !(statusChoice === "markAway" && laterStart))
+            ? person.plannedFrom
+            : null,
+        plannedStatus: person.plannedStatus ?? null,
       })
-    : startsNow
-      ? describeStatusAction("markAway", getFullName(person), {
-          hasAccount: Boolean(person.userId),
-          returnDate,
-          absenceName: chosenAbsenceName,
-        })
-      : cancellingPlan
+    : offboardsNow
+      ? describeStatusAction("archive", getFullName(person), { hasAccount: Boolean(person.userId) })
+      : plannedLeave && cancellingPlan
         ? describeStatusAction("cancelPlannedChange", getFullName(person), {
-            absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
+            plannedStatus: "removed",
           })
-        : planChanged
+        : lastDayChanged
           ? describeStatusAction("setPlannedChange", getFullName(person), {
-              startDate: laterStart,
-              returnDate,
-              absenceName: chosenAbsenceName,
+              plannedStatus: "removed",
+              lastDay,
+              hasAccount: Boolean(person.userId),
             })
-          : awayDetailsChanged
-            ? describeStatusAction("setReturnDate", getFullName(person), {
+          : startsNow
+            ? describeStatusAction("markAway", getFullName(person), {
+                hasAccount: Boolean(person.userId),
                 returnDate,
-                currentReturnDate: person.awayUntil,
                 absenceName: chosenAbsenceName,
               })
-            : null;
+            : cancellingPlan
+              ? describeStatusAction("cancelPlannedChange", getFullName(person), {
+                  absenceName: plannedAbsence
+                    ? (plannedAbsence.name ?? plannedAbsence.label)
+                    : null,
+                })
+              : planChanged
+                ? describeStatusAction("setPlannedChange", getFullName(person), {
+                    startDate: laterStart,
+                    returnDate,
+                    absenceName: chosenAbsenceName,
+                  })
+                : awayDetailsChanged
+                  ? describeStatusAction("setReturnDate", getFullName(person), {
+                      returnDate,
+                      currentReturnDate: person.awayUntil,
+                      absenceName: chosenAbsenceName,
+                    })
+                  : null;
   // A return date is the first day back, so the organization's tomorrow at the
   // earliest, or the day after a planned Away's start.
   const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
@@ -1603,7 +1658,9 @@ export default function PersonDetailScreen() {
               (statusOpening.focus === "plan"
                 ? isAway
                   ? `Change ${getFullName(person)}'s return date?`
-                  : `Change ${getFullName(person)}'s planned away?`
+                  : plannedLeave
+                    ? `Change ${getFullName(person)}'s last day?`
+                    : `Change ${getFullName(person)}'s planned away?`
                 : `Change ${getFullName(person)}'s status?`)
             }
           />
@@ -1625,20 +1682,22 @@ export default function PersonDetailScreen() {
                     !statusChoice &&
                     !awayDetailsChanged &&
                     !planChanged &&
+                    !lastDayChanged &&
                     !cancellingPlan &&
-                    !startsNow
+                    !startsNow &&
+                    !offboardsNow
                   }
                   label={
-                    statusChoice || cancellingPlan || startsNow
+                    statusChoice || cancellingPlan || startsNow || offboardsNow
                       ? (statusCopy?.label ?? "")
-                      : isAway || (hasPlan && statusOpening.focus !== "status")
+                      : isAway || ((hasPlan || plannedLeave) && statusOpening.focus !== "status")
                         ? "Save changes"
                         : "Change status"
                   }
                   loading={statusMutation.isPending}
                   onPress={confirmStatusAction}
                   tone={
-                    statusChoice === "archive"
+                    statusChoice === "archive" || offboardsNow
                       ? "danger"
                       : statusChoice === "markAway" || statusChoice === "suspend" || startsNow
                         ? "warning"
@@ -1668,6 +1727,28 @@ export default function PersonDetailScreen() {
                 value={returnDate}
               />
               {awayAbsenceChoices}
+            </>
+          ) : null}
+          {plannedLeave && !statusChoice && statusOpening.focus !== "status" ? (
+            <>
+              {cancellingPlan ? null : (
+                <ReturnDateField
+                  disabled={statusMutation.isPending}
+                  emptyLabel="Offboard now"
+                  hint="Clear it to offboard them today."
+                  label="Last day"
+                  minDate={orgToday}
+                  onChange={setLastDay}
+                  value={lastDay}
+                />
+              )}
+              <Button
+                compact
+                disabled={statusMutation.isPending}
+                label={cancellingPlan ? "Keep last day" : "Cancel last day"}
+                onPress={() => setCancellingPlan((value) => !value)}
+                tone="plain"
+              />
             </>
           ) : null}
           {hasPlan && !statusChoice && statusOpening.focus !== "status" ? (
@@ -1745,6 +1826,17 @@ export default function PersonDetailScreen() {
             />
             {awayAbsenceChoices}
           </>
+        ) : null}
+        {statusChoice === "archive" && canPlanLastDay ? (
+          <ReturnDateField
+            disabled={statusMutation.isPending}
+            emptyLabel="Offboard now"
+            hint={LAST_DAY_HINT}
+            label="Last day"
+            minDate={orgToday}
+            onChange={setLastDay}
+            value={lastDay}
+          />
         ) : null}
         {statusCopy?.message ? (
           <Text style={styles.statusMessage}>{statusCopy.message}</Text>

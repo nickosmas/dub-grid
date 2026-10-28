@@ -354,7 +354,11 @@ export function availabilityFromShifts(
   assignmentId: number,
 ): CoverageAvailability {
   const away = input.awayRanges?.get(employeeId);
-  if (away && isInAwayRange(away, dateKey)) return { kind: "away", until: away.until };
+  if (away && isInAwayRange(away, dateKey)) {
+    return away.lastDay
+      ? { kind: "leaving", lastDay: away.lastDay }
+      : { kind: "away", until: away.until };
+  }
   const context = { assignments: input.assignments, shiftCategories: input.shiftCategories };
   const stateOn = (key: string) => staffingStateFromEntry(input.shifts[`${employeeId}_${key}`]);
   const state = stateOn(dateKey);

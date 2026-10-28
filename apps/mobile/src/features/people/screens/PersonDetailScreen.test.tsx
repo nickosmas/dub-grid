@@ -1457,6 +1457,91 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("sets a last day through Offboard (51g2)", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      fireEvent.click(screen.getByRole("button", { name: "Last day, none" }));
+      choose(day(3));
+      expect(
+        screen.getByText(
+          `They stay Active through ${formatReturnDate(day(3), { weekday: true })}, their last day.`,
+        ),
+      ).toBeInTheDocument();
+      confirm("Set last day");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "remove",
+        copyAction: "archive",
+        lastDay: day(3),
+      });
+    });
+
+    it("offboards now when no last day is picked", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+      pick(/^Offboarded/);
+      confirm("Offboard");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "remove", lastDay: null });
+    });
+
+    it("moves, cancels and clears a last day from Edit plan", () => {
+      const leaving = { plannedStatus: "removed" as const, plannedFrom: day(5) };
+      const mutate = renderWithStatusMutation(leaving);
+
+      expect(
+        screen.getByText(`Leaving ${formatReturnDate(day(4), { weekday: true })}`),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      expect(screen.getByText("Change Mina Diaz's last day?")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Last day, / }));
+      choose(day(6));
+      confirm("Save changes");
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "setPlannedChange",
+        copyAction: "setPlannedChange",
+        lastDay: day(6),
+        startDate: undefined,
+        fromPlannedStatus: "removed",
+      });
+      cleanup();
+
+      const cancel = renderWithStatusMutation(leaving);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancel last day" }));
+      confirm("Cancel last day");
+      expect(cancel.mock.calls[0]?.[0]).toMatchObject({ action: "cancelPlannedChange" });
+      cleanup();
+
+      const now = renderWithStatusMutation(leaving);
+      fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Last day, / }));
+      fireEvent.click(screen.getByRole("button", { name: "Offboard now" }));
+      expect(screen.getByText("Offboard Mina Diaz?")).toBeInTheDocument();
+      confirm("Offboard");
+      expect(now.mock.calls[0]?.[0]).toMatchObject({ action: "remove", lastDay: undefined });
+    });
+
+    it("leaves Offboard out of the list while a last day is planned", () => {
+      renderWithStatusMutation({ plannedStatus: "removed", plannedFrom: day(5) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change status" }));
+
+      expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
+        [
+          "Away. Keeps sign-in. Not scheduled while away.",
+          "Suspended. Can't sign in. Stays on the schedule.",
+        ],
+      );
+      pick(/^Suspended/);
+      expect(screen.getByLabelText("Changes")).toHaveTextContent(
+        `The last day planned for ${formatReturnDate(day(4))} is cancelled.`,
+      );
+    });
+
     it("never offers today as a return date", () => {
       renderWithStatusMutation();
 

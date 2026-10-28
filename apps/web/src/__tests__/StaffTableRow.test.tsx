@@ -217,6 +217,11 @@ describe("StaffTableRow column gating", () => {
         "Away from Nov 10, back Jan 4",
         "planned",
       ],
+      [
+        { status: "active", plannedStatus: "removed", plannedFrom: "2026-11-09" },
+        "Leaving Nov 8",
+        "planned",
+      ],
       [{ status: "removed" }, "Offboarded", "archived"],
     ] as const) {
       const { getByRole, unmount } = renderRow(true, true, state);

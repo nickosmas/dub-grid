@@ -1,8 +1,16 @@
-import { formatReturnDate, isPlannedAwayOn } from "@dubgrid/domain";
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  formatReturnDate,
+  isPlannedAwayOn,
+  plannedLastDay,
+} from "@dubgrid/domain";
 import { buildAbsenceRuns, type AbsenceRunDay } from "@dubgrid/schedule-core";
 import type { Employee } from "@/types";
 
 export const AWAY_RUN_LABEL = "Away";
+
+/** The bar over the days after a last day (51g2), when they're offboarded. */
+export const LEAVING_RUN_LABEL = EMPLOYMENT_STATUS_LABELS.removed;
 
 /** The away bar's label, naming the absence their days hold (51f) when there is one. */
 export function awayRunLabel(absenceName: string | null): string {
@@ -11,11 +19,13 @@ export function awayRunLabel(absenceName: string | null): string {
 
 /**
  * The days someone is away and can't be scheduled: from `from` (or always,
- * when null) up to the day before `until` (or onward, when null).
+ * when null) up to the day before `until` (or onward, when null). With
+ * `lastDay`, they're the days after someone's last day (51g2) instead.
  */
 export interface AwayRange {
   from: string | null;
   until: string | null;
+  lastDay?: string | null;
 }
 
 export function isInAwayRange(range: AwayRange, dateKey: string): boolean {
@@ -27,6 +37,9 @@ export function isInAwayRange(range: AwayRange, dateKey: string): boolean {
 
 /** Why a locked away day can't be selected, and where to change it. */
 export function awayLockedHint(range: AwayRange): string {
+  if (range.lastDay) {
+    return `Last day ${formatReturnDate(range.lastDay, { weekday: true })}. Change the last day on their record to change these days.`;
+  }
   if (range.from !== null) {
     const from = formatReturnDate(range.from, { weekday: true });
     return range.until
@@ -42,11 +55,16 @@ type RangeFields = AwayFields & Pick<Employee, "plannedStatus" | "plannedFrom" |
 
 /**
  * Someone's away days: until their return date when Away until a date (51e),
- * or from the start of a planned Away (51g1). Null for anyone else.
+ * from the start of a planned Away (51g1), or after a planned last day (51g2).
+ * Null for anyone else.
  */
 export function awayRangeOf(employee: RangeFields): AwayRange | null {
   const until = awayReturnDate(employee);
   if (until) return { from: null, until };
+  const lastDay = plannedLastDay(employee);
+  if (employee.status === "active" && !employee.archivedAt && lastDay) {
+    return { from: employee.plannedFrom ?? null, until: null, lastDay };
+  }
   if (
     employee.status === "active" &&
     !employee.archivedAt &&

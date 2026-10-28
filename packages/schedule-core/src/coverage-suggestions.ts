@@ -214,7 +214,9 @@ export type CoverageAvailability =
   /** The scheduler left the person out of this build. */
   | { kind: "excluded" }
   /** The person is away until `until`, their first day back (YYYY-MM-DD). */
-  | { kind: "away"; until: string | null };
+  | { kind: "away"; until: string | null }
+  /** The day is after the person's last day (YYYY-MM-DD), when they're offboarded. */
+  | { kind: "leaving"; lastDay: string };
 
 /** A person's shift preference: flexible ("prefers") or strict ("only"). */
 export interface CoverageShiftPreference {

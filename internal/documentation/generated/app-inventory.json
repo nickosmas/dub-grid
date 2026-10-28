@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b0a93a6b5d3e9eeb7d36ac6f0c8762a96ec631de8531630bffdc9d036107caba",
+  "sourceDigest": "sha256:b1d9cf9bd5aa2f954ca6568acc2f6a6dec7550cf08cbdf8472bb906b62396376",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4824,6 +4824,16 @@
       "sha256": "65534b7564855561d9cb002aa125b354c50eababb271f55c9a58a67adcbadc53",
       "source": {
         "path": "supabase/migrations/103_planned_status_change.sql"
+      }
+    },
+    {
+      "id": "migration:104_planned_last_day.sql",
+      "version": "104",
+      "name": "planned_last_day",
+      "file": "104_planned_last_day.sql",
+      "sha256": "2ac37eb1506e1e045d5961c8ed39de34d6a1f6765085a1f8f581113b4e1cb5ef",
+      "source": {
+        "path": "supabase/migrations/104_planned_last_day.sql"
       }
     }
   ],

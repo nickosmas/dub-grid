@@ -79,13 +79,24 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     assertions: [
       /\brequireAuthenticatedUser\s*\(/,
       /\bcanManageEmployees\s*\(/,
-      // Removal signs the person out everywhere; marking inactive (Away) doesn't (51a).
-      /if \(action === "remove" && currentEmployee\.userId\) \{\s*try \{\s*await revokeAllUserSessions\(/,
+      // Removal signs the person out everywhere; marking inactive (Away) doesn't
+      // (51a), and nor does setting a last day, until the day after it (51g2).
+      /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,[\s\S]*?endMembership: isGridmaster \|\| isSuperAdmin,/,
       // A Gridmaster taking a staff record out, suspending it or planning it
       // away needs fresh proof before any read or write (F-96, 51c, 51g1).
       /if \(\s*isGridmaster &&\s*\(action === "deactivate" \|\|\s*action === "remove" \|\|\s*action === "suspend" \|\|\s*action === "setPlannedChange"\)\s*\) \{\s*const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.from\("employees"\)/,
       // Suspension signs only the suspended person out (51c).
       /if \(action === "suspend" && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+    ],
+  },
+  // The daily job offboards someone the day after the last day a manager with
+  // the employees permission set (51g2), with that Offboard's follow-up. Only
+  // the cron secret reaches it.
+  "apps/web/src/app/api/cron/return-from-away/route.ts": {
+    policy: "authorized-target-revocation",
+    assertions: [
+      /if \(!bearerMatchesSecret\(req\.headers\.get\("authorization"\), secret\)\)/,
+      /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?endMembership: await canEndMembership\(db, row\.org_id, row\.planned_by\),/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {
@@ -352,7 +363,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
 // and mobile handlers only, so a new helper that makes such a change belongs
 // in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|endOffboardedAccess|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 

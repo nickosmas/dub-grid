@@ -1,6 +1,6 @@
 "use client";
 
-import type { PlannedAway } from "@/features/employees/client";
+import type { PlannedChange } from "@/features/employees/client";
 import {
   EMPLOYMENT_STATUS_LABELS,
   describeEmploymentStatus,
@@ -149,7 +149,7 @@ export interface MembersSectionProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
-  onRemove: (empId: string, note?: string) => void | Promise<boolean>;
+  onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<boolean>;
   onDeactivate: (
     empId: string,
     note?: string,
@@ -172,7 +172,7 @@ export interface MembersSectionProps {
   /** Suspends someone's access (51c). */
   onSuspend?: (empId: string) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
-  onSetPlannedAway?: (empId: string, plan: PlannedAway | null) => void | Promise<unknown>;
+  onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
   canManageEmployees: boolean;
@@ -209,7 +209,7 @@ export function MembersSection({
   onActivate,
   onReinstate,
   onSuspend,
-  onSetPlannedAway,
+  onSetPlannedChange,
   onAdd,
   canViewEmployeeDetails,
   canManageEmployees,
@@ -2226,7 +2226,7 @@ export function MembersSection({
           onActivate={(employeeId) => onActivate(employeeId)}
           onReinstate={onReinstate}
           onSuspend={onSuspend}
-          onSetPlannedAway={onSetPlannedAway}
+          onSetPlannedChange={onSetPlannedChange}
           statusStepUpOpen={statusStepUpOpen}
           onClose={() => setExpandedEmpId(null)}
           onInvite={
@@ -2569,7 +2569,8 @@ export function MembersSection({
                   getEmployeeDisplayName(only),
                   {
                     hasAccount: Boolean(only.userId),
-                    plannedFrom: only.plannedStatus === "away" ? (only.plannedFrom ?? null) : null,
+                    plannedFrom: only.plannedFrom ?? null,
+                    plannedStatus: only.plannedStatus ?? null,
                   },
                 )
               : describeStatusAction(

@@ -6,6 +6,7 @@ import {
   awayRunLabel,
   buildRowAwayDays,
   isOnScheduleGrid,
+  LEAVING_RUN_LABEL,
 } from "./awayRuns";
 
 const period = { lastDateKey: "2026-11-07", todayKey: "2026-11-02" };
@@ -135,5 +136,33 @@ describe("planned away in the grid (51g1)", () => {
     expect(awayLockedHint({ from: "2026-11-03", until: "2026-11-05" })).toBe(
       "Away from Tue, Nov 3 until Thu, Nov 5. Change the planned away on their record to change these days.",
     );
+  });
+});
+
+describe("last day in the grid (51g2)", () => {
+  // Last day Wed, Nov 4: offboarded from Thu, Nov 5.
+  const leaving = {
+    status: "active" as const,
+    plannedStatus: "removed" as const,
+    plannedFrom: "2026-11-05",
+    plannedUntil: null,
+  };
+
+  it("locks and draws the days after the last day, labeled Offboarded", () => {
+    const range = awayRangeOf(leaving);
+    expect(range).toEqual({ from: "2026-11-05", until: null, lastDay: "2026-11-04" });
+    const days = buildRowAwayDays(range, week, "2026-11-01");
+    expect(days?.locked).toEqual([false, false, false, false, true, true, true]);
+    expect(LEAVING_RUN_LABEL).toBe("Offboarded");
+  });
+
+  it("names the last day and where to change it", () => {
+    expect(
+      awayLockedHint(awayRangeOf(leaving) as NonNullable<ReturnType<typeof awayRangeOf>>),
+    ).toBe("Last day Wed, Nov 4. Change the last day on their record to change these days.");
+  });
+
+  it("leaves someone already offboarded off it", () => {
+    expect(awayRangeOf({ ...leaving, archivedAt: "2026-11-05T08:00:00Z" })).toBeNull();
   });
 });

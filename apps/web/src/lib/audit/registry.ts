@@ -542,6 +542,32 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned away`,
     suppressKeys: ["plannedFrom", "plannedUntil"],
   },
+  "employee.last_day_set": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const lastDay = d.date("lastDay");
+      const name = who(d, ctx, "a team member");
+      return lastDay ? `Set ${name}'s last day to ${lastDay}` : `Set ${name}'s last day`;
+    },
+    suppressKeys: ["lastDay"],
+  },
+  "employee.last_day_changed": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => {
+      const lastDay = d.date("lastDay");
+      const name = who(d, ctx, "a team member");
+      return lastDay ? `Moved ${name}'s last day to ${lastDay}` : `Changed ${name}'s last day`;
+    },
+    suppressKeys: ["fromLastDay", "lastDay"],
+  },
+  "employee.last_day_cancelled": {
+    category: "people",
+    severity: "update",
+    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s last day`,
+    suppressKeys: ["lastDay"],
+  },
   "employee.suspended": {
     category: "people",
     severity: "delete",
@@ -555,7 +581,14 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.removed": {
     category: "people",
     severity: "delete",
-    headline: (d, ctx) => `Offboarded ${who(d, ctx, "a team member")}`,
+    headline: (d, ctx) => {
+      // The daily job offboards someone the day after their last day, with no actor.
+      const lastDay = d.date("lastDay");
+      return lastDay
+        ? `${who(d, ctx, "A team member")} was offboarded after their last day, ${lastDay}`
+        : `Offboarded ${who(d, ctx, "a team member")}`;
+    },
+    suppressKeys: ["lastDay"],
   },
   // Historical keys from before the bench→deactivate / terminate→remove rename.
   // Old rows still carry them, so they render with the current copy.

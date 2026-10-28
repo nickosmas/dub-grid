@@ -76,7 +76,7 @@ function run(current: Employee, body: Omit<MobilePersonStatusUpdateBody, "expect
       async (
         _client: SupabaseClient,
         input: {
-          plannedStatus: "away" | null;
+          plannedStatus: "away" | "removed" | null;
           plannedFrom: string | null;
           plannedUntil: string | null;
           plannedAbsenceTypeId: number | null;
@@ -441,5 +441,112 @@ describe("updateMobilePersonStatus with a planned away (51g1)", () => {
       expect.anything(),
       expect.objectContaining({ action: "employee.away_plan_cancelled" }),
     );
+  });
+});
+
+describe("updateMobilePersonStatus with a last day (51g2)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+    vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("sets a last day without offboarding them now", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "remove",
+      lastDay: "2026-10-26",
+      note: "Moving",
+    });
+
+    expect(await result).toMatchObject({ kind: "updated", status: 200 });
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
+    expect(deps.archiveOrganizationMembership).not.toHaveBeenCalled();
+    expect(deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plannedStatus: "removed",
+        plannedFrom: "2026-10-27",
+        plannedUntil: null,
+        plannedAbsenceTypeId: null,
+        plannedNote: "Moving",
+      }),
+    );
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.last_day_set",
+        details: { lastDay: "2026-10-26", changedFields: ["planned_status"] },
+      }),
+    );
+  });
+
+  it("refuses a past or far last day, someone suspended, and the only super admin", async () => {
+    expect(await run(employee(), { action: "remove", lastDay: "2026-10-25" }).result).toMatchObject(
+      { status: 400, code: "LAST_DAY_INVALID" },
+    );
+    expect(await run(employee(), { action: "remove", lastDay: "2027-10-27" }).result).toMatchObject(
+      { code: "LAST_DAY_INVALID" },
+    );
+    expect(
+      await run(employee({ suspendedAt: "2026-10-20T00:00:00Z" }), {
+        action: "remove",
+        lastDay: "2026-11-08",
+      }).result,
+    ).toMatchObject({ code: "NOT_PLANNABLE" });
+
+    const onlyOwner = run(employee({ userId: "user-9" }), {
+      action: "remove",
+      lastDay: "2026-11-08",
+    });
+    onlyOwner.deps.fetchActiveMembershipOrgRole.mockResolvedValue("super_admin" as never);
+    onlyOwner.deps.countActiveSuperAdmins.mockResolvedValue(1);
+    expect(await onlyOwner.result).toMatchObject({ kind: "cannot_remove_last_super_admin" });
+    expect(onlyOwner.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+
+  it("moves and cancels a last day, for someone not on the schedule too", async () => {
+    const leaving = employee({
+      focusAreaIds: [],
+      plannedStatus: "removed",
+      plannedFrom: "2026-11-09",
+    });
+    const moved = run(leaving, { action: "setPlannedChange", lastDay: "2026-11-12" });
+    expect(await moved.result).toMatchObject({ kind: "updated" });
+    expect(moved.deps.updateEmployeePlannedChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ plannedStatus: "removed", plannedFrom: "2026-11-13" }),
+    );
+    expect(moved.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.last_day_changed",
+        details: expect.objectContaining({ fromLastDay: "2026-11-08", lastDay: "2026-11-12" }),
+      }),
+    );
+
+    const cancelled = run(leaving, { action: "cancelPlannedChange" });
+    expect(await cancelled.result).toMatchObject({ kind: "updated" });
+    expect(cancelled.deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "employee.last_day_cancelled",
+        details: expect.objectContaining({ lastDay: "2026-11-08" }),
+      }),
+    );
+  });
+
+  it("still offboards now with no last day", async () => {
+    const { deps, result } = run(employee(), { action: "remove" });
+
+    await result;
+    expect(deps.updateEmployeeStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "removed" }),
+    );
+    expect(deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
   });
 });

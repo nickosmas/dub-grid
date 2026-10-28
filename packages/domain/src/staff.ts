@@ -1,7 +1,10 @@
 export type EmployeeStatus = "active" | "inactive" | "removed";
 export type EmployeeEmploymentType = "full_time" | "part_time";
-/** The statuses a change can be planned for (51g); 51g2 and 51g3 add more. */
-export type PlannedStatus = "away";
+/**
+ * The statuses a change can be planned for (51g): Away from a date (51g1), and
+ * Offboarded after a last day (51g2), whose `plannedFrom` is the day after it.
+ */
+export type PlannedStatus = "away" | "removed";
 
 export interface Employee {
   id: string;
@@ -21,7 +24,7 @@ export interface Employee {
   suspendedAt?: string | null;
   /** A status change set for a later date (51g), or null. */
   plannedStatus?: PlannedStatus | null;
-  /** The planned change's first day (YYYY-MM-DD). */
+  /** The planned change's first day (YYYY-MM-DD); for a last day, the day after it. */
   plannedFrom?: string | null;
   /** The first day back from a planned Away (YYYY-MM-DD), or null. */
   plannedUntil?: string | null;

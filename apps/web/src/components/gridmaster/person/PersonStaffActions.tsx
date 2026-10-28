@@ -146,6 +146,9 @@ export function PersonStaffActions({
     employee.status === "active" ? ["deactivate", "remove"] : ["activate", "remove"];
   const plannedFrom =
     employee.plannedStatus === "away" && employee.plannedFrom ? employee.plannedFrom : null;
+  // Any change here replaces a planned last day (51g2), and says so.
+  const plannedLastDayFrom =
+    employee.plannedStatus === "removed" && employee.plannedFrom ? employee.plannedFrom : null;
   const available = statusOptions.filter(
     (option) =>
       !(option === "remove" && employee.status === "removed") &&
@@ -162,7 +165,11 @@ export function PersonStaffActions({
           ? "archive"
           : (statusUndoAction(employee.status) ?? "markActive"),
       fullName,
-      { hasAccount: linked, plannedFrom: change === "remove" ? plannedFrom : null },
+      {
+        hasAccount: linked,
+        plannedFrom: plannedLastDayFrom ?? (change === "remove" ? plannedFrom : null),
+        plannedStatus: employee.plannedStatus ?? null,
+      },
     );
 
   return (
