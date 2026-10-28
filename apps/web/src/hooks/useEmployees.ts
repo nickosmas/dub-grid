@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
+  changeEmployeeStatuses,
   reinstateEmployee,
   suspendEmployee,
   setEmployeeSuspendedUntil,
@@ -15,13 +16,18 @@ import {
   plannedChangeToast,
   setEmployeeReturnDate,
   updateEmployee,
+  type BulkStatusOutcome,
   type PlannedChange,
   type SuspensionDates,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import { toast } from "sonner";
-import { SELF_ACTION_FORBIDDEN_MESSAGE, SelfActionForbiddenError } from "@dubgrid/domain";
+import {
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+  SelfActionForbiddenError,
+  type BulkStatusAction,
+} from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -90,6 +96,18 @@ export interface EmployeesData {
   ) => Promise<boolean>;
   /** Sets, moves or clears (null) a suspended person's end date (51g3). */
   handleSetSuspendedUntil: (empId: string, until: string | null) => Promise<boolean>;
+  /**
+   * One status change for several people (51h): saved rows and refreshed
+   * conflicts go into the list, with no toast per person. Resolves each
+   * person's outcome; throws when the whole request was refused, a step-up
+   * prompt included, for the caller to handle.
+   */
+  handleBulkStatusChange: (
+    action: BulkStatusAction,
+    empIds: readonly string[],
+    options?: { note?: string; returnDate?: string | null },
+    accessToken?: string,
+  ) => Promise<BulkStatusOutcome[]>;
   /** Sets, moves or clears (null) an Away person's return date and the absence their days hold. */
   handleSetEmployeeReturnDate: (
     empId: string,
@@ -565,6 +583,34 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
+  const handleBulkStatusChange = useCallback(
+    async (
+      action: BulkStatusAction,
+      empIds: readonly string[],
+      options: { note?: string; returnDate?: string | null } = {},
+      accessToken?: string,
+    ) => {
+      if (!orgId) return [];
+      const people = empIds.flatMap((empId) => {
+        const employee = allEmployeesRef.current.find((e) => e.id === empId);
+        return employee ? [{ empId, expectedVersion: employee.version }] : [];
+      });
+      if (people.length === 0) return [];
+      const outcomes = await changeEmployeeStatuses(
+        { orgId, action, people, ...options },
+        accessToken,
+      );
+      // A conflict carries the latest row, so the list shows what changed elsewhere.
+      const rows = outcomes.flatMap((outcome) => (outcome.employee ? [outcome.employee] : []));
+      if (rows.length > 0) {
+        setAllLocal((prev) => rows.reduce((list, row) => replaceEmployeeRow(list, row), prev));
+        invalidateEmployees();
+      }
+      return outcomes;
+    },
+    [orgId, invalidateEmployees],
+  );
+
   const handleSetEmployeeReturnDate = useCallback(
     async (empId: string, returnDate: string | null, absenceTypeId?: number | null) => {
       const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
@@ -611,5 +657,6 @@ export function useEmployees(orgId: string | null): EmployeesData {
     handleSetSuspendedUntil,
     handleSetEmployeeReturnDate,
     handleSetPlannedChange,
+    handleBulkStatusChange,
   };
 }

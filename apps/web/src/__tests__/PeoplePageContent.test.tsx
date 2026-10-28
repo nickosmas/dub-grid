@@ -7,6 +7,7 @@ import PeoplePageContent from "@/app/(app)/people/PeoplePageContent";
 const mocks = vi.hoisted(() => ({
   deactivate: vi.fn(),
   remove: vi.fn(),
+  bulk: vi.fn(),
   prompt: vi.fn(),
   result: vi.fn(),
   cancel: false,
@@ -22,11 +23,22 @@ vi.mock("@/components/StaffView", () => ({
   default: ({
     onDeactivate,
     onRemove,
+    onBulkStatusChange,
   }: {
     onDeactivate: (empId: string, note?: string) => unknown;
     onRemove: (empId: string, note?: string) => unknown;
+    onBulkStatusChange: (action: string, ids: string[], options: object) => Promise<unknown>;
   }) => (
     <>
+      <button
+        onClick={() =>
+          void onBulkStatusChange("archive", ["emp-1", "emp-2"], { note: "Left" }).then(
+            mocks.result,
+          )
+        }
+      >
+        Bulk offboard
+      </button>
       <button
         onClick={() => void Promise.resolve(onDeactivate("emp-1", "On leave")).then(mocks.result)}
       >
@@ -52,6 +64,7 @@ vi.mock("@/hooks", () => ({
     loading: false,
     handleRemoveEmployee: mocks.remove,
     handleDeactivateEmployee: mocks.deactivate,
+    handleBulkStatusChange: mocks.bulk,
   }),
 }));
 // Stands in for the shared prompt: a refusal the page hands back is retried
@@ -133,5 +146,44 @@ describe("PeoplePageContent status changes", () => {
 
     await waitFor(() => expect(mocks.result).toHaveBeenCalledWith(false));
     expect(mocks.deactivate).toHaveBeenCalledOnce();
+  });
+});
+
+describe("PeoplePageContent bulk status changes (51h)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.cancel = false;
+  });
+
+  it("asks for fresh proof once for the whole selection and resolves each outcome", async () => {
+    const outcomes = [{ empId: "emp-1", ok: true }];
+    mocks.bulk.mockRejectedValueOnce(refusal()).mockResolvedValueOnce(outcomes);
+    render(<PeoplePageContent />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bulk offboard" }));
+
+    await waitFor(() => expect(mocks.result).toHaveBeenCalledWith(outcomes));
+    expect(mocks.prompt).toHaveBeenCalledOnce();
+    expect(mocks.bulk).toHaveBeenNthCalledWith(
+      2,
+      "archive",
+      ["emp-1", "emp-2"],
+      { note: "Left" },
+      "assured-token",
+    );
+  });
+
+  it("resolves null for a cancelled prompt or a refused request", async () => {
+    mocks.cancel = true;
+    mocks.bulk.mockRejectedValueOnce(refusal());
+    render(<PeoplePageContent />);
+    fireEvent.click(await screen.findByRole("button", { name: "Bulk offboard" }));
+    await waitFor(() => expect(mocks.result).toHaveBeenCalledWith(null));
+
+    mocks.cancel = false;
+    mocks.bulk.mockRejectedValueOnce(new Error("Too many requests"));
+    fireEvent.click(screen.getByRole("button", { name: "Bulk offboard" }));
+    await waitFor(() => expect(mocks.result).toHaveBeenCalledTimes(2));
+    expect(mocks.result).toHaveBeenLastCalledWith(null);
   });
 });

@@ -1,6 +1,10 @@
 "use client";
 
-import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
+import type {
+  BulkStatusChangeHandler,
+  PlannedChange,
+  SuspensionDates,
+} from "@/features/employees/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, type WheelEvent, useCallback, useMemo, useState } from "react";
@@ -135,6 +139,8 @@ interface StaffViewProps {
   onSetSuspendedUntil?: (empId: string, until: string | null) => void | Promise<unknown>;
   /** Moves or changes a planned Away, or cancels it (null) (51g1). */
   onSetPlannedChange?: (empId: string, plan: PlannedChange | null) => void | Promise<unknown>;
+  /** The People list's bulk status changes (51h). */
+  onBulkStatusChange?: BulkStatusChangeHandler;
   onAdd: () => void;
   orgId?: string;
   assignments?: AssignmentDefinition[];
@@ -179,6 +185,7 @@ export default function StaffView({
   onSuspend,
   onSetSuspendedUntil,
   onSetPlannedChange,
+  onBulkStatusChange,
   onAdd,
   orgId,
   assignments,
@@ -378,6 +385,7 @@ export default function StaffView({
             onSuspend={onSuspend}
             onSetSuspendedUntil={onSetSuspendedUntil}
             onSetPlannedChange={onSetPlannedChange}
+            onBulkStatusChange={onBulkStatusChange}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
             canManageEmployees={canManageEmployees ?? false}

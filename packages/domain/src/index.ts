@@ -3,6 +3,7 @@ export * from "./alert-destination";
 export * from "./audience";
 export * from "./billing";
 export * from "./billing-policy";
+export * from "./bulk-status";
 export * from "./calendar-links";
 export * from "./consent-record";
 export * from "./credential-requirements";

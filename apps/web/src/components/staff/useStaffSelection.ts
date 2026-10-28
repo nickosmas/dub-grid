@@ -25,6 +25,10 @@ export function useStaffSelection() {
     setSelectedIds(new Set());
   }, []);
 
+  const selectOnly = useCallback((ids: readonly string[]) => {
+    setSelectedIds(new Set(ids));
+  }, []);
+
   const isAllSelected = useCallback(
     (list: Employee[]) => list.length > 0 && list.every((e) => selectedIds.has(e.id)),
     [selectedIds],
@@ -35,6 +39,7 @@ export function useStaffSelection() {
     toggleSelect,
     toggleSelectAll,
     clearSelection,
+    selectOnly,
     isAllSelected,
     selectionCount: selectedIds.size,
   };

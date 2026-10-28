@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:c5e6f3eb24ed2ea688422a33a827ea17dc69a5898a57f2005d2121a69444646e",
+  "sourceDigest": "sha256:9f80ac7c6d28307bef762a18750631fc659181aeb1e39caf42967baec5d609cb",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2433,6 +2433,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/employees/status/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/employees/status/bulk",
+      "method": "POST",
+      "path": "/api/employees/status/bulk",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/status/bulk/route.ts"
       }
     },
     {

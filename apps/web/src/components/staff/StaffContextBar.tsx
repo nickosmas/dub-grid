@@ -1,6 +1,13 @@
 "use client";
 
-import { canMarkInactive } from "@dubgrid/domain";
+import {
+  BULK_STATUS_ACTIONS,
+  describeStatusAction,
+  isSelfAction,
+  planBulkStatusChange,
+  type BulkStatusAction,
+  type BulkStatusPlan,
+} from "@dubgrid/domain";
 import { GripVertical } from "lucide-react";
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
@@ -53,10 +60,10 @@ interface StaffContextBarProps {
   displayList: Employee[];
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onBulkInvite: (employees: Employee[]) => void;
-  onBulkDeactivate: (ids: string[]) => void;
-  onBulkActivate: (ids: string[]) => void;
-  onBulkRestore: (ids: string[]) => void;
-  onBulkRemove: (ids: string[]) => void;
+  /** Opens a bulk status change's confirmation (51h); absent, the bar offers none. */
+  onBulkStatus?: (plan: BulkStatusPlan<Employee>) => void;
+  /** The manager's own account, never changed by a bulk status change. */
+  currentUserId?: string | null;
   onClearSelection: () => void;
   // Reorder
   isReordering: boolean;
@@ -107,10 +114,8 @@ export function StaffContextBar({
   displayList,
   pendingInviteByEmployeeId,
   onBulkInvite,
-  onBulkDeactivate,
-  onBulkActivate,
-  onBulkRestore,
-  onBulkRemove,
+  onBulkStatus,
+  currentUserId = null,
   onClearSelection,
   isReordering,
   isDirty,
@@ -171,15 +176,14 @@ export function StaffContextBar({
   const invitableEmployees = selectedEmployees.filter(
     (e) => e.status === "active" && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id),
   );
-  // Away only takes someone off the schedule, so it skips management-only people.
-  const deactivatableIds = selectedEmployees
-    .filter((e) => e.status === "active" && canMarkInactive(e.focusAreaIds))
-    .map((e) => e.id);
-  const activatableIds = selectedEmployees.filter((e) => e.status === "inactive").map((e) => e.id);
-  const restorableIds = selectedEmployees.filter((e) => e.status === "removed").map((e) => e.id);
-  const removableIds = selectedEmployees
-    .filter((e) => e.status === "active" || e.status === "inactive")
-    .map((e) => e.id);
+  // Each change shows only when it reaches someone, with how many (51h).
+  const statusPlans: BulkStatusPlan<Employee>[] = onBulkStatus
+    ? BULK_STATUS_ACTIONS.map((action: BulkStatusAction) =>
+        planBulkStatusChange(action, selectedEmployees, (employee) =>
+          isSelfAction(currentUserId, employee.userId),
+        ),
+      ).filter((plan) => plan.eligible.length > 0)
+    : [];
 
   return (
     <div
@@ -259,41 +263,15 @@ export function StaffContextBar({
                 Invite ({invitableEmployees.length})
               </Button>
             )}
-            {activatableIds.length > 0 && (
+            {statusPlans.map((plan) => (
               <Button
-                onClick={() => onBulkActivate(activatableIds)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
+                key={plan.action}
+                onClick={() => onBulkStatus?.(plan)}
+                className="dg-btn dg-btn-secondary dg-btn-sm dg-tabular-nums"
               >
-                Mark active
-                {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
+                {describeStatusAction(plan.action, "").label} ({plan.eligible.length})
               </Button>
-            )}
-            {restorableIds.length > 0 && (
-              <Button
-                onClick={() => onBulkRestore(restorableIds)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-              >
-                Restore
-                {restorableIds.length !== selectionCount ? ` (${restorableIds.length})` : ""}
-              </Button>
-            )}
-            {deactivatableIds.length > 0 && (
-              <Button
-                onClick={() => onBulkDeactivate(deactivatableIds)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-              >
-                Mark away
-                {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
-              </Button>
-            )}
-            {removableIds.length > 0 && (
-              <Button
-                onClick={() => onBulkRemove(removableIds)}
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-              >
-                Offboard{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
-              </Button>
-            )}
+            ))}
             <Button onClick={onClearSelection} className="dg-btn dg-btn-ghost dg-btn-sm">
               Clear selection
             </Button>

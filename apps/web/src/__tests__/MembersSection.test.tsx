@@ -1245,57 +1245,149 @@ describe("MembersSection — per-certification cards", () => {
   });
 });
 
-describe("MembersSection - bulk status changes under step-up (F-98)", () => {
-  const people = [
-    makeEmployee({ id: "emp-1", firstName: "Jamie", lastName: "Rivera" }),
-    makeEmployee({ id: "emp-2", firstName: "Alex", lastName: "Chen" }),
-  ];
+describe("MembersSection - bulk status changes (51h)", () => {
+  const jamie = makeEmployee({
+    id: "emp-1",
+    firstName: "Jamie",
+    lastName: "Rivera",
+    userId: "user-1",
+    version: 3,
+  });
+  const alex = makeEmployee({ id: "emp-2", firstName: "Alex", lastName: "Chen", userId: null });
+  const pat = makeEmployee({
+    id: "emp-3",
+    firstName: "Pat",
+    lastName: "Lee",
+    userId: "user-3",
+    suspendedAt: "2026-10-01T00:00:00Z",
+  });
+  const me = makeEmployee({
+    id: "emp-4",
+    firstName: "Viewer",
+    lastName: "Self",
+    userId: "viewer-1",
+  });
 
-  async function openBulkDeactivate(props: Partial<MembersSectionProps>) {
+  async function selectAll(props: Partial<MembersSectionProps>) {
     const user = userEvent.setup();
     const view = renderMembersSection({
       canManageEmployees: true,
       canViewEmployeeDetails: true,
       isSuperAdmin: true,
-      employees: people,
+      employees: [jamie, alex, pat],
+      onBulkStatusChange: vi.fn().mockResolvedValue([]),
       ...props,
     });
     await settleInvitations();
     // The header checkbox selects every row on the page (the rows' own are unlabeled).
     await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: /^Mark away/ }));
-    await screen.findByText(/^Mark \d+ people away\?$/);
     return { user, view };
   }
 
-  it("names a lone pick's planned away and leaves out sign-in when they have no account", async () => {
-    const user = userEvent.setup();
-    renderMembersSection({
-      canManageEmployees: true,
-      canViewEmployeeDetails: true,
-      isSuperAdmin: true,
-      employees: [
-        makeEmployee({
-          id: "emp-1",
-          firstName: "Jamie",
-          lastName: "Rivera",
-          userId: null,
-          plannedStatus: "away",
-          plannedFrom: "2099-01-05",
-        }),
-      ],
-    });
-    await settleInvitations();
-    await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: /^Offboard\b(?!d)/ }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Offboard Jamie Rivera?" });
-    expect(dialog).toHaveTextContent("The away planned from Jan 5 is cancelled.");
-    expect(dialog).not.toHaveTextContent(/sign in/i);
+  it("offers each change that reaches someone, with how many", async () => {
+    await selectAll({});
+    expect(screen.getByRole("button", { name: "Reinstate (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark away (3)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Suspend (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Offboard (3)" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Mark active/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Restore/ })).toBeNull();
   });
 
-  it("hides the bulk confirmation while the step-up prompt is open", async () => {
-    const { view } = await openBulkDeactivate({});
+  it("offers no status change without a handler", async () => {
+    await selectAll({ onBulkStatusChange: undefined });
+    expect(screen.queryByRole("button", { name: /^Offboard \(/ })).toBeNull();
+  });
+
+  it("names who it skips and why, and sends only the people it reaches", async () => {
+    const onBulkStatusChange = vi.fn().mockResolvedValue([{ empId: "emp-1", ok: true }]);
+    const { user } = await selectAll({ onBulkStatusChange });
+
+    await user.click(screen.getByRole("button", { name: "Suspend (1)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Suspend Jamie Rivera?" });
+    const skipped = within(dialog).getByRole("region", { name: "Skipped" });
+    expect(skipped).toHaveTextContent("Skipped (2)");
+    expect(skipped).toHaveTextContent("Alex Chen");
+    expect(skipped).toHaveTextContent("Only someone with an account can be suspended.");
+    expect(skipped).toHaveTextContent("Pat Lee");
+    expect(skipped).toHaveTextContent("Already Suspended.");
+
+    await user.click(within(dialog).getByRole("button", { name: "Suspend" }));
+    await waitFor(() => expect(onBulkStatusChange).toHaveBeenCalledWith("suspend", ["emp-1"], {}));
+    await waitFor(() => expect(vi.mocked(toast.success)).toHaveBeenCalledWith("Suspended"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("skips the manager's own row", async () => {
+    await selectAll({ employees: [jamie, me] });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Offboard (1)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Offboard Jamie Rivera?" });
+    expect(dialog).toHaveTextContent("You can't change your own status.");
+  });
+
+  it("sends a shared reason and return date with Mark away", async () => {
+    const onBulkStatusChange = vi.fn().mockResolvedValue([
+      { empId: "emp-1", ok: true },
+      { empId: "emp-2", ok: true },
+      { empId: "emp-3", ok: true },
+    ]);
+    const { user } = await selectAll({ onBulkStatusChange });
+
+    await user.click(screen.getByRole("button", { name: "Mark away (3)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Mark 3 people away?" });
+    expect(within(dialog).getByText("Return date")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Reason (optional)"), " Unit closed ");
+    await user.click(within(dialog).getByRole("button", { name: "Mark away" }));
+
+    await waitFor(() =>
+      expect(onBulkStatusChange).toHaveBeenCalledWith("markAway", ["emp-1", "emp-2", "emp-3"], {
+        note: "Unit closed",
+      }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith("3 people marked away"),
+    );
+  });
+
+  it("names who wasn't changed and why, and keeps only them selected", async () => {
+    const onBulkStatusChange = vi.fn().mockResolvedValue([
+      { empId: "emp-1", ok: true },
+      { empId: "emp-2", ok: false, code: "EMPLOYEE_STATUS_CONFLICT" },
+      { empId: "emp-3", ok: false, error: "They're the only Super Admin who can sign in." },
+    ]);
+    const { user } = await selectAll({ onBulkStatusChange });
+
+    await user.click(screen.getByRole("button", { name: "Offboard (3)" }));
+    const confirm = await screen.findByRole("dialog", { name: "Offboard 3 people?" });
+    await user.click(within(confirm).getByRole("button", { name: "Offboard" }));
+
+    const result = await screen.findByRole("dialog", { name: "2 people not changed" });
+    expect(result).toHaveTextContent("1 person offboarded. Anyone not changed is still selected.");
+    expect(result).toHaveTextContent("Alex Chen");
+    expect(result).toHaveTextContent("Their status changed elsewhere. Check it and try again.");
+    expect(result).toHaveTextContent("Pat Lee");
+    expect(result).toHaveTextContent("They're the only Super Admin who can sign in.");
+    expect(vi.mocked(toast.success)).not.toHaveBeenCalledWith(expect.stringMatching(/offboarded/i));
+
+    await user.click(within(result).getByRole("button", { name: "Close" }));
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+  });
+
+  it("stays open when the request didn't run", async () => {
+    const onBulkStatusChange = vi.fn().mockResolvedValue(null);
+    const { user } = await selectAll({ onBulkStatusChange });
+    await user.click(screen.getByRole("button", { name: "Offboard (3)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Offboard 3 people?" });
+    await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
+    await waitFor(() => expect(onBulkStatusChange).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("dialog", { name: "Offboard 3 people?" })).toBeInTheDocument();
+  });
+
+  it("hides the confirmation while the step-up prompt is open and keeps its reason", async () => {
+    const onBulkStatusChange = vi.fn();
+    const { user, view } = await selectAll({ onBulkStatusChange });
+    await user.click(screen.getByRole("button", { name: "Offboard (3)" }));
+    await user.type(await screen.findByLabelText("Reason (optional)"), "Left");
     const rerender = (statusStepUpOpen: boolean) =>
       view.rerender(
         <QueryClientProvider client={new QueryClient()}>
@@ -1305,64 +1397,17 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
             canViewEmployeeDetails
             isManagementUser={false}
             isSuperAdmin
-            employees={people}
+            employees={[jamie, alex, pat]}
+            onBulkStatusChange={onBulkStatusChange}
             statusStepUpOpen={statusStepUpOpen}
           />
         </QueryClientProvider>,
       );
 
     rerender(true);
-    expect(screen.queryByText(/^Mark \d+ people away\?$/)).toBeNull();
+    expect(screen.queryByText("Offboard 3 people?")).toBeNull();
     rerender(false);
-    expect(screen.getByText(/^Mark \d+ people away\?$/)).toBeInTheDocument();
-  });
-
-  it("does not count a change that did not go through as updated", async () => {
-    const onDeactivate = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    const { user } = await openBulkDeactivate({ onDeactivate });
-
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark away" }));
-
-    await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
-        "1 updated, 1 failed. Refresh and retry the ones that didn't go through.",
-      ),
-    );
-    expect(vi.mocked(toast.success)).not.toHaveBeenCalledWith("2 people updated");
-  });
-});
-
-describe("MembersSection - bulk status change pacing (F-103)", () => {
-  it("never runs more than three status changes at once", async () => {
-    const people = Array.from({ length: 5 }, (_, index) =>
-      makeEmployee({ id: `emp-${index}`, firstName: `Person${index}`, lastName: "Test" }),
-    );
-    let inFlight = 0;
-    let most = 0;
-    const onDeactivate = vi.fn(async () => {
-      inFlight += 1;
-      most = Math.max(most, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      inFlight -= 1;
-      return true;
-    });
-    const user = userEvent.setup();
-    renderMembersSection({
-      canManageEmployees: true,
-      canViewEmployeeDetails: true,
-      isSuperAdmin: true,
-      employees: people,
-      onDeactivate,
-    });
-    await settleInvitations();
-    await user.click(screen.getAllByRole("checkbox")[0]);
-    await user.click(screen.getByRole("button", { name: /^Mark away/ }));
-    await screen.findByText(/^Mark \d+ people away\?$/);
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark away" }));
-
-    await waitFor(() => expect(onDeactivate).toHaveBeenCalledTimes(5));
-    await waitFor(() => expect(vi.mocked(toast.success)).toHaveBeenCalledWith("5 people updated"));
-    expect(most).toBeLessThanOrEqual(3);
+    expect(screen.getByText("Offboard 3 people?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reason (optional)")).toHaveValue("Left");
   });
 });

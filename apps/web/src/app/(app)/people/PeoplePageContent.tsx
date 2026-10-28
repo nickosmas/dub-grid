@@ -13,6 +13,7 @@ import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationB
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
+import type { BulkStatusChangeHandler, BulkStatusOutcome } from "@/features/employees/client";
 
 function PeopleContent() {
   const {
@@ -64,6 +65,7 @@ function PeopleContent() {
     handleSetSuspendedUntil,
     handleSetEmployeeReturnDate,
     handleSetPlannedChange,
+    handleBulkStatusChange,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
@@ -81,6 +83,20 @@ function PeopleContent() {
     } catch (err) {
       toast.error(formatClientErrorMessage(err, "We couldn't update their status. Try again."));
       return false;
+    }
+  };
+
+  /** Each person's outcome, or null when the prompt was cancelled or the request refused. */
+  const runBulkStatusChange: BulkStatusChangeHandler = async (action, empIds, options) => {
+    let outcomes: BulkStatusOutcome[] | null = null;
+    try {
+      const completed = await statusStepUp.run(async (accessToken) => {
+        outcomes = await handleBulkStatusChange(action, empIds, options, accessToken);
+      });
+      return completed ? outcomes : null;
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "We couldn't change their status. Try again."));
+      return null;
     }
   };
 
@@ -168,6 +184,7 @@ function PeopleContent() {
             onSetPlannedChange={(empId, plan) =>
               runStatusChange((token) => handleSetPlannedChange(empId, plan, token))
             }
+            onBulkStatusChange={runBulkStatusChange}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}
             assignments={assignments}

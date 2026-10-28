@@ -1125,7 +1125,7 @@
           from today or a later start; the job reinstates them on it.
     - [x] 51g4. **First day** - a new hire can't be scheduled before their
           first day, and shows "Starts Nov 10" until then.
-  - [ ] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
+  - [x] 51h. **Bulk status changes** - the People list bulk bar: Mark away,
         Suspend, Archive and Mark active.
   - [ ] 51i. **Losing a focus area** - taking someone off a focus area asks
         whether to clear their upcoming shifts there, in the draft, or keep

@@ -407,8 +407,13 @@ Item 51 is split:
     "Starts Nov 10" in the People list, on a dashed card and in the grid
     until then, keep sign-in and a seat, and the date stays on the record.
     No job step (migration 106).
-- **51h - Bulk status changes:** the People list bulk bar: Mark away,
-  Suspend, Archive and Mark active.
+- **51h - Bulk status changes:** shipped; the web People list's bulk bar
+  offers Mark active, Reinstate, Restore, Mark away, Suspend and Offboard,
+  each with how many selected people it reaches. One confirmation names who
+  it skips and why (Change status's reasons), Mark away takes one return
+  date, and one request changes each person with the single route's checks
+  and audit row; anyone not changed is listed with why and stays selected.
+  Web only. No migration.
 - **51i - Losing a focus area:** taking someone off a focus area asks
   whether to clear their upcoming shifts there, in the draft, or keep them.
 - **51j - No contact without sign-in:** push and schedule emails go only to

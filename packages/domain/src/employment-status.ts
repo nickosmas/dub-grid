@@ -796,6 +796,11 @@ function currentKind(state: StatusState): StatusChoiceKind {
   return state.suspendedAt ? "suspended" : "active";
 }
 
+/** The status they're in now, as `statusChoices` names it. */
+export function currentStatusKind(state: StatusState): StatusChoiceKind {
+  return currentKind(state);
+}
+
 /** A status choice, shown disabled with its reason when one is given. */
 function choice(
   base: Omit<StatusChoice, "available" | "unavailableReason">,

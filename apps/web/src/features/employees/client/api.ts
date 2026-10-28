@@ -2,7 +2,11 @@
 
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { SELF_ACTION_FORBIDDEN_CODE, SelfActionForbiddenError } from "@dubgrid/domain";
+import {
+  SELF_ACTION_FORBIDDEN_CODE,
+  SelfActionForbiddenError,
+  type BulkStatusAction,
+} from "@dubgrid/domain";
 import type {
   Employee,
   EmployeeActivityEntry,
@@ -366,6 +370,79 @@ async function updateEmployeeStatus(
   }
 
   return body.employee;
+}
+
+/** One person's outcome in a bulk status change (51h). */
+export interface BulkStatusOutcome {
+  empId: string;
+  ok: boolean;
+  /** The saved row, or the latest one when it changed elsewhere. */
+  employee?: Employee;
+  /** Why it didn't go through. */
+  error?: string;
+  code?: string;
+}
+
+export interface BulkStatusChangeInput {
+  orgId: string;
+  action: BulkStatusAction;
+  people: { empId: string; expectedVersion: number }[];
+  /** Mark away and Offboard: the reason, the same for everyone. */
+  note?: string;
+  /** Mark away: the first day back, the same for everyone. */
+  returnDate?: string | null;
+}
+
+/**
+ * Runs a bulk status change for the People list: each person's outcome, or
+ * null when it didn't run (a cancelled prompt or a refused request, already
+ * reported).
+ */
+export type BulkStatusChangeHandler = (
+  action: BulkStatusAction,
+  empIds: readonly string[],
+  options: { note?: string; returnDate?: string | null },
+) => Promise<BulkStatusOutcome[] | null>;
+
+/**
+ * One status change for several people (51h), answered per person. Throws
+ * only when nobody was changed: a refusal of the whole request (permission,
+ * rate limit, a step-up prompt the caller answers, a bad date).
+ */
+export async function changeEmployeeStatuses(
+  { orgId, action, people, note, returnDate }: BulkStatusChangeInput,
+  accessToken?: string,
+): Promise<BulkStatusOutcome[]> {
+  const response = await fetch(resolveClientUrl("/api/employees/status/bulk"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      orgId,
+      action,
+      people,
+      ...(note ? { note } : {}),
+      ...(returnDate ? { returnDate } : {}),
+    }),
+  });
+  const body = (await response.json().catch(() => null)) as {
+    results?: BulkStatusOutcome[];
+    error?: string;
+    code?: string;
+    method?: string;
+  } | null;
+  if (!response.ok || !body?.results) {
+    // Status, code and method let step-up recognize a request for fresh proof.
+    throw Object.assign(
+      new Error(
+        formatClientErrorMessage(body?.error, "We couldn't change their status. Try again."),
+      ),
+      { status: response.status, code: body?.code, method: body?.method },
+    );
+  }
+  return body.results;
 }
 
 /** Offboards someone now, or with `lastDay` (51g2) the day after it. */
