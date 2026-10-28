@@ -1095,8 +1095,10 @@ describe("first day (51g4)", () => {
     expect(upcomingFirstDay({ firstDay: null }, today)).toBeNull();
   });
 
-  it("accepts any past day and up to a year ahead", () => {
-    expect(isValidFirstDay("2019-03-04", today)).toBe(true);
+  it("accepts today up to a year ahead, never a past day", () => {
+    expect(isValidFirstDay("2019-03-04", today)).toBe(false);
+    expect(isValidFirstDay("2026-10-27", today)).toBe(false);
+    expect(isValidFirstDay(today, today)).toBe(true);
     expect(isValidFirstDay("2027-10-28", today)).toBe(true);
     expect(isValidFirstDay("2027-10-29", today)).toBe(false);
     expect(isValidFirstDay("2026-02-30", today)).toBe(false);

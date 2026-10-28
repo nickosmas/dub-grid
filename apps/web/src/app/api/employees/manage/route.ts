@@ -129,7 +129,7 @@ const employeeSchema = z.object({
   firstDay: z.string().date().nullable().optional(),
 });
 
-/** A new or changed first day must be no more than a year ahead (51g4). */
+/** A new or changed first day must be from today up to a year ahead (51g4). */
 async function refuseInvalidFirstDay(
   serviceClient: SupabaseClient,
   orgId: string,

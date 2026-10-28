@@ -400,13 +400,14 @@ Item 51 is split, and every part has shipped:
     the day; a later start shows "Suspended from Nov 10" as the plan and
     locks no day. The daily job reinstates them on the end and starts a
     planned suspension the way a manual Suspend does (migration 105).
-  - **51g4 - First day:** shipped; Add Staff Members and the person form
-    take an optional First day (any past day, up to a year ahead; mobile Add
-    person from today). Nobody can schedule them before it, and setting it
-    later clears those draft days and closes their requests; they show
-    "Starts Nov 10" in the People list, on a dashed card and in the grid
-    until then, keep sign-in and a seat, and the date stays on the record.
-    No job step (migration 106).
+  - **51g4 - First day:** shipped; Add Staff Members takes an optional
+    First day, from today up to a year ahead (web and mobile), and the
+    person form offers it only while it's ahead (owner, 2026-10-28). Nobody
+    can schedule them before it, and setting it later clears those draft
+    days and closes their requests; they show "Starts Nov 10" in the People
+    list, on a dashed card and in the grid until then, keep sign-in and a
+    seat, and the date stays on the full profile's record. No job step
+    (migration 106).
 - **51h - Bulk status changes:** shipped; the web People list's bulk bar
   offers Mark active, Reinstate, Restore, Mark away, Suspend and Offboard,
   each with how many selected people it reaches. One confirmation names who
