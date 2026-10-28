@@ -1,8 +1,8 @@
 import { useMemo } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
-import { Banner } from "../../../shared/components/Banner";
 import { Button } from "../../../shared/components/Button";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -51,8 +51,17 @@ export function PendingRequestsCard({
     requests.length === 1 ? "1 pending request" : `${requests.length} pending requests`;
 
   return (
-    <Banner icon="time-outline" title={countLabel} tone="warning">
-      Waiting on admin review. You can cancel a request anytime.
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Ionicons color={mobileColors.warningText} name="time" size={24} style={styles.icon} />
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>{countLabel}</Text>
+          <Text style={styles.subtitle}>
+            Waiting on admin review. You can cancel a request anytime.
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.list}>
         {requests.map((request) => {
           const isCancelling = cancellingId === request.id;
@@ -76,15 +85,43 @@ export function PendingRequestsCard({
           );
         })}
       </View>
-    </Banner>
+    </View>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    card: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: mobileSpace.md,
+      padding: 16,
+    },
+    header: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
+    },
+    icon: {
+      flexShrink: 0,
+      marginTop: 1,
+    },
+    headerCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      ...mobileText.cardTitle,
+      color: mobileColors.warningText,
+    },
+    subtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
     list: {
       gap: mobileSpace.md,
-      marginTop: mobileSpace.sm,
     },
     row: {
       backgroundColor: mobileColors.surface,

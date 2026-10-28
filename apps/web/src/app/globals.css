@@ -356,7 +356,7 @@
   --dg-color-info-border: #bfdbfe;
   /* Banners and notices (components/ui/Banner.tsx): a saturated fill, a
      deeper border of the same hue, and dark text and icon of that hue. Text
-     clears 7:1 on every fill. Mirrors `banner*` in @dubgrid/design-tokens. */
+     clears 7:1 on every fill. */
   --dg-color-banner-warning-bg: #fadba0;
   --dg-color-banner-warning-border: #e9bc69;
   --dg-color-banner-warning-text: #5a3a0c;
@@ -369,6 +369,21 @@
   --dg-color-banner-success-bg: #cbead3;
   --dg-color-banner-success-border: #93cca0;
   --dg-color-banner-success-text: #16452b;
+  /* The sticky bars across the top of the page (Banner layout="bar") are
+     solid so they call for attention, and stay the same in dark mode. White
+     clears 4.8:1 on each fill; amber carries dark text at 7:1. */
+  --dg-color-banner-info-vivid-bg: #2563eb;
+  --dg-color-banner-info-vivid-border: #1d4ed8;
+  --dg-color-banner-info-vivid-text: #ffffff;
+  --dg-color-banner-success-vivid-bg: #15803d;
+  --dg-color-banner-success-vivid-border: #166534;
+  --dg-color-banner-success-vivid-text: #ffffff;
+  --dg-color-banner-warning-vivid-bg: #f59e0b;
+  --dg-color-banner-warning-vivid-border: #d97706;
+  --dg-color-banner-warning-vivid-text: #3b2100;
+  --dg-color-banner-danger-vivid-bg: #dc2626;
+  --dg-color-banner-danger-vivid-border: #b91c1c;
+  --dg-color-banner-danger-vivid-text: #ffffff;
   --dg-color-today-bg: #eff6ff;
   --dg-color-today-text: #1d4ed8;
   --dg-color-today-border: #93c5fd;

@@ -9,7 +9,7 @@ export default function InactiveAccountBanner() {
 
   if (!isInactive) return null;
 
-  // A calm notice, not a warning: being away isn't something to fix.
+  // Info, not a warning: being away isn't something to fix.
   return (
     <Banner icon={Moon} layout="bar" role="status" tone="info">
       You&apos;re away.
