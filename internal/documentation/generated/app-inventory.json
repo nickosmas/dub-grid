@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:73d6c3eb8ddcd785f2739d220e2c59b4820233934dc74c6466cd777feae1441c",
+  "sourceDigest": "sha256:0ab1941ee6bec527e6a96c12c979d3bf03ad38ea9635b50c08de38ed502626c6",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4913,6 +4913,16 @@
       "sha256": "c8981c41c244dc14d2dc271b92e413034102b503423804542513d97c1ff180e8",
       "source": {
         "path": "supabase/migrations/111_past_days_not_drafted.sql"
+      }
+    },
+    {
+      "id": "migration:112_correction_reason_typed.sql",
+      "version": "112",
+      "name": "correction_reason_typed",
+      "file": "112_correction_reason_typed.sql",
+      "sha256": "2ccb8538c40090be5aacdb639dd58fecb85af760d23afbd08de068f2eae4be4d",
+      "source": {
+        "path": "supabase/migrations/112_correction_reason_typed.sql"
       }
     }
   ],

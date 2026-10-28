@@ -2,11 +2,11 @@
 
 /**
  * Migration 110: a past-day correction (53a) writes one person's published
- * day with a reason, clears its draft, records Before and After, and leaves
+ * day with an optional typed reason (112), clears its draft, records Before and After, and leaves
  * Publish History alone; it needs Edit shifts and Publish schedule, a day
  * more than 14 days ago needs a Super Admin, and only a day the person could
  * have worked is accepted. The cell-save function stops writing published
- * cells. Each case runs 110 from its file inside BEGIN/ROLLBACK against the
+ * cells. Each case runs 110 to 112 from their files inside BEGIN/ROLLBACK against the
  * seeded local database, on a person created inside the transaction.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { actAsAuthenticated } from "./helpers/simulated-jwt";
+import { beginWithLocks, policyGrantTables } from "./helpers/migration-locks";
 import { migrationPath } from "./helpers/sql-inventory";
 
 const DB_URL =
@@ -40,7 +41,11 @@ async function probeDb(): Promise<boolean> {
 
 const reachable = await probeDb();
 
-const MIGRATION = readFileSync(migrationPath("110_past_day_corrections.sql"), "utf8");
+const MIGRATIONS = [
+  "110_past_day_corrections.sql",
+  "111_past_days_not_drafted.sql",
+  "112_correction_reason_typed.sql",
+].map((name) => readFileSync(migrationPath(name), "utf8"));
 const REFUSED = /Employee not found, archived, or inactive/;
 
 type Member = { userId: string; orgRole: "admin" | "super_admin" };
@@ -58,6 +63,7 @@ interface Fixture {
 }
 
 let db: Client;
+let lockTables: string[] = [];
 let fx: Fixture;
 let empId: string;
 
@@ -196,21 +202,20 @@ async function attempt(sql: string, params: unknown[] = []): Promise<Error | nul
 async function correct(
   member: Member,
   date: string,
-  options: { reason?: string | null; note?: string | null; expectedVersion?: number | null } = {},
+  options: { reason?: string | null; expectedVersion?: number | null } = {},
 ): Promise<Error | null> {
   await asMember(member);
   const error = await attempt(
     `SELECT public.correct_schedule_cell(
        $1, $2, $3::date, 'absence', '{}'::bigint[], '{}'::bigint[], $4::bigint,
-       NULL, NULL, NULL, $5::bigint, '{}'::boolean[], NULL, NULL, $6, $7)`,
+       NULL, NULL, NULL, $5::bigint, '{}'::boolean[], NULL, NULL, $6)`,
     [
       fx.orgId,
       empId,
       date,
       fx.sickId,
       options.expectedVersion ?? null,
-      options.reason === undefined ? "called_off" : options.reason,
-      options.note ?? null,
+      options.reason === undefined ? "Called off" : options.reason,
     ],
   );
   await asSuperuser();
@@ -255,6 +260,7 @@ describe.skipIf(!reachable)("110 past-day corrections", () => {
     db = new Client(DB_CONFIG);
     await db.connect();
     fx = await loadFixture();
+    lockTables = await policyGrantTables(db);
   });
 
   afterAll(async () => {
@@ -262,8 +268,10 @@ describe.skipIf(!reachable)("110 past-day corrections", () => {
   });
 
   beforeEach(async () => {
-    await db.query("BEGIN");
-    await db.query(MIGRATION);
+    // 110 and 112 replace the same functions and 110 recreates a policy, so
+    // each case holds the corrections table and the policy-grant tables first.
+    await beginWithLocks(db, ["public.schedule_cell_corrections", ...lockTables]);
+    for (const migration of MIGRATIONS) await db.query(migration);
     // Only the ranges a case publishes count, so "never published" is ours to decide.
     await db.query(`DELETE FROM public.publish_history WHERE org_id = $1`, [fx.orgId]);
     empId = await createPerson();
@@ -310,19 +318,18 @@ describe.skipIf(!reachable)("110 past-day corrections", () => {
         [fx.orgId],
       );
 
-      expect(await correct(fx.admin, day(-1), { note: "Called out sick at 6 AM" })).toBeNull();
+      expect(await correct(fx.admin, day(-1), { reason: "  Called out sick at 6 AM " })).toBeNull();
 
       expect(await cellState(day(-1))).toEqual({ draft: null, published: "absence" });
       const { rows } = await db.query(
-        `SELECT reason, note, before->>'state_kind' AS before_state,
+        `SELECT reason, before->>'state_kind' AS before_state,
                 after->>'state_kind' AS after_state, corrected_by
            FROM public.schedule_cell_corrections WHERE emp_id = $1`,
         [empId],
       );
       expect(rows).toEqual([
         {
-          reason: "called_off",
-          note: "Called out sick at 6 AM",
+          reason: "Called out sick at 6 AM",
           before_state: "worked",
           after_state: "absence",
           corrected_by: fx.admin.userId,
@@ -364,16 +371,17 @@ describe.skipIf(!reachable)("110 past-day corrections", () => {
       });
     });
 
-    it("needs a reason, and a note for Other", async () => {
-      expect(await correct(fx.admin, day(-1), { reason: null })).toMatchObject({
-        message: expect.stringMatching(/pick a reason/),
+    it("takes a typed reason or none, up to 500 characters", async () => {
+      expect(await correct(fx.admin, day(-1), { reason: null })).toBeNull();
+      expect(await correct(fx.admin, day(-2), { reason: "   " })).toBeNull();
+      expect(await correct(fx.admin, day(-3), { reason: "x".repeat(501) })).toMatchObject({
+        message: expect.stringMatching(/longer than 500 characters/),
       });
-      expect(await correct(fx.admin, day(-1), { reason: "other", note: "  " })).toMatchObject({
-        message: expect.stringMatching(/say what happened/),
-      });
-      expect(
-        await correct(fx.admin, day(-1), { reason: "other", note: "Forgot to move her" }),
-      ).toBeNull();
+      const { rows } = await db.query(
+        `SELECT reason FROM public.schedule_cell_corrections WHERE emp_id = $1 ORDER BY date`,
+        [empId],
+      );
+      expect(rows).toEqual([{ reason: null }, { reason: null }]);
     });
 
     it("refuses a stale version", async () => {

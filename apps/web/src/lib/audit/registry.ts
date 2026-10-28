@@ -757,14 +757,11 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "schedule",
     severity: "update",
     headline: (_d, ctx) => `Corrected a past day${onDate(ctx)}`,
-    // The day itself is drawn as Before and After; the reason says why.
+    // The day itself is drawn as Before and After; the typed reason, when
+    // given, says why.
     details: (d) => {
       const reason = d.text("reason");
-      const note = d.text("note");
-      return [
-        ...(reason ? [{ label: "Reason", value: correctionReasonLabel(reason) }] : []),
-        ...(note ? [{ label: "Note", value: note }] : []),
-      ];
+      return reason ? [{ label: "Reason", value: correctionReasonLabel(reason) }] : [];
     },
   },
   "schedule.published": {

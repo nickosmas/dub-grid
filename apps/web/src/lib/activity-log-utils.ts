@@ -108,13 +108,17 @@ export function describeAuditEvent(action: string, details: Record<string, unkno
 export function formatDetails(entry: ActivityEntryLike & { action: string }): DetailItem[] {
   // A schedule edit that recorded its earlier state reads as Before -> After
   // (item 46h); the details dialog draws the full card instead.
-  if (entry.shiftChange && entry.shiftChange.kind !== "none") {
-    return [{ label: "Change", value: formatShiftChangeCompact(entry.shiftChange) }];
-  }
   const details = detailsOf(entry);
+  const spec = getAuditActionSpec(entry.action);
+  if (entry.shiftChange && entry.shiftChange.kind !== "none") {
+    const change = { label: "Change", value: formatShiftChangeCompact(entry.shiftChange) };
+    // A correction (53c) also says why it was made.
+    return entry.action === "shift.corrected" && spec?.details
+      ? [change, ...spec.details(new AuditDetails(details), contextFromEntry(entry))]
+      : [change];
+  }
   if (Object.keys(details).length === 0) return [];
 
-  const spec = getAuditActionSpec(entry.action);
   if (spec?.details) {
     return spec.details(new AuditDetails(details), contextFromEntry(entry));
   }

@@ -23,11 +23,8 @@ import {
 } from "@/app/api/shared/permissions";
 import { withoutHiddenRequests } from "@dubgrid/data-access";
 import {
-  CORRECTION_NOTE_MAX_LENGTH,
-  CORRECTION_REASON_KEYS,
-  correctionNeedsNote,
+  CORRECTION_REASON_MAX_LENGTH,
   isSchedulableOn,
-  type CorrectionReason,
   type EmployeeStatus,
 } from "@dubgrid/domain";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -138,6 +135,12 @@ const requestActionSchema = z.discriminatedUnion("action", [
     endDate: z.string().date().optional(),
   }),
   z.object({
+    action: z.literal("fetchCorrections"),
+    orgId: z.string().uuid(),
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+  }),
+  z.object({
     action: z.literal("fetchCalloffOpenShifts"),
     orgId: z.string().uuid(),
     startDate: z.string().date(),
@@ -159,8 +162,7 @@ const requestActionSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     input: scheduleCellStateSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
-    reason: z.enum(CORRECTION_REASON_KEYS),
-    note: z.string().trim().max(CORRECTION_NOTE_MAX_LENGTH).optional(),
+    reason: z.string().trim().max(CORRECTION_REASON_MAX_LENGTH).optional(),
     echo: cellEchoSchema.optional(),
   }),
   z.object({
@@ -846,8 +848,7 @@ async function correctShiftSnapshot(
     date: string;
     state: ScheduleCellInput;
     expectedVersion?: number;
-    reason: CorrectionReason;
-    note?: string;
+    reason?: string;
   },
 ): Promise<void> {
   const state = input.state.kind === "deleted" ? null : normalizeScheduleInput(input.state);
@@ -866,8 +867,7 @@ async function correctShiftSnapshot(
     p_absence_start_time: storage?.absenceStartTime ?? null,
     p_absence_end_time: storage?.absenceEndTime ?? null,
     p_expected_version: input.expectedVersion ?? null,
-    p_reason: input.reason,
-    p_note: input.note || null,
+    p_reason: input.reason || null,
   });
   if (!error) return;
   if (error.message?.includes("Optimistic lock failed")) {
@@ -1072,6 +1072,49 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ shifts });
+      }
+
+      case "fetchCorrections": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const buildCorrectionsPage = (from: number, to: number) =>
+          auth.serviceClient
+            .from("schedule_cell_corrections")
+            .select("id, emp_id, date, reason, corrected_at")
+            .eq("org_id", data.orgId)
+            .gte("date", data.startDate)
+            .lte("date", data.endDate)
+            .order("corrected_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+        const rows = await fetchAllRows<{
+          id: string;
+          emp_id: string;
+          date: string;
+          reason: string | null;
+          corrected_at: string;
+        }>(buildCorrectionsPage);
+        // Oldest first, so each day keeps its latest correction.
+        const latest = new Map<string, (typeof rows)[number]>();
+        for (const row of rows) latest.set(`${row.emp_id}_${row.date}`, row);
+
+        return NextResponse.json({
+          corrections: [...latest.values()].map((row) => ({
+            empId: row.emp_id,
+            date: row.date,
+            reason: row.reason,
+            correctedAt: row.corrected_at,
+          })),
+        });
       }
 
       case "fetchScheduleNotes": {
@@ -1288,13 +1331,6 @@ export async function POST(req: NextRequest) {
         if ("response" in auth) {
           return auth.response;
         }
-        if (correctionNeedsNote(data.reason) && !data.note) {
-          return NextResponse.json(
-            { error: "Say what happened.", code: "CORRECTION_REFUSED" },
-            { status: 422 },
-          );
-        }
-
         const before = await readPublishedCellStateForAudit(
           auth.serviceClient,
           data.orgId,
@@ -1308,7 +1344,6 @@ export async function POST(req: NextRequest) {
           state: data.input,
           expectedVersion: data.expectedVersion,
           reason: data.reason,
-          note: data.note,
         });
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
@@ -1317,7 +1352,7 @@ export async function POST(req: NextRequest) {
           action: "shift.corrected",
           resourceType: "shift",
           resourceId: `${data.employeeId}:${data.date}`,
-          details: { input: data.input, before, reason: data.reason, note: data.note ?? null },
+          details: { input: data.input, before, reason: data.reason || null },
         });
         return writeResponse(
           auth.serviceClient,

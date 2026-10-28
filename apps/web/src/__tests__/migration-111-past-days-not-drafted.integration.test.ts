@@ -5,7 +5,7 @@
  * (53b). The cell save and the cell clear refuse it, so paste, fills, moves
  * and bulk delete can't touch a past day, while today and later save as
  * before and a correction (110) still writes the past day. Each case runs
- * 110 and 111 from their files inside BEGIN/ROLLBACK against the seeded local
+ * 110 to 112 from their files inside BEGIN/ROLLBACK against the seeded local
  * database, on a person created inside the transaction.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { actAsAuthenticated } from "./helpers/simulated-jwt";
+import { beginWithLocks, policyGrantTables } from "./helpers/migration-locks";
 import { migrationPath } from "./helpers/sql-inventory";
 
 const DB_URL =
@@ -39,9 +40,11 @@ async function probeDb(): Promise<boolean> {
 
 const reachable = await probeDb();
 
-const MIGRATIONS = ["110_past_day_corrections.sql", "111_past_days_not_drafted.sql"].map((name) =>
-  readFileSync(migrationPath(name), "utf8"),
-);
+const MIGRATIONS = [
+  "110_past_day_corrections.sql",
+  "111_past_days_not_drafted.sql",
+  "112_correction_reason_typed.sql",
+].map((name) => readFileSync(migrationPath(name), "utf8"));
 const PAST = /Past days are corrected, not drafted/;
 
 type Member = { userId: string; orgRole: "admin" | "super_admin" };
@@ -59,6 +62,7 @@ interface Fixture {
 }
 
 let db: Client;
+let lockTables: string[] = [];
 let fx: Fixture;
 let empId: string;
 
@@ -197,21 +201,20 @@ async function attempt(sql: string, params: unknown[] = []): Promise<Error | nul
 async function correct(
   member: Member,
   date: string,
-  options: { reason?: string | null; note?: string | null; expectedVersion?: number | null } = {},
+  options: { reason?: string | null; expectedVersion?: number | null } = {},
 ): Promise<Error | null> {
   await asMember(member);
   const error = await attempt(
     `SELECT public.correct_schedule_cell(
        $1, $2, $3::date, 'absence', '{}'::bigint[], '{}'::bigint[], $4::bigint,
-       NULL, NULL, NULL, $5::bigint, '{}'::boolean[], NULL, NULL, $6, $7)`,
+       NULL, NULL, NULL, $5::bigint, '{}'::boolean[], NULL, NULL, $6)`,
     [
       fx.orgId,
       empId,
       date,
       fx.sickId,
       options.expectedVersion ?? null,
-      options.reason === undefined ? "called_off" : options.reason,
-      options.note ?? null,
+      options.reason === undefined ? "Called off" : options.reason,
     ],
   );
   await asSuperuser();
@@ -259,6 +262,7 @@ describe.skipIf(!reachable)("111 past days not drafted", () => {
     db = new Client(DB_CONFIG);
     await db.connect();
     fx = await loadFixture();
+    lockTables = await policyGrantTables(db);
   });
 
   afterAll(async () => {
@@ -266,7 +270,9 @@ describe.skipIf(!reachable)("111 past days not drafted", () => {
   });
 
   beforeEach(async () => {
-    await db.query("BEGIN");
+    // 110 and 112 replace the same functions and 110 recreates a policy, so
+    // each case holds the corrections table and the policy-grant tables first.
+    await beginWithLocks(db, ["public.schedule_cell_corrections", ...lockTables]);
     for (const migration of MIGRATIONS) await db.query(migration);
     empId = await createPerson();
   });

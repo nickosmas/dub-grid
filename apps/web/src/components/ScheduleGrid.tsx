@@ -20,14 +20,14 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, UserPen, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
+import { correctionReasonLabel, formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { isNewShiftChange, isPastDateKey, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
@@ -76,6 +76,7 @@ import {
 } from "@/types";
 import { buildScheduleGridModel } from "./schedule-grid/model";
 import type {
+  CorrectionMark,
   ScheduleGridHandlers,
   ScheduleGridInteractionState,
   ScheduleGridModel,
@@ -228,6 +229,7 @@ interface LegacyScheduleGridProps {
   ) => void;
   todayKey: string;
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  corrections?: ReadonlyMap<string, CorrectionMark>;
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   focusAreas: FocusArea[];
@@ -336,6 +338,7 @@ interface SectionBlockProps {
   weekDates: Date[];
   todayKey: string;
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  corrections?: ReadonlyMap<string, CorrectionMark>;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
@@ -1096,6 +1099,7 @@ const SectionBlock = memo(function SectionBlock({
   weekDates,
   todayKey,
   awayRanges,
+  corrections,
   shiftForKey,
   assignmentIdsForKey,
   segmentsForKey,
@@ -2586,6 +2590,12 @@ const SectionBlock = memo(function SectionBlock({
                       // A past day is finished (53b): it opens for a correction,
                       // and nothing moves into or out of it.
                       const isPastDay = isPastDateKey(dateKey, todayKey);
+                      const correction = isPastDay ? corrections?.get(cellKey) : undefined;
+                      const correctionHint = correction
+                        ? correction.reason
+                          ? `Corrected: ${correctionReasonLabel(correction.reason)}`
+                          : "Corrected"
+                        : undefined;
                       const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                       // The row above paints its own bottom stroke inside its
                       // own box — the header cells and the open-shifts row both
@@ -2669,8 +2679,9 @@ const SectionBlock = memo(function SectionBlock({
                           data-absence-run-index={absenceRunDay?.runIndex}
                           data-away-run={awayRunDay?.position}
                           data-away-locked={isAwayLocked ? "true" : undefined}
-                          title={awayHint}
-                          aria-description={awayHint}
+                          title={awayHint ?? correctionHint}
+                          aria-description={awayHint ?? correctionHint}
+                          data-corrected={correction ? "true" : undefined}
                           data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                           data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                           data-bulk-selected={isBulkSelected ? "true" : undefined}
@@ -2719,6 +2730,31 @@ const SectionBlock = memo(function SectionBlock({
                             }
                           }}
                         >
+                          {correction && (
+                            <span
+                              aria-hidden="true"
+                              data-correction-mark
+                              className="dg-grid-correction-mark"
+                              style={{
+                                position: "absolute",
+                                top: 3,
+                                right: 3 + cornerLockClearance,
+                                zIndex: 9,
+                                width: 14,
+                                height: 14,
+                                borderRadius: 999,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "var(--dg-color-surface)",
+                                boxShadow: "0 0 0 1px var(--dg-color-border)",
+                                color: "var(--dg-color-text-muted)",
+                                pointerEvents: "none",
+                              }}
+                            >
+                              <Pencil size={8} strokeWidth={2.5} />
+                            </span>
+                          )}
                           <div
                             className="dg-grid-cell__content"
                             style={{
@@ -4872,6 +4908,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   handleCellClick,
   todayKey,
   awayRanges,
+  corrections,
   highlightEmpIds,
   highlightScrollKey,
   focusAreas,
@@ -5308,6 +5345,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     weekDates={allDates}
                     todayKey={todayKey}
                     awayRanges={awayRanges}
+                    corrections={corrections}
                     shiftForKey={shiftForKey}
                     assignmentIdsForKey={assignmentIdsForKey}
                     segmentsForKey={segmentsForKey}
@@ -5554,6 +5592,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           handleCellClick={handleLegacyCellClick}
           todayKey={model.todayKey}
           awayRanges={model.awayRanges}
+          corrections={model.corrections}
           highlightEmpIds={model.options.highlightEmpIds}
           highlightScrollKey={model.options.highlightScrollKey}
           focusAreas={model.focusAreas}

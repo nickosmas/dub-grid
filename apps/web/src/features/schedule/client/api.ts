@@ -18,7 +18,7 @@ import type {
   ShiftRequestType,
   SeriesFrequency,
 } from "@/types";
-import type { CorrectionReason, ShiftRequestDraftCell } from "@dubgrid/domain";
+import type { ShiftRequestDraftCell } from "@dubgrid/domain";
 import type { CoverageJobPreference, CoverageShiftPreference } from "@dubgrid/schedule-core";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
@@ -662,13 +662,36 @@ export function upsertShift(
   });
 }
 
-/** Corrects one person's published past day with a reason (53a); no draft, no alert. */
+/** A day's latest correction (53c), as the grid marks it. */
+export interface CellCorrection {
+  empId: string;
+  date: string;
+  reason: string | null;
+  correctedAt: string;
+}
+
+/** The latest correction of each corrected day in a date range, for editors. */
+export async function fetchCorrections(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+): Promise<CellCorrection[]> {
+  const payload = await requestScheduleManage<{ corrections?: CellCorrection[] }>({
+    action: "fetchCorrections",
+    orgId,
+    startDate,
+    endDate,
+  });
+  return payload.corrections ?? [];
+}
+
+/** Corrects one person's published past day (53a), with an optional typed reason; no draft, no alert. */
 export function correctShift(
   employeeId: string,
   date: string,
   input: ScheduleCellInput,
   orgId: string,
-  correction: { reason: CorrectionReason; note: string },
+  reason: string,
   expectedVersion?: number,
   echo?: CellEcho,
 ): Promise<EchoedCells | null> {
@@ -679,8 +702,7 @@ export function correctShift(
     date,
     input,
     expectedVersion,
-    reason: correction.reason,
-    note: correction.note || undefined,
+    reason: reason || undefined,
     echo: serializeEcho(echo),
   });
 }

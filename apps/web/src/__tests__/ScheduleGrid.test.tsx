@@ -217,6 +217,7 @@ beforeEach(() => {
 
 interface RenderGridOptions {
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  corrections?: ReadonlyMap<string, { reason: string | null }>;
   filteredEmployees?: Employee[];
   allEmployees?: Employee[];
   week1?: Date[];
@@ -389,6 +390,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     spanWeeks: options.spanWeeks ?? 2,
     todayKey: options.todayKey ?? formatDateKey(week1[0]),
     awayRanges: options.awayRanges,
+    corrections: options.corrections,
     focusAreas: options.focusAreas ?? focusAreas,
     departments: options.departments ?? departments,
     assignments: resolvedAssignmentDefinitions,
@@ -2477,6 +2479,32 @@ describe("ScheduleGrid", () => {
           cellId: expect.objectContaining({ dateKey: formatDateKey(week1[1]) }),
         }),
       );
+    });
+  });
+
+  describe("corrected days (53c)", () => {
+    it("marks a corrected past day and names why", () => {
+      observedWidth = 1600;
+      const corrected = formatDateKey(week1[1]);
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        corrections: new Map([
+          [`emp-1_${corrected}`, { reason: "Sent home sick at 10" }],
+          [`emp-1_${formatDateKey(week1[2])}`, { reason: null }],
+          [`emp-1_${formatDateKey(week1[4])}`, { reason: "Not past" }],
+        ]),
+      });
+
+      const cells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === "emp-1",
+      );
+      expect(cells[1].dataset.corrected).toBe("true");
+      expect(cells[1].querySelector("[data-correction-mark]")).not.toBeNull();
+      expect(cells[1].getAttribute("title")).toBe("Corrected: Sent home sick at 10");
+      expect(cells[2].getAttribute("title")).toBe("Corrected");
+      expect(cells[0].dataset.corrected).toBeUndefined();
+      // A day from today on is never marked, whatever the map holds.
+      expect(cells[4].dataset.corrected).toBeUndefined();
     });
   });
 

@@ -151,7 +151,7 @@ import {
 import { planRecurringFills } from "./_lib/recurring-fills";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
-import { CORRECTION_ADMIN_WINDOW_DAYS, type CorrectionReason } from "@dubgrid/domain";
+import { CORRECTION_ADMIN_WINDOW_DAYS } from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -221,8 +221,10 @@ import {
   updateSeriesAllShifts,
   upsertScheduleNote,
   correctShift,
+  fetchCorrections,
   upsertShift,
   upsertShiftTimes,
+  type CellCorrection,
   type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
@@ -656,6 +658,23 @@ function SchedulerContent({
     setLoadedShiftWindow(next);
   }, []);
 
+  useEffect(() => {
+    const orgId = org?.id;
+    if (!orgId || !canEditShifts) return;
+    let cancelled = false;
+    fetchCorrections(orgId, shiftFetchStart, shiftFetchEnd)
+      .then((rows) => {
+        if (!cancelled) {
+          setCorrections(new Map(rows.map((row) => [`${row.empId}_${row.date}`, row])));
+        }
+      })
+      // The mark is a hint; a failed read leaves the grid as it is.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
+
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(initialDate ? parseLocalDateKey(initialDate) : todayAnchor),
   );
@@ -670,6 +689,10 @@ function SchedulerContent({
   const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
   const localWrites = useRef(createLocalWriteLedger());
   const [notes, setNotes] = useState<ScheduleNoteMap>({});
+  // Each corrected past day's latest correction (53c), for the grid's mark.
+  const [corrections, setCorrections] = useState<ReadonlyMap<string, CellCorrection>>(
+    () => new Map(),
+  );
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
@@ -5477,7 +5500,7 @@ function SchedulerContent({
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
 
   const handleSaveCorrection = useCallback(
-    async (reason: CorrectionReason, note: string) => {
+    async (reason: string) => {
       const orgId = org?.id;
       const session = editSessionDraftRef.current;
       const panel = editPanel;
@@ -5506,7 +5529,7 @@ function SchedulerContent({
           formatDateKey(panel.date),
           input,
           orgId,
-          { reason, note },
+          reason,
           shiftsRef.current[session.cellKey]?.version ?? 0,
           {
             isScheduler: canEditShiftsRef.current,
@@ -5532,6 +5555,15 @@ function SchedulerContent({
         } else {
           await refetchScheduleDataRef.current();
         }
+        const correctedDateKey = formatDateKey(panel.date);
+        setCorrections((current) =>
+          new Map(current).set(`${panel.empId}_${correctedDateKey}`, {
+            empId: panel.empId,
+            date: correctedDateKey,
+            reason: reason || null,
+            correctedAt: new Date().toISOString(),
+          }),
+        );
         closeEditPanel();
         toast.success("Day corrected.");
       } catch (error) {
@@ -7791,6 +7823,7 @@ function SchedulerContent({
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
         todayKey,
         awayRanges,
+        corrections,
         focusAreas,
         departments,
         assignments,
@@ -7848,6 +7881,7 @@ function SchedulerContent({
       spanWeeks,
       todayKey,
       awayRanges,
+      corrections,
       focusAreas,
       departments,
       assignments,

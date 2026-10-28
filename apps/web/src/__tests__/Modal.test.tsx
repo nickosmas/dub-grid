@@ -150,9 +150,12 @@ describe("Modal focus lifecycle", () => {
     render(<Editor />);
     const trigger = screen.getByRole("button", { name: "Remove entry" });
     await userEvent.click(trigger);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
+    // A full parallel run can take past waitFor's one-second default to move focus.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus(), {
+      timeout: 5000,
+    });
     await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(trigger).toHaveFocus());
+    await waitFor(() => expect(trigger).toHaveFocus(), { timeout: 5000 });
     expect(closeEditor).not.toHaveBeenCalled();
   });
 

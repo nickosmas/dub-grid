@@ -9,13 +9,7 @@ import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import { toDarkPillColors, darkenColor } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
-import {
-  CORRECTION_NOTE_MAX_LENGTH,
-  CORRECTION_REASONS,
-  correctionNeedsNote,
-  indefiniteArticle,
-  type CorrectionReason,
-} from "@dubgrid/domain";
+import { CORRECTION_REASON_MAX_LENGTH, indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
   EditModalState,
@@ -182,11 +176,11 @@ interface ShiftEditPanelProps {
   /** Commits the current local draft to the server. */
   onConfirmDraft?: (seriesScope?: SeriesScope) => void;
   /**
-   * A past day being corrected (53b): the edit is saved as a correction with
-   * a reason through `onSave` rather than as a draft.
+   * A past day being corrected (53b): the edit is saved as a correction, with
+   * an optional typed reason, through `onSave` rather than as a draft.
    */
   correction?: {
-    onSave: (reason: CorrectionReason, note: string) => void;
+    onSave: (reason: string) => void;
     saving?: boolean;
   } | null;
   /** Why a past day opens read-only for this person (53b). */
@@ -755,11 +749,7 @@ export default function ShiftEditPanel({
     (slot) => slot.added.length > 0 || slot.removed.length > 0,
   );
   const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
-  const [correctionReason, setCorrectionReason] = useState<CorrectionReason | null>(null);
-  const [correctionNote, setCorrectionNote] = useState("");
-  const correctionReady =
-    correctionReason != null &&
-    (!correctionNeedsNote(correctionReason) || correctionNote.trim().length > 0);
+  const [correctionReason, setCorrectionReason] = useState("");
   const canEditSeriesPattern = Boolean(
     allowShiftEdits && seriesId && empId && onLoadSeriesPattern && onRescheduleSeries,
   );
@@ -5092,61 +5082,17 @@ export default function ShiftEditPanel({
               </div>
             )}
             {correction && hasEdits && (
-              <div
-                role="radiogroup"
-                aria-label="Why are you correcting this day?"
-                data-correction-reasons
-                style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}
-              >
-                <div
-                  style={{
-                    fontSize: "var(--dg-fs-badge)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  Why are you correcting this day?
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {CORRECTION_REASONS.map((reason) => {
-                    const selected = correctionReason === reason.key;
-                    return (
-                      <Button
-                        key={reason.key}
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => setCorrectionReason(reason.key)}
-                        className={`dg-btn ${selected ? "dg-btn-primary" : "dg-btn-secondary"}`}
-                        style={{
-                          fontSize: "var(--dg-fs-badge)",
-                          padding: "5px 10px",
-                          borderRadius: 999,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {reason.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-                {correctionReason != null && (
-                  <textarea
-                    aria-label={
-                      correctionNeedsNote(correctionReason) ? "What happened" : "Note (optional)"
-                    }
-                    placeholder={
-                      correctionNeedsNote(correctionReason)
-                        ? "What happened"
-                        : "Add a note (optional)"
-                    }
-                    value={correctionNote}
-                    maxLength={CORRECTION_NOTE_MAX_LENGTH}
-                    rows={2}
-                    onChange={(event) => setCorrectionNote(event.target.value)}
-                    className="dg-input"
-                    style={{ fontSize: "var(--dg-fs-caption)", resize: "vertical" }}
-                  />
-                )}
-              </div>
+              <textarea
+                aria-label="Reason for the correction (optional)"
+                placeholder="Reason (optional)"
+                value={correctionReason}
+                maxLength={CORRECTION_REASON_MAX_LENGTH}
+                rows={2}
+                onChange={(event) => setCorrectionReason(event.target.value)}
+                className="dg-input"
+                data-correction-reason
+                style={{ fontSize: "var(--dg-fs-caption)", resize: "vertical", marginBottom: 4 }}
+              />
             )}
             <div style={{ display: "flex", gap: 8 }}>
               <Button
@@ -5158,20 +5104,10 @@ export default function ShiftEditPanel({
               </Button>
               {correction ? (
                 <Button
-                  onClick={() => {
-                    if (correctionReason && correctionReady) {
-                      correction.onSave(correctionReason, correctionNote.trim());
-                    }
-                  }}
+                  onClick={() => correction.onSave(correctionReason.trim())}
                   className="dg-btn dg-btn-primary"
                   style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-                  disabled={
-                    confirmBlocked ||
-                    absenceBlocksSave() ||
-                    !hasEdits ||
-                    !correctionReady ||
-                    correction.saving
-                  }
+                  disabled={confirmBlocked || absenceBlocksSave() || !hasEdits || correction.saving}
                 >
                   <ButtonLoading loading={!!correction.saving}>Save correction</ButtonLoading>
                 </Button>

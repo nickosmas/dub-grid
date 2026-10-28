@@ -40,7 +40,7 @@ function correction(overrides: Record<string, unknown> = {}) {
       date: "2026-10-27",
       input: { kind: "absence", segments: [], absenceTypeId: 7 },
       expectedVersion: 3,
-      reason: "called_off",
+      reason: "Called out at 6 AM",
       ...overrides,
     }),
   });
@@ -88,7 +88,7 @@ describe("POST /api/schedule/manage correctShift", () => {
   });
 
   it("corrects the day through the caller's client and logs it with Before and the reason", async () => {
-    const response = await POST(correction({ note: "  Sent home sick  " }));
+    const response = await POST(correction({ reason: "  Sent home sick  " }));
 
     expect(response.status).toBe(200);
     expect(userRpc).toHaveBeenCalledWith(
@@ -100,8 +100,7 @@ describe("POST /api/schedule/manage correctShift", () => {
         p_state_kind: "absence",
         p_absence_type_id: 7,
         p_expected_version: 3,
-        p_reason: "called_off",
-        p_note: "Sent home sick",
+        p_reason: "Sent home sick",
       }),
     );
     expect(auditInsert).toHaveBeenCalledWith(
@@ -110,8 +109,7 @@ describe("POST /api/schedule/manage correctShift", () => {
         resource_type: "shift",
         resource_id: `${employeeId}:2026-10-27`,
         details: expect.objectContaining({
-          reason: "called_off",
-          note: "Sent home sick",
+          reason: "Sent home sick",
           before: expect.objectContaining({ kind: "worked" }),
         }),
       }),
@@ -119,13 +117,14 @@ describe("POST /api/schedule/manage correctShift", () => {
     expect(dispatchNotificationEvent).not.toHaveBeenCalled();
   });
 
-  it("refuses a missing reason, an unknown one, and Other without a note", async () => {
-    expect((await POST(correction({ reason: undefined }))).status).toBe(400);
-    expect((await POST(correction({ reason: "forgot" }))).status).toBe(400);
-    const other = await POST(correction({ reason: "other", note: "   " }));
-    expect(other.status).toBe(422);
-    expect(await other.json()).toMatchObject({ error: "Say what happened." });
-    expect(userRpc).not.toHaveBeenCalled();
+  it("takes no reason at all, and refuses one over 500 characters", async () => {
+    expect((await POST(correction({ reason: undefined }))).status).toBe(200);
+    expect(userRpc).toHaveBeenLastCalledWith(
+      "correct_schedule_cell",
+      expect.objectContaining({ p_reason: null }),
+    );
+    expect((await POST(correction({ reason: "x".repeat(501) }))).status).toBe(400);
+    expect(userRpc).toHaveBeenCalledTimes(1);
   });
 
   it("passes the database's refusal on in plain words", async () => {

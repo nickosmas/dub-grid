@@ -29,6 +29,11 @@ import type {
   ScheduleNoteShift,
 } from "@/types";
 
+/** A corrected past day's latest correction (53c), with its typed reason if any. */
+export interface CorrectionMark {
+  reason: string | null;
+}
+
 export interface ScheduleGridAccessors {
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -112,6 +117,8 @@ export interface ScheduleGridModel {
   todayKey: string;
   /** Each away person's range, dated in the organization's timezone. */
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  /** Corrected past days by `${empId}_${dateKey}` (53c). */
+  corrections?: ReadonlyMap<string, CorrectionMark>;
   columns: GridColumnMeta[];
   week1: Date[];
   week2: Date[];
@@ -199,6 +206,8 @@ export interface BuildScheduleGridModelInput {
   todayKey: string;
   /** Each away person's range, as the page counts coverage with it. */
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  /** Corrected past days by `${empId}_${dateKey}` (53c). */
+  corrections?: ReadonlyMap<string, CorrectionMark>;
   focusAreas: FocusArea[];
   departments: Department[];
   assignments: AssignmentDefinition[];
@@ -241,6 +250,7 @@ export function buildScheduleGridModel({
   spanWeeks,
   todayKey,
   awayRanges,
+  corrections,
   focusAreas,
   departments,
   assignments,
@@ -442,6 +452,7 @@ export function buildScheduleGridModel({
     activeFocusArea,
     todayKey,
     awayRanges,
+    corrections,
     columns,
     week1,
     week2,

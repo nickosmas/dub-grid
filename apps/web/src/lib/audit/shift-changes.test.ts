@@ -70,6 +70,24 @@ describe("shiftChangeForAuditRow", () => {
     ).toEqual({ before: [expect.stringMatching(/^Day Shift/)], after: [] });
   });
 
+  it("reads a correction as the published day before and after it", () => {
+    expect(
+      sides(
+        shiftChangeForAuditRow(
+          row("shift.corrected", {
+            before: worked(1),
+            input: worked(2),
+            reason: "Moved to nights",
+          }),
+          resolvers,
+        ),
+      ),
+    ).toEqual({
+      before: [expect.stringMatching(/^Day Shift/)],
+      after: [expect.stringMatching(/^Night Shift/)],
+    });
+  });
+
   it("reads a move as the day it landed on", () => {
     const change = shiftChangeForAuditRow(
       row("shift.moved", {

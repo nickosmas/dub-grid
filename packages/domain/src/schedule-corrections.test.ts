@@ -1,28 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  CORRECTION_REASON_KEYS,
-  correctionNeedsNote,
-  correctionReasonLabel,
-} from "./schedule-corrections";
+import { correctionReasonLabel } from "./schedule-corrections";
 
-describe("correction reasons", () => {
-  it("are the keys the database accepts, in the panel's order", () => {
-    expect(CORRECTION_REASON_KEYS).toEqual([
-      "called_off",
-      "left_early",
-      "swapped",
-      "wrong_shift",
-      "other",
-    ]);
+describe("correctionReasonLabel", () => {
+  it("passes a typed reason through", () => {
+    expect(correctionReasonLabel("Sent home sick at 10")).toBe("Sent home sick at 10");
   });
 
-  it("label each key and pass an unknown one through", () => {
+  it("reads a reason stored as a key before reasons were typed", () => {
     expect(correctionReasonLabel("swapped")).toBe("Swapped with someone");
-    expect(correctionReasonLabel("legacy")).toBe("legacy");
-  });
-
-  it("need a note only for Other", () => {
-    expect(correctionNeedsNote("other")).toBe(true);
-    expect(correctionNeedsNote("called_off")).toBe(false);
   });
 });
