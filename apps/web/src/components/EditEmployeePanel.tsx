@@ -614,12 +614,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         style={{ width: "100%" }}
                       />
                     </div>
-                    <FirstDayField
-                      value={form.firstDay}
-                      onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
-                      labelStyle={{ ...fieldLabel, marginBottom: 0 }}
-                      disabled={readOnly}
-                    />
+                    {/* Asked when adding someone; once set, it stays here to move or clear. */}
+                    {employee.firstDay ? (
+                      <FirstDayField
+                        value={form.firstDay}
+                        onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
+                        labelStyle={{ ...fieldLabel, marginBottom: 0 }}
+                        disabled={readOnly}
+                      />
+                    ) : null}
                   </div>
                 )}
 

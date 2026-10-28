@@ -184,6 +184,18 @@ describe("EditEmployeePanel", () => {
   // Pre-population
   // -------------------------------------------------------------------------
   describe("Pre-population", () => {
+    it("leaves First day out for someone without one", () => {
+      renderPanel({ employee: { ...employee, firstDay: null } });
+
+      expect(screen.queryByText("First day")).not.toBeInTheDocument();
+    });
+
+    it("keeps First day to move or clear once one is set", () => {
+      renderPanel({ employee: { ...employee, firstDay: "2026-11-10" } });
+
+      expect(screen.getByText("First day")).toBeInTheDocument();
+    });
+
     it("scopes identity fields to explicit contact autofill tokens", () => {
       renderPanel();
 
