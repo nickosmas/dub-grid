@@ -635,7 +635,11 @@ export interface BillingOperationSummary {
 
 /** Who takes a seat and who doesn't, line by line. `total` is the billed count. */
 export interface SeatBreakdown {
+  /** Active and able to sign in; suspended staff are counted apart. */
   activeStaff: number;
+  /** Suspended staff: they can't sign in but always take a seat. */
+  suspended: number;
+  suspendedNames: string[];
   /** Away staff whose live membership can still manage (Admin or Super Admin). */
   awayManaging: number;
   awayManagingNames: string[];

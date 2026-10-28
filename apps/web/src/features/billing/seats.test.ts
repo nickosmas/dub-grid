@@ -112,12 +112,43 @@ describe("breakdownBillableSeats", () => {
   it("splits billed and unbilled people by status", () => {
     expect(breakdownBillableSeats(employees, memberships)).toEqual({
       activeStaff: 2,
+      suspended: 0,
+      suspendedNames: [],
       awayManaging: 2,
       awayManagingNames: ["Amy Diaz", "Lee Wong"],
       managementOnly: 1,
       awayNotBilled: 2,
       archived: 2,
       total: 5,
+    });
+  });
+
+  it("counts suspended staff apart from active staff, and still bills them", () => {
+    const breakdown = breakdownBillableSeats(
+      [
+        {
+          status: "active",
+          archived_at: null,
+          user_id: "u-1",
+          first_name: "Ada",
+          last_name: "Ray",
+        },
+        {
+          status: "active",
+          archived_at: null,
+          suspended_at: "2026-10-26T00:00:00Z",
+          user_id: "u-2",
+          first_name: "Carol",
+          last_name: "Henderson",
+        },
+      ],
+      [],
+    );
+    expect(breakdown).toMatchObject({
+      activeStaff: 1,
+      suspended: 1,
+      suspendedNames: ["Carol Henderson"],
+      total: 2,
     });
   });
 
@@ -152,6 +183,8 @@ describe("breakdownBillableSeats", () => {
 describe("describeSeatBreakdown", () => {
   const base = {
     activeStaff: 42,
+    suspended: 0,
+    suspendedNames: [],
     awayManaging: 0,
     awayManagingNames: [],
     managementOnly: 0,
@@ -179,6 +212,21 @@ describe("describeSeatBreakdown", () => {
       label: "Away, can manage",
       count: 1,
       detail: "Lee Wong. Away people take a seat only while they keep management access.",
+    });
+  });
+
+  it("shows suspended people as their own billed group, named, after active staff", () => {
+    const { billed } = describeSeatBreakdown({
+      ...base,
+      suspended: 1,
+      suspendedNames: ["Carol Henderson"],
+      total: 43,
+    });
+    expect(billed[1]).toEqual({
+      key: "suspended",
+      label: "Suspended",
+      count: 1,
+      detail: "Carol Henderson. Suspended people keep their seat while they can't sign in.",
     });
   });
 

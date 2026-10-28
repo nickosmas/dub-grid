@@ -231,6 +231,8 @@ describe("GET /api/billing", () => {
       appUserCount: 7,
       seatBreakdown: {
         activeStaff: 6,
+        suspended: 0,
+        suspendedNames: [],
         awayManaging: 0,
         awayManagingNames: [],
         managementOnly: 1,

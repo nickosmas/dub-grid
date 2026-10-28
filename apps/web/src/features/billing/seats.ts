@@ -4,6 +4,7 @@ import type { SeatBreakdown } from "@/types";
 export interface SeatEmployee {
   status?: string | null;
   archived_at?: string | null;
+  suspended_at?: string | null;
   user_id?: string | null;
   first_name?: string | null;
   last_name?: string | null;
@@ -21,7 +22,7 @@ function fullName(employee: SeatEmployee): string {
 }
 
 /**
- * Billed seats: active staff, inactive (Away) staff whose live membership can
+ * Billed seats: active staff (suspended ones included, counted apart), inactive (Away) staff whose live membership can
  * still manage (Admin or Super Admin), plus live members linked to no staff
  * record. `employees` must include inactive and removed rows, so a member whose
  * staff record has left is recognised as that person rather than billed as a
@@ -41,6 +42,8 @@ export function breakdownBillableSeats(
   const staffUserIds = new Set<string>();
   const breakdown: SeatBreakdown = {
     activeStaff: 0,
+    suspended: 0,
+    suspendedNames: [],
     awayManaging: 0,
     awayManagingNames: [],
     managementOnly: 0,
@@ -53,6 +56,10 @@ export function breakdownBillableSeats(
     if (employee.user_id && internalUserIds.has(employee.user_id)) continue;
     if (employee.archived_at || employee.status === "removed") {
       breakdown.archived += 1;
+    } else if (employee.status === "active" && employee.suspended_at) {
+      breakdown.suspended += 1;
+      const name = fullName(employee);
+      if (name) breakdown.suspendedNames.push(name);
     } else if (employee.status === "active") {
       breakdown.activeStaff += 1;
     } else if (employee.status === "inactive") {
@@ -73,7 +80,9 @@ export function breakdownBillableSeats(
   }
   breakdown.managementOnly = managementOnly.size;
   breakdown.awayManagingNames.sort((a, b) => a.localeCompare(b));
-  breakdown.total = breakdown.activeStaff + breakdown.awayManaging + breakdown.managementOnly;
+  breakdown.suspendedNames.sort((a, b) => a.localeCompare(b));
+  breakdown.total =
+    breakdown.activeStaff + breakdown.suspended + breakdown.awayManaging + breakdown.managementOnly;
   return breakdown;
 }
 
@@ -86,7 +95,7 @@ export function countBillableSeats(
 }
 
 export interface SeatBreakdownLine {
-  key: "active" | "away-managing" | "management-only" | "away" | "archived";
+  key: "active" | "suspended" | "away-managing" | "management-only" | "away" | "archived";
   label: string;
   count: number;
   detail?: string;
@@ -110,6 +119,15 @@ export function describeSeatBreakdown(breakdown: SeatBreakdown): {
   const billed: SeatBreakdownLine[] = [
     { key: "active", label: "Active staff", count: breakdown.activeStaff },
   ];
+  if (breakdown.suspended > 0) {
+    const names = listNames(breakdown.suspendedNames);
+    billed.push({
+      key: "suspended",
+      label: "Suspended",
+      count: breakdown.suspended,
+      detail: `${names ? `${names}. ` : ""}Suspended people keep their seat while they can't sign in.`,
+    });
+  }
   if (breakdown.awayManaging > 0) {
     const names = listNames(breakdown.awayManagingNames);
     billed.push({

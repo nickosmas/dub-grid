@@ -97,7 +97,16 @@ function NoticeBanner({ tone, children }: { tone: BillingTone; children: ReactNo
   );
 }
 
-function SeatLines({ title, lines }: { title: string; lines: SeatBreakdownLine[] }) {
+function SeatLines({
+  title,
+  lines,
+  total,
+}: {
+  title: string;
+  lines: SeatBreakdownLine[];
+  /** The billed seats each line is a share of; left out for lines that aren't billed. */
+  total?: number;
+}) {
   if (lines.length === 0) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
@@ -128,9 +137,29 @@ function SeatLines({ title, lines }: { title: string; lines: SeatBreakdownLine[]
                 className="dg-tabular-nums"
                 style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}
               >
-                {line.count}
+                {total ? seatShareLabel(line.count, total) : line.count}
               </span>
             </div>
+            {total ? (
+              <div
+                aria-hidden="true"
+                style={{
+                  marginTop: 6,
+                  height: 4,
+                  borderRadius: 2,
+                  background: "var(--dg-color-border-light)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.round((line.count / total) * 100)}%`,
+                    height: "100%",
+                    background: "var(--dg-color-primary)",
+                  }}
+                />
+              </div>
+            ) : null}
             {line.detail && (
               <div
                 style={{
@@ -144,9 +173,32 @@ function SeatLines({ title, lines }: { title: string; lines: SeatBreakdownLine[]
             )}
           </li>
         ))}
+        {total ? (
+          <li
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "8px 0 0",
+              borderTop: "1px solid var(--dg-color-border)",
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 600,
+              color: "var(--dg-color-text-primary)",
+            }}
+          >
+            <span>Billed seats</span>
+            <span className="dg-tabular-nums">{total}</span>
+          </li>
+        ) : null}
       </ul>
     </div>
   );
+}
+
+/** "1 seat", or "25 of 31 seats": how much of the bill a group makes up. */
+function seatShareLabel(count: number, total: number): string {
+  if (count === total) return `${count} ${count === 1 ? "seat" : "seats"}`;
+  return `${count} of ${total} seats`;
 }
 
 function SeatBreakdownSection({ breakdown }: { breakdown: SeatBreakdown }) {
@@ -162,7 +214,7 @@ function SeatBreakdownSection({ breakdown }: { breakdown: SeatBreakdown }) {
         padding: "12px 14px",
       }}
     >
-      <SeatLines title="Who takes a seat" lines={billed} />
+      <SeatLines title="Who takes a seat" lines={billed} total={breakdown.total} />
       <SeatLines title="Not billed" lines={notBilled} />
     </div>
   );
