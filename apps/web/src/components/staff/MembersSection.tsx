@@ -2567,6 +2567,10 @@ export function MembersSection({
               ? describeStatusAction(
                   BULK_STATUS_ACTIONS[bulkConfirm.action],
                   getEmployeeDisplayName(only),
+                  {
+                    hasAccount: Boolean(only.userId),
+                    plannedFrom: only.plannedStatus === "away" ? (only.plannedFrom ?? null) : null,
+                  },
                 )
               : describeStatusAction(
                   BULK_STATUS_ACTIONS[bulkConfirm.action],

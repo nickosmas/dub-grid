@@ -144,11 +144,14 @@ export function PersonStaffActions({
 
   const statusOptions: StatusChange[] =
     employee.status === "active" ? ["deactivate", "remove"] : ["activate", "remove"];
+  const plannedFrom =
+    employee.plannedStatus === "away" && employee.plannedFrom ? employee.plannedFrom : null;
   const available = statusOptions.filter(
     (option) =>
       !(option === "remove" && employee.status === "removed") &&
-      // Away only takes someone off the schedule, so it skips management-only people.
-      !(option === "deactivate" && !canMarkInactive(employee.focusAreaIds)),
+      // Away only takes someone off the schedule, so it skips management-only people,
+      // and someone with an away planned already has one (51g1).
+      !(option === "deactivate" && (!canMarkInactive(employee.focusAreaIds) || plannedFrom)),
   );
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const copyFor = (change: StatusChange) =>
@@ -159,6 +162,7 @@ export function PersonStaffActions({
           ? "archive"
           : (statusUndoAction(employee.status) ?? "markActive"),
       fullName,
+      { hasAccount: linked, plannedFrom: change === "remove" ? plannedFrom : null },
     );
 
   return (

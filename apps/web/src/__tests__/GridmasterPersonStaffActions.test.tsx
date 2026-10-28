@@ -148,6 +148,37 @@ describe("PersonStaffActions", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
+  it("offers no second Mark away for someone with an away planned", () => {
+    render(
+      <PersonStaffActions
+        employee={staff({
+          focusAreaIds: [1],
+          plannedStatus: "away",
+          plannedFrom: "2099-01-05",
+          plannedUntil: "2099-01-12",
+        })}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(
+      within(screen.getByRole("dialog", { name: "Archive Ada Lovelace?" })).getByText(
+        "The away planned from Jan 5 is cancelled.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing of sign-in when archiving someone with no account", () => {
+    render(<PersonStaffActions employee={staff({ userId: null })} onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("dialog", { name: "Archive Ada Lovelace?" })).not.toHaveTextContent(
+      /sign in/i,
+    );
+  });
+
   it("restores an archived record", async () => {
     render(<PersonStaffActions employee={staff({ status: "removed" })} onChanged={vi.fn()} />);
 

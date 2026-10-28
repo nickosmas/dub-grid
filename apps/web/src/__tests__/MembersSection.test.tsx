@@ -1268,6 +1268,32 @@ describe("MembersSection - bulk status changes under step-up (F-98)", () => {
     return { user, view };
   }
 
+  it("names a lone pick's planned away and leaves out sign-in when they have no account", async () => {
+    const user = userEvent.setup();
+    renderMembersSection({
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      isSuperAdmin: true,
+      employees: [
+        makeEmployee({
+          id: "emp-1",
+          firstName: "Jamie",
+          lastName: "Rivera",
+          userId: null,
+          plannedStatus: "away",
+          plannedFrom: "2099-01-05",
+        }),
+      ],
+    });
+    await settleInvitations();
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("button", { name: /^Archive\b(?!d)/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Archive Jamie Rivera?" });
+    expect(dialog).toHaveTextContent("The away planned from Jan 5 is cancelled.");
+    expect(dialog).not.toHaveTextContent(/sign in/i);
+  });
+
   it("hides the bulk confirmation while the step-up prompt is open", async () => {
     const { view } = await openBulkDeactivate({});
     const rerender = (statusStepUpOpen: boolean) =>
