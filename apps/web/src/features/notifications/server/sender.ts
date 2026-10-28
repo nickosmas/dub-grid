@@ -13,6 +13,7 @@ import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 import { serverEnv } from "@/lib/env.server";
+import { contactChannels, loadContactFacts } from "./contact-eligibility";
 
 export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   // schedule
@@ -133,6 +134,7 @@ export interface SendNotificationOptions {
 /**
  * Create a notification and optionally send an email.
  * Should be called from server-side code (API routes, server actions).
+ * Only someone who can still sign in is pushed or emailed (contact-eligibility.ts).
  */
 export async function sendNotification(
   userId: string,
@@ -145,7 +147,12 @@ export async function sendNotification(
 ): Promise<void> {
   const supabase = getServiceClient();
   const category = NOTIFICATION_CATEGORIES[type] ?? "system";
-  const writeInApp = options.writeInApp !== false;
+  // A security alert is about the DubGrid sign-in, which no organization owns.
+  const orgScopedId = category === "security" ? null : orgId;
+  const channels = contactChannels(await loadContactFacts(supabase, userId, orgScopedId), {
+    orgScoped: orgScopedId !== null,
+  });
+  const writeInApp = options.writeInApp !== false && channels.inApp;
 
   // 1. Create the in-app notification unless the caller opted out.
   let insertedNotificationId: string | null = null;
@@ -171,7 +178,7 @@ export async function sendNotification(
     }
   }
 
-  if (isPushEligibleNotificationType(type)) {
+  if (channels.push && isPushEligibleNotificationType(type)) {
     await sendMobilePushNotifications(
       userId,
       orgId,
@@ -187,6 +194,8 @@ export async function sendNotification(
       { accountWide: isAccountWidePushType(type) },
     );
   }
+
+  if (!channels.email) return;
 
   // 2. Check user preferences for email
   const { data: prefs } = await supabase

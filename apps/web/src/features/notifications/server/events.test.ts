@@ -229,7 +229,7 @@ describe("dispatchNotificationEvent", () => {
     );
   });
 
-  it("notifies the removed user and super_admins on membership_removed", async () => {
+  it("tells the other super_admins on membership_removed, never the removed user", async () => {
     let call = 0;
     fromMock.mockImplementation((table: string) => {
       if (table === "organizations") {
@@ -260,13 +260,11 @@ describe("dispatchNotificationEvent", () => {
       removedUserId: "removed-user",
     });
 
-    // super-1 is actor → excluded. Should notify super-2 + removed-user.
-    expect(sendNotification).toHaveBeenCalledTimes(2);
+    // super-1 is the actor and the removed user can't sign in here (51j).
+    expect(sendNotification).toHaveBeenCalledTimes(1);
     const calls = (sendNotification as ReturnType<typeof vi.fn>).mock.calls;
-    const recipients = calls.map((c) => c[0]);
-    expect(recipients).toContain("super-2");
-    expect(recipients).toContain("removed-user");
-    expect(recipients).not.toContain("super-1");
+    expect(calls[0]?.[0]).toBe("super-2");
+    expect(calls[0]?.[3]).toBe("Member removed");
   });
 
   it("uses friendly role names in the role_changed message", async () => {

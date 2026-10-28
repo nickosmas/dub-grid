@@ -441,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:831d9cb21708a6c769ae48dd2b6fb05dae4a13fbfde55c8f5f7a6a34bba10cb7"
+      "evidenceFingerprint": "sha256:881445a7d19acc9209e32bcd601a5a7b4b7c3dd6a066f75fb0ce4e4ef46ebf26"
     },
     {
       "id": "recurring-shifts",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1bbb5bbdb445cc9c91b2cce109437898d00b3e0dda2292982aaee1cdbdfd8571"
+      "evidenceFingerprint": "sha256:7791783a2b5e08214eb3a07f2b5d072627e795b954b1729ba340b3c66a940856"
     },
     {
       "id": "dashboard",
@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d5ff7394e1e8d64f3ae0b6a9a39a63bfb2e12868547226736c5a88cf12be219d"
+      "evidenceFingerprint": "sha256:f1c5e387b413a76b3a8991c91ec5df1f9ee71d6ced7e935992658de9098ed22f"
     },
     {
       "id": "person-detail",
@@ -1319,13 +1319,15 @@
             "web bell: unread count, latest 20, mark all read, view all",
             "alerts page toolbar, categories with billing for Super Admins, priority, sort, bulk and row actions",
             "app alerts: bell, filters, search, swipe actions, subject navigation, web-only message, push taps",
-            "preferences by category; security alerts always on"
+            "preferences by category; security alerts always on",
+            "push and email reach only people who can sign in; a suspended person's alerts wait in the app; security alerts follow the account"
           ],
           "sourceFiles": [
             "apps/web/src/components/NotificationBell.tsx",
             "apps/web/src/app/(app)/alerts/AlertsInboxPage.tsx",
             "packages/domain/src/alert-destination.ts",
             "apps/web/src/features/notifications/server/sender.ts",
+            "apps/web/src/features/notifications/server/contact-eligibility.ts",
             "apps/web/src/components/profile/NotificationPreferences.tsx",
             "apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx",
             "apps/mobile/src/features/notifications/components/NotificationRow.tsx",
@@ -1334,6 +1336,8 @@
             "apps/mobile/src/shared/navigation/AlertsHeaderButton.tsx"
           ],
           "testFiles": [
+            "apps/web/src/features/notifications/server/contact-eligibility.test.ts",
+            "apps/web/src/features/notifications/server/sender.email.test.ts",
             "apps/web/src/components/NotificationBell.test.tsx",
             "packages/domain/src/alert-destination.test.ts",
             "apps/web/src/features/notifications/server/sender.categories.test.ts",
@@ -1350,7 +1354,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:111be0dc588df9a6892ad844626849e3db0ff6f0c22886269bfcead3c6fd9be0"
+      "evidenceFingerprint": "sha256:b94013a76983cad1f6c6c17b2649d07f6d7dd9dbabb56b92f287ce4c41a90bd7"
     },
     {
       "id": "reports",
@@ -1551,7 +1555,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a854b4df05c26b759c73c2c9a69c7b7d162ea6c56528fce1a7a48d7074c2e495"
+      "evidenceFingerprint": "sha256:da1a3b77f7f3891866dbd0a6327244d6848f7534dc73bc08125b1992f0a6c744"
     },
     {
       "id": "privacy-controls",
@@ -1614,7 +1618,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:5b059837ff3a6249f48ceb33bc331b6c6a6e59d47d8bf649995e88efedc33cf6"
+      "evidenceFingerprint": "sha256:98d9fc2427ca4f3956989320baa401b16c25e98eb1767298c64d5394f9ba0e16"
     },
     {
       "id": "schedule-rules-display",

@@ -1130,7 +1130,7 @@
   - [x] 51i. **Losing a focus area** - taking someone off a focus area asks
         whether to clear their upcoming shifts there, in the draft, or keep
         them; today nothing acts on them.
-  - [ ] 51j. **No contact without sign-in** - push and schedule emails go
+  - [x] 51j. **No contact without sign-in** - push and schedule emails go
         only to people who can still sign in, so Suspended, Archived,
         Gridmaster's Remove access and a deactivated or terminated account
         stop them (Suspended keeps its one notice email); restoring access

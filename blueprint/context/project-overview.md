@@ -420,10 +420,13 @@ Item 51 is split:
   closes their open requests, Keep shifts leaves them, closing saves
   nothing. The server refuses the save until it's answered; the clear runs
   after the save in one transaction (migration 107).
-- **51j - No contact without sign-in:** push and schedule emails go only to
-  people who can still sign in (Suspended keeps its one notice email), and
-  restoring access restores delivery; settles whether in-app alerts are
-  still created for them.
+- **51j - No contact without sign-in:** shipped; every alert's push and
+  email goes only to someone who can still sign in to its organization, so
+  Suspended, Offboarded, removed from the organization and a deactivated or
+  terminated account get none (Suspended keeps its one notice email), and
+  Reinstate or Restore brings delivery back with nothing stored. A
+  Suspended person's in-app alerts still collect; nothing is written for
+  the others. Security alerts follow the account. No migration.
 - **51k - One Archive:** archiving ends the membership whoever does it, and
   Restore works the same after either.
 
