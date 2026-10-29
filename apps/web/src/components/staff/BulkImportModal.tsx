@@ -846,14 +846,7 @@ export function BulkImportModal({
         </div>
 
         {/* Footer */}
-        <div
-          className="dg-modal-actions"
-          style={{
-            padding: "12px 24px",
-            borderTop: "1px solid var(--dg-color-border)",
-            flexShrink: 0,
-          }}
-        >
+        <div className="dg-modal-actions dg-footer-bar [--dg-footer-bar-px:24px]">
           {step === "preview" && (
             <>
               <Button

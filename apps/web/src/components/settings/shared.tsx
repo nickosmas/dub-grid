@@ -43,11 +43,14 @@ export function normalizeTimeCompare(t: string | null | undefined): string | nul
 // ── Section card (headerless container) ─────────────────────────────────────────
 export function SectionCard({
   children,
+  footer,
   maxWidth = 1120,
   noPadding = false,
   align = "center",
 }: {
   children: React.ReactNode;
+  /** The card's bottom buttons, drawn under a line across the whole card. */
+  footer?: React.ReactNode;
   maxWidth?: number;
   noPadding?: boolean;
   align?: "center" | "start";
@@ -64,6 +67,7 @@ export function SectionCard({
       }}
     >
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
+      {footer ? <div className="dg-footer-bar">{footer}</div> : null}
     </div>
   );
 }

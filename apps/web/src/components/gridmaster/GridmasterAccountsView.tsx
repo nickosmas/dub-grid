@@ -566,6 +566,20 @@ export default function GridmasterAccountsView({
           title="Demote Gridmaster"
           onClose={() => setDemoteTarget(null)}
           style={{ maxWidth: 460 }}
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="dg-btn dg-btn-danger"
+                onClick={handleDemote}
+                disabled={!demoteOrgId || actionLoading === demoteTarget.id}
+              >
+                <ButtonLoading loading={actionLoading === demoteTarget.id}>Demote</ButtonLoading>
+              </Button>
+            </div>
+          }
         >
           <p
             style={{
@@ -615,18 +629,6 @@ export default function GridmasterAccountsView({
                 style={{ width: "100%" }}
               />
             </label>
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-            <Button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              className="dg-btn dg-btn-danger"
-              onClick={handleDemote}
-              disabled={!demoteOrgId || actionLoading === demoteTarget.id}
-            >
-              <ButtonLoading loading={actionLoading === demoteTarget.id}>Demote</ButtonLoading>
-            </Button>
           </div>
         </Modal>
       )}

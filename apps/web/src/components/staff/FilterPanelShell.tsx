@@ -41,7 +41,7 @@ export function FilterPanelShell({
     <div className="flex max-h-[inherit] flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
 
-      <div className="flex items-center justify-between border-t border-[var(--dg-color-border-light)] px-4 py-3">
+      <div className="dg-footer-bar flex items-center justify-between rounded-b-[inherit] [--dg-footer-bar-px:16px]">
         <Button
           type="button"
           onClick={onClearAll}

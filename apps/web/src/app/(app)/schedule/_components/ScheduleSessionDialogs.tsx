@@ -65,21 +65,21 @@ export function ScheduleSessionEndedDialog({ onClose }: { onClose: () => void })
       title="Schedule session ended"
       onClose={onClose}
       aria-describedby="schedule-session-ended-description"
-    >
-      <div className="space-y-5 p-1">
-        <p
-          id="schedule-session-ended-description"
-          className="text-sm leading-6 text-[var(--dg-color-text-secondary)]"
-        >
-          This schedule editor was ended from another tab or device. Any unsaved changes in this tab
-          were not saved. Reload the page when you want to start a new schedule session.
-        </p>
+      footer={
         <div className="flex justify-end">
           <Button type="button" className="dg-btn dg-btn-primary" onClick={onClose}>
             Got it
           </Button>
         </div>
-      </div>
+      }
+    >
+      <p
+        id="schedule-session-ended-description"
+        className="p-1 text-sm leading-6 text-[var(--dg-color-text-secondary)]"
+      >
+        This schedule editor was ended from another tab or device. Any unsaved changes in this tab
+        were not saved. Reload the page when you want to start a new schedule session.
+      </p>
     </Modal>
   );
 }

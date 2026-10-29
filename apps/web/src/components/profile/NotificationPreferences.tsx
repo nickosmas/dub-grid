@@ -352,6 +352,7 @@ export function NotificationPreferences({
       </div>
 
       <EditorActionRow
+        className="dg-footer-bar dg-footer-bar--bleed"
         secondaryAction={
           hasChanges ? (
             <Button onClick={discard} disabled={saving} className="dg-btn dg-btn-secondary">

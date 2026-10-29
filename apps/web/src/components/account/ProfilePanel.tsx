@@ -899,26 +899,30 @@ export function ProfilePanel({
       )}
 
       {isEditingManagementAccess && orgId && employee && (
-        <Modal
-          title={showManagementAccess ? "Edit management access" : "Add to management"}
+        <EmployeeManagementAccessEditor
+          employee={employee}
+          orgId={orgId}
+          managementDepartments={allManagementDepartments}
+          directoryPerson={selfDirectoryPerson}
+          onDirtyChange={setManagementAccessDirty}
           onClose={closeManagementAccessEditor}
-          onRequestClose={requestManagementAccessClose}
-          className="dg-modal--tight-header"
-          style={{ maxWidth: 560, width: "100%" }}
-        >
-          <EmployeeManagementAccessEditor
-            employee={employee}
-            orgId={orgId}
-            managementDepartments={allManagementDepartments}
-            directoryPerson={selfDirectoryPerson}
-            onDirtyChange={setManagementAccessDirty}
-            onClose={closeManagementAccessEditor}
-            onCompleted={async (updatedEmployee) => {
-              if (updatedEmployee) setEmployee(updatedEmployee);
-              await refetchProfile();
-            }}
-          />
-        </Modal>
+          onCompleted={async (updatedEmployee) => {
+            if (updatedEmployee) setEmployee(updatedEmployee);
+            await refetchProfile();
+          }}
+          frame={(fields, actions) => (
+            <Modal
+              title={showManagementAccess ? "Edit management access" : "Add to management"}
+              onClose={closeManagementAccessEditor}
+              onRequestClose={requestManagementAccessClose}
+              className="dg-modal--tight-header"
+              style={{ maxWidth: 560, width: "100%" }}
+              footer={actions}
+            >
+              {fields}
+            </Modal>
+          )}
+        />
       )}
       {managementAccessUnsavedChangesDialog}
 

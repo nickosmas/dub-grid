@@ -37,7 +37,7 @@ export function PersonFieldGrid({ children }: { children: ReactNode }) {
 
 export function PersonActions({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap gap-2 border-t border-[var(--dg-color-border-light)] px-[var(--dg-card-padding-x)] py-3.5">
+    <div className="dg-footer-bar flex flex-wrap gap-2 [--dg-footer-bar-px:var(--dg-card-padding-x)]">
       {children}
     </div>
   );

@@ -324,7 +324,29 @@ export default function PlatformFeatureFlagsView() {
       )}
 
       {addModalOpen && (
-        <Modal title="Add Feature Control" onClose={closeAddModal} style={{ maxWidth: 480 }}>
+        <Modal
+          title="Add Feature Control"
+          onClose={closeAddModal}
+          style={{ maxWidth: 480 }}
+          footer={
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button className="dg-btn dg-btn-secondary" onClick={closeAddModal}>
+                Cancel
+              </Button>
+              <Button
+                className="dg-btn dg-btn-primary"
+                onClick={handleCreateSubmit}
+                disabled={
+                  createMutation.isPending || !newKey.trim() || !newDescription.trim() || !!keyError
+                }
+              >
+                <ButtonLoading loading={createMutation.isPending}>
+                  Add Feature Control
+                </ButtonLoading>
+              </Button>
+            </div>
+          }
+        >
           <div style={{ display: "grid", gap: 14 }}>
             <label style={{ display: "grid", gap: 6 }}>
               <span
@@ -384,20 +406,6 @@ export default function PlatformFeatureFlagsView() {
                 Start enabled
               </span>
             </label>
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-            <Button className="dg-btn dg-btn-secondary" onClick={closeAddModal}>
-              Cancel
-            </Button>
-            <Button
-              className="dg-btn dg-btn-primary"
-              onClick={handleCreateSubmit}
-              disabled={
-                createMutation.isPending || !newKey.trim() || !newDescription.trim() || !!keyError
-              }
-            >
-              <ButtonLoading loading={createMutation.isPending}>Add Feature Control</ButtonLoading>
-            </Button>
           </div>
         </Modal>
       )}

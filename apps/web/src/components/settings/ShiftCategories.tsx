@@ -526,7 +526,8 @@ function ShiftCategoriesSettings({
         style={{
           background: "var(--dg-color-bg-secondary)",
           borderRadius: "var(--dg-radius-lg)",
-          padding: "14px 16px",
+          padding: "14px 16px 0",
+          overflow: "hidden",
           margin: "8px 0",
           border: "1px solid var(--dg-color-border-light)",
         }}
@@ -715,6 +716,7 @@ function ShiftCategoriesSettings({
         )}
         {/* Actions */}
         <EditorActionRow
+          className="dg-footer-bar dg-footer-bar--in-box"
           destructiveAction={
             canManageScheduleDefinitions && !cat.isNew ? (
               <Button

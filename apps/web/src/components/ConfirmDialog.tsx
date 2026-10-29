@@ -107,6 +107,50 @@ export default function ConfirmDialog({
       }
     : confirmStyle;
 
+  const actions = (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: wrapActions ? "wrap" : "nowrap",
+        gap: 12,
+        justifyContent: "flex-end",
+        alignItems: "stretch",
+      }}
+    >
+      <Button
+        ref={cancelRef}
+        className="dg-btn dg-btn-secondary"
+        onClick={onCancel}
+        disabled={actionDisabled}
+        style={cancelButtonStyle}
+      >
+        {cancelLabel}
+      </Button>
+      {secondaryConfirmLabel && onSecondaryConfirm && (
+        <Button
+          className={secondaryConfirmTone === "neutral" ? "dg-btn dg-btn-secondary" : confirmClass}
+          style={secondaryConfirmTone === "neutral" ? undefined : confirmButtonStyle}
+          onClick={secondaryConfirm.run}
+          disabled={actionDisabled || secondaryConfirmDisabled}
+        >
+          <ButtonLoading loading={secondaryBusy} spinnerSize={16}>
+            {secondaryConfirmLabel}
+          </ButtonLoading>
+        </Button>
+      )}
+      <Button
+        className={confirmClass}
+        style={confirmButtonStyle}
+        onClick={confirm.run}
+        disabled={actionDisabled || confirmDisabled}
+      >
+        <ButtonLoading loading={confirmBusy} spinnerSize={16}>
+          {confirmLabel}
+        </ButtonLoading>
+      </Button>
+    </div>
+  );
+
   return (
     <Modal
       title={title}
@@ -116,11 +160,9 @@ export default function ConfirmDialog({
       onRequestClose={() => !actionDisabled}
       style={{ maxWidth }}
       aria-describedby={descId}
+      footer={actions}
     >
-      <div
-        id={descId}
-        style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}
-      >
+      <div id={descId} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {message ? (
           <div
             style={{
@@ -145,49 +187,6 @@ export default function ConfirmDialog({
           </div>
         ) : null}
         {summary && summary.points.length > 1 ? <ConfirmSummaryBox summary={summary} /> : null}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: wrapActions ? "wrap" : "nowrap",
-          gap: 12,
-          justifyContent: "flex-end",
-          alignItems: "stretch",
-        }}
-      >
-        <Button
-          ref={cancelRef}
-          className="dg-btn dg-btn-secondary"
-          onClick={onCancel}
-          disabled={actionDisabled}
-          style={cancelButtonStyle}
-        >
-          {cancelLabel}
-        </Button>
-        {secondaryConfirmLabel && onSecondaryConfirm && (
-          <Button
-            className={
-              secondaryConfirmTone === "neutral" ? "dg-btn dg-btn-secondary" : confirmClass
-            }
-            style={secondaryConfirmTone === "neutral" ? undefined : confirmButtonStyle}
-            onClick={secondaryConfirm.run}
-            disabled={actionDisabled || secondaryConfirmDisabled}
-          >
-            <ButtonLoading loading={secondaryBusy} spinnerSize={16}>
-              {secondaryConfirmLabel}
-            </ButtonLoading>
-          </Button>
-        )}
-        <Button
-          className={confirmClass}
-          style={confirmButtonStyle}
-          onClick={confirm.run}
-          disabled={actionDisabled || confirmDisabled}
-        >
-          <ButtonLoading loading={confirmBusy} spinnerSize={16}>
-            {confirmLabel}
-          </ButtonLoading>
-        </Button>
       </div>
     </Modal>
   );

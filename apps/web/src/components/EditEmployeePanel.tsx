@@ -507,18 +507,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const canEdit = employee.status === "active" || employee.status === "inactive";
     const readOnly = !canEdit;
     const sidePadding = flushHorizontal ? "0" : isMobile ? "16px" : "24px";
+    // Flush inside a card's side padding, the footer reaches out to the card's edges.
+    const footerSidePadding = flushHorizontal ? "var(--dg-card-padding-x)" : sidePadding;
 
     return (
       <>
         <div
           style={{
-            padding: isMobile
-              ? hideActions
-                ? `16px ${sidePadding} 0`
-                : `16px ${sidePadding} 24px`
-              : hideActions
-                ? `0 ${sidePadding}`
-                : `0 ${sidePadding} 28px`,
+            padding: isMobile ? `16px ${sidePadding} 0` : `0 ${sidePadding}`,
           }}
         >
           {/* A removed employee's record is read-only, not disabled: every field
@@ -947,13 +943,16 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           {/* ── Actions ── */}
           {!hideActions && (
             <div
-              style={{
-                paddingTop: 16,
-                borderTop: "1px solid var(--dg-color-border-light)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
+              className="dg-footer-bar"
+              style={
+                {
+                  "--dg-footer-bar-px": footerSidePadding,
+                  margin: `0 calc(-1 * ${footerSidePadding})`,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                } as React.CSSProperties
+              }
             >
               {/* Primary actions */}
               {canEdit && (

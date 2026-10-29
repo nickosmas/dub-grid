@@ -789,9 +789,7 @@ function FocusAreaCoverageCard({
             ))}
           </div>
 
-          <div
-            style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
-          >
+          <div className="dg-footer-bar [--dg-footer-bar-px:16px]">
             <EditorActionRow
               secondaryAction={
                 isDirty ? (

@@ -110,6 +110,16 @@ export default function TrialWelcomeModal() {
       onClose={handleClose}
       disableOverlayClose
       style={{ maxWidth: 560 }}
+      footer={
+        <div className="dg-modal-actions">
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleClose}>
+            Maybe later
+          </Button>
+          <Button type="button" className="dg-btn dg-btn-primary" onClick={handleGoToBilling}>
+            Set up billing
+          </Button>
+        </div>
+      }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
@@ -226,15 +236,6 @@ export default function TrialWelcomeModal() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="dg-modal-actions">
-          <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleClose}>
-            Maybe later
-          </Button>
-          <Button type="button" className="dg-btn dg-btn-primary" onClick={handleGoToBilling}>
-            Set up billing
-          </Button>
         </div>
       </div>
     </Modal>

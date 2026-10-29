@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import type { StepUpMethod } from "@/features/account/client/step-up";
 
@@ -15,6 +15,8 @@ interface StepUpFormProps {
   confirmLabel?: string;
   variant?: "primary" | "danger";
   disabled?: boolean;
+  /** Places the fields and the buttons apart, for a dialog that pins the buttons in its footer. */
+  frame?: (fields: ReactNode, actions: ReactNode) => ReactNode;
 }
 
 /** Shared credential entry; callers retain ownership of authorization and mutations. */
@@ -29,8 +31,10 @@ export function StepUpForm({
   confirmLabel = "Continue",
   variant = "primary",
   disabled = false,
+  frame,
 }: StepUpFormProps) {
   const id = useId();
+  const formId = `${id}-form`;
   const [credential, setCredential] = useState("");
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -58,8 +62,33 @@ export function StepUpForm({
     }
   }
 
-  return (
+  const actions = (
+    <div className="grid grid-cols-2 gap-3">
+      <Button
+        type="button"
+        className="dg-btn dg-btn-secondary w-full"
+        disabled={busy || disabled}
+        onClick={() => {
+          if (!inFlight.current && !disabled) onCancel();
+        }}
+      >
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        form={formId}
+        className={`dg-btn dg-btn-${variant} w-full`}
+        disabled={!canSubmit || disabled}
+        loading={busy}
+      >
+        {confirmLabel}
+      </Button>
+    </div>
+  );
+
+  const form = (
     <form
+      id={formId}
       className="flex flex-col gap-4"
       data-dg-client-form="true"
       onSubmit={(event) => {
@@ -103,26 +132,14 @@ export function StepUpForm({
           {displayedError}
         </p>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          type="button"
-          className="dg-btn dg-btn-secondary w-full"
-          disabled={busy || disabled}
-          onClick={() => {
-            if (!inFlight.current && !disabled) onCancel();
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          className={`dg-btn dg-btn-${variant} w-full`}
-          disabled={!canSubmit || disabled}
-          loading={busy}
-        >
-          {confirmLabel}
-        </Button>
-      </div>
     </form>
+  );
+
+  if (frame) return frame(form, actions);
+  return (
+    <div className="flex flex-col gap-4">
+      {form}
+      {actions}
+    </div>
   );
 }

@@ -704,14 +704,8 @@ export default function DisplayMode({
         />
 
         <div
-          style={{
-            padding: "14px 18px",
-            borderTop: "1px solid var(--dg-color-border-light)",
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-            background: "var(--dg-color-surface)",
-          }}
+          className="dg-footer-bar"
+          style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
         >
           {isModified ? (
             <Button

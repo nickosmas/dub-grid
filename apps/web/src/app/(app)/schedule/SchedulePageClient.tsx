@@ -9046,57 +9046,7 @@ function SchedulerContent({
                 title="Choose Assignment"
                 onClose={() => setCoverageGapSelection(null)}
                 style={{ maxWidth: 420 }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-body-sm)",
-                      color: "var(--dg-color-text-secondary)",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    <strong>
-                      {coverageGapSelection.openShift.assignmentFullName ??
-                        coverageGapSelection.openShift.ruleLabel ??
-                        coverageGapSelection.openShift.assignmentLabel}
-                    </strong>{" "}
-                    on <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more
-                    than one exact assignment option. Choose which option you want to volunteer for.
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 600,
-                        color: "var(--dg-color-text-muted)",
-                      }}
-                    >
-                      Shift and job
-                    </span>
-                    <CustomSelect
-                      value={String(coverageGapSelection.selectedAssignmentDefinitionId)}
-                      options={coverageGapSelection.qualifiedAssignmentDefinitions.map(
-                        (assignment) => ({
-                          value: String(assignment.id),
-                          label:
-                            spellOutAssignment(assignment.id) ??
-                            assignmentLabelMap.get(assignment.id) ??
-                            (assignment.name || assignment.label),
-                        }),
-                      )}
-                      onChange={(value) =>
-                        setCoverageGapSelection((current) =>
-                          current
-                            ? { ...current, selectedAssignmentDefinitionId: Number(value) }
-                            : current,
-                        )
-                      }
-                      style={{ width: "100%" }}
-                      fontSize="var(--dg-fs-caption)"
-                    />
-                  </div>
-
+                footer={
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                     <Button
                       type="button"
@@ -9164,6 +9114,57 @@ function SchedulerContent({
                     >
                       Volunteer
                     </Button>
+                  </div>
+                }
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-body-sm)",
+                      color: "var(--dg-color-text-secondary)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong>
+                      {coverageGapSelection.openShift.assignmentFullName ??
+                        coverageGapSelection.openShift.ruleLabel ??
+                        coverageGapSelection.openShift.assignmentLabel}
+                    </strong>{" "}
+                    on <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more
+                    than one exact assignment option. Choose which option you want to volunteer for.
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        color: "var(--dg-color-text-muted)",
+                      }}
+                    >
+                      Shift and job
+                    </span>
+                    <CustomSelect
+                      value={String(coverageGapSelection.selectedAssignmentDefinitionId)}
+                      options={coverageGapSelection.qualifiedAssignmentDefinitions.map(
+                        (assignment) => ({
+                          value: String(assignment.id),
+                          label:
+                            spellOutAssignment(assignment.id) ??
+                            assignmentLabelMap.get(assignment.id) ??
+                            (assignment.name || assignment.label),
+                        }),
+                      )}
+                      onChange={(value) =>
+                        setCoverageGapSelection((current) =>
+                          current
+                            ? { ...current, selectedAssignmentDefinitionId: Number(value) }
+                            : current,
+                        )
+                      }
+                      style={{ width: "100%" }}
+                      fontSize="var(--dg-fs-caption)"
+                    />
                   </div>
                 </div>
               </Modal>

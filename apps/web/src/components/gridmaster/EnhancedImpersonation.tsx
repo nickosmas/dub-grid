@@ -521,7 +521,10 @@ export default function EnhancedImpersonation({
                     </div>
                   )}
                 </div>
-                <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                <div
+                  className="dg-footer-bar dg-footer-bar--bleed"
+                  style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}
+                >
                   <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {
@@ -737,7 +740,10 @@ export default function EnhancedImpersonation({
                     </div>
                   )}
                 </div>
-                <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                <div
+                  className="dg-footer-bar dg-footer-bar--bleed"
+                  style={{ marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 }}
+                >
                   <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {

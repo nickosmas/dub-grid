@@ -1395,38 +1395,42 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       )}
 
       {isEditingManagementAccess && orgId && org && employee && (
-        <Modal
-          title={
-            directoryPerson?.isManagementUser || hasPendingManagementInvite
-              ? "Edit management access"
-              : "Add to management"
-          }
+        <EmployeeManagementAccessEditor
+          employee={employee}
+          orgId={orgId}
+          managementDepartments={(departments ?? []).filter(
+            (department) => department.type === "management",
+          )}
+          directoryPerson={directoryPerson}
+          pendingInvitation={pendingInvite ?? undefined}
+          onDirtyChange={setManagementAccessDirty}
           onClose={closeManagementAccessEditor}
-          onRequestClose={requestManagementAccessClose}
-          className="dg-modal--tight-header"
-          style={{ maxWidth: 560, width: "100%" }}
-        >
-          <EmployeeManagementAccessEditor
-            employee={employee}
-            orgId={orgId}
-            managementDepartments={(departments ?? []).filter(
-              (department) => department.type === "management",
-            )}
-            directoryPerson={directoryPerson}
-            pendingInvitation={pendingInvite ?? undefined}
-            onDirtyChange={setManagementAccessDirty}
-            onClose={closeManagementAccessEditor}
-            onCompleted={async (updatedEmployee) => {
-              if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
-              await refreshInvitations();
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
-                queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
-                queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
-              ]);
-            }}
-          />
-        </Modal>
+          onCompleted={async (updatedEmployee) => {
+            if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
+            await refreshInvitations();
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) }),
+              queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) }),
+              queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) }),
+            ]);
+          }}
+          frame={(fields, actions) => (
+            <Modal
+              title={
+                directoryPerson?.isManagementUser || hasPendingManagementInvite
+                  ? "Edit management access"
+                  : "Add to management"
+              }
+              onClose={closeManagementAccessEditor}
+              onRequestClose={requestManagementAccessClose}
+              className="dg-modal--tight-header"
+              style={{ maxWidth: 560, width: "100%" }}
+              footer={actions}
+            >
+              {fields}
+            </Modal>
+          )}
+        />
       )}
       {managementAccessUnsavedChangesDialog}
       {showInviteModal && employee && orgId && org && (

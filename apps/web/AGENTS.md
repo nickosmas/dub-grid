@@ -205,6 +205,16 @@ supporting or secondary actions first, then the primary action last. This maps
 to secondary-left/primary-right in rows and secondary-top/primary-bottom in
 stacks. Use `EditorActionRow` for editor footers where possible.
 
+A container's bottom buttons sit in a footer strip: a `--dg-color-border-light`
+line across the whole card, popup or slideover, then the buttons on
+`--dg-color-surface-footer` with 12px above and below. Popups pass them as
+`Modal`'s `footer` (`ConfirmDialog` already does); Settings cards use
+`SectionCard`'s `footer`; anything else takes the `dg-footer-bar` class, with
+`--dg-footer-bar-px` matching the container's side padding,
+`dg-footer-bar--bleed` for a row that ends a padded card body it doesn't own,
+and `dg-footer-bar--in-box` (line, no fill) inside a tinted list-item editor.
+A short choice list keeps `dg-modal--quiet-footer`, with no line.
+
 ## Double-Press
 
 An action button that fires a request must not run it twice when it is

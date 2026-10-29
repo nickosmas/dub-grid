@@ -165,7 +165,29 @@ export default function OrganizationLabels({
   );
 
   return (
-    <SectionCard>
+    <SectionCard
+      footer={
+        !readOnly &&
+        !isWizardMode && (
+          <div
+            style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
+          >
+            {isModified ? (
+              <Button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary">
+                {EDITOR_ACTION_LABELS.discard}
+              </Button>
+            ) : null}
+            <Button
+              onClick={handleSave}
+              disabled={!isModified || saving || hasFieldErrors}
+              className="dg-btn dg-btn-primary"
+            >
+              <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
+            </Button>
+          </div>
+        )
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
           style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
@@ -276,25 +298,6 @@ export default function OrganizationLabels({
             </p>
           </div>
         </div>
-
-        {!readOnly && !isWizardMode && (
-          <div
-            style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
-          >
-            {isModified ? (
-              <Button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary">
-                {EDITOR_ACTION_LABELS.discard}
-              </Button>
-            ) : null}
-            <Button
-              onClick={handleSave}
-              disabled={!isModified || saving || hasFieldErrors}
-              className="dg-btn dg-btn-primary"
-            >
-              <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
-            </Button>
-          </div>
-        )}
       </div>
     </SectionCard>
   );

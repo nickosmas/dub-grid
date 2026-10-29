@@ -8,6 +8,7 @@ import { buildCalendarSubscribeLinks } from "@dubgrid/domain";
 
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import {
   createCalendarSubscription,
   fetchCalendarSubscriptionStatus,
@@ -94,6 +95,52 @@ export function CalendarSubscriptionCard() {
     setPendingAction(null);
   }
 
+  const actions = isLoading ? null : error ? (
+    <EditorActionRow
+      primaryAction={
+        <Button type="button" onClick={() => loadStatus()} className="dg-btn dg-btn-secondary">
+          Retry
+        </Button>
+      }
+    />
+  ) : !status?.active ? (
+    <EditorActionRow
+      primaryAction={
+        <Button
+          type="button"
+          onClick={() => createLink()}
+          disabled={isWorking}
+          className="dg-btn dg-btn-primary"
+        >
+          Create private link
+        </Button>
+      }
+    />
+  ) : (
+    <EditorActionRow
+      destructiveAction={
+        <Button
+          type="button"
+          onClick={() => setPendingAction("disable")}
+          disabled={isWorking}
+          className="dg-btn dg-btn-danger"
+        >
+          Disable subscription
+        </Button>
+      }
+      primaryAction={
+        <Button
+          type="button"
+          onClick={() => setPendingAction("replace")}
+          disabled={isWorking}
+          className="dg-btn dg-btn-secondary"
+        >
+          Replace link
+        </Button>
+      }
+    />
+  );
+
   return (
     <div className="dg-card">
       <div className="dg-card-header">
@@ -111,28 +158,13 @@ export function CalendarSubscriptionCard() {
             Loading subscription status...
           </p>
         ) : error ? (
-          <div className="flex flex-col items-start gap-3">
-            <p className="m-0 text-[14px] text-[var(--dg-color-danger)]">{error}</p>
-            <Button type="button" onClick={() => loadStatus()} className="dg-btn dg-btn-secondary">
-              Retry
-            </Button>
-          </div>
+          <p className="m-0 text-[14px] text-[var(--dg-color-danger)]">{error}</p>
         ) : !status?.active ? (
-          <div className="flex flex-col items-start gap-3">
-            <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
-              Create a private link, then add it to Apple Calendar, Google Calendar, or Outlook in
-              one click, or copy it for any other app. Calendar apps poll the link without a DubGrid
-              login.
-            </p>
-            <Button
-              type="button"
-              onClick={() => createLink()}
-              disabled={isWorking}
-              className="dg-btn dg-btn-primary"
-            >
-              Create private link
-            </Button>
-          </div>
+          <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
+            Create a private link, then add it to Apple Calendar, Google Calendar, or Outlook in one
+            click, or copy it for any other app. Calendar apps poll the link without a DubGrid
+            login.
+          </p>
         ) : (
           <div className="flex flex-col gap-3">
             {feedUrl ? (
@@ -169,27 +201,12 @@ export function CalendarSubscriptionCard() {
             <p className="m-0 text-[12px] text-[var(--dg-color-text-subtle)]">
               Replacing the link immediately disables the previous URL.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() => setPendingAction("replace")}
-                disabled={isWorking}
-                className="dg-btn dg-btn-secondary"
-              >
-                Replace link
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setPendingAction("disable")}
-                disabled={isWorking}
-                className="dg-btn dg-btn-danger"
-              >
-                Disable subscription
-              </Button>
-            </div>
           </div>
         )}
       </div>
+      {actions ? (
+        <div className="dg-footer-bar [--dg-footer-bar-px:var(--dg-card-padding-x)]">{actions}</div>
+      ) : null}
       {pendingAction === "replace" && (
         <ConfirmDialog
           title="Replace private link?"
