@@ -96,6 +96,61 @@ describe("GET /api/organization/directory", () => {
     });
   });
 
+  it("withholds a coworker's HR and account facts from a viewer without employee details", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: ORG_ID,
+      actor: { id: "member-self" },
+      serviceClient: { rpc, from: internalProfilesFrom([]) },
+      permissions: { isGridmaster: false, isSuperAdmin: false, canViewStaff: true },
+    });
+    const withFacts = (personId: string) => ({
+      ...makeRow(personId),
+      employee_number: 42,
+      seniority: 3,
+      invitation_status: "pending",
+      membership_updated_at: "2026-10-01T00:00:00Z",
+    });
+    rpc.mockResolvedValue({ data: [withFacts("member-self"), withFacts("member-2")], error: null });
+
+    const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
+    const [self, coworker] = body.directory;
+
+    expect(self.userId).toBe("member-self");
+    expect(coworker).toMatchObject({
+      userId: null,
+      employeeNumber: null,
+      seniority: null,
+      invitationStatus: null,
+      membershipUpdatedAt: null,
+      email: "",
+    });
+  });
+
+  it("keeps them for a staff manager", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: ORG_ID,
+      actor: { id: "manager" },
+      serviceClient: { rpc, from: internalProfilesFrom([]) },
+      permissions: {
+        isGridmaster: false,
+        isSuperAdmin: false,
+        canManageEmployees: true,
+        canViewEmployeeDetails: true,
+      },
+    });
+    rpc.mockResolvedValue({
+      data: [{ ...makeRow("member-2"), employee_number: 42, seniority: 3 }],
+      error: null,
+    });
+
+    const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
+    expect(body.directory[0]).toMatchObject({
+      userId: "member-2",
+      employeeNumber: 42,
+      seniority: 3,
+    });
+  });
+
   it("defaults to a 50-row page and requests it from the RPC", async () => {
     rpc.mockResolvedValue({ data: [], error: null });
 

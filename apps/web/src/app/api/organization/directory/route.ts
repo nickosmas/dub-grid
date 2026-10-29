@@ -45,6 +45,12 @@ export async function GET(req: NextRequest) {
     // derives canViewEmployeeDetails from canManageEmployees, so every staff
     // manager keeps them without a second grant.
     const canSeeContactDetails = canSeePermissions || orgAuth.permissions.canViewEmployeeDetails;
+    // The same holds for a coworker's HR and account facts: employee number,
+    // seniority, invitation state and the link to their sign-in account, which
+    // the employees route also withholds from view-only callers. Your own row
+    // keeps its user id so the page can still find you.
+    const canSeeHrDetails = canSeeContactDetails;
+    const callerId = orgAuth.actor.id;
     const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
     const offset = parsed.data.offset ?? 0;
     const [{ data, error }, hiddenUserIds] = await Promise.all([
@@ -86,13 +92,14 @@ export async function GET(req: NextRequest) {
         (row.dept_admin_ids as number[] | undefined) ??
         [];
       const hasAppAccess = (row.has_app_access as boolean) ?? false;
+      const userId = (row.user_id as string | null) ?? null;
 
       return {
         personId: row.person_id as string,
         source: row.source as "employee" | "user_only" | "pending_invite",
         employeeId: (row.employee_id as string | null) ?? null,
-        employeeNumber: (row.employee_number as number | null) ?? null,
-        userId: (row.user_id as string | null) ?? null,
+        employeeNumber: canSeeHrDetails ? ((row.employee_number as number | null) ?? null) : null,
+        userId: canSeeHrDetails || userId === callerId ? userId : null,
         firstName: (row.first_name as string) ?? "",
         lastName: (row.last_name as string) ?? "",
         email: canSeeContactDetails ? ((row.email as string) ?? "") : "",
@@ -103,9 +110,11 @@ export async function GET(req: NextRequest) {
         focusAreaIds: (row.focus_area_ids as number[]) ?? [],
         certificationId: (row.certification_id as number | null) ?? null,
         roleIds: (row.role_ids as number[]) ?? [],
-        seniority: (row.seniority as number | null) ?? null,
+        seniority: canSeeHrDetails ? ((row.seniority as number | null) ?? null) : null,
         lastSignInAt: canSeeActivity ? ((row.last_sign_in_at as string | null) ?? null) : null,
-        invitationStatus: (row.invitation_status as "pending" | "expired" | null) ?? null,
+        invitationStatus: canSeeHrDetails
+          ? ((row.invitation_status as "pending" | "expired" | null) ?? null)
+          : null,
         scheduledDepartmentIds,
         scheduledDeptAdminIds,
         managementDepartmentIds,
@@ -113,7 +122,9 @@ export async function GET(req: NextRequest) {
         departmentIds: managementDepartmentIds,
         deptAdminIds: managementDeptAdminIds,
         isManagementUser: hasAppAccess && managementDepartmentIds.length > 0,
-        membershipUpdatedAt: (row.membership_updated_at as string | null) ?? null,
+        membershipUpdatedAt: canSeeHrDetails
+          ? ((row.membership_updated_at as string | null) ?? null)
+          : null,
         adminPermissions: canSeePermissions
           ? ((row.membership_admin_permissions as AdminPermissions | null) ?? null)
           : null,
