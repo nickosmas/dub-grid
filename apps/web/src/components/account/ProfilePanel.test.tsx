@@ -261,7 +261,7 @@ describe("ProfilePanel", () => {
       renderPanel({ role: "user", canManageManagementAccess: false, managementDepartmentIds: [] });
 
       expect(screen.getByText("Access")).toBeInTheDocument();
-      expect(screen.getByText("Role")).toBeInTheDocument();
+      expect(screen.getByText("Access level")).toBeInTheDocument();
       expect(screen.getByText("User")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /add to management|edit management access/i }),
@@ -358,6 +358,34 @@ describe("ProfilePanel change-request loading", () => {
     vi.mocked(fetchOwnProfileChangeRequests).mockClear();
     renderPanel({ isOrgMember: true, canEditProfileDirectly: false });
     await waitFor(() => expect(fetchOwnProfileChangeRequests).toHaveBeenCalledWith("org-1"));
+  });
+
+  it("shows someone who can't edit their own work details read-only, in the org's terms", () => {
+    renderPanel({
+      role: "user",
+      canEditProfileDirectly: false,
+      canManageScheduleEmployees: false,
+      employee: { ...employee, employmentType: "part_time", roleIds: [5] },
+      certifications: [{ id: 2, orgId: "org-1", name: "CNA", abbr: "CNA" }],
+      roles: [{ id: 5, orgId: "org-1", name: "Charge", abbr: "CH" }],
+      focusAreaLabel: "Wings",
+      certificationLabel: "Skill level",
+      roleLabel: "Duties",
+    });
+
+    expect(
+      screen.getByText("Ask an Admin to change your employment, wings, skill level or duties."),
+    ).toBeInTheDocument();
+    const details = within(screen.getByRole("group", { name: "Work details" }));
+    for (const text of ["Part-time", "Wings", "North", "Skill level", "CNA", "Duties", "Charge"]) {
+      expect(details.getByText(text)).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Change work details" })).not.toBeInTheDocument();
+  });
+
+  it("leaves the work details card out for someone off the schedule who can't edit", () => {
+    renderPanel({ canEditProfileDirectly: false, isOnSchedule: false });
+    expect(screen.queryByText("Work details")).not.toBeInTheDocument();
   });
 
   describe("account deletion", () => {

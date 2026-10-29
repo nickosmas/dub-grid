@@ -55,18 +55,6 @@ export function formatProfileValue(value: string | null | undefined) {
   return value && value.trim() ? value : "Not set";
 }
 
-export function formatProfileStatus(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return value
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
-}
-
 /**
  * How the hero arranges its identity block.
  *

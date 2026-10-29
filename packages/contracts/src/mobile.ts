@@ -192,6 +192,8 @@ export const mobileProfileLinkedEmployeeSchema = mobileLinkedEmployeeSchema
      * doesn't send it shows nothing instead of claiming employee #0.
      */
     employeeNumber: z.number().int().nullable().default(null),
+    /** An Away person's return date, so their own status reads "Away until Jan 4". */
+    awayUntil: z.string().date().nullable().default(null),
   })
   .nullable();
 

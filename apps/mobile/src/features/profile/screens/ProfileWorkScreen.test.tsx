@@ -272,6 +272,54 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByText("#87")).toBeInTheDocument();
   });
 
+  function viewAsRegularUser(linkedEmployee: Partial<typeof profileData.linkedEmployee> = {}) {
+    const bootstrap = useBootstrap();
+    useBootstrap.mockReturnValue({
+      ...bootstrap,
+      data: { ...bootstrap.data, permissions: { canManageEmployees: false } },
+    });
+    useQuery.mockReturnValue({
+      data: {
+        ...profileData,
+        currentMembership: { ...profileData.currentMembership, orgRole: "user" },
+        currentOrg: {
+          ...profileData.currentOrg,
+          labels: { ...profileData.currentOrg.labels, focusArea: "Wing", role: "Duty" },
+        },
+        managementDepartmentIds: [],
+        linkedEmployee: { ...profileData.linkedEmployee, ...linkedEmployee },
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+  }
+
+  it("shows someone who can't edit their own work details read-only, in the org's terms", () => {
+    viewAsRegularUser({ employmentType: "part_time", certificationId: 5 });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Work details")).toBeInTheDocument();
+    expect(screen.getByText("Ask an Admin to change these.")).toBeInTheDocument();
+    expect(screen.getByText("Part-time")).toBeInTheDocument();
+    expect(screen.getByText("RN")).toBeInTheDocument();
+    expect(screen.getByText("Wing")).toBeInTheDocument();
+    expect(screen.getByText("ICU")).toBeInTheDocument();
+    expect(screen.getByText("Duty")).toBeInTheDocument();
+    expect(screen.getByText("Supervisor")).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "RN" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "ICU" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Contact notes")).not.toBeInTheDocument();
+  });
+
+  it("names an Away status the way People does, with the return date", () => {
+    viewAsRegularUser({ status: "inactive", awayUntil: "2027-01-04" });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Away until Jan 4")).toBeInTheDocument();
+    expect(screen.queryByText("Inactive")).not.toBeInTheDocument();
+  });
+
   function grantManagementAccessPermission() {
     // Reads the value `beforeEach` installed and layers the permission on it.
     const bootstrap = useBootstrap();

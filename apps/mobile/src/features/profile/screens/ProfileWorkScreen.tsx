@@ -20,6 +20,7 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { describeEmploymentStatus } from "@dubgrid/domain";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
@@ -67,14 +68,13 @@ import {
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
-  formatProfileStatus,
 } from "../components/ProfilePrimitives";
 import { isRoleCertificationBlocked } from "../lib/role-certification";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 import { getMobileStepUpMethod } from "../lib/step-up";
 
-const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
+const PENDING_PROFILE_CHANGE_MESSAGE = "Your change is waiting for an Admin to review it.";
 
 type LinkedEmployee = NonNullable<MobileProfileResponse["linkedEmployee"]>;
 
@@ -467,7 +467,7 @@ export default function ProfileWorkScreen() {
   // keyed on anything looser would interrupt an ordinary swipe back.
   const saveConfirmationPoints = hasEmailChange
     ? [
-        ...(isNameRequest ? ["An admin reviews your new name."] : []),
+        ...(isNameRequest ? ["An Admin reviews your new name."] : []),
         ...(isNameRequest && hasOtherChanges ? ["Other edits you made are saved."] : []),
         "Your email changes for every organization you belong to.",
         "You'll confirm it's you first.",
@@ -608,7 +608,10 @@ export default function ProfileWorkScreen() {
                     <ProfileInfoRow
                       iconName="pulse-outline"
                       label="Status"
-                      value={formatProfileStatus(linkedEmployee.status)}
+                      value={describeEmploymentStatus(
+                        linkedEmployee.status,
+                        linkedEmployee.awayUntil,
+                      )}
                     />
                     {linkedEmployee.employeeNumber != null ? (
                       <ProfileInfoRow
@@ -678,8 +681,8 @@ export default function ProfileWorkScreen() {
           hasEmailChange
             ? undefined
             : hasOtherChanges
-              ? "An admin will review your new name. Your other edits will be saved."
-              : "An admin will review your new name."
+              ? "An Admin reviews your new name. Your other edits are saved."
+              : "An Admin reviews your new name."
         }
         summary={saveConfirmationPoints.length > 0 ? { points: saveConfirmationPoints } : undefined}
         error={saveError}
@@ -715,6 +718,18 @@ export default function ProfileWorkScreen() {
       ) : null}
     </Screen>
   );
+}
+
+function namesFor(
+  ids: number[],
+  items: { id: number; name: string; abbr?: string | null }[],
+  compact: boolean,
+): string {
+  const names = ids.flatMap((id) => {
+    const item = items.find((candidate) => candidate.id === id);
+    return item ? [(compact && item.abbr) || item.name] : [];
+  });
+  return names.length > 0 ? names.join(", ") : "None";
 }
 
 function EditPanel({
@@ -930,6 +945,38 @@ function EditPanel({
         </>
       ) : null}
 
+      {hasLinkedEmployee && !canEditProfileDirectly ? (
+        <ProfileSection description="Ask an Admin to change these." title="Work details">
+          <ProfileList>
+            <ProfileInfoRow
+              iconName="time-outline"
+              label="Employment"
+              value={draft.employmentType === "part_time" ? "Part-time" : "Full-time"}
+            />
+            <ProfileInfoRow
+              iconName="ribbon-outline"
+              label={certificationLabel}
+              value={namesFor(
+                draft.certificationId == null ? [] : [draft.certificationId],
+                certifications,
+                useCompactRoleCertificationLabels,
+              )}
+            />
+            <ProfileInfoRow
+              iconName="location-outline"
+              label={focusAreaLabel}
+              value={namesFor(draft.focusAreaIds, focusAreas, false)}
+            />
+            <ProfileInfoRow
+              iconName="people-outline"
+              isLast
+              label={roleLabel}
+              value={namesFor(draft.roleIds, roles, useCompactRoleCertificationLabels)}
+            />
+          </ProfileList>
+        </ProfileSection>
+      ) : null}
+
       {isNameRequest ? (
         <ProfileSection
           description="Add a note for the Admin who reviews it, if it helps."
@@ -937,13 +984,13 @@ function EditPanel({
         >
           <ProfilePanel>
             <ProfileTextInput
-              accessibilityLabel="Note for admins"
+              accessibilityLabel="Note for Admins"
               editable={!saving}
               error={fieldErrors.requestNote}
               focused={focusedField === "requestNote"}
-              label="Note for admins (optional)"
+              label="Note for Admins (optional)"
               multiline
-              placeholder="Add context for your admin"
+              placeholder="Add context for the Admin"
               value={draft.requestNote}
               onBlur={() => setFocusedField(null)}
               onChangeText={(value) => setField("requestNote", value)}

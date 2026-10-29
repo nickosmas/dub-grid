@@ -12,6 +12,7 @@ import {
   mobilePersonUpdateBodySchema,
   mobileProfileAccountUpdateBodySchema,
   mobileProfileChangeRequestCreateBodySchema,
+  mobileProfileLinkedEmployeeSchema,
   mobileProfilePhoneUpdateBodySchema,
   mobileProfileResponseSchema,
   mobileProfileSessionsResponseSchema,
@@ -246,6 +247,20 @@ describe("mobile contracts", () => {
     expect(result.success).toBe(true);
     // A server from before the joined date existed omits it; the app still parses.
     expect(result.success ? result.data.joinedAt : "missing").toBeNull();
+    // Likewise a server from before the return date was sent.
+    expect(result.success ? result.data.linkedEmployee?.awayUntil : "missing").toBeNull();
+  });
+
+  it("carries an Away person's own return date on their profile", () => {
+    const linkedEmployee = mobileProfileLinkedEmployeeSchema.parse({
+      id: "33333333-3333-4333-8333-333333333333",
+      firstName: "Alex",
+      lastName: "North",
+      status: "inactive",
+      awayUntil: "2027-01-04",
+    });
+
+    expect(linkedEmployee?.awayUntil).toBe("2027-01-04");
   });
 
   it("carries the joined date separately from the account's creation date", () => {
