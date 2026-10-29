@@ -1835,7 +1835,7 @@ export default function PersonDetailScreen() {
               statusCopy?.title ??
               (statusOpening.focus === "plan"
                 ? isAway
-                  ? `Change ${getFullName(person)}'s return date?`
+                  ? `Change ${getFullName(person)}'s time away?`
                   : isSuspended
                     ? `Change when ${getFullName(person)}'s suspension ends?`
                     : returnDay

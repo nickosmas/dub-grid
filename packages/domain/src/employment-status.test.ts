@@ -242,8 +242,8 @@ describe("describeStatusAction with a return date", () => {
 
   it("sets a first return date with a message alone", () => {
     expect(describeStatusAction("setReturnDate", "Ana Torres", { returnDate: RETURN })).toEqual({
-      label: "Set return date",
-      title: "Set a return date for Ana Torres?",
+      label: "Edit time away",
+      title: "Change Ana Torres's time away?",
       message: "They're back to Active on Mon, Jan 4, and can be scheduled from then.",
       points: [],
       unchanged: [],
@@ -258,10 +258,10 @@ describe("describeStatusAction with a return date", () => {
     });
 
     expect(copy).toMatchObject({
-      label: "Change return date",
-      title: "Change Ana Torres's return date?",
+      label: "Edit time away",
+      title: "Change Ana Torres's time away?",
       message: "They're back to Active on Mon, Jan 11.",
-      done: "Return date changed",
+      done: "Time away updated",
     });
     expect(copy.points).toEqual([
       "Shifts before Jan 11 come off the schedule in the draft.",
