@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,20 +10,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusPill } from "@/components/ui/status-pill";
 import { MaybeHint } from "@/components/ui/hint";
+import { getAvatarInitials } from "@/lib/utils";
 import {
   describeAction,
   formatActivityDayDate,
+  formatActivityRowDetails,
   formatActivityTime,
   formatActivityTimestamp,
-  formatDetails,
+  getActionSeverity,
   getAuditActorLabel,
   getAuditActorSecondaryLabel,
+  getAuditCategoryLabel,
   getAuditTargetLabel,
   type ActivityDayGroup,
+  type ActivityRowDetails,
 } from "@/lib/activity-log-utils";
-import { ActionBadge, type ActivityEntryLike } from "./ActivityLogParts";
+import { ACTION_TONES, ActivityKindIcon, type ActivityEntryLike } from "./ActivityLogParts";
 
 export type ActivityTableEntry = ActivityEntryLike & { id: string | number };
 
@@ -50,21 +53,26 @@ export function ActivityTable<T extends ActivityTableEntry>({
   dayCounts,
   onSelect,
 }: ActivityTableProps<T>) {
-  const columnCount = 4 + (showTarget ? 1 : 0) + (showOrganization ? 1 : 0);
+  const columnCount = 3 + (showTarget ? 1 : 0) + (showOrganization ? 1 : 0) + 1;
 
   return (
     <div className="dg-activity-table-shell" data-settings-table-layout="available">
       <Table scrollable={false} className="dg-activity-table">
         <TableHeader>
           <TableRow className="dg-activity-head-row hover:bg-transparent">
-            <TableHead>Time</TableHead>
-            <TableHead className="hidden sm:table-cell">Kind of change</TableHead>
-            <TableHead className="hidden md:table-cell">By</TableHead>
-            {showTarget && <TableHead className="hidden md:table-cell">Affected</TableHead>}
-            {showOrganization && (
-              <TableHead className="hidden lg:table-cell">Organization</TableHead>
+            <TableHead className="dg-activity-head--when">Time</TableHead>
+            <TableHead className="w-full">Activity</TableHead>
+            <TableHead className="dg-activity-head--identity hidden md:table-cell">By</TableHead>
+            {showTarget && (
+              <TableHead className="dg-activity-head--identity hidden md:table-cell">
+                Affected
+              </TableHead>
             )}
-            <TableHead className="w-full">Activity and changes</TableHead>
+            {showOrganization && (
+              <TableHead className="dg-activity-head--identity hidden lg:table-cell">
+                Organization
+              </TableHead>
+            )}
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -104,9 +112,9 @@ export function ActivityTable<T extends ActivityTableEntry>({
 
 function DayCount({ count }: { count: number }) {
   return (
-    <StatusPill variant="category" aria-label={`${count} ${count === 1 ? "event" : "events"}`}>
-      {count}
-    </StatusPill>
+    <span className="dg-activity-day-count">
+      {count} {count === 1 ? "event" : "events"}
+    </span>
   );
 }
 
@@ -124,7 +132,7 @@ function ActivityRow<T extends ActivityTableEntry>({
   onSelect: (entry: T) => void;
 }) {
   const description = describeAction(entry);
-  const details = formatDetails(entry);
+  const rowDetails = formatActivityRowDetails(entry);
   const actorLabel = getAuditActorLabel(entry);
   const targetLabel = getAuditTargetLabel(entry);
 
@@ -146,12 +154,32 @@ function ActivityRow<T extends ActivityTableEntry>({
         </MaybeHint>
       </TableCell>
 
-      <TableCell className="dg-activity-cell dg-activity-cell--type hidden sm:table-cell">
-        <ActionBadge action={entry.action} />
+      <TableCell className="dg-activity-cell whitespace-normal">
+        <div className="dg-activity-main">
+          <ActivityKindIcon action={entry.action} />
+          <div className="min-w-0">
+            <div
+              className="dg-activity-kind"
+              data-tone={ACTION_TONES[getActionSeverity(entry.action)]}
+            >
+              {getAuditCategoryLabel(entry.action)}
+            </div>
+            <div className="dg-activity-description">{description}</div>
+            <ActivityRowDetailLines {...rowDetails} />
+            <div className="dg-activity-context md:hidden">
+              By {actorLabel}
+              {showTarget ? ` · Affected: ${targetLabel}` : ""}
+            </div>
+          </div>
+        </div>
       </TableCell>
 
       <TableCell className="dg-activity-cell dg-activity-cell--identity hidden md:table-cell">
-        <ActivityIdentity primary={actorLabel} secondary={getAuditActorSecondaryLabel(entry)} />
+        <ActivityIdentity
+          primary={actorLabel}
+          secondary={getAuditActorSecondaryLabel(entry)}
+          withAvatar
+        />
       </TableCell>
 
       {showTarget && (
@@ -171,26 +199,6 @@ function ActivityRow<T extends ActivityTableEntry>({
         </TableCell>
       )}
 
-      <TableCell className="dg-activity-cell whitespace-normal">
-        <div className="mb-1 sm:hidden">
-          <ActionBadge action={entry.action} />
-        </div>
-        <div className="dg-activity-description">{description}</div>
-        {details.length > 0 && (
-          <div className="dg-activity-detail-list">
-            {details.map((item) => (
-              <div key={`${item.label}:${item.value}`}>
-                <span className="dg-activity-detail-key">{item.label}:</span> {item.value}
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="dg-activity-context md:hidden">
-          By {actorLabel}
-          {showTarget ? ` · Target: ${targetLabel}` : ""}
-        </div>
-      </TableCell>
-
       <TableCell className="dg-activity-cell dg-activity-cell--chevron">
         <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
       </TableCell>
@@ -198,12 +206,60 @@ function ActivityRow<T extends ActivityTableEntry>({
   );
 }
 
-function ActivityIdentity({ primary, secondary }: { primary: string; secondary?: string | null }) {
-  const showSecondary = secondary && secondary !== primary;
+function ActivityRowDetailLines({ change, details }: ActivityRowDetails) {
+  return (
+    <>
+      {change && (
+        <div className="dg-activity-change">
+          {change.before === null ? (
+            <span className="dg-activity-change-new">New</span>
+          ) : (
+            <>
+              <span className="dg-activity-change-before">{change.before}</span>
+              <ArrowRight
+                className="dg-activity-change-arrow"
+                size={12}
+                strokeWidth={2.25}
+                aria-label="changed to"
+              />
+            </>
+          )}
+          <span>{change.after}</span>
+        </div>
+      )}
+      {details.length > 0 && (
+        <div className="dg-activity-detail-list">
+          {details.map((item) => (
+            <span className="dg-activity-detail" key={`${item.label}:${item.value}`}>
+              <span className="dg-activity-detail-key">{item.label}:</span> {item.value}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ActivityIdentity({
+  primary,
+  secondary,
+  withAvatar = false,
+}: {
+  primary: string;
+  secondary?: string | null;
+  /** Only the actor is always a person; the affected item often isn't. */
+  withAvatar?: boolean;
+}) {
   return (
     <div className="dg-activity-identity">
-      <div className="dg-activity-identity-primary">{primary}</div>
-      {showSecondary && <div className="dg-activity-identity-secondary">{secondary}</div>}
+      {withAvatar && (
+        <span className="dg-activity-avatar" aria-hidden>
+          {getAvatarInitials(primary)}
+        </span>
+      )}
+      <MaybeHint content={secondary && secondary !== primary ? secondary : null}>
+        <span className="dg-activity-identity-primary">{primary}</span>
+      </MaybeHint>
     </div>
   );
 }

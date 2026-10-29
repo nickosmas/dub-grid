@@ -1150,17 +1150,16 @@ button {
 /* Below this the row genuinely cannot hold every control, so the stepper takes
    its own line and the remaining tools sit under it. */
 .dg-activity-head-row > th {
-  background: var(--dg-color-bg);
+  height: auto;
+  background: var(--dg-color-surface);
   padding: 10px 12px;
   border-bottom: 1px solid var(--dg-color-border-light);
-  border-right: 1px solid var(--dg-color-border-light);
 }
 .dg-activity-head-row > th:first-child {
-  padding-left: 24px;
+  padding-left: 20px;
 }
 .dg-activity-head-row > th:last-child {
-  padding-right: 24px;
-  border-right: 0;
+  padding-right: 16px;
 }
 .dg-role-department-edit-pills > button,
 .dg-role-requirement-edit-pills > button {

@@ -66,9 +66,22 @@ function compactSide(side: ShiftChangeSide): string {
   return side.items.length === 0 ? NO_SHIFT : side.items.map((item) => item.plain).join(" + ");
 }
 
+/**
+ * The compact Before and After apart, for a layout that draws the arrow itself;
+ * `before` is null for a day that had nothing.
+ */
+export function formatShiftChangeCompactSides(
+  change: ShiftChange,
+): { before: string | null; after: string } | null {
+  if (change.kind === "none") return null;
+  if (isNewShiftChange(change)) return { before: null, after: compactSide(change.after) };
+  return { before: compactSide(change.before), after: compactSide(change.after) };
+}
+
 /** One line with an arrow, for compact spaces such as push notifications. */
 export function formatShiftChangeCompact(change: ShiftChange): string {
-  if (change.kind === "none") return "";
-  if (isNewShiftChange(change)) return `New: ${compactSide(change.after)}`;
-  return `${compactSide(change.before)} → ${compactSide(change.after)}`;
+  const sides = formatShiftChangeCompactSides(change);
+  if (!sides) return "";
+  if (sides.before === null) return `New: ${sides.after}`;
+  return `${sides.before} → ${sides.after}`;
 }

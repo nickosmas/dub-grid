@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { describeShiftChange, type ShiftChangeShiftInput } from "@dubgrid/schedule-core";
 import {
+  formatActivityRowDetails,
   formatActivityTime,
   formatActivityTimestamp,
   formatDetails,
@@ -229,5 +231,50 @@ describe("activity timestamps", () => {
   it("passes an unparseable value through rather than printing Invalid Date", () => {
     expect(formatActivityTime("not a date", "UTC")).toBe("not a date");
     expect(formatActivityTimestamp("not a date", "UTC")).toBe("not a date");
+  });
+});
+
+describe("formatActivityRowDetails", () => {
+  const day: ShiftChangeShiftInput = {
+    kind: "shift",
+    key: "1:10",
+    shiftName: "Day Shift",
+    jobName: "Registered Nurse",
+    focusAreaName: null,
+    start: "07:00",
+    end: "15:00",
+  };
+  const change = describeShiftChange(
+    { items: [day] },
+    { items: [{ ...day, shiftName: "Evening Shift", start: "15:00", end: "23:00" }] },
+    { date: "2026-10-27" },
+  );
+
+  it("sets a corrected day's Before and After apart from its reason", () => {
+    const rows = formatActivityRowDetails(
+      makeEntry({
+        action: "shift.corrected",
+        details: { reason: "Left early" },
+        shiftChange: change,
+      }),
+    );
+
+    expect(rows.change).toEqual({
+      before: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs)",
+      after: "Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs)",
+    });
+    expect(rows.details).toEqual([{ label: "Reason", value: "Left early" }]);
+  });
+
+  it("keeps every detail when there is no shift change", () => {
+    const entry = makeEntry({
+      action: "role.changed",
+      details: { fromRole: "user", toRole: "admin" },
+    });
+
+    expect(formatActivityRowDetails(entry)).toEqual({
+      change: null,
+      details: formatDetails(entry),
+    });
   });
 });

@@ -1,11 +1,29 @@
 "use client";
 
 import React from "react";
+import {
+  ArrowLeftRight,
+  Building2,
+  CalendarDays,
+  CircleDot,
+  CreditCard,
+  Database,
+  Eye,
+  KeyRound,
+  Mail,
+  Repeat,
+  Server,
+  ShieldCheck,
+  SlidersHorizontal,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import type { FullAuditLogEntry } from "@/types";
+import { getAuditCategory, type AuditCategory } from "@/lib/audit/registry";
 import { formatDateTime } from "@/lib/audit/details";
 import {
   describeAction,
@@ -36,6 +54,33 @@ export function ActionBadge({ action }: { action: string }) {
     <StatusPill tone={ACTION_TONES[getActionSeverity(action)]} variant="category">
       {getAuditCategoryLabel(action)}
     </StatusPill>
+  );
+}
+
+const CATEGORY_ICONS: Record<AuditCategory, LucideIcon> = {
+  people: User,
+  schedule: CalendarDays,
+  requests: ArrowLeftRight,
+  access: KeyRound,
+  invitations: Mail,
+  setup: SlidersHorizontal,
+  recurring: Repeat,
+  organization: Building2,
+  impersonation: Eye,
+  billing: CreditCard,
+  data: Database,
+  security: ShieldCheck,
+  platform: Server,
+};
+
+/** The kind of change as an icon tile, tinted like its badge. */
+export function ActivityKindIcon({ action }: { action: string }) {
+  const category = getAuditCategory(action);
+  const Icon = category ? CATEGORY_ICONS[category] : CircleDot;
+  return (
+    <span className="dg-activity-kind-icon" data-tone={ACTION_TONES[getActionSeverity(action)]}>
+      <Icon size={15} strokeWidth={2} aria-hidden />
+    </span>
   );
 }
 
