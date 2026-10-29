@@ -1,6 +1,14 @@
 "use client";
 
-import { Copy, ClipboardPaste, Trash2, UserPlus, ArrowLeftRight } from "lucide-react";
+import {
+  Copy,
+  ClipboardPaste,
+  Trash2,
+  UserPlus,
+  ArrowLeftRight,
+  CalendarOff,
+  Eye,
+} from "lucide-react";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 
@@ -11,14 +19,35 @@ interface ShiftContextMenuProps {
   canEdit: boolean;
   /** Show coverage/swap actions (employee viewing own published shift). */
   canRequest: boolean;
-  /** An active request already exists for this shift. */
+  /** The viewer's own request is already active for this shift. */
   hasActiveRequest: boolean;
   onCopy: () => void;
   onPaste: () => void;
   onClear: () => void;
   onNeedCoverage?: () => void;
   onProposeSwap?: () => void;
+  /** Opens the call-off flow; omitted when no absence can be chosen. */
+  onCallOff?: () => void;
+  /** Opens the active request. */
+  onViewRequest?: () => void;
   onClose: () => void;
+}
+
+export type ShiftRequestMenuState = "request" | "active" | "none";
+
+/**
+ * What the menu offers for requests: the actions on the viewer's own
+ * requestable shift, or the request already on it. A request stays viewable
+ * after the shift starts, when nothing new can be asked for.
+ */
+export function resolveShiftRequestMenuState(input: {
+  isOwnShift: boolean;
+  canRequest: boolean;
+  hasActiveRequest: boolean;
+}): ShiftRequestMenuState {
+  if (!input.isOwnShift) return "none";
+  if (input.hasActiveRequest) return "active";
+  return input.canRequest ? "request" : "none";
 }
 
 export default function ShiftContextMenu({
@@ -33,6 +62,8 @@ export default function ShiftContextMenu({
   onClear,
   onNeedCoverage,
   onProposeSwap,
+  onCallOff,
+  onViewRequest,
   onClose,
 }: ShiftContextMenuProps) {
   useCloseOnWindowResize(onClose);
@@ -123,9 +154,20 @@ export default function ShiftContextMenu({
                 Swap
               </MenuItem>
             )}
+            {onCallOff && (
+              <MenuItem
+                className="dg-menu-item--danger"
+                onClick={() => {
+                  onCallOff();
+                }}
+              >
+                <CalendarOff size={14} />
+                Call off
+              </MenuItem>
+            )}
           </>
         )}
-        {canRequest && hasShift && hasActiveRequest && (
+        {hasShift && hasActiveRequest && (
           <>
             {canEdit && <div className="dg-menu-divider" />}
             <div
@@ -138,6 +180,17 @@ export default function ShiftContextMenu({
             >
               Request already active
             </div>
+            {onViewRequest && (
+              <MenuItem
+                className="dg-menu-item--accent"
+                onClick={() => {
+                  onViewRequest();
+                }}
+              >
+                <Eye size={14} />
+                View request
+              </MenuItem>
+            )}
           </>
         )}
       </MenuContent>

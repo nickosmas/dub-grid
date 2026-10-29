@@ -30,6 +30,10 @@ import CustomSelect from "@/components/CustomSelect";
 import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import { fetchShiftRequests } from "@/features/schedule/client/api";
+import {
+  HISTORY_STATUSES,
+  filterRequestHistory,
+} from "@/components/shift-requests/request-history";
 import { queryKeys } from "@/lib/query-keys";
 import {
   describeAwaitingRecipient,
@@ -77,7 +81,6 @@ interface ShiftRequestBoardProps {
 
 type Tab = "available" | "mine" | "approval" | "history";
 
-const HISTORY_STATUSES: ShiftRequestStatus[] = ["approved", "rejected", "cancelled", "expired"];
 const HISTORY_DEFAULT_DAYS = 30;
 
 function isoDateDaysAgo(days: number): string {
@@ -170,7 +173,7 @@ export default function ShiftRequestBoard({
   const canReviewOrg = canApprove || canViewAllRequests;
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (!initialTab) return "available";
-    if ((initialTab === "approval" || initialTab === "history") && !canReviewOrg) return "mine";
+    if (initialTab === "approval" && !canReviewOrg) return "mine";
     return initialTab;
   });
 
@@ -178,6 +181,8 @@ export default function ShiftRequestBoard({
   // requests for a shift-date window on demand, and the staff and outcome
   // filters narrow that result in place, so a manager can answer "what did
   // Laura ask for in March" without paging through everything since launch.
+  // Staff get their own: the route already scopes them to requests they made
+  // or were asked to take, and the filter below holds to that too.
   const [historyFrom, setHistoryFrom] = useState(() => isoDateDaysAgo(HISTORY_DEFAULT_DAYS));
   const [historyTo, setHistoryTo] = useState("");
   const [historyType, setHistoryType] = useState<ShiftRequestType | "all">("all");
@@ -198,25 +203,19 @@ export default function ShiftRequestBoard({
         ...(historyFrom ? { startDate: historyFrom } : {}),
         ...(historyTo ? { endDate: historyTo } : {}),
       }),
-    enabled: Boolean(orgId) && canReviewOrg && activeTab === "history",
+    enabled: Boolean(orgId) && activeTab === "history",
     staleTime: 60_000,
   });
-  const historyRequests = useMemo(() => {
-    const people = new Set(historyStaff);
-    return (historyQuery.data ?? [])
-      .filter((r) => historyStatus === "all" || r.status === historyStatus)
-      .filter(
-        (r) =>
-          people.size === 0 ||
-          people.has(r.requesterEmpId) ||
-          (r.targetEmpId != null && people.has(r.targetEmpId)),
-      )
-      .sort(
-        (left, right) =>
-          new Date(right.resolvedAt ?? right.createdAt).getTime() -
-          new Date(left.resolvedAt ?? left.createdAt).getTime(),
-      );
-  }, [historyQuery.data, historyStaff, historyStatus]);
+  const historyRequests = useMemo(
+    () =>
+      filterRequestHistory(historyQuery.data ?? [], {
+        status: historyStatus,
+        people: historyStaff,
+        viewerEmpId: currentEmpId,
+        canReviewOrg,
+      }),
+    [canReviewOrg, currentEmpId, historyQuery.data, historyStaff, historyStatus],
+  );
   // One optional note per pending card, sent with whichever decision is made.
   const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
@@ -248,7 +247,9 @@ export default function ShiftRequestBoard({
   }
 
   const tabs: { key: Tab; label: string; count: number; visible: boolean }[] = [
-    { key: "available", label: "Available shifts", count: openPickups.length, visible: true },
+    // "Available shifts" on the dashboard also counts open shifts; this tab
+    // lists only pickups, so it says so.
+    { key: "available", label: "Pickups", count: openPickups.length, visible: true },
     { key: "mine", label: "My requests", count: myRequests.length, visible: true },
     {
       key: "approval",
@@ -256,7 +257,7 @@ export default function ShiftRequestBoard({
       count: managerQueue.length,
       visible: canReviewOrg,
     },
-    { key: "history", label: "History", count: historyRequests.length, visible: canReviewOrg },
+    { key: "history", label: "History", count: historyRequests.length, visible: true },
   ];
 
   function getTabData(): ShiftRequest[] {
@@ -272,16 +273,20 @@ export default function ShiftRequestBoard({
     }
   }
 
-  function getEmptyMessage(): string {
+  function getEmptyMessage(): { title: string; description?: string } {
     switch (activeTab) {
       case "available":
-        return "No available shifts";
+        return { title: "No pickups to claim" };
       case "mine":
-        return "No requests yet";
+        return {
+          title: "No requests yet",
+          description: "Open one of your shifts to offer, swap or call it off.",
+        };
       case "approval":
-        return canApprove ? "No active requests" : "No organization requests";
+        return { title: canApprove ? "No active requests" : "No organization requests" };
       case "history":
-        return historyQuery.isPending ? "Loading history" : "No decided requests match";
+        if (historyQuery.isPending) return { title: "Loading history" };
+        return { title: canReviewOrg ? "No decided requests match" : "No past requests match" };
     }
   }
 
@@ -958,7 +963,7 @@ export default function ShiftRequestBoard({
                 marginTop: 2,
               }}
             >
-              Pickups, swaps, and approvals
+              {canReviewOrg ? "Pickups, swaps, and approvals" : "Pickups, swaps, and call-offs"}
             </div>
           </div>
           {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close panel" />}
@@ -1070,12 +1075,14 @@ export default function ShiftRequestBoard({
                 ]}
                 value={historyStatus}
               />
-              <StaffMultiSelect
-                style={{ flex: "1 1 auto" }}
-                onChange={setHistoryStaff}
-                options={staffOptions}
-                value={historyStaff}
-              />
+              {canReviewOrg ? (
+                <StaffMultiSelect
+                  style={{ flex: "1 1 auto" }}
+                  onChange={setHistoryStaff}
+                  options={staffOptions}
+                  value={historyStaff}
+                />
+              ) : null}
             </div>
           ) : null}
           {tabData.length === 0 ? (
@@ -1098,7 +1105,8 @@ export default function ShiftRequestBoard({
                     <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                 }
-                title={getEmptyMessage()}
+                title={getEmptyMessage().title}
+                description={getEmptyMessage().description}
                 style={{ padding: "40px 24px", border: "none", background: "transparent" }}
               />
             )

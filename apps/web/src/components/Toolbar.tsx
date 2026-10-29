@@ -110,6 +110,112 @@ interface ToolbarProps {
   hasVisibleScheduleEntries?: boolean;
   /** When false, disables the bulk-delete entry point while still allowing exit. */
   hasRemovableVisibleEntries?: boolean;
+  /**
+   * False for someone who can't edit shifts: their Tools menu would hold just
+   * Requests and Print, so both sit on the toolbar instead.
+   */
+  hasEditorTools?: boolean;
+}
+
+function RequestsIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="17 1 21 5 17 9" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <polyline points="7 23 3 19 7 15" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </svg>
+  );
+}
+
+function PrintIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 6 2 18 2 18 9" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </svg>
+  );
+}
+
+const TOOLBAR_BUTTON_STYLE = {
+  borderRadius: "var(--dg-btn-radius)",
+  height: "var(--dg-toolbar-h)",
+  padding: "0 12px",
+  flexShrink: 0,
+  position: "relative",
+} as const;
+
+/* ── Requests and Print, for someone who only views the schedule ── */
+function ViewerActions({
+  requestsBadgeCount,
+  onRequestsToggle,
+  onPrintOpen,
+  printDisabled,
+}: {
+  requestsBadgeCount: number;
+  onRequestsToggle?: () => void;
+  onPrintOpen?: () => void;
+  printDisabled?: boolean;
+}) {
+  return (
+    <>
+      {onRequestsToggle && (
+        <Hint content={hint("Your pickups, swaps and call-offs")} side="bottom">
+          <Button
+            onClick={onRequestsToggle}
+            className="dg-btn dg-btn-secondary"
+            style={TOOLBAR_BUTTON_STYLE}
+          >
+            <RequestsIcon size={13} />
+            Requests
+            <NumericBadge
+              count={requestsBadgeCount}
+              label={`${requestsBadgeCount} waiting for your answer`}
+              size="sm"
+              tone="danger"
+              style={FLOATING_BADGE_STYLE}
+            />
+          </Button>
+        </Hint>
+      )}
+      {onPrintOpen && (
+        <Button
+          onClick={onPrintOpen}
+          disabled={printDisabled}
+          // The options modal is its own chunk; fetching it on the way to a
+          // click usually means it opens from cache.
+          onPointerEnter={() => void import("@/components/PrintOptionsModal")}
+          onFocus={() => void import("@/components/PrintOptionsModal")}
+          className="dg-btn dg-btn-secondary"
+          style={TOOLBAR_BUTTON_STYLE}
+        >
+          <PrintIcon size={13} />
+          Print
+        </Button>
+      )}
+    </>
+  );
 }
 
 /* ── Clear search button ── */
@@ -296,21 +402,7 @@ function ToolsMenu({
                 onRequestsToggle();
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="17 1 21 5 17 9" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                <polyline points="7 23 3 19 7 15" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-              </svg>
+              <RequestsIcon size={14} />
               <span style={{ flex: 1 }}>Requests</span>
               <NumericBadge count={requestsBadgeCount ?? 0} tone="danger" />
             </MenuItem>
@@ -325,20 +417,7 @@ function ToolsMenu({
               onPrintOpen();
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
+            <PrintIcon size={14} />
             Print
           </MenuItem>
         )}
@@ -486,6 +565,7 @@ export default function Toolbar({
   hasVisibleGridRows,
   hasVisibleScheduleEntries,
   hasRemovableVisibleEntries,
+  hasEditorTools = true,
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -647,7 +727,15 @@ export default function Toolbar({
               {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
             </div>
           )}
-          {hasData && (
+          {hasData && !hasEditorTools && (
+            <ViewerActions
+              requestsBadgeCount={requestsBadgeCount}
+              onRequestsToggle={onRequestsToggle}
+              onPrintOpen={onPrintOpen}
+              printDisabled={scheduleEntryActionsDisabled}
+            />
+          )}
+          {hasData && hasEditorTools && (
             <Button
               ref={toolsBtnRef}
               onClick={toggleTools}
@@ -693,7 +781,7 @@ export default function Toolbar({
               />
             </Button>
           )}
-          {hasData && toolsOpen && (
+          {hasData && hasEditorTools && toolsOpen && (
             <ToolsMenu
               triggerRef={toolsBtnRef}
               onClose={closeTools}
@@ -971,54 +1059,68 @@ export default function Toolbar({
             </Hint>
           )}
 
-          {/* Tools dropdown */}
-          <Hint content={hint("Print, export, recurring shifts, requests, and more")} side="bottom">
-            <Button
-              ref={toolsBtnRef}
-              onClick={toggleTools}
-              aria-expanded={toolsOpen}
-              aria-haspopup="menu"
-              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
-              data-tour="toolbar-tools-btn"
-              style={{
-                borderRadius: "var(--dg-btn-radius)",
-                height: "var(--dg-toolbar-h)",
-                padding: "0 12px",
-                position: "relative",
-              }}
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="4" y1="21" x2="4" y2="14" />
-                <line x1="4" y1="10" x2="4" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12" y2="3" />
-                <line x1="20" y1="21" x2="20" y2="16" />
-                <line x1="20" y1="12" x2="20" y2="3" />
-                <line x1="1" y1="14" x2="7" y2="14" />
-                <line x1="9" y1="8" x2="15" y2="8" />
-                <line x1="17" y1="16" x2="23" y2="16" />
-              </svg>
-              Tools
-              <NumericBadge
-                count={requestsBadgeCount}
-                label={`${requestsBadgeCount} active requests`}
-                size="sm"
-                tone="danger"
-                style={FLOATING_BADGE_STYLE}
-              />
-            </Button>
-          </Hint>
+          {!hasEditorTools && (
+            <ViewerActions
+              requestsBadgeCount={requestsBadgeCount}
+              onRequestsToggle={onRequestsToggle}
+              onPrintOpen={onPrintOpen}
+              printDisabled={scheduleEntryActionsDisabled}
+            />
+          )}
 
-          {toolsOpen && (
+          {/* Tools dropdown */}
+          {hasEditorTools && (
+            <Hint
+              content={hint("Print, export, recurring shifts, requests, and more")}
+              side="bottom"
+            >
+              <Button
+                ref={toolsBtnRef}
+                onClick={toggleTools}
+                aria-expanded={toolsOpen}
+                aria-haspopup="menu"
+                className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
+                data-tour="toolbar-tools-btn"
+                style={{
+                  borderRadius: "var(--dg-btn-radius)",
+                  height: "var(--dg-toolbar-h)",
+                  padding: "0 12px",
+                  position: "relative",
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                  <line x1="1" y1="14" x2="7" y2="14" />
+                  <line x1="9" y1="8" x2="15" y2="8" />
+                  <line x1="17" y1="16" x2="23" y2="16" />
+                </svg>
+                Tools
+                <NumericBadge
+                  count={requestsBadgeCount}
+                  label={`${requestsBadgeCount} active requests`}
+                  size="sm"
+                  tone="danger"
+                  style={FLOATING_BADGE_STYLE}
+                />
+              </Button>
+            </Hint>
+          )}
+
+          {hasEditorTools && toolsOpen && (
             <ToolsMenu
               triggerRef={toolsBtnRef}
               onClose={closeTools}

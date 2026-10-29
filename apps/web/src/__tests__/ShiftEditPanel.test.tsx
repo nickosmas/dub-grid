@@ -370,6 +370,10 @@ function renderRequestPanel(
     currentShift?: string;
     currentAssignmentIds?: number[];
     currentSegments?: ShiftJobSegment[];
+    allowShiftEdits?: boolean;
+    hasActiveRequest?: boolean;
+    onViewActiveRequest?: ReturnType<typeof vi.fn>;
+    onCancelActiveRequest?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const onMakeAvailable = overrides.onMakeAvailable ?? vi.fn();
@@ -392,9 +396,13 @@ function renderRequestPanel(
       jobs={jobs}
       onSelect={vi.fn()}
       onClose={vi.fn()}
+      allowShiftEdits={overrides.allowShiftEdits}
       focusAreas={focusAreas}
       certifications={certifications}
       isOwnShift
+      hasActiveRequest={overrides.hasActiveRequest}
+      onViewActiveRequest={overrides.onViewActiveRequest}
+      onCancelActiveRequest={overrides.onCancelActiveRequest}
       onMakeAvailable={onMakeAvailable}
       onCallOff={onCallOff}
       employees={employees}
@@ -2922,11 +2930,77 @@ describe("ShiftEditPanel", () => {
 
       expect(onCallOff).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
-        name: /^Submit a call off for your /,
+        name: /^Call off your /,
       });
-      await user.click(within(dialog).getByRole("button", { name: "Submit call off" }));
+      await user.click(within(dialog).getByRole("button", { name: "Request call-off" }));
 
       expect(onCallOff).toHaveBeenCalledWith(absenceTypes[0]);
+    });
+
+    it("lets the requester view or cancel the request already on their shift", async () => {
+      const user = userEvent.setup();
+      const onViewActiveRequest = vi.fn();
+      const onCancelActiveRequest = vi.fn(async () => true);
+      renderRequestPanel({
+        allowShiftEdits: false,
+        hasActiveRequest: true,
+        onViewActiveRequest,
+        onCancelActiveRequest,
+      });
+
+      expect(screen.getByText("A request is already active for this shift")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "View request" }));
+      expect(onViewActiveRequest).toHaveBeenCalledOnce();
+
+      await user.click(screen.getByRole("button", { name: "Cancel request" }));
+      const dialog = screen.getByRole("dialog", { name: /^Cancel your request for your shift/ });
+      expect(onCancelActiveRequest).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+
+      expect(onCancelActiveRequest).toHaveBeenCalledOnce();
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("dialog", { name: /^Cancel your request/ }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("opens straight on the call-off reasons from the grid's Call off", () => {
+      renderRequestPanel({
+        modalOverride: {
+          ...modal,
+          date: new Date(2026, 4, 4),
+          requestMode: "coverage",
+          requestFocus: "calloff",
+        },
+      });
+
+      expect(screen.getByText("Select absence reason")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Vacation/i })).toBeInTheDocument();
+    });
+
+    it("shows staff that a teammate is off without saying why", async () => {
+      const user = userEvent.setup();
+      renderRequestPanel({ allowShiftEdits: false });
+
+      await user.click(screen.getByRole("button", { name: "Drop shift" }));
+      await user.click(screen.getByRole("button", { name: /Offer for pickup/i }));
+
+      expect(screen.getByText("Teammates who are off that day.")).toBeInTheDocument();
+      expect(screen.queryByText("Vacation")).not.toBeInTheDocument();
+      const bob = screen.getByRole("button", { name: /Bob Jones/i });
+      expect(within(bob).getByText("Off")).toBeInTheDocument();
+      await user.click(bob);
+
+      const dialog = screen.getByRole("dialog", { name: /^Request pickup of your / });
+      expect(within(dialog).queryByText(/Vacation/)).not.toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          "The person you chose is asked to pick it up, and you take their time off that day.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("opens the same chooser directly in coverage mode and disables calloff without absence types", async () => {
