@@ -1680,6 +1680,10 @@ const SectionBlock = memo(function SectionBlock({
             onClick={() => setAwayAllPeriodFolded(!awayAllPeriodFolded)}
             aria-expanded={!awayAllPeriodFolded}
             style={{
+              // Stays in view while a narrow grid scrolls sideways, beside the
+              // pinned name column.
+              position: "sticky",
+              left: 12,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -1952,10 +1956,11 @@ const SectionBlock = memo(function SectionBlock({
           borderRadius: "0 0 var(--dg-radius-md) var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
           borderTop: 0,
-          // Change chips intentionally cross the top edge of a shift pill.
-          // The card cannot clip that layer; horizontal clipping belongs only
-          // to the scrollable narrow-grid path below.
-          overflow: fitToContainer ? "visible" : "clip",
+          // Clips to the inner curve of the rounded corners, so the last row's
+          // square cells never paint over them. A change chip still clears its
+          // pill's top edge: the first row's chip has the scroller's top
+          // padding, and every other chip hangs into the row above, inside.
+          overflow: "clip",
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
@@ -2022,7 +2027,7 @@ const SectionBlock = memo(function SectionBlock({
                     backgroundPosition: "0 100%",
                     backgroundRepeat: "no-repeat",
                     backgroundSize: "100% 2px",
-                    boxShadow: "1px 0 0 0 var(--dg-color-border)",
+                    boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
                   }}
                 >
                   <svg
@@ -2785,7 +2790,10 @@ const SectionBlock = memo(function SectionBlock({
                             data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                             data-bulk-selected={isBulkSelected ? "true" : undefined}
                             style={{
-                              height: GRID_CELL_HEIGHT,
+                              // A floor, not a fixed height: a name cell taller than
+                              // the day cells grows the row, and every day cell must
+                              // grow with it or its dividers stop short of the next row.
+                              minHeight: GRID_CELL_HEIGHT,
                               background: isBulkSelected
                                 ? "var(--dg-color-brand-bg)"
                                 : showDiffCellTint
