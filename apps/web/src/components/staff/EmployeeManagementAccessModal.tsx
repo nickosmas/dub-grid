@@ -44,6 +44,8 @@ interface EmployeeManagementAccessEditorProps {
   onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
   onDirtyChange?: (isDirty: boolean) => void;
   hideActions?: boolean;
+  /** Places the fields and the buttons apart, for a popup that pins the buttons in its footer. */
+  frame?: (fields: React.ReactNode, actions: React.ReactNode) => React.ReactNode;
 }
 
 export interface EmployeeManagementAccessEditorHandle {
@@ -85,6 +87,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
     onCompleted,
     onDirtyChange,
     hideActions = false,
+    frame,
   }: EmployeeManagementAccessEditorProps,
   ref,
 ) {
@@ -379,104 +382,113 @@ export const EmployeeManagementAccessEditor = forwardRef<
     [handleDismissClick, handleSubmit],
   );
 
-  return (
-    <>
-      <section
-        aria-label={isEditingExistingAccess ? "Edit management access" : "Add to management"}
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
+  const actions = hideActions ? null : (
+    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+      <Button className="dg-btn dg-btn-secondary" onClick={handleDismissClick}>
+        {dismissLabel}
+      </Button>
+      <Button
+        className={
+          inviteSaveAction === "revoke" ? "dg-btn dg-btn-danger-filled" : "dg-btn dg-btn-primary"
+        }
+        onClick={handleSubmit}
+        disabled={!canSubmit}
+        style={{ opacity: canSubmit ? 1 : 0.5 }}
       >
-        {/* First thing in the editor, so in a popup it lands directly under the
+        <ButtonLoading loading={saving} spinnerSize={16}>
+          {submitLabel}
+        </ButtonLoading>
+      </Button>
+    </div>
+  );
+
+  const fields = (
+    <section
+      aria-label={isEditingExistingAccess ? "Edit management access" : "Add to management"}
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
+    >
+      {/* First thing in the editor, so in a popup it lands directly under the
             title rather than partway down the body. */}
-        <SectionNotice messages={accessNotices} />
+      <SectionNotice messages={accessNotices} />
 
-        {!hasKnownOrgRole && (
-          <div>
-            <label style={fieldLabelStyle}>Role</label>
-            <div style={{ maxWidth: 200 }}>
-              <CustomSelect
-                value={role}
-                options={inviteRoleOptions}
-                onChange={(value) => setRole(value as AssignableOrganizationRole)}
-              />
-            </div>
-          </div>
-        )}
-
-        {!loadingUsers && !linkedUser && !effectiveEmail.trim() && (
-          <FieldError message="Add an email address in Profile details before inviting them." />
-        )}
-
+      {!hasKnownOrgRole && (
         <div>
-          <label style={fieldLabelStyle}>
-            Management departments
-            {!hasExistingManagementAccess && (
-              <span style={{ color: "var(--dg-color-danger)" }}> *</span>
-            )}
-          </label>
-          {managementDepartments.length === 0 ? (
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-muted)",
-              }}
-            >
-              You don't have any management departments yet. Add one in Settings, under Departments,
-              then come back to assign it here.
+          <label style={fieldLabelStyle}>Role</label>
+          <div style={{ maxWidth: 200 }}>
+            <CustomSelect
+              value={role}
+              options={inviteRoleOptions}
+              onChange={(value) => setRole(value as AssignableOrganizationRole)}
+            />
+          </div>
+        </div>
+      )}
+
+      {!loadingUsers && !linkedUser && !effectiveEmail.trim() && (
+        <FieldError message="Add an email address in Profile details before inviting them." />
+      )}
+
+      <div>
+        <label style={fieldLabelStyle}>
+          Management departments
+          {!hasExistingManagementAccess && (
+            <span style={{ color: "var(--dg-color-danger)" }}> *</span>
+          )}
+        </label>
+        {managementDepartments.length === 0 ? (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-text-muted)",
+            }}
+          >
+            You don't have any management departments yet. Add one in Settings, under Departments,
+            then come back to assign it here.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {managementDepartments.map((department) => (
+                <SelectableTag
+                  key={department.id}
+                  selected={managementDepartmentIds.includes(department.id)}
+                  onClick={() => toggleDepartment(department.id)}
+                  padding="5px 12px"
+                >
+                  {department.name}
+                </SelectableTag>
+              ))}
             </div>
-          ) : (
-            <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {managementDepartments.map((department) => (
-                  <SelectableTag
-                    key={department.id}
-                    selected={managementDepartmentIds.includes(department.id)}
-                    onClick={() => toggleDepartment(department.id)}
-                    padding="5px 12px"
-                  >
-                    {department.name}
-                  </SelectableTag>
-                ))}
-              </div>
-              {/* Only the validation half stays by the tags. The removal is a
+            {/* Only the validation half stays by the tags. The removal is a
                   consequence of the save, so it is raised once at the top of
                   the section instead. */}
-              {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
-                <FieldError message="Select at least one management department" />
-              )}
-            </>
-          )}
+            {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
+              <FieldError message="Select at least one management department" />
+            )}
+          </>
+        )}
+      </div>
+
+      {isInSandbox && (
+        <Banner tone="info" icon={FlaskConical}>
+          Granting management access isn't available in sandbox mode. Exit the sandbox to update
+          access on your real organization.
+        </Banner>
+      )}
+    </section>
+  );
+
+  return (
+    <>
+      {frame ? (
+        frame(fields, actions)
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {fields}
+          {actions}
         </div>
-
-        {isInSandbox && (
-          <Banner tone="info" icon={FlaskConical}>
-            Granting management access isn't available in sandbox mode. Exit the sandbox to update
-            access on your real organization.
-          </Banner>
-        )}
-
-        {!hideActions && (
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button className="dg-btn dg-btn-secondary" onClick={handleDismissClick}>
-              {dismissLabel}
-            </Button>
-            <Button
-              className={
-                inviteSaveAction === "revoke"
-                  ? "dg-btn dg-btn-danger-filled"
-                  : "dg-btn dg-btn-primary"
-              }
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              style={{ opacity: canSubmit ? 1 : 0.5 }}
-            >
-              <ButtonLoading loading={saving} spinnerSize={16}>
-                {submitLabel}
-              </ButtonLoading>
-            </Button>
-          </div>
-        )}
-      </section>
+      )}
       {stepUp.dialog}
     </>
   );

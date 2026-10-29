@@ -38,10 +38,24 @@ export default function InactivityGuard() {
   if (!user || phase !== "warning") return null;
 
   return (
-    <Modal title="Still there?" onClose={handleStay} style={{ maxWidth: 400 }}>
+    <Modal
+      title="Still there?"
+      onClose={handleStay}
+      style={{ maxWidth: 400 }}
+      footer={
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleExpire}>
+            Sign out now
+          </Button>
+          <Button type="button" className="dg-btn dg-btn-primary" onClick={handleStay}>
+            Stay signed in
+          </Button>
+        </div>
+      }
+    >
       <p
         style={{
-          margin: "0 0 20px",
+          margin: 0,
           fontSize: "var(--dg-fs-body-sm)",
           lineHeight: 1.5,
           color: "var(--dg-color-text-secondary)",
@@ -50,14 +64,6 @@ export default function InactivityGuard() {
       >
         You&rsquo;ll be signed out in {secondsRemaining} seconds due to inactivity.
       </p>
-      <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-        <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleExpire}>
-          Sign out now
-        </Button>
-        <Button type="button" className="dg-btn dg-btn-primary" onClick={handleStay}>
-          Stay signed in
-        </Button>
-      </div>
     </Modal>
   );
 }

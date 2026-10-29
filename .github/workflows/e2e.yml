@@ -73,8 +73,19 @@ jobs:
         with:
           version: "2.111.0" # pinned: `latest` silently adopts any new CLI build
 
+      # Every shard pulls the same images at once, and ghcr.io answers that burst
+      # with "error from registry: retry-after" before any test runs. A failed
+      # start is cleared and retried after a growing pause instead of failing
+      # the shard.
       - name: Start Supabase
-        run: supabase start
+        run: |
+          for attempt in 1 2 3 4; do
+            supabase start && exit 0
+            echo "supabase start failed (attempt $attempt of 4)" >&2
+            supabase stop --no-backup || true
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: Seed database
         run: npx tsx seed.ts

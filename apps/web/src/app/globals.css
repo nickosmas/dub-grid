@@ -278,6 +278,9 @@
   --dg-color-surface: #ffffff;
   --dg-color-surface-alt: #eeeeee;
   --dg-color-surface-hover: #e5e5e5;
+  /* Fill for the footer strip under a line that holds a container's bottom
+     buttons (cards, popups, slideovers): one faint step off the surface. */
+  --dg-color-surface-footer: #f8f8f8;
   /* Fill for an editable field (text, select, picker), one step off the card
      it sits on: a faint gray on white here, darker than the card in dark mode.
      A field on the page background takes `.dg-field-raised` instead, and a
@@ -461,6 +464,7 @@
   --dg-color-surface: #121214;
   --dg-color-surface-alt: #0a0a0b;
   --dg-color-surface-hover: #1c1c1f;
+  --dg-color-surface-footer: #17171a;
   --dg-color-field: #0a0a0b;
   --dg-color-bg-secondary: #1c1c1f;
   --dg-color-row-alt: #0a0a0b;
@@ -1369,7 +1373,7 @@ table tbody > tr:last-child > th {
 .staff-panel-editor-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--dg-color-border-light);
-  background: var(--dg-color-surface);
+  background: var(--dg-color-surface-footer);
 }
 .staff-panel-action-footer {
   max-height: min(45dvh, 360px);
@@ -1377,7 +1381,7 @@ table tbody > tr:last-child > th {
   padding: 12px 24px;
 }
 .staff-panel-editor-footer {
-  padding: 16px 24px;
+  padding: 12px 24px;
 }
 /* Mobile: full-screen panel */
 @media (max-width: 767px) {

@@ -91,12 +91,14 @@ something done.
 11. **Feature commit** - `/complete` squash-merges the work branch (step work
     plus the logging changes) into `dev` as one conventional feature commit,
     then deletes the branch.
-12. **Release PR** - Keep `main` untouched during development. When explicitly
-    asked to prepare a release, create or update a PR from `dev` to `main` only
-    after auditing the diff and included commits. Do not merge, rewrite, or push
-    `main` without separate explicit authorization, and never merge until every
-    GitHub check on the PR is green (`gh pr checks <n> --watch`); a failure
-    withdraws the authorization until it is fixed and the checks rerun.
+12. **Release PR** - Keep `main` untouched during development. After work
+    merges into `dev`, create or update a PR from `dev` to `main` after
+    auditing the diff and included commits, and merge it once every GitHub
+    check on it is green: the owner has standing-authorized releasing every
+    change to production and fixing failing checks without asking (see
+    "DubGrid Git policy" in `AGENTS.md`, including its migration stop). Never
+    rewrite or push `main` directly, and never merge past a red or running
+    check (`gh pr checks <n> --watch`); a failure is fixed and the checks rerun.
 13. **Release prep (optional)** - run `/release render` or `/release vercel`
     after a completed feature or milestone when you want local provider config,
     env var review, build/start checks, and a smoke-test path. `/release` must

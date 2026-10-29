@@ -204,7 +204,14 @@ vi.mock("@/components/staff/StaffReadOnlyDetailPanel", () => ({
 }));
 
 vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
-  EmployeeManagementAccessEditor: () => <div data-testid="employee-management-access-editor" />,
+  EmployeeManagementAccessEditor: ({
+    frame,
+  }: {
+    frame?: (fields: React.ReactNode, actions: React.ReactNode) => React.ReactNode;
+  }) => {
+    const fields = <div data-testid="employee-management-access-editor" />;
+    return frame ? frame(fields, null) : fields;
+  },
 }));
 
 vi.mock("@/components/staff/AddManagementUserToScheduleModal", () => ({

@@ -38,7 +38,37 @@ export default function ChangeReviewModal({
   const hasSensitiveChanges = changes.some((change) => change.sensitive);
 
   return (
-    <Modal title={title} onClose={onCancel} style={{ maxWidth: 720, width: "100%" }}>
+    <Modal
+      title={title}
+      onClose={onCancel}
+      style={{ maxWidth: 720, width: "100%" }}
+      footer={
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Go Back
+          </Button>
+          <Button
+            type="button"
+            className="dg-btn dg-btn-primary"
+            onClick={onConfirm}
+            disabled={saving}
+          >
+            <ButtonLoading loading={saving}>{confirmLabel}</ButtonLoading>
+          </Button>
+        </div>
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <p
           style={{
@@ -136,31 +166,6 @@ export default function ChangeReviewModal({
               </div>
             </div>
           ))}
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary"
-            onClick={onCancel}
-            disabled={saving}
-          >
-            Go Back
-          </Button>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-primary"
-            onClick={onConfirm}
-            disabled={saving}
-          >
-            <ButtonLoading loading={saving}>{confirmLabel}</ButtonLoading>
-          </Button>
         </div>
       </div>
     </Modal>

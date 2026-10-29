@@ -159,6 +159,23 @@ export function AddManagementUserToScheduleModal({
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
+        footer={
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
+            </Button>
+            <Button
+              className="dg-btn dg-btn-primary"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              style={{ opacity: canSubmit ? 1 : 0.5 }}
+            >
+              <ButtonLoading loading={saving} spinnerSize={16}>
+                Add to schedule
+              </ButtonLoading>
+            </Button>
+          </div>
+        }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div
@@ -245,22 +262,6 @@ export function AddManagementUserToScheduleModal({
                 </SelectableTag>
               ))}
             </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
-              {EDITOR_ACTION_LABELS.close}
-            </Button>
-            <Button
-              className="dg-btn dg-btn-primary"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              style={{ opacity: canSubmit ? 1 : 0.5 }}
-            >
-              <ButtonLoading loading={saving} spinnerSize={16}>
-                Add to schedule
-              </ButtonLoading>
-            </Button>
           </div>
         </div>
       </Modal>

@@ -571,11 +571,8 @@ export default function StringListSettings({
           <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
         </Button>
       }
-      style={{
-        marginTop: 12,
-        padding: sectionTitle ? "12px 16px" : undefined,
-        borderTop: sectionTitle ? "1px solid var(--dg-color-border-light)" : undefined,
-      }}
+      className={sectionTitle ? "dg-footer-bar [--dg-footer-bar-px:16px]" : undefined}
+      style={{ marginTop: 12 }}
     />
   ) : null;
 

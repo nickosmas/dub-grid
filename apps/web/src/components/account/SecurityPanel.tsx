@@ -305,7 +305,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 )}
               </div>
               {error && <p className="dg-form-error">{error}</p>}
-              <div className="flex flex-wrap gap-2">
+              <div className="dg-footer-bar dg-footer-bar--bleed flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   onClick={hasPasswordChanges ? discardChanges : closeForm}

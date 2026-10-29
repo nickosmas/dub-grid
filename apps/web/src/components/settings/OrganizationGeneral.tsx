@@ -188,7 +188,34 @@ export default function OrganizationGeneral({
   }, [buildForm]);
 
   return (
-    <SectionCard>
+    <SectionCard
+      footer={
+        !isWizardMode && (
+          <EditorActionRow
+            secondaryAction={
+              isModified ? (
+                <Button
+                  onClick={handleDiscard}
+                  disabled={saving}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  {EDITOR_ACTION_LABELS.discard}
+                </Button>
+              ) : null
+            }
+            primaryAction={
+              <Button
+                onClick={handleReview}
+                disabled={!isModified || saving || hasValidationErrors}
+                className="dg-btn dg-btn-primary"
+              >
+                Review & Save
+              </Button>
+            }
+          />
+        )
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
           style={{
@@ -227,31 +254,6 @@ export default function OrganizationGeneral({
           employeeCountLoading={employeeCountLoading}
           gridTemplateColumns={isMobile ? "minmax(0, 1fr)" : "1fr 1fr"}
         />
-
-        {!isWizardMode && (
-          <EditorActionRow
-            secondaryAction={
-              isModified ? (
-                <Button
-                  onClick={handleDiscard}
-                  disabled={saving}
-                  className="dg-btn dg-btn-secondary"
-                >
-                  {EDITOR_ACTION_LABELS.discard}
-                </Button>
-              ) : null
-            }
-            primaryAction={
-              <Button
-                onClick={handleReview}
-                disabled={!isModified || saving || hasValidationErrors}
-                className="dg-btn dg-btn-primary"
-              >
-                Review & Save
-              </Button>
-            }
-          />
-        )}
 
         {reviewOpen ? (
           <OrganizationChangeReviewModal

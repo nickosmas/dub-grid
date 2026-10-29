@@ -183,7 +183,19 @@ export default function ScheduleRules({
   ];
 
   return (
-    <SectionCard>
+    <SectionCard
+      footer={
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            disabled={!isModified || saving}
+            className="dg-btn dg-btn-primary"
+          >
+            <ButtonLoading loading={saving}>Save</ButtonLoading>
+          </Button>
+        </div>
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div
           data-schedule-rule-row
@@ -298,7 +310,7 @@ export default function ScheduleRules({
           />
         </div>
 
-        <div data-schedule-rule-row style={ruleRowStyle}>
+        <div data-schedule-rule-row style={{ ...ruleRowStyle, paddingBottom: 0 }}>
           <div>
             <label htmlFor="open-shift-calloff-visibility" style={ruleTitleStyle}>
               Show call-off vacancies to staff
@@ -314,16 +326,6 @@ export default function ScheduleRules({
             onChange={setCalloffVisibility}
             options={visibilityOptions}
           />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 2 }}>
-          <Button
-            onClick={() => setConfirmOpen(true)}
-            disabled={!isModified || saving}
-            className="dg-btn dg-btn-primary"
-          >
-            <ButtonLoading loading={saving}>Save</ButtonLoading>
-          </Button>
         </div>
 
         {confirmOpen && (

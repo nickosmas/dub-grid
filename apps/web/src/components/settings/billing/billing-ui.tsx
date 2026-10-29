@@ -172,14 +172,7 @@ export function BillingCard({
 
 export function CardFooter({ children }: { children: ReactNode }) {
   return (
-    <div
-      className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center"
-      style={{
-        padding: "12px 20px",
-        borderTop: "1px solid var(--dg-color-border-light)",
-        background: "var(--dg-color-bg-secondary)",
-      }}
-    >
+    <div className="dg-footer-bar flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
       {children}
     </div>
   );
