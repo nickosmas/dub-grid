@@ -214,7 +214,7 @@ export default function PlatformFeatureFlagsView() {
         )}
         <div style={sectionBodyStyle}>
           {flagsQuery.isLoading ? (
-            <div style={{ color: "var(--dg-color-text-muted)" }}>Loading feature controls…</div>
+            <div style={{ color: "var(--dg-color-text-muted)" }}>Loading feature controls</div>
           ) : flags.length === 0 ? (
             <EmptyState
               size="compact"

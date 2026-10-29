@@ -151,7 +151,7 @@ import {
 import { planRecurringFills } from "./_lib/recurring-fills";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
-import { CORRECTION_ADMIN_WINDOW_DAYS } from "@dubgrid/domain";
+import { CORRECTION_ADMIN_WINDOW_DAYS, singularLabelNoun } from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -6588,7 +6588,9 @@ function SchedulerContent({
             const dateObj = new Date(openShift.date + "T00:00:00");
             if (openShift.source === "coverage_gap" && currentEmployee) {
               if (!currentEmployee.focusAreaIds.includes(openShift.focusAreaId)) {
-                toast.error("You are not assigned to the focus area required for this shift.");
+                toast.error(
+                  `You aren't assigned to the ${singularLabelNoun(org?.focusAreaLabel || "Focus Areas")} this shift is in.`,
+                );
                 return;
               }
 
@@ -7723,7 +7725,10 @@ function SchedulerContent({
         );
         if (cells.length === 0) {
           if (framesLeft-- > 0) window.requestAnimationFrame(reveal);
-          else toast.info("No one in that focus area is on the grid to show.");
+          else
+            toast.info(
+              `No one in that ${singularLabelNoun(org?.focusAreaLabel || "Focus Areas")} is on the grid to show.`,
+            );
           return;
         }
         cells[0].scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });

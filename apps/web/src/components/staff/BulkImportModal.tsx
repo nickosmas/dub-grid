@@ -1,5 +1,6 @@
 "use client";
 
+import { pluralLabelNoun } from "@dubgrid/domain";
 import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -154,19 +155,21 @@ function parseCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
   return { rows, errors };
 }
 
-const PREVIEW_COLUMNS: {
+function previewColumns(focusAreaLabel: string): {
   key: "name" | keyof ParsedRow;
   label: string;
   maxWidth?: number;
-}[] = [
-  { key: "name", label: "Name", maxWidth: 180 },
-  { key: "email", label: "Email", maxWidth: 220 },
-  { key: "phone", label: "Phone", maxWidth: 120 },
-  { key: "focusAreaNames", label: "Focus Areas", maxWidth: 160 },
-  { key: "certificationName", label: "Certification", maxWidth: 160 },
-  { key: "roleNames", label: "Roles", maxWidth: 160 },
-  { key: "contactNotes", label: "Notes", maxWidth: 200 },
-];
+}[] {
+  return [
+    { key: "name", label: "Name", maxWidth: 180 },
+    { key: "email", label: "Email", maxWidth: 220 },
+    { key: "phone", label: "Phone", maxWidth: 120 },
+    { key: "focusAreaNames", label: focusAreaLabel, maxWidth: 160 },
+    { key: "certificationName", label: "Certification", maxWidth: 160 },
+    { key: "roleNames", label: "Roles", maxWidth: 160 },
+    { key: "contactNotes", label: "Notes", maxWidth: 200 },
+  ];
+}
 
 function previewCellValue(row: ParsedRow, key: "name" | keyof ParsedRow): string {
   if (key === "name") return `${row.firstName} ${row.lastName}`;
@@ -221,10 +224,12 @@ export function BulkImportModal({
   focusAreas,
   certifications,
   roles,
+  focusAreaLabel = "Focus Areas",
   onClose,
   onImported,
 }: {
   orgId: string;
+  focusAreaLabel?: string;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
@@ -610,8 +615,7 @@ export function BulkImportModal({
                     color: "var(--dg-color-text-muted)",
                   }}
                 >
-                  Separate multiple focus areas or roles with semicolons (;). Names must match
-                  existing org configuration.
+                  {`Separate several ${pluralLabelNoun(focusAreaLabel)} or roles with semicolons (;). Names must match your organization's settings.`}
                 </p>
               </div>
             </div>
@@ -648,8 +652,8 @@ export function BulkImportModal({
                     <Banner tone="warning" icon={UserSearch}>
                       <div>
                         {warningCount} row{warningCount !== 1 ? "s" : ""}{" "}
-                        {warningCount !== 1 ? "look" : "looks"} similar to existing employees —
-                        review before importing.
+                        {warningCount !== 1 ? "look" : "looks"} like people already on staff. Check
+                        them before importing.
                       </div>
                     </Banner>
                   )}
@@ -705,7 +709,7 @@ export function BulkImportModal({
                         >
                           Status
                         </th>
-                        {PREVIEW_COLUMNS.map((col) => (
+                        {previewColumns(focusAreaLabel).map((col) => (
                           <th
                             key={col.key}
                             style={{
@@ -764,7 +768,7 @@ export function BulkImportModal({
                                 )}
                               </td>
                             </MaybeHint>
-                            {PREVIEW_COLUMNS.map((col) => (
+                            {previewColumns(focusAreaLabel).map((col) => (
                               <MaybeHint
                                 key={col.key}
                                 content={col.maxWidth ? previewCellValue(row, col.key) : null}
