@@ -204,6 +204,10 @@ interface ShiftEditPanelProps {
   isOwnShift?: boolean;
   /** True if there's already an active request for this shift. */
   hasActiveRequest?: boolean;
+  /** Opens that active request. */
+  onViewActiveRequest?: () => void;
+  /** Withdraws that active request; omitted when the viewer can't. */
+  onCancelActiveRequest?: () => void | Promise<unknown>;
   /** Callback to submit an offer-for-pickup request for this shift. */
   onMakeAvailable?: (options?: {
     targetEmpId?: string;
@@ -431,6 +435,8 @@ export default function ShiftEditPanel({
   auditInfo,
   isOwnShift = false,
   hasActiveRequest = false,
+  onViewActiveRequest,
+  onCancelActiveRequest,
   onMakeAvailable,
   onCallOff,
   employees = [],
@@ -514,7 +520,13 @@ export default function ShiftEditPanel({
   const [activeRequestMode, setActiveRequestMode] = useState<EditModalState["requestMode"] | null>(
     modal.requestMode ?? null,
   );
-  const [showCoverageCalloffOptions, setShowCoverageCalloffOptions] = useState(false);
+  // Call off from the grid's menu lands on the absence reasons.
+  const [showCoverageCalloffOptions, setShowCoverageCalloffOptions] = useState(
+    () =>
+      modal.requestMode === "coverage" &&
+      modal.requestFocus === "calloff" &&
+      absenceTypes.some((at) => !at.archivedAt),
+  );
   const [showPickupTargetOptions, setShowPickupTargetOptions] = useState(false);
   const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] = useState(0);
   const [swapViewDate, setSwapViewDate] = useState(formatDateKey(modal.date));
@@ -556,6 +568,10 @@ export default function ShiftEditPanel({
   const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
   const requestShiftDate = formatDateKey(modal.date);
   const requestOnlyMode = modal.requestMode ?? null;
+  // Why a teammate is off is theirs to share; someone who edits the schedule
+  // sees it on the grid already, anyone else sees only that they're off.
+  const showTeammateAbsenceReasons = allowShiftEdits;
+  const [confirmCancelActiveRequest, setConfirmCancelActiveRequest] = useState(false);
   const canRenderCoverage = Boolean(onMakeAvailable || onCallOff);
   const canRenderSwap = Boolean(
     onSubmitSwap && shiftForKey && isRequestableShift && getShiftTimeRanges,
@@ -1905,14 +1921,16 @@ export default function ShiftEditPanel({
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? `Request pickup of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
               : pendingRequestConfirmation.kind === "calloff"
-                ? `Submit a call off for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+                ? `Call off your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
                 : `Request a swap of your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
         }
         message={
           pendingRequestConfirmation.kind === "pickup"
             ? undefined
             : pendingRequestConfirmation.kind === "targeted_pickup"
-              ? `The person you chose is asked to pick it up. Your absence for that shift is ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}.`
+              ? showTeammateAbsenceReasons
+                ? `The person you chose is asked to pick it up. Your absence for that shift is ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}.`
+                : "The person you chose is asked to pick it up, and you take their time off that day."
               : pendingRequestConfirmation.kind === "calloff"
                 ? `It's requested as ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence.`
                 : `In return you'd get the other person's ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}.`
@@ -1923,7 +1941,7 @@ export default function ShiftEditPanel({
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? "Request pickup"
               : pendingRequestConfirmation.kind === "calloff"
-                ? "Submit call off"
+                ? "Request call-off"
                 : "Request swap"
         }
         variant={pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"}
@@ -2157,9 +2175,7 @@ export default function ShiftEditPanel({
                   gap: 6,
                 }}
               >
-                <div style={choiceBodyStyle}>
-                  Only teammates with an absence on this date are shown.
-                </div>
+                <div style={choiceBodyStyle}>Teammates who are off that day.</div>
               </div>
               <div
                 style={{
@@ -2182,7 +2198,7 @@ export default function ShiftEditPanel({
                       fontSize: "var(--dg-fs-body-sm)",
                     }}
                   >
-                    No absent teammates are available on this date.
+                    No teammates are off that day.
                   </div>
                 ) : (
                   targetedPickupTargets.map((target, index) => {
@@ -2244,7 +2260,7 @@ export default function ShiftEditPanel({
                             textAlign: "right",
                           }}
                         >
-                          {target.absenceTypeLabel}
+                          {showTeammateAbsenceReasons ? target.absenceTypeLabel : "Off"}
                         </span>
                       </Button>
                     );
@@ -4832,6 +4848,60 @@ export default function ShiftEditPanel({
                 <Banner tone="warning" icon={Hourglass} className="mt-4">
                   A request is already active for this shift
                 </Banner>
+              )}
+              {isOwnShift && hasActiveRequest && (onViewActiveRequest || onCancelActiveRequest) && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {onViewActiveRequest && (
+                    <Button
+                      type="button"
+                      onClick={onViewActiveRequest}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        gridColumn: onCancelActiveRequest ? undefined : "1 / -1",
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                      }}
+                    >
+                      View request
+                    </Button>
+                  )}
+                  {onCancelActiveRequest && (
+                    <Button
+                      type="button"
+                      onClick={() => setConfirmCancelActiveRequest(true)}
+                      className="dg-btn dg-btn-secondary"
+                      style={{
+                        gridColumn: onViewActiveRequest ? undefined : "1 / -1",
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                      }}
+                    >
+                      Cancel request
+                    </Button>
+                  )}
+                </div>
+              )}
+              {confirmCancelActiveRequest && onCancelActiveRequest && (
+                <ConfirmDialog
+                  title={`Cancel your request for your shift on ${formatDate(modal.date)}?`}
+                  summary={{
+                    points: ["The request is withdrawn.", "Nothing on the schedule changes."],
+                  }}
+                  confirmLabel="Cancel request"
+                  variant="warning"
+                  onConfirm={async () => {
+                    const result = await onCancelActiveRequest();
+                    if (result !== false) setConfirmCancelActiveRequest(false);
+                  }}
+                  onCancel={() => setConfirmCancelActiveRequest(false)}
+                />
               )}
               {isStale && (
                 <Banner tone="danger" icon={RefreshCw} className="mt-4">

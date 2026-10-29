@@ -316,6 +316,47 @@ describe("Toolbar — Tools dropdown", () => {
   });
 });
 
+describe("Toolbar - someone who only views the schedule", () => {
+  it("shows Requests with its count and Print on the toolbar, with no Tools menu", async () => {
+    const user = userEvent.setup();
+    const onRequestsToggle = vi.fn();
+    const onPrintOpen = vi.fn();
+    render(
+      <Toolbar
+        {...defaultProps}
+        hasEditorTools={false}
+        requestsBadgeCount={2}
+        onRequestsToggle={onRequestsToggle}
+        onPrintOpen={onPrintOpen}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Tools/ })).not.toBeInTheDocument();
+    const requests = screen.getByRole("button", { name: /^Requests/ });
+    expect(requests).toHaveTextContent("2");
+
+    await user.click(requests);
+    await user.click(screen.getByRole("button", { name: "Print" }));
+
+    expect(onRequestsToggle).toHaveBeenCalledOnce();
+    expect(onPrintOpen).toHaveBeenCalledOnce();
+  });
+
+  it("leaves Print off when the organization has printing turned off", () => {
+    render(<Toolbar {...defaultProps} hasEditorTools={false} onRequestsToggle={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /^Requests/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Tools menu for editors", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} onPrintOpen={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /^Tools/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Requests/ })).not.toBeInTheDocument();
+  });
+});
+
 describe("Toolbar — active state styles", () => {
   it("date label updates when spanWeeks changes", () => {
     const { rerender } = render(<Toolbar {...defaultProps} spanWeeks={1} />);

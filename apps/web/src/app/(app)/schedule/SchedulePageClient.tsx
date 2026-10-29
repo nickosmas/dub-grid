@@ -263,7 +263,10 @@ import PresenceAvatars, { type PresenceProfile } from "@/components/PresenceAvat
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
-import ShiftContextMenu from "@/components/ShiftContextMenu";
+import ShiftContextMenu, {
+  resolveShiftRequestMenuState,
+  type ShiftRequestMenuState,
+} from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
@@ -373,7 +376,14 @@ import {
   ScheduleCellInput,
   ScheduleNoteShift,
   ShiftJobSegment,
+  ShiftRequest,
 } from "@/types";
+import {
+  describeOwnPublishChanges,
+  describePublishNotice,
+  formatDayLabel,
+  ownPublishChanges,
+} from "@/lib/publish-notice";
 
 type CoverageGap = ReturnType<typeof computeCoverageGaps>[number];
 
@@ -1110,6 +1120,15 @@ function SchedulerContent({
   editorSessionIdRef.current = editorSessionId;
   const [showSessionEndedDialog, setShowSessionEndedDialog] = useState(false);
   const isScheduleEditor = canEditShifts || canEditNotes;
+  // Whoever edits or publishes hears about everyone's changes; anyone else,
+  // only about their own shifts.
+  const seesOrgPublishChanges = isScheduleEditor || canNavigatePublishHistory;
+  // Read when the publish history lands, which can be after this render.
+  const publishNoticeViewerRef = useRef({
+    seesOrgChanges: seesOrgPublishChanges,
+    empId: currentEmpId,
+  });
+  publishNoticeViewerRef.current = { seesOrgChanges: seesOrgPublishChanges, empId: currentEmpId };
 
   // Audit mode: toggle to show who created each shift under grid cells
   const [showAudit, setShowAudit] = useState(false);
@@ -1593,20 +1612,11 @@ function SchedulerContent({
       // Show "what changed" toast once per mount
       if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
         hasShownChangeToast.current = true;
-        const allChanges = recentPublishes.flatMap((e) => e.changes);
-        const newCount = allChanges.filter((c) => c.kind === "new").length;
-        const modCount = allChanges.filter((c) => c.kind === "modified").length;
-        const delCount = allChanges.filter((c) => c.kind === "deleted").length;
-        const parts: string[] = [];
-        if (newCount > 0) parts.push(`${newCount} new`);
-        if (modCount > 0) parts.push(`${modCount} modified`);
-        if (delCount > 0) parts.push(`${delCount} removed`);
-        if (parts.length > 0) {
-          toast.info(
-            `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit: ${parts.join(", ")}`,
-            { duration: 6000 },
-          );
-        }
+        const notice = describePublishNotice(
+          recentPublishes.flatMap((e) => e.changes),
+          publishNoticeViewerRef.current,
+        );
+        if (notice) toast.info(notice, { duration: 6000 });
       }
 
       // Fire-and-forget: update last-viewed timestamp for this user, only once
@@ -1944,6 +1954,37 @@ function SchedulerContent({
         .map((group) => `${formatDateKey(group.periodStart)}:${group.count}`)
         .join("|"),
     );
+  // A count of everyone's changes tells staff nothing they can act on, so
+  // their banners are about their own shifts or don't show.
+  const viewerInWindowPublishHistory = useMemo(
+    () =>
+      seesOrgPublishChanges
+        ? inWindowPublishHistory
+        : inWindowPublishHistory.filter(
+            (entry) => ownPublishChanges(entry.changes, currentEmpId).length > 0,
+          ),
+    [currentEmpId, inWindowPublishHistory, seesOrgPublishChanges],
+  );
+  const viewerOutOfWindowPublishHistory = useMemo(
+    () =>
+      seesOrgPublishChanges
+        ? outOfWindowPublishHistory
+        : outOfWindowPublishHistory.flatMap((entry) => {
+            const own = ownPublishChanges(entry.changes, currentEmpId);
+            return own.length > 0 ? [{ ...entry, changeCount: own.length }] : [];
+          }),
+    [currentEmpId, outOfWindowPublishHistory, seesOrgPublishChanges],
+  );
+  const ownInWindowPublishNotice = useMemo(
+    () =>
+      seesOrgPublishChanges
+        ? null
+        : describeOwnPublishChanges(
+            inWindowPublishHistory.flatMap((entry) => entry.changes),
+            currentEmpId,
+          ),
+    [currentEmpId, inWindowPublishHistory, seesOrgPublishChanges],
+  );
   const { isDismissed: publishBannerDismissed, reset: resetPublishBanner } = useDismissibleBanner(
     "schedule-publish",
     inWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
@@ -2087,6 +2128,14 @@ function SchedulerContent({
     setEditPanel(null);
     setEditSessionDraft(null);
   }, [announceEditingCell]);
+
+  // The board reads its tab once, on opening, so it is set before it mounts.
+  const openMyRequests = useCallback(() => {
+    closeEditPanel();
+    setContextMenu(null);
+    setRequestBoardTab("mine");
+    setShowRequestBoard(true);
+  }, [closeEditPanel]);
 
   const endLocalScheduleEditor = useCallback(() => {
     localSessionEndedRef.current = true;
@@ -3916,15 +3965,24 @@ function SchedulerContent({
    * asked, not the person being asked: covering the other side needs a second
    * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
    */
+  const findActiveRequestForShift = useCallback(
+    (empId: string, date: Date): ShiftRequest | null => {
+      const dateKey = formatDateKey(date);
+      return (
+        shiftRequests.requests.find(
+          (r) =>
+            r.requesterEmpId === empId &&
+            r.requesterShiftDate === dateKey &&
+            (r.status === "open" || r.status === "pending_approval"),
+        ) ?? null
+      );
+    },
+    [shiftRequests.requests],
+  );
+
   const activeRequestForKey = useCallback(
     (empId: string, date: Date): ActiveShiftRequestSummary | null => {
-      const dateKey = formatDateKey(date);
-      const match = shiftRequests.requests.find(
-        (r) =>
-          r.requesterEmpId === empId &&
-          r.requesterShiftDate === dateKey &&
-          (r.status === "open" || r.status === "pending_approval"),
-      );
+      const match = findActiveRequestForShift(empId, date);
       if (!match) return null;
       // The find above already admitted only these two, so this narrows rather
       // than decides.
@@ -3933,7 +3991,7 @@ function SchedulerContent({
         status: match.status === "pending_approval" ? "pending_approval" : "open",
       };
     },
-    [shiftRequests.requests],
+    [findActiveRequestForShift],
   );
 
   const hasActiveRequestForShift = useCallback(
@@ -4198,6 +4256,18 @@ function SchedulerContent({
       empId === currentEmpId &&
       (hasActiveRequestForShift(empId, date) || canCreateOwnShiftRequest(empId, date)),
     [canCreateOwnShiftRequest, currentEmpId, hasActiveRequestForShift],
+  );
+
+  const shiftRequestMenuStateFor = useCallback(
+    (empId: string, date: Date): ShiftRequestMenuState =>
+      resolveShiftRequestMenuState({
+        isOwnShift: !!currentEmpId && empId === currentEmpId,
+        canRequest:
+          !shifts[`${empId}_${formatDateKey(date)}`]?.absenceTypeId &&
+          canCreateOwnShiftRequest(empId, date),
+        hasActiveRequest: hasActiveRequestForShift(empId, date),
+      }),
+    [canCreateOwnShiftRequest, currentEmpId, hasActiveRequestForShift, shifts],
   );
 
   const canOpenOwnShiftDetails = useCallback(
@@ -5981,14 +6051,10 @@ function SchedulerContent({
         (shiftEntry.assignmentIds.length > 0 || shiftEntry.absenceTypeId != null) &&
         !shiftEntry.isDelete
       );
-      const canRequestBase =
-        !shiftEntry?.absenceTypeId && canCreateOwnShiftRequest(cellId.empId, date);
-      const hasActiveRequest = hasActiveRequestForShift(cellId.empId, date);
-      const canRequest = canRequestBase && !hasActiveRequest;
       const hasEditActions = canEditShifts && (hasShift || !!clipboard);
-      const hasRequestActions = canRequest && !hasActiveRequest;
+      const hasRequestItems = hasShift && shiftRequestMenuStateFor(cellId.empId, date) !== "none";
 
-      if (!hasEditActions && !hasRequestActions) {
+      if (!hasEditActions && !hasRequestItems) {
         setContextMenu(null);
         return;
       }
@@ -5998,14 +6064,7 @@ function SchedulerContent({
         cellId,
       });
     },
-    [
-      canCreateOwnShiftRequest,
-      canEditShifts,
-      clipboard,
-      hasActiveRequestForShift,
-      isBulkDeleteMode,
-      shifts,
-    ],
+    [canEditShifts, clipboard, isBulkDeleteMode, shiftRequestMenuStateFor, shifts],
   );
 
   // Compute the auto-fill date range (reused by preview + apply)
@@ -6596,7 +6655,7 @@ function SchedulerContent({
             const dateObj = new Date(openShift.date + "T00:00:00");
             if (openShift.source === "coverage_gap" && currentEmployee) {
               if (!currentEmployee.focusAreaIds.includes(openShift.focusAreaId)) {
-                toast.error("You are not assigned to the focus area required for this shift.");
+                toast.error("This shift is outside the areas you work in.");
                 return;
               }
 
@@ -6624,7 +6683,7 @@ function SchedulerContent({
                 );
 
               if (eligibleAssignmentDefinitions.length === 0) {
-                toast.error("You aren't qualified to cover this gap.");
+                toast.error("You aren't qualified for this shift.");
                 return;
               }
 
@@ -8535,7 +8594,7 @@ function SchedulerContent({
                 </div>
               )}
             {!isBulkDeleteMode &&
-              outOfWindowPublishHistory.length > 0 &&
+              viewerOutOfWindowPublishHistory.length > 0 &&
               !outOfWindowPublishesDismissed &&
               (() => {
                 type PublishGroup = {
@@ -8545,7 +8604,7 @@ function SchedulerContent({
                   changeCount: number;
                 };
                 const groups = new Map<string, PublishGroup>();
-                for (const entry of outOfWindowPublishHistory) {
+                for (const entry of viewerOutOfWindowPublishHistory) {
                   const key = `${entry.startDate}_${entry.endDate}`;
                   const existing = groups.get(key);
                   if (existing) {
@@ -8570,7 +8629,9 @@ function SchedulerContent({
                     <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span>
-                      {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
+                      {seesOrgPublishChanges
+                        ? `${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`
+                        : `Your shifts changed in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
                     </span>
                     <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
                       {sortedGroups.map((group) => {
@@ -8623,10 +8684,10 @@ function SchedulerContent({
                 );
               })()}
             {!isBulkDeleteMode &&
-              inWindowPublishHistory.length > 0 &&
+              viewerInWindowPublishHistory.length > 0 &&
               !publishBannerDismissed &&
               (() => {
-                const latest = inWindowPublishHistory[0];
+                const latest = viewerInWindowPublishHistory[0];
                 return (
                   <div className="dg-draft-banner dg-draft-banner--info no-print">
                     <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
@@ -8646,8 +8707,12 @@ function SchedulerContent({
                     {/* The counts are the key: each kind is named, counted
                         and colored once, and only the kinds this publish
                         actually contains appear at all. */}
-                    <ChangeCountChips counts={publishChangeCounts} />
-                    {inWindowPublishHistory.length > 1 && (
+                    {seesOrgPublishChanges ? (
+                      <ChangeCountChips counts={publishChangeCounts} />
+                    ) : (
+                      <span>{ownInWindowPublishNotice}</span>
+                    )}
+                    {seesOrgPublishChanges && inWindowPublishHistory.length > 1 && (
                       <span style={{ marginLeft: 4 }}>
                         across {inWindowPublishHistory.length} publishes
                       </span>
@@ -8825,6 +8890,7 @@ function SchedulerContent({
                 hasVisibleGridRows={dates.length > 0 && filteredEmployees.length > 0}
                 hasVisibleScheduleEntries={hasVisibleScheduleEntries}
                 hasRemovableVisibleEntries={visibleBulkDeleteTargets.length > 0}
+                hasEditorTools={canEditShifts}
               />
               <div
                 data-tour="schedule-timezone-clocks"
@@ -8930,48 +8996,50 @@ function SchedulerContent({
                 (cmShiftEntry.assignmentIds.length > 0 || cmShiftEntry.absenceTypeId != null) &&
                 !cmShiftEntry.isDelete
               );
-              const cmCanRequestBase =
-                !cmShiftEntry?.absenceTypeId &&
-                canCreateOwnShiftRequest(contextMenu.cellId.empId, contextMenuDate);
-              const cmCanRequest =
-                cmCanRequestBase &&
-                !hasActiveRequestForShift(contextMenu.cellId.empId, contextMenuDate);
-              const cmHasActiveRequest = hasActiveRequestForShift(
+              const cmRequestState = shiftRequestMenuStateFor(
                 contextMenu.cellId.empId,
                 contextMenuDate,
               );
               // Only show the menu when at least one action is usable
               const hasEditActions = canEditShifts && (cmHasEntry || !!clipboard);
-              const hasRequestActions = cmCanRequest && !cmHasActiveRequest;
-              if (!hasEditActions && !hasRequestActions) return null;
+              const hasRequestItems = cmHasEntry && cmRequestState !== "none";
+              if (!hasEditActions && !hasRequestItems) return null;
+              const openCoverageFlow = (requestFocus?: "calloff") => {
+                const emp = scheduleEmployees.find((e) => e.id === contextMenu.cellId.empId);
+                if (!emp) return;
+                const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
+                if (!guardActiveSession()) return;
+                announceEditingCell(cellKey);
+                startEditSession({
+                  empId: emp.id,
+                  empName: getEmployeeDisplayName(emp),
+                  date: contextMenuDate,
+                  empFocusAreaIds: emp.focusAreaIds,
+                  empCertificationId: emp.certificationId,
+                  empRoleIds: emp.roleIds,
+                  activeFocusAreaId: contextMenu.cellId.sectionId,
+                  requestMode: "coverage",
+                  ...(requestFocus ? { requestFocus } : {}),
+                });
+              };
               return (
                 <ShiftContextMenu
                   anchorEl={contextMenu.anchorEl}
                   hasShift={cmHasEntry}
                   hasClipboard={!!clipboard}
                   canEdit={canEditShifts}
-                  canRequest={cmCanRequest}
-                  hasActiveRequest={cmHasActiveRequest}
+                  canRequest={cmRequestState === "request"}
+                  hasActiveRequest={cmRequestState === "active"}
                   onCopy={() => handleCopyGridCell(contextMenu.cellId)}
                   onPaste={() => handlePasteGridCell(contextMenu.cellId)}
                   onClear={() => handleClearShift(contextMenu.cellId.empId, contextMenuDate)}
-                  onNeedCoverage={() => {
-                    const emp = scheduleEmployees.find((e) => e.id === contextMenu.cellId.empId);
-                    if (!emp) return;
-                    const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
-                    if (!guardActiveSession()) return;
-                    announceEditingCell(cellKey);
-                    startEditSession({
-                      empId: emp.id,
-                      empName: getEmployeeDisplayName(emp),
-                      date: contextMenuDate,
-                      empFocusAreaIds: emp.focusAreaIds,
-                      empCertificationId: emp.certificationId,
-                      empRoleIds: emp.roleIds,
-                      activeFocusAreaId: contextMenu.cellId.sectionId,
-                      requestMode: "coverage",
-                    });
-                  }}
+                  onNeedCoverage={() => openCoverageFlow()}
+                  onCallOff={
+                    absenceTypes.some((absenceType) => !absenceType.archivedAt)
+                      ? () => openCoverageFlow("calloff")
+                      : undefined
+                  }
+                  onViewRequest={openMyRequests}
                   onProposeSwap={() => {
                     const emp = scheduleEmployees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
@@ -9061,7 +9129,7 @@ function SchedulerContent({
             )}
             {coverageGapSelection && currentEmpId && (
               <Modal
-                title="Choose Assignment"
+                title="Choose a shift"
                 onClose={() => setCoverageGapSelection(null)}
                 style={{ maxWidth: 420 }}
               >
@@ -9078,8 +9146,8 @@ function SchedulerContent({
                         coverageGapSelection.openShift.ruleLabel ??
                         coverageGapSelection.openShift.assignmentLabel}
                     </strong>{" "}
-                    on <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more
-                    than one exact assignment option. Choose which option you want to volunteer for.
+                    on <strong>{formatDayLabel(coverageGapSelection.openShift.date)}</strong> can be
+                    worked more than one way. Choose the one you want.
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -9192,10 +9260,10 @@ function SchedulerContent({
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
+                    ? "It goes on the schedule right away."
+                    : "It's sent for manager approval."
                 }
-                title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${pendingCoverageGapVolunteer.date}?`}
+                title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${formatDayLabel(pendingCoverageGapVolunteer.date)}?`}
                 variant="info"
                 onCancel={() => {
                   if (!isCoverageGapVolunteerPending) {
@@ -9230,11 +9298,11 @@ function SchedulerContent({
                 title={`Claim ${
                   spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
                   pendingClaimShift.assignmentLabel
-                } on ${pendingClaimShift.date}?`}
+                } on ${formatDayLabel(pendingClaimShift.date)}?`}
                 message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${
                   canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
+                    ? "It goes on the schedule right away."
+                    : "It's sent for manager approval."
                 }`}
                 confirmLabel="Claim"
                 variant="info"
@@ -9365,7 +9433,7 @@ function SchedulerContent({
 
           {editPanel && (
             <ShiftEditPanel
-              key={`${editSessionCellKey ?? "panel"}_${editSessionDraft?.baseVersion ?? "new"}_${editPanel.requestMode ?? "edit"}`}
+              key={`${editSessionCellKey ?? "panel"}_${editSessionDraft?.baseVersion ?? "new"}_${editPanel.requestMode ?? "edit"}${editPanel.requestFocus ? `_${editPanel.requestFocus}` : ""}`}
               modal={editPanel}
               currentShift={panelCurrentShift}
               currentAssignmentIds={panelCurrentAssignmentIds}
@@ -9475,6 +9543,14 @@ function SchedulerContent({
               defaultShiftEnabled={org?.defaultShiftEnabled ?? true}
               isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
               hasActiveRequest={hasActiveRequestForShift(editPanel.empId, editPanel.date)}
+              onViewActiveRequest={openMyRequests}
+              onCancelActiveRequest={(() => {
+                const activeRequest = findActiveRequestForShift(editPanel.empId, editPanel.date);
+                if (!activeRequest || activeRequest.requesterEmpId !== currentEmpId) {
+                  return undefined;
+                }
+                return () => shiftRequests.cancel(activeRequest.id, activeRequest.requesterEmpId);
+              })()}
               onMakeAvailable={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
                   ? async (options) => {

@@ -530,6 +530,8 @@ export interface EditModalState {
   activeFocusAreaId?: number | null;
   /** When set, panel opens directly into the selected shift-request flow. */
   requestMode?: "coverage" | "swap";
+  /** Opens the coverage flow on its call-off reasons. */
+  requestFocus?: "calloff";
 }
 
 export interface GridCellId {
