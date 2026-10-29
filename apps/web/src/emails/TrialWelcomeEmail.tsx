@@ -11,15 +11,14 @@ export type TrialWelcomeEmailProps = {
   logoUrl: string;
 };
 
-/** Sent once when an organization's 14-day trial starts. */
+/** Sent once when an organization's free trial starts. */
 export function TrialWelcomeEmail({ orgName, trialEndDate, logoUrl }: TrialWelcomeEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={`Your DubGrid trial for ${orgName} has started`}>
       <Text style={styles.heading}>Your free trial has started</Text>
       <EmailGreeting />
       <Text style={styles.paragraph}>
-        Thanks for choosing DubGrid! Your 14-day free trial for <strong>{orgName}</strong> is now
-        active, with every feature unlocked.
+        Your free trial for <strong>{orgName}</strong> is active, with everything included.
       </Text>
       <Text style={styles.paragraph}>
         Your trial ends on <strong>{trialEndDate}</strong>. To keep using DubGrid after that, add a

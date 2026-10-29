@@ -44,7 +44,7 @@ export function SplitShiftBadge({
     return null;
   }
 
-  const accessibilityLabel = customLabel ? label : `Multiple Shifts, ${label}`;
+  const accessibilityLabel = customLabel ? label : `Multiple shifts, ${label}`;
 
   if (!inverse) {
     return (
@@ -113,7 +113,7 @@ export function SplitShiftSegmentList({
     <View
       accessibilityLabel={
         labelTotalCount > 1 && !suppressCountAccessibilityLabel
-          ? `Multiple Shifts with ${labelTotalCount} shifts`
+          ? `Multiple shifts with ${labelTotalCount} shifts`
           : undefined
       }
       style={[

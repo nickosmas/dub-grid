@@ -579,7 +579,7 @@ function PrintSection({
                         </span>
                       )}
                     </div>
-                    {certAbbr && certAbbr !== "—" && (
+                    {certAbbr && certAbbr !== "-" && (
                       <span
                         style={{
                           fontSize: "0.8em",
@@ -837,7 +837,7 @@ export default function PrintScheduleView({
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
 
   const dateRangeLabel = useMemo(
-    () => `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, spanWeeks * 7 - 1))}`,
+    () => `${formatDate(weekStart)} - ${formatDate(addDays(weekStart, spanWeeks * 7 - 1))}`,
     [weekStart, spanWeeks],
   );
 
@@ -1161,7 +1161,7 @@ export default function PrintScheduleView({
                   marginBottom: "0.7em",
                 }}
               >
-                Shift Key
+                Shift key
               </div>
               <div
                 style={{

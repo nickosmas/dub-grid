@@ -27,7 +27,7 @@ const defaultCertifications = [
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
   { id: 3, orgId: "org-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
   { id: 4, orgId: "org-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
-  { id: 5, orgId: "org-1", name: "—", abbr: "—", sortOrder: 4 },
+  { id: 5, orgId: "org-1", name: "-", abbr: "-", sortOrder: 4 },
 ];
 function renderModal(
   overrides: {
@@ -106,9 +106,9 @@ describe("AddEmployeeModal", () => {
       expect(southBtns.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders Add Staff Members submit button", () => {
+    it("renders Add staff members submit button", () => {
       renderModal();
-      // Button text is dynamic: "Add Staff Members" when no valid rows, or "Add N Staff Member(s)"
+      // Button text is dynamic: "Add staff members" when no valid rows, or "Add N Staff Member(s)"
       const btn = screen.getByRole("button", { name: /Add.*Staff Member/i });
       expect(btn).toBeInTheDocument();
     });
@@ -295,11 +295,13 @@ describe("AddEmployeeModal", () => {
       await user.type(getFirstNameInputs()[0], "Alice");
       await user.click(screen.getByRole("button", { name: "Close modal" }));
 
-      expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: /discard your changes/i })).toBeInTheDocument();
       expect(onClose).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole("button", { name: /keep editing/i }));
-      expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: /discard your changes/i }),
+      ).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Close modal" }));
       await user.click(screen.getByRole("button", { name: /^discard$/i }));

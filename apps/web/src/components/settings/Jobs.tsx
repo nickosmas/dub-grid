@@ -67,6 +67,7 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { changedElsewhereMessage, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
@@ -655,7 +656,10 @@ function EligibilityModeToggle({
   );
 }
 
-function buildSectionHeaderText(section: JobSection): { title: string; description: string } {
+function buildSectionHeaderText(
+  section: JobSection,
+  focusAreas: string,
+): { title: string; description: string } {
   if (section === "defaultShift") {
     return {
       title: "Default Shift Job",
@@ -674,8 +678,7 @@ function buildSectionHeaderText(section: JobSection): { title: string; descripti
 
   return {
     title: "Scheduled Jobs",
-    description:
-      "Choose departments first, narrow to focus areas, then define exactly how the job behaves on each selected shift.",
+    description: `Choose departments first, narrow to ${focusAreas}, then define exactly how the job behaves on each selected shift.`,
   };
 }
 
@@ -701,7 +704,7 @@ function DefaultShiftToggle({
     const next = pendingValue;
 
     if (!organization.updatedAt) {
-      toast.error("Organization data is out of date. Refresh and try again.");
+      toast.error(changedElsewhereMessage("these settings"));
       setPendingValue(null);
       return;
     }
@@ -802,9 +805,11 @@ function JobSectionCard({
   onAdd,
   hideAddButton = false,
   headerAction,
+  focusAreasTerm,
   children,
 }: {
   section: JobSection;
+  focusAreasTerm: string;
   rows: Array<JobDefinition & { isNew?: boolean }>;
   canManageScheduleDefinitions: boolean;
   onAdd: () => void;
@@ -812,7 +817,7 @@ function JobSectionCard({
   headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const header = buildSectionHeaderText(section);
+  const header = buildSectionHeaderText(section, focusAreasTerm);
 
   return (
     <div
@@ -865,7 +870,7 @@ function JobSectionCard({
           description={
             section === "shiftless"
               ? "Create shiftless jobs for work that should appear without a Day, Evening, or Night shift."
-              : "Create jobs that start with scheduled departments, then narrow to the focus areas and shifts where they apply."
+              : `Create jobs that start with scheduled departments, then narrow to the ${focusAreasTerm} and shifts where they apply.`
           }
           action={
             canManageScheduleDefinitions ? (
@@ -901,6 +906,7 @@ function JobRow({
   orgId,
   roleLabel,
   certificationLabel,
+  focusAreaLabel,
   scheduleRoles,
   certifications,
   departments,
@@ -918,6 +924,7 @@ function JobRow({
   orgId: string;
   roleLabel: string;
   certificationLabel: string;
+  focusAreaLabel: string;
   scheduleRoles: NamedItem[];
   certifications: NamedItem[];
   departments: Department[];
@@ -1291,7 +1298,11 @@ function JobRow({
         toast.success(hard ? "Job deleted" : "Job archived");
       } catch (error) {
         Sentry.captureException(error);
-        toast.error(hard ? "Failed to delete job" : "Failed to archive job");
+        toast.error(
+          hard
+            ? "We couldn't delete that job. Try again."
+            : "We couldn't archive that job. Try again.",
+        );
       } finally {
         setDeleting(false);
         setShowDeleteConfirm(false);
@@ -1316,7 +1327,7 @@ function JobRow({
     ? `Shift-only: ${form.departmentIds.length} dept · ${form.focusAreaIds.length} area · ${form.applicableShiftIds.length} shift`
     : section === "shiftless"
       ? "General / no shift"
-      : `${formatCount(form.departmentIds.length, "department")} · ${formatCount(form.focusAreaIds.length, "focus area")} · ${formatCount(form.applicableShiftIds.length, "shift")}`;
+      : `${formatCount(form.departmentIds.length, "department")} · ${formatCount(form.focusAreaIds.length, singularLabelNoun(focusAreaLabel))} · ${formatCount(form.applicableShiftIds.length, "shift")}`;
 
   const eligibleRoleSummary =
     form.eligibleRoleIds.length === 0
@@ -1819,7 +1830,7 @@ function JobRow({
           {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Placement"
-              description="Choose the scheduled departments first. Then select the focus areas inside them and the shifts where this job applies."
+              description={`Choose the scheduled departments first. Then select the ${pluralLabelNoun(focusAreaLabel)} inside them and the shifts where this job applies.`}
               summary={placementSummary}
               collapsible
               defaultOpen={form.departmentIds.length === 0}
@@ -1887,13 +1898,13 @@ function JobRow({
                 />
 
                 <ChecklistPanel
-                  title="Focus areas"
+                  title={focusAreaLabel}
                   summary={
                     form.departmentIds.length === 0
                       ? "Select departments first."
                       : form.focusAreaIds.length === 0
-                        ? "Choose the focus areas where this job can be assigned."
-                        : `${formatCount(form.focusAreaIds.length, "focus area")} selected`
+                        ? `Choose the ${pluralLabelNoun(focusAreaLabel)} where this job can be assigned.`
+                        : `${formatCount(form.focusAreaIds.length, singularLabelNoun(focusAreaLabel))} selected`
                   }
                   items={focusAreasInSelectedDepartments.map((focusArea) => ({
                     id: focusArea.id,
@@ -1971,7 +1982,7 @@ function JobRow({
                   emptyMessage={
                     form.departmentIds.length === 0
                       ? "Select scheduled departments first."
-                      : "No focus areas exist in the selected departments yet."
+                      : `No ${pluralLabelNoun(focusAreaLabel)} exist in the selected departments yet.`
                   }
                 />
 
@@ -1979,7 +1990,7 @@ function JobRow({
                   title="Shifts"
                   summary={
                     form.focusAreaIds.length === 0
-                      ? "Select focus areas first."
+                      ? `Select ${pluralLabelNoun(focusAreaLabel)} first.`
                       : form.applicableShiftIds.length === 0
                         ? "Choose the shifts where this job applies."
                         : `${formatCount(form.applicableShiftIds.length, "shift")} selected`
@@ -2051,8 +2062,8 @@ function JobRow({
                   }
                   emptyMessage={
                     form.focusAreaIds.length === 0
-                      ? "Select focus areas first."
-                      : "No shifts exist in the selected focus areas yet."
+                      ? `Select ${pluralLabelNoun(focusAreaLabel)} first.`
+                      : `No shifts exist in the selected ${pluralLabelNoun(focusAreaLabel)} yet.`
                   }
                 />
               </div>
@@ -2312,8 +2323,8 @@ function JobRow({
                                 }}
                               >
                                 Using{" "}
-                                {resolvedTimes.startTime ? fmt12h(resolvedTimes.startTime) : "—"} -{" "}
-                                {resolvedTimes.endTime ? fmt12h(resolvedTimes.endTime) : "—"} from
+                                {resolvedTimes.startTime ? fmt12h(resolvedTimes.startTime) : "-"} -{" "}
+                                {resolvedTimes.endTime ? fmt12h(resolvedTimes.endTime) : "-"} from
                                 the shift.
                               </div>
                             )}
@@ -2558,8 +2569,8 @@ function JobRow({
                   message={
                     <>
                       <strong>{form.name}</strong> is currently{" "}
-                      {dependencyInfo!.summary.toLowerCase()}. Archiving keeps its history but
-                      removes it from future scheduling and coverage configuration.
+                      {dependencyInfo!.summary.toLowerCase()}.{" "}
+                      {"It stays on past schedules but can't be picked for anything new."}
                     </>
                   }
                   confirmLabel="Archive"
@@ -2574,7 +2585,7 @@ function JobRow({
               return (
                 <ConfirmDialog
                   title={`Archive "${form.name}"?`}
-                  message="Archiving keeps its historical records but removes it from future scheduling and coverage configuration."
+                  message="It stays on past schedules but can't be picked for anything new."
                   confirmLabel="Archive"
                   variant="warning"
                   isLoading={deleting}
@@ -2632,6 +2643,7 @@ export default function JobsSettings({
   const [local, setLocal] = useState<Array<JobDefinition & { isNew?: boolean }>>(jobs);
   const nextTmpId = useRef(-1);
   const defaultShiftEnabled = organization?.defaultShiftEnabled ?? true;
+  const focusAreaLabel = organization?.focusAreaLabel || "Focus Areas";
 
   useEffect(() => {
     setLocal((previous) => {
@@ -2865,6 +2877,7 @@ export default function JobsSettings({
 
       <JobSectionCard
         section="scheduled"
+        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
         rows={scheduledRows}
         canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
         onAdd={handleAddScheduledJob}
@@ -2886,6 +2899,7 @@ export default function JobsSettings({
             orgId={orgId}
             roleLabel={roleLabel}
             certificationLabel={certificationLabel}
+            focusAreaLabel={focusAreaLabel}
             scheduleRoles={scheduleRoles}
             certifications={certifications}
             departments={departments}
@@ -2917,6 +2931,7 @@ export default function JobsSettings({
 
       <JobSectionCard
         section="shiftless"
+        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
         rows={shiftlessRows}
         canManageScheduleDefinitions={canManageScheduleDefinitions}
         onAdd={handleAddShiftlessJob}
@@ -2929,6 +2944,7 @@ export default function JobsSettings({
             orgId={orgId}
             roleLabel={roleLabel}
             certificationLabel={certificationLabel}
+            focusAreaLabel={focusAreaLabel}
             scheduleRoles={scheduleRoles}
             certifications={certifications}
             departments={departments}

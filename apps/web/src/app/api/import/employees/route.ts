@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
@@ -298,6 +298,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "import-employees" } });
     logger.error({ error: err }, "Bulk import failed");
-    return NextResponse.json({ error: "Import failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't import those people. Try again." },
+      { status: 500 },
+    );
   }
 }

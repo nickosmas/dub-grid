@@ -55,14 +55,14 @@ describe("top-level stack options on iOS", () => {
   // A screen that stays on the inline title keeps the opaque header, which is
   // both safe there and what keeps its title off a seam.
   it("keeps the opaque header on a screen with no large title", () => {
-    const options = createDetailStackOptions(mobileColors, "Shift Detail");
+    const options = createDetailStackOptions(mobileColors, "Shift detail");
 
     expect(options.headerLargeTitleEnabled).toBe(false);
     expect(options.headerStyle).toMatchObject({ backgroundColor: mobileColors.background });
   });
 
   it("keeps an inline title while letting UIKit apply its native scroll-edge blur", () => {
-    const options = createDetailStackOptions(mobileColors, "Staff Profile", {
+    const options = createDetailStackOptions(mobileColors, "Staff profile", {
       scrollEdge: true,
     });
 

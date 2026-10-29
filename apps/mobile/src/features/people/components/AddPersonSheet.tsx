@@ -217,7 +217,7 @@ export function AddPersonSheet({
           : {
               tone: "warning",
               title: "Person added, invitation not sent",
-              message: `${firstName} ${lastName} is on your roster. Resend the invitation from their profile.`,
+              message: `${firstName} ${lastName} is on your roster. Send the invitation from their profile.`,
             },
       );
       onDismiss();
@@ -235,7 +235,7 @@ export function AddPersonSheet({
       }
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not add person",
+        title: "Couldn't add person",
         fallbackMessage: "We couldn't add that person right now.",
       });
     },
@@ -333,7 +333,7 @@ export function AddPersonSheet({
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
-          title="Could not load this form"
+          title="Couldn't load this form"
           variant="centered"
           onAction={() => {
             void bootstrapQuery.refetch();

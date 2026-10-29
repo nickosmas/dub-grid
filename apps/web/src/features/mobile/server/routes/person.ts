@@ -26,6 +26,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -242,7 +243,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (currentPerson.version !== parsed.data.expectedVersion) {
     return NextResponse.json(
       {
-        error: "Employee details changed elsewhere. Review the latest values before saving again.",
+        error: changedElsewhereMessage("their details"),
         code: "EMPLOYEE_CONFLICT",
         person: currentPerson,
       },
@@ -369,7 +370,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const latestPerson = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
     return NextResponse.json(
       {
-        error: "Employee details changed elsewhere. Review the latest values before saving again.",
+        error: changedElsewhereMessage("their details"),
         code: "EMPLOYEE_CONFLICT",
         person: latestPerson ?? currentPerson,
       },

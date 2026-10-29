@@ -283,9 +283,7 @@ export default function InviteEmployeeModal({
     <>
       <Modal
         title={
-          isManagementInvite
-            ? "Invite Management Staff"
-            : `Invite ${getEmployeeDisplayName(employee)}`
+          isManagementInvite ? "Invite to management" : `Invite ${getEmployeeDisplayName(employee)}`
         }
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
@@ -306,11 +304,10 @@ export default function InviteEmployeeModal({
             }}
           >
             {isManagementInvite ? (
-              "Invite management staff who need app access but won\u2019t appear on the schedule."
+              "For someone who signs in to manage but isn\u2019t on the schedule."
             ) : (
               <>
-                Sending an invitation to <strong>{getEmployeeDisplayName(employee!)}</strong>. They
-                will receive an email with a link to set their password and join your organization.
+                They&apos;ll get an email with a link to set a password and join your organization.
               </>
             )}
           </div>
@@ -574,7 +571,7 @@ export default function InviteEmployeeModal({
               style={{ opacity: canSend ? 1 : 0.5 }}
             >
               <ButtonLoading loading={sending} spinnerSize={16}>
-                Send Invitation
+                Send invitation
               </ButtonLoading>
             </Button>
           </div>

@@ -232,7 +232,7 @@ const WHY_ORDER = [
   "Fewest weekends",
   "Fewest nights",
   "Fewest hours",
-  "Even",
+  "Tied with others",
   "Only one who could fill it",
   "Only one free",
   "Qualified and free",
@@ -245,7 +245,7 @@ const CHOICE_WHY: Record<CoverageFairChoice["reason"], string> = {
   weekends: "Fewest weekends",
   nights: "Fewest nights",
   hours: "Fewest hours",
-  tie: "Even",
+  tie: "Tied with others",
   weekDays: "Up to 5 days a week",
   moved: "Only one who could fill it",
 };
@@ -463,7 +463,7 @@ function LeftOut({ preview, words }: { preview: CoverageBuildPreview; words?: Sk
 /** What a build does, one point each, shown under the title. */
 export const BUILD_POINTS = [
   "Fills open shifts with qualified staff who are free.",
-  "Starts from recurring schedules and respects time off.",
+  "Starts from recurring schedules and works around absences and waiting requests.",
   "Nothing changes until you apply it.",
 ];
 
@@ -727,7 +727,7 @@ export function ScheduleBuildSection({
               />
               {excluded.length > 0 && (
                 <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-                  Their recurring schedules still fill in. Nothing else changes for them.
+                  Auto-build fills only their recurring schedules.
                 </p>
               )}
             </div>
@@ -737,7 +737,7 @@ export function ScheduleBuildSection({
               label={
                 state.progress == null
                   ? "Loading recurring schedules and recent weeks"
-                  : `Placing shifts: ${state.progress.placed} placed`
+                  : `${state.progress.placed} shifts placed`
               }
               percent={planningPercent(state.progress)}
             />

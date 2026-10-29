@@ -21,6 +21,7 @@ import {
   type LoadedMobilePerson,
 } from "@/features/mobile/server/person-access";
 import logger from "@/lib/logger";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function getRequestIp(req: NextRequest): string | null {
 function conflictResponse(person: LoadedMobilePerson["person"]) {
   return NextResponse.json(
     {
-      error: "Access changed elsewhere. Review the latest values and try again.",
+      error: changedElsewhereMessage("their access"),
       code: "ORG_ACCESS_CONFLICT",
       person,
     },
@@ -141,7 +142,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // ── No account yet: the role lives on the invitation ──
   if (!loaded.pendingInvitation) {
     return NextResponse.json(
-      { error: "Send an invitation before changing app access." },
+      { error: "Send an invitation before changing their access level." },
       { status: 400 },
     );
   }

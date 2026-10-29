@@ -742,7 +742,7 @@ export default function GridmasterDashboard({
                           borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        {c.slug ?? "—"}
+                        {c.slug ?? "-"}
                       </td>
                       <td
                         style={{
@@ -813,7 +813,7 @@ export default function GridmasterDashboard({
                             {c.focusAreaLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>-</span>
                         )}
                       </td>
                       <td
@@ -828,7 +828,7 @@ export default function GridmasterDashboard({
                             {c.certificationLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>-</span>
                         )}
                       </td>
                       <td
@@ -843,7 +843,7 @@ export default function GridmasterDashboard({
                             {c.roleLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>-</span>
                         )}
                       </td>
                       <td
@@ -854,7 +854,7 @@ export default function GridmasterDashboard({
                           borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        {c.timezone ?? "—"}
+                        {c.timezone ?? "-"}
                       </td>
                     </tr>
                   );

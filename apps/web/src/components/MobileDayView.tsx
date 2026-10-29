@@ -689,7 +689,7 @@ export default function MobileDayView({
                                 : "1px solid var(--dg-color-border)",
                             }}
                           >
-                            —
+                            -
                           </span>
                         )}
                         <NoteDots
@@ -759,10 +759,10 @@ export default function MobileDayView({
         <EmptyState
           size="compact"
           icon={<CalendarOff size={22} />}
-          title="No shifts found for this period"
+          title={canEditSchedule ? "Nobody assigned here yet" : "No shifts found for this period"}
           description={
             canEditSchedule
-              ? "No employees are assigned to this focus area. Add them on the People page."
+              ? "Assign people here from the People page."
               : "No shifts have been published for this period yet."
           }
         />

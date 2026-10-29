@@ -98,7 +98,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
       value === "code" || value === "name" ? SHIFT_DISPLAY_MODE_LABELS[value] : DEFAULT_EMPTY,
   },
   showShiftDetailHoverCards: {
-    label: "Shift Detail Hover Cards",
+    label: "Shift detail Hover Cards",
     sensitive: false,
     format: (value) => (value ? "Enabled" : "Disabled"),
   },
@@ -118,7 +118,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     format: (value) => (value ? "Shown" : "Hidden"),
   },
   payPeriodStartDate: {
-    label: "Pay Period Start Date",
+    label: "Pay Period Start date",
     sensitive: true,
   },
   enforceConflictPrevention: {

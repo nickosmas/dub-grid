@@ -131,7 +131,7 @@ describe("ProfileTwoFactorScreen", () => {
 
     expect(screen.getByText("Not enabled")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
 
     await waitFor(() => {
       expect(stepUpRun).toHaveBeenCalledTimes(1);
@@ -169,7 +169,7 @@ describe("ProfileTwoFactorScreen", () => {
 
     const { unmount } = render(<ProfileTwoFactorScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     expect(await screen.findByLabelText("6-digit verification code")).toBeInTheDocument();
 
     // Back is the way out of a pushed screen, so the cleanup — not a Cancel
@@ -202,7 +202,7 @@ describe("ProfileTwoFactorScreen", () => {
     } as never);
 
     const { unmount } = render(<ProfileTwoFactorScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     await screen.findByLabelText("6-digit verification code");
     fireEvent.change(screen.getByLabelText("6-digit verification code"), {
       target: { value: "123456" },
@@ -247,12 +247,12 @@ describe("ProfileTwoFactorScreen", () => {
 
     expect(screen.getByText("Enabled")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
 
-    expect(screen.getByText("Disable two-factor authentication?")).toBeInTheDocument();
+    expect(screen.getByText("Turn off two-factor?")).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Disable" }));
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Turn off" }));
     });
 
     await waitFor(() => {
@@ -273,7 +273,7 @@ describe("ProfileTwoFactorScreen", () => {
     });
     stepUpRun.mockResolvedValue(false);
     render(<ProfileTwoFactorScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));
     expect(requireMobileCredentialAssurance).not.toHaveBeenCalled();
     expect(enrollMobileMfa).not.toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe("ProfileTwoFactorScreen", () => {
     });
     updateProfileMfaStatus.mockRejectedValueOnce(new Error("Status unavailable"));
     render(<ProfileTwoFactorScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     fireEvent.change(await screen.findByLabelText("6-digit verification code"), {
       target: { value: "123456" },
     });

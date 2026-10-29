@@ -990,7 +990,7 @@ export default function StringListSettings({
                           {(item.departmentIds ?? [])
                             .map((id) => deptMap.get(id)?.name)
                             .filter(Boolean)
-                            .join(", ") || "—"}
+                            .join(", ") || "-"}
                         </span>
                       ) : (
                         <span
@@ -1123,8 +1123,8 @@ export default function StringListSettings({
                 message={
                   <>
                     <strong>{deleteConfirm.item.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}. Archiving keeps its historical records but
-                    removes it from dropdowns and new assignments.
+                    {deps!.summary.toLowerCase()}.{" "}
+                    {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
                 confirmLabel="Archive"
@@ -1134,7 +1134,7 @@ export default function StringListSettings({
                   setDeleteConfirm(null);
                 }}
                 onCancel={() => setDeleteConfirm(null)}
-                secondaryConfirmLabel="Rename Instead"
+                secondaryConfirmLabel="Rename instead"
                 onSecondaryConfirm={() => {
                   setDeleteConfirm(null);
                   requestAnimationFrame(() => {
@@ -1149,7 +1149,7 @@ export default function StringListSettings({
             return (
               <ConfirmDialog
                 title={`Archive "${deleteConfirm.item.name}"?`}
-                message="Archiving keeps its historical records but removes it from dropdowns and new assignments."
+                message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {

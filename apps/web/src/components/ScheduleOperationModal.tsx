@@ -53,7 +53,7 @@ export default function ScheduleOperationModal({
               color: "var(--dg-color-text-subtle)",
             }}
           >
-            In Progress
+            In progress
           </span>
           <span
             style={{
@@ -113,7 +113,7 @@ export default function ScheduleOperationModal({
             color: "var(--dg-color-text-faint)",
           }}
         >
-          Hang tight while we finish this scheduling update.
+          Keep this page open until it finishes.
         </p>
       </div>
     </Modal>

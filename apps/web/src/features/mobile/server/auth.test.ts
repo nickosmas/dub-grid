@@ -205,7 +205,7 @@ describe("mobile auth server boundaries", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "Organization unavailable. Please try again later.",
+      error: "Organization unavailable. Try again later.",
     });
   });
 
@@ -342,7 +342,7 @@ describe("mobile auth server boundaries", () => {
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
       error: orgId
-        ? "Organization context does not match this user"
+        ? "You're no longer in this organization. Sign in again to pick another."
         : "Your session is not tied to an organization. Sign in again to pick one.",
     });
     if (!orgId) expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
@@ -363,7 +363,7 @@ describe("mobile auth server boundaries", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "No active organization membership found",
+      error: "You're no longer in an organization. Ask an Admin if that's a mistake.",
     });
   });
 
@@ -388,7 +388,7 @@ describe("mobile auth server boundaries", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "Organization unavailable. Please try again later.",
+      error: "Organization unavailable. Try again later.",
     });
   });
 

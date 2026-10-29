@@ -73,7 +73,7 @@ describe("OpenShiftsExpandedScreen", () => {
 
     render(<OpenShiftsExpandedScreen />);
 
-    expect(screen.getByText("Could not load open shifts")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load open shifts")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no open shifts", () => {

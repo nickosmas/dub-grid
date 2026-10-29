@@ -30,14 +30,14 @@ export default function ChangeCountChips({ counts }: { counts: ChangeCounts }) {
   if (counts.modifiedShifts)
     chips.push({
       key: "modified",
-      label: `${counts.modifiedShifts} edited`,
+      label: `${counts.modifiedShifts} changed`,
       cls: "dg-draft-chip--modified",
       tone: getPublishDiffTone("modified").background,
     });
   if (counts.deletedShifts)
     chips.push({
       key: "deleted",
-      label: `${counts.deletedShifts} deleted`,
+      label: `${counts.deletedShifts} removed`,
       cls: "dg-draft-chip--deleted",
       tone: getPublishDiffTone("deleted").background,
     });

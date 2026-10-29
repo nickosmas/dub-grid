@@ -151,7 +151,7 @@ describe("EmployeeStatusActions", () => {
     );
     expect(within(dialog).getByText("Change to")).toBeInTheDocument();
     expect(choices(dialog)).toEqual([
-      "AwayKeeps sign-in. Not scheduled while away.",
+      "AwayCan sign in but isn't scheduled.",
       "SuspendedCan't sign in. Stays on the schedule.",
       "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
@@ -170,7 +170,7 @@ describe("EmployeeStatusActions", () => {
     const changes = within(dialog).getByRole("region", { name: "Changes" });
     expect(changes).toHaveTextContent("They can no longer sign in.");
     expect(within(dialog).getByRole("region", { name: "Stays the same" })).toHaveTextContent(
-      "Past records stay, and you can restore them later.",
+      "Their history stays, and you can restore them later.",
     );
   });
 
@@ -603,12 +603,14 @@ describe("EmployeeStatusActions", () => {
     const { onSetPlannedChange } = renderActions(makeEmployee(planned), ABSENCE_TYPES);
 
     const dialog = await openDialog(user);
-    await user.click(within(dialog).getByRole("button", { name: "Cancel planned away" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel planned time away" }));
     expect(
       within(dialog).getByText("Those days go back to what was published, without Vacation."),
     ).toBeInTheDocument();
     await user.click(
-      within(dialog).getAllByRole("button", { name: "Cancel planned away" }).at(-1) as HTMLElement,
+      within(dialog)
+        .getAllByRole("button", { name: "Cancel planned time away" })
+        .at(-1) as HTMLElement,
     );
 
     expect(onSetPlannedChange).toHaveBeenCalledWith("emp-1", null);
@@ -622,7 +624,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("radio", { name: /^Suspended/ }));
 
     expect(
-      within(dialog).getByText("The away planned from Jan 5 is cancelled."),
+      within(dialog).getByText("The time away planned from Jan 5 is canceled."),
     ).toBeInTheDocument();
   });
 
@@ -665,11 +667,7 @@ describe("EmployeeStatusActions", () => {
 
     const dialog = await openDialog(user);
     await user.click(within(dialog).getByRole("radio", { name: /^Offboarded/ }));
-    expect(
-      within(dialog).getByText(
-        "They stay Active through this day and are offboarded the day after. Leave it empty to offboard them now.",
-      ),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Leave it empty to offboard them now.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Last day" }));
     await user.click(screen.getByRole("button", { name: lastDay.label }));
 
@@ -699,7 +697,7 @@ describe("EmployeeStatusActions", () => {
     expect(within(dialog).getByText("Planned: Leaving Thu, Jan 8")).toBeInTheDocument();
     expect(within(dialog).getByText("Offboarded on Fri, Jan 9.")).toBeInTheDocument();
     expect(choices(dialog)).toEqual([
-      "AwayKeeps sign-in. Not scheduled while away.",
+      "AwayCan sign in but isn't scheduled.",
       "SuspendedCan't sign in. Stays on the schedule.",
       "OffboardedLeaving Thu, Jan 8. Change it with Edit plan.",
     ]);
@@ -753,7 +751,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("radio", { name: /^Away/ }));
 
     expect(
-      within(dialog).getByText("The last day planned for Jan 8 is cancelled."),
+      within(dialog).getByText("The last day planned for Jan 8 is canceled."),
     ).toBeInTheDocument();
   });
 
@@ -771,7 +769,7 @@ describe("EmployeeStatusActions", () => {
     };
     const { unmount } = render(<EmployeeStatusActions {...base} label="Edit plan" focus="plan" />);
     await user.click(screen.getByRole("button", { name: "Edit plan" }));
-    let dialog = screen.getByRole("dialog", { name: "Change Alice Smith's planned away?" });
+    let dialog = screen.getByRole("dialog", { name: "Change Alice Smith's planned time away?" });
     expect(within(dialog).getByRole("button", { name: "Starts" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     unmount();
@@ -810,9 +808,7 @@ describe("EmployeeStatusActions", () => {
     const dialog = screen.getByRole("dialog", { name: "Reinstate Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(
-      within(dialog).getByText(
-        "They'll be Active again and can sign in on the web and in the app.",
-      ),
+      within(dialog).getByText("They'll be Active again and can sign in."),
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Reinstate" }));
     expect(handlers.onReinstate).toHaveBeenCalledWith("emp-1");
@@ -890,11 +886,11 @@ describe("EmployeeStatusActions", () => {
     expect(cardButtons()).toEqual(["Mark active", "More status changes"]);
     await user.click(screen.getByRole("button", { name: "More status changes" }));
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Change return date",
+      "Edit time away",
       "Offboard",
     ]);
-    await user.click(screen.getByRole("menuitem", { name: "Change return date" }));
-    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's return date?" });
+    await user.click(screen.getByRole("menuitem", { name: "Edit time away" }));
+    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's time away?" });
     expect(within(dialog).getByRole("button", { name: "Return date" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
   });
@@ -922,7 +918,7 @@ describe("EmployeeStatusActions", () => {
 
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
-      "AwayNot scheduled while away.",
+      "AwayIsn't scheduled.",
       "SuspendedOnly someone with an account can be suspended.",
       "OffboardedNo longer on staff. Can't be scheduled.",
     ]);

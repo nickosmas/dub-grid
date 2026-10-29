@@ -248,11 +248,11 @@ export default function ShiftRequestBoard({
   }
 
   const tabs: { key: Tab; label: string; count: number; visible: boolean }[] = [
-    { key: "available", label: "Available Shifts", count: openPickups.length, visible: true },
-    { key: "mine", label: "My Requests", count: myRequests.length, visible: true },
+    { key: "available", label: "Available shifts", count: openPickups.length, visible: true },
+    { key: "mine", label: "My requests", count: myRequests.length, visible: true },
     {
       key: "approval",
-      label: canApprove ? "Approval Queue" : "All Requests",
+      label: canApprove ? "To approve" : "All requests",
       count: managerQueue.length,
       visible: canReviewOrg,
     },
@@ -673,7 +673,7 @@ export default function ShiftRequestBoard({
               confirmLabel: "Claim",
               key: `claim:${req.id}`,
               message: canApprove
-                ? "As an admin, it goes on the schedule right away."
+                ? "It goes on the schedule right away."
                 : "It's sent for manager approval.",
               onConfirm: () => onClaim(req.id),
               title: `Claim ${requestLabel}?`,
@@ -1052,7 +1052,7 @@ export default function ShiftRequestBoard({
                   { value: "all", label: "All types" },
                   { value: "swap", label: "Swaps" },
                   { value: "pickup", label: "Pickups" },
-                  { value: "calloff", label: "Time off" },
+                  { value: "calloff", label: "Call-off" },
                 ]}
                 value={historyType}
               />

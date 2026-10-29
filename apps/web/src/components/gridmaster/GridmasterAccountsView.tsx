@@ -373,7 +373,7 @@ export default function GridmasterAccountsView({
                             flexWrap: "wrap",
                           }}
                         >
-                          {account.email ?? "—"}
+                          {account.email ?? "-"}
                           <StatusBadge deactivatedAt={account.deactivatedAt} />
                           {isSelf && (
                             <span

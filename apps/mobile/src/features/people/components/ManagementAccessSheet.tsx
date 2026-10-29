@@ -261,7 +261,7 @@ export function ManagementAccessSheet({
               />
             }
           >
-            {/* One label for both branches, as on web. "Send Invitation" would
+            {/* One label for both branches, as on web. "Send invitation" would
                   also collide with the staff-invitation action on the page behind
                   this sheet, which does something else entirely. */}
             <Button
@@ -288,7 +288,7 @@ export function ManagementAccessSheet({
     >
       {managementDepartments.length === 0 ? (
         <AppText tone="secondary" variant="body">
-          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before granting management access.`}
+          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one in Settings on the web before granting management access.`}
         </AppText>
       ) : (
         <View style={{ gap: mobileSpace.lg }}>

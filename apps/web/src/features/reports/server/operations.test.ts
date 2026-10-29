@@ -1231,7 +1231,7 @@ describe("operations reports", () => {
           1,
           1,
           1,
-          "Initiated calloff (approved) (1)",
+          "Sent call-off (approved) (1)",
         ],
       },
       {

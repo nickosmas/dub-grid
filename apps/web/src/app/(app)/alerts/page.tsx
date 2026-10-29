@@ -1,7 +1,7 @@
 import AlertsInboxPage from "./AlertsInboxPage";
 
 export const metadata = {
-  title: "Alerts",
+  title: "Alerts | DubGrid",
 };
 
 // F-4: render this authed route dynamically so the per-request CSP nonce set in

@@ -84,7 +84,7 @@ export function layoutAbsencePill(args: {
   return {
     first,
     joinsShift,
-    shortTime: span(fmt12hShort, "–"),
+    shortTime: span(fmt12hShort, " - "),
     time: span(fmt12h, " - "),
   };
 }
@@ -93,7 +93,7 @@ export function layoutAbsencePill(args: {
 export function overnightShortRange(date: Date, range: ClockRange): string {
   const crosses = minutesOf(range.end) <= minutesOf(range.start);
   const nextDay = WEEKDAYS[(date.getDay() + 1) % 7];
-  return `${fmt12hShort(range.start)}–${crosses ? `${nextDay} ` : ""}${fmt12hShort(range.end)}`;
+  return `${fmt12hShort(range.start)} - ${crosses ? `${nextDay} ` : ""}${fmt12hShort(range.end)}`;
 }
 
 /** The fields of a schedule entry the absence's layout reads, for its draft or published side. */

@@ -35,7 +35,7 @@ interface StaffReadOnlyDetailPanelProps {
 
 function formatList(ids: number[], map: Map<number, string>): string {
   const names = ids.map((id) => map.get(id)).filter((v): v is string => Boolean(v));
-  return names.length > 0 ? names.join(", ") : "—";
+  return names.length > 0 ? names.join(", ") : "-";
 }
 
 function deriveScheduledDepartmentIds(focusAreaIds: number[], focusAreas: FocusArea[]): number[] {
@@ -87,7 +87,7 @@ export function StaffReadOnlyDetailPanel({
   const departmentIds = deriveScheduledDepartmentIds(employee.focusAreaIds, focusAreas);
   const departmentNames = formatList(departmentIds, deptMap);
   const certificationName =
-    employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "—";
+    employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "-";
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const isOnSchedule = employee.focusAreaIds.length > 0;
   const showEmployment = isOnSchedule && canViewEmployeeDetails;
@@ -204,7 +204,7 @@ export function StaffReadOnlyDetailPanel({
             </a>
           )}
 
-          <ReadOnlySection title="Staff Profile">
+          <ReadOnlySection title="Staff profile">
             <ReadOnlyRow
               icon={<UserCircle size={15} strokeWidth={1.8} />}
               label="Name"
@@ -258,7 +258,7 @@ export function StaffReadOnlyDetailPanel({
                       {employee.email}
                     </a>
                   ) : (
-                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>-</span>
                   )
                 }
               />
@@ -278,7 +278,7 @@ export function StaffReadOnlyDetailPanel({
                       {employee.phone}
                     </a>
                   ) : (
-                    <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                    <span style={{ color: "var(--dg-color-text-faint)" }}>-</span>
                   )
                 }
                 isLast

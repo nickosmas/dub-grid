@@ -140,7 +140,7 @@ describe("OrganizationGateScreen", () => {
 
     renderScreen();
 
-    expect(await screen.findByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/isn't available right now/i)).toBeInTheDocument();
     expect(screen.queryByText(/billing|trial|suspend|archive/i)).not.toBeInTheDocument();
   });
 });
@@ -155,7 +155,7 @@ describe("getGateMessage", () => {
 
   it("uses neutral wording for a redacted unavailable state", () => {
     const message = getGateMessage("unavailable");
-    expect(message).toMatch(/currently unavailable/i);
+    expect(message).toMatch(/isn't available right now/i);
     expect(message).not.toMatch(/billing|trial|suspend|archive/i);
   });
 

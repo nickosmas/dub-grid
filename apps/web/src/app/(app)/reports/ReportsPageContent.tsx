@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { capitalizeFirst, pluralLabelNoun } from "@dubgrid/domain";
 import type { CSSProperties, ReactNode } from "react";
 import { ChevronDown, FileText, FileUp, RefreshCw, Upload, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -477,7 +478,19 @@ function ReportsContent() {
     ],
   );
   const filtersKey = useMemo(() => serializeFilters(reportFilters), [reportFilters]);
-  const reportOptions = REPORT_OPTIONS as SelectOption<OperationsReportType>[];
+  const focusAreaTerm = pluralLabelNoun(org?.focusAreaLabel || "Focus Areas");
+  const reportOptions = useMemo(
+    () =>
+      REPORT_OPTIONS.map((option) =>
+        option.value === "certification-role-matrix"
+          ? {
+              ...option,
+              label: `${capitalizeFirst(pluralLabelNoun(org?.certificationLabel || "Certifications"))} and ${pluralLabelNoun(org?.roleLabel || "Roles")}`,
+            }
+          : option,
+      ) as SelectOption<OperationsReportType>[],
+    [org?.certificationLabel, org?.roleLabel],
+  );
   const quickRangeOptions = useMemo(
     () => buildQuickRangeOptions(range, org?.payPeriodStartDate, customRangeSelected),
     [customRangeSelected, org?.payPeriodStartDate, range],
@@ -520,7 +533,7 @@ function ReportsContent() {
       return;
     }
     if (nextQuickRange === "pay-period") {
-      toast.info("This organization does not have a pay period anchor.");
+      toast.info("Set a pay period start date in Settings > Schedule Rules to use this range.");
       setQuickRange("current-week");
       updateRange(resolveQuickRange("current-week", org?.payPeriodStartDate) ?? getDefaultRange());
     }
@@ -617,7 +630,7 @@ function ReportsContent() {
   );
   const focusAreaSummary =
     selectedFocusAreaIds.length === 0
-      ? "All focus areas"
+      ? `All ${focusAreaTerm}`
       : `${selectedFocusAreaIds.length} selected`;
   const peopleSummary =
     selectedEmployeeIds.length === 0 ? "All people" : `${selectedEmployeeIds.length} selected`;
@@ -659,7 +672,7 @@ function ReportsContent() {
       }
       toast.success(`${format.toUpperCase()} report exported`);
     } catch (error) {
-      toast.error(formatClientErrorMessage(error, "Export failed"));
+      toast.error(formatClientErrorMessage(error, "We couldn't export that report. Try again."));
     } finally {
       setExportingFormat(null);
     }
@@ -827,11 +840,11 @@ function ReportsContent() {
                   updateSelectedFocusAreas([]);
                 }}
                 summary={focusAreaSummary}
-                title="Focus areas"
+                title={capitalizeFirst(focusAreaTerm)}
               >
                 <div style={targetListStyle}>
                   {focusAreaOptions.length === 0 ? (
-                    <div style={targetEmptyStyle}>No focus areas</div>
+                    <div style={targetEmptyStyle}>No {focusAreaTerm}</div>
                   ) : (
                     focusAreaOptions.map((option) => {
                       const id = Number(option.id);
@@ -869,8 +882,8 @@ function ReportsContent() {
                   {visibleEmployeeOptions.length === 0 ? (
                     <div style={targetEmptyStyle}>
                       {selectedFocusAreaIds.length === 0
-                        ? "No staff records"
-                        : "No people in selected focus areas"}
+                        ? "No people yet"
+                        : `No people in the selected ${focusAreaTerm}`}
                     </div>
                   ) : (
                     visibleEmployeeOptions.map((option) => (
@@ -1049,7 +1062,10 @@ function ReportsContent() {
         {appliedRequest && reportsQuery.error ? (
           <EmptyState
             description="Refresh the report or adjust the selected filters and try again."
-            heading={formatClientErrorMessage(reportsQuery.error, "Failed to load reports")}
+            heading={formatClientErrorMessage(
+              reportsQuery.error,
+              "We couldn't load reports. Try again.",
+            )}
           />
         ) : null}
 

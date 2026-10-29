@@ -174,7 +174,7 @@ export function BillingSeatsCard({
             <SeatTerm
               value={breakdown.total}
               name="Seats in use"
-              detail="The people in your organization who take a seat right now, counted from your staff and managers."
+              detail="Everyone who takes a seat today."
               icon="users"
               filled
             />
@@ -207,8 +207,7 @@ export function BillingSeatsCard({
               lineHeight: 1.5,
             }}
           >
-            You&apos;re billed for each person who takes a seat. Here&apos;s how the{" "}
-            {breakdown.total} seats in use are counted right now.
+            You&apos;re billed for each seat in use. Here&apos;s who takes one.
           </p>
           <div className="flex flex-col items-center gap-6 sm:flex-row">
             <SeatDonut lines={shown} total={breakdown.total} />

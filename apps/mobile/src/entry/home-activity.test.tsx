@@ -64,7 +64,7 @@ describe("ActivityExpandedScreen", () => {
 
     render(<ActivityExpandedScreen />);
 
-    expect(screen.getByText("Could not load activity")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load activity")).toBeInTheDocument();
   });
 
   it("shows the empty state when there is no activity", () => {

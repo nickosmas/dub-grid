@@ -12,30 +12,30 @@ const sections = [
   {
     icon: <DashboardIcon size={22} />,
     name: "Dashboard",
-    desc: "Your home base \u2014 see coverage status, shift summaries, and quick actions at a glance.",
+    desc: "Coverage, shift totals, and shortcuts for today.",
   },
   {
     icon: <ScheduleIcon size={22} />,
     name: "Schedule",
-    desc: "The schedule grid where you view, edit, and publish shifts for your team.",
+    desc: "View, edit, and publish your team's shifts.",
   },
   {
     icon: <PeopleIcon size={22} />,
     name: "People",
-    desc: "Manage employees, view the directory, send invitations, and track certifications.",
+    desc: "Your staff directory, invitations, and each person's details.",
   },
   {
     icon: <SettingsIcon size={22} />,
     name: "Settings",
-    desc: "Configure departments, shifts, jobs, roles, and other organization options.",
+    desc: "Departments, shifts, jobs, and how your organization works.",
   },
 ];
 
 export default function AdminOrientationStep({ onNext, onBack }: AdminOrientationStepProps) {
   return (
     <StepLayout
-      title="Getting Around"
-      description="Here's a quick overview of the main sections you'll be working with."
+      title="Getting around"
+      description="The main pages you'll use."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Continue"

@@ -4,9 +4,9 @@ export default function ScheduleNotFound() {
   return (
     <NotFoundBoundary
       title="Schedule not found"
-      message="The schedule you're looking for doesn't exist."
+      message="The link may be old or mistyped."
       backHref="/schedule"
-      backLabel="Back to Schedule"
+      backLabel="Back to schedule"
     />
   );
 }

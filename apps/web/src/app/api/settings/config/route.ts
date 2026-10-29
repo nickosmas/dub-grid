@@ -1507,7 +1507,10 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     logger.error({ action, orgId: effectiveOrgId, error }, "Settings GET failed");
-    return NextResponse.json({ error: "Settings request failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your settings. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -2569,6 +2572,6 @@ export async function POST(req: NextRequest) {
       }
     }
     logger.error({ action: data.action, orgId, error }, "Settings POST failed");
-    return apiErrorResponse(error, "Settings request failed");
+    return apiErrorResponse(error, "We couldn't save your settings. Try again.");
   }
 }

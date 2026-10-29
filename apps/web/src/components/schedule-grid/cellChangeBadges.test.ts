@@ -89,7 +89,7 @@ describe("resolveCellChangeBadges: drafts", () => {
     expect(result.pillBadges[1]).toMatchObject({
       source: "draft",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
     });
     expect(result.pillBorderKinds).toEqual([null, "modified"]);
   });
@@ -142,7 +142,7 @@ describe("resolveCellChangeBadges: drafts", () => {
       },
       pillCount: 1,
     });
-    expect(result.pillBadges[0]).toMatchObject({ source: "draft", kind: "time", label: "Edited" });
+    expect(result.pillBadges[0]).toMatchObject({ source: "draft", kind: "time", label: "Changed" });
   });
 
   it("puts a removed segment's marker on the cell, not the survivor", () => {
@@ -163,7 +163,7 @@ describe("resolveCellChangeBadges: drafts", () => {
       source: "draft",
       kind: "modified",
       text: "Changed",
-      label: "Edited",
+      label: "Changed",
     });
   });
 
@@ -183,7 +183,7 @@ describe("resolveCellChangeBadges: drafts", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "draft",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
     });
   });
 
@@ -195,7 +195,7 @@ describe("resolveCellChangeBadges: drafts", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "draft",
       kind: "deleted",
-      label: "Deleted",
+      label: "Removed",
     });
     expect(result.pillBadges[1]).toBeNull();
     expect(result.pillBorderKinds).toEqual(["deleted", "deleted"]);
@@ -238,7 +238,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "time",
-      label: "Edited",
+      label: "Changed",
     });
   });
 
@@ -272,7 +272,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
       detail: "Was Day.",
     });
     expect(result.pillBadges[1]).toMatchObject({ source: "publish", kind: "new", label: "New" });
@@ -307,7 +307,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
       detail: "Was Vacation.",
     });
     expect(result.pillBadges[1]).toMatchObject({ source: "publish", kind: "new", label: "New" });
@@ -329,7 +329,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "draft",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
     });
     expect(result.pillBadges[1]).toBeNull();
     expect(result.pillBorderKinds).toEqual(["modified", "new"]);
@@ -352,7 +352,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
       detail: "Was Night.",
     });
   });
@@ -369,7 +369,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "modified",
-      label: "Edited",
+      label: "Changed",
     });
   });
 
@@ -382,7 +382,7 @@ describe("resolveCellChangeBadges: publications", () => {
     expect(result.pillBadges[0]).toMatchObject({
       source: "publish",
       kind: "deleted",
-      label: "Deleted",
+      label: "Removed",
     });
     expect(result.pillBorderKinds).toEqual([null]);
   });
@@ -441,7 +441,7 @@ describe("resolveCellChangeBadges: absence for the rest of the day", () => {
       pillCount: 2,
     });
     expect(result.pillBadges[0]).toBeNull();
-    expect(result.pillBadges[1]).toMatchObject({ source: "draft", label: "Edited" });
+    expect(result.pillBadges[1]).toMatchObject({ source: "draft", label: "Changed" });
     expect(result.pillBorderKinds).toEqual([null, "modified"]);
   });
 
@@ -467,8 +467,8 @@ describe("resolveCellChangeBadges: absence for the rest of the day", () => {
       publishChange: { from: [DAY], to: [DAY], fromRestOfDayAbsenceTypeId: SICK },
       pillCount: 1,
     });
-    expect(result.pillBadges[0]).toMatchObject({ source: "publish", label: "Edited" });
-    expect(result.pillBadges[0]?.detail).toContain("rest of the day");
+    expect(result.pillBadges[0]).toMatchObject({ source: "publish", label: "Changed" });
+    expect(result.pillBadges[0]?.detail).toContain("part of the day");
   });
 });
 

@@ -11,6 +11,7 @@ import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import {
+  changedElsewhereMessage,
   AWAY_ABSENCE_INVALID_CODE,
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
@@ -70,7 +71,7 @@ export const STATUS_CHANGE_ACTIONS = [
 ] as const;
 
 export const ONLY_SUPER_ADMIN_MESSAGE =
-  "They're the only Super Admin who can sign in. Transfer ownership first.";
+  "They're the only Super Admin who can sign in. Make someone else a Super Admin first.";
 
 export type StatusChangeAction = (typeof STATUS_CHANGE_ACTIONS)[number];
 
@@ -159,7 +160,7 @@ function respond(body: Record<string, unknown>, init?: { status: number }): Stat
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>): StatusChangeResult {
   return respond(
     {
-      error: "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: changedElsewhereMessage("their status"),
       code: "EMPLOYEE_STATUS_CONFLICT",
       employee,
     },

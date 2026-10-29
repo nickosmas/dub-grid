@@ -134,9 +134,7 @@ describe("CoveragePanel", () => {
 
     expect(screen.getAllByText("Not published yet").length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        "Coverage details will appear after this period is published for the first time.",
-      ),
+      screen.getByText("You'll see coverage once this period is published."),
     ).toBeInTheDocument();
   });
 
@@ -214,7 +212,7 @@ describe("CoveragePanel", () => {
   it("explains that Month view is not checked", () => {
     renderPanel({ matrix: null });
 
-    expect(screen.getByText("Coverage is checked in 1 Week and 2 Weeks.")).toBeInTheDocument();
+    expect(screen.getByText("Schedule Builder doesn't work in Month view.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Coverage by day" })).not.toBeInTheDocument();
   });
 
@@ -375,7 +373,7 @@ describe("CoveragePanel", () => {
 
       fireEvent.click(cell(/Monday, October 26/));
       expect(
-        detail().getByText("Already short when published. Nothing in this draft changed it."),
+        detail().getByText("Short since it was published. The draft doesn't change that."),
       ).toBeInTheDocument();
       expect(detail().queryByText("What changed")).not.toBeInTheDocument();
     });
@@ -384,7 +382,7 @@ describe("CoveragePanel", () => {
       renderPanel({ matrix: sameOnBothSides(3, 3) });
 
       fireEvent.click(cell(/Monday, October 26/));
-      expect(detail().getByText("Nothing in this draft changed it.")).toBeInTheDocument();
+      expect(detail().getByText("The draft doesn't change this count.")).toBeInTheDocument();
     });
 
     it("says there is nothing to compare before a first publish", () => {
@@ -548,7 +546,7 @@ describe("CoveragePanel", () => {
       fireEvent.click(dateHeading(/Wednesday, October 28/));
       fireEvent.click(day().getByRole("button", { name: "Apply all for this day" }));
       expect(onApplyAllSuggestions).toHaveBeenLastCalledWith("2026-10-28");
-      expect(day().getByText(/Approvals are not included/)).toBeInTheDocument();
+      expect(day().getByText(/Pickup approvals aren't included/)).toBeInTheDocument();
     });
 
     it("offers no Apply all when only approvals and advice remain", () => {
@@ -738,7 +736,7 @@ describe("CoveragePanel", () => {
           .map((item) => item.textContent),
       ).toEqual([
         "Fills open shifts with qualified staff who are free.",
-        "Starts from recurring schedules and respects time off.",
+        "Starts from recurring schedules and works around absences and waiting requests.",
         "Nothing changes until you apply it.",
       ]);
       fireEvent.click(section().getByRole("button", { name: "Generate schedule" }));
@@ -784,9 +782,7 @@ describe("CoveragePanel", () => {
       const picker = section().getByRole("button", { name: "Exclude staff" });
       expect(picker).toHaveTextContent("Ben Shepherd");
       expect(
-        section().getByText(
-          "Their recurring schedules still fill in. Nothing else changes for them.",
-        ),
+        section().getByText("Auto-build fills only their recurring schedules."),
       ).toBeInTheDocument();
       fireEvent.click(picker);
       fireEvent.click(screen.getByRole("option", { name: /Ana Crawford/ }));
@@ -925,7 +921,7 @@ describe("CoveragePanel", () => {
 
       it("counts the spots filled while placing", () => {
         withBuild({ status: "previewing", progress: { placed: 3, filled: 3, needed: 12 } });
-        expect(status()).toHaveTextContent("Placing shifts: 3 placed25%");
+        expect(status()).toHaveTextContent("3 shifts placed25%");
         expect(bar()).toHaveAttribute("aria-valuenow", "25");
       });
 
@@ -1200,7 +1196,7 @@ describe("CoveragePanel", () => {
 
     it("clears the preview when the focus area filter changes", () => {
       const build = withBuild({ status: "idle" });
-      fireEvent.click(screen.getByText("All Focus Areas"));
+      fireEvent.click(screen.getByText("All focus areas"));
       fireEvent.click(screen.getByRole("option", { name: "North Wing" }));
       expect(build.onCancel).toHaveBeenCalled();
     });

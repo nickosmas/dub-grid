@@ -190,7 +190,7 @@ function StaffRowCells({
         month: "short",
         day: "numeric",
       })
-    : "—";
+    : "-";
 
   return (
     <>
@@ -399,7 +399,7 @@ function StaffRowCells({
         <span className="text-[12px] text-[var(--dg-color-text-primary)]">
           {emp.roleIds.length > 0
             ? getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")
-            : "\u2014"}
+            : "-"}
         </span>
       </StaffCell>
 

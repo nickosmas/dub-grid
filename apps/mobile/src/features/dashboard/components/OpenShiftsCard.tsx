@@ -59,7 +59,7 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
           {formatUsDate(shift.date)}
           {shift.presentation.shiftName ? ` · ${shift.presentation.shiftName}` : ""}
           {shift.presentation.startTime && shift.presentation.endTime
-            ? ` · ${formatUsTime(shift.presentation.startTime)}–${formatUsTime(shift.presentation.endTime)}`
+            ? ` · ${formatUsTime(shift.presentation.startTime)} - ${formatUsTime(shift.presentation.endTime)}`
             : ""}
         </Text>
       </View>

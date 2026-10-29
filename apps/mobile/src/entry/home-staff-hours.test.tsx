@@ -69,7 +69,7 @@ describe("StaffHoursExpandedScreen", () => {
 
     render(<StaffHoursExpandedScreen />);
 
-    expect(screen.getByText("Could not load overtime watch")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load overtime watch")).toBeInTheDocument();
   });
 
   it("shows the threshold-aware empty state when no one is over the limit", () => {

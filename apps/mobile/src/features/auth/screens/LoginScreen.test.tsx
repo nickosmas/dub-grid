@@ -1066,7 +1066,9 @@ describe("LoginScreen", () => {
   });
 
   it("shows an organization lookup error before the credential form", async () => {
-    lookupOrganization.mockRejectedValue(new Error("No organization matched that slug."));
+    lookupOrganization.mockRejectedValue(
+      new Error("We couldn't find that organization. Check the domain and try again."),
+    );
 
     await renderLogin();
 
@@ -1138,7 +1140,7 @@ describe("LoginScreen", () => {
         dedupeKey: "network-connection-error",
       });
     });
-    expect(screen.queryByText("Could not sign in")).not.toBeInTheDocument();
+    expect(screen.queryByText("Couldn't sign in")).not.toBeInTheDocument();
   });
 
   it("recovers when the mobile session handoff stalls after valid credentials", async () => {

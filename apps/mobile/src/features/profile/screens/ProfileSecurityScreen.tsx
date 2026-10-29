@@ -39,8 +39,8 @@ import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { formatSessionCount } from "../components/session-format";
 
 const APP_LOCK_DESCRIPTION = Platform.select({
-  ios: "Ask for Face ID, Touch ID, or your passcode whenever you return to DubGrid.",
-  default: "Ask for your fingerprint, face, or screen lock whenever you return to DubGrid.",
+  ios: "Ask for Face ID, Touch ID, or your passcode whenever you come back to the app.",
+  default: "Ask for your fingerprint, face, or screen lock whenever you come back to the app.",
 });
 
 const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
@@ -96,7 +96,7 @@ export default function ProfileSecurityScreen() {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not request deletion",
+        title: "Couldn't request deletion",
         fallbackMessage: "We couldn't send that request right now.",
       });
     },
@@ -126,7 +126,7 @@ export default function ProfileSecurityScreen() {
         if (!hasHardware || !isEnrolled) {
           pushToast({
             tone: "error",
-            title: "Could not enable app lock",
+            title: "Couldn't enable app lock",
             message: "Set up a passcode or biometrics in your device settings first.",
           });
           return;
@@ -159,7 +159,7 @@ export default function ProfileSecurityScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load security"
+          title="Couldn't load security"
           variant="centered"
           onAction={() => {
             void profileQuery.refetch();
@@ -237,7 +237,7 @@ export default function ProfileSecurityScreen() {
         </>
       ) : null}
       <ConfirmationModal
-        body="Your admin will be notified to start the deletion process."
+        body="An Admin reviews the request before your account is deleted."
         confirmLabel="Request"
         confirmTone="danger"
         loading={deletionRequestMutation.isPending}

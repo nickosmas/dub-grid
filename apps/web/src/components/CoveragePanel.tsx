@@ -2,6 +2,7 @@
 import { ChevronLeft, History } from "lucide-react";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import { createPortal } from "react-dom";
 import {
   parseLocalDateKey,
@@ -59,6 +60,7 @@ interface CoveragePanelProps {
   canEditShifts: boolean;
   hasRequirements: boolean;
   todayKey: string;
+  focusAreaLabel?: string;
   getCellFill: (focusAreaId: number, cell: CoverageMatrixCell) => CoverageCellFill;
   /** Lines naming the draft changes behind a cell; only asked for when editing. */
   describeCellChanges: (row: CoverageMatrixRow, cell: CoverageMatrixCell) => string[];
@@ -172,6 +174,7 @@ export default function CoveragePanel({
   canEditShifts,
   hasRequirements,
   todayKey,
+  focusAreaLabel = "Focus Areas",
   getCellFill,
   describeCellChanges,
   onFillSpot,
@@ -283,17 +286,15 @@ export default function CoveragePanel({
   const activeView: CoverageCheckView = comparable ? view : "all";
   const showsMatrix = matrix !== null && hasRequirements && !hidesForViewer;
 
-  const subtitle = !matrix
-    ? "Checked in 1 Week and 2 Weeks"
-    : !hasRequirements
-      ? "No coverage requirements"
-      : hidesForViewer
-        ? "Not published yet"
-        : coverageCheckSubtitle({
-            totals,
-            publishedOnly: !canEditShifts && isPartial,
-            areaName,
-          });
+  // An empty state below says why there's nothing to show, so the header stays quiet.
+  const subtitle =
+    !matrix || !hasRequirements || hidesForViewer
+      ? null
+      : coverageCheckSubtitle({
+          totals,
+          publishedOnly: !canEditShifts && isPartial,
+          areaName,
+        });
 
   return createPortal(
     <>
@@ -346,16 +347,18 @@ export default function CoveragePanel({
             >
               Schedule Builder
             </div>
-            <div
-              className="dg-tabular-nums"
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-subtle)",
-                marginTop: 2,
-              }}
-            >
-              {subtitle}
-            </div>
+            {subtitle ? (
+              <div
+                className="dg-tabular-nums"
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--dg-color-text-subtle)",
+                  marginTop: 2,
+                }}
+              >
+                {subtitle}
+              </div>
+            ) : null}
           </div>
           {!isMobile && (
             <CloseButton size="md" onClick={close} aria-label="Close Schedule Builder" />
@@ -376,8 +379,8 @@ export default function CoveragePanel({
             )}
             {canEditShifts && isUnpublished && (
               <div className="dg-cc-note">
-                Nothing in this period is published yet, so there is nothing to compare. The counts
-                are the draft&apos;s.
+                Nothing in this period is published yet, so there&apos;s nothing to compare. These
+                counts come from the draft.
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
@@ -393,7 +396,7 @@ export default function CoveragePanel({
                 style={{ flex: "1 1 180px" }}
                 value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
                 options={[
-                  { value: "all", label: "All Focus Areas" },
+                  { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
                   ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
                 ]}
                 onChange={(val) => {
@@ -419,7 +422,7 @@ export default function CoveragePanel({
               size="compact"
               style={{ minHeight: 260 }}
               title="Switch to 1 Week or 2 Weeks"
-              description="Coverage is checked in 1 Week and 2 Weeks."
+              description="Schedule Builder doesn't work in Month view."
             />
           ) : !hasRequirements ? (
             <EmptyState
@@ -433,7 +436,7 @@ export default function CoveragePanel({
               size="compact"
               style={{ minHeight: 260 }}
               title="Not published yet"
-              description="Coverage details will appear after this period is published for the first time."
+              description="You'll see coverage once this period is published."
             />
           ) : (
             <div className="flex flex-col gap-3">
@@ -443,11 +446,10 @@ export default function CoveragePanel({
               {rows.length === 0 ? (
                 <EmptyState
                   size="compact"
-                  title="No coverage requirements here"
-                  description={
+                  title={
                     areaName
-                      ? `${areaName} has no coverage requirements for these dates.`
-                      : "No requirement applies to these dates."
+                      ? `No coverage requirements for ${areaName}`
+                      : "No coverage requirements for these dates"
                   }
                 />
               ) : (
@@ -461,7 +463,7 @@ export default function CoveragePanel({
                       />
                       {build && (
                         <ScheduleBuildSection
-                          scope={`${areaName ?? "All focus areas"}, ${formatDateRange(dates)}`}
+                          scope={`${areaName ?? `All ${pluralLabelNoun(focusAreaLabel)}`}, ${formatDateRange(dates)}`}
                           state={build.state}
                           busy={busySuggestionId != null}
                           onPreview={() => build.onPreview(rows.map((row) => row.rowKey))}

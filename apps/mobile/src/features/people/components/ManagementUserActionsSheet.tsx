@@ -234,9 +234,7 @@ export function ManagementUserActionsSheet({
             ? "The current invitation will be canceled."
             : "The invite link stops working."
         }
-        confirmLabel={
-          invitationConfirmAction === "resend" ? "Reissue Invitation" : "Revoke Invitation"
-        }
+        confirmLabel={invitationConfirmAction === "resend" ? "Resend" : "Revoke"}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         error={error}
         loading={invitationMutation.isPending}
@@ -250,7 +248,7 @@ export function ManagementUserActionsSheet({
         }}
         title={
           invitationConfirmAction === "resend"
-            ? `Reissue the invitation to ${displayed.email}?`
+            ? `Resend the invitation to ${displayed.email}?`
             : `Revoke the invitation to ${displayed.email}?`
         }
         visible={invitationConfirmAction != null}
@@ -269,7 +267,7 @@ export function ManagementUserActionsSheet({
               {isPendingInvite ? (
                 <Button
                   disabled={isPending}
-                  label="Reinvite"
+                  label="Resend invite"
                   loading={invitationMutation.isPending}
                   onPress={() => setInvitationConfirmAction("resend")}
                   tone="secondary"
@@ -298,7 +296,7 @@ export function ManagementUserActionsSheet({
               />
               <Button
                 disabled={isPending}
-                label={isPendingInvite ? "Revoke Invitation" : "Remove from Management"}
+                label={isPendingInvite ? "Revoke invite" : "Remove from management"}
                 onPress={() =>
                   isPendingInvite
                     ? setInvitationConfirmAction("revoke")

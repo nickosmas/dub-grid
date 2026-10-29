@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       if (isMissingTerminationsTable(error)) {
         logger.warn({ error }, "schedule editor session terminations table missing");
         return NextResponse.json(
-          { error: "Ending another schedule session isn't available in this environment yet." },
+          { error: "We can't close your other schedule tabs from here yet. Close them yourself." },
           { status: 503 },
         );
       }

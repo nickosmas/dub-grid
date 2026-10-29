@@ -98,7 +98,7 @@ export function DirectoryCertificationCards({
           ? "Archived"
           : ((useCompactRoleCertificationLabels
               ? certification?.abbr || certification?.name
-              : certification?.name) ?? "—");
+              : certification?.name) ?? "-");
         const fullName = isArchived
           ? `Holders of an archived ${certificationLabel.toLowerCase()} entry`
           : (certification?.name ?? null);

@@ -79,13 +79,13 @@ async function startImpersonation(page: Page) {
   // The portal header carries its own org chip and org search; only the
   // picker inside the content region selects an impersonation target.
   const content = page.getByLabel("Gridmaster content");
-  await content.getByPlaceholder("Search organizations…").fill("Calm");
+  await content.getByPlaceholder("Search organizations").fill("Calm");
   await content
     .getByRole("button", { name: /Calm Haven/ })
     .first()
     .click();
 
-  await content.getByPlaceholder("Search by email…").fill("qa-regular");
+  await content.getByPlaceholder("Search by email").fill("qa-regular");
   await content.getByRole("button", { name: QA_REGULAR_EMAIL }).first().click();
 
   await content.getByPlaceholder(/Why are you impersonating/).fill(JUSTIFICATION);

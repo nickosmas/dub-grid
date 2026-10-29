@@ -32,7 +32,7 @@ function ErrorReporter({ error, onPush }: { error: unknown; onPush: () => void }
   useEffect(() => {
     if (error) {
       onPush();
-      pushToast({ tone: "error", title: "Could not load", message: "Something went wrong." });
+      pushToast({ tone: "error", title: "Couldn't load", message: "Something went wrong." });
     }
   }, [error, onPush, pushToast]);
 

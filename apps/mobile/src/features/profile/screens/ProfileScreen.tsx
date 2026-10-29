@@ -140,8 +140,8 @@ export default function ProfileScreen() {
         tone: "success",
         message:
           request.type === "account_deletion"
-            ? "Account deletion request cancelled."
-            : "Name change request cancelled.",
+            ? "Account deletion request canceled."
+            : "Name change request canceled.",
       });
       await Promise.all([changeRequestsQuery.refetch(), profileQuery.refetch()]);
     },
@@ -149,7 +149,7 @@ export default function ProfileScreen() {
       pushClientFriendlyErrorToast(pushToast, {
         error,
         fallbackMessage: "We couldn't cancel that request right now.",
-        title: "Could not cancel request",
+        title: "Couldn't cancel request",
       });
     },
   });
@@ -200,7 +200,7 @@ export default function ProfileScreen() {
       if (error) {
         pushClientFriendlyErrorToast(pushToast, {
           error,
-          title: "Could not sign out",
+          title: "Couldn't sign out",
           fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
         });
         return;
@@ -210,7 +210,7 @@ export default function ProfileScreen() {
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not sign out",
+        title: "Couldn't sign out",
         fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
       });
     } finally {
@@ -240,7 +240,7 @@ export default function ProfileScreen() {
       pushClientFriendlyErrorToast(pushToast, {
         error,
         fallbackMessage: "Sign in again to finish switching organizations.",
-        title: "Could not finish organization switch",
+        title: "Couldn't finish organization switch",
       });
       await handleExpiredMobileSession();
     };
@@ -256,7 +256,7 @@ export default function ProfileScreen() {
         pushClientFriendlyErrorToast(pushToast, {
           error: switchResult.error,
           fallbackMessage: "We couldn't switch organizations right now.",
-          title: "Could not switch organization",
+          title: "Couldn't switch organization",
         });
         return;
       }
@@ -320,7 +320,7 @@ export default function ProfileScreen() {
         pushClientFriendlyErrorToast(pushToast, {
           error,
           fallbackMessage: "We couldn't switch organizations right now.",
-          title: "Could not switch organization",
+          title: "Couldn't switch organization",
         });
       }
     } finally {
@@ -413,7 +413,7 @@ export default function ProfileScreen() {
             actionLabel="Try again"
             body={contentState.message}
             fillScreen
-            title="Could not load profile"
+            title="Couldn't load profile"
             variant="centered"
             onAction={() => {
               void profileQuery.refetch();

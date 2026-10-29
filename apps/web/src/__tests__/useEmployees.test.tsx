@@ -21,13 +21,13 @@ const runStepUp = vi.fn();
 vi.mock("@/features/employees/client", () => {
   class MockEmployeeProfileConflictError extends Error {
     constructor(public readonly latestEmployee: unknown) {
-      super("Employee details changed elsewhere.");
+      super("Someone else just changed their details. Refresh and try again.");
       this.name = "EmployeeProfileConflictError";
     }
   }
   class MockEmployeeStatusConflictError extends Error {
     constructor(public readonly latestEmployee: unknown) {
-      super("Employee status changed elsewhere.");
+      super("Someone else just changed their status. Refresh and try again.");
       this.name = "EmployeeStatusConflictError";
     }
   }

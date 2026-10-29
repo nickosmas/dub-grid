@@ -38,7 +38,7 @@ test.describe("people states", () => {
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people`);
 
-    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Opening your organization" })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "Try again" })).toBeEnabled();
@@ -97,9 +97,9 @@ test.describe("people states", () => {
     // segment isn't a UUID - no data fetch needed to trigger it.
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people/not-a-real-id`);
 
-    await expect(page.getByText("Page not found")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("The page you're looking for doesn't exist.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Back to People" })).toBeVisible();
+    await expect(page.getByText("Person not found")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("The link may be old or mistyped.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to people" })).toBeVisible();
   });
 });
 

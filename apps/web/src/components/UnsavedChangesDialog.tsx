@@ -10,8 +10,8 @@ interface UnsavedChangesDialogProps {
 export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChangesDialogProps) {
   return (
     <ConfirmDialog
-      title="Unsaved changes"
-      message="Your changes won't be saved."
+      title="Discard your changes?"
+      message="You haven't saved what you changed here."
       cancelLabel="Keep editing"
       confirmLabel="Discard"
       variant="danger"

@@ -137,7 +137,7 @@ describe("GET mobile org-status route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Organization context does not match this user",
+      error: "You're no longer in this organization. Sign in again to pick another.",
     });
     expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
   });

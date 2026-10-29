@@ -8,6 +8,7 @@ import {
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMobileAuth } from "@/features/mobile/server";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 /**
  * The composite key the management roster is addressed by. A management user
@@ -136,7 +137,7 @@ export function getRequestIp(req: NextRequest): string | null {
 export function managementConflictResponse() {
   return NextResponse.json(
     {
-      error: "Management access changed elsewhere. Refresh and try again.",
+      error: changedElsewhereMessage("their management access"),
       code: "ORG_ACCESS_CONFLICT",
     },
     { status: 409 },
@@ -162,7 +163,7 @@ export async function requireManagementRosterActor(
   if (!allowed) {
     return {
       response: NextResponse.json(
-        { error: "You don't have permission to manage management access." },
+        { error: "You don't have permission to change who's in management." },
         { status: 403 },
       ),
     };

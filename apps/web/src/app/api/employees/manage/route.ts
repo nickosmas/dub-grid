@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  changedElsewhereMessage,
   canMarkInactive,
   FIRST_DAY_INVALID_CODE,
   FIRST_DAY_INVALID_MESSAGE,
@@ -810,7 +811,7 @@ export async function POST(req: NextRequest) {
           if (previousRow && previousRow.version !== expectedVersion) {
             return NextResponse.json(
               {
-                error: "Employee details changed elsewhere. Refresh and try again.",
+                error: changedElsewhereMessage("their details"),
                 code: "EMPLOYEE_CONFLICT",
                 employee: previousRow,
               },
@@ -891,7 +892,7 @@ export async function POST(req: NextRequest) {
           );
           return NextResponse.json(
             {
-              error: "Employee details changed elsewhere. Refresh and try again.",
+              error: changedElsewhereMessage("their details"),
               code: "EMPLOYEE_CONFLICT",
               employee: latestEmployee,
             },
@@ -1286,6 +1287,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(contactConflict, { status: 409 });
     }
 
-    return apiErrorResponse(error, "Employee request failed");
+    return apiErrorResponse(error, "We couldn't save that. Try again.");
   }
 }

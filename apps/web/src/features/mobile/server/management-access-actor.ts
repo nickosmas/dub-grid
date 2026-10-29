@@ -35,7 +35,7 @@ export async function requireManagementAccessActor(
   if (!auth.permissions.canManageUsers) {
     return {
       response: NextResponse.json(
-        { error: "You don't have permission to manage management access." },
+        { error: "You don't have permission to change who's in management." },
         { status: 403 },
       ),
     };

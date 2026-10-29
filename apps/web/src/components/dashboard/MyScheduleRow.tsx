@@ -794,7 +794,7 @@ function EmptyDayPlaceholder({ height }: { height: number }) {
         color: "var(--dg-color-text-subtle)",
       }}
     >
-      {"—"}
+      {"-"}
     </div>
   );
 }

@@ -493,7 +493,7 @@ export default function RequestsScreen() {
       ...getMobileRequestActionSuccessToast(variables.body, data),
     }),
     errorToast: {
-      title: "Could not update request",
+      title: "Couldn't update request",
       fallbackMessage: "We couldn't update that shift request.",
     },
     announceOnSuccess: (data, variables) =>
@@ -862,7 +862,7 @@ export default function RequestsScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load requests"
+          title="Couldn't load requests"
           variant="centered"
           onAction={() => {
             void refreshRequests();
@@ -871,7 +871,7 @@ export default function RequestsScreen() {
       ) : contentState.kind === "empty" && activeTab !== "history" ? (
         <EmptyStateCard
           fillScreen
-          body="Coverage and pickup requests will appear here when someone needs help."
+          body="Pickup, swap, and call-off requests show up here."
           iconName="swap-horizontal-outline"
           title="No requests yet"
         />
@@ -1027,7 +1027,7 @@ export default function RequestsScreen() {
               actionLabel="Try again"
               body={historyContentState.message}
               fillScreen
-              title="Could not load history"
+              title="Couldn't load history"
               variant="centered"
               onAction={() => {
                 void historyQuery.refetch();
@@ -1115,7 +1115,6 @@ export default function RequestsScreen() {
           tone="warning"
         />
         <ProfileTextInput
-          accessibilityLabel={`Note to ${resolveNoteRecipients}? (Optional)`}
           label={`Note to ${resolveNoteRecipients} (optional)`}
           maxLength={500}
           multiline

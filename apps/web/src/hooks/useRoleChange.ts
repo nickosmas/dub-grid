@@ -64,7 +64,10 @@ export function useRoleChange() {
 
       if (!response.ok) {
         throw new Error(
-          formatClientErrorMessage(body?.error, "We couldn't change role. Try again."),
+          formatClientErrorMessage(
+            body?.error,
+            "We couldn't change their access level. Try again.",
+          ),
         );
       }
 

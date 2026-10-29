@@ -65,7 +65,7 @@ export function InlineRoleSelect({
         {ORG_ROLE_LABELS[orgRole]}
       </span>
     ) : (
-      <span className="text-[12px] text-[var(--dg-color-text-muted)]">{"—"}</span>
+      <span className="text-[12px] text-[var(--dg-color-text-muted)]">{"-"}</span>
     );
   }
 
@@ -83,8 +83,8 @@ export function InlineRoleSelect({
         <ConfirmDialog
           title={
             pendingInvitationEmail
-              ? `Change invitation access from ${ORG_ROLE_LABELS[orgRole]} to ${ORG_ROLE_LABELS[pending]}?`
-              : `Change this person's role to ${ORG_ROLE_LABELS[pending]}?`
+              ? `Change the invitation for ${pendingInvitationEmail} to ${ORG_ROLE_LABELS[pending]}?`
+              : `Change their access level to ${ORG_ROLE_LABELS[pending]}?`
           }
           message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
           summary={
@@ -97,7 +97,7 @@ export function InlineRoleSelect({
                 }
               : undefined
           }
-          confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
+          confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access level"}
           variant="warning"
           isLoading={saving}
           onCancel={() => {
@@ -116,12 +116,15 @@ export function InlineRoleSelect({
               toast.success(
                 pendingInvitationEmail
                   ? `Invitation replaced with ${ORG_ROLE_LABELS[next]} access.`
-                  : `Role updated to ${ORG_ROLE_LABELS[next]}.`,
+                  : `Access level changed to ${ORG_ROLE_LABELS[next]}.`,
               );
               setPending(null);
             } catch (error) {
               toast.error(
-                formatClientErrorMessage(error, "We couldn't change that role. Try again."),
+                formatClientErrorMessage(
+                  error,
+                  "We couldn't change their access level. Try again.",
+                ),
               );
             } finally {
               setSaving(false);

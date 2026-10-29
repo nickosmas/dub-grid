@@ -169,11 +169,9 @@ const STATUS_REQUEST: Record<StatusAction, StatusMutationAction> = {
 };
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
-const SUSPENSION_END_HINT =
-  "They get access back on this day. Leave it empty to reinstate them yourself.";
+const SUSPENSION_END_HINT = "Leave it empty to reinstate them yourself.";
 
-const LAST_DAY_HINT =
-  "They stay Active through this day and are offboarded the day after. Leave it empty to offboard them now.";
+const LAST_DAY_HINT = "Leave it empty to offboard them now.";
 
 /** Draft fields the server can reject on its own, so a rejection can be retired. */
 const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -683,7 +681,8 @@ export default function PersonDetailScreen() {
       if (result.result === "unchanged") return;
       pushToast({
         tone: "success",
-        title: result.result === "invitation_replaced" ? "Invitation replaced" : "Role updated",
+        title:
+          result.result === "invitation_replaced" ? "Invitation replaced" : "Access level updated",
         message:
           result.result === "invitation_replaced"
             ? "A replacement invitation is on its way."
@@ -888,7 +887,7 @@ export default function PersonDetailScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load person"
+          title="Couldn't load person"
           variant="centered"
           onAction={() => {
             void personQuery.refetch();
@@ -1364,7 +1363,7 @@ export default function PersonDetailScreen() {
     invitationConfirmAction === "create"
       ? `Send an invitation to ${person.email}?`
       : invitationConfirmAction === "resend"
-        ? `Reissue the invitation to ${person.email}?`
+        ? `Resend the invitation to ${person.email}?`
         : `Revoke the invitation to ${person.email}?`;
   const invitationConfirmationLead =
     invitationConfirmAction === "create"
@@ -1376,8 +1375,8 @@ export default function PersonDetailScreen() {
     invitationConfirmAction === "create"
       ? "Send invitation"
       : invitationConfirmAction === "resend"
-        ? "Reissue Invitation"
-        : "Revoke Invitation";
+        ? "Resend"
+        : "Revoke";
   const invitationPendingLabel = invitationConfirmAction === "revoke" ? "Revoking" : "Sending";
 
   const editFieldErrors = editing
@@ -1747,7 +1746,7 @@ export default function PersonDetailScreen() {
                 person.pendingInvitation ? (
                   <>
                     <Button
-                      label="Reinvite"
+                      label="Resend invite"
                       loading={invitationMutation.isPending}
                       onPress={() => setInvitationConfirmAction("resend")}
                       tone="neutral"
@@ -1835,7 +1834,7 @@ export default function PersonDetailScreen() {
               statusCopy?.title ??
               (statusOpening.focus === "plan"
                 ? isAway
-                  ? `Change ${getFullName(person)}'s return date?`
+                  ? `Change ${getFullName(person)}'s time away?`
                   : isSuspended
                     ? `Change when ${getFullName(person)}'s suspension ends?`
                     : returnDay
@@ -1844,7 +1843,7 @@ export default function PersonDetailScreen() {
                         ? `Change ${getFullName(person)}'s planned suspension?`
                         : plannedLeave
                           ? `Change ${getFullName(person)}'s last day?`
-                          : `Change ${getFullName(person)}'s planned away?`
+                          : `Change ${getFullName(person)}'s planned time away?`
                 : `Change ${getFullName(person)}'s status?`)
             }
           />
@@ -2027,9 +2026,9 @@ export default function PersonDetailScreen() {
                 )}
                 <PlanCancelToggle
                   cancelling={cancellingPlan}
-                  cancelLabel="Cancel planned away"
+                  cancelLabel="Cancel planned time away"
                   disabled={statusMutation.isPending}
-                  keepLabel="Keep planned away"
+                  keepLabel="Keep planned time away"
                   onToggle={() => setCancellingPlan((value) => !value)}
                 />
               </>

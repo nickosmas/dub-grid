@@ -135,7 +135,7 @@ export default function AddToScheduleScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load this form"
+          title="Couldn't load this form"
           variant="centered"
           onAction={() => {
             void personQuery.refetch();
@@ -197,7 +197,7 @@ export default function AddToScheduleScreen() {
     <Screen bottomPaddingMode="tabbed">
       {focusAreas.length === 0 ? (
         <EmptyStateCard
-          body={`There are no ${focusAreaLabel.toLowerCase()} yet. Add one on the web app, under Settings, before putting anyone on the schedule.`}
+          body={`There are no ${focusAreaLabel.toLowerCase()} yet. Add one in Settings on the web before putting anyone on the schedule.`}
           fillScreen
           iconName="albums-outline"
           title={`No ${focusAreaLabel.toLowerCase()}`}
@@ -205,7 +205,7 @@ export default function AddToScheduleScreen() {
       ) : (
         <>
           <ProfileSection
-            description="They keep their management access either way. This is what puts them on the grid."
+            description="Assignments put them on the schedule. Their management access doesn't change."
             title="Assignments"
           >
             <ProfileChoiceGroup

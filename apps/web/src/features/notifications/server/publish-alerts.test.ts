@@ -148,9 +148,7 @@ describe("notifyPublishedShiftChanges", () => {
     });
 
     const byUser = new Map(sendNotification.mock.calls.map((call) => [call[0], call]));
-    expect(byUser.get("user-staff")?.[4]).toBe(
-      "Your schedule changed on Thu, Oct 22. Open the schedule to see it now.",
-    );
+    expect(byUser.get("user-staff")?.[4]).toBe("Open the schedule to see what changed.");
     expect(byUser.get("user-editor")?.[4]).toMatch(/Day Shift .* → Night Shift/);
   });
 

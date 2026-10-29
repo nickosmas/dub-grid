@@ -78,7 +78,7 @@ export async function deleteUserAccountWithCleanup({
 
     if ((count ?? 0) <= 1) {
       throw new Error(
-        "This user is the only super admin of an organization. Transfer ownership first.",
+        "They're the only Super Admin of an organization. Make someone else a Super Admin first.",
       );
     }
   }

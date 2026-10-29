@@ -69,7 +69,7 @@ describe("CoverageExpandedScreen", () => {
 
     render(<CoverageExpandedScreen />);
 
-    expect(screen.getByText("Could not load coverage")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load coverage")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no coverage sections", () => {

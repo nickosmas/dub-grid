@@ -346,7 +346,7 @@ describe("ProfilePasswordScreen", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Could not change password")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't change password")).toBeInTheDocument();
     });
     expect(updateUser).not.toHaveBeenCalled();
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
@@ -415,7 +415,7 @@ describe("ProfilePasswordScreen", () => {
       pressBack();
     });
     fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: "Keep Editing" }),
+      within(screen.getByRole("alert")).getByRole("button", { name: "Keep editing" }),
     );
 
     expect(navigatedActions).toHaveLength(0);

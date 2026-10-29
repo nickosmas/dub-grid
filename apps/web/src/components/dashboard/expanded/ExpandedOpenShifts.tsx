@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import Link from "next/link";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -35,12 +36,14 @@ const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 interface ExpandedOpenShiftsProps {
   openShifts: OpenShift[];
   publishedWindowState?: PublishedWindowState;
+  focusAreaLabel?: string;
   onClose: () => void;
 }
 
 export default function ExpandedOpenShifts({
   openShifts,
   publishedWindowState = "published",
+  focusAreaLabel = "Focus Areas",
   onClose,
 }: ExpandedOpenShiftsProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
@@ -67,8 +70,8 @@ export default function ExpandedOpenShifts({
         {isUnpublished ? (
           <EmptyState
             size="compact"
-            heading="Nothing to show yet"
-            description="This period has not been published yet. Open shifts will appear after the first publish."
+            heading="Not published yet"
+            description="Open shifts show here once this period is published."
           />
         ) : (
           <>
@@ -112,7 +115,7 @@ export default function ExpandedOpenShifts({
               <CustomSelect
                 value={focusAreaFilter}
                 options={[
-                  { value: "all", label: "All sections" },
+                  { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
                   ...focusAreaNames.map((name) => ({
                     value: name,
                     label: name,

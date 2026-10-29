@@ -106,8 +106,8 @@ describe("ActivityLog date navigation", () => {
     renderLog();
 
     expect(await screen.findByLabelText("Events: 3, this week")).toBeInTheDocument();
-    expect(screen.getByLabelText("Days with activity: 2, 2 days")).toBeInTheDocument();
-    expect(screen.getByLabelText("People involved: 1, 1 person")).toBeInTheDocument();
+    expect(screen.getByLabelText("Days with activity: 2, this week")).toBeInTheDocument();
+    expect(screen.getByLabelText("People involved: 1, this week")).toBeInTheDocument();
     expect(screen.getByLabelText("Most common: 2, Access & roles")).toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe("ActivityLog date navigation", () => {
 
     // The page holds one row; the period holds 200 across two days.
     expect(await screen.findByLabelText("Events: 200, this week")).toBeInTheDocument();
-    expect(screen.getByLabelText("Days with activity: 2, 2 days")).toBeInTheDocument();
+    expect(screen.getByLabelText("Days with activity: 2, this week")).toBeInTheDocument();
     expect(await screen.findByLabelText("140 events")).toBeInTheDocument();
     expect(mockedCounts).toHaveBeenCalledWith(
       expect.objectContaining({

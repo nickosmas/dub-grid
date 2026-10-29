@@ -44,7 +44,7 @@ describe("MFAVerify recovery", () => {
     render(<MFAVerify onVerified={vi.fn()} onCancel={vi.fn()} />);
 
     expect(
-      await screen.findByText("DubGrid is temporarily unavailable. Please try again."),
+      await screen.findByText("We can't reach DubGrid right now. Try again in a moment."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await enterCode();
@@ -102,9 +102,7 @@ describe("MFAVerify recovery", () => {
     expect(verifyBrowserTotpEnrollment).toHaveBeenCalledTimes(1);
     resolveVerification?.({ error: { status: 400 } });
 
-    expect(
-      await screen.findByText("Invalid verification code. Please try again."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("That code isn't right. Try again.")).toBeInTheDocument();
     expect(input).toHaveValue("");
   });
 });

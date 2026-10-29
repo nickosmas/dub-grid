@@ -195,9 +195,7 @@ describe("ShiftRequestBoard", () => {
     renderBoard({ openPickups: [makeRequest()], canApprove: true });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
-    expect(
-      screen.getByText("As an admin, it goes on the schedule right away."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("It goes on the schedule right away.")).toBeInTheDocument();
     expect(screen.queryByText(/manager approval/)).not.toBeInTheDocument();
   });
 
@@ -249,7 +247,7 @@ describe("ShiftRequestBoard", () => {
       currentEmpId: "manager-1",
     });
 
-    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    await user.click(screen.getByRole("button", { name: /to approve/i }));
     expect(
       screen
         .getAllByRole("button")
@@ -285,7 +283,7 @@ describe("ShiftRequestBoard", () => {
         canApprove: true,
         currentEmpId: "manager-1",
       });
-      await user.click(screen.getByRole("button", { name: /approval queue/i }));
+      await user.click(screen.getByRole("button", { name: /to approve/i }));
       await user.click(screen.getByRole("button", { name: "Approve" }));
       return { user, ...handlers };
     }
@@ -353,7 +351,7 @@ describe("ShiftRequestBoard", () => {
       currentEmpId: "manager-1",
     });
 
-    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    await user.click(screen.getByRole("button", { name: /to approve/i }));
 
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Swap request")).toBeInTheDocument();
@@ -421,7 +419,7 @@ describe("ShiftRequestBoard", () => {
     });
 
     renderBoard({ approvalQueue: [swap, pickup, calloff], canApprove: true, currentEmpId: "m-1" });
-    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    await user.click(screen.getByRole("button", { name: /to approve/i }));
 
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual(["Pending approval1", "Pickups1", "Swaps awaiting a response1"]);
@@ -449,7 +447,7 @@ describe("ShiftRequestBoard", () => {
       currentEmpId: "manager-1",
     });
 
-    await user.click(screen.getByRole("button", { name: /approval queue/i }));
+    await user.click(screen.getByRole("button", { name: /to approve/i }));
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     // The note goes to both people; it is optional and travels with the cancel.
     await user.type(

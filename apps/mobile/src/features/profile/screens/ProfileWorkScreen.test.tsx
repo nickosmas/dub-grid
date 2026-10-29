@@ -473,7 +473,7 @@ describe("ProfileWorkScreen", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This change applies to every organization you belong to, not just this one.",
+      "Your email changes for every organization you belong to.",
     );
   });
 
@@ -615,7 +615,7 @@ describe("ProfileWorkScreen", () => {
       pressBack();
     });
     fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: "Keep Editing" }),
+      within(screen.getByRole("alert")).getByRole("button", { name: "Keep editing" }),
     );
 
     expect(navigatedActions).toHaveLength(0);

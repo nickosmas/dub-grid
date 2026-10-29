@@ -59,7 +59,7 @@ test.describe("profile states", () => {
   const SECTION_MARKERS: Record<string, string> = {
     profile: "First name",
     security: "Password",
-    notifications: "System Notifications",
+    notifications: "Product updates",
     "data-privacy": "Cookie preferences",
   };
 

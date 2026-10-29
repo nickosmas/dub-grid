@@ -20,7 +20,7 @@ export default function TimezoneSelect({
   value,
   onChange,
   disabled,
-  placeholder = "Select a time zone…",
+  placeholder = "Select a time zone",
   style,
 }: TimezoneSelectProps) {
   const options = useMemo(
@@ -109,7 +109,7 @@ export default function TimezoneSelect({
                 setOpen(false);
               }
             }}
-            placeholder="Search time zones…"
+            placeholder="Search time zones"
           />
           <div
             role="listbox"

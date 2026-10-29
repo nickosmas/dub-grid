@@ -488,7 +488,7 @@ export function StaffDetailPanel({
                           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                           <polyline points="22,6 12,13 2,6" />
                         </svg>
-                        Send Invitation
+                        Send invitation
                       </Button>
                     )}
                     {showManagementAccessAction && onManageManagementAccess && (
@@ -512,7 +512,7 @@ export function StaffDetailPanel({
                           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                         </svg>
                         {hasManagementAccess || hasPendingManagementInvite
-                          ? "Edit Management Access"
+                          ? "Edit management access"
                           : "Add to Management"}
                       </Button>
                     )}

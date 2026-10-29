@@ -176,7 +176,7 @@ export async function loginAsQaAccount(page: Page, email: string, origin: string
 
 /**
  * Signs the seeded QA gridmaster into the platform portal. The portal's form
- * ("Platform admin sign in", submit "Access Portal") differs from the org
+ * ("Platform admin sign in", submit "Open portal") differs from the org
  * login, and a gridmaster has no org membership, so the signed-in signal is
  * the portal's own navigation rather than the org shell's Dashboard link.
  */
@@ -191,7 +191,7 @@ export async function loginAsQaGridmaster(page: Page): Promise<void> {
 
   await loginRoot.getByLabel("Email").fill(QA_GRIDMASTER_EMAIL);
   await loginRoot.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
-  await loginRoot.getByRole("button", { name: "Access Portal" }).click();
+  await loginRoot.getByRole("button", { name: "Open portal" }).click();
 
   // Same one-time Terms interstitial as org accounts on a fresh seed.
   const termsHeading = page.getByRole("heading", { name: "Updated Terms of Service" });

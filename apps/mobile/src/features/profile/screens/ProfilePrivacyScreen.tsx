@@ -52,7 +52,7 @@ export default function ProfilePrivacyScreen() {
       setAnalytics(previous);
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not save preference",
+        title: "Couldn't save preference",
         fallbackMessage: "We couldn't save that preference. Try again in a moment.",
       });
     } finally {

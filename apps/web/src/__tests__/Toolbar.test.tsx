@@ -69,7 +69,7 @@ describe("Toolbar — schedule mode rendering", () => {
 
   it("renders date label showing the current period", () => {
     render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    // Date range label is shown as text (e.g. "1/7 – 1/13"), not a button
+    // Date range label is shown as text (e.g. "1/7 - 1/13"), not a button
     expect(screen.getByText(/\d{1,2}\/\d{1,2}/)).toBeInTheDocument();
   });
 
@@ -80,9 +80,9 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
   });
 
-  it("renders staff search input with placeholder Search staff…", () => {
+  it("renders staff search input with placeholder Search staff", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByPlaceholderText("Search staff…")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search staff")).toBeInTheDocument();
   });
 });
 
@@ -90,7 +90,7 @@ describe("Toolbar — Sort menu", () => {
   it("opens a dropdown with Seniority and Alphabetical options", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    await user.click(screen.getByRole("button", { name: "Sort staff" }));
     expect(screen.getByRole("menuitem", { name: /Seniority/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Alphabetical/i })).toBeInTheDocument();
   });
@@ -98,7 +98,7 @@ describe("Toolbar — Sort menu", () => {
   it("marks the active sort option with a checkmark", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} sortBy="name" />);
-    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    await user.click(screen.getByRole("button", { name: "Sort staff" }));
     const seniorityItem = screen.getByRole("menuitem", { name: /Seniority/i });
     const alphabeticalItem = screen.getByRole("menuitem", { name: /Alphabetical/i });
     expect(alphabeticalItem.querySelector(".lucide-check")).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("Toolbar — Sort menu", () => {
     const user = userEvent.setup();
     const onSortByChange = vi.fn();
     render(<Toolbar {...defaultProps} sortBy="seniority" onSortByChange={onSortByChange} />);
-    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    await user.click(screen.getByRole("button", { name: "Sort staff" }));
     await user.click(screen.getByRole("menuitem", { name: /Alphabetical/i }));
     expect(onSortByChange).toHaveBeenCalledExactlyOnceWith("name");
     expect(screen.queryByRole("menuitem", { name: /Alphabetical/i })).not.toBeInTheDocument();
@@ -319,8 +319,8 @@ describe("Toolbar — Tools dropdown", () => {
 describe("Toolbar — active state styles", () => {
   it("date label updates when spanWeeks changes", () => {
     const { rerender } = render(<Toolbar {...defaultProps} spanWeeks={1} />);
-    // 1 week: shows M/D – M/D
-    expect(screen.getByText(/\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}/)).toBeInTheDocument();
+    // 1 week: shows M/D - M/D
+    expect(screen.getByText(/\d{1,2}\/\d{1,2} - \d{1,2}\/\d{1,2}/)).toBeInTheDocument();
     rerender(<Toolbar {...defaultProps} spanWeeks="month" />);
     // Month: shows MonthName YYYY
     expect(screen.getByText(/[A-Z][a-z]+ \d{4}/)).toBeInTheDocument();
@@ -405,7 +405,7 @@ describe("Toolbar — staff search", () => {
   it("typing in search input calls onStaffSearchChange with typed value", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    const input = screen.getByPlaceholderText("Search staff…");
+    const input = screen.getByPlaceholderText("Search staff");
     await user.type(input, "B");
     // The input is controlled (value=staffSearch stays ""), so each keystroke fires
     // onChange with just that character. Verify the callback was invoked with "B".
@@ -418,7 +418,7 @@ import * as fc from "fast-check";
 
 describe("Toolbar — property tests", () => {
   // Feature: ui-ux-test-suite, Property 1: Week label format for numeric spans
-  it("week label always matches M/D – M/D for spans 1 and 2", () => {
+  it("week label always matches M/D - M/D for spans 1 and 2", () => {
     // Validates: Requirements 2.9, 2.10, 8.1
     const arbDate = fc
       .date({ min: new Date(2000, 0, 1), max: new Date(2030, 11, 31) })
@@ -429,7 +429,7 @@ describe("Toolbar — property tests", () => {
       fc.property(arbDate, arbNumericSpan, (date, span) => {
         const { unmount } = render(<Toolbar {...defaultProps} weekStart={date} spanWeeks={span} />);
         const label = screen.getByText(/\d{1,2}\/\d{1,2}/);
-        const result = /^\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}$/.test(label.textContent ?? "");
+        const result = /^\d{1,2}\/\d{1,2} - \d{1,2}\/\d{1,2}$/.test(label.textContent ?? "");
         unmount();
         return result;
       }),

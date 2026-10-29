@@ -40,7 +40,7 @@ export default function PendingApprovalsExpandedScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load pending approvals"
+          title="Couldn't load pending approvals"
           variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();

@@ -118,7 +118,9 @@ export function useGridmasterBillingActions(): GridmasterBillingActions {
       toast.success(SUCCESS_MESSAGES[input.action]);
       invalidateBilling();
     } catch (error) {
-      toast.error(formatClientErrorMessage(error, "Billing action failed"));
+      toast.error(
+        formatClientErrorMessage(error, "We couldn't complete that billing action. Try again."),
+      );
     } finally {
       setBusyOrgId(null);
       setBusyAction(null);

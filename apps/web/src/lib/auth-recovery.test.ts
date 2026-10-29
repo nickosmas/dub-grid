@@ -14,7 +14,7 @@ describe("getWebAuthRecoveryMessage", () => {
       "We couldn't reach DubGrid. Check your connection and try again.",
     );
     expect(getWebAuthRecoveryMessage({ status: 503 }, "fallback")).toBe(
-      "DubGrid is temporarily unavailable. Please try again.",
+      "We can't reach DubGrid right now. Try again in a moment.",
     );
   });
 

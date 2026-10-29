@@ -629,7 +629,7 @@ function getRequestTimeRange(
 
 function getOpenShiftShiftName(openShift: MobileOpenShift): string {
   const primarySegment = getOpenShiftPrimarySegment(openShift);
-  return primarySegment?.shiftName ?? openShift.presentation.label ?? "Open Shift";
+  return primarySegment?.shiftName ?? openShift.presentation.label ?? "Open shift";
 }
 
 function getOpenShiftJobChip(
@@ -819,7 +819,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not update request",
+        title: "Couldn't update request",
         fallbackMessage: "We couldn't update that shift request right now.",
       });
     },
@@ -1774,7 +1774,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           ) : null
         ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
           <ScrollableTabStrip
-            accessibilityLabel="Focus areas"
+            accessibilityLabel={bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas"}
             activeKey={activeTeamFocusAreaKey}
             onSelect={handleSelectFocusArea}
             tabs={teamFocusAreaTabs}
@@ -1793,7 +1793,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             actionLabel="Try again"
             body={contentState.message}
             fillScreen
-            title="Could not load schedule"
+            title="Couldn't load schedule"
             variant="centered"
             onAction={() => refetchScreenContent()}
           />
@@ -2582,7 +2582,7 @@ export function MeHeroCard({
           title={hasWeekItems ? "Nothing more this week" : "Nothing scheduled this week"}
           body={
             hasWeekItems
-              ? "Your remaining shifts this week are done."
+              ? "You've finished your shifts for this week."
               : "Your upcoming shifts will appear here once published."
           }
         />
@@ -2596,7 +2596,7 @@ export function MeHeroCard({
 
   const badgeLabel =
     status === "active"
-      ? "On Duty"
+      ? "On duty"
       : status === "away"
         ? "Away"
         : status === "upcoming"
@@ -3098,7 +3098,7 @@ function UpcomingShiftsSection({
                                 maxFontSizeMultiplier={MAX_FONT_SCALE}
                                 style={styles.upcomingShiftArea}
                               >
-                                {restOfDayAbsenceTimeLabel(entry) ?? "Rest of the day"}
+                                {restOfDayAbsenceTimeLabel(entry) ?? "Part of the day"}
                               </Text>
                             </View>
                           </PressableRow>
@@ -3185,7 +3185,7 @@ function OpenShiftsSection({
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load shift requests",
+        title: "Couldn't load shift requests",
         fallbackMessage: "We couldn't load shift requests right now.",
         // This section and the cover-requests section below render together in
         // personal scope and read the same query, so one failure used to raise
@@ -3590,7 +3590,7 @@ function ShiftCoverRequestsSection({
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsError,
-        title: "Could not load shift requests",
+        title: "Couldn't load shift requests",
         fallbackMessage: "We couldn't load shift requests right now.",
         dedupeKey: SCHEDULE_REQUESTS_ERROR_TOAST_KEY,
       });
@@ -3650,7 +3650,7 @@ function ShiftCoverRequestsSection({
                   </View>
                   <View style={styles.requestHeaderTextStack}>
                     <Text style={styles.requestHeaderText}>{request.requesterName}</Text>
-                    <Text style={styles.requestHeaderSubtext}>Needs shift coverage</Text>
+                    <Text style={styles.requestHeaderSubtext}>Asked you to cover a shift</Text>
                   </View>
                 </View>
                 <Text style={styles.requestDateText}>{getRequestDateLabel(request)}</Text>

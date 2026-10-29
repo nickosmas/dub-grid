@@ -73,7 +73,7 @@ export function useUnsavedChangesGuard({
   title = "Discard unsaved changes?",
   body = "Your edits won't be saved.",
   confirmLabel = "Discard",
-  cancelLabel = "Keep Editing",
+  cancelLabel = "Keep editing",
 }: {
   isDirty: boolean;
   /** A write is in flight. Nothing may interrupt it. */
@@ -94,7 +94,7 @@ export function useUnsavedChangesGuard({
   /** Default: "Discard". */
   confirmLabel?: string;
   /**
-   * Default: "Keep Editing". Deliberately not "Cancel" — on a sheet whose own
+   * Default: "Keep editing". Deliberately not "Cancel" — on a sheet whose own
    * dismiss button is Cancel, a confirmation offering Cancel asks the user to
    * cancel their cancel. Override it where "editing" isn't what they were
    * doing, as in a two-factor setup.

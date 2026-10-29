@@ -33,6 +33,7 @@ import {
   createShiftJobCompatibilityMaps,
 } from "@/lib/shift-job-segments";
 import type { RecurringShift, ShiftMap } from "@/types";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export interface SelfProfileSnapshot {
   firstName: string | null;
@@ -480,7 +481,7 @@ export async function updateSelfLinkedEmployeePhone(input: {
   }
   if (!data) {
     const latestEmployee = await fetchLinkedEmployeeByUserId(input.userId, input.orgId);
-    throw Object.assign(new Error("Your staff profile changed elsewhere. Refresh and try again."), {
+    throw Object.assign(new Error(changedElsewhereMessage("your profile")), {
       code: "EMPLOYEE_CONFLICT" as const,
       employee: latestEmployee ?? employee,
     });

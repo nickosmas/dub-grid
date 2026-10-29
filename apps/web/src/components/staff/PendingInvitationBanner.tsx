@@ -79,7 +79,7 @@ export function PendingInvitationBanner({
                   isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
                 }
               >
-                Reinvite
+                Resend
               </Button>
             )}
             <Button

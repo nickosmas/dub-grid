@@ -324,14 +324,14 @@ export function buildHeroSummary(input: {
     return {
       statusLabel: "Attention",
       title: `${input.urgentGapCount} urgent coverage ${input.urgentGapCount === 1 ? "gap" : "gaps"}`,
-      description: "Resolve staffing gaps to keep your schedule fully covered.",
+      description: "Fill them before the next shift starts.",
     };
   }
   if (input.pendingApprovalsCount > 0) {
     return {
       statusLabel: "Approval",
       title: `${input.pendingApprovalsCount} ${input.pendingApprovalsCount === 1 ? "request" : "requests"} awaiting approval`,
-      description: "Review pending requests to keep your schedule up to date.",
+      description: "Approve or reject them in Requests.",
     };
   }
   if (input.coverageWindow === "unpublished") {
@@ -339,21 +339,21 @@ export function buildHeroSummary(input: {
       statusLabel: "Pending publish",
       title: "This period has not been published yet",
       description: input.hasCoverageRequirements
-        ? "Coverage and open-gap metrics will appear after the first publish."
-        : "Publish this period so the schedule is visible to your team.",
+        ? "Coverage and open shifts show here once it's published."
+        : "Staff see the schedule once it's published.",
     };
   }
   if (!input.hasCoverageRequirements) {
     return {
       statusLabel: "Setup",
-      title: "Coverage requirements not configured",
-      description: "Set staffing requirements so coverage tracking can surface here.",
+      title: "Set staffing needs",
+      description: "Coverage shows here once you set how many people each shift needs.",
     };
   }
   return {
     statusLabel: "Healthy",
-    title: "Schedule health looks good",
-    description: "No open gaps or pending requests right now.",
+    title: "Nothing needs attention",
+    description: "No urgent gaps or requests waiting.",
   };
 }
 

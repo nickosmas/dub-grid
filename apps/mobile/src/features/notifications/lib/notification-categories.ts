@@ -21,7 +21,8 @@ export const NOTIFICATION_CATEGORIES = [
     key: "shift_requests",
     icon: "swap-horizontal-outline",
     title: "Shift requests",
-    detail: "Your pickup, swap, or time-off request is answered, or a new one needs your approval.",
+    detail:
+      "Your pickup, swap, or call-off request is answered, or someone else's needs your approval.",
   },
   {
     key: "system",

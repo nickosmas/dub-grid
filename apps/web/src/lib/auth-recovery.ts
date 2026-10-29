@@ -22,7 +22,7 @@ export function getWebAuthRecoveryMessage(error: unknown, fallback: string): str
     return "We couldn't reach DubGrid. Check your connection and try again.";
   }
   if (isRetryableAuthRecoveryError(error)) {
-    return "DubGrid is temporarily unavailable. Please try again.";
+    return "We can't reach DubGrid right now. Try again in a moment.";
   }
   return fallback;
 }

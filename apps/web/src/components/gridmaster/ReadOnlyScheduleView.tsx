@@ -186,7 +186,7 @@ export default function ReadOnlyScheduleView({
             fontSize: "var(--dg-fs-label)",
           }}
         >
-          Loading schedule…
+          Loading schedule
         </div>
       ) : shifts.length === 0 ? (
         <EmptyState title="No shifts found" description="No schedule data for this date range." />
@@ -254,7 +254,7 @@ export default function ReadOnlyScheduleView({
                         ) : r.absenceLabel ? (
                           <AbsenceChip label={r.absenceLabel} />
                         ) : (
-                          <span style={{ color: "var(--dg-color-text-faint)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-faint)" }}>-</span>
                         )}
                       </td>
                       <td
@@ -267,7 +267,7 @@ export default function ReadOnlyScheduleView({
                         {r.focusAreaName ??
                           r.assignmentDetails.find((assignment) => assignment.focusAreaName)
                             ?.focusAreaName ??
-                          "—"}
+                          "-"}
                       </td>
                       <td style={gmTdStyle}>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

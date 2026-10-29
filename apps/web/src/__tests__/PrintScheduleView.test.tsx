@@ -177,7 +177,7 @@ describe("PrintScheduleView", () => {
 
   it("keys shift codes but prints no shift key for full shift names", () => {
     const { container, unmount } = renderPrintView();
-    expect(container.textContent).toContain("Shift Key");
+    expect(container.textContent).toContain("Shift key");
     unmount();
 
     const named = render(
@@ -203,7 +203,7 @@ describe("PrintScheduleView", () => {
         indicatorTypes={indicatorTypes}
       />,
     );
-    expect(named.container.textContent).not.toContain("Shift Key");
+    expect(named.container.textContent).not.toContain("Shift key");
     expect(named.container.querySelector("[data-print-indicator-legend]")).not.toBeNull();
   });
 
@@ -376,7 +376,7 @@ describe("PrintScheduleView", () => {
       const { container } = renderMixed({
         first: true,
         joinsShift: true,
-        shortTime: "3–7",
+        shortTime: "3 - 7",
         time: "3:00 AM - 7:00 AM",
       });
       const [mixed] = Array.from(container.querySelectorAll("td")).filter(
@@ -384,7 +384,7 @@ describe("PrintScheduleView", () => {
       );
 
       const pills = cellPills(mixed);
-      expect(pills[0].textContent).toBe("S3–7");
+      expect(pills[0].textContent).toBe("S3 - 7");
       expect(pills[1].textContent).toContain("D");
       expect(pills[0].style.borderRightStyle).toBe("none");
     });

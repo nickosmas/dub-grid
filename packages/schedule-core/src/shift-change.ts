@@ -253,7 +253,7 @@ function describeAbsence(
       minutes: null,
     };
   }
-  const scopeText = item.scope === "restOfDay" ? "(rest of day)" : "(all day)";
+  const scopeText = item.scope === "restOfDay" ? "(part of day)" : "(all day)";
   const title = markSeparators(
     [
       part(withArchived(item.name, item.archived), marks.all || marks.absence),

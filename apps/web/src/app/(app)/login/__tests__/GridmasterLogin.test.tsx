@@ -66,7 +66,7 @@ function submit() {
   fireEvent.change(screen.getByLabelText("Password"), {
     target: { value: "password123" },
   });
-  fireEvent.submit(screen.getByRole("button", { name: "Access Portal" }));
+  fireEvent.submit(screen.getByRole("button", { name: "Open portal" }));
 }
 
 describe("GridmasterLogin recovery", () => {
@@ -85,7 +85,7 @@ describe("GridmasterLogin recovery", () => {
       }),
     );
     render(<GridmasterLogin />);
-    const button = screen.getByRole("button", { name: "Access Portal" });
+    const button = screen.getByRole("button", { name: "Open portal" });
     submit();
 
     expect(button).toBeDisabled();
@@ -115,7 +115,7 @@ describe("GridmasterLogin recovery", () => {
     });
     expect(screen.getByLabelText("Email")).toHaveValue("admin@dubgrid.test");
     expect(screen.getByLabelText("Password")).toHaveValue("password123");
-    expect(screen.getByRole("button", { name: "Access Portal" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Open portal" })).toBeEnabled();
   });
 
   it("keeps terminal credential handling specific and prevents duplicate submission", async () => {

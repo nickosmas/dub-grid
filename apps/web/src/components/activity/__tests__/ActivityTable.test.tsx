@@ -46,7 +46,7 @@ describe("ActivityTable", () => {
     renderTable([entry({ id: "a" })]);
 
     const table = screen.getByRole("table");
-    for (const name of ["Time", "Activity type", "Performed by", "Target changed"]) {
+    for (const name of ["Time", "Kind of change", "By", "Affected"]) {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
     expect(within(table).queryByRole("columnheader", { name: "Organization" })).toBeNull();
@@ -59,7 +59,7 @@ describe("ActivityTable", () => {
   it("drops the target column for a person's own page", () => {
     renderTable([entry({ id: "a" })], { showTarget: false });
 
-    expect(screen.queryByRole("columnheader", { name: "Target changed" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Affected" })).toBeNull();
   });
 
   it("adds an organization column for the platform-wide log", () => {
@@ -107,7 +107,7 @@ describe("ActivityTable", () => {
   it("repeats the actor under the description for narrow screens", () => {
     renderTable([entry({ id: "a" })]);
 
-    expect(screen.getByText(/Performed by Alex Admin/)).toHaveClass("md:hidden");
+    expect(screen.getByText(/By Alex Admin/)).toHaveClass("md:hidden");
   });
 });
 

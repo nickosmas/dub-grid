@@ -135,7 +135,7 @@ export function OverviewTab({
       >
         <MetricCard
           label="This Week"
-          value={thisWeekHours ? `${thisWeekHours.totalHours}h` : "—"}
+          value={thisWeekHours ? `${thisWeekHours.totalHours}h` : "-"}
           detail={
             thisWeekHours?.isOvertime
               ? `+${thisWeekHours.overtimeHours}h overtime`
@@ -172,9 +172,6 @@ export function OverviewTab({
                 <div className="dg-card-title flex items-center gap-2">
                   <User className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
                   Details
-                </div>
-                <div className="dg-card-subtitle">
-                  {`Employment, ${focusAreaLabel.toLowerCase()}, certification, roles, and internal notes.`}
                 </div>
               </div>
             </div>

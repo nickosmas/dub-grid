@@ -37,7 +37,7 @@ export const BILLING_STATUSES = [
 ] as const;
 
 export function formatBillingDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString() : "—";
+  return value ? new Date(value).toLocaleDateString() : "-";
 }
 
 export function billingStatusTone(status: string | null) {
@@ -134,7 +134,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
             fontSize: "var(--dg-fs-label)",
           }}
         >
-          Loading billing…
+          Loading billing
         </div>
       </div>
     );
@@ -269,9 +269,9 @@ export function BillingTab({ organization }: { organization: Organization }) {
           gap: 12,
         }}
       >
-        <BillingMetric label="Stripe seats" value={billingOrg.seats ?? "—"} />
+        <BillingMetric label="Stripe seats" value={billingOrg.seats ?? "-"} />
         <BillingMetric label="App users" value={billingOrg.appUsers} />
-        <BillingMetric label="Seat delta" value={billingOrg.seatDelta ?? "—"} tone={deltaTone} />
+        <BillingMetric label="Seat delta" value={billingOrg.seatDelta ?? "-"} tone={deltaTone} />
         <BillingMetric label="Employees" value={billingOrg.employeeCount} />
       </div>
 
@@ -325,7 +325,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   ? new Date(billingOrg.trialStartedAt).toLocaleDateString()
                   : billingOrg.status === "trialing" || !billingOrg.status
                     ? "Not started"
-                    : "—"
+                    : "-"
               }
             />
             <InfoRow
@@ -335,7 +335,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   ? new Date(billingOrg.trialEndsAt).toLocaleDateString()
                   : billingOrg.status === "trialing" || !billingOrg.status
                     ? "Not started"
-                    : "—"
+                    : "-"
               }
             />
             <InfoRow label="Period end" value={formatBillingDate(billingOrg.currentPeriodEnd)} />
@@ -386,7 +386,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 )
               }
             />
-            <InfoRow label="Org slug" value={billingOrg.orgSlug ?? "—"} />
+            <InfoRow label="Org slug" value={billingOrg.orgSlug ?? "-"} />
           </div>
         </div>
       </div>
@@ -463,7 +463,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 loading={running("end_trial", "expire_trial")}
                 onClick={() => actions.endTrial(billingOrg)}
               >
-                End trial…
+                End trial
               </Button>
             </div>
             {trialNotes.map((note) => (
@@ -493,7 +493,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                   loading={running("pause_billing")}
                   onClick={() => actions.pauseBilling(billingOrg)}
                 >
-                  Pause billing…
+                  Pause billing
                 </Button>
               )}
               <Button
@@ -503,7 +503,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                 loading={running("extend_grace")}
                 onClick={() => actions.extendGrace(billingOrg)}
               >
-                Extend grace…
+                Extend grace
               </Button>
             </div>
             {holdNotes.map((note) => (

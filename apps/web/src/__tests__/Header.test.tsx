@@ -398,7 +398,7 @@ describe("Header sign out in sandbox mode", () => {
 
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: /sign out/i })).toBeInTheDocument();
-    expect(screen.queryByText(/exit sandbox to sign out/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sign out and discard your sandbox/i)).not.toBeInTheDocument();
   });
 
   it("signs out directly when not in sandbox, on confirm", async () => {
@@ -438,7 +438,7 @@ describe("Header sign out in sandbox mode", () => {
 
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(vi.mocked(exitSandbox)).not.toHaveBeenCalled();
-    expect(screen.getByText(/exit sandbox to sign out/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign out and discard your sandbox/i)).toBeInTheDocument();
   });
 
   it("destroys the sandbox, then signs out, on confirm", async () => {
@@ -446,7 +446,7 @@ describe("Header sign out in sandbox mode", () => {
     renderHeader(<Header />, { inSandbox: true });
 
     const user = await openSignOut();
-    await user.click(screen.getByRole("button", { name: /exit & sign out/i }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
     // Sandbox is destroyed before the session is torn down.

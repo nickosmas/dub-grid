@@ -522,7 +522,7 @@ export default function ShiftPicker({
           <div style={{ marginBottom: 20 }}>
             {renderGroupHeading(
               "Absences",
-              absenceScope === "restOfDay" ? "Rest of the day · no hours" : "Whole day · no hours",
+              absenceScope === "restOfDay" ? "Part of the day · no hours" : "Whole day · no hours",
             )}
             <div role="group" aria-label="Absence options" style={tileGrid}>
               {absenceTypes.map((at) => {
