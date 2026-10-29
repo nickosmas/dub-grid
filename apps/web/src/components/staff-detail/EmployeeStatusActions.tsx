@@ -853,7 +853,7 @@ export function EmployeeStatusActions({
           copy?.title ??
           (focus === "plan"
             ? isAway
-              ? `Change ${displayName}'s return date?`
+              ? `Change ${displayName}'s time away?`
               : isSuspended
                 ? `Change when ${displayName}'s suspension ends?`
                 : returnDay

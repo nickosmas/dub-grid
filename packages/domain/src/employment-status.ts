@@ -384,12 +384,12 @@ export interface StatusActionOptions {
   /** `name` is a count such as "3 people". */
   group?: boolean;
   /**
-   * Mark away or Set return date: the first day back chosen (YYYY-MM-DD), if
+   * Mark away or Edit time away: the first day back chosen (YYYY-MM-DD), if
    * any. Suspend, Set end date or a planned suspension: the first day they
    * have access again (51g3).
    */
   returnDate?: string | null;
-  /** Set return date or Set end date: the person's current one, if any. */
+  /** Edit time away or Set end date: the person's current one, if any. */
   currentReturnDate?: string | null;
   /** With a return date: the absence their away days hold (51f), by name. */
   absenceName?: string | null;
@@ -438,10 +438,8 @@ function describeSetReturnDate(
   absenceName: string | null,
 ): StatusActionCopy {
   const changing = currentReturnDate !== null;
-  const base = {
-    label: changing ? "Change return date" : "Set return date",
-    title: changing ? `Change ${name}'s return date?` : `Set a return date for ${name}?`,
-  };
+  // The dialog edits the absence as well as the date, so it's named for the whole time away.
+  const base = { label: "Edit time away", title: `Change ${name}'s time away?` };
   if (!returnDate) {
     return {
       ...base,
@@ -465,7 +463,7 @@ function describeSetReturnDate(
         message: `They're back to Active on ${day}.`,
         points: returnDatePoints(returnDate, absenceName),
         unchanged: [],
-        done: "Return date changed",
+        done: "Time away updated",
       }
     : {
         ...base,
