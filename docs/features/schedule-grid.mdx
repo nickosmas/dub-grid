@@ -44,6 +44,7 @@ You need permission to edit shifts. Every change you make is a draft until it's 
 - **Last day**: someone with a [last day](/staff/roster#a-last-day) works as usual up to and on it. The days after it show as one **Offboarded** bar per week and can't be scheduled; hovering a day names the last day.
 - **First day**: someone with a [first day](/staff/roster#a-first-day) still ahead shows one **Starts** bar per week, such as **Starts Nov 10**, on the days before it. Those days can't be scheduled, and hovering one names the first day.
 - **Suspended**: someone [suspended](/staff/roster#active-away-suspended-and-offboarded) keeps their row and can still be scheduled. A lock beside their name says they won't see it in the app, and **Assign open shift** says the same under their name.
+- **What staff see**: someone who can't edit the schedule sees a plain **Away** bar only for a coworker who is away now. Planned time away, a last day, a first day still ahead and a suspension don't show to them, and hovering a coworker's day says nothing. Only their own shifts open when selected, and an empty cell offers nothing to add.
 - **Past days**: days before today have a light shade, and nothing moves into or out of them: they can't be dragged, pasted into, cleared from the right-click menu, selected for **Bulk Delete Entries**, or filled from recurring schedules or by **Auto-build**. Select a past cell to **Correct this day** if you can both edit shifts and publish: change the shift or absence, type a reason if you like, check **Before** and **After**, and select **Save correction**. The published day changes right away, without a draft, and staff aren't sent an alert. A corrected day carries a small pencil mark, and hovering it shows the reason. An Admin can correct the last 14 days; an earlier day needs a Super Admin. Anyone else sees a past day as it is.
 - **Right-click a cell** for **Copy**, **Paste**, and **Clear day**. Pasting over an existing entry asks before replacing it. <kbd>Cmd</kbd> or <kbd>Ctrl</kbd> with <kbd>C</kbd> and <kbd>V</kbd> copy and paste too.
 - **Drag and drop**: drag a shift to another cell to move it, or hold <kbd>Shift</kbd> while dragging to copy it. The shift you drop replaces what was there. DubGrid checks that the person can work that shift first.
@@ -62,7 +63,7 @@ See [Coverage and Open Shifts](/features/coverage-and-open-shifts) for the diffe
 
 ## More tools
 
-The **Tools** menu holds the rest, depending on what you're allowed to do:
+The **Tools** menu holds the rest, depending on what you're allowed to do. If you can't edit shifts, the toolbar shows **Requests** and **Print** in its place.
 
 - **Requests**: the shift request board.
 - **Print**: choose the view, font size, and focus areas, then **Preview & Print**. With full shift names, the printout covers one week and needs no shift legend. The printout includes a legend for your shift codes and schedule notes. Printing may not be available in every organization.
