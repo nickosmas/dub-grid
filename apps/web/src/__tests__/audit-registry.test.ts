@@ -250,6 +250,24 @@ describe("audit copy never leaks implementation detail", () => {
     }
   });
 
+  it("says why a past day was corrected, beside what changed", () => {
+    expect(describeAction({ action: "shift.corrected", details: {} })).toMatch(
+      /^Corrected a past day/,
+    );
+    const rows = formatDetails({
+      action: "shift.corrected",
+      details: { reason: "Sent home sick at 10" },
+      shiftChange: {
+        kind: "changed",
+        date: "2026-10-26",
+        before: { items: [{ plain: "Day Shift" }] },
+        after: { items: [{ plain: "Sick (all day)" }] },
+      } as unknown as Parameters<typeof formatDetails>[0]["shiftChange"],
+    });
+    expect(rows.slice(1)).toEqual([{ label: "Reason", value: "Sent home sick at 10" }]);
+    expect(rows[0].label).toBe("Change");
+  });
+
   it("drops rather than stringifies a value it cannot name", () => {
     const rows = formatDetails({
       // No spec, so this exercises the generic flattener.

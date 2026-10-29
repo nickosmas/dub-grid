@@ -662,6 +662,51 @@ export function upsertShift(
   });
 }
 
+/** A day's latest correction (53c), as the grid marks it. */
+export interface CellCorrection {
+  empId: string;
+  date: string;
+  reason: string | null;
+  correctedAt: string;
+}
+
+/** The latest correction of each corrected day in a date range, for editors. */
+export async function fetchCorrections(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+): Promise<CellCorrection[]> {
+  const payload = await requestScheduleManage<{ corrections?: CellCorrection[] }>({
+    action: "fetchCorrections",
+    orgId,
+    startDate,
+    endDate,
+  });
+  return payload.corrections ?? [];
+}
+
+/** Corrects one person's published past day (53a), with an optional typed reason; no draft, no alert. */
+export function correctShift(
+  employeeId: string,
+  date: string,
+  input: ScheduleCellInput,
+  orgId: string,
+  reason: string,
+  expectedVersion?: number,
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
+    action: "correctShift",
+    orgId,
+    employeeId,
+    date,
+    input,
+    expectedVersion,
+    reason: reason || undefined,
+    echo: serializeEcho(echo),
+  });
+}
+
 export type ImportPreviousScheduleOutcomeKind = "imported" | "skipped";
 
 export type ImportPreviousScheduleOutcome = {

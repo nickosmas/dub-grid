@@ -207,11 +207,12 @@ describe("AddPersonSheet", () => {
     fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
     fireEvent.click(screen.getByText("Skilled Nursing"));
     fireEvent.click(screen.getByRole("button", { name: "First day, none" }));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: `Choose ${formatReturnDate(tomorrow, { weekday: true })}`,
-      }),
-    );
+    const tomorrowButton = `Choose ${formatReturnDate(tomorrow, { weekday: true })}`;
+    // On a month's last day, tomorrow is on the next month's page.
+    if (!screen.queryByRole("button", { name: tomorrowButton })) {
+      fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: tomorrowButton }));
     expect(screen.getByText("They can't be scheduled before this day.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add person" }));
 

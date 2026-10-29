@@ -314,6 +314,9 @@
   --dg-color-brand-mark-on-brand-side: #9dbbf7;
   --dg-color-brand-mark-on-brand-center: #ffffff;
   --dg-color-brand-bg: #eff6ff;
+  /* Past days in the schedule grid (53b): a light wash, never heavier, so
+     shifts keep their colors. */
+  --dg-color-past-wash: color-mix(in srgb, var(--dg-color-text-primary) 3%, transparent);
   --dg-color-brand-border: #bfdbfe;
   --dg-color-nav-active-bg: #e5e5e5;
   --dg-color-primary: #2563eb;
@@ -480,6 +483,7 @@
   --dg-color-brand-mark-side: #1e40af;
   --dg-color-brand-mark-center: #3b82f6;
   --dg-color-brand-bg: #152238;
+  --dg-color-past-wash: color-mix(in srgb, var(--dg-color-text-primary) 4%, transparent);
   --dg-color-brand-border: #1e3a5f;
   --dg-color-nav-active-bg: #26262b;
   --dg-color-primary: #2075ff;

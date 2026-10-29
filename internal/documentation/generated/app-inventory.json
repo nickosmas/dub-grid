@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:28486ea21282b9709d617bb8e154c2bd1b0c28d459921fb60d6ffbce743cc381",
+  "sourceDigest": "sha256:0ab1941ee6bec527e6a96c12c979d3bf03ad38ea9635b50c08de38ed502626c6",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4894,6 +4894,36 @@
       "source": {
         "path": "supabase/migrations/109_planned_restore.sql"
       }
+    },
+    {
+      "id": "migration:110_past_day_corrections.sql",
+      "version": "110",
+      "name": "past_day_corrections",
+      "file": "110_past_day_corrections.sql",
+      "sha256": "777b8874f1bd4d7ac0c45895032ffb48ae3f8fa025eee22a238722186bbda0fb",
+      "source": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
+      }
+    },
+    {
+      "id": "migration:111_past_days_not_drafted.sql",
+      "version": "111",
+      "name": "past_days_not_drafted",
+      "file": "111_past_days_not_drafted.sql",
+      "sha256": "c8981c41c244dc14d2dc271b92e413034102b503423804542513d97c1ff180e8",
+      "source": {
+        "path": "supabase/migrations/111_past_days_not_drafted.sql"
+      }
+    },
+    {
+      "id": "migration:112_correction_reason_typed.sql",
+      "version": "112",
+      "name": "correction_reason_typed",
+      "file": "112_correction_reason_typed.sql",
+      "sha256": "2ccb8538c40090be5aacdb639dd58fecb85af760d23afbd08de068f2eae4be4d",
+      "source": {
+        "path": "supabase/migrations/112_correction_reason_typed.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -5279,6 +5309,18 @@
       },
       "enabledIn": {
         "path": "supabase/migrations/003_rls_policies.sql"
+      }
+    },
+    {
+      "id": "rls:public.schedule_cell_corrections",
+      "schema": "public",
+      "table": "schedule_cell_corrections",
+      "enabled": true,
+      "createdIn": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
+      },
+      "enabledIn": {
+        "path": "supabase/migrations/110_past_day_corrections.sql"
       }
     },
     {

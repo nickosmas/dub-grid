@@ -119,8 +119,10 @@ import {
   type CoverageSkippedRecurring,
   type CoverageTopUpRule,
   suggestCoverageFixes,
+  addDaysToIsoDate,
   getIsoDateInTimeZone,
   hasShiftStartedAtTimeRanges,
+  isPastDateKey,
   parseLocalDateKey,
   type CoverageCategorySnapshot,
   type CoverageDaySide,
@@ -130,7 +132,6 @@ import {
   type CoverageMatrixRow,
   type CoverageSuggestion,
 } from "@dubgrid/schedule-core";
-import { isSchedulableOn } from "@dubgrid/domain";
 import {
   availabilityFromShifts,
   availabilityWithPlanned,
@@ -149,6 +150,8 @@ import {
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
+import { buildSchedulableOn } from "./_lib/schedulable-on";
+import { CORRECTION_ADMIN_WINDOW_DAYS } from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -217,8 +220,11 @@ import {
   updateScheduleLastViewed,
   updateSeriesAllShifts,
   upsertScheduleNote,
+  correctShift,
+  fetchCorrections,
   upsertShift,
   upsertShiftTimes,
+  type CellCorrection,
   type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
@@ -559,14 +565,6 @@ function SchedulerContent({
     () => buildEmployeeNameById(employeeDirectory),
     [employeeDirectory],
   );
-  // Recurring fills follow the database: someone Away until a date only from that date.
-  const schedulableOn = useMemo(() => {
-    const byId = new Map(employeeDirectory.map((employee) => [employee.id, employee]));
-    return (employeeId: string, dateKey: string) => {
-      const employee = byId.get(employeeId);
-      return !!employee && isSchedulableOn(employee, dateKey);
-    };
-  }, [employeeDirectory]);
   const [presenceProfiles, setPresenceProfiles] = useState<Map<string, PresenceProfile>>(
     () => new Map(),
   );
@@ -594,6 +592,13 @@ function SchedulerContent({
   // ahead of or behind the facility's local day).
   const orgTimeZone = org?.timezone ?? null;
   const todayKey = useMemo(() => getIsoDateInTimeZone(today, orgTimeZone), [today, orgTimeZone]);
+  // Planning callbacks read today when they run, not when they were made.
+  const todayKeyRef = useRef(todayKey);
+  todayKeyRef.current = todayKey;
+  const schedulableOn = useMemo(
+    () => buildSchedulableOn(employeeDirectory, todayKey),
+    [employeeDirectory, todayKey],
+  );
 
   // A local-midnight Date standing in for "today" that's already resolved to
   // the org's calendar day, safe to feed into the local-getter week/month/
@@ -653,6 +658,23 @@ function SchedulerContent({
     setLoadedShiftWindow(next);
   }, []);
 
+  useEffect(() => {
+    const orgId = org?.id;
+    if (!orgId || !canEditShifts) return;
+    let cancelled = false;
+    fetchCorrections(orgId, shiftFetchStart, shiftFetchEnd)
+      .then((rows) => {
+        if (!cancelled) {
+          setCorrections(new Map(rows.map((row) => [`${row.empId}_${row.date}`, row])));
+        }
+      })
+      // The mark is a hint; a failed read leaves the grid as it is.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
+
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(initialDate ? parseLocalDateKey(initialDate) : todayAnchor),
   );
@@ -667,6 +689,10 @@ function SchedulerContent({
   const pendingShiftWrites = useRef<Map<string, Promise<void>>>(new Map());
   const localWrites = useRef(createLocalWriteLedger());
   const [notes, setNotes] = useState<ScheduleNoteMap>({});
+  // Each corrected past day's latest correction (53c), for the grid's mark.
+  const [corrections, setCorrections] = useState<ReadonlyMap<string, CellCorrection>>(
+    () => new Map(),
+  );
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
@@ -5456,6 +5482,107 @@ function SchedulerContent({
     () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
     [focusAreas],
   );
+  // A past day opens for a correction (53b) when this person may correct it.
+  const editPanelDateKey = editPanel ? formatDateKey(editPanel.date) : null;
+  const editPanelIsPast = editPanelDateKey != null && isPastDateKey(editPanelDateKey, todayKey);
+  const correctionWindowStart = addDaysToIsoDate(todayKey, -CORRECTION_ADMIN_WINDOW_DAYS);
+  const canCorrectPanelDay =
+    editPanelIsPast &&
+    canEditShifts &&
+    canPublishSchedule &&
+    (isSuperAdmin || isGridmaster || (editPanelDateKey ?? "") >= correctionWindowStart);
+  const pastDayNotice =
+    editPanelIsPast && canEditShifts && !canCorrectPanelDay
+      ? canPublishSchedule
+        ? "Only a Super Admin can correct a day more than 14 days ago."
+        : "Correcting a past day needs Publish schedule."
+      : null;
+  const [isSavingCorrection, setIsSavingCorrection] = useState(false);
+
+  const handleSaveCorrection = useCallback(
+    async (reason: string) => {
+      const orgId = org?.id;
+      const session = editSessionDraftRef.current;
+      const panel = editPanel;
+      if (!orgId || !session || !panel || !session.isDirty) return;
+      if (session.isStale) {
+        toast.error("This cell changed while you were editing. Close and reopen it.");
+        return;
+      }
+      const draft = session.draftShift;
+      const input: ScheduleCellInput =
+        draft && !draft.isDelete && (draft.assignmentIds.length > 0 || draft.absenceTypeId != null)
+          ? buildEntryPayload(draft)
+          : {
+              kind: "deleted",
+              segments: [],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            };
+      setIsSavingCorrection(true);
+      try {
+        const echoedCells = await correctShift(
+          panel.empId,
+          formatDateKey(panel.date),
+          input,
+          orgId,
+          reason,
+          shiftsRef.current[session.cellKey]?.version ?? 0,
+          {
+            isScheduler: canEditShiftsRef.current,
+            assignmentLabelMap: assignmentLabelMapRef.current,
+            absenceTypeMap: absenceTypeMapRef.current,
+          },
+        );
+        if (echoedCells) {
+          const nextShifts: ShiftMap = { ...shiftsRef.current };
+          for (const [key, entry] of Object.entries(echoedCells)) {
+            if (entry) nextShifts[key] = entry;
+            else delete nextShifts[key];
+          }
+          markLocalWrite(localWrites.current, [session.cellKey, ...Object.keys(echoedCells)]);
+          setShifts(nextShifts);
+          shiftsRef.current = nextShifts;
+          writeScheduleWindow(queryClient, orgId, {
+            window: { start: shiftFetchStart, end: shiftFetchEnd },
+            shifts: nextShifts,
+            notes: notesRef.current,
+            canEditShifts: canEditShiftsRef.current,
+          });
+        } else {
+          await refetchScheduleDataRef.current();
+        }
+        const correctedDateKey = formatDateKey(panel.date);
+        setCorrections((current) =>
+          new Map(current).set(`${panel.empId}_${correctedDateKey}`, {
+            empId: panel.empId,
+            date: correctedDateKey,
+            reason: reason || null,
+            correctedAt: new Date().toISOString(),
+          }),
+        );
+        closeEditPanel();
+        toast.success("Day corrected.");
+      } catch (error) {
+        toast.error(formatClientErrorMessage(error, "The day wasn't corrected. Try again."));
+      } finally {
+        setIsSavingCorrection(false);
+      }
+    },
+    [
+      buildEntryPayload,
+      closeEditPanel,
+      editPanel,
+      org?.id,
+      queryClient,
+      shiftFetchEnd,
+      shiftFetchStart,
+    ],
+  );
+
   const handleGridCellActivate = useCallback<ScheduleGridHandlers["onActivateCell"]>(
     ({ emp, date, cellId }) => {
       handleCellClick(emp, date, focusAreaNameMap.get(cellId.sectionId));
@@ -5799,6 +5926,8 @@ function SchedulerContent({
 
   const handleClearShift = useCallback(
     (empId: string, date: Date) => {
+      // A keyboard clear lands on the hovered cell, which may be a past day.
+      if (isPastDateKey(formatDateKey(date), todayKeyRef.current)) return;
       if (!guardActiveSession()) return;
       const emp = scheduleEmployees.find((e) => e.id === empId);
       const empName = emp ? getEmployeeDisplayName(emp) : "";
@@ -7293,7 +7422,7 @@ function SchedulerContent({
       // Then everyone who works in the period gets the day off absence on each empty day.
       const recurringKey = recurringKeyOf(recurring);
       if (!dayOff) return { preview, fixedWrites, recurringKey };
-      const todayKey = formatDateKey(new Date());
+      const todayKey = todayKeyRef.current;
       const { writes: daysOff, blanks } = planDaysOff({
         shifts: shiftsRef.current,
         planned: plannedDays,
@@ -7360,7 +7489,7 @@ function SchedulerContent({
     (rowKeys: string[]) => {
       const plannedFrom = coverageCountsKey;
       const shifts = shiftsRef.current;
-      const todayKey = formatDateKey(new Date());
+      const todayKey = todayKeyRef.current;
       previewPlanRef.current = null;
       setBuildReport(null);
       setBuildPreview({ state: { status: "previewing", progress: null }, rowKeys, plannedFrom });
@@ -7409,7 +7538,7 @@ function SchedulerContent({
       planned.built.preview === shown &&
       planned.planBuild === planBuild &&
       planned.shifts === shiftsRef.current &&
-      planned.todayKey === formatDateKey(new Date())
+      planned.todayKey === todayKeyRef.current
     ) {
       // The page does not follow recurring schedules live, so read them again to compare.
       const recurring = await fetchRecurringShifts(
@@ -7694,6 +7823,9 @@ function SchedulerContent({
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
         todayKey,
         awayRanges,
+        corrections,
+        dayOffAbsenceTypeId:
+          resolveDayOffAbsenceType(org?.coverageRuleConfig, absenceTypes)?.absenceType.id ?? null,
         focusAreas,
         departments,
         assignments,
@@ -7751,6 +7883,9 @@ function SchedulerContent({
       spanWeeks,
       todayKey,
       awayRanges,
+      corrections,
+      org?.coverageRuleConfig,
+      absenceTypes,
       focusAreas,
       departments,
       assignments,
@@ -7807,7 +7942,7 @@ function SchedulerContent({
         for (const emp of section.employees) {
           for (const column of scheduleGridModel.columns) {
             const key = `${emp.id}_${column.dateKey}`;
-            if (targetsByKey.has(key)) continue;
+            if (targetsByKey.has(key) || isPastDateKey(column.dateKey, todayKey)) continue;
 
             const entry = shifts[key];
             const hasEntry =
@@ -7851,6 +7986,7 @@ function SchedulerContent({
     shiftForKey,
     shifts,
     spanWeeks,
+    todayKey,
   ]);
 
   const visibleBulkDeleteTargetByKey = useMemo(
@@ -9224,9 +9360,15 @@ function SchedulerContent({
               orgRoles={orgRoles}
               indicatorTypes={indicatorTypes}
               onSelect={handleShiftSelect}
-              onConfirmDraft={handleConfirmEditPanel}
-              allowShiftEdits={canEditShifts}
-              canEditScheduleIndicators={canEditNotes}
+              onConfirmDraft={editPanelIsPast ? undefined : handleConfirmEditPanel}
+              correction={
+                canCorrectPanelDay
+                  ? { onSave: handleSaveCorrection, saving: isSavingCorrection }
+                  : null
+              }
+              pastDayNotice={pastDayNotice}
+              allowShiftEdits={canEditShifts && (!editPanelIsPast || canCorrectPanelDay)}
+              canEditScheduleIndicators={canEditNotes && !editPanelIsPast}
               getActiveIndicatorIds={panelActiveIndicatorIds}
               onNoteToggle={handleNoteToggle}
               onClose={closeEditPanel}
@@ -9253,13 +9395,19 @@ function SchedulerContent({
               }
               fromRecurring={panelShiftEntry?.fromRecurring ?? false}
               onRepeatConfirm={
-                canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined
+                canEditShifts && canManageShiftSeries && !editPanelIsPast
+                  ? handleRepeatConfirm
+                  : undefined
               }
               onLoadSeriesPattern={
-                canEditShifts && canManageShiftSeries ? handleLoadSeriesPattern : undefined
+                canEditShifts && canManageShiftSeries && !editPanelIsPast
+                  ? handleLoadSeriesPattern
+                  : undefined
               }
               onRescheduleSeries={
-                canEditShifts && canManageShiftSeries ? handleRescheduleSeries : undefined
+                canEditShifts && canManageShiftSeries && !editPanelIsPast
+                  ? handleRescheduleSeries
+                  : undefined
               }
               isCreatingRepeatSeries={isCreatingRepeatSeries}
               empId={editPanel.empId}

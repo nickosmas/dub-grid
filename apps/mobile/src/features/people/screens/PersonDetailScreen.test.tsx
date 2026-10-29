@@ -1247,12 +1247,15 @@ describe("PersonDetailScreen", () => {
     // No organization timezone in these tests, so the first return date is UTC's tomorrow.
     const day = (offset: number) =>
       addDaysToIsoDate(getIsoDateInTimeZone(new Date(), null), offset);
-    const choose = (date: string) =>
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: `Choose ${formatReturnDate(date, { weekday: true })}`,
-        }),
-      );
+    // The calendar opens on the earliest day's month, so a day a few days
+    // ahead can be next month near a month's end: page forward to it.
+    const choose = (date: string) => {
+      const name = `Choose ${formatReturnDate(date, { weekday: true })}`;
+      for (let page = 0; page < 13 && !screen.queryByRole("button", { name }); page++) {
+        fireEvent.click(screen.getAllByRole("button", { name: "Next month" }).at(-1)!);
+      }
+      fireEvent.click(screen.getByRole("button", { name }));
+    };
     const pick = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
     const confirm = (label: string) =>
       fireEvent.click(screen.getAllByRole("button", { name: label }).at(-1)!);

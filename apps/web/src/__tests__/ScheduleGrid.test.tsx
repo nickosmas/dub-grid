@@ -217,6 +217,7 @@ beforeEach(() => {
 
 interface RenderGridOptions {
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  corrections?: ReadonlyMap<string, { reason: string | null }>;
   filteredEmployees?: Employee[];
   allEmployees?: Employee[];
   week1?: Date[];
@@ -389,6 +390,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     spanWeeks: options.spanWeeks ?? 2,
     todayKey: options.todayKey ?? formatDateKey(week1[0]),
     awayRanges: options.awayRanges,
+    corrections: options.corrections,
     focusAreas: options.focusAreas ?? focusAreas,
     departments: options.departments ?? departments,
     assignments: resolvedAssignmentDefinitions,
@@ -2432,6 +2434,127 @@ describe("ScheduleGrid", () => {
       const cell = alexCells()[6];
       fireEvent.mouseEnter(cell);
       expect(cell.dataset.runHover).toBeUndefined();
+    });
+  });
+
+  describe("past days (53b)", () => {
+    it("washes days before today, still opens them, and takes no drag or menu there", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      const onOpenCellMenu = vi.fn();
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        canDragShifts: true,
+        onActivateCell,
+        onOpenCellMenu,
+      });
+
+      const cells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === "emp-1",
+      );
+      expect(cells.slice(0, 5).map((cell) => cell.dataset.past)).toEqual([
+        "true",
+        "true",
+        "true",
+        undefined,
+        undefined,
+      ]);
+      const headers = (screen.getAllByRole("columnheader") as HTMLElement[]).filter(
+        (header) => header.dataset.dateKey,
+      );
+      expect(headers[2].dataset.past).toBe("true");
+      expect(headers[3].dataset.past).toBeUndefined();
+
+      expect(cells[1].querySelector(".dg-draggable-shift")).toBeNull();
+      expect(cells[4].querySelector(".dg-draggable-shift")).not.toBeNull();
+
+      fireEvent.contextMenu(cells[1]);
+      expect(onOpenCellMenu).not.toHaveBeenCalled();
+      fireEvent.contextMenu(cells[4]);
+      expect(onOpenCellMenu).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(cells[1]);
+      expect(onActivateCell).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cellId: expect.objectContaining({ dateKey: formatDateKey(week1[1]) }),
+        }),
+      );
+    });
+  });
+
+  describe("away all period (54)", () => {
+    const gone: Employee = {
+      ...employees[0],
+      id: "emp-gone-all",
+      firstName: "Dana",
+      lastName: "Price",
+      seniority: 9,
+      status: "inactive",
+      awayUntil: "2024-02-01",
+    };
+
+    afterEach(() => window.localStorage.clear());
+
+    it("lists someone away every day last, under a row that folds and stays folded", () => {
+      observedWidth = 1600;
+      const people = [gone, employees[0]];
+      const view = renderGrid({ filteredEmployees: people, allEmployees: people });
+
+      const rows = (screen.getAllByRole("row") as HTMLElement[]).filter(
+        (row) => row.dataset.awayAllPeriodGroup !== undefined || row.querySelector("[data-emp-id]"),
+      );
+      const order = rows.map((row) =>
+        row.dataset.awayAllPeriodGroup !== undefined
+          ? "group"
+          : (row.querySelector("[data-emp-id]") as HTMLElement).dataset.empId,
+      );
+      expect(order).toEqual(["emp-1", "group", "emp-gone-all"]);
+
+      const fold = screen.getByRole("button", { name: /Away all period/ });
+      expect(fold.getAttribute("aria-expanded")).toBe("true");
+      fireEvent.click(fold);
+      const folded = screen.getByRole("button", { name: /Away all period/ });
+      expect(folded.getAttribute("aria-expanded")).toBe("false");
+      expect(folded.textContent).toContain("Dana Price (Away until Feb 1)");
+      expect(document.querySelector('[data-emp-id="emp-gone-all"]')).toBeNull();
+
+      view.unmount();
+      renderGrid({ filteredEmployees: people, allEmployees: people });
+      expect(
+        screen.getByRole("button", { name: /Away all period/ }).getAttribute("aria-expanded"),
+      ).toBe("false");
+    });
+
+    it("shows no group when nobody is away the whole period", () => {
+      observedWidth = 1600;
+      renderGrid();
+      expect(screen.queryByRole("button", { name: /Away all period/ })).toBeNull();
+    });
+  });
+
+  describe("corrected days (53c)", () => {
+    it("marks a corrected past day and names why", () => {
+      observedWidth = 1600;
+      const corrected = formatDateKey(week1[1]);
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        corrections: new Map([
+          [`emp-1_${corrected}`, { reason: "Sent home sick at 10" }],
+          [`emp-1_${formatDateKey(week1[2])}`, { reason: null }],
+          [`emp-1_${formatDateKey(week1[4])}`, { reason: "Not past" }],
+        ]),
+      });
+
+      const cells = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (cell) => cell.dataset.empId === "emp-1",
+      );
+      expect(cells[1].dataset.corrected).toBe("true");
+      expect(cells[1].querySelector("[data-correction-mark]")).not.toBeNull();
+      expect(cells[1].getAttribute("title")).toBe("Corrected: Sent home sick at 10");
+      expect(cells[2].getAttribute("title")).toBe("Corrected");
+      expect(cells[0].dataset.corrected).toBeUndefined();
+      // A day from today on is never marked, whatever the map holds.
+      expect(cells[4].dataset.corrected).toBeUndefined();
     });
   });
 

@@ -26,7 +26,7 @@ import {
 } from "./details";
 import { formatBillingStatusLabel } from "@/lib/client-facing";
 import { diffPermissions, permissionLabel } from "@/lib/permission-labels";
-import type { Audience } from "@dubgrid/domain";
+import { correctionReasonLabel, type Audience } from "@dubgrid/domain";
 
 // ── Categories ───────────────────────────────────────────────────────────────
 
@@ -751,6 +751,17 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     details: (d) => {
       const cell = describeScheduleCell(d);
       return cell ? [{ label: "Shift", value: cell }] : [];
+    },
+  },
+  "shift.corrected": {
+    category: "schedule",
+    severity: "update",
+    headline: (_d, ctx) => `Corrected a past day${onDate(ctx)}`,
+    // The day itself is drawn as Before and After; the typed reason, when
+    // given, says why.
+    details: (d) => {
+      const reason = d.text("reason");
+      return reason ? [{ label: "Reason", value: correctionReasonLabel(reason) }] : [];
     },
   },
   "schedule.published": {

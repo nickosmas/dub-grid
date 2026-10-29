@@ -389,3 +389,8 @@ export function formatScheduleTimeValue(value: string): string {
   const normalizedHours = hours % 12 || 12;
   return `${normalizedHours}:${minutes} ${suffix}`;
 }
+
+/** Whether a YYYY-MM-DD day is before today, both in the organization's calendar. */
+export function isPastDateKey(dateKey: string, todayKey: string): boolean {
+  return dateKey < todayKey;
+}

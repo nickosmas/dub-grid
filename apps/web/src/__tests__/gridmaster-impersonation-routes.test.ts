@@ -15,6 +15,7 @@ const API = path.resolve(__dirname, "../app/api");
 const READS = new Set([
   "fetchShifts",
   "fetchScheduleNotes",
+  "fetchCorrections",
   "fetchCalloffOpenShifts",
   "getScheduleLastViewed",
   "updateScheduleLastViewed",

@@ -19,6 +19,7 @@ export type AuditAction =
   | "shift.updated"
   | "shift.deleted"
   | "shift.moved"
+  | "shift.corrected"
   // Schedule
   | "schedule.published"
   | "schedule.drafts_discarded"

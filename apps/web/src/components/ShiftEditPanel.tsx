@@ -9,7 +9,7 @@ import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import { toDarkPillColors, darkenColor } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
-import { indefiniteArticle } from "@dubgrid/domain";
+import { CORRECTION_REASON_MAX_LENGTH, indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
   EditModalState,
@@ -175,6 +175,16 @@ interface ShiftEditPanelProps {
   draftKind?: DraftKind;
   /** Commits the current local draft to the server. */
   onConfirmDraft?: (seriesScope?: SeriesScope) => void;
+  /**
+   * A past day being corrected (53b): the edit is saved as a correction, with
+   * an optional typed reason, through `onSave` rather than as a draft.
+   */
+  correction?: {
+    onSave: (reason: string) => void;
+    saving?: boolean;
+  } | null;
+  /** Why a past day opens read-only for this person (53b). */
+  pastDayNotice?: string | null;
   /** True when the underlying cell changed externally while the panel was open. */
   isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
@@ -412,6 +422,8 @@ export default function ShiftEditPanel({
   publishedCustomEndTime = null,
   draftKind = null,
   onConfirmDraft,
+  correction = null,
+  pastDayNotice = null,
   isStale = false,
   focusAreas = [],
   certifications = [],
@@ -737,6 +749,7 @@ export default function ShiftEditPanel({
     (slot) => slot.added.length > 0 || slot.removed.length > 0,
   );
   const hasEdits = hasShiftEdit || hasNoteEdit || hasTimeEdit;
+  const [correctionReason, setCorrectionReason] = useState("");
   const canEditSeriesPattern = Boolean(
     allowShiftEdits && seriesId && empId && onLoadSeriesPattern && onRescheduleSeries,
   );
@@ -4347,7 +4360,9 @@ export default function ShiftEditPanel({
         className={`dg-panel${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label={allowShiftEdits ? "Edit shift" : "Shift details"}
+        aria-label={
+          correction ? "Correct this day" : allowShiftEdits ? "Edit shift" : "Shift details"
+        }
       >
         {/* Panel Header */}
         <div
@@ -4383,6 +4398,18 @@ export default function ShiftEditPanel({
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
+            {correction && (
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-badge)",
+                  fontWeight: 600,
+                  color: "var(--dg-color-brand)",
+                  marginBottom: 2,
+                }}
+              >
+                Correct this day
+              </div>
+            )}
             <div
               style={{
                 fontSize: "var(--dg-fs-body)",
@@ -4427,6 +4454,19 @@ export default function ShiftEditPanel({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
+          {pastDayNotice && (
+            <p
+              data-past-day-notice
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                lineHeight: 1.45,
+              }}
+            >
+              {pastDayNotice}
+            </p>
+          )}
           {showStandaloneRequestFlow ? (
             renderRequestControls({ standalone: true })
           ) : repeatFormOpen && empId ? (
@@ -5041,6 +5081,19 @@ export default function ShiftEditPanel({
                 {noteSummary && <div>{noteSummary}</div>}
               </div>
             )}
+            {correction && hasEdits && (
+              <textarea
+                aria-label="Reason for the correction (optional)"
+                placeholder="Reason (optional)"
+                value={correctionReason}
+                maxLength={CORRECTION_REASON_MAX_LENGTH}
+                rows={2}
+                onChange={(event) => setCorrectionReason(event.target.value)}
+                className="dg-input"
+                data-correction-reason
+                style={{ fontSize: "var(--dg-fs-caption)", resize: "vertical", marginBottom: 4 }}
+              />
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <Button
                 onClick={canReturnToView ? returnToView : handleUndo}
@@ -5049,14 +5102,25 @@ export default function ShiftEditPanel({
               >
                 Cancel
               </Button>
-              <Button
-                onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
-                className="dg-btn dg-btn-primary"
-                style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-                disabled={confirmBlocked || absenceBlocksSave() || !hasEdits}
-              >
-                Save changes
-              </Button>
+              {correction ? (
+                <Button
+                  onClick={() => correction.onSave(correctionReason.trim())}
+                  className="dg-btn dg-btn-primary"
+                  style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+                  disabled={confirmBlocked || absenceBlocksSave() || !hasEdits || correction.saving}
+                >
+                  <ButtonLoading loading={!!correction.saving}>Save correction</ButtonLoading>
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
+                  className="dg-btn dg-btn-primary"
+                  style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+                  disabled={confirmBlocked || absenceBlocksSave() || !hasEdits}
+                >
+                  Save changes
+                </Button>
+              )}
             </div>
           </div>
         )}
