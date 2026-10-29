@@ -133,7 +133,9 @@ export async function expectNoManageControls(
 /** A published, non-OFF cell in one employee's row, or in anyone else's. */
 export function scheduledCell(page: Page, viewer: string, own: boolean) {
   const rowMatch = `[aria-label^="${viewer},"]`;
+  // A day before today opens Correct this day for an editor (53b), so the
+  // editing and viewing checks use today and later.
   return page.locator(
-    `[role="gridcell"][data-empty="false"]${own ? rowMatch : `:not(${rowMatch})`}`,
+    `[role="gridcell"][data-empty="false"]:not([data-past="true"])${own ? rowMatch : `:not(${rowMatch})`}`,
   );
 }
