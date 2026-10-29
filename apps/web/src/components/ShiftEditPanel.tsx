@@ -2445,10 +2445,11 @@ export default function ShiftEditPanel({
               display: "flex",
               flexDirection: "column",
               gap: 12,
-              padding: "14px 16px",
+              padding: "14px 16px 0",
               borderRadius: "var(--dg-radius-xl)",
               border: "1px solid var(--dg-color-border)",
               background: "var(--dg-color-surface)",
+              overflow: "hidden",
             }}
           >
             <div>
@@ -2560,7 +2561,10 @@ export default function ShiftEditPanel({
               ) : null}
             </div>
 
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div
+              className="dg-footer-bar [--dg-footer-bar-px:16px]"
+              style={{ margin: "0 -16px", display: "flex", gap: 8, justifyContent: "flex-end" }}
+            >
               <Button
                 type="button"
                 className="dg-btn dg-btn-ghost"
@@ -4324,14 +4328,7 @@ export default function ShiftEditPanel({
             >
               {renderRequestControls({ standalone: true })}
             </div>
-            <div
-              style={{
-                flexShrink: 0,
-                padding: "12px 20px 20px",
-                borderTop: "1px solid var(--dg-color-border)",
-                background: "var(--dg-color-surface)",
-              }}
-            >
+            <div className="dg-footer-bar">
               <Button
                 type="button"
                 onClick={closeRequestSection}
@@ -4955,14 +4952,7 @@ export default function ShiftEditPanel({
         </div>
 
         {showStandaloneRequestFlow && (
-          <div
-            style={{
-              flexShrink: 0,
-              padding: "12px 20px 20px",
-              borderTop: "1px solid var(--dg-color-border)",
-              background: "var(--dg-color-surface)",
-            }}
-          >
+          <div className="dg-footer-bar">
             <Button
               type="button"
               onClick={closeRequestSection}
@@ -4979,13 +4969,10 @@ export default function ShiftEditPanel({
 
         {repeatFormOpen && (
           <div
+            className="dg-footer-bar"
             style={{
-              flexShrink: 0,
-              padding: "12px 20px",
-              borderTop: "1px solid var(--dg-color-border)",
               display: "flex",
               gap: 8,
-              background: "var(--dg-color-surface)",
             }}
           >
             <Button
@@ -5026,14 +5013,11 @@ export default function ShiftEditPanel({
 
         {inViewMode && !repeatFormOpen && (
           <div
+            className="dg-footer-bar"
             style={{
-              flexShrink: 0,
-              padding: "12px 20px",
-              borderTop: "1px solid var(--dg-color-border)",
               display: "grid",
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
               gap: 8,
-              background: "var(--dg-color-surface)",
             }}
           >
             <Button
@@ -5062,14 +5046,11 @@ export default function ShiftEditPanel({
 
         {!inViewMode && !repeatFormOpen && (hasEdits || canReturnToView) && (
           <div
+            className="dg-footer-bar"
             style={{
-              flexShrink: 0,
-              padding: "12px 20px",
-              borderTop: "1px solid var(--dg-color-border)",
               display: "flex",
               flexDirection: "column",
               gap: 6,
-              background: "var(--dg-color-surface)",
             }}
           >
             {(showsUnsavedChange || noteSummary) && (

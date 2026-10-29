@@ -271,7 +271,8 @@ function IndicatorRow({
               borderRadius: "var(--dg-radius-lg)",
               border: "1px solid var(--dg-color-border-light)",
               margin: "0 0 8px",
-              padding: "14px 16px",
+              padding: "14px 16px 0",
+              overflow: "hidden",
               display: "flex",
               flexDirection: "column",
               gap: 12,
@@ -364,6 +365,7 @@ function IndicatorRow({
 
             {canEdit && (
               <EditorActionRow
+                className="dg-footer-bar dg-footer-bar--in-box"
                 destructiveAction={
                   !indicator.isNew ? (
                     <Button

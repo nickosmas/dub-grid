@@ -363,7 +363,7 @@ export function OverviewTab({
                 </div>
               </div>
               <EditorActionRow
-                style={{ gridColumn: "1 / -1", marginTop: 8 }}
+                className="dg-footer-bar dg-footer-bar--bleed"
                 secondaryAction={
                   <Button
                     className="dg-btn dg-btn-secondary"

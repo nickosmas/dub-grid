@@ -285,9 +285,11 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       return (
         <div>
           <p>Two-factor status needs to be refreshed.</p>
-          <Button className="dg-btn dg-btn-secondary" onClick={retryStatus}>
-            Refresh status
-          </Button>
+          <div className="dg-footer-bar dg-footer-bar--bleed flex justify-end">
+            <Button className="dg-btn dg-btn-secondary" onClick={retryStatus}>
+              Refresh status
+            </Button>
+          </div>
         </div>
       );
     }
@@ -322,30 +324,27 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             ? "Signing in asks for a code from your authenticator app."
             : "Signing in will ask for a code from an authenticator app."}
         </p>
-        {mfaEnabled ? (
-          <Button
-            onClick={() => setStep("disabling")}
-            className="dg-btn dg-btn-danger"
-            style={{ alignSelf: "flex-start" }}
-          >
-            Turn off two-factor
-          </Button>
-        ) : (
-          <Button
-            onClick={() => setStep("enrolling")}
-            disabled={loading}
-            className="dg-btn dg-btn-primary"
-            style={{ alignSelf: "flex-start" }}
-          >
-            <ButtonLoading
-              loading={loading}
-              spinnerColor="var(--dg-color-text-inverse)"
-              spinnerSize={14}
+        <div className="dg-footer-bar dg-footer-bar--bleed flex justify-end">
+          {mfaEnabled ? (
+            <Button onClick={() => setStep("disabling")} className="dg-btn dg-btn-danger">
+              Turn off two-factor
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setStep("enrolling")}
+              disabled={loading}
+              className="dg-btn dg-btn-primary"
             >
-              Set up two-factor
-            </ButtonLoading>
-          </Button>
-        )}
+              <ButtonLoading
+                loading={loading}
+                spinnerColor="var(--dg-color-text-inverse)"
+                spinnerSize={14}
+              >
+                Set up two-factor
+              </ButtonLoading>
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -367,6 +366,12 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         onConfirm={enrolling ? startEnrollment : disableMFA}
         confirmLabel={enrolling ? "Continue" : "Turn off two-factor"}
         variant={enrolling ? "primary" : "danger"}
+        frame={(fields, actions) => (
+          <div className="flex flex-col gap-4">
+            {fields}
+            <div className="dg-footer-bar dg-footer-bar--bleed">{actions}</div>
+          </div>
+        )}
       />
     );
   }
@@ -376,7 +381,10 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <p>Refresh the account's two-factor status before making another change.</p>
         {verifyError && <p role="alert">{verifyError}</p>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+        <div
+          className="dg-footer-bar dg-footer-bar--bleed"
+          style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}
+        >
           <Button className="dg-btn dg-btn-secondary" disabled={loading} onClick={resetState}>
             Cancel
           </Button>
@@ -513,7 +521,10 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+      <div
+        className="dg-footer-bar dg-footer-bar--bleed"
+        style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}
+      >
         <Button
           onClick={async () => {
             // Cancel enrollment — unenroll the pending factor

@@ -17,27 +17,31 @@ export function StepUpDialog({ method, error, onConfirm, onCancel }: StepUpDialo
   const inFlight = useRef(false);
 
   return (
-    <Modal
-      title="Confirm your identity"
-      onClose={onCancel}
-      onRequestClose={() => {
-        if (!inFlight.current) onCancel();
-        return false;
+    <StepUpForm
+      key={method}
+      method={method}
+      error={error}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      descriptionId={`${id}-description`}
+      onBusyChange={(busy) => {
+        inFlight.current = busy;
       }}
-      aria-describedby={`${id}-description`}
-      className="max-w-md"
-    >
-      <StepUpForm
-        key={method}
-        method={method}
-        error={error}
-        onConfirm={onConfirm}
-        onCancel={onCancel}
-        descriptionId={`${id}-description`}
-        onBusyChange={(busy) => {
-          inFlight.current = busy;
-        }}
-      />
-    </Modal>
+      frame={(fields, actions) => (
+        <Modal
+          title="Confirm your identity"
+          onClose={onCancel}
+          onRequestClose={() => {
+            if (!inFlight.current) onCancel();
+            return false;
+          }}
+          aria-describedby={`${id}-description`}
+          className="max-w-md"
+          footer={actions}
+        >
+          {fields}
+        </Modal>
+      )}
+    />
   );
 }

@@ -89,6 +89,22 @@ export default function PrintOptionsModal({
         onClose={onClose}
         onRequestClose={requestClose}
         style={{ maxWidth: 400 }}
+        footer={
+          <div className="dg-modal-actions">
+            <Button onClick={handleActionClose} className="dg-btn dg-btn-secondary">
+              {EDITOR_ACTION_LABELS.close}
+            </Button>
+            <Button
+              onClick={handlePrint}
+              disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
+              className="dg-btn dg-btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Printer size={13} />
+              Preview
+            </Button>
+          </div>
+        }
       >
         {/* View */}
         <div className="dg-modal-section">
@@ -132,7 +148,7 @@ export default function PrintOptionsModal({
 
         {/* Focus Areas */}
         {focusAreas.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
+          <div>
             <div className="dg-modal-section-label">{focusAreaLabel.toUpperCase()}</div>
             <div className="dg-checklist">
               {/* All toggle */}
@@ -160,22 +176,6 @@ export default function PrintOptionsModal({
             </div>
           </div>
         )}
-
-        {/* Actions */}
-        <div className="dg-modal-actions">
-          <Button onClick={handleActionClose} className="dg-btn dg-btn-secondary">
-            {EDITOR_ACTION_LABELS.close}
-          </Button>
-          <Button
-            onClick={handlePrint}
-            disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
-            className="dg-btn dg-btn-primary"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            <Printer size={13} />
-            Preview
-          </Button>
-        </div>
       </Modal>
       {unsavedChangesDialog}
     </>

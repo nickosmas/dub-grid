@@ -77,7 +77,27 @@ export default function DangerZone({ organization }: DangerZoneProps) {
   }
 
   return (
-    <SectionCard>
+    <SectionCard
+      footer={
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-start",
+          }}
+        >
+          <Button
+            className="dg-btn dg-btn-danger-filled"
+            onClick={() => setConfirmOpen(true)}
+            disabled={isInSandbox}
+            title={
+              isInSandbox ? "Deleting the organization isn't available in sandbox mode." : undefined
+            }
+          >
+            Delete organization
+          </Button>
+        </div>
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <h2
@@ -100,25 +120,6 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           >
             Everyone loses access and billing stops. Only DubGrid Support can bring it back.
           </p>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-start",
-            paddingTop: 12,
-            borderTop: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <Button
-            className="dg-btn dg-btn-danger-filled"
-            onClick={() => setConfirmOpen(true)}
-            disabled={isInSandbox}
-            title={
-              isInSandbox ? "Deleting the organization isn't available in sandbox mode." : undefined
-            }
-          >
-            Delete organization
-          </Button>
         </div>
       </div>
 

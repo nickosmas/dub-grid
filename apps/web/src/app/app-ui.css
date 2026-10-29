@@ -1727,10 +1727,11 @@ button.dg-cc-sg-main {
   }
 }
 .dg-modal {
+  --dg-modal-px: 32px;
   position: relative;
   background: var(--dg-color-surface);
   border-radius: var(--dg-radius-xl);
-  padding: 28px 32px;
+  padding: 28px var(--dg-modal-px);
   min-width: 320px;
   max-width: 480px;
   max-height: calc(100vh - 48px);
@@ -1758,21 +1759,51 @@ button.dg-cc-sg-main {
   padding: 4px;
   margin: -4px;
 }
-/* A pinned action row keeps 16px on both sides of its buttons, so the modal's
-   own bottom padding tightens to match instead of stacking underneath. */
+/* Every card, popup and slideover ends the same way: a line across the whole
+   container, then its bottom buttons on a faint strip, 12px above and below. */
+.dg-footer-bar {
+  flex: 0 0 auto;
+  padding: 12px var(--dg-footer-bar-px, 20px);
+  border-top: 1px solid var(--dg-color-border-light);
+  background: var(--dg-color-surface-footer);
+}
+/* For a row that ends a padded card body it doesn't own, reaching out to the
+   card's edges and bottom. SectionCard pads 20px; `.dg-card-body` sets its own. */
+.dg-footer-bar--bleed {
+  --dg-footer-bar-px: var(--dg-bleed-x, 20px);
+  margin: 0 calc(-1 * var(--dg-bleed-x, 20px)) calc(-1 * var(--dg-bleed-bottom, 20px));
+}
+/* An editor box that opens inside a list row is already tinted, so its
+   footer keeps the line, one step darker to show on the tint, and leaves out
+   the fill. */
+.dg-footer-bar--in-box {
+  --dg-footer-bar-px: 16px;
+  margin: 0 -16px;
+  border-top-color: var(--dg-color-border);
+  background: transparent;
+}
+/* The modal's footer is that strip, pulled out through the side padding so the
+   line reaches both edges; the strip closes the modal, so it takes no padding
+   underneath. */
 .dg-modal-footer {
   flex: 0 0 auto;
-  padding-top: 16px;
+  margin: 20px calc(-1 * var(--dg-modal-px)) 0;
+  padding: 12px var(--dg-modal-px);
   border-top: 1px solid var(--dg-color-border-light);
+  border-radius: 0 0 calc(var(--dg-radius-xl) - 1px) calc(var(--dg-radius-xl) - 1px);
+  background: var(--dg-color-surface-footer);
 }
 .dg-modal.dg-modal--with-footer {
-  padding-bottom: 16px;
+  padding-bottom: 0;
 }
 /* For a short list of choices: no divider under the last one, and the
    buttons sit as far below it as the list sits below the title. */
 .dg-modal--quiet-footer .dg-modal-footer {
-  padding-top: 24px;
+  margin: 0;
+  padding: 24px 0 16px;
   border-top: none;
+  border-radius: 0;
+  background: none;
 }
 .dg-scroll-overflow-cue {
   position: absolute;
@@ -2244,6 +2275,9 @@ button.dg-cc-sg-main {
 }
 .dg-modal-section {
   margin-bottom: 20px;
+}
+.dg-modal-section:last-child {
+  margin-bottom: 0;
 }
 .dg-modal-section-label {
   font-size: var(--dg-fs-footnote);
@@ -2951,6 +2985,8 @@ button.dg-cc-sg-main {
   margin-top: 1px;
 }
 .dg-card-body {
+  --dg-bleed-x: var(--dg-card-padding-x);
+  --dg-bleed-bottom: 16px;
   padding: 16px var(--dg-card-padding-x);
 }
 /* Side padding only, for an embedded editor that brings its own vertical rhythm. */
@@ -3388,7 +3424,8 @@ button.dg-cc-sg-main {
     width: calc(100vw - 32px);
     max-height: calc(100dvh - 32px);
     border-radius: 12px;
-    padding: 20px 16px;
+    --dg-modal-px: 16px;
+    padding: 20px var(--dg-modal-px);
   }
   /* Draft banner — allow wrapping */
   .dg-draft-banner {

@@ -186,7 +186,14 @@ vi.mock("@/components/InviteEmployeeModal", () => ({
 }));
 
 vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
-  EmployeeManagementAccessEditor: () => <div>Management access editor</div>,
+  EmployeeManagementAccessEditor: ({
+    frame,
+  }: {
+    frame?: (fields: React.ReactNode, actions: React.ReactNode) => React.ReactNode;
+  }) => {
+    const fields = <div>Management access editor</div>;
+    return frame ? frame(fields, null) : fields;
+  },
 }));
 
 const mockedFetchEmployeeById = vi.mocked(fetchEmployeeById);

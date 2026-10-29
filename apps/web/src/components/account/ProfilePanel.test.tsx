@@ -53,9 +53,11 @@ vi.mock("@/components/staff/EmployeeManagementAccessModal", () => ({
   EmployeeManagementAccessEditor: (props: {
     employee: Employee;
     onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
+    frame?: (fields: React.ReactNode, actions: React.ReactNode) => React.ReactNode;
   }) => {
     lastManagementAccessEditorProps = props;
-    return <div data-testid="employee-management-access-editor" />;
+    const fields = <div data-testid="employee-management-access-editor" />;
+    return props.frame ? props.frame(fields, null) : fields;
   },
 }));
 

@@ -876,7 +876,7 @@ function DepartmentSection({
           <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
         </Button>
       }
-      style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
+      className="dg-footer-bar [--dg-footer-bar-px:16px]"
     />
   ) : null;
 

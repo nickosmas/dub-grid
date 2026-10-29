@@ -288,6 +288,23 @@ export default function InviteEmployeeModal({
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
         style={{ maxWidth: 480 }}
+        footer={
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
+            </Button>
+            <Button
+              className="dg-btn dg-btn-primary"
+              onClick={handleSend}
+              disabled={!canSend}
+              style={{ opacity: canSend ? 1 : 0.5 }}
+            >
+              <ButtonLoading loading={sending} spinnerSize={16}>
+                Send invitation
+              </ButtonLoading>
+            </Button>
+          </div>
+        }
       >
         {/* Single-state: invite-only. accept_invitation handles whether the
             recipient already has an account elsewhere (cross-org case) or
@@ -558,23 +575,6 @@ export default function InviteEmployeeModal({
 
           {/* Error */}
           {error && <Banner tone="danger">{error}</Banner>}
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
-              {EDITOR_ACTION_LABELS.close}
-            </Button>
-            <Button
-              className="dg-btn dg-btn-primary"
-              onClick={handleSend}
-              disabled={!canSend}
-              style={{ opacity: canSend ? 1 : 0.5 }}
-            >
-              <ButtonLoading loading={sending} spinnerSize={16}>
-                Send invitation
-              </ButtonLoading>
-            </Button>
-          </div>
         </div>
       </Modal>
       {unsavedChangesDialog}
