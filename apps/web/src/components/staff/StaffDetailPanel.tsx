@@ -24,6 +24,7 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
+import { StatusPill } from "@/components/ui/status-pill";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StaffPanelFooter } from "./StaffPanelFooter";
 import {
@@ -310,7 +311,8 @@ export function StaffDetailPanel({
                 <span
                   style={{
                     fontWeight: 700,
-                    fontSize: "var(--dg-fs-body)",
+                    fontSize: 22,
+                    lineHeight: "var(--dg-type-section-title-line-height)",
                     color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
@@ -321,7 +323,7 @@ export function StaffDetailPanel({
                   {getEmployeeDisplayName(employee)}
                 </span>
                 <StatusMarkIcon person={employee} size={14} />
-                <AccessInsignia orgRole={orgRole} size="md" />
+                <AccessInsignia orgRole={orgRole} size="lg" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                 {employee.email && (
@@ -389,9 +391,9 @@ export function StaffDetailPanel({
                 />
               </div>
             ) : (
-              <span className="shrink-0 text-[13px] font-medium text-[var(--dg-color-text-muted)]">
+              <StatusPill tone="neutral" className="shrink-0">
                 No app access
-              </span>
+              </StatusPill>
             )}
           </div>
         </div>

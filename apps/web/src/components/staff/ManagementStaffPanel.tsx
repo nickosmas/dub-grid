@@ -513,7 +513,8 @@ export function ManagementStaffPanel({
                 <span
                   style={{
                     fontWeight: 700,
-                    fontSize: "var(--dg-fs-body)",
+                    fontSize: 22,
+                    lineHeight: "var(--dg-type-section-title-line-height)",
                     color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
@@ -523,7 +524,7 @@ export function ManagementStaffPanel({
                 >
                   {displayName}
                 </span>
-                <AccessInsignia orgRole={person.orgRole} size="md" />
+                <AccessInsignia orgRole={person.orgRole} size="lg" />
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   {isOnSchedule && (
                     <span
