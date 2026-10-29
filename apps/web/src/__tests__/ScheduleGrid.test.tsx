@@ -2482,6 +2482,56 @@ describe("ScheduleGrid", () => {
     });
   });
 
+  describe("away all period (54)", () => {
+    const gone: Employee = {
+      ...employees[0],
+      id: "emp-gone-all",
+      firstName: "Dana",
+      lastName: "Price",
+      seniority: 9,
+      status: "inactive",
+      awayUntil: "2024-02-01",
+    };
+
+    afterEach(() => window.localStorage.clear());
+
+    it("lists someone away every day last, under a row that folds and stays folded", () => {
+      observedWidth = 1600;
+      const people = [gone, employees[0]];
+      const view = renderGrid({ filteredEmployees: people, allEmployees: people });
+
+      const rows = (screen.getAllByRole("row") as HTMLElement[]).filter(
+        (row) => row.dataset.awayAllPeriodGroup !== undefined || row.querySelector("[data-emp-id]"),
+      );
+      const order = rows.map((row) =>
+        row.dataset.awayAllPeriodGroup !== undefined
+          ? "group"
+          : (row.querySelector("[data-emp-id]") as HTMLElement).dataset.empId,
+      );
+      expect(order).toEqual(["emp-1", "group", "emp-gone-all"]);
+
+      const fold = screen.getByRole("button", { name: /Away all period/ });
+      expect(fold.getAttribute("aria-expanded")).toBe("true");
+      fireEvent.click(fold);
+      const folded = screen.getByRole("button", { name: /Away all period/ });
+      expect(folded.getAttribute("aria-expanded")).toBe("false");
+      expect(folded.textContent).toContain("Dana Price (Away until Feb 1)");
+      expect(document.querySelector('[data-emp-id="emp-gone-all"]')).toBeNull();
+
+      view.unmount();
+      renderGrid({ filteredEmployees: people, allEmployees: people });
+      expect(
+        screen.getByRole("button", { name: /Away all period/ }).getAttribute("aria-expanded"),
+      ).toBe("false");
+    });
+
+    it("shows no group when nobody is away the whole period", () => {
+      observedWidth = 1600;
+      renderGrid();
+      expect(screen.queryByRole("button", { name: /Away all period/ })).toBeNull();
+    });
+  });
+
   describe("corrected days (53c)", () => {
     it("marks a corrected past day and names why", () => {
       observedWidth = 1600;

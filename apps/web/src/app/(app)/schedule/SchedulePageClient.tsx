@@ -7824,6 +7824,8 @@ function SchedulerContent({
         todayKey,
         awayRanges,
         corrections,
+        dayOffAbsenceTypeId:
+          resolveDayOffAbsenceType(org?.coverageRuleConfig, absenceTypes)?.absenceType.id ?? null,
         focusAreas,
         departments,
         assignments,
@@ -7882,6 +7884,8 @@ function SchedulerContent({
       todayKey,
       awayRanges,
       corrections,
+      org?.coverageRuleConfig,
+      absenceTypes,
       focusAreas,
       departments,
       assignments,

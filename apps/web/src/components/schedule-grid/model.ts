@@ -4,6 +4,7 @@ import type { AbsencePillLayout } from "@/lib/absence-pill";
 import type React from "react";
 
 import { formatDateKey } from "@/lib/utils";
+import { orderAwayAllPeriod } from "./awayAllPeriod";
 import { isOnScheduleGrid, type AwayRange } from "./awayRuns";
 import type { ScheduleNoteMark } from "./noteDots";
 import type {
@@ -102,7 +103,10 @@ export interface ScheduleGridSectionModel {
   sectionName: string;
   departmentId: number;
   exclusiveCodeIds: Set<number>;
+  /** The section's people, anyone away for the whole period last (item 54). */
   employees: Employee[];
+  /** Why each person away for the whole period is, by employee id (item 54). */
+  awayAllPeriod?: ReadonlyMap<string, string>;
   openShifts: GridOpenShift[];
 }
 
@@ -119,6 +123,8 @@ export interface ScheduleGridModel {
   awayRanges?: ReadonlyMap<string, AwayRange>;
   /** Corrected past days by `${empId}_${dateKey}` (53c). */
   corrections?: ReadonlyMap<string, CorrectionMark>;
+  /** The organization's day off absence (item 54). */
+  dayOffAbsenceTypeId?: number | null;
   columns: GridColumnMeta[];
   week1: Date[];
   week2: Date[];
@@ -208,6 +214,8 @@ export interface BuildScheduleGridModelInput {
   awayRanges?: ReadonlyMap<string, AwayRange>;
   /** Corrected past days by `${empId}_${dateKey}` (53c). */
   corrections?: ReadonlyMap<string, CorrectionMark>;
+  /** The organization's day off absence, which alone never makes someone away (54). */
+  dayOffAbsenceTypeId?: number | null;
   focusAreas: FocusArea[];
   departments: Department[];
   assignments: AssignmentDefinition[];
@@ -251,6 +259,7 @@ export function buildScheduleGridModel({
   todayKey,
   awayRanges,
   corrections,
+  dayOffAbsenceTypeId = null,
   focusAreas,
   departments,
   assignments,
@@ -421,12 +430,26 @@ export function buildScheduleGridModel({
               }),
           );
 
+          const { employees, awayAllPeriod } = orderAwayAllPeriod(
+            [...homeEmployees, ...guestEmployees],
+            {
+              dates: allDates,
+              awayRanges,
+              absenceTypeIdForKey: accessors.absenceTypeIdForKey,
+              assignmentIdsForKey: accessors.assignmentIdsForKey,
+              dayOffAbsenceTypeId,
+              absenceName: (id) => absenceTypeMap?.get(id)?.name || "Absence",
+            },
+          );
+
           return {
             sectionId: focusArea.id,
             sectionName: focusArea.name,
             departmentId: department.id,
             exclusiveCodeIds,
-            employees: [...homeEmployees, ...guestEmployees],
+            // Anyone away for the whole period sits last (item 54).
+            employees,
+            awayAllPeriod,
             openShifts: openShifts.filter((openShift) => openShift.focusAreaId === focusArea.id),
           };
         }),
@@ -453,6 +476,7 @@ export function buildScheduleGridModel({
     todayKey,
     awayRanges,
     corrections,
+    dayOffAbsenceTypeId,
     columns,
     week1,
     week2,

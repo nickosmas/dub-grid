@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 67f97bc611b8883741dd87f16fca03fa83c9a977353694dcb6cd73c6dd00b4aa -->
+<!-- blueprint:source-hash 207853f2a437c639728f641b87a8fc21005320b993c58f06e1d85624375556ce -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -30,8 +30,8 @@ organization staff, managers, and platform operators.
 
 ## Features
 
-Items appear in build-plan order. Items 1 through 39 and 41 through 53 are
-shipped. Item 40 is in progress. Item 54 is planned.
+Items appear in build-plan order. Items 1 through 39 and 41 through 54 are
+shipped. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,7 +88,7 @@ shipped. Item 40 is in progress. Item 54 is planned.
 | 51   | Shipped     | People are Active, Away, Suspended or Offboarded, with a last day and return date; managers see who takes a seat.               |
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 | 53   | Shipped     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
-| 54   | Planned     | People away or absent all period sit last in their section, under a group row that folds.                                       |
+| 54   | Shipped     | People away or absent all period sit last in their section, under a group row that folds.                                       |
 
 Item 40 is split:
 
@@ -504,7 +504,7 @@ Item 53 is split, and every part has shipped:
 - **53c - Corrected everywhere:** shipped; the Corrected mark, the activity
   log, dashboard hours and the public docs.
 
-Item 54, Away all period, is planned. In the Week and 2 Weeks grid, anyone
+Item 54, Away all period, has shipped. In the Week and 2 Weeks grid, anyone
 Away or on a whole-day absence for every day on screen moves to the end of
 their section under a group row "Away all period · 2" that folds; folded, it
 names each person and why. The day off absence alone doesn't count, the

@@ -1198,7 +1198,7 @@
         the reason on hover, corrections with their reason in the activity
         log, web dashboard hours that follow a correction, and the public
         docs. The reason becomes typed and optional (migration 112).
-- [ ] 54. **Away all period** - in the Week and 2 Weeks grid, anyone Away or
+- [x] 54. **Away all period** - in the Week and 2 Weeks grid, anyone Away or
       on a whole-day absence for every day of the period on screen moves to
       the end of their section, under a group row "Away all period · 2"
       with a chevron. Open, their rows show as usual (the Away bar or the

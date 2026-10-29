@@ -2,6 +2,7 @@
 
 import type { AbsencePillLayout } from "@/lib/absence-pill";
 import React, {
+  Fragment,
   memo,
   useMemo,
   useRef,
@@ -20,9 +21,10 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { ChevronLeft, ChevronRight, Pencil, UserPen, Users } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Pencil, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
+import { useRememberedFold } from "@/hooks/useRememberedFold";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
@@ -75,6 +77,7 @@ import {
   ScheduleNoteShift,
 } from "@/types";
 import { buildScheduleGridModel } from "./schedule-grid/model";
+import { orderAwayAllPeriod } from "./schedule-grid/awayAllPeriod";
 import type {
   CorrectionMark,
   ScheduleGridHandlers,
@@ -230,6 +233,8 @@ interface LegacyScheduleGridProps {
   todayKey: string;
   awayRanges?: ReadonlyMap<string, AwayRange>;
   corrections?: ReadonlyMap<string, CorrectionMark>;
+  /** The organization's day off absence, which alone never makes someone away (54). */
+  dayOffAbsenceTypeId?: number | null;
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   focusAreas: FocusArea[];
@@ -339,6 +344,8 @@ interface SectionBlockProps {
   todayKey: string;
   awayRanges?: ReadonlyMap<string, AwayRange>;
   corrections?: ReadonlyMap<string, CorrectionMark>;
+  /** Why each person away for the whole period is, by employee id (item 54). */
+  awayAllPeriod?: ReadonlyMap<string, string>;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
@@ -1005,6 +1012,7 @@ const CONTENT_COMPARED_KEYS = new Set<keyof SectionBlockProps>([
   "employees",
   "exclusiveCodeIds",
   "openShifts",
+  "awayAllPeriod",
 ]);
 
 /** Everything a section's cell reads from those props, in the arguments it reads it with. */
@@ -1100,6 +1108,7 @@ const SectionBlock = memo(function SectionBlock({
   todayKey,
   awayRanges,
   corrections,
+  awayAllPeriod,
   shiftForKey,
   assignmentIdsForKey,
   segmentsForKey,
@@ -1155,6 +1164,11 @@ const SectionBlock = memo(function SectionBlock({
   bulkSelectableCellKeys,
   onToggleBulkDeleteCell,
 }: SectionBlockProps) {
+  // People away for the whole period sit last under one row that folds them
+  // (item 54); each viewer's browser remembers the fold per section.
+  const [awayAllPeriodFolded, setAwayAllPeriodFolded] = useRememberedFold(
+    `away-all-period:${sectionId}`,
+  );
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -1635,6 +1649,81 @@ const SectionBlock = memo(function SectionBlock({
   const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
   const renderedEmployees =
     renderedRows === undefined ? employees : employees.slice(0, renderedRows);
+  const awayAllPeriodPeople = employees.filter((employee) => awayAllPeriod?.has(employee.id));
+  const firstAwayAllPeriodIndex = renderedEmployees.findIndex((employee) =>
+    awayAllPeriod?.has(employee.id),
+  );
+  const awayAllPeriodGroupRow =
+    awayAllPeriodPeople.length > 0 ? (
+      <div
+        role="row"
+        data-away-all-period-group
+        style={{ ...rowGrid, position: "relative", zIndex: 4 }}
+      >
+        <div
+          role="gridcell"
+          style={{
+            gridColumn: "1 / -1",
+            display: "flex",
+            alignItems: "center",
+            minWidth: 0,
+            padding: "6px 12px",
+            background: "var(--dg-color-surface-muted, var(--dg-color-bg))",
+            backgroundImage:
+              "linear-gradient(var(--dg-color-border-light), var(--dg-color-border-light))",
+            backgroundPosition: "0 0",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "100% 1px",
+          }}
+        >
+          <Button
+            onClick={() => setAwayAllPeriodFolded(!awayAllPeriodFolded)}
+            aria-expanded={!awayAllPeriodFolded}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              minWidth: 0,
+              maxWidth: "100%",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--dg-color-text-muted)",
+            }}
+          >
+            {awayAllPeriodFolded ? (
+              <ChevronRight size={14} aria-hidden="true" />
+            ) : (
+              <ChevronDown size={14} aria-hidden="true" />
+            )}
+            <span style={{ fontWeight: 600, color: "var(--dg-color-text-secondary)" }}>
+              Away all period
+            </span>
+            <span>· {awayAllPeriodPeople.length}</span>
+            {awayAllPeriodFolded && (
+              <span
+                style={{
+                  marginLeft: 4,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  minWidth: 0,
+                }}
+              >
+                {awayAllPeriodPeople
+                  .map(
+                    (employee) =>
+                      `${getEmployeeDisplayName(employee)} (${awayAllPeriod?.get(employee.id)})`,
+                  )
+                  .join(", ")}
+              </span>
+            )}
+          </Button>
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div
@@ -2117,6 +2206,11 @@ const SectionBlock = memo(function SectionBlock({
 
             {/* Employee rows */}
             {renderedEmployees.map((emp, ri) => {
+              if (awayAllPeriodFolded && awayAllPeriod?.has(emp.id)) {
+                return ri === firstAwayAllPeriodIndex ? (
+                  <Fragment key="away-all-period">{awayAllPeriodGroupRow}</Fragment>
+                ) : null;
+              }
               const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
               const isHighlighted = hasHighlightedSearch
                 ? (highlightEmpIds?.has(emp.id) ?? false)
@@ -2228,1100 +2322,1594 @@ const SectionBlock = memo(function SectionBlock({
               }
 
               return (
-                <div
-                  key={emp.id}
-                  role="row"
-                  className="dg-row-enter"
-                  data-search-highlight={hasHighlightedSearch && isHighlighted ? "true" : undefined}
-                  // Where the pinned date row starts sliding away, so the last
-                  // staff rows and the tallies below them are never covered.
-                  data-sticky-release={ri === releaseRowIndex ? "true" : undefined}
-                  style={{
-                    ...rowGrid,
-                    // A chip deliberately hangs into the row above its shift
-                    // card. Give the whole staff row a layer above header and
-                    // open-shift cells; a child z-index cannot escape a lower
-                    // grid-item stacking context on its own.
-                    position: "relative",
-                    zIndex: 4,
-                    background: rowBg,
-                    opacity: isHighlighted ? 1 : 0.35,
-                    transition: "opacity 150ms ease, background 150ms ease",
-                    alignItems: "stretch",
-                    ...(grownCellHeights.size > 0
-                      ? {
-                          [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...grownCellHeights].join(", ")})`,
-                        }
-                      : null),
-                  }}
-                >
-                  {/* Name cell */}
+                <Fragment key={emp.id}>
+                  {ri === firstAwayAllPeriodIndex && awayAllPeriodGroupRow}
                   <div
-                    role="rowheader"
+                    role="row"
+                    className="dg-row-enter"
+                    data-search-highlight={
+                      hasHighlightedSearch && isHighlighted ? "true" : undefined
+                    }
+                    // Where the pinned date row starts sliding away, so the last
+                    // staff rows and the tallies below them are never covered.
+                    data-sticky-release={ri === releaseRowIndex ? "true" : undefined}
                     style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 10,
+                      ...rowGrid,
+                      // A chip deliberately hangs into the row above its shift
+                      // card. Give the whole staff row a layer above header and
+                      // open-shift cells; a child z-index cannot escape a lower
+                      // grid-item stacking context on its own.
+                      position: "relative",
+                      zIndex: 4,
                       background: rowBg,
-                      padding: "7px var(--dg-space-md)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      minWidth: 0,
-                      borderTop: ri > 0 ? "1px solid var(--dg-color-border-light)" : undefined,
-                      boxShadow: joinBoxShadows(
-                        hasHighlightedSearch && isHighlighted
-                          ? "inset 4px 0 0 0 var(--dg-color-brand)"
-                          : undefined,
-                        "1px 0 0 0 var(--dg-color-border-light)",
-                        "2px 0 4px rgba(0,0,0,0.02)",
-                      ),
+                      opacity: isHighlighted ? 1 : 0.35,
+                      transition: "opacity 150ms ease, background 150ms ease",
+                      alignItems: "stretch",
+                      ...(grownCellHeights.size > 0
+                        ? {
+                            [ROW_CELL_HEIGHT_VAR]: `max(var(--dg-grid-cell-height), ${[...grownCellHeights].join(", ")})`,
+                          }
+                        : null),
                     }}
                   >
+                    {/* Name cell */}
                     <div
+                      role="rowheader"
                       style={{
-                        minWidth: 0,
-                        position: "relative",
-                        overflow: "hidden",
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 10,
+                        background: rowBg,
+                        padding: "7px var(--dg-space-md)",
                         display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        minWidth: 0,
+                        borderTop: ri > 0 ? "1px solid var(--dg-color-border-light)" : undefined,
+                        boxShadow: joinBoxShadows(
+                          hasHighlightedSearch && isHighlighted
+                            ? "inset 4px 0 0 0 var(--dg-color-brand)"
+                            : undefined,
+                          "1px 0 0 0 var(--dg-color-border-light)",
+                          "2px 0 4px rgba(0,0,0,0.02)",
+                        ),
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
-                        <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
-                          <span
-                            style={{
-                              fontSize: "var(--dg-fs-body-sm)",
-                              fontWeight: 600,
-                              color:
-                                hasHighlightedSearch && isHighlighted
-                                  ? "var(--dg-color-brand)"
-                                  : "var(--dg-color-text-secondary)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              lineHeight: "var(--dg-lh-tight)",
-                            }}
-                          >
-                            {getEmployeeDisplayName(emp)}
-                          </span>
-                        </MaybeHint>
-                        <StatusMarkIcon person={emp} size={12} only={GRID_STATUS_MARKS} />
-                      </div>
-                      {emp.roleIds.length > 0 && (
-                        <EmployeeDetailHoverCard
-                          employeeName={getEmployeeDisplayName(emp)}
-                          certificationName={certificationName}
-                          roleNames={roleNames}
-                        >
-                          <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          minWidth: 0,
+                          position: "relative",
+                          overflow: "hidden",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                          <MaybeHint content={getEmployeeDisplayName(emp)} side="top">
                             <span
                               style={{
-                                fontSize: "var(--dg-fs-badge)",
-                                color: "var(--dg-color-text-subtle)",
+                                fontSize: "var(--dg-fs-body-sm)",
+                                fontWeight: 600,
+                                color:
+                                  hasHighlightedSearch && isHighlighted
+                                    ? "var(--dg-color-brand)"
+                                    : "var(--dg-color-text-secondary)",
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 lineHeight: "var(--dg-lh-tight)",
                               }}
                             >
-                              {roleAbbrs.join(", ")}
+                              {getEmployeeDisplayName(emp)}
+                            </span>
+                          </MaybeHint>
+                          <StatusMarkIcon person={emp} size={12} only={GRID_STATUS_MARKS} />
+                        </div>
+                        {emp.roleIds.length > 0 && (
+                          <EmployeeDetailHoverCard
+                            employeeName={getEmployeeDisplayName(emp)}
+                            certificationName={certificationName}
+                            roleNames={roleNames}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <span
+                                style={{
+                                  fontSize: "var(--dg-fs-badge)",
+                                  color: "var(--dg-color-text-subtle)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  lineHeight: "var(--dg-lh-tight)",
+                                }}
+                              >
+                                {roleAbbrs.join(", ")}
+                              </span>
+                            </div>
+                          </EmployeeDetailHoverCard>
+                        )}
+                      </div>
+                      {emp.certificationId != null && (
+                        <EmployeeDetailHoverCard
+                          employeeName={getEmployeeDisplayName(emp)}
+                          certificationName={certificationName}
+                          roleNames={roleNames}
+                        >
+                          <div style={{ flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 700,
+                                background: dc.bg,
+                                color: dc.text,
+                                padding: "2px 7px",
+                                borderRadius: 20,
+                                whiteSpace: "nowrap",
+                                letterSpacing: "0.01em",
+                              }}
+                            >
+                              {certAbbr}
                             </span>
                           </div>
                         </EmployeeDetailHoverCard>
                       )}
                     </div>
-                    {emp.certificationId != null && (
-                      <EmployeeDetailHoverCard
-                        employeeName={getEmployeeDisplayName(emp)}
-                        certificationName={certificationName}
-                        roleNames={roleNames}
-                      >
-                        <div style={{ flexShrink: 0 }}>
-                          <span
-                            style={{
-                              fontSize: "var(--dg-fs-caption)",
-                              fontWeight: 700,
-                              background: dc.bg,
-                              color: dc.text,
-                              padding: "2px 7px",
-                              borderRadius: 20,
-                              whiteSpace: "nowrap",
-                              letterSpacing: "0.01em",
-                            }}
-                          >
-                            {certAbbr}
-                          </span>
-                        </div>
-                      </EmployeeDetailHoverCard>
-                    )}
-                  </div>
 
-                  {/* Shift cells */}
-                  {(() => {
-                    return weekDates.map((date, index) => {
-                      const dateKey = formatDateKey(date);
-                      const cellKey = `${emp.id}_${dateKey}`;
-                      const isToday = dateKey === todayKey;
-                      const shiftLabel = rowShiftLabels[index];
-                      // A worked cell's absence for the rest of the day (item 45): one more
-                      // pill, always after the shifts.
-                      const restOfDayAbsenceTypeId =
-                        rowAbsenceTypeIds[index] == null
-                          ? (restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null)
+                    {/* Shift cells */}
+                    {(() => {
+                      return weekDates.map((date, index) => {
+                        const dateKey = formatDateKey(date);
+                        const cellKey = `${emp.id}_${dateKey}`;
+                        const isToday = dateKey === todayKey;
+                        const shiftLabel = rowShiftLabels[index];
+                        // A worked cell's absence for the rest of the day (item 45): one more
+                        // pill, always after the shifts.
+                        const restOfDayAbsenceTypeId =
+                          rowAbsenceTypeIds[index] == null
+                            ? (restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null)
+                            : null;
+                        const restOfDayAbsenceType =
+                          restOfDayAbsenceTypeId != null
+                            ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null)
+                            : null;
+                        const restOfDayAbsenceName =
+                          restOfDayAbsenceTypeId != null
+                            ? restOfDayAbsenceType?.name || restOfDayAbsenceType?.label || "Absence"
+                            : null;
+                        // Where it sits and the time it covers (item 50d): first when
+                        // they arrived late, joined to the shift whose time it meets.
+                        const absenceSpans = restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null;
+                        const absenceLayout = restOfDayAbsenceTypeId != null ? absenceSpans : null;
+                        const absenceFirst = !!absenceLayout?.first;
+                        const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
+                        const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
+                        const draftKind = draftKindForKey?.(emp.id, date) ?? null;
+                        const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
+                        const publishedMetadata =
+                          publishedMetadataForKey?.(emp.id, date) ??
+                          (publishDiff
+                            ? {
+                                publishedAt: publishDiff.publishedAt,
+                                publishedBy: publishDiff.publishedBy,
+                              }
+                            : null);
+                        const publicationLabel = publishedMetadata
+                          ? formatPublishedMetadata({
+                              ...publishedMetadata,
+                              resolvePublisherName,
+                            })
                           : null;
-                      const restOfDayAbsenceType =
-                        restOfDayAbsenceTypeId != null
-                          ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null)
+                        const publicationTimeZone = publishedMetadata?.timeZone ?? null;
+                        const showsPublishDiff = !!(showPublishDiffOverlay && publishDiff);
+                        const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
+                        const publishedCodeIds = publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
+                        const publishedSegments = publishedSegmentsForKey?.(emp.id, date) ?? [];
+                        const publishedCustomTimes =
+                          getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
+                        const noteMarks =
+                          noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
+                        const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
+                        const cellEditor = cellEditors?.get(cellKey);
+                        const hasPeerEditor = !!cellEditor;
+                        const cellEditorTone = cellEditor
+                          ? getAvatarTone(cellEditor.userId, isDarkTheme)
                           : null;
-                      const restOfDayAbsenceName =
-                        restOfDayAbsenceTypeId != null
-                          ? restOfDayAbsenceType?.name || restOfDayAbsenceType?.label || "Absence"
+                        const auditName = createdByNameForKey?.(emp.id, date) ?? null;
+                        const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
+                        const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
+                        const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
+                        const currentAbsenceTypeId = rowAbsenceTypeIds[index];
+                        const publishedAbsenceTypeId =
+                          publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                        const publishedRestOfDayAbsenceTypeId =
+                          publishedRestOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                        const publishChangeView =
+                          showsPublishDiff && publishDiff && publishChangeHasStates(publishDiff)
+                            ? describeCellStateChange(
+                                publishDiff.fromState,
+                                publishDiff.toState,
+                                dateKey,
+                                shiftChangeResolvers,
+                              )
+                            : null;
+                        // A changed or deleted draft needs its published cell to compare
+                        // with; without it, the older badge text stands.
+                        const hasPublishedCell =
+                          publishedSegments.length > 0 || publishedAbsenceTypeId != null;
+                        const draftChangeView =
+                          draftKind && (draftKind === "new" || hasPublishedCell)
+                            ? describeCellStateChange(
+                                cellStateFromParts({
+                                  segments: publishedSegments,
+                                  absenceTypeId: publishedAbsenceTypeId,
+                                  restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                  restOfDayAbsenceTimes: absenceSpans?.publishedRange ?? null,
+                                  customTimes: publishedCustomTimes,
+                                }),
+                                draftKind === "deleted"
+                                  ? null
+                                  : cellStateFromParts({
+                                      segments: cellSegments,
+                                      absenceTypeId: currentAbsenceTypeId,
+                                      restOfDayAbsenceTypeId,
+                                      restOfDayAbsenceTimes: absenceSpans?.range ?? null,
+                                      customTimes,
+                                    }),
+                                dateKey,
+                                shiftChangeResolvers,
+                              )
+                            : null;
+                        const publishChangeText = publishChangeView
+                          ? formatShiftChangeWasText(publishChangeView)
                           : null;
-                      // Where it sits and the time it covers (item 50d): first when
-                      // they arrived late, joined to the shift whose time it meets.
-                      const absenceSpans = restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null;
-                      const absenceLayout = restOfDayAbsenceTypeId != null ? absenceSpans : null;
-                      const absenceFirst = !!absenceLayout?.first;
-                      const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
-                      const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
-                      const draftKind = draftKindForKey?.(emp.id, date) ?? null;
-                      const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
-                      const publishedMetadata =
-                        publishedMetadataForKey?.(emp.id, date) ??
-                        (publishDiff
-                          ? {
-                              publishedAt: publishDiff.publishedAt,
-                              publishedBy: publishDiff.publishedBy,
-                            }
-                          : null);
-                      const publicationLabel = publishedMetadata
-                        ? formatPublishedMetadata({
-                            ...publishedMetadata,
-                            resolvePublisherName,
-                          })
-                        : null;
-                      const publicationTimeZone = publishedMetadata?.timeZone ?? null;
-                      const showsPublishDiff = !!(showPublishDiffOverlay && publishDiff);
-                      const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
-                      const publishedCodeIds = publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
-                      const publishedSegments = publishedSegmentsForKey?.(emp.id, date) ?? [];
-                      const publishedCustomTimes =
-                        getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
-                      const noteMarks = noteMarksForKey?.(emp.id, date, sectionFocusArea?.id) ?? [];
-                      const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
-                      const cellEditor = cellEditors?.get(cellKey);
-                      const hasPeerEditor = !!cellEditor;
-                      const cellEditorTone = cellEditor
-                        ? getAvatarTone(cellEditor.userId, isDarkTheme)
-                        : null;
-                      const auditName = createdByNameForKey?.(emp.id, date) ?? null;
-                      const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
-                      const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
-                      const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
-                      const currentAbsenceTypeId = rowAbsenceTypeIds[index];
-                      const publishedAbsenceTypeId =
-                        publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
-                      const publishedRestOfDayAbsenceTypeId =
-                        publishedRestOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null;
-                      const publishChangeView =
-                        showsPublishDiff && publishDiff && publishChangeHasStates(publishDiff)
-                          ? describeCellStateChange(
-                              publishDiff.fromState,
-                              publishDiff.toState,
-                              dateKey,
-                              shiftChangeResolvers,
-                            )
+                        const draftChangeText = draftChangeView
+                          ? formatShiftChangeWasText(draftChangeView)
                           : null;
-                      // A changed or deleted draft needs its published cell to compare
-                      // with; without it, the older badge text stands.
-                      const hasPublishedCell =
-                        publishedSegments.length > 0 || publishedAbsenceTypeId != null;
-                      const draftChangeView =
-                        draftKind && (draftKind === "new" || hasPublishedCell)
-                          ? describeCellStateChange(
-                              cellStateFromParts({
-                                segments: publishedSegments,
-                                absenceTypeId: publishedAbsenceTypeId,
-                                restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
-                                restOfDayAbsenceTimes: absenceSpans?.publishedRange ?? null,
-                                customTimes: publishedCustomTimes,
-                              }),
-                              draftKind === "deleted"
-                                ? null
-                                : cellStateFromParts({
-                                    segments: cellSegments,
-                                    absenceTypeId: currentAbsenceTypeId,
-                                    restOfDayAbsenceTypeId,
-                                    restOfDayAbsenceTimes: absenceSpans?.range ?? null,
-                                    customTimes,
-                                  }),
-                              dateKey,
-                              shiftChangeResolvers,
-                            )
+                        const hoverChanges = [
+                          ...(draftChangeView ? [{ view: draftChangeView, draft: true }] : []),
+                          ...(publishChangeView ? [{ view: publishChangeView, draft: false }] : []),
+                        ];
+                        const cellAbsenceType =
+                          currentAbsenceTypeId != null
+                            ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
+                            : null;
+                        const activeRequest = activeRequestForKey?.(emp.id, date) ?? null;
+                        const activeRequestLabel = activeRequest
+                          ? formatActiveRequestLabel(activeRequest)
                           : null;
-                      const publishChangeText = publishChangeView
-                        ? formatShiftChangeWasText(publishChangeView)
-                        : null;
-                      const draftChangeText = draftChangeView
-                        ? formatShiftChangeWasText(draftChangeView)
-                        : null;
-                      const hoverChanges = [
-                        ...(draftChangeView ? [{ view: draftChangeView, draft: true }] : []),
-                        ...(publishChangeView ? [{ view: publishChangeView, draft: false }] : []),
-                      ];
-                      const cellAbsenceType =
-                        currentAbsenceTypeId != null
-                          ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
-                          : null;
-                      const activeRequest = activeRequestForKey?.(emp.id, date) ?? null;
-                      const activeRequestLabel = activeRequest
-                        ? formatActiveRequestLabel(activeRequest)
-                        : null;
-                      const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
-                        ? [
-                            {
-                              label: restOfDayAbsenceName,
-                              jobName: null,
-                              focusAreaName: null,
-                              timeLabel: absenceLayout?.time ?? "Rest of the day",
-                              isCustomTime: false,
-                              isMentored: false,
-                            },
-                          ]
-                        : [];
-                      const shiftHoverEntries: ShiftDetailEntry[] = cellAbsenceType
-                        ? [
-                            {
-                              label: cellAbsenceType.name || cellAbsenceType.label,
-                              jobName: null,
-                              focusAreaName: sectionFocusArea?.name ?? null,
-                              timeLabel: null,
-                              isCustomTime: false,
-                              isMentored: false,
-                            },
-                          ]
-                        : cellCodeIds.map((assignmentId, entryIndex) => {
-                            const assignment = assignmentById.get(assignmentId);
-                            const category =
-                              assignment?.categoryId != null
-                                ? categoryById.get(assignment.categoryId)
-                                : null;
-                            const job =
-                              assignment?.jobId != null ? jobById.get(assignment.jobId) : null;
-                            const customTime =
-                              customTimes?.perPill?.[entryIndex] ??
-                              (entryIndex === 0 && !customTimes?.perPill ? customTimes : null);
-                            const start =
-                              customTime?.start ??
-                              assignment?.defaultStartTime ??
-                              category?.startTime ??
-                              null;
-                            const end =
-                              customTime?.end ??
-                              assignment?.defaultEndTime ??
-                              category?.endTime ??
-                              null;
-                            const focusArea =
-                              assignment?.focusAreaId != null
-                                ? (focusAreas.find((area) => area.id === assignment.focusAreaId)
-                                    ?.name ?? null)
-                                : (sectionFocusArea?.name ?? null);
-                            const isGeneralShift =
-                              assignment?.isGeneral === true ||
-                              (assignment?.focusAreaId == null &&
-                                assignment?.shiftId == null &&
-                                assignment?.categoryId == null);
-                            const generalShiftName =
-                              job?.name ??
-                              assignment?.name ??
-                              assignment?.label ??
-                              shiftLabel?.split("/")[entryIndex] ??
-                              "Shift";
-
-                            return {
-                              label:
-                                (isGeneralShift ? generalShiftName : null) ??
-                                category?.name ??
+                        const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
+                          ? [
+                              {
+                                label: restOfDayAbsenceName,
+                                jobName: null,
+                                focusAreaName: null,
+                                timeLabel: absenceLayout?.time ?? "Rest of the day",
+                                isCustomTime: false,
+                                isMentored: false,
+                              },
+                            ]
+                          : [];
+                        const shiftHoverEntries: ShiftDetailEntry[] = cellAbsenceType
+                          ? [
+                              {
+                                label: cellAbsenceType.name || cellAbsenceType.label,
+                                jobName: null,
+                                focusAreaName: sectionFocusArea?.name ?? null,
+                                timeLabel: null,
+                                isCustomTime: false,
+                                isMentored: false,
+                              },
+                            ]
+                          : cellCodeIds.map((assignmentId, entryIndex) => {
+                              const assignment = assignmentById.get(assignmentId);
+                              const category =
+                                assignment?.categoryId != null
+                                  ? categoryById.get(assignment.categoryId)
+                                  : null;
+                              const job =
+                                assignment?.jobId != null ? jobById.get(assignment.jobId) : null;
+                              const customTime =
+                                customTimes?.perPill?.[entryIndex] ??
+                                (entryIndex === 0 && !customTimes?.perPill ? customTimes : null);
+                              const start =
+                                customTime?.start ??
+                                assignment?.defaultStartTime ??
+                                category?.startTime ??
+                                null;
+                              const end =
+                                customTime?.end ??
+                                assignment?.defaultEndTime ??
+                                category?.endTime ??
+                                null;
+                              const focusArea =
+                                assignment?.focusAreaId != null
+                                  ? (focusAreas.find((area) => area.id === assignment.focusAreaId)
+                                      ?.name ?? null)
+                                  : (sectionFocusArea?.name ?? null);
+                              const isGeneralShift =
+                                assignment?.isGeneral === true ||
+                                (assignment?.focusAreaId == null &&
+                                  assignment?.shiftId == null &&
+                                  assignment?.categoryId == null);
+                              const generalShiftName =
+                                job?.name ??
                                 assignment?.name ??
                                 assignment?.label ??
                                 shiftLabel?.split("/")[entryIndex] ??
-                                "Shift",
-                              jobName: isGeneralShift ? "General shift" : (job?.name ?? null),
-                              focusAreaName: focusArea,
-                              timeLabel: start && end ? `${fmt12h(start)} - ${fmt12h(end)}` : null,
-                              isCustomTime: !!customTime,
-                              isMentored: cellSegments[entryIndex]?.isMentored ?? false,
-                            };
-                          });
-                      const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
-                      const hoverIndicatorNames = indicatorTypes
-                        .filter((indicator) =>
-                          noteMarks.some((mark) => mark.indicatorTypeId === indicator.id),
-                        )
-                        .map((indicator) => indicator.name);
-                      const hoverStatus = draftKind
-                        ? draftKind === "new"
-                          ? "Draft new"
-                          : draftKind === "modified"
-                            ? "Draft changes"
-                            : "Marked for deletion"
-                        : showsPublishDiff
-                          ? "Recently published change"
-                          : null;
-                      // The lock avatar outranks everything else in the top-right
-                      // corner: it is the only mark that explains why a cell will
-                      // not open. Everything else there starts past it.
-                      const cornerLockClearance = hasPeerEditor ? LOCK_CORNER_CLEARANCE : 0;
+                                "Shift";
 
-                      const awayRunDay = rowAwayDays?.runs[index] ?? null;
-                      // Before the return date nothing can be scheduled for them.
-                      const isAwayLocked = !!rowAwayDays?.locked[index];
-                      const awayHint =
-                        isAwayLocked && rowAwayRange
-                          ? awayLockedHint(rowAwayRange, dateKey)
+                              return {
+                                label:
+                                  (isGeneralShift ? generalShiftName : null) ??
+                                  category?.name ??
+                                  assignment?.name ??
+                                  assignment?.label ??
+                                  shiftLabel?.split("/")[entryIndex] ??
+                                  "Shift",
+                                jobName: isGeneralShift ? "General shift" : (job?.name ?? null),
+                                focusAreaName: focusArea,
+                                timeLabel:
+                                  start && end ? `${fmt12h(start)} - ${fmt12h(end)}` : null,
+                                isCustomTime: !!customTime,
+                                isMentored: cellSegments[entryIndex]?.isMentored ?? false,
+                              };
+                            });
+                        const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
+                        const hoverIndicatorNames = indicatorTypes
+                          .filter((indicator) =>
+                            noteMarks.some((mark) => mark.indicatorTypeId === indicator.id),
+                          )
+                          .map((indicator) => indicator.name);
+                        const hoverStatus = draftKind
+                          ? draftKind === "new"
+                            ? "Draft new"
+                            : draftKind === "modified"
+                              ? "Draft changes"
+                              : "Marked for deletion"
+                          : showsPublishDiff
+                            ? "Recently published change"
+                            : null;
+                        // The lock avatar outranks everything else in the top-right
+                        // corner: it is the only mark that explains why a cell will
+                        // not open. Everything else there starts past it.
+                        const cornerLockClearance = hasPeerEditor ? LOCK_CORNER_CLEARANCE : 0;
+
+                        const awayRunDay = rowAwayDays?.runs[index] ?? null;
+                        // Before the return date nothing can be scheduled for them.
+                        const isAwayLocked = !!rowAwayDays?.locked[index];
+                        const awayHint =
+                          isAwayLocked && rowAwayRange
+                            ? awayLockedHint(rowAwayRange, dateKey)
+                            : undefined;
+                        // Days before a first day (51g4) carry its own label and no absence.
+                        const awayRunBeforeFirstDay =
+                          !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
+                        const isDayInteractive = isCellInteractive && !isAwayLocked;
+                        // A past day is finished (53b): it opens for a correction,
+                        // and nothing moves into or out of it.
+                        const isPastDay = isPastDateKey(dateKey, todayKey);
+                        const correction = isPastDay ? corrections?.get(cellKey) : undefined;
+                        const correctionHint = correction
+                          ? correction.reason
+                            ? `Corrected: ${correctionReasonLabel(correction.reason)}`
+                            : "Corrected"
                           : undefined;
-                      // Days before a first day (51g4) carry its own label and no absence.
-                      const awayRunBeforeFirstDay =
-                        !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
-                      const isDayInteractive = isCellInteractive && !isAwayLocked;
-                      // A past day is finished (53b): it opens for a correction,
-                      // and nothing moves into or out of it.
-                      const isPastDay = isPastDateKey(dateKey, todayKey);
-                      const correction = isPastDay ? corrections?.get(cellKey) : undefined;
-                      const correctionHint = correction
-                        ? correction.reason
-                          ? `Corrected: ${correctionReasonLabel(correction.reason)}`
-                          : "Corrected"
-                        : undefined;
-                      const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
-                      // The row above paints its own bottom stroke inside its
-                      // own box — the header cells and the open-shifts row both
-                      // do it with a background-image at their bottom edge. Row
-                      // 0 must not repaint that stroke or the two stack and
-                      // content cells read thicker than their empty neighbours.
-                      const topDivider = ri > 0 ? "light" : undefined;
-                      const cellId = buildCellId(emp.id, dateKey);
-                      const bulkCellKey = getGridCellKey(cellId);
-                      const isBulkSelectable =
-                        bulkDeleteMode && !!bulkSelectableCellKeys?.has(bulkCellKey);
-                      const isBulkSelected =
-                        bulkDeleteMode && !!bulkSelectedCellKeys?.has(bulkCellKey);
-                      const hasDraggableEntry =
-                        canDragShifts &&
-                        !bulkDeleteMode &&
-                        !isAwayLocked &&
-                        !isPastDay &&
-                        !!shiftLabel &&
-                        shiftLabel !== "OFF" &&
-                        draftKind !== "deleted";
-                      const firstStyle = hasDraggableEntry
-                        ? getStyleByIdOrLabel(shiftLabel.split("/")[0], cellCodeIds[0])
-                        : null;
-                      const dragAbsenceStripes = cellAbsenceType
-                        ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
-                        : null;
-                      const leadingDividerInset = index === 0 ? 0 : 1;
-                      const absenceRunDay = rowAbsenceRuns?.days[index] ?? null;
-                      const absenceRunInside =
-                        (absenceRunDay != null && absenceRunDay.position !== "start") ||
-                        (awayRunDay != null && awayRunDay.position !== "start");
-                      // Only the cell's own top divider eats into its box. The
-                      // header/open-shifts stroke above row 0 lives in that
-                      // row's box, so row 0 needs no inset and its pills line up
-                      // with every other row's.
-                      const topDividerInset = ri > 0 ? 1 : 0;
-                      const insetFromVisibleCellLeft = (base: number) =>
-                        `${base + leadingDividerInset}px`;
-                      const insetFromVisibleCellTop = (base: number) =>
-                        `${base + topDividerInset}px`;
+                        const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
+                        // The row above paints its own bottom stroke inside its
+                        // own box — the header cells and the open-shifts row both
+                        // do it with a background-image at their bottom edge. Row
+                        // 0 must not repaint that stroke or the two stack and
+                        // content cells read thicker than their empty neighbours.
+                        const topDivider = ri > 0 ? "light" : undefined;
+                        const cellId = buildCellId(emp.id, dateKey);
+                        const bulkCellKey = getGridCellKey(cellId);
+                        const isBulkSelectable =
+                          bulkDeleteMode && !!bulkSelectableCellKeys?.has(bulkCellKey);
+                        const isBulkSelected =
+                          bulkDeleteMode && !!bulkSelectedCellKeys?.has(bulkCellKey);
+                        const hasDraggableEntry =
+                          canDragShifts &&
+                          !bulkDeleteMode &&
+                          !isAwayLocked &&
+                          !isPastDay &&
+                          !!shiftLabel &&
+                          shiftLabel !== "OFF" &&
+                          draftKind !== "deleted";
+                        const firstStyle = hasDraggableEntry
+                          ? getStyleByIdOrLabel(shiftLabel.split("/")[0], cellCodeIds[0])
+                          : null;
+                        const dragAbsenceStripes = cellAbsenceType
+                          ? resolveAbsenceStripes(cellAbsenceType.color, isDarkTheme)
+                          : null;
+                        const leadingDividerInset = index === 0 ? 0 : 1;
+                        const absenceRunDay = rowAbsenceRuns?.days[index] ?? null;
+                        const absenceRunInside =
+                          (absenceRunDay != null && absenceRunDay.position !== "start") ||
+                          (awayRunDay != null && awayRunDay.position !== "start");
+                        // Only the cell's own top divider eats into its box. The
+                        // header/open-shifts stroke above row 0 lives in that
+                        // row's box, so row 0 needs no inset and its pills line up
+                        // with every other row's.
+                        const topDividerInset = ri > 0 ? 1 : 0;
+                        const insetFromVisibleCellLeft = (base: number) =>
+                          `${base + leadingDividerInset}px`;
+                        const insetFromVisibleCellTop = (base: number) =>
+                          `${base + topDividerInset}px`;
 
-                      return (
-                        <DroppableCell
-                          key={dateKey}
-                          id={`drop_${emp.id}_${dateKey}_${sectionName}`}
-                          data={{
-                            cellId,
-                          }}
-                          disabled={!isDayInteractive || bulkDeleteMode || isPastDay}
-                          className="dg-grid-cell"
-                          role="gridcell"
-                          aria-label={
-                            awayRunDay
-                              ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
-                              : shiftLabel && shiftLabel !== "OFF"
-                                ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
-                                : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
-                          }
-                          aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
-                          tabIndex={isDayInteractive || isBulkSelectable ? 0 : -1}
-                          data-emp-id={emp.id}
-                          data-date-key={dateKey}
-                          data-section-id={sectionId}
-                          data-interactive={isDayInteractive ? "true" : "false"}
-                          data-peer-editing={hasPeerEditor ? "true" : "false"}
-                          data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
-                          data-slot="cell"
-                          data-leading-divider={
-                            index === 0 || absenceRunInside
-                              ? "none"
-                              : isSplitDayDivider(index)
-                                ? "split"
-                                : "light"
-                          }
-                          data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
-                          data-today={isToday ? "true" : undefined}
-                          data-past={isPastDay ? "true" : undefined}
-                          data-top-divider={topDivider}
-                          data-absence-run={absenceRunDay?.position}
-                          data-absence-run-index={absenceRunDay?.runIndex}
-                          data-away-run={awayRunDay?.position}
-                          data-away-locked={isAwayLocked ? "true" : undefined}
-                          title={awayHint ?? correctionHint}
-                          aria-description={awayHint ?? correctionHint}
-                          data-corrected={correction ? "true" : undefined}
-                          data-bulk-mode={bulkDeleteMode ? "true" : undefined}
-                          data-bulk-selectable={isBulkSelectable ? "true" : undefined}
-                          data-bulk-selected={isBulkSelected ? "true" : undefined}
-                          style={{
-                            height: GRID_CELL_HEIGHT,
-                            background: isBulkSelected
-                              ? "var(--dg-color-brand-bg)"
-                              : showDiffCellTint
-                                ? rowBg
-                                : isPastDay
-                                  ? "var(--dg-color-past-wash)"
-                                  : undefined,
-                            // A run's bar crosses into the next cells, so none of
-                            // them may stack its own background above it.
-                            zIndex: showDiffCellTint
-                              ? 8
-                              : ri === 0 && !absenceRunDay && !awayRunDay
-                                ? 5
-                                : undefined,
-                          }}
-                          onFocus={() => onCellFocus?.(cellId)}
-                          onMouseEnter={(event) => {
-                            onCellHover?.(cellId);
-                            if (absenceRunDay) setAbsenceRunHover(event.currentTarget, true);
-                          }}
-                          onMouseLeave={
-                            absenceRunDay
-                              ? (event) => setAbsenceRunHover(event.currentTarget, false)
-                              : undefined
-                          }
-                          onClick={() => {
-                            if (!isAwayLocked) triggerCellActivation(emp, date, "click");
-                          }}
-                          onContextMenu={(event) => {
-                            if (isAwayLocked || isPastDay) return;
-                            triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
-                          }}
-                          onKeyDown={(event) => {
-                            if (isAwayLocked) return;
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              triggerCellActivation(emp, date, "keyboard");
+                        return (
+                          <DroppableCell
+                            key={dateKey}
+                            id={`drop_${emp.id}_${dateKey}_${sectionName}`}
+                            data={{
+                              cellId,
+                            }}
+                            disabled={!isDayInteractive || bulkDeleteMode || isPastDay}
+                            className="dg-grid-cell"
+                            role="gridcell"
+                            aria-label={
+                              awayRunDay
+                                ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
+                                : shiftLabel && shiftLabel !== "OFF"
+                                  ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
+                                  : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                             }
-                            if (event.shiftKey && event.key === "F10" && !isPastDay) {
-                              triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
+                            aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
+                            tabIndex={isDayInteractive || isBulkSelectable ? 0 : -1}
+                            data-emp-id={emp.id}
+                            data-date-key={dateKey}
+                            data-section-id={sectionId}
+                            data-interactive={isDayInteractive ? "true" : "false"}
+                            data-peer-editing={hasPeerEditor ? "true" : "false"}
+                            data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            data-slot="cell"
+                            data-leading-divider={
+                              index === 0 || absenceRunInside
+                                ? "none"
+                                : isSplitDayDivider(index)
+                                  ? "split"
+                                  : "light"
                             }
-                          }}
-                        >
-                          {correction && (
-                            <span
-                              aria-hidden="true"
-                              data-correction-mark
-                              className="dg-grid-correction-mark"
-                              style={{
-                                position: "absolute",
-                                top: 3,
-                                right: 3 + cornerLockClearance,
-                                zIndex: 9,
-                                width: 14,
-                                height: 14,
-                                borderRadius: 999,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                background: "var(--dg-color-surface)",
-                                boxShadow: "0 0 0 1px var(--dg-color-border)",
-                                color: "var(--dg-color-text-muted)",
-                                pointerEvents: "none",
-                              }}
-                            >
-                              <Pencil size={8} strokeWidth={2.5} />
-                            </span>
-                          )}
-                          <div
-                            className="dg-grid-cell__content"
+                            data-week-split-start={isSplitDayDivider(index) ? "true" : undefined}
+                            data-today={isToday ? "true" : undefined}
+                            data-past={isPastDay ? "true" : undefined}
+                            data-top-divider={topDivider}
+                            data-absence-run={absenceRunDay?.position}
+                            data-absence-run-index={absenceRunDay?.runIndex}
+                            data-away-run={awayRunDay?.position}
+                            data-away-locked={isAwayLocked ? "true" : undefined}
+                            title={awayHint ?? correctionHint}
+                            aria-description={awayHint ?? correctionHint}
+                            data-corrected={correction ? "true" : undefined}
+                            data-bulk-mode={bulkDeleteMode ? "true" : undefined}
+                            data-bulk-selectable={isBulkSelectable ? "true" : undefined}
+                            data-bulk-selected={isBulkSelected ? "true" : undefined}
                             style={{
-                              zIndex: showDiffCellTint ? 4 : undefined,
-                              overflow: "visible",
-                              // In a row grown for one cell's content, every
-                              // other cell keeps the normal height, centred.
-                              ...(rowCellGrows[index]
-                                ? null
-                                : { height: "var(--dg-grid-cell-height)" }),
+                              height: GRID_CELL_HEIGHT,
+                              background: isBulkSelected
+                                ? "var(--dg-color-brand-bg)"
+                                : showDiffCellTint
+                                  ? rowBg
+                                  : isPastDay
+                                    ? "var(--dg-color-past-wash)"
+                                    : undefined,
+                              // A run's bar crosses into the next cells, so none of
+                              // them may stack its own background above it.
+                              zIndex: showDiffCellTint
+                                ? 8
+                                : ri === 0 && !absenceRunDay && !awayRunDay
+                                  ? 5
+                                  : undefined,
+                            }}
+                            onFocus={() => onCellFocus?.(cellId)}
+                            onMouseEnter={(event) => {
+                              onCellHover?.(cellId);
+                              if (absenceRunDay) setAbsenceRunHover(event.currentTarget, true);
+                            }}
+                            onMouseLeave={
+                              absenceRunDay
+                                ? (event) => setAbsenceRunHover(event.currentTarget, false)
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!isAwayLocked) triggerCellActivation(emp, date, "click");
+                            }}
+                            onContextMenu={(event) => {
+                              if (isAwayLocked || isPastDay) return;
+                              triggerCellContextMenu(event, event.currentTarget, cellId, emp, date);
+                            }}
+                            onKeyDown={(event) => {
+                              if (isAwayLocked) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                triggerCellActivation(emp, date, "keyboard");
+                              }
+                              if (event.shiftKey && event.key === "F10" && !isPastDay) {
+                                triggerCellContextMenu(
+                                  event,
+                                  event.currentTarget,
+                                  cellId,
+                                  emp,
+                                  date,
+                                );
+                              }
                             }}
                           >
-                            {isBulkSelected && (
+                            {correction && (
                               <span
-                                className="dg-grid-cell__bulk-selected-indicator"
-                                data-bulk-selection-indicator="true"
                                 aria-hidden="true"
+                                data-correction-mark
+                                className="dg-grid-correction-mark"
+                                style={{
+                                  position: "absolute",
+                                  top: 3,
+                                  right: 3 + cornerLockClearance,
+                                  zIndex: 9,
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: 999,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: "var(--dg-color-surface)",
+                                  boxShadow: "0 0 0 1px var(--dg-color-border)",
+                                  color: "var(--dg-color-text-muted)",
+                                  pointerEvents: "none",
+                                }}
                               >
-                                -
+                                <Pencil size={8} strokeWidth={2.5} />
                               </span>
                             )}
-                            {absenceRunDay?.position === "start" &&
-                              cellAbsenceType &&
-                              dragAbsenceStripes && (
-                                <AbsenceRunBar
-                                  runIndex={absenceRunDay.runIndex}
-                                  name={cellAbsenceType.name || cellAbsenceType.label}
-                                  length={absenceRunDay.length}
-                                  stripes={dragAbsenceStripes}
+                            <div
+                              className="dg-grid-cell__content"
+                              style={{
+                                zIndex: showDiffCellTint ? 4 : undefined,
+                                overflow: "visible",
+                                // In a row grown for one cell's content, every
+                                // other cell keeps the normal height, centred.
+                                ...(rowCellGrows[index]
+                                  ? null
+                                  : { height: "var(--dg-grid-cell-height)" }),
+                              }}
+                            >
+                              {isBulkSelected && (
+                                <span
+                                  className="dg-grid-cell__bulk-selected-indicator"
+                                  data-bulk-selection-indicator="true"
+                                  aria-hidden="true"
+                                >
+                                  -
+                                </span>
+                              )}
+                              {absenceRunDay?.position === "start" &&
+                                cellAbsenceType &&
+                                dragAbsenceStripes && (
+                                  <AbsenceRunBar
+                                    runIndex={absenceRunDay.runIndex}
+                                    name={cellAbsenceType.name || cellAbsenceType.label}
+                                    length={absenceRunDay.length}
+                                    stripes={dragAbsenceStripes}
+                                    top={insetFromVisibleCellTop(4)}
+                                    left={insetFromVisibleCellLeft(4)}
+                                    sideInset={4}
+                                    bottom={4}
+                                  />
+                                )}
+                              {awayRunDay?.position === "start" && (
+                                <AwayRunBar
+                                  runIndex={awayRunDay.runIndex}
+                                  label={
+                                    awayRunBeforeFirstDay && rowAwayRange?.firstDay
+                                      ? startsRunLabel(rowAwayRange.firstDay)
+                                      : rowAwayRange?.lastDay
+                                        ? LEAVING_RUN_LABEL
+                                        : undefined
+                                  }
+                                  absenceName={
+                                    rowAwayAbsence && !awayRunBeforeFirstDay
+                                      ? rowAwayAbsence.name || rowAwayAbsence.label
+                                      : null
+                                  }
+                                  length={awayRunDay.length}
                                   top={insetFromVisibleCellTop(4)}
                                   left={insetFromVisibleCellLeft(4)}
                                   sideInset={4}
                                   bottom={4}
                                 />
                               )}
-                            {awayRunDay?.position === "start" && (
-                              <AwayRunBar
-                                runIndex={awayRunDay.runIndex}
-                                label={
-                                  awayRunBeforeFirstDay && rowAwayRange?.firstDay
-                                    ? startsRunLabel(rowAwayRange.firstDay)
-                                    : rowAwayRange?.lastDay
-                                      ? LEAVING_RUN_LABEL
-                                      : undefined
-                                }
-                                absenceName={
-                                  rowAwayAbsence && !awayRunBeforeFirstDay
-                                    ? rowAwayAbsence.name || rowAwayAbsence.label
-                                    : null
-                                }
-                                length={awayRunDay.length}
-                                top={insetFromVisibleCellTop(4)}
-                                left={insetFromVisibleCellLeft(4)}
-                                sideInset={4}
-                                bottom={4}
-                              />
-                            )}
-                            {awayRunDay ? null : shiftLabel && shiftLabel !== "OFF" ? (
-                              <DraggableShift
-                                id={`drag_${emp.id}_${dateKey}_${sectionName}`}
-                                data={{
-                                  cellId,
-                                  label: shiftLabel,
-                                  payload: {
-                                    kind: currentAbsenceTypeId != null ? "absence" : "worked",
-                                    segments:
-                                      currentAbsenceTypeId != null
-                                        ? []
-                                        : (cellSegments.length > 0
-                                            ? cellSegments
-                                            : cellCodeIds.map((assignmentId, position) => {
-                                                const assignment = assignmentById.get(assignmentId);
-                                                if (assignment?.jobId == null) {
-                                                  return null;
-                                                }
+                              {awayRunDay ? null : shiftLabel && shiftLabel !== "OFF" ? (
+                                <DraggableShift
+                                  id={`drag_${emp.id}_${dateKey}_${sectionName}`}
+                                  data={{
+                                    cellId,
+                                    label: shiftLabel,
+                                    payload: {
+                                      kind: currentAbsenceTypeId != null ? "absence" : "worked",
+                                      segments:
+                                        currentAbsenceTypeId != null
+                                          ? []
+                                          : (cellSegments.length > 0
+                                              ? cellSegments
+                                              : cellCodeIds.map((assignmentId, position) => {
+                                                  const assignment =
+                                                    assignmentById.get(assignmentId);
+                                                  if (assignment?.jobId == null) {
+                                                    return null;
+                                                  }
+                                                  return {
+                                                    shiftId:
+                                                      assignment.shiftId ??
+                                                      assignment.categoryId ??
+                                                      null,
+                                                    jobId: assignment.jobId,
+                                                    position,
+                                                    isMentored: false,
+                                                  };
+                                                })
+                                            )
+                                              .map((segment, position) => {
+                                                if (!segment) return null;
+                                                const assignmentId = assignmentIdByPair.get(
+                                                  buildShiftJobPairKey(
+                                                    segment.shiftId ?? null,
+                                                    segment.jobId,
+                                                  ),
+                                                );
+                                                const assignment =
+                                                  assignmentId == null
+                                                    ? null
+                                                    : assignmentById.get(assignmentId);
                                                 return {
                                                   shiftId:
-                                                    assignment.shiftId ??
-                                                    assignment.categoryId ??
+                                                    segment.shiftId ??
+                                                    assignment?.shiftId ??
+                                                    assignment?.categoryId ??
                                                     null,
-                                                  jobId: assignment.jobId,
-                                                  position,
-                                                  isMentored: false,
+                                                  jobId: segment.jobId,
+                                                  position: segment.position ?? position,
+                                                  isMentored: segment.isMentored ?? false,
                                                 };
                                               })
-                                          )
-                                            .map((segment, position) => {
-                                              if (!segment) return null;
-                                              const assignmentId = assignmentIdByPair.get(
-                                                buildShiftJobPairKey(
-                                                  segment.shiftId ?? null,
-                                                  segment.jobId,
-                                                ),
-                                              );
-                                              const assignment =
-                                                assignmentId == null
-                                                  ? null
-                                                  : assignmentById.get(assignmentId);
-                                              return {
-                                                shiftId:
-                                                  segment.shiftId ??
-                                                  assignment?.shiftId ??
-                                                  assignment?.categoryId ??
-                                                  null,
-                                                jobId: segment.jobId,
-                                                position: segment.position ?? position,
-                                                isMentored: segment.isMentored ?? false,
-                                              };
-                                            })
-                                            .filter(
-                                              (
-                                                segment,
-                                              ): segment is {
-                                                shiftId: number | null;
-                                                jobId: number;
-                                                position: number;
-                                                isMentored: boolean;
-                                              } => segment != null,
+                                              .filter(
+                                                (
+                                                  segment,
+                                                ): segment is {
+                                                  shiftId: number | null;
+                                                  jobId: number;
+                                                  position: number;
+                                                  isMentored: boolean;
+                                                } => segment != null,
+                                              ),
+                                      // A worked cell carries its rest-of-day absence (item 45).
+                                      absenceTypeId: currentAbsenceTypeId ?? restOfDayAbsenceTypeId,
+                                      ...joinedCustomTimes(customTimes),
+                                      seriesId: null,
+                                      fromRecurring: false,
+                                    },
+                                    pillColor: dragAbsenceStripes
+                                      ? absenceStripeCss(
+                                          dragAbsenceStripes.stripeA,
+                                          dragAbsenceStripes.stripeB,
+                                        )
+                                      : (firstStyle?.color ?? "var(--dg-color-bg)"),
+                                    pillText:
+                                      dragAbsenceStripes?.text ??
+                                      firstStyle?.text ??
+                                      "var(--dg-color-text-muted)",
+                                  }}
+                                  disabled={!hasDraggableEntry}
+                                >
+                                  {(() => {
+                                    // "/" joins the segments of a worked cell,
+                                    // so it is what splits that cell into pills.
+                                    // An absence is a single pill whose label is
+                                    // whatever the org named it — splitting one
+                                    // called "PTO/Flex" tore it into two pills
+                                    // that then resolved against the assignment
+                                    // list and rendered someone else's label.
+                                    const labels = cellAbsenceType
+                                      ? [shiftLabel]
+                                      : shiftLabel.split("/");
+                                    // A first publication is the baseline. The
+                                    // page client normally filters it already,
+                                    // but keep the grid safe for direct callers
+                                    // and historical test fixtures as well.
+                                    const isMeaningfulPublishNew =
+                                      publishDiff?.kind !== "new" ||
+                                      publishDiff.isNewAddition !== false;
+                                    const isPubDiff =
+                                      showsPublishDiff && isMeaningfulPublishNew
+                                        ? publishDiff
+                                        : null;
+                                    // Persisted segment snapshots carry stable IDs, not presentation
+                                    // labels. Treat an absent label as absent — passing `?` here masks
+                                    // the current/published label fallback and produced `Added ?`.
+                                    const snapshotLabels = (
+                                      segments: PublishChange["fromSegments"],
+                                    ): Array<string | null> | undefined => {
+                                      const labels = segments?.map((segment) => {
+                                        const label = (segment as { label?: unknown }).label;
+                                        return typeof label === "string" && label.trim()
+                                          ? label
+                                          : null;
+                                      });
+                                      return labels?.some((label) => label != null)
+                                        ? labels
+                                        : undefined;
+                                    };
+                                    const resolveGridShiftLabel = (assignmentId: number) => {
+                                      const assignmentEntry = assignmentById.get(assignmentId);
+                                      if (!assignmentEntry) return "?";
+                                      return isNameMode
+                                        ? assignmentEntry.name || assignmentEntry.label
+                                        : assignmentEntry.label;
+                                    };
+                                    const resolveGridAbsenceLabel = (absenceTypeId: number) => {
+                                      const absenceType = absenceTypeMap?.get(absenceTypeId);
+                                      if (!absenceType) return "?";
+                                      return isNameMode
+                                        ? absenceType.name || absenceType.label
+                                        : absenceType.label;
+                                    };
+                                    // History is explanatory, not compact grid chrome. Always spell
+                                    // out both the shift and job so `Was …` remains meaningful when
+                                    // the grid is configured to show short codes.
+                                    const resolveHistoryShiftLabel = (assignmentId: number) => {
+                                      const assignmentEntry = assignmentById.get(assignmentId);
+                                      if (!assignmentEntry) return "?";
+                                      const category =
+                                        assignmentEntry.categoryId != null
+                                          ? categoryById.get(assignmentEntry.categoryId)
+                                          : null;
+                                      const job =
+                                        assignmentEntry.jobId != null
+                                          ? jobById.get(assignmentEntry.jobId)
+                                          : null;
+                                      const isGeneral =
+                                        assignmentEntry.isGeneral === true ||
+                                        (assignmentEntry.focusAreaId == null &&
+                                          assignmentEntry.shiftId == null &&
+                                          assignmentEntry.categoryId == null);
+                                      const shiftName = isGeneral
+                                        ? (job?.name ??
+                                          assignmentEntry.name ??
+                                          assignmentEntry.label)
+                                        : (assignmentEntry.name ??
+                                          category?.name ??
+                                          assignmentEntry.label);
+                                      const shiftNameAlreadyIncludesJob =
+                                        !!job?.name &&
+                                        shiftName
+                                          .toLocaleLowerCase()
+                                          .includes(job.name.toLocaleLowerCase());
+                                      return !isGeneral && job?.name && !shiftNameAlreadyIncludesJob
+                                        ? `${shiftName} · ${job.name}`
+                                        : shiftName;
+                                    };
+                                    const draftDiff = shouldComputeDraftDiff
+                                      ? buildShiftDiffDescriptors({
+                                          before: {
+                                            assignmentIds: publishedCodeIds,
+                                            absenceTypeId: publishedAbsenceTypeId,
+                                            restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
+                                            isMentoredFlags: publishedSegments.map(
+                                              (segment) => segment.isMentored ?? false,
                                             ),
-                                    // A worked cell carries its rest-of-day absence (item 45).
-                                    absenceTypeId: currentAbsenceTypeId ?? restOfDayAbsenceTypeId,
-                                    ...joinedCustomTimes(customTimes),
-                                    seriesId: null,
-                                    fromRecurring: false,
-                                  },
-                                  pillColor: dragAbsenceStripes
-                                    ? absenceStripeCss(
-                                        dragAbsenceStripes.stripeA,
-                                        dragAbsenceStripes.stripeB,
-                                      )
-                                    : (firstStyle?.color ?? "var(--dg-color-bg)"),
-                                  pillText:
-                                    dragAbsenceStripes?.text ??
-                                    firstStyle?.text ??
-                                    "var(--dg-color-text-muted)",
-                                }}
-                                disabled={!hasDraggableEntry}
-                              >
-                                {(() => {
-                                  // "/" joins the segments of a worked cell,
-                                  // so it is what splits that cell into pills.
-                                  // An absence is a single pill whose label is
-                                  // whatever the org named it — splitting one
-                                  // called "PTO/Flex" tore it into two pills
-                                  // that then resolved against the assignment
-                                  // list and rendered someone else's label.
-                                  const labels = cellAbsenceType
-                                    ? [shiftLabel]
-                                    : shiftLabel.split("/");
-                                  // A first publication is the baseline. The
-                                  // page client normally filters it already,
-                                  // but keep the grid safe for direct callers
-                                  // and historical test fixtures as well.
-                                  const isMeaningfulPublishNew =
-                                    publishDiff?.kind !== "new" ||
-                                    publishDiff.isNewAddition !== false;
-                                  const isPubDiff =
-                                    showsPublishDiff && isMeaningfulPublishNew ? publishDiff : null;
-                                  // Persisted segment snapshots carry stable IDs, not presentation
-                                  // labels. Treat an absent label as absent — passing `?` here masks
-                                  // the current/published label fallback and produced `Added ?`.
-                                  const snapshotLabels = (
-                                    segments: PublishChange["fromSegments"],
-                                  ): Array<string | null> | undefined => {
-                                    const labels = segments?.map((segment) => {
-                                      const label = (segment as { label?: unknown }).label;
-                                      return typeof label === "string" && label.trim()
-                                        ? label
-                                        : null;
-                                    });
-                                    return labels?.some((label) => label != null)
-                                      ? labels
-                                      : undefined;
-                                  };
-                                  const resolveGridShiftLabel = (assignmentId: number) => {
-                                    const assignmentEntry = assignmentById.get(assignmentId);
-                                    if (!assignmentEntry) return "?";
-                                    return isNameMode
-                                      ? assignmentEntry.name || assignmentEntry.label
-                                      : assignmentEntry.label;
-                                  };
-                                  const resolveGridAbsenceLabel = (absenceTypeId: number) => {
-                                    const absenceType = absenceTypeMap?.get(absenceTypeId);
-                                    if (!absenceType) return "?";
-                                    return isNameMode
-                                      ? absenceType.name || absenceType.label
-                                      : absenceType.label;
-                                  };
-                                  // History is explanatory, not compact grid chrome. Always spell
-                                  // out both the shift and job so `Was …` remains meaningful when
-                                  // the grid is configured to show short codes.
-                                  const resolveHistoryShiftLabel = (assignmentId: number) => {
-                                    const assignmentEntry = assignmentById.get(assignmentId);
-                                    if (!assignmentEntry) return "?";
-                                    const category =
-                                      assignmentEntry.categoryId != null
-                                        ? categoryById.get(assignmentEntry.categoryId)
-                                        : null;
-                                    const job =
-                                      assignmentEntry.jobId != null
-                                        ? jobById.get(assignmentEntry.jobId)
-                                        : null;
-                                    const isGeneral =
-                                      assignmentEntry.isGeneral === true ||
-                                      (assignmentEntry.focusAreaId == null &&
-                                        assignmentEntry.shiftId == null &&
-                                        assignmentEntry.categoryId == null);
-                                    const shiftName = isGeneral
-                                      ? (job?.name ?? assignmentEntry.name ?? assignmentEntry.label)
-                                      : (assignmentEntry.name ??
-                                        category?.name ??
-                                        assignmentEntry.label);
-                                    const shiftNameAlreadyIncludesJob =
-                                      !!job?.name &&
-                                      shiftName
-                                        .toLocaleLowerCase()
-                                        .includes(job.name.toLocaleLowerCase());
-                                    return !isGeneral && job?.name && !shiftNameAlreadyIncludesJob
-                                      ? `${shiftName} · ${job.name}`
-                                      : shiftName;
-                                  };
-                                  const draftDiff = shouldComputeDraftDiff
-                                    ? buildShiftDiffDescriptors({
-                                        before: {
-                                          assignmentIds: publishedCodeIds,
-                                          absenceTypeId: publishedAbsenceTypeId,
-                                          restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeId,
-                                          isMentoredFlags: publishedSegments.map(
-                                            (segment) => segment.isMentored ?? false,
-                                          ),
-                                          timeRanges: timeRangesFromCustomTimes({
-                                            customTimes: publishedCustomTimes,
-                                            count: publishedCodeIds.length,
-                                          }),
-                                        },
-                                        after: {
-                                          assignmentIds: cellCodeIds,
-                                          absenceTypeId: currentAbsenceTypeId,
-                                          restOfDayAbsenceTypeId,
-                                          isMentoredFlags: cellSegments.map(
-                                            (segment) => segment.isMentored ?? false,
-                                          ),
-                                          timeRanges: timeRangesFromCustomTimes({
-                                            customTimes,
-                                            count: cellCodeIds.length,
-                                          }),
-                                        },
-                                        beforeShiftLabels: splitShiftLabelParts(publishedLabel),
-                                        afterShiftLabels: splitShiftLabelParts(shiftLabel),
-                                        resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
-                                        resolveAbsenceLabel: resolveGridAbsenceLabel,
-                                      })
-                                    : null;
-                                  // Only a cell with a published change to
-                                  // paint pays for resolving its before and
-                                  // after states; every other cell used to
-                                  // derive both id lists and both history
-                                  // label lists on every render for nothing.
-                                  const publishDiffSummary = isPubDiff
-                                    ? isPubDiff.detailsHidden && isPubDiff.kind !== "deleted"
-                                      ? hiddenPublishDiffDescriptors(isPubDiff.kind, labels.length)
-                                      : (() => {
-                                          const publishFrom =
-                                            isPubDiff.from ??
-                                            assignmentIdsFromPublishState(
-                                              isPubDiff.fromState,
-                                              publishedAssignmentIdByPair,
-                                            );
-                                          const publishTo =
-                                            isPubDiff.to ??
-                                            assignmentIdsFromPublishState(
-                                              isPubDiff.toState,
-                                              publishedAssignmentIdByPair,
-                                            );
-                                          return buildShiftDiffDescriptors({
-                                            before: {
-                                              assignmentIds: publishFrom,
-                                              absenceTypeId:
-                                                isPubDiff.fromAbsenceTypeId ??
-                                                absenceTypeIdFromPublishState(isPubDiff.fromState),
-                                              restOfDayAbsenceTypeId:
-                                                isPubDiff.fromRestOfDayAbsenceTypeId ??
-                                                restOfDayAbsenceTypeIdFromPublishState(
+                                            timeRanges: timeRangesFromCustomTimes({
+                                              customTimes: publishedCustomTimes,
+                                              count: publishedCodeIds.length,
+                                            }),
+                                          },
+                                          after: {
+                                            assignmentIds: cellCodeIds,
+                                            absenceTypeId: currentAbsenceTypeId,
+                                            restOfDayAbsenceTypeId,
+                                            isMentoredFlags: cellSegments.map(
+                                              (segment) => segment.isMentored ?? false,
+                                            ),
+                                            timeRanges: timeRangesFromCustomTimes({
+                                              customTimes,
+                                              count: cellCodeIds.length,
+                                            }),
+                                          },
+                                          beforeShiftLabels: splitShiftLabelParts(publishedLabel),
+                                          afterShiftLabels: splitShiftLabelParts(shiftLabel),
+                                          resolveAssignmentDefinitionLabel: resolveGridShiftLabel,
+                                          resolveAbsenceLabel: resolveGridAbsenceLabel,
+                                        })
+                                      : null;
+                                    // Only a cell with a published change to
+                                    // paint pays for resolving its before and
+                                    // after states; every other cell used to
+                                    // derive both id lists and both history
+                                    // label lists on every render for nothing.
+                                    const publishDiffSummary = isPubDiff
+                                      ? isPubDiff.detailsHidden && isPubDiff.kind !== "deleted"
+                                        ? hiddenPublishDiffDescriptors(
+                                            isPubDiff.kind,
+                                            labels.length,
+                                          )
+                                        : (() => {
+                                            const publishFrom =
+                                              isPubDiff.from ??
+                                              assignmentIdsFromPublishState(
+                                                isPubDiff.fromState,
+                                                publishedAssignmentIdByPair,
+                                              );
+                                            const publishTo =
+                                              isPubDiff.to ??
+                                              assignmentIdsFromPublishState(
+                                                isPubDiff.toState,
+                                                publishedAssignmentIdByPair,
+                                              );
+                                            return buildShiftDiffDescriptors({
+                                              before: {
+                                                assignmentIds: publishFrom,
+                                                absenceTypeId:
+                                                  isPubDiff.fromAbsenceTypeId ??
+                                                  absenceTypeIdFromPublishState(
+                                                    isPubDiff.fromState,
+                                                  ),
+                                                restOfDayAbsenceTypeId:
+                                                  isPubDiff.fromRestOfDayAbsenceTypeId ??
+                                                  restOfDayAbsenceTypeIdFromPublishState(
+                                                    isPubDiff.fromState,
+                                                  ),
+                                                timeRanges: timeRangesFromPublishState(
+                                                  isPubDiff.fromState,
+                                                  isPubDiff.fromCustomStart,
+                                                  isPubDiff.fromCustomEnd,
+                                                  publishFrom.length,
+                                                ),
+                                                isMentoredFlags: mentoredFlagsFromPublishState(
                                                   isPubDiff.fromState,
                                                 ),
-                                              timeRanges: timeRangesFromPublishState(
-                                                isPubDiff.fromState,
-                                                isPubDiff.fromCustomStart,
-                                                isPubDiff.fromCustomEnd,
-                                                publishFrom.length,
-                                              ),
-                                              isMentoredFlags: mentoredFlagsFromPublishState(
-                                                isPubDiff.fromState,
-                                              ),
-                                            },
-                                            after: {
-                                              assignmentIds: publishTo,
-                                              absenceTypeId:
-                                                isPubDiff.toAbsenceTypeId ??
-                                                absenceTypeIdFromPublishState(isPubDiff.toState),
-                                              restOfDayAbsenceTypeId:
-                                                isPubDiff.toRestOfDayAbsenceTypeId ??
-                                                restOfDayAbsenceTypeIdFromPublishState(
+                                              },
+                                              after: {
+                                                assignmentIds: publishTo,
+                                                absenceTypeId:
+                                                  isPubDiff.toAbsenceTypeId ??
+                                                  absenceTypeIdFromPublishState(isPubDiff.toState),
+                                                restOfDayAbsenceTypeId:
+                                                  isPubDiff.toRestOfDayAbsenceTypeId ??
+                                                  restOfDayAbsenceTypeIdFromPublishState(
+                                                    isPubDiff.toState,
+                                                  ),
+                                                timeRanges: timeRangesFromPublishState(
+                                                  isPubDiff.toState,
+                                                  isPubDiff.toCustomStart,
+                                                  isPubDiff.toCustomEnd,
+                                                  publishTo.length,
+                                                ),
+                                                isMentoredFlags: mentoredFlagsFromPublishState(
                                                   isPubDiff.toState,
                                                 ),
-                                              timeRanges: timeRangesFromPublishState(
-                                                isPubDiff.toState,
-                                                isPubDiff.toCustomStart,
-                                                isPubDiff.toCustomEnd,
-                                                publishTo.length,
-                                              ),
-                                              isMentoredFlags: mentoredFlagsFromPublishState(
-                                                isPubDiff.toState,
-                                              ),
-                                            },
-                                            beforeShiftLabels:
-                                              snapshotLabels(isPubDiff.fromSegments) ??
-                                              publishFrom.map(resolveHistoryShiftLabel),
-                                            afterShiftLabels:
-                                              snapshotLabels(isPubDiff.toSegments) ??
-                                              cellCodeIds.map(resolveHistoryShiftLabel),
-                                            resolveAssignmentDefinitionLabel:
-                                              resolveHistoryShiftLabel,
-                                            resolveAbsenceLabel: (absenceTypeId) =>
-                                              absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
-                                          });
-                                        })()
-                                    : null;
+                                              },
+                                              beforeShiftLabels:
+                                                snapshotLabels(isPubDiff.fromSegments) ??
+                                                publishFrom.map(resolveHistoryShiftLabel),
+                                              afterShiftLabels:
+                                                snapshotLabels(isPubDiff.toSegments) ??
+                                                cellCodeIds.map(resolveHistoryShiftLabel),
+                                              resolveAssignmentDefinitionLabel:
+                                                resolveHistoryShiftLabel,
+                                              resolveAbsenceLabel: (absenceTypeId) =>
+                                                absenceTypeMap?.get(absenceTypeId)?.name ?? "?",
+                                            });
+                                          })()
+                                      : null;
 
-                                  const publishCellBadge = isPubDiff
-                                    ? publishCellLevelBadge(
-                                        publishDiffSummary,
-                                        labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0),
-                                      )
-                                    : null;
-                                  const publishBadge: GridDiffBadgeConfig | null = publishCellBadge
-                                    ? {
-                                        source: "publish",
-                                        kind: publishCellBadge.kind,
-                                        text: publishCellBadge.text,
-                                        tooltip: buildPublishTooltip({
-                                          publishDiff: publishDiff!,
-                                          resolvePublisherName,
-                                          detail: publishChangeText ?? publishCellBadge.detail,
-                                          timeZone: publicationTimeZone,
-                                        }),
-                                      }
-                                    : null;
-                                  // An absence produces no pill diffs — pills
-                                  // are keyed off after-side assignment ids,
-                                  // which an absence has none of — so its ring
-                                  // has to come from the cell-level diff. The
-                                  // badge above already carries the text for
-                                  // that case; this only fills in a ring the
-                                  // badge itself doesn't imply (a plain "New").
-                                  const publishRingKind: ShiftDiffBorderKind =
-                                    publishBadge?.kind === "new" ||
-                                    publishBadge?.kind === "modified"
-                                      ? publishBadge.kind
-                                      : isPubDiff &&
-                                          publishDiffSummary &&
-                                          publishDiffSummary.pillDiffs.length === 0 &&
-                                          (publishDiffSummary.cellBadge?.kind === "new" ||
-                                            publishDiffSummary.cellBadge?.kind === "modified")
-                                        ? publishDiffSummary.cellBadge.kind
+                                    const publishCellBadge = isPubDiff
+                                      ? publishCellLevelBadge(
+                                          publishDiffSummary,
+                                          labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0),
+                                        )
+                                      : null;
+                                    const publishBadge: GridDiffBadgeConfig | null =
+                                      publishCellBadge
+                                        ? {
+                                            source: "publish",
+                                            kind: publishCellBadge.kind,
+                                            text: publishCellBadge.text,
+                                            tooltip: buildPublishTooltip({
+                                              publishDiff: publishDiff!,
+                                              resolvePublisherName,
+                                              detail: publishChangeText ?? publishCellBadge.detail,
+                                              timeZone: publicationTimeZone,
+                                            }),
+                                          }
                                         : null;
+                                    // An absence produces no pill diffs — pills
+                                    // are keyed off after-side assignment ids,
+                                    // which an absence has none of — so its ring
+                                    // has to come from the cell-level diff. The
+                                    // badge above already carries the text for
+                                    // that case; this only fills in a ring the
+                                    // badge itself doesn't imply (a plain "New").
+                                    const publishRingKind: ShiftDiffBorderKind =
+                                      publishBadge?.kind === "new" ||
+                                      publishBadge?.kind === "modified"
+                                        ? publishBadge.kind
+                                        : isPubDiff &&
+                                            publishDiffSummary &&
+                                            publishDiffSummary.pillDiffs.length === 0 &&
+                                            (publishDiffSummary.cellBadge?.kind === "new" ||
+                                              publishDiffSummary.cellBadge?.kind === "modified")
+                                          ? publishDiffSummary.cellBadge.kind
+                                          : null;
 
-                                  const draftCellBadge = showsDraftBadge
-                                    ? cellLevelDiffBadge(draftDiff)
-                                    : null;
-                                  const draftBadge: GridDiffBadgeConfig | null = draftCellBadge
-                                    ? {
-                                        source: "draft",
-                                        kind: draftCellBadge.kind,
-                                        text: draftCellBadge.text,
-                                        tooltip: draftChangeText ?? draftCellBadge.detail,
+                                    const draftCellBadge = showsDraftBadge
+                                      ? cellLevelDiffBadge(draftDiff)
+                                      : null;
+                                    const draftBadge: GridDiffBadgeConfig | null = draftCellBadge
+                                      ? {
+                                          source: "draft",
+                                          kind: draftCellBadge.kind,
+                                          text: draftCellBadge.text,
+                                          tooltip: draftChangeText ?? draftCellBadge.detail,
+                                        }
+                                      : null;
+
+                                    const buildPillBadge = (args: {
+                                      source: "publish" | "draft";
+                                      descriptor: ShiftDiffBadgeDescriptor | null | undefined;
+                                    }): GridDiffBadgeConfig | null => {
+                                      const { source, descriptor } = args;
+                                      // A draft "New" is already the dashed border.
+                                      if (
+                                        !descriptor ||
+                                        (descriptor.kind === "new" && source === "draft")
+                                      ) {
+                                        return null;
                                       }
-                                    : null;
 
-                                  const buildPillBadge = (args: {
-                                    source: "publish" | "draft";
-                                    descriptor: ShiftDiffBadgeDescriptor | null | undefined;
-                                  }): GridDiffBadgeConfig | null => {
-                                    const { source, descriptor } = args;
-                                    // A draft "New" is already the dashed border.
-                                    if (
-                                      !descriptor ||
-                                      (descriptor.kind === "new" && source === "draft")
-                                    ) {
-                                      return null;
+                                      return {
+                                        source,
+                                        kind: descriptor.kind,
+                                        text: descriptor.text,
+                                        tooltip:
+                                          source === "publish" && publishDiff
+                                            ? buildPublishTooltip({
+                                                publishDiff,
+                                                resolvePublisherName,
+                                                detail: publishChangeText ?? descriptor.detail,
+                                                timeZone: publicationTimeZone,
+                                              })
+                                            : source === "draft"
+                                              ? (draftChangeText ?? descriptor.detail)
+                                              : descriptor.detail,
+                                      };
+                                    };
+
+                                    if (labels.length === 1 && restOfDayAbsenceTypeId == null) {
+                                      const label = labels[0];
+                                      const isAbsence = cellAbsenceType != null;
+                                      const style = isAbsence
+                                        ? {
+                                            ...getStyleByIdOrLabel(label, cellCodeIds[0]),
+                                            color: cellAbsenceType!.color,
+                                            text: cellAbsenceType!.text,
+                                          }
+                                        : getStyleByIdOrLabel(label, cellCodeIds[0]);
+                                      const absenceStripes = isAbsence
+                                        ? resolveAbsenceStripes(style.color, isDarkTheme)
+                                        : null;
+                                      const darkPillStyle =
+                                        isDarkTheme && !absenceStripes
+                                          ? toDarkPillColors(style.color)
+                                          : null;
+                                      const effectiveColor =
+                                        absenceStripes?.stripeA ?? darkPillStyle?.bg ?? style.color;
+                                      const effectiveText =
+                                        absenceStripes?.text ?? darkPillStyle?.text ?? style.text;
+                                      const codeEntry0 =
+                                        cellCodeIds[0] != null
+                                          ? assignmentById.get(cellCodeIds[0])
+                                          : undefined;
+                                      const cat0 =
+                                        codeEntry0?.categoryId != null
+                                          ? categoryById.get(codeEntry0.categoryId)
+                                          : undefined;
+                                      const isOvernight =
+                                        !isAbsence &&
+                                        isOvernightTimes(
+                                          customTimes?.start ??
+                                            codeEntry0?.defaultStartTime ??
+                                            cat0?.startTime,
+                                          customTimes?.end ??
+                                            codeEntry0?.defaultEndTime ??
+                                            cat0?.endTime,
+                                        );
+                                      const isCross =
+                                        !isAbsence &&
+                                        label !== "X" &&
+                                        codeEntry0?.focusAreaId != null &&
+                                        sectionFocusArea != null &&
+                                        codeEntry0.focusAreaId !== sectionFocusArea.id;
+                                      const displayParts = isAbsence
+                                        ? {
+                                            primaryLabel: label,
+                                            secondaryLabel: null,
+                                          }
+                                        : getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
+                                      const crossHomeFa = isCross
+                                        ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
+                                        : undefined;
+                                      const singleDraftDiffBorderKind: ShiftDiffBorderKind =
+                                        draftDiff?.pillDiffs[0]?.borderKind ??
+                                        (draftKind === "new" || draftKind === "modified"
+                                          ? draftKind
+                                          : null);
+                                      const singleDraftBorderKind: DraftKind =
+                                        singleDraftDiffBorderKind ?? draftKind;
+                                      const singlePublishRingKind =
+                                        publishDiffSummary?.pillDiffs[0]?.borderKind ??
+                                        publishRingKind;
+                                      const singleAuthorLeftInset = 5 + leadingDividerInset;
+                                      const singleAuthorBottomInset = (customTimes ? 3 : 4) + 1;
+                                      const singleUsesShiftColor = shouldUseShiftColorForDiffState({
+                                        isCross,
+                                      });
+                                      const singleForegroundColor = singleUsesShiftColor
+                                        ? effectiveText
+                                        : getReadableTextOnSurface(
+                                            effectiveColor,
+                                            effectiveText,
+                                            themeSurface,
+                                          );
+                                      // Compute effective border: draft indicators use dashed border.
+                                      const absenceBorder = absenceStripes
+                                        ? `1px solid ${absenceStripes.border}`
+                                        : `1px solid ${borderColor(singleForegroundColor)}`;
+                                      const effectiveBorder = singleDraftBorderKind
+                                        ? getDraftBorder(singleDraftBorderKind, absenceBorder)
+                                        : absenceBorder;
+                                      const singlePillBadge =
+                                        (showsDraftBadge &&
+                                        (draftBadge == null || draftBadge.text === "Changed")
+                                          ? buildPillBadge({
+                                              source: "draft",
+                                              descriptor: draftDiff?.pillDiffs[0]?.badge,
+                                            })
+                                          : null) ??
+                                        (publishBadge == null || publishBadge.text === "Changed"
+                                          ? buildPillBadge({
+                                              source: "publish",
+                                              descriptor: publishDiffSummary?.pillDiffs[0]?.badge,
+                                            })
+                                          : null);
+                                      // A cell-level badge is still rendered inside this card (for
+                                      // example, when the second segment of a former double shift
+                                      // was removed). It must be treated as a foreground overlay too;
+                                      // otherwise the card's own `overflow: hidden` cuts the chip in
+                                      // half at exactly the top edge it is meant to straddle.
+                                      const singleHasChangeBadge = !!(
+                                        singlePillBadge ||
+                                        draftBadge ||
+                                        publishBadge
+                                      );
+                                      const singleHoverChangeDetails = Array.from(
+                                        new Set(
+                                          [
+                                            singlePillBadge?.tooltip,
+                                            draftBadge?.tooltip,
+                                            publishBadge?.tooltip,
+                                          ].filter((detail): detail is string => !!detail),
+                                        ),
+                                      );
+                                      // A change chip is an overlay, never a
+                                      // layout reservation: active pills keep
+                                      // their normal height and vertical origin.
+                                      const singleTopInset = customTimes ? 3 : 4;
+                                      const singleSideInset = 4;
+                                      const singleBottomInset = customTimes ? 3 : 4;
+                                      const singleCrossFocusPill =
+                                        isCross && crossHomeFa ? crossHomeFa : null;
+                                      // The focus wing sits inside the pill's border, so its curve
+                                      // uses the inner radius. Matching the outer radius left a
+                                      // hairline wedge of the pill showing at each corner.
+                                      const singleCrossFocusWingRadius =
+                                        SINGLE_SHIFT_PILL_RADIUS - (singleDraftBorderKind ? 2 : 1);
+                                      const singleCrossFocusPalette = getCrossFocusBadgePalette({
+                                        color: effectiveColor,
+                                        text: effectiveText,
+                                      });
+                                      const showSingleSecondaryLine = !!displayParts.secondaryLabel;
+                                      // Name mode spells shift and job out, so each item earns its
+                                      // own row; when a custom time joins them the stack steps down
+                                      // a size to fit three rows in the 52px cell. Code mode's
+                                      // labels are a character or two, so a row each would waste
+                                      // the pill: shift and job always share a line there,
+                                      // separated by a middot, at their full size.
+                                      const singleIsThreeRow =
+                                        showSingleSecondaryLine && !!customTimes && isNameMode;
+                                      const singleInlinesSecondary =
+                                        showSingleSecondaryLine && !isNameMode;
+                                      const singleDisplayLabel = displayParts.primaryLabel;
+                                      const singleIsMentored =
+                                        !isAbsence && (cellSegments[0]?.isMentored ?? false);
+                                      // Notes always take a row of their own, below every line of text.
+                                      const singleHasNotes = noteMarks.length > 0;
+                                      const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
+                                      // A day in a run is a clear segment over the run's
+                                      // bar: open on the sides it shares with the run.
+                                      const runSegment = isAbsence ? absenceRunDay : null;
+                                      const runOpenLeft =
+                                        !!runSegment && runSegment.position !== "start";
+                                      const runOpenRight =
+                                        !!runSegment && runSegment.position !== "end";
+                                      return (
+                                        <>
+                                          {isBulkSelected && (
+                                            <span
+                                              className="dg-grid-cell__bulk-selection-ring"
+                                              data-bulk-selection-ring="true"
+                                              aria-hidden="true"
+                                              style={getBulkSelectionRingStyle({
+                                                topInset: singleTopInset,
+                                                rightInset: singleSideInset,
+                                                bottomInset: singleBottomInset,
+                                                leftInset: singleSideInset,
+                                                topDividerInset,
+                                                leadingDividerInset,
+                                                pillRadius: SINGLE_SHIFT_PILL_RADIUS,
+                                              })}
+                                            />
+                                          )}
+                                          <ShiftDetailHoverCard
+                                            enabled={showShiftDetailHoverCards}
+                                            employeeName={getEmployeeDisplayName(emp)}
+                                            date={date}
+                                            entries={hoverDetailEntries}
+                                            indicators={hoverIndicatorNames}
+                                            requestLabel={activeRequestLabel}
+                                            status={hoverStatus}
+                                            changeDetails={singleHoverChangeDetails}
+                                            changes={hoverChanges}
+                                            publicationLabel={publicationLabel}
+                                          >
+                                            <div
+                                              data-shift-pill="single"
+                                              data-absence-run-segment={runSegment?.position}
+                                              className={
+                                                runSegment ? "dg-absence-run-segment" : undefined
+                                              }
+                                              style={{
+                                                position: "absolute",
+                                                top: insetFromVisibleCellTop(singleTopInset),
+                                                right: runOpenRight ? 0 : `${singleSideInset}px`,
+                                                bottom: `${singleBottomInset}px`,
+                                                left: runOpenLeft
+                                                  ? 0
+                                                  : insetFromVisibleCellLeft(singleSideInset),
+                                                ...(runSegment && absenceStripes
+                                                  ? {
+                                                      ["--dg-absence-run-edge" as string]:
+                                                        absenceStripes.border,
+                                                    }
+                                                  : null),
+                                                background: runSegment
+                                                  ? "transparent"
+                                                  : !singleUsesShiftColor
+                                                    ? "var(--dg-color-surface)"
+                                                    : absenceStripes
+                                                      ? absenceStripeCss(
+                                                          absenceStripes.stripeA,
+                                                          absenceStripes.stripeB,
+                                                        )
+                                                      : effectiveColor,
+                                                opacity: draftKind === "deleted" ? 0.5 : 1,
+                                                border: runSegment ? undefined : effectiveBorder,
+                                                borderRadius: runSegment
+                                                  ? `${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px`
+                                                  : SINGLE_SHIFT_PILL_RADIUS,
+                                                color: singleForegroundColor,
+                                                zIndex: singleHasChangeBadge ? 2 : 1,
+                                                boxShadow:
+                                                  singlePublishRingKind === "new" ||
+                                                  singlePublishRingKind === "modified"
+                                                    ? getPublishDiffRing(
+                                                        singlePublishRingKind,
+                                                        borderColor(singleForegroundColor),
+                                                      )
+                                                    : "none",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                padding: isNameMode ? "2px 6px" : "2px 3px",
+                                                paddingTop: 2,
+                                                paddingLeft: singleCrossFocusPill
+                                                  ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                  : isNameMode
+                                                    ? 6
+                                                    : 3,
+                                                paddingRight: isNameMode ? 6 : 3,
+                                                overflow: singleHasChangeBadge
+                                                  ? "visible"
+                                                  : "hidden",
+                                                textDecoration:
+                                                  draftKind === "deleted" ? "line-through" : "none",
+                                              }}
+                                            >
+                                              {activeRequest && activeRequestLabel && (
+                                                <RequestCornerFold
+                                                  status={activeRequest.status}
+                                                  label={activeRequestLabel}
+                                                />
+                                              )}
+                                              {singlePillBadge && (
+                                                <GridDiffBadge
+                                                  badge={{
+                                                    ...singlePillBadge,
+                                                    // Every status chip overlaps the same top-left
+                                                    // pill edge. It is a paint-only overlay: the
+                                                    // active pill remains in its normal grid slot.
+                                                    topOffset: 0,
+                                                    leftOffset: 4,
+                                                    overlapPillEdge: true,
+                                                    showChangeTooltip: !showShiftDetailHoverCards,
+                                                  }}
+                                                />
+                                              )}
+                                              {singleCrossFocusPill && (
+                                                <span
+                                                  style={{
+                                                    position: "absolute",
+                                                    // The focus wing is part of the
+                                                    // pill, not a smaller chip. It
+                                                    // keeps the parent corner curve
+                                                    // while a change badge overlaps it.
+                                                    top: 0,
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    display: "flex",
+                                                    // Initials stack upright so the wing costs one
+                                                    // letter of width rather than two or three.
+                                                    // Upright glyphs advance about 1.2em, so the
+                                                    // negative spacing keeps three initials
+                                                    // inside a draft pill's 40px.
+                                                    writingMode: "vertical-rl",
+                                                    textOrientation: "upright",
+                                                    whiteSpace: "nowrap",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    fontSize: "var(--dg-fs-footnote)",
+                                                    fontWeight: 600,
+                                                    lineHeight: 1,
+                                                    background: singleCrossFocusPalette.background,
+                                                    color: singleCrossFocusPalette.color,
+                                                    borderRadius: `${singleCrossFocusWingRadius}px 0 0 ${singleCrossFocusWingRadius}px`,
+                                                    padding: "0 2px",
+                                                    letterSpacing: "-0.2em",
+                                                    pointerEvents: "none",
+                                                  }}
+                                                >
+                                                  {getFocusAreaInitials(singleCrossFocusPill.name)}
+                                                </span>
+                                              )}
+                                              {singleIsMentored && (
+                                                <MentoredShiftBadge
+                                                  rightInset={cornerLockClearance || undefined}
+                                                />
+                                              )}
+                                              <div
+                                                style={{
+                                                  display: "flex",
+                                                  flexDirection: "column",
+                                                  alignItems: "center",
+                                                  alignSelf: "stretch",
+                                                  justifyContent: "center",
+                                                  gap:
+                                                    showSingleSecondaryLine &&
+                                                    !singleInlinesSecondary
+                                                      ? 1
+                                                      : 0,
+                                                  minWidth: 0,
+                                                  overflow: "hidden",
+                                                }}
+                                              >
+                                                <span
+                                                  data-pill-fit=""
+                                                  style={{
+                                                    ...gridFitLine(
+                                                      isNameMode
+                                                        ? "var(--dg-fs-caption)"
+                                                        : "var(--dg-fs-title)",
+                                                      // A name alone in its pill may take two lines.
+                                                      {
+                                                        wrap:
+                                                          isNameMode &&
+                                                          !showSingleSecondaryLine &&
+                                                          !customTimes &&
+                                                          !singleHasNotes,
+                                                      },
+                                                    ),
+                                                    fontWeight: 600,
+                                                    lineHeight:
+                                                      isNameMode && singleIsThreeRow ? 1.15 : 1.2,
+                                                  }}
+                                                >
+                                                  {runSegment ? null : singleDisplayLabel}
+                                                  {!customTimes && isOvernight && (
+                                                    <sup
+                                                      style={{
+                                                        fontSize: "0.5em",
+                                                        fontWeight: 700,
+                                                        opacity: 0.5,
+                                                        marginLeft: 1,
+                                                      }}
+                                                    >
+                                                      +1
+                                                    </sup>
+                                                  )}
+                                                  {singleInlinesSecondary && (
+                                                    <>
+                                                      <span
+                                                        aria-hidden="true"
+                                                        style={{
+                                                          fontSize:
+                                                            gridFitSize("var(--dg-fs-footnote)"),
+                                                          fontWeight: 700,
+                                                          opacity: 0.5,
+                                                          margin: "0 2px",
+                                                        }}
+                                                      >
+                                                        ·
+                                                      </span>
+                                                      <span
+                                                        style={{
+                                                          fontSize:
+                                                            gridFitSize("var(--dg-fs-footnote)"),
+                                                          fontWeight: 700,
+                                                          color:
+                                                            "color-mix(in srgb, currentColor 78%, transparent)",
+                                                        }}
+                                                      >
+                                                        {displayParts.secondaryLabel}
+                                                      </span>
+                                                    </>
+                                                  )}
+                                                </span>
+                                                {showSingleSecondaryLine &&
+                                                !singleInlinesSecondary ? (
+                                                  <span
+                                                    data-pill-fit=""
+                                                    style={{
+                                                      ...gridFitLine(
+                                                        singleIsThreeRow
+                                                          ? "var(--dg-fs-micro)"
+                                                          : "var(--dg-fs-footnote)",
+                                                      ),
+                                                      fontWeight: 700,
+                                                      lineHeight: singleIsThreeRow ? 1.2 : 1.3,
+                                                      opacity: 0.78,
+                                                    }}
+                                                  >
+                                                    {displayParts.secondaryLabel}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              {customTimes && (
+                                                <span
+                                                  data-pill-fit=""
+                                                  style={{
+                                                    ...gridFitLine(
+                                                      singleIsThreeRow
+                                                        ? "var(--dg-fs-micro)"
+                                                        : "var(--dg-fs-footnote)",
+                                                    ),
+                                                    fontWeight: 500,
+                                                    lineHeight: 1,
+                                                    marginTop: singleTimeMarginTop,
+                                                    opacity: 0.7,
+                                                    letterSpacing: "0.02em",
+                                                  }}
+                                                >
+                                                  {fmt12hShort(customTimes.start)}–
+                                                  {fmt12hShort(customTimes.end)}
+                                                  {isOvernight && (
+                                                    <sup
+                                                      style={{
+                                                        fontSize: "0.7em",
+                                                        fontWeight: 700,
+                                                        marginLeft: 1,
+                                                        opacity: 1,
+                                                      }}
+                                                    >
+                                                      +1
+                                                    </sup>
+                                                  )}
+                                                </span>
+                                              )}
+                                              <NoteDots
+                                                marks={noteMarks}
+                                                indicatorTypes={indicatorTypes}
+                                                rimColor={singleForegroundColor}
+                                                isDark={isDarkTheme}
+                                                corner
+                                              />
+                                              {(draftBadge || publishBadge) && (
+                                                <GridDiffBadge
+                                                  badge={{
+                                                    ...(draftBadge ?? publishBadge!),
+                                                    topOffset: 0,
+                                                    leftOffset: 4,
+                                                    overlapPillEdge: true,
+                                                    showChangeTooltip: !showShiftDetailHoverCards,
+                                                  }}
+                                                />
+                                              )}
+                                            </div>
+                                          </ShiftDetailHoverCard>
+                                          {shouldShowAuthorName && auditName && (
+                                            <AuthorBadge
+                                              name={auditName}
+                                              leftInset={singleAuthorLeftInset}
+                                              // The name shares the pill's bottom row with a
+                                              // note strip, so it stops short of the dots.
+                                              rightInset={
+                                                singleHasNotes
+                                                  ? singleSideInset +
+                                                    1 +
+                                                    NOTE_LANE_INSET +
+                                                    noteMarksWidth(noteMarks.length) +
+                                                    3
+                                                  : 5
+                                              }
+                                              bottomInset={singleAuthorBottomInset}
+                                            />
+                                          )}
+                                        </>
+                                      );
                                     }
 
-                                    return {
-                                      source,
-                                      kind: descriptor.kind,
-                                      text: descriptor.text,
-                                      tooltip:
-                                        source === "publish" && publishDiff
-                                          ? buildPublishTooltip({
-                                              publishDiff,
-                                              resolvePublisherName,
-                                              detail: publishChangeText ?? descriptor.detail,
-                                              timeZone: publicationTimeZone,
+                                    // Multi-pill: each shift is its own pill, drawn like a single
+                                    // shift's. They sit side by side while the column leaves each
+                                    // one a single pill's width, and stack in a taller row when it
+                                    // does not; halves about 30px wide had marks over their words.
+                                    const multiPillBadges = labels.map(
+                                      (_, labelIndex) =>
+                                        (showsDraftBadge &&
+                                        (draftBadge == null || draftBadge.text === "Changed")
+                                          ? buildPillBadge({
+                                              source: "draft",
+                                              descriptor: draftDiff?.pillDiffs[labelIndex]?.badge,
                                             })
-                                          : source === "draft"
-                                            ? (draftChangeText ?? descriptor.detail)
-                                            : descriptor.detail,
-                                    };
-                                  };
-
-                                  if (labels.length === 1 && restOfDayAbsenceTypeId == null) {
-                                    const label = labels[0];
-                                    const isAbsence = cellAbsenceType != null;
-                                    const style = isAbsence
-                                      ? {
-                                          ...getStyleByIdOrLabel(label, cellCodeIds[0]),
-                                          color: cellAbsenceType!.color,
-                                          text: cellAbsenceType!.text,
-                                        }
-                                      : getStyleByIdOrLabel(label, cellCodeIds[0]);
-                                    const absenceStripes = isAbsence
-                                      ? resolveAbsenceStripes(style.color, isDarkTheme)
-                                      : null;
-                                    const darkPillStyle =
-                                      isDarkTheme && !absenceStripes
-                                        ? toDarkPillColors(style.color)
-                                        : null;
-                                    const effectiveColor =
-                                      absenceStripes?.stripeA ?? darkPillStyle?.bg ?? style.color;
-                                    const effectiveText =
-                                      absenceStripes?.text ?? darkPillStyle?.text ?? style.text;
-                                    const codeEntry0 =
-                                      cellCodeIds[0] != null
-                                        ? assignmentById.get(cellCodeIds[0])
-                                        : undefined;
-                                    const cat0 =
-                                      codeEntry0?.categoryId != null
-                                        ? categoryById.get(codeEntry0.categoryId)
-                                        : undefined;
-                                    const isOvernight =
-                                      !isAbsence &&
-                                      isOvernightTimes(
-                                        customTimes?.start ??
-                                          codeEntry0?.defaultStartTime ??
-                                          cat0?.startTime,
-                                        customTimes?.end ??
-                                          codeEntry0?.defaultEndTime ??
-                                          cat0?.endTime,
-                                      );
-                                    const isCross =
-                                      !isAbsence &&
-                                      label !== "X" &&
-                                      codeEntry0?.focusAreaId != null &&
-                                      sectionFocusArea != null &&
-                                      codeEntry0.focusAreaId !== sectionFocusArea.id;
-                                    const displayParts = isAbsence
-                                      ? {
-                                          primaryLabel: label,
-                                          secondaryLabel: null,
-                                        }
-                                      : getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
-                                    const crossHomeFa = isCross
-                                      ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
-                                      : undefined;
-                                    const singleDraftDiffBorderKind: ShiftDiffBorderKind =
-                                      draftDiff?.pillDiffs[0]?.borderKind ??
-                                      (draftKind === "new" || draftKind === "modified"
-                                        ? draftKind
-                                        : null);
-                                    const singleDraftBorderKind: DraftKind =
-                                      singleDraftDiffBorderKind ?? draftKind;
-                                    const singlePublishRingKind =
-                                      publishDiffSummary?.pillDiffs[0]?.borderKind ??
-                                      publishRingKind;
-                                    const singleAuthorLeftInset = 5 + leadingDividerInset;
-                                    const singleAuthorBottomInset = (customTimes ? 3 : 4) + 1;
-                                    const singleUsesShiftColor = shouldUseShiftColorForDiffState({
-                                      isCross,
-                                    });
-                                    const singleForegroundColor = singleUsesShiftColor
-                                      ? effectiveText
-                                      : getReadableTextOnSurface(
-                                          effectiveColor,
-                                          effectiveText,
-                                          themeSurface,
-                                        );
-                                    // Compute effective border: draft indicators use dashed border.
-                                    const absenceBorder = absenceStripes
-                                      ? `1px solid ${absenceStripes.border}`
-                                      : `1px solid ${borderColor(singleForegroundColor)}`;
-                                    const effectiveBorder = singleDraftBorderKind
-                                      ? getDraftBorder(singleDraftBorderKind, absenceBorder)
-                                      : absenceBorder;
-                                    const singlePillBadge =
-                                      (showsDraftBadge &&
-                                      (draftBadge == null || draftBadge.text === "Changed")
+                                          : null) ??
+                                        (publishBadge == null || publishBadge.text === "Changed"
+                                          ? buildPillBadge({
+                                              source: "publish",
+                                              descriptor:
+                                                publishDiffSummary?.pillDiffs[labelIndex]?.badge,
+                                            })
+                                          : null),
+                                    );
+                                    // The rest-of-day absence pill's own change (item 45).
+                                    const restOfDayDraftDiff = draftDiff?.restOfDayDiff ?? null;
+                                    const restOfDayPublishDiff =
+                                      publishDiffSummary?.restOfDayDiff ?? null;
+                                    const restOfDayPillBadge =
+                                      (showsDraftBadge
                                         ? buildPillBadge({
                                             source: "draft",
-                                            descriptor: draftDiff?.pillDiffs[0]?.badge,
+                                            descriptor: restOfDayDraftDiff?.badge,
                                           })
                                         : null) ??
-                                      (publishBadge == null || publishBadge.text === "Changed"
-                                        ? buildPillBadge({
-                                            source: "publish",
-                                            descriptor: publishDiffSummary?.pillDiffs[0]?.badge,
-                                          })
-                                        : null);
-                                    // A cell-level badge is still rendered inside this card (for
-                                    // example, when the second segment of a former double shift
-                                    // was removed). It must be treated as a foreground overlay too;
-                                    // otherwise the card's own `overflow: hidden` cuts the chip in
-                                    // half at exactly the top edge it is meant to straddle.
-                                    const singleHasChangeBadge = !!(
-                                      singlePillBadge ||
-                                      draftBadge ||
-                                      publishBadge
+                                      buildPillBadge({
+                                        source: "publish",
+                                        descriptor: restOfDayPublishDiff?.badge,
+                                      });
+                                    // The rest-of-day absence is the last pill (item 45).
+                                    const pillCount =
+                                      labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0);
+                                    const stackShifts = stacksShifts(
+                                      dayColumnWidth,
+                                      pillCount,
+                                      isNameMode,
                                     );
-                                    const singleHoverChangeDetails = Array.from(
+                                    const multiPillGap = stackShifts
+                                      ? multiPillBadges.slice(1).some(Boolean) ||
+                                        !!restOfDayPillBadge
+                                        ? STACKED_SHIFT_CHIP_GAP
+                                        : STACKED_SHIFT_GAP
+                                      : SIDE_BY_SIDE_SHIFT_GAP;
+                                    // Neighbouring pills touch when one runs straight into
+                                    // the next; the rest-of-day absence always starts where
+                                    // the last shift ends.
+                                    const pillSpans = labels.map((_, li) => {
+                                      const code =
+                                        cellCodeIds[li] != null
+                                          ? assignmentById.get(cellCodeIds[li])
+                                          : undefined;
+                                      const category =
+                                        code?.categoryId != null
+                                          ? categoryById.get(code.categoryId)
+                                          : undefined;
+                                      const own =
+                                        customTimes?.perPill?.[li] ??
+                                        (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                      // An unset custom time is stored as "", not null.
+                                      return {
+                                        start:
+                                          own?.start ||
+                                          code?.defaultStartTime ||
+                                          category?.startTime,
+                                        end: own?.end || code?.defaultEndTime || category?.endTime,
+                                      };
+                                    });
+                                    // An arrived-late absence comes first (item 50d); each
+                                    // pill takes its place in the cell by CSS order.
+                                    const shiftOrder = (li: number) => (absenceFirst ? li + 1 : li);
+                                    const absenceOrder = absenceFirst ? 0 : labels.length;
+                                    const shiftJoins = pillSpans
+                                      .slice(1)
+                                      .map((span, li) => timesMeet(pillSpans[li].end, span.start));
+                                    const absenceJoins =
+                                      restOfDayAbsenceTypeId != null
+                                        ? [absenceLayout?.joinsShift ?? true]
+                                        : [];
+                                    const pillJoins = absenceFirst
+                                      ? [...absenceJoins, ...shiftJoins]
+                                      : [...shiftJoins, ...absenceJoins];
+                                    // Stacked, each pill's share of spare height follows its
+                                    // line count, so a one-line shift stays short beside a
+                                    // pill carrying a time or a job.
+                                    const shiftLines = [
+                                      ...labels.map((label, li) => {
+                                        const own =
+                                          customTimes?.perPill?.[li] ??
+                                          (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                        const secondary = !!getDisplayPartsByIdOrLabel(
+                                          label,
+                                          cellCodeIds[li],
+                                        ).secondaryLabel;
+                                        return (
+                                          1 +
+                                          (own?.start || own?.end ? 1 : 0) +
+                                          (secondary && isNameMode ? 1 : 0)
+                                        );
+                                      }),
+                                    ];
+                                    const absenceLines =
+                                      restOfDayAbsenceTypeId != null
+                                        ? [
+                                            1 +
+                                              (absenceLayout?.shortTime ||
+                                              (
+                                                customTimes?.perPill?.[labels.length - 1] ??
+                                                (labels.length === 1 && !customTimes?.perPill
+                                                  ? customTimes
+                                                  : null)
+                                              )?.end
+                                                ? 1
+                                                : 0),
+                                          ]
+                                        : [];
+                                    const pillLines = absenceFirst
+                                      ? [...absenceLines, ...shiftLines]
+                                      : [...shiftLines, ...absenceLines];
+                                    const pillAxis = stackShifts ? "stacked" : "side-by-side";
+                                    const pillSeams = attachedPillSeams(pillAxis, pillJoins);
+                                    const multiTopInset = 4;
+                                    const multiSideInset = 4;
+                                    const multiBottomInset = 4;
+                                    const multiAuthorLeftInset = 4 + leadingDividerInset;
+                                    // Each pill draws its own shift's notes when the
+                                    // cell's segments line up with its pills.
+                                    const notesPerPill =
+                                      !!noteMarksForKey && cellSegments.length === labels.length;
+                                    const multiHoverChangeDetails = Array.from(
                                       new Set(
                                         [
-                                          singlePillBadge?.tooltip,
                                           draftBadge?.tooltip,
                                           publishBadge?.tooltip,
+                                          ...multiPillBadges.map((badge) => badge?.tooltip),
+                                          restOfDayPillBadge?.tooltip,
                                         ].filter((detail): detail is string => !!detail),
                                       ),
                                     );
-                                    // A change chip is an overlay, never a
-                                    // layout reservation: active pills keep
-                                    // their normal height and vertical origin.
-                                    const singleTopInset = customTimes ? 3 : 4;
-                                    const singleSideInset = 4;
-                                    const singleBottomInset = customTimes ? 3 : 4;
-                                    const singleCrossFocusPill =
-                                      isCross && crossHomeFa ? crossHomeFa : null;
-                                    // The focus wing sits inside the pill's border, so its curve
-                                    // uses the inner radius. Matching the outer radius left a
-                                    // hairline wedge of the pill showing at each corner.
-                                    const singleCrossFocusWingRadius =
-                                      SINGLE_SHIFT_PILL_RADIUS - (singleDraftBorderKind ? 2 : 1);
-                                    const singleCrossFocusPalette = getCrossFocusBadgePalette({
-                                      color: effectiveColor,
-                                      text: effectiveText,
-                                    });
-                                    const showSingleSecondaryLine = !!displayParts.secondaryLabel;
-                                    // Name mode spells shift and job out, so each item earns its
-                                    // own row; when a custom time joins them the stack steps down
-                                    // a size to fit three rows in the 52px cell. Code mode's
-                                    // labels are a character or two, so a row each would waste
-                                    // the pill: shift and job always share a line there,
-                                    // separated by a middot, at their full size.
-                                    const singleIsThreeRow =
-                                      showSingleSecondaryLine && !!customTimes && isNameMode;
-                                    const singleInlinesSecondary =
-                                      showSingleSecondaryLine && !isNameMode;
-                                    const singleDisplayLabel = displayParts.primaryLabel;
-                                    const singleIsMentored =
-                                      !isAbsence && (cellSegments[0]?.isMentored ?? false);
-                                    // Notes always take a row of their own, below every line of text.
-                                    const singleHasNotes = noteMarks.length > 0;
-                                    const singleTimeMarginTop = singleIsThreeRow ? 2 : 4;
-                                    // A day in a run is a clear segment over the run's
-                                    // bar: open on the sides it shares with the run.
-                                    const runSegment = isAbsence ? absenceRunDay : null;
-                                    const runOpenLeft =
-                                      !!runSegment && runSegment.position !== "start";
-                                    const runOpenRight =
-                                      !!runSegment && runSegment.position !== "end";
                                     return (
                                       <>
                                         {isBulkSelected && (
@@ -3330,10 +3918,10 @@ const SectionBlock = memo(function SectionBlock({
                                             data-bulk-selection-ring="true"
                                             aria-hidden="true"
                                             style={getBulkSelectionRingStyle({
-                                              topInset: singleTopInset,
-                                              rightInset: singleSideInset,
-                                              bottomInset: singleBottomInset,
-                                              leftInset: singleSideInset,
+                                              topInset: multiTopInset,
+                                              rightInset: multiSideInset,
+                                              bottomInset: multiBottomInset,
+                                              leftInset: multiSideInset,
                                               topDividerInset,
                                               leadingDividerInset,
                                               pillRadius: SINGLE_SHIFT_PILL_RADIUS,
@@ -3348,71 +3936,22 @@ const SectionBlock = memo(function SectionBlock({
                                           indicators={hoverIndicatorNames}
                                           requestLabel={activeRequestLabel}
                                           status={hoverStatus}
-                                          changeDetails={singleHoverChangeDetails}
+                                          changeDetails={multiHoverChangeDetails}
                                           changes={hoverChanges}
                                           publicationLabel={publicationLabel}
                                         >
                                           <div
-                                            data-shift-pill="single"
-                                            data-absence-run-segment={runSegment?.position}
-                                            className={
-                                              runSegment ? "dg-absence-run-segment" : undefined
-                                            }
                                             style={{
                                               position: "absolute",
-                                              top: insetFromVisibleCellTop(singleTopInset),
-                                              right: runOpenRight ? 0 : `${singleSideInset}px`,
-                                              bottom: `${singleBottomInset}px`,
-                                              left: runOpenLeft
-                                                ? 0
-                                                : insetFromVisibleCellLeft(singleSideInset),
-                                              ...(runSegment && absenceStripes
-                                                ? {
-                                                    ["--dg-absence-run-edge" as string]:
-                                                      absenceStripes.border,
-                                                  }
-                                                : null),
-                                              background: runSegment
-                                                ? "transparent"
-                                                : !singleUsesShiftColor
-                                                  ? "var(--dg-color-surface)"
-                                                  : absenceStripes
-                                                    ? absenceStripeCss(
-                                                        absenceStripes.stripeA,
-                                                        absenceStripes.stripeB,
-                                                      )
-                                                    : effectiveColor,
-                                              opacity: draftKind === "deleted" ? 0.5 : 1,
-                                              border: runSegment ? undefined : effectiveBorder,
-                                              borderRadius: runSegment
-                                                ? `${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenRight ? 0 : SINGLE_SHIFT_PILL_RADIUS}px ${runOpenLeft ? 0 : SINGLE_SHIFT_PILL_RADIUS}px`
-                                                : SINGLE_SHIFT_PILL_RADIUS,
-                                              color: singleForegroundColor,
-                                              zIndex: singleHasChangeBadge ? 2 : 1,
-                                              boxShadow:
-                                                singlePublishRingKind === "new" ||
-                                                singlePublishRingKind === "modified"
-                                                  ? getPublishDiffRing(
-                                                      singlePublishRingKind,
-                                                      borderColor(singleForegroundColor),
-                                                    )
-                                                  : "none",
-                                              cursor: "pointer",
+                                              top: insetFromVisibleCellTop(multiTopInset),
+                                              right: `${multiSideInset}px`,
+                                              bottom: `${multiBottomInset}px`,
+                                              left: insetFromVisibleCellLeft(multiSideInset),
                                               display: "flex",
                                               flexDirection: "column",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              padding: isNameMode ? "2px 6px" : "2px 3px",
-                                              paddingTop: 2,
-                                              paddingLeft: singleCrossFocusPill
-                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                                : isNameMode
-                                                  ? 6
-                                                  : 3,
-                                              paddingRight: isNameMode ? 6 : 3,
-                                              overflow: singleHasChangeBadge ? "visible" : "hidden",
-                                              textDecoration:
-                                                draftKind === "deleted" ? "line-through" : "none",
+                                              gap: 1,
+                                              alignItems: "stretch",
+                                              opacity: draftKind === "deleted" ? 0.5 : 1,
                                             }}
                                           >
                                             {activeRequest && activeRequestLabel && (
@@ -3421,924 +3960,197 @@ const SectionBlock = memo(function SectionBlock({
                                                 label={activeRequestLabel}
                                               />
                                             )}
-                                            {singlePillBadge && (
-                                              <GridDiffBadge
-                                                badge={{
-                                                  ...singlePillBadge,
-                                                  // Every status chip overlaps the same top-left
-                                                  // pill edge. It is a paint-only overlay: the
-                                                  // active pill remains in its normal grid slot.
-                                                  topOffset: 0,
-                                                  leftOffset: 4,
-                                                  overlapPillEdge: true,
-                                                  showChangeTooltip: !showShiftDetailHoverCards,
-                                                }}
-                                              />
-                                            )}
-                                            {singleCrossFocusPill && (
-                                              <span
-                                                style={{
-                                                  position: "absolute",
-                                                  // The focus wing is part of the
-                                                  // pill, not a smaller chip. It
-                                                  // keeps the parent corner curve
-                                                  // while a change badge overlaps it.
-                                                  top: 0,
-                                                  bottom: 0,
-                                                  left: 0,
-                                                  display: "flex",
-                                                  // Initials stack upright so the wing costs one
-                                                  // letter of width rather than two or three.
-                                                  // Upright glyphs advance about 1.2em, so the
-                                                  // negative spacing keeps three initials
-                                                  // inside a draft pill's 40px.
-                                                  writingMode: "vertical-rl",
-                                                  textOrientation: "upright",
-                                                  whiteSpace: "nowrap",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                  fontSize: "var(--dg-fs-footnote)",
-                                                  fontWeight: 600,
-                                                  lineHeight: 1,
-                                                  background: singleCrossFocusPalette.background,
-                                                  color: singleCrossFocusPalette.color,
-                                                  borderRadius: `${singleCrossFocusWingRadius}px 0 0 ${singleCrossFocusWingRadius}px`,
-                                                  padding: "0 2px",
-                                                  letterSpacing: "-0.2em",
-                                                  pointerEvents: "none",
-                                                }}
-                                              >
-                                                {getFocusAreaInitials(singleCrossFocusPill.name)}
-                                              </span>
-                                            )}
-                                            {singleIsMentored && (
-                                              <MentoredShiftBadge
-                                                rightInset={cornerLockClearance || undefined}
-                                              />
-                                            )}
                                             <div
+                                              data-shift-layout={
+                                                stackShifts ? "stacked" : "side-by-side"
+                                              }
                                               style={{
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                alignItems: "center",
-                                                alignSelf: "stretch",
-                                                justifyContent: "center",
-                                                gap:
-                                                  showSingleSecondaryLine && !singleInlinesSecondary
-                                                    ? 1
-                                                    : 0,
-                                                minWidth: 0,
-                                                overflow: "hidden",
+                                                // A grid, so a pill padded clear of its M
+                                                // stays the same size as its neighbour.
+                                                display: "grid",
+                                                // Stacked, each pill is at least as tall as
+                                                // its own lines and they share any spare room.
+                                                ...(stackShifts
+                                                  ? {
+                                                      gridTemplateRows: pillLines
+                                                        .map(
+                                                          (lines) =>
+                                                            `minmax(min-content, ${lines}fr)`,
+                                                        )
+                                                        .join(" "),
+                                                    }
+                                                  : {
+                                                      gridTemplateColumns: `repeat(${pillCount}, minmax(0, 1fr))`,
+                                                    }),
+                                                gap: 0,
+                                                flex: 1,
+                                                minHeight: 0,
                                               }}
                                             >
-                                              <span
-                                                data-pill-fit=""
-                                                style={{
-                                                  ...gridFitLine(
-                                                    isNameMode
-                                                      ? "var(--dg-fs-caption)"
-                                                      : "var(--dg-fs-title)",
-                                                    // A name alone in its pill may take two lines.
-                                                    {
-                                                      wrap:
-                                                        isNameMode &&
-                                                        !showSingleSecondaryLine &&
-                                                        !customTimes &&
-                                                        !singleHasNotes,
-                                                    },
-                                                  ),
-                                                  fontWeight: 600,
-                                                  lineHeight:
-                                                    isNameMode && singleIsThreeRow ? 1.15 : 1.2,
-                                                }}
-                                              >
-                                                {runSegment ? null : singleDisplayLabel}
-                                                {!customTimes && isOvernight && (
-                                                  <sup
-                                                    style={{
-                                                      fontSize: "0.5em",
-                                                      fontWeight: 700,
-                                                      opacity: 0.5,
-                                                      marginLeft: 1,
-                                                    }}
-                                                  >
-                                                    +1
-                                                  </sup>
-                                                )}
-                                                {singleInlinesSecondary && (
-                                                  <>
-                                                    <span
-                                                      aria-hidden="true"
-                                                      style={{
-                                                        fontSize:
-                                                          gridFitSize("var(--dg-fs-footnote)"),
-                                                        fontWeight: 700,
-                                                        opacity: 0.5,
-                                                        margin: "0 2px",
-                                                      }}
-                                                    >
-                                                      ·
-                                                    </span>
-                                                    <span
-                                                      style={{
-                                                        fontSize:
-                                                          gridFitSize("var(--dg-fs-footnote)"),
-                                                        fontWeight: 700,
-                                                        color:
-                                                          "color-mix(in srgb, currentColor 78%, transparent)",
-                                                      }}
-                                                    >
-                                                      {displayParts.secondaryLabel}
-                                                    </span>
-                                                  </>
-                                                )}
-                                              </span>
-                                              {showSingleSecondaryLine &&
-                                              !singleInlinesSecondary ? (
-                                                <span
-                                                  data-pill-fit=""
-                                                  style={{
-                                                    ...gridFitLine(
-                                                      singleIsThreeRow
-                                                        ? "var(--dg-fs-micro)"
-                                                        : "var(--dg-fs-footnote)",
-                                                    ),
-                                                    fontWeight: 700,
-                                                    lineHeight: singleIsThreeRow ? 1.2 : 1.3,
-                                                    opacity: 0.78,
-                                                  }}
-                                                >
-                                                  {displayParts.secondaryLabel}
-                                                </span>
-                                              ) : null}
-                                            </div>
-                                            {customTimes && (
-                                              <span
-                                                data-pill-fit=""
-                                                style={{
-                                                  ...gridFitLine(
-                                                    singleIsThreeRow
-                                                      ? "var(--dg-fs-micro)"
-                                                      : "var(--dg-fs-footnote)",
-                                                  ),
-                                                  fontWeight: 500,
-                                                  lineHeight: 1,
-                                                  marginTop: singleTimeMarginTop,
-                                                  opacity: 0.7,
-                                                  letterSpacing: "0.02em",
-                                                }}
-                                              >
-                                                {fmt12hShort(customTimes.start)}–
-                                                {fmt12hShort(customTimes.end)}
-                                                {isOvernight && (
-                                                  <sup
-                                                    style={{
-                                                      fontSize: "0.7em",
-                                                      fontWeight: 700,
-                                                      marginLeft: 1,
-                                                      opacity: 1,
-                                                    }}
-                                                  >
-                                                    +1
-                                                  </sup>
-                                                )}
-                                              </span>
-                                            )}
-                                            <NoteDots
-                                              marks={noteMarks}
-                                              indicatorTypes={indicatorTypes}
-                                              rimColor={singleForegroundColor}
-                                              isDark={isDarkTheme}
-                                              corner
-                                            />
-                                            {(draftBadge || publishBadge) && (
-                                              <GridDiffBadge
-                                                badge={{
-                                                  ...(draftBadge ?? publishBadge!),
-                                                  topOffset: 0,
-                                                  leftOffset: 4,
-                                                  overlapPillEdge: true,
-                                                  showChangeTooltip: !showShiftDetailHoverCards,
-                                                }}
-                                              />
-                                            )}
-                                          </div>
-                                        </ShiftDetailHoverCard>
-                                        {shouldShowAuthorName && auditName && (
-                                          <AuthorBadge
-                                            name={auditName}
-                                            leftInset={singleAuthorLeftInset}
-                                            // The name shares the pill's bottom row with a
-                                            // note strip, so it stops short of the dots.
-                                            rightInset={
-                                              singleHasNotes
-                                                ? singleSideInset +
-                                                  1 +
-                                                  NOTE_LANE_INSET +
-                                                  noteMarksWidth(noteMarks.length) +
-                                                  3
-                                                : 5
-                                            }
-                                            bottomInset={singleAuthorBottomInset}
-                                          />
-                                        )}
-                                      </>
-                                    );
-                                  }
-
-                                  // Multi-pill: each shift is its own pill, drawn like a single
-                                  // shift's. They sit side by side while the column leaves each
-                                  // one a single pill's width, and stack in a taller row when it
-                                  // does not; halves about 30px wide had marks over their words.
-                                  const multiPillBadges = labels.map(
-                                    (_, labelIndex) =>
-                                      (showsDraftBadge &&
-                                      (draftBadge == null || draftBadge.text === "Changed")
-                                        ? buildPillBadge({
-                                            source: "draft",
-                                            descriptor: draftDiff?.pillDiffs[labelIndex]?.badge,
-                                          })
-                                        : null) ??
-                                      (publishBadge == null || publishBadge.text === "Changed"
-                                        ? buildPillBadge({
-                                            source: "publish",
-                                            descriptor:
-                                              publishDiffSummary?.pillDiffs[labelIndex]?.badge,
-                                          })
-                                        : null),
-                                  );
-                                  // The rest-of-day absence pill's own change (item 45).
-                                  const restOfDayDraftDiff = draftDiff?.restOfDayDiff ?? null;
-                                  const restOfDayPublishDiff =
-                                    publishDiffSummary?.restOfDayDiff ?? null;
-                                  const restOfDayPillBadge =
-                                    (showsDraftBadge
-                                      ? buildPillBadge({
-                                          source: "draft",
-                                          descriptor: restOfDayDraftDiff?.badge,
-                                        })
-                                      : null) ??
-                                    buildPillBadge({
-                                      source: "publish",
-                                      descriptor: restOfDayPublishDiff?.badge,
-                                    });
-                                  // The rest-of-day absence is the last pill (item 45).
-                                  const pillCount =
-                                    labels.length + (restOfDayAbsenceTypeId != null ? 1 : 0);
-                                  const stackShifts = stacksShifts(
-                                    dayColumnWidth,
-                                    pillCount,
-                                    isNameMode,
-                                  );
-                                  const multiPillGap = stackShifts
-                                    ? multiPillBadges.slice(1).some(Boolean) || !!restOfDayPillBadge
-                                      ? STACKED_SHIFT_CHIP_GAP
-                                      : STACKED_SHIFT_GAP
-                                    : SIDE_BY_SIDE_SHIFT_GAP;
-                                  // Neighbouring pills touch when one runs straight into
-                                  // the next; the rest-of-day absence always starts where
-                                  // the last shift ends.
-                                  const pillSpans = labels.map((_, li) => {
-                                    const code =
-                                      cellCodeIds[li] != null
-                                        ? assignmentById.get(cellCodeIds[li])
-                                        : undefined;
-                                    const category =
-                                      code?.categoryId != null
-                                        ? categoryById.get(code.categoryId)
-                                        : undefined;
-                                    const own =
-                                      customTimes?.perPill?.[li] ??
-                                      (li === 0 && !customTimes?.perPill ? customTimes : null);
-                                    // An unset custom time is stored as "", not null.
-                                    return {
-                                      start:
-                                        own?.start || code?.defaultStartTime || category?.startTime,
-                                      end: own?.end || code?.defaultEndTime || category?.endTime,
-                                    };
-                                  });
-                                  // An arrived-late absence comes first (item 50d); each
-                                  // pill takes its place in the cell by CSS order.
-                                  const shiftOrder = (li: number) => (absenceFirst ? li + 1 : li);
-                                  const absenceOrder = absenceFirst ? 0 : labels.length;
-                                  const shiftJoins = pillSpans
-                                    .slice(1)
-                                    .map((span, li) => timesMeet(pillSpans[li].end, span.start));
-                                  const absenceJoins =
-                                    restOfDayAbsenceTypeId != null
-                                      ? [absenceLayout?.joinsShift ?? true]
-                                      : [];
-                                  const pillJoins = absenceFirst
-                                    ? [...absenceJoins, ...shiftJoins]
-                                    : [...shiftJoins, ...absenceJoins];
-                                  // Stacked, each pill's share of spare height follows its
-                                  // line count, so a one-line shift stays short beside a
-                                  // pill carrying a time or a job.
-                                  const shiftLines = [
-                                    ...labels.map((label, li) => {
-                                      const own =
-                                        customTimes?.perPill?.[li] ??
-                                        (li === 0 && !customTimes?.perPill ? customTimes : null);
-                                      const secondary = !!getDisplayPartsByIdOrLabel(
-                                        label,
-                                        cellCodeIds[li],
-                                      ).secondaryLabel;
-                                      return (
-                                        1 +
-                                        (own?.start || own?.end ? 1 : 0) +
-                                        (secondary && isNameMode ? 1 : 0)
-                                      );
-                                    }),
-                                  ];
-                                  const absenceLines =
-                                    restOfDayAbsenceTypeId != null
-                                      ? [
-                                          1 +
-                                            (absenceLayout?.shortTime ||
-                                            (
-                                              customTimes?.perPill?.[labels.length - 1] ??
-                                              (labels.length === 1 && !customTimes?.perPill
-                                                ? customTimes
-                                                : null)
-                                            )?.end
-                                              ? 1
-                                              : 0),
-                                        ]
-                                      : [];
-                                  const pillLines = absenceFirst
-                                    ? [...absenceLines, ...shiftLines]
-                                    : [...shiftLines, ...absenceLines];
-                                  const pillAxis = stackShifts ? "stacked" : "side-by-side";
-                                  const pillSeams = attachedPillSeams(pillAxis, pillJoins);
-                                  const multiTopInset = 4;
-                                  const multiSideInset = 4;
-                                  const multiBottomInset = 4;
-                                  const multiAuthorLeftInset = 4 + leadingDividerInset;
-                                  // Each pill draws its own shift's notes when the
-                                  // cell's segments line up with its pills.
-                                  const notesPerPill =
-                                    !!noteMarksForKey && cellSegments.length === labels.length;
-                                  const multiHoverChangeDetails = Array.from(
-                                    new Set(
-                                      [
-                                        draftBadge?.tooltip,
-                                        publishBadge?.tooltip,
-                                        ...multiPillBadges.map((badge) => badge?.tooltip),
-                                        restOfDayPillBadge?.tooltip,
-                                      ].filter((detail): detail is string => !!detail),
-                                    ),
-                                  );
-                                  return (
-                                    <>
-                                      {isBulkSelected && (
-                                        <span
-                                          className="dg-grid-cell__bulk-selection-ring"
-                                          data-bulk-selection-ring="true"
-                                          aria-hidden="true"
-                                          style={getBulkSelectionRingStyle({
-                                            topInset: multiTopInset,
-                                            rightInset: multiSideInset,
-                                            bottomInset: multiBottomInset,
-                                            leftInset: multiSideInset,
-                                            topDividerInset,
-                                            leadingDividerInset,
-                                            pillRadius: SINGLE_SHIFT_PILL_RADIUS,
-                                          })}
-                                        />
-                                      )}
-                                      <ShiftDetailHoverCard
-                                        enabled={showShiftDetailHoverCards}
-                                        employeeName={getEmployeeDisplayName(emp)}
-                                        date={date}
-                                        entries={hoverDetailEntries}
-                                        indicators={hoverIndicatorNames}
-                                        requestLabel={activeRequestLabel}
-                                        status={hoverStatus}
-                                        changeDetails={multiHoverChangeDetails}
-                                        changes={hoverChanges}
-                                        publicationLabel={publicationLabel}
-                                      >
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: insetFromVisibleCellTop(multiTopInset),
-                                            right: `${multiSideInset}px`,
-                                            bottom: `${multiBottomInset}px`,
-                                            left: insetFromVisibleCellLeft(multiSideInset),
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: 1,
-                                            alignItems: "stretch",
-                                            opacity: draftKind === "deleted" ? 0.5 : 1,
-                                          }}
-                                        >
-                                          {activeRequest && activeRequestLabel && (
-                                            <RequestCornerFold
-                                              status={activeRequest.status}
-                                              label={activeRequestLabel}
-                                            />
-                                          )}
-                                          <div
-                                            data-shift-layout={
-                                              stackShifts ? "stacked" : "side-by-side"
-                                            }
-                                            style={{
-                                              // A grid, so a pill padded clear of its M
-                                              // stays the same size as its neighbour.
-                                              display: "grid",
-                                              // Stacked, each pill is at least as tall as
-                                              // its own lines and they share any spare room.
-                                              ...(stackShifts
-                                                ? {
-                                                    gridTemplateRows: pillLines
-                                                      .map(
-                                                        (lines) =>
-                                                          `minmax(min-content, ${lines}fr)`,
-                                                      )
-                                                      .join(" "),
-                                                  }
-                                                : {
-                                                    gridTemplateColumns: `repeat(${pillCount}, minmax(0, 1fr))`,
-                                                  }),
-                                              gap: 0,
-                                              flex: 1,
-                                              minHeight: 0,
-                                            }}
-                                          >
-                                            {labels.map((label, li) => {
-                                              const style = getStyleByIdOrLabel(
-                                                label,
-                                                cellCodeIds[li],
-                                              );
-                                              const darkPillStyleLi = isDarkTheme
-                                                ? toDarkPillColors(style.color)
-                                                : null;
-                                              const effectiveColorLi =
-                                                darkPillStyleLi?.bg ?? style.color;
-                                              const effectiveTextLi =
-                                                darkPillStyleLi?.text ?? style.text;
-                                              const codeEntryLi =
-                                                cellCodeIds[li] != null
-                                                  ? assignmentById.get(cellCodeIds[li])
-                                                  : undefined;
-                                              const isCross =
-                                                label !== "X" &&
-                                                codeEntryLi?.focusAreaId != null &&
-                                                sectionFocusArea != null &&
-                                                codeEntryLi.focusAreaId !== sectionFocusArea.id;
-                                              const displayParts = getDisplayPartsByIdOrLabel(
-                                                label,
-                                                cellCodeIds[li],
-                                              );
-                                              const crossHomeFaLi = isCross
-                                                ? focusAreas.find(
-                                                    (fa) => fa.id === codeEntryLi!.focusAreaId,
-                                                  )
-                                                : undefined;
-                                              const draftPillDiff = draftDiff?.pillDiffs[li] ?? {
-                                                borderKind:
-                                                  draftKind === "new" || draftKind === "modified"
-                                                    ? draftKind
-                                                    : null,
-                                                badge: null,
-                                              };
-                                              const draftPillBorderKind: DraftKind = draftDiff
-                                                ? draftPillDiff.borderKind
-                                                : (draftPillDiff.borderKind ?? draftKind);
-                                              const publishRingStatus =
-                                                publishDiffSummary?.pillDiffs[li]?.borderKind ??
-                                                null;
-                                              const multiUsesShiftColor =
-                                                shouldUseShiftColorForDiffState({
-                                                  isCross,
-                                                });
-                                              const multiForegroundColor = multiUsesShiftColor
-                                                ? effectiveTextLi
-                                                : getReadableTextOnSurface(
-                                                    effectiveColorLi,
-                                                    effectiveTextLi,
-                                                    themeSurface,
-                                                  );
-                                              const pillBadge = multiPillBadges[li];
-                                              // The cell's own chip rides on the first pill.
-                                              const pillHasChip =
-                                                !!pillBadge ||
-                                                (li === 0 && !!(draftBadge || publishBadge));
-                                              const pillSeam = pillSeams[shiftOrder(li)];
-                                              const pillBorder = draftPillBorderKind
-                                                ? getDraftBorder(
-                                                    draftPillBorderKind,
-                                                    `1px solid ${borderColor(multiForegroundColor)}`,
-                                                  )
-                                                : `1px solid ${borderColor(multiForegroundColor)}`;
-                                              const pillTime =
-                                                customTimes?.perPill?.[li] ??
-                                                (li === 0 && !customTimes?.perPill
-                                                  ? customTimes
-                                                  : null);
-                                              const hasTime =
-                                                pillTime && (pillTime.start || pillTime.end);
-                                              const catLi =
-                                                codeEntryLi?.categoryId != null
-                                                  ? categoryById.get(codeEntryLi.categoryId)
-                                                  : undefined;
-                                              const isPillOvernight = isOvernightTimes(
-                                                pillTime?.start ??
-                                                  codeEntryLi?.defaultStartTime ??
-                                                  catLi?.startTime,
-                                                pillTime?.end ??
-                                                  codeEntryLi?.defaultEndTime ??
-                                                  catLi?.endTime,
-                                              );
-                                              const multiCrossFocusPill =
-                                                isCross && crossHomeFaLi ? crossHomeFaLi : null;
-                                              const multiCrossFocusWingRadius =
-                                                SINGLE_SHIFT_PILL_RADIUS -
-                                                (draftPillBorderKind ? 2 : 1);
-                                              const multiCrossFocusPalette =
-                                                getCrossFocusBadgePalette({
-                                                  color: effectiveColorLi,
-                                                  text: effectiveTextLi,
-                                                });
-                                              const showMultiSecondaryLine =
-                                                !!displayParts.secondaryLabel;
-                                              // Same split as the single pill: a row per item in
-                                              // name mode, shift · job on one line in code mode.
-                                              const multiIsThreeRow =
-                                                showMultiSecondaryLine && !!hasTime && isNameMode;
-                                              const multiInlinesSecondary =
-                                                showMultiSecondaryLine && !isNameMode;
-                                              const multiDisplayLabel = displayParts.primaryLabel;
-                                              const isMentoredPill =
-                                                cellSegments[li]?.isMentored ?? false;
-                                              const multiSidePadding = isNameMode ? 6 : 3;
-                                              const multiPaddingLeft = multiCrossFocusPill
-                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
-                                                : multiSidePadding;
-                                              const pillSegment = notesPerPill
-                                                ? cellSegments[li]
-                                                : undefined;
-                                              const pillNoteMarks = pillSegment
-                                                ? (noteMarksForKey?.(
-                                                    emp.id,
-                                                    date,
-                                                    // A note shows only in its shift's own
-                                                    // focus area, so a pill from another area
-                                                    // finds none in this section.
-                                                    sectionFocusArea?.id,
-                                                    {
-                                                      shiftId: pillSegment.shiftId,
-                                                      jobId: pillSegment.jobId,
-                                                    },
-                                                  ) ?? [])
-                                                : // Segments that do not line up with the
-                                                  // pills leave the notes with the cell, so
-                                                  // the last pill carries them.
-                                                  li === labels.length - 1
-                                                  ? noteMarks
-                                                  : [];
-                                              const pillHasNotes = pillNoteMarks.length > 0;
-
-                                              return (
-                                                <div
-                                                  key={li}
-                                                  data-shift-pill="multi"
-                                                  style={{
-                                                    order: shiftOrder(li),
-                                                    flex: 1,
-                                                    background: multiUsesShiftColor
-                                                      ? effectiveColorLi
-                                                      : "var(--dg-color-surface)",
-                                                    ...seamBorders(pillBorder, pillSeam),
-                                                    ...gapBefore(
-                                                      shiftOrder(li),
-                                                      pillSeam,
-                                                      pillAxis,
-                                                      multiPillGap,
-                                                    ),
-                                                    borderRadius: seamRadius(
-                                                      SINGLE_SHIFT_PILL_RADIUS,
-                                                      pillSeam,
-                                                    ),
-                                                    color: multiForegroundColor,
-                                                    boxShadow:
-                                                      publishRingStatus === "new" ||
-                                                      publishRingStatus === "modified"
-                                                        ? getPublishDiffRing(
-                                                            publishRingStatus,
-                                                            borderColor(multiForegroundColor),
-                                                          )
-                                                        : "none",
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: "center",
-                                                    justifyContent: "center",
-                                                    gap: 1,
-                                                    fontSize: isNameMode
-                                                      ? "var(--dg-fs-caption)"
-                                                      : "var(--dg-fs-title)",
-                                                    fontWeight: 600,
-                                                    position: "relative",
-                                                    // The pill above otherwise paints over the
-                                                    // raised chip in the gap between them.
-                                                    zIndex: pillBadge ? 2 : 1,
-                                                    cursor: "pointer",
-                                                    textDecoration:
-                                                      draftKind === "deleted"
-                                                        ? "line-through"
-                                                        : "none",
-                                                    lineHeight: 1.2,
-                                                    overflow: pillBadge ? "visible" : "hidden",
-                                                    minWidth: 0,
-                                                    padding: isNameMode ? "2px 6px" : "2px 3px",
-                                                    // Words start below a raised chip's lower half.
-                                                    paddingTop: pillHasChip
-                                                      ? RAISED_CHIP_RESERVE
-                                                      : 2,
-                                                    paddingLeft: multiPaddingLeft,
-                                                    paddingRight: multiSidePadding,
-                                                  }}
-                                                >
-                                                  {pillBadge && (
-                                                    <GridDiffBadge
-                                                      badge={{
-                                                        ...pillBadge,
-                                                        topOffset: 0,
-                                                        // Clears the mentored M on a single pill's width.
-                                                        leftOffset: 2,
-                                                        overlapPillEdge: true,
-                                                        showChangeTooltip:
-                                                          !showShiftDetailHoverCards,
-                                                      }}
-                                                    />
-                                                  )}
-                                                  {multiCrossFocusPill && (
-                                                    <span
-                                                      style={{
-                                                        position: "absolute",
-                                                        top: 0,
-                                                        bottom: 0,
-                                                        left: 0,
-                                                        display: "flex",
-                                                        writingMode: "vertical-rl",
-                                                        textOrientation: "upright",
-                                                        whiteSpace: "nowrap",
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                        fontSize: "var(--dg-fs-footnote)",
-                                                        fontWeight: 600,
-                                                        lineHeight: 1,
-                                                        background:
-                                                          multiCrossFocusPalette.background,
-                                                        color: multiCrossFocusPalette.color,
-                                                        borderRadius: seamRadius(
-                                                          multiCrossFocusWingRadius,
-                                                          [...pillSeam, "right"],
-                                                        ),
-                                                        padding: "0 2px",
-                                                        letterSpacing: "-0.2em",
-                                                        pointerEvents: "none",
-                                                      }}
-                                                    >
-                                                      {getFocusAreaInitials(
-                                                        multiCrossFocusPill.name,
-                                                      )}
-                                                    </span>
-                                                  )}
-                                                  {isMentoredPill && (
-                                                    <MentoredShiftBadge
-                                                      rightInset={
-                                                        // Only the pill in the cell's
-                                                        // top-right corner shares it
-                                                        // with the lock avatar.
-                                                        li === (stackShifts ? 0 : pillCount - 1)
-                                                          ? cornerLockClearance || undefined
-                                                          : undefined
-                                                      }
-                                                    />
-                                                  )}
-                                                  <div
-                                                    style={{
-                                                      display: "flex",
-                                                      flexDirection: "column",
-                                                      alignItems: "center",
-                                                      alignSelf: "stretch",
-                                                      justifyContent: "center",
-                                                      gap:
-                                                        showMultiSecondaryLine &&
-                                                        !multiInlinesSecondary
-                                                          ? 1
-                                                          : 0,
-                                                      // The first line shares the corner's height,
-                                                      // so it alone keeps the M's room on both
-                                                      // sides: clear of it and still centred.
-                                                      ...(isMentoredPill
-                                                        ? {
-                                                            paddingLeft: Math.max(
-                                                              0,
-                                                              MENTORED_CORNER_CLEARANCE -
-                                                                multiPaddingLeft,
-                                                            ),
-                                                            paddingRight:
-                                                              MENTORED_CORNER_CLEARANCE -
-                                                              multiSidePadding,
-                                                          }
-                                                        : null),
-                                                      minWidth: 0,
-                                                      overflow: "hidden",
-                                                    }}
-                                                  >
-                                                    <span
-                                                      data-pill-fit=""
-                                                      style={{
-                                                        ...gridFitLine(
-                                                          isNameMode
-                                                            ? "var(--dg-fs-caption)"
-                                                            : "var(--dg-fs-title)",
-                                                          // A name alone in its pill may take two lines.
-                                                          {
-                                                            wrap:
-                                                              isNameMode &&
-                                                              !showMultiSecondaryLine &&
-                                                              !hasTime &&
-                                                              !pillHasNotes,
-                                                          },
-                                                        ),
-                                                        lineHeight: 1.2,
-                                                      }}
-                                                    >
-                                                      {multiDisplayLabel}
-                                                      {!hasTime && isPillOvernight && (
-                                                        <sup
-                                                          style={{
-                                                            fontSize: "0.65em",
-                                                            fontWeight: 700,
-                                                            opacity: 0.5,
-                                                            marginLeft: 1,
-                                                          }}
-                                                        >
-                                                          +1
-                                                        </sup>
-                                                      )}
-                                                      {multiInlinesSecondary && (
-                                                        <>
-                                                          <span
-                                                            aria-hidden="true"
-                                                            style={{
-                                                              fontSize:
-                                                                gridFitSize(
-                                                                  "var(--dg-fs-footnote)",
-                                                                ),
-                                                              fontWeight: 700,
-                                                              opacity: 0.5,
-                                                              margin: "0 2px",
-                                                            }}
-                                                          >
-                                                            ·
-                                                          </span>
-                                                          <span
-                                                            style={{
-                                                              fontSize:
-                                                                gridFitSize(
-                                                                  "var(--dg-fs-footnote)",
-                                                                ),
-                                                              fontWeight: 700,
-                                                              color:
-                                                                "color-mix(in srgb, currentColor 78%, transparent)",
-                                                            }}
-                                                          >
-                                                            {displayParts.secondaryLabel}
-                                                          </span>
-                                                        </>
-                                                      )}
-                                                    </span>
-                                                    {showMultiSecondaryLine &&
-                                                    !multiInlinesSecondary ? (
-                                                      <span
-                                                        data-pill-fit=""
-                                                        style={{
-                                                          ...gridFitLine(
-                                                            multiIsThreeRow
-                                                              ? "var(--dg-fs-micro)"
-                                                              : "var(--dg-fs-footnote)",
-                                                          ),
-                                                          fontWeight: 700,
-                                                          opacity: 0.78,
-                                                          // A split shift is half the width but the
-                                                          // full cell height, so three rows fit on
-                                                          // the same budget as the single pill.
-                                                          lineHeight: multiIsThreeRow ? 1.2 : 1.3,
-                                                        }}
-                                                      >
-                                                        {displayParts.secondaryLabel}
-                                                      </span>
-                                                    ) : null}
-                                                  </div>
-                                                  {hasTime && (
-                                                    <span
-                                                      data-pill-fit=""
-                                                      style={{
-                                                        ...gridFitLine(
-                                                          multiIsThreeRow
-                                                            ? "var(--dg-fs-micro)"
-                                                            : "var(--dg-fs-footnote)",
-                                                        ),
-                                                        fontWeight: 500,
-                                                        opacity: 0.7,
-                                                        lineHeight: 1,
-                                                      }}
-                                                    >
-                                                      {fmt12hShort(pillTime!.start)}–
-                                                      {fmt12hShort(pillTime!.end)}
-                                                      {isPillOvernight && (
-                                                        <sup
-                                                          style={{
-                                                            fontSize: "0.65em",
-                                                            fontWeight: 700,
-                                                            marginLeft: 1,
-                                                            opacity: 1,
-                                                          }}
-                                                        >
-                                                          +1
-                                                        </sup>
-                                                      )}
-                                                    </span>
-                                                  )}
-                                                  <NoteDots
-                                                    marks={pillNoteMarks}
-                                                    indicatorTypes={indicatorTypes}
-                                                    rimColor={multiForegroundColor}
-                                                    isDark={isDarkTheme}
-                                                    corner
-                                                  />
-                                                </div>
-                                              );
-                                            })}
-                                            {restOfDayAbsenceTypeId != null &&
-                                              (() => {
-                                                // The absence for the rest of the day, after the
-                                                // shifts; from when the last shift ended, if known.
-                                                const stripes = restOfDayAbsenceType
-                                                  ? resolveAbsenceStripes(
-                                                      restOfDayAbsenceType.color,
-                                                      isDarkTheme,
-                                                    )
+                                              {labels.map((label, li) => {
+                                                const style = getStyleByIdOrLabel(
+                                                  label,
+                                                  cellCodeIds[li],
+                                                );
+                                                const darkPillStyleLi = isDarkTheme
+                                                  ? toDarkPillColors(style.color)
                                                   : null;
-                                                const absenceBg = stripes
-                                                  ? absenceStripeCss(
-                                                      stripes.stripeA,
-                                                      stripes.stripeB,
+                                                const effectiveColorLi =
+                                                  darkPillStyleLi?.bg ?? style.color;
+                                                const effectiveTextLi =
+                                                  darkPillStyleLi?.text ?? style.text;
+                                                const codeEntryLi =
+                                                  cellCodeIds[li] != null
+                                                    ? assignmentById.get(cellCodeIds[li])
+                                                    : undefined;
+                                                const isCross =
+                                                  label !== "X" &&
+                                                  codeEntryLi?.focusAreaId != null &&
+                                                  sectionFocusArea != null &&
+                                                  codeEntryLi.focusAreaId !== sectionFocusArea.id;
+                                                const displayParts = getDisplayPartsByIdOrLabel(
+                                                  label,
+                                                  cellCodeIds[li],
+                                                );
+                                                const crossHomeFaLi = isCross
+                                                  ? focusAreas.find(
+                                                      (fa) => fa.id === codeEntryLi!.focusAreaId,
                                                     )
-                                                  : "var(--dg-color-bg)";
-                                                const absenceFg =
-                                                  stripes?.text ?? "var(--dg-color-text-primary)";
-                                                const absenceBorder =
-                                                  stripes?.border ?? borderColor(absenceFg);
-                                                const absenceSeam = pillSeams[absenceOrder];
-                                                const lastShiftTime =
-                                                  customTimes?.perPill?.[labels.length - 1] ??
-                                                  (labels.length === 1 && !customTimes?.perPill
+                                                  : undefined;
+                                                const draftPillDiff = draftDiff?.pillDiffs[li] ?? {
+                                                  borderKind:
+                                                    draftKind === "new" || draftKind === "modified"
+                                                      ? draftKind
+                                                      : null,
+                                                  badge: null,
+                                                };
+                                                const draftPillBorderKind: DraftKind = draftDiff
+                                                  ? draftPillDiff.borderKind
+                                                  : (draftPillDiff.borderKind ?? draftKind);
+                                                const publishRingStatus =
+                                                  publishDiffSummary?.pillDiffs[li]?.borderKind ??
+                                                  null;
+                                                const multiUsesShiftColor =
+                                                  shouldUseShiftColorForDiffState({
+                                                    isCross,
+                                                  });
+                                                const multiForegroundColor = multiUsesShiftColor
+                                                  ? effectiveTextLi
+                                                  : getReadableTextOnSurface(
+                                                      effectiveColorLi,
+                                                      effectiveTextLi,
+                                                      themeSurface,
+                                                    );
+                                                const pillBadge = multiPillBadges[li];
+                                                // The cell's own chip rides on the first pill.
+                                                const pillHasChip =
+                                                  !!pillBadge ||
+                                                  (li === 0 && !!(draftBadge || publishBadge));
+                                                const pillSeam = pillSeams[shiftOrder(li)];
+                                                const pillBorder = draftPillBorderKind
+                                                  ? getDraftBorder(
+                                                      draftPillBorderKind,
+                                                      `1px solid ${borderColor(multiForegroundColor)}`,
+                                                    )
+                                                  : `1px solid ${borderColor(multiForegroundColor)}`;
+                                                const pillTime =
+                                                  customTimes?.perPill?.[li] ??
+                                                  (li === 0 && !customTimes?.perPill
                                                     ? customTimes
                                                     : null);
-                                                const absenceLabel = isNameMode
-                                                  ? restOfDayAbsenceName
-                                                  : restOfDayAbsenceType?.label ||
-                                                    restOfDayAbsenceName;
+                                                const hasTime =
+                                                  pillTime && (pillTime.start || pillTime.end);
+                                                const catLi =
+                                                  codeEntryLi?.categoryId != null
+                                                    ? categoryById.get(codeEntryLi.categoryId)
+                                                    : undefined;
+                                                const isPillOvernight = isOvernightTimes(
+                                                  pillTime?.start ??
+                                                    codeEntryLi?.defaultStartTime ??
+                                                    catLi?.startTime,
+                                                  pillTime?.end ??
+                                                    codeEntryLi?.defaultEndTime ??
+                                                    catLi?.endTime,
+                                                );
+                                                const multiCrossFocusPill =
+                                                  isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                                                const multiCrossFocusWingRadius =
+                                                  SINGLE_SHIFT_PILL_RADIUS -
+                                                  (draftPillBorderKind ? 2 : 1);
+                                                const multiCrossFocusPalette =
+                                                  getCrossFocusBadgePalette({
+                                                    color: effectiveColorLi,
+                                                    text: effectiveTextLi,
+                                                  });
+                                                const showMultiSecondaryLine =
+                                                  !!displayParts.secondaryLabel;
+                                                // Same split as the single pill: a row per item in
+                                                // name mode, shift · job on one line in code mode.
+                                                const multiIsThreeRow =
+                                                  showMultiSecondaryLine && !!hasTime && isNameMode;
+                                                const multiInlinesSecondary =
+                                                  showMultiSecondaryLine && !isNameMode;
+                                                const multiDisplayLabel = displayParts.primaryLabel;
+                                                const isMentoredPill =
+                                                  cellSegments[li]?.isMentored ?? false;
+                                                const multiSidePadding = isNameMode ? 6 : 3;
+                                                const multiPaddingLeft = multiCrossFocusPill
+                                                  ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                  : multiSidePadding;
+                                                const pillSegment = notesPerPill
+                                                  ? cellSegments[li]
+                                                  : undefined;
+                                                const pillNoteMarks = pillSegment
+                                                  ? (noteMarksForKey?.(
+                                                      emp.id,
+                                                      date,
+                                                      // A note shows only in its shift's own
+                                                      // focus area, so a pill from another area
+                                                      // finds none in this section.
+                                                      sectionFocusArea?.id,
+                                                      {
+                                                        shiftId: pillSegment.shiftId,
+                                                        jobId: pillSegment.jobId,
+                                                      },
+                                                    ) ?? [])
+                                                  : // Segments that do not line up with the
+                                                    // pills leave the notes with the cell, so
+                                                    // the last pill carries them.
+                                                    li === labels.length - 1
+                                                    ? noteMarks
+                                                    : [];
+                                                const pillHasNotes = pillNoteMarks.length > 0;
+
                                                 return (
                                                   <div
-                                                    key="rest-of-day-absence"
-                                                    data-shift-pill="rest-of-day-absence"
-                                                    data-absence-first={absenceFirst || undefined}
+                                                    key={li}
+                                                    data-shift-pill="multi"
                                                     style={{
-                                                      order: absenceOrder,
+                                                      order: shiftOrder(li),
                                                       flex: 1,
-                                                      background: absenceBg,
-                                                      ...seamBorders(
-                                                        restOfDayDraftDiff?.borderKind
-                                                          ? getDraftBorder(
-                                                              restOfDayDraftDiff.borderKind,
-                                                              `1px solid ${absenceBorder}`,
-                                                            )
-                                                          : `1px solid ${absenceBorder}`,
-                                                        absenceSeam,
-                                                      ),
+                                                      background: multiUsesShiftColor
+                                                        ? effectiveColorLi
+                                                        : "var(--dg-color-surface)",
+                                                      ...seamBorders(pillBorder, pillSeam),
                                                       ...gapBefore(
-                                                        absenceOrder,
-                                                        absenceSeam,
+                                                        shiftOrder(li),
+                                                        pillSeam,
                                                         pillAxis,
                                                         multiPillGap,
                                                       ),
-                                                      boxShadow: restOfDayPublishDiff?.borderKind
-                                                        ? getPublishDiffRing(
-                                                            restOfDayPublishDiff.borderKind,
-                                                            borderColor(absenceFg),
-                                                          )
-                                                        : "none",
                                                       borderRadius: seamRadius(
                                                         SINGLE_SHIFT_PILL_RADIUS,
-                                                        absenceSeam,
+                                                        pillSeam,
                                                       ),
-                                                      color: absenceFg,
+                                                      color: multiForegroundColor,
+                                                      boxShadow:
+                                                        publishRingStatus === "new" ||
+                                                        publishRingStatus === "modified"
+                                                          ? getPublishDiffRing(
+                                                              publishRingStatus,
+                                                              borderColor(multiForegroundColor),
+                                                            )
+                                                          : "none",
                                                       display: "flex",
                                                       flexDirection: "column",
                                                       alignItems: "center",
@@ -4349,28 +4161,32 @@ const SectionBlock = memo(function SectionBlock({
                                                         : "var(--dg-fs-title)",
                                                       fontWeight: 600,
                                                       position: "relative",
-                                                      zIndex: restOfDayPillBadge ? 2 : 1,
+                                                      // The pill above otherwise paints over the
+                                                      // raised chip in the gap between them.
+                                                      zIndex: pillBadge ? 2 : 1,
                                                       cursor: "pointer",
                                                       textDecoration:
                                                         draftKind === "deleted"
                                                           ? "line-through"
                                                           : "none",
                                                       lineHeight: 1.2,
-                                                      overflow: restOfDayPillBadge
-                                                        ? "visible"
-                                                        : "hidden",
+                                                      overflow: pillBadge ? "visible" : "hidden",
                                                       minWidth: 0,
                                                       padding: isNameMode ? "2px 6px" : "2px 3px",
-                                                      paddingTop: restOfDayPillBadge
+                                                      // Words start below a raised chip's lower half.
+                                                      paddingTop: pillHasChip
                                                         ? RAISED_CHIP_RESERVE
                                                         : 2,
+                                                      paddingLeft: multiPaddingLeft,
+                                                      paddingRight: multiSidePadding,
                                                     }}
                                                   >
-                                                    {restOfDayPillBadge && (
+                                                    {pillBadge && (
                                                       <GridDiffBadge
                                                         badge={{
-                                                          ...restOfDayPillBadge,
+                                                          ...pillBadge,
                                                           topOffset: 0,
+                                                          // Clears the mentored M on a single pill's width.
                                                           leftOffset: 2,
                                                           overlapPillEdge: true,
                                                           showChangeTooltip:
@@ -4378,377 +4194,684 @@ const SectionBlock = memo(function SectionBlock({
                                                         }}
                                                       />
                                                     )}
-                                                    <span
-                                                      data-pill-fit=""
-                                                      style={gridFitLine(
-                                                        isNameMode
-                                                          ? "var(--dg-fs-caption)"
-                                                          : "var(--dg-fs-title)",
-                                                      )}
+                                                    {multiCrossFocusPill && (
+                                                      <span
+                                                        style={{
+                                                          position: "absolute",
+                                                          top: 0,
+                                                          bottom: 0,
+                                                          left: 0,
+                                                          display: "flex",
+                                                          writingMode: "vertical-rl",
+                                                          textOrientation: "upright",
+                                                          whiteSpace: "nowrap",
+                                                          alignItems: "center",
+                                                          justifyContent: "center",
+                                                          fontSize: "var(--dg-fs-footnote)",
+                                                          fontWeight: 600,
+                                                          lineHeight: 1,
+                                                          background:
+                                                            multiCrossFocusPalette.background,
+                                                          color: multiCrossFocusPalette.color,
+                                                          borderRadius: seamRadius(
+                                                            multiCrossFocusWingRadius,
+                                                            [...pillSeam, "right"],
+                                                          ),
+                                                          padding: "0 2px",
+                                                          letterSpacing: "-0.2em",
+                                                          pointerEvents: "none",
+                                                        }}
+                                                      >
+                                                        {getFocusAreaInitials(
+                                                          multiCrossFocusPill.name,
+                                                        )}
+                                                      </span>
+                                                    )}
+                                                    {isMentoredPill && (
+                                                      <MentoredShiftBadge
+                                                        rightInset={
+                                                          // Only the pill in the cell's
+                                                          // top-right corner shares it
+                                                          // with the lock avatar.
+                                                          li === (stackShifts ? 0 : pillCount - 1)
+                                                            ? cornerLockClearance || undefined
+                                                            : undefined
+                                                        }
+                                                      />
+                                                    )}
+                                                    <div
+                                                      style={{
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        alignItems: "center",
+                                                        alignSelf: "stretch",
+                                                        justifyContent: "center",
+                                                        gap:
+                                                          showMultiSecondaryLine &&
+                                                          !multiInlinesSecondary
+                                                            ? 1
+                                                            : 0,
+                                                        // The first line shares the corner's height,
+                                                        // so it alone keeps the M's room on both
+                                                        // sides: clear of it and still centred.
+                                                        ...(isMentoredPill
+                                                          ? {
+                                                              paddingLeft: Math.max(
+                                                                0,
+                                                                MENTORED_CORNER_CLEARANCE -
+                                                                  multiPaddingLeft,
+                                                              ),
+                                                              paddingRight:
+                                                                MENTORED_CORNER_CLEARANCE -
+                                                                multiSidePadding,
+                                                            }
+                                                          : null),
+                                                        minWidth: 0,
+                                                        overflow: "hidden",
+                                                      }}
                                                     >
-                                                      {absenceLabel}
-                                                    </span>
-                                                    {(absenceLayout?.shortTime ||
-                                                      lastShiftTime?.end) && (
                                                       <span
                                                         data-pill-fit=""
                                                         style={{
-                                                          ...gridFitLine("var(--dg-fs-footnote)"),
+                                                          ...gridFitLine(
+                                                            isNameMode
+                                                              ? "var(--dg-fs-caption)"
+                                                              : "var(--dg-fs-title)",
+                                                            // A name alone in its pill may take two lines.
+                                                            {
+                                                              wrap:
+                                                                isNameMode &&
+                                                                !showMultiSecondaryLine &&
+                                                                !hasTime &&
+                                                                !pillHasNotes,
+                                                            },
+                                                          ),
+                                                          lineHeight: 1.2,
+                                                        }}
+                                                      >
+                                                        {multiDisplayLabel}
+                                                        {!hasTime && isPillOvernight && (
+                                                          <sup
+                                                            style={{
+                                                              fontSize: "0.65em",
+                                                              fontWeight: 700,
+                                                              opacity: 0.5,
+                                                              marginLeft: 1,
+                                                            }}
+                                                          >
+                                                            +1
+                                                          </sup>
+                                                        )}
+                                                        {multiInlinesSecondary && (
+                                                          <>
+                                                            <span
+                                                              aria-hidden="true"
+                                                              style={{
+                                                                fontSize:
+                                                                  gridFitSize(
+                                                                    "var(--dg-fs-footnote)",
+                                                                  ),
+                                                                fontWeight: 700,
+                                                                opacity: 0.5,
+                                                                margin: "0 2px",
+                                                              }}
+                                                            >
+                                                              ·
+                                                            </span>
+                                                            <span
+                                                              style={{
+                                                                fontSize:
+                                                                  gridFitSize(
+                                                                    "var(--dg-fs-footnote)",
+                                                                  ),
+                                                                fontWeight: 700,
+                                                                color:
+                                                                  "color-mix(in srgb, currentColor 78%, transparent)",
+                                                              }}
+                                                            >
+                                                              {displayParts.secondaryLabel}
+                                                            </span>
+                                                          </>
+                                                        )}
+                                                      </span>
+                                                      {showMultiSecondaryLine &&
+                                                      !multiInlinesSecondary ? (
+                                                        <span
+                                                          data-pill-fit=""
+                                                          style={{
+                                                            ...gridFitLine(
+                                                              multiIsThreeRow
+                                                                ? "var(--dg-fs-micro)"
+                                                                : "var(--dg-fs-footnote)",
+                                                            ),
+                                                            fontWeight: 700,
+                                                            opacity: 0.78,
+                                                            // A split shift is half the width but the
+                                                            // full cell height, so three rows fit on
+                                                            // the same budget as the single pill.
+                                                            lineHeight: multiIsThreeRow ? 1.2 : 1.3,
+                                                          }}
+                                                        >
+                                                          {displayParts.secondaryLabel}
+                                                        </span>
+                                                      ) : null}
+                                                    </div>
+                                                    {hasTime && (
+                                                      <span
+                                                        data-pill-fit=""
+                                                        style={{
+                                                          ...gridFitLine(
+                                                            multiIsThreeRow
+                                                              ? "var(--dg-fs-micro)"
+                                                              : "var(--dg-fs-footnote)",
+                                                          ),
                                                           fontWeight: 500,
                                                           opacity: 0.7,
                                                           lineHeight: 1,
                                                         }}
                                                       >
-                                                        {absenceLayout?.shortTime ??
-                                                          `from ${fmt12hShort(lastShiftTime!.end)}`}
+                                                        {fmt12hShort(pillTime!.start)}–
+                                                        {fmt12hShort(pillTime!.end)}
+                                                        {isPillOvernight && (
+                                                          <sup
+                                                            style={{
+                                                              fontSize: "0.65em",
+                                                              fontWeight: 700,
+                                                              marginLeft: 1,
+                                                              opacity: 1,
+                                                            }}
+                                                          >
+                                                            +1
+                                                          </sup>
+                                                        )}
                                                       </span>
                                                     )}
+                                                    <NoteDots
+                                                      marks={pillNoteMarks}
+                                                      indicatorTypes={indicatorTypes}
+                                                      rimColor={multiForegroundColor}
+                                                      isDark={isDarkTheme}
+                                                      corner
+                                                    />
                                                   </div>
                                                 );
-                                              })()}
+                                              })}
+                                              {restOfDayAbsenceTypeId != null &&
+                                                (() => {
+                                                  // The absence for the rest of the day, after the
+                                                  // shifts; from when the last shift ended, if known.
+                                                  const stripes = restOfDayAbsenceType
+                                                    ? resolveAbsenceStripes(
+                                                        restOfDayAbsenceType.color,
+                                                        isDarkTheme,
+                                                      )
+                                                    : null;
+                                                  const absenceBg = stripes
+                                                    ? absenceStripeCss(
+                                                        stripes.stripeA,
+                                                        stripes.stripeB,
+                                                      )
+                                                    : "var(--dg-color-bg)";
+                                                  const absenceFg =
+                                                    stripes?.text ?? "var(--dg-color-text-primary)";
+                                                  const absenceBorder =
+                                                    stripes?.border ?? borderColor(absenceFg);
+                                                  const absenceSeam = pillSeams[absenceOrder];
+                                                  const lastShiftTime =
+                                                    customTimes?.perPill?.[labels.length - 1] ??
+                                                    (labels.length === 1 && !customTimes?.perPill
+                                                      ? customTimes
+                                                      : null);
+                                                  const absenceLabel = isNameMode
+                                                    ? restOfDayAbsenceName
+                                                    : restOfDayAbsenceType?.label ||
+                                                      restOfDayAbsenceName;
+                                                  return (
+                                                    <div
+                                                      key="rest-of-day-absence"
+                                                      data-shift-pill="rest-of-day-absence"
+                                                      data-absence-first={absenceFirst || undefined}
+                                                      style={{
+                                                        order: absenceOrder,
+                                                        flex: 1,
+                                                        background: absenceBg,
+                                                        ...seamBorders(
+                                                          restOfDayDraftDiff?.borderKind
+                                                            ? getDraftBorder(
+                                                                restOfDayDraftDiff.borderKind,
+                                                                `1px solid ${absenceBorder}`,
+                                                              )
+                                                            : `1px solid ${absenceBorder}`,
+                                                          absenceSeam,
+                                                        ),
+                                                        ...gapBefore(
+                                                          absenceOrder,
+                                                          absenceSeam,
+                                                          pillAxis,
+                                                          multiPillGap,
+                                                        ),
+                                                        boxShadow: restOfDayPublishDiff?.borderKind
+                                                          ? getPublishDiffRing(
+                                                              restOfDayPublishDiff.borderKind,
+                                                              borderColor(absenceFg),
+                                                            )
+                                                          : "none",
+                                                        borderRadius: seamRadius(
+                                                          SINGLE_SHIFT_PILL_RADIUS,
+                                                          absenceSeam,
+                                                        ),
+                                                        color: absenceFg,
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                        gap: 1,
+                                                        fontSize: isNameMode
+                                                          ? "var(--dg-fs-caption)"
+                                                          : "var(--dg-fs-title)",
+                                                        fontWeight: 600,
+                                                        position: "relative",
+                                                        zIndex: restOfDayPillBadge ? 2 : 1,
+                                                        cursor: "pointer",
+                                                        textDecoration:
+                                                          draftKind === "deleted"
+                                                            ? "line-through"
+                                                            : "none",
+                                                        lineHeight: 1.2,
+                                                        overflow: restOfDayPillBadge
+                                                          ? "visible"
+                                                          : "hidden",
+                                                        minWidth: 0,
+                                                        padding: isNameMode ? "2px 6px" : "2px 3px",
+                                                        paddingTop: restOfDayPillBadge
+                                                          ? RAISED_CHIP_RESERVE
+                                                          : 2,
+                                                      }}
+                                                    >
+                                                      {restOfDayPillBadge && (
+                                                        <GridDiffBadge
+                                                          badge={{
+                                                            ...restOfDayPillBadge,
+                                                            topOffset: 0,
+                                                            leftOffset: 2,
+                                                            overlapPillEdge: true,
+                                                            showChangeTooltip:
+                                                              !showShiftDetailHoverCards,
+                                                          }}
+                                                        />
+                                                      )}
+                                                      <span
+                                                        data-pill-fit=""
+                                                        style={gridFitLine(
+                                                          isNameMode
+                                                            ? "var(--dg-fs-caption)"
+                                                            : "var(--dg-fs-title)",
+                                                        )}
+                                                      >
+                                                        {absenceLabel}
+                                                      </span>
+                                                      {(absenceLayout?.shortTime ||
+                                                        lastShiftTime?.end) && (
+                                                        <span
+                                                          data-pill-fit=""
+                                                          style={{
+                                                            ...gridFitLine("var(--dg-fs-footnote)"),
+                                                            fontWeight: 500,
+                                                            opacity: 0.7,
+                                                            lineHeight: 1,
+                                                          }}
+                                                        >
+                                                          {absenceLayout?.shortTime ??
+                                                            `from ${fmt12hShort(lastShiftTime!.end)}`}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })()}
+                                            </div>
+                                            {(draftBadge || publishBadge) && (
+                                              <GridDiffBadge
+                                                badge={{
+                                                  ...(draftBadge ?? publishBadge!),
+                                                  topOffset: 0,
+                                                  leftOffset: 2,
+                                                  overlapPillEdge: true,
+                                                  showChangeTooltip: !showShiftDetailHoverCards,
+                                                }}
+                                              />
+                                            )}
                                           </div>
-                                          {(draftBadge || publishBadge) && (
-                                            <GridDiffBadge
-                                              badge={{
-                                                ...(draftBadge ?? publishBadge!),
-                                                topOffset: 0,
-                                                leftOffset: 2,
-                                                overlapPillEdge: true,
-                                                showChangeTooltip: !showShiftDetailHoverCards,
-                                              }}
-                                            />
-                                          )}
-                                        </div>
-                                      </ShiftDetailHoverCard>
-                                      {shouldShowAuthorName && auditName && (
-                                        <AuthorBadge
-                                          name={auditName}
-                                          leftInset={multiAuthorLeftInset}
-                                          rightInset={4}
-                                          bottomInset={4}
-                                        />
-                                      )}
-                                    </>
+                                        </ShiftDetailHoverCard>
+                                        {shouldShowAuthorName && auditName && (
+                                          <AuthorBadge
+                                            name={auditName}
+                                            leftInset={multiAuthorLeftInset}
+                                            rightInset={4}
+                                            bottomInset={4}
+                                          />
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </DraggableShift>
+                              ) : (draftKind === "deleted" && publishedLabel) ||
+                                (showsPublishDiff &&
+                                  publishDiff?.kind === "deleted" &&
+                                  (publishDiff.detailsHidden ||
+                                    (publishDiff.from ?? []).length > 0 ||
+                                    publishDiff.fromAbsenceTypeId != null ||
+                                    publishDiff.fromState?.kind === "worked" ||
+                                    publishDiff.fromState?.kind === "absence")) ? (
+                                (() => {
+                                  const isDraftDelete = draftKind === "deleted";
+                                  const publishDeletedFromIds =
+                                    publishDiff?.from ??
+                                    assignmentIdsFromPublishState(
+                                      publishDiff?.fromState,
+                                      publishedAssignmentIdByPair,
+                                    );
+                                  const publishDeletedAbsenceTypeId =
+                                    publishDiff?.fromAbsenceTypeId ??
+                                    absenceTypeIdFromPublishState(publishDiff?.fromState);
+                                  // The organization may hide what was removed
+                                  // from staff (item 46f); the pill still says
+                                  // that something was.
+                                  const deletedLabel = isDraftDelete
+                                    ? publishedLabel!
+                                    : publishDiff?.detailsHidden
+                                      ? "Removed"
+                                      : publishDeletedAbsenceTypeId != null
+                                        ? (() => {
+                                            const at = absenceTypeMap?.get(
+                                              Number(publishDeletedAbsenceTypeId),
+                                            );
+                                            return at ? (isNameMode ? at.name : at.label) : "?";
+                                          })()
+                                        : publishDeletedFromIds
+                                            .map((id) => {
+                                              const sc = assignmentById.get(id);
+                                              return sc
+                                                ? isNameMode
+                                                  ? sc.name || sc.label
+                                                  : sc.label
+                                                : "?";
+                                            })
+                                            .join("/");
+                                  const deletedTooltip =
+                                    !isDraftDelete && publishDiff
+                                      ? buildPublishTooltip({
+                                          publishDiff,
+                                          resolvePublisherName,
+                                          detail:
+                                            publishChangeText ??
+                                            (publishDiff.detailsHidden
+                                              ? "Removed since the last publish."
+                                              : `Deleted ${deletedLabel}.`),
+                                          timeZone: publicationTimeZone,
+                                        })
+                                      : undefined;
+                                  // A reviewer checking a delete before publishing
+                                  // needs the same two facts the live pill carries:
+                                  // whether it was mentored, and whether it was
+                                  // someone else's focus area. This branch used to
+                                  // drop both, leaving only the struck-through
+                                  // label. One pill stands for a joined label, so
+                                  // "any segment" is the right rule for mentored.
+                                  const deletedSegments = isDraftDelete
+                                    ? publishedSegments
+                                    : (publishDiff?.fromState?.segments ?? []);
+                                  const deletedWasMentored = deletedSegments.some(
+                                    (segment) => segment.isMentored ?? false,
                                   );
-                                })()}
-                              </DraggableShift>
-                            ) : (draftKind === "deleted" && publishedLabel) ||
-                              (showsPublishDiff &&
-                                publishDiff?.kind === "deleted" &&
-                                (publishDiff.detailsHidden ||
-                                  (publishDiff.from ?? []).length > 0 ||
-                                  publishDiff.fromAbsenceTypeId != null ||
-                                  publishDiff.fromState?.kind === "worked" ||
-                                  publishDiff.fromState?.kind === "absence")) ? (
-                              (() => {
-                                const isDraftDelete = draftKind === "deleted";
-                                const publishDeletedFromIds =
-                                  publishDiff?.from ??
-                                  assignmentIdsFromPublishState(
-                                    publishDiff?.fromState,
-                                    publishedAssignmentIdByPair,
-                                  );
-                                const publishDeletedAbsenceTypeId =
-                                  publishDiff?.fromAbsenceTypeId ??
-                                  absenceTypeIdFromPublishState(publishDiff?.fromState);
-                                // The organization may hide what was removed
-                                // from staff (item 46f); the pill still says
-                                // that something was.
-                                const deletedLabel = isDraftDelete
-                                  ? publishedLabel!
-                                  : publishDiff?.detailsHidden
-                                    ? "Removed"
-                                    : publishDeletedAbsenceTypeId != null
-                                      ? (() => {
-                                          const at = absenceTypeMap?.get(
-                                            Number(publishDeletedAbsenceTypeId),
-                                          );
-                                          return at ? (isNameMode ? at.name : at.label) : "?";
-                                        })()
-                                      : publishDeletedFromIds
-                                          .map((id) => {
-                                            const sc = assignmentById.get(id);
-                                            return sc
-                                              ? isNameMode
-                                                ? sc.name || sc.label
-                                                : sc.label
-                                              : "?";
-                                          })
-                                          .join("/");
-                                const deletedTooltip =
-                                  !isDraftDelete && publishDiff
-                                    ? buildPublishTooltip({
-                                        publishDiff,
-                                        resolvePublisherName,
-                                        detail:
-                                          publishChangeText ??
-                                          (publishDiff.detailsHidden
-                                            ? "Removed since the last publish."
-                                            : `Deleted ${deletedLabel}.`),
-                                        timeZone: publicationTimeZone,
-                                      })
-                                    : undefined;
-                                // A reviewer checking a delete before publishing
-                                // needs the same two facts the live pill carries:
-                                // whether it was mentored, and whether it was
-                                // someone else's focus area. This branch used to
-                                // drop both, leaving only the struck-through
-                                // label. One pill stands for a joined label, so
-                                // "any segment" is the right rule for mentored.
-                                const deletedSegments = isDraftDelete
-                                  ? publishedSegments
-                                  : (publishDiff?.fromState?.segments ?? []);
-                                const deletedWasMentored = deletedSegments.some(
-                                  (segment) => segment.isMentored ?? false,
-                                );
-                                const deletedAssignmentDefinitionId = isDraftDelete
-                                  ? publishedCodeIds[0]
-                                  : publishDeletedFromIds[0];
-                                const deletedAssignment =
-                                  deletedAssignmentDefinitionId != null
-                                    ? assignmentById.get(deletedAssignmentDefinitionId)
-                                    : undefined;
-                                const deletedCrossFocusArea =
-                                  publishDeletedAbsenceTypeId == null &&
-                                  deletedAssignment?.focusAreaId != null &&
-                                  sectionFocusArea != null &&
-                                  deletedAssignment.focusAreaId !== sectionFocusArea.id
-                                    ? focusAreas.find(
-                                        (fa) => fa.id === deletedAssignment.focusAreaId,
-                                      )
-                                    : undefined;
-                                const deletedCrossFocusPalette = getCrossFocusBadgePalette({
-                                  color: "var(--dg-color-danger-bg)",
-                                  text: "var(--dg-color-danger-dark)",
-                                });
-                                const deletedCrossFocusWingRadius =
-                                  SINGLE_SHIFT_PILL_RADIUS - (isDraftDelete ? 2 : 1);
-                                const deletedPill = (
-                                  <div
-                                    data-shift-pill="deleted"
-                                    aria-label={deletedTooltip ?? "Deleted shift"}
-                                    style={{
-                                      position: "absolute",
-                                      top: insetFromVisibleCellTop(4),
-                                      right: "4px",
-                                      bottom: "4px",
-                                      left: insetFromVisibleCellLeft(4),
-                                      background:
-                                        publishDeletedAbsenceTypeId != null
-                                          ? tintStripeCss(
-                                              "var(--dg-color-danger-bg)",
-                                              "var(--dg-color-danger-dark)",
-                                            )
-                                          : "var(--dg-color-danger-bg)",
-                                      border: isDraftDelete
-                                        ? "2px dashed var(--dg-color-danger-dark)"
-                                        : "1px solid var(--dg-color-danger-border)",
-                                      borderRadius: "var(--dg-radius-md)",
-                                      ...(isDraftDelete
-                                        ? {}
-                                        : {
-                                            boxShadow: getPublishDiffRing(
-                                              "deleted",
-                                              "var(--dg-color-danger-dark)",
-                                            ),
-                                          }),
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      color: "var(--dg-color-danger-dark)",
-                                      overflow: "visible",
-                                    }}
-                                  >
-                                    <GridDiffBadge
-                                      badge={{
-                                        source: isDraftDelete ? "draft" : "publish",
-                                        kind: "deleted",
-                                        text: "Deleted",
-                                        tooltip: deletedTooltip,
-                                        topOffset: 0,
-                                        leftOffset: 4,
-                                        overlapPillEdge: true,
-                                        showChangeTooltip: !showShiftDetailHoverCards,
-                                      }}
-                                    />
-                                    {deletedCrossFocusArea && (
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          top: 0,
-                                          bottom: 0,
-                                          left: 0,
-                                          display: "flex",
-                                          writingMode: "vertical-rl",
-                                          textOrientation: "upright",
-                                          whiteSpace: "nowrap",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          fontSize: "var(--dg-fs-footnote)",
-                                          fontWeight: 600,
-                                          lineHeight: 1,
-                                          background: deletedCrossFocusPalette.background,
-                                          color: deletedCrossFocusPalette.color,
-                                          borderRadius: `${deletedCrossFocusWingRadius}px 0 0 ${deletedCrossFocusWingRadius}px`,
-                                          padding: "0 2px",
-                                          letterSpacing: "-0.2em",
-                                          pointerEvents: "none",
-                                        }}
-                                      >
-                                        {getFocusAreaInitials(deletedCrossFocusArea.name)}
-                                      </span>
-                                    )}
-                                    {deletedWasMentored && (
-                                      <MentoredShiftBadge
-                                        rightInset={cornerLockClearance || undefined}
-                                      />
-                                    )}
-                                    <span
-                                      data-pill-fit=""
+                                  const deletedAssignmentDefinitionId = isDraftDelete
+                                    ? publishedCodeIds[0]
+                                    : publishDeletedFromIds[0];
+                                  const deletedAssignment =
+                                    deletedAssignmentDefinitionId != null
+                                      ? assignmentById.get(deletedAssignmentDefinitionId)
+                                      : undefined;
+                                  const deletedCrossFocusArea =
+                                    publishDeletedAbsenceTypeId == null &&
+                                    deletedAssignment?.focusAreaId != null &&
+                                    sectionFocusArea != null &&
+                                    deletedAssignment.focusAreaId !== sectionFocusArea.id
+                                      ? focusAreas.find(
+                                          (fa) => fa.id === deletedAssignment.focusAreaId,
+                                        )
+                                      : undefined;
+                                  const deletedCrossFocusPalette = getCrossFocusBadgePalette({
+                                    color: "var(--dg-color-danger-bg)",
+                                    text: "var(--dg-color-danger-dark)",
+                                  });
+                                  const deletedCrossFocusWingRadius =
+                                    SINGLE_SHIFT_PILL_RADIUS - (isDraftDelete ? 2 : 1);
+                                  const deletedPill = (
+                                    <div
+                                      data-shift-pill="deleted"
+                                      aria-label={deletedTooltip ?? "Deleted shift"}
                                       style={{
-                                        ...gridFitLine("var(--dg-fs-title)"),
-                                        fontWeight: 600,
-                                        lineHeight: 1,
+                                        position: "absolute",
+                                        top: insetFromVisibleCellTop(4),
+                                        right: "4px",
+                                        bottom: "4px",
+                                        left: insetFromVisibleCellLeft(4),
+                                        background:
+                                          publishDeletedAbsenceTypeId != null
+                                            ? tintStripeCss(
+                                                "var(--dg-color-danger-bg)",
+                                                "var(--dg-color-danger-dark)",
+                                              )
+                                            : "var(--dg-color-danger-bg)",
+                                        border: isDraftDelete
+                                          ? "2px dashed var(--dg-color-danger-dark)"
+                                          : "1px solid var(--dg-color-danger-border)",
+                                        borderRadius: "var(--dg-radius-md)",
+                                        ...(isDraftDelete
+                                          ? {}
+                                          : {
+                                              boxShadow: getPublishDiffRing(
+                                                "deleted",
+                                                "var(--dg-color-danger-dark)",
+                                              ),
+                                            }),
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: "var(--dg-color-danger-dark)",
+                                        overflow: "visible",
                                       }}
                                     >
-                                      {deletedLabel}
-                                    </span>
-                                    {/* Deleting the shift does not delete the
+                                      <GridDiffBadge
+                                        badge={{
+                                          source: isDraftDelete ? "draft" : "publish",
+                                          kind: "deleted",
+                                          text: "Deleted",
+                                          tooltip: deletedTooltip,
+                                          topOffset: 0,
+                                          leftOffset: 4,
+                                          overlapPillEdge: true,
+                                          showChangeTooltip: !showShiftDetailHoverCards,
+                                        }}
+                                      />
+                                      {deletedCrossFocusArea && (
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            bottom: 0,
+                                            left: 0,
+                                            display: "flex",
+                                            writingMode: "vertical-rl",
+                                            textOrientation: "upright",
+                                            whiteSpace: "nowrap",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "var(--dg-fs-footnote)",
+                                            fontWeight: 600,
+                                            lineHeight: 1,
+                                            background: deletedCrossFocusPalette.background,
+                                            color: deletedCrossFocusPalette.color,
+                                            borderRadius: `${deletedCrossFocusWingRadius}px 0 0 ${deletedCrossFocusWingRadius}px`,
+                                            padding: "0 2px",
+                                            letterSpacing: "-0.2em",
+                                            pointerEvents: "none",
+                                          }}
+                                        >
+                                          {getFocusAreaInitials(deletedCrossFocusArea.name)}
+                                        </span>
+                                      )}
+                                      {deletedWasMentored && (
+                                        <MentoredShiftBadge
+                                          rightInset={cornerLockClearance || undefined}
+                                        />
+                                      )}
+                                      <span
+                                        data-pill-fit=""
+                                        style={{
+                                          ...gridFitLine("var(--dg-fs-title)"),
+                                          fontWeight: 600,
+                                          lineHeight: 1,
+                                        }}
+                                      >
+                                        {deletedLabel}
+                                      </span>
+                                      {/* Deleting the shift does not delete the
                                         cell's notes — they outlive the draft and
                                         come back the moment it publishes. This
                                         branch used to drop them, so a note went
                                         invisible for exactly as long as the
                                         delete sat unpublished. */}
-                                    <NoteDots
-                                      marks={noteMarks}
-                                      indicatorTypes={indicatorTypes}
-                                      rimColor="var(--dg-color-danger-dark)"
-                                      isDark={isDarkTheme}
-                                      corner
-                                    />
-                                  </div>
-                                );
-                                const deletedHoverEntries: ShiftDetailEntry[] = [
-                                  {
-                                    label: deletedLabel,
-                                    jobName: null,
-                                    focusAreaName: deletedCrossFocusArea?.name ?? null,
-                                    timeLabel: null,
-                                    isCustomTime: false,
-                                    isMentored: deletedWasMentored,
-                                  },
-                                ];
-                                const deletedShiftContent = (
-                                  <ShiftDetailHoverCard
-                                    enabled={showShiftDetailHoverCards}
-                                    employeeName={getEmployeeDisplayName(emp)}
-                                    date={date}
-                                    entries={deletedHoverEntries}
-                                    indicators={hoverIndicatorNames}
-                                    requestLabel={null}
-                                    status="Deleted"
-                                    changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
-                                    changes={hoverChanges}
-                                    publicationLabel={publicationLabel}
-                                  >
-                                    {deletedPill}
-                                  </ShiftDetailHoverCard>
-                                );
-                                return (
-                                  <>
-                                    {deletedShiftContent}
-                                    {shouldShowAuthorName && auditName && (
-                                      <AuthorBadge
-                                        name={auditName}
-                                        leftInset={5 + leadingDividerInset}
-                                        rightInset={
-                                          noteMarks.length > 0
-                                            ? 4 +
-                                              1 +
-                                              NOTE_LANE_INSET +
-                                              noteMarksWidth(noteMarks.length) +
-                                              3
-                                            : 5
-                                        }
-                                        bottomInset={5}
+                                      <NoteDots
+                                        marks={noteMarks}
+                                        indicatorTypes={indicatorTypes}
+                                        rimColor="var(--dg-color-danger-dark)"
+                                        isDark={isDarkTheme}
+                                        corner
                                       />
-                                    )}
-                                  </>
-                                );
-                              })()
-                            ) : (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  gap: 2,
-                                }}
-                              >
-                                {shiftLabel === "OFF" && (
-                                  <span
-                                    style={{
-                                      fontSize: "var(--dg-fs-micro)",
-                                      fontWeight: 600,
-                                      color: "var(--dg-color-text-faint)",
-                                      letterSpacing: "0.06em",
-                                      userSelect: "none",
-                                    }}
-                                  >
-                                    OFF
-                                  </span>
-                                )}
-                                <NoteDots
-                                  marks={noteMarks}
-                                  indicatorTypes={indicatorTypes}
-                                  isDark={isDarkTheme}
-                                  style={{ alignSelf: "stretch", justifyContent: "center" }}
-                                />
-                              </div>
-                            )}
-                            {cellEditor && (
-                              <MaybeHint
-                                content={`Being edited by ${cellEditor.userName}`}
-                                side="top"
-                              >
-                                <span
+                                    </div>
+                                  );
+                                  const deletedHoverEntries: ShiftDetailEntry[] = [
+                                    {
+                                      label: deletedLabel,
+                                      jobName: null,
+                                      focusAreaName: deletedCrossFocusArea?.name ?? null,
+                                      timeLabel: null,
+                                      isCustomTime: false,
+                                      isMentored: deletedWasMentored,
+                                    },
+                                  ];
+                                  const deletedShiftContent = (
+                                    <ShiftDetailHoverCard
+                                      enabled={showShiftDetailHoverCards}
+                                      employeeName={getEmployeeDisplayName(emp)}
+                                      date={date}
+                                      entries={deletedHoverEntries}
+                                      indicators={hoverIndicatorNames}
+                                      requestLabel={null}
+                                      status="Deleted"
+                                      changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                      changes={hoverChanges}
+                                      publicationLabel={publicationLabel}
+                                    >
+                                      {deletedPill}
+                                    </ShiftDetailHoverCard>
+                                  );
+                                  return (
+                                    <>
+                                      {deletedShiftContent}
+                                      {shouldShowAuthorName && auditName && (
+                                        <AuthorBadge
+                                          name={auditName}
+                                          leftInset={5 + leadingDividerInset}
+                                          rightInset={
+                                            noteMarks.length > 0
+                                              ? 4 +
+                                                1 +
+                                                NOTE_LANE_INSET +
+                                                noteMarksWidth(noteMarks.length) +
+                                                3
+                                              : 5
+                                          }
+                                          bottomInset={5}
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                })()
+                              ) : (
+                                <div
                                   style={{
-                                    ...getAvatarTypography(20),
-                                    position: "absolute",
-                                    top: 2,
-                                    right: 2,
-                                    width: 20,
-                                    height: 20,
-                                    boxSizing: "border-box",
-                                    borderRadius: "50%",
-                                    // The person's own chip, the same one the
-                                    // roster and the people table draw, so the
-                                    // marker reads as the same someone.
-                                    background: cellEditorTone?.backgroundColor,
-                                    border: `1px solid ${cellEditorTone?.borderColor}`,
-                                    color: cellEditorTone?.textColor,
-                                    // Two initials at the badge size run wider
-                                    // than this 20px circle, so the marker
-                                    // sizes its own text off the ring instead.
                                     display: "flex",
+                                    flexDirection: "column",
                                     alignItems: "center",
-                                    justifyContent: "center",
-                                    zIndex: 2,
-                                    pointerEvents: "none",
+                                    gap: 2,
                                   }}
                                 >
-                                  {getAvatarInitials(cellEditor.userName)}
-                                </span>
-                              </MaybeHint>
-                            )}
-                          </div>
-                          <div className="dg-grid-cell__chrome" aria-hidden="true" />
-                        </DroppableCell>
-                      );
-                    });
-                  })()}
-                </div>
+                                  {shiftLabel === "OFF" && (
+                                    <span
+                                      style={{
+                                        fontSize: "var(--dg-fs-micro)",
+                                        fontWeight: 600,
+                                        color: "var(--dg-color-text-faint)",
+                                        letterSpacing: "0.06em",
+                                        userSelect: "none",
+                                      }}
+                                    >
+                                      OFF
+                                    </span>
+                                  )}
+                                  <NoteDots
+                                    marks={noteMarks}
+                                    indicatorTypes={indicatorTypes}
+                                    isDark={isDarkTheme}
+                                    style={{ alignSelf: "stretch", justifyContent: "center" }}
+                                  />
+                                </div>
+                              )}
+                              {cellEditor && (
+                                <MaybeHint
+                                  content={`Being edited by ${cellEditor.userName}`}
+                                  side="top"
+                                >
+                                  <span
+                                    style={{
+                                      ...getAvatarTypography(20),
+                                      position: "absolute",
+                                      top: 2,
+                                      right: 2,
+                                      width: 20,
+                                      height: 20,
+                                      boxSizing: "border-box",
+                                      borderRadius: "50%",
+                                      // The person's own chip, the same one the
+                                      // roster and the people table draw, so the
+                                      // marker reads as the same someone.
+                                      background: cellEditorTone?.backgroundColor,
+                                      border: `1px solid ${cellEditorTone?.borderColor}`,
+                                      color: cellEditorTone?.textColor,
+                                      // Two initials at the badge size run wider
+                                      // than this 20px circle, so the marker
+                                      // sizes its own text off the ring instead.
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      zIndex: 2,
+                                      pointerEvents: "none",
+                                    }}
+                                  >
+                                    {getAvatarInitials(cellEditor.userName)}
+                                  </span>
+                                </MaybeHint>
+                              )}
+                            </div>
+                            <div className="dg-grid-cell__chrome" aria-hidden="true" />
+                          </DroppableCell>
+                        );
+                      });
+                    })()}
+                  </div>
+                </Fragment>
               );
             })}
             {renderedEmployees.length < employees.length && (
@@ -4909,6 +5032,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   todayKey,
   awayRanges,
   corrections,
+  dayOffAbsenceTypeId = null,
   highlightEmpIds,
   highlightScrollKey,
   focusAreas,
@@ -5133,6 +5257,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
         sectionId: number;
         exclusiveCodeIds: Set<number>;
         employees: Employee[];
+        awayAllPeriod: ReadonlyMap<string, string>;
         openShifts: GridOpenShift[] | undefined;
       }
     >();
@@ -5164,10 +5289,20 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
               return codeIds.some((id) => exclusiveCodeIds.has(id));
             }),
         );
+        // Anyone away for the whole period sits last, under a group row (item 54).
+        const ordered = orderAwayAllPeriod([...homeEmps, ...guestEmps], {
+          dates: allDates,
+          awayRanges,
+          absenceTypeIdForKey,
+          assignmentIdsForKey,
+          dayOffAbsenceTypeId,
+          absenceName: (id) => absenceTypeMap?.get(id)?.name || "Absence",
+        });
         map.set(fa.id, {
           sectionId,
           exclusiveCodeIds,
-          employees: [...homeEmps, ...guestEmps],
+          employees: ordered.employees,
+          awayAllPeriod: ordered.awayAllPeriod,
           openShifts: openShifts?.filter((os) => sectionId != null && os.focusAreaId === sectionId),
         });
       }
@@ -5184,6 +5319,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     assignmentIdsForKey,
     assignments,
     openShifts,
+    awayRanges,
+    absenceTypeIdForKey,
+    dayOffAbsenceTypeId,
+    absenceTypeMap,
   ]);
 
   const hasOpenShifts = (openShifts?.length ?? 0) > 0;
@@ -5317,6 +5456,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                   sectionId,
                   exclusiveCodeIds,
                   employees: sectionEmps,
+                  awayAllPeriod: sectionAwayAllPeriod,
                   openShifts: sectionOpenShifts,
                 } = section;
                 const sectionName = fa.name;
@@ -5341,6 +5481,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     sectionName={sectionName}
                     exclusiveCodeIds={exclusiveCodeIds}
                     employees={sectionEmps}
+                    awayAllPeriod={sectionAwayAllPeriod}
                     renderedRows={mount === "full" ? undefined : mount.rows}
                     weekDates={allDates}
                     todayKey={todayKey}
@@ -5593,6 +5734,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           todayKey={model.todayKey}
           awayRanges={model.awayRanges}
           corrections={model.corrections}
+          dayOffAbsenceTypeId={model.dayOffAbsenceTypeId}
           highlightEmpIds={model.options.highlightEmpIds}
           highlightScrollKey={model.options.highlightScrollKey}
           focusAreas={model.focusAreas}
