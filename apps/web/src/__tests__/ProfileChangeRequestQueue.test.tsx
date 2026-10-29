@@ -205,7 +205,7 @@ describe("ProfileChangeRequestQueue", () => {
     renderQueue();
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-    const dialog = screen.getByRole("dialog", { name: "Approve this person's account deletion?" });
+    const dialog = screen.getByRole("dialog", { name: "Approve Alice Smith's account deletion?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
 
     await waitFor(() => expect(resolvePeopleProfileChangeRequest).toHaveBeenCalledOnce());
@@ -227,7 +227,7 @@ describe("ProfileChangeRequestQueue", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
     fireEvent.click(
       within(
-        screen.getByRole("dialog", { name: "Reject this person's account deletion?" }),
+        screen.getByRole("dialog", { name: "Reject Alice Smith's account deletion?" }),
       ).getByRole("button", {
         name: "Reject",
       }),

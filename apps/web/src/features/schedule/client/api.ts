@@ -50,7 +50,9 @@ async function requestScheduleJson<T>(input: string, init?: RequestInit): Promis
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Schedule request failed."));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't update the schedule. Try again."),
+    );
   }
 
   return body as T;
@@ -602,7 +604,9 @@ async function requestManageWithLockTyped<T extends Record<string, unknown>>(
   }
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(payload?.error, "Schedule request failed."));
+    throw new Error(
+      formatClientErrorMessage(payload?.error, "We couldn't update the schedule. Try again."),
+    );
   }
 
   return (payload ?? ({} as T)) as T;

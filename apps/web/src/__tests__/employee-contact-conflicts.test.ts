@@ -39,9 +39,9 @@ describe("getEmployeeContactConflict", () => {
       }),
     ).toEqual({
       code: "EMPLOYEE_CONTACT_CONFLICT",
-      error: "An employee with that name already exists.",
+      error: "Someone in this organization already has that name.",
       field: "name",
-      message: "An employee with that name already exists.",
+      message: "Someone in this organization already has that name.",
     });
   });
 

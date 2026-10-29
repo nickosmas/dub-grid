@@ -9,7 +9,7 @@ type DashboardHeroMetric = {
 
 interface DashboardHeroProps {
   headline: string;
-  description: string;
+  description?: string;
   actionLabel: string;
   actionHref: string;
   metrics?: DashboardHeroMetric[];
@@ -166,17 +166,19 @@ export default function DashboardHero({
           >
             {headline}
           </h2>
-          <p
-            style={{
-              margin: "6px 0 0",
-              color: "var(--dg-color-text-muted)",
-              fontSize: "var(--dg-fs-body-sm, 14px)",
-              maxWidth: 780,
-              lineHeight: 1.45,
-            }}
-          >
-            {description}
-          </p>
+          {description ? (
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "var(--dg-color-text-muted)",
+                fontSize: "var(--dg-fs-body-sm, 14px)",
+                maxWidth: 780,
+                lineHeight: 1.45,
+              }}
+            >
+              {description}
+            </p>
+          ) : null}
         </div>
         <Link
           href={actionHref}

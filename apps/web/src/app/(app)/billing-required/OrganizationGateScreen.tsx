@@ -24,7 +24,7 @@ const ORGANIZATION_GATE_MANUAL_DEADLINE_MS = 15_000;
 export function getGateMessage(state: OrganizationAccessState | undefined): string {
   switch (state) {
     case "unavailable":
-      return "This organization is currently unavailable. Please try again later.";
+      return "This organization isn't available right now. Try again later.";
     case "locked":
       return "This organization is on hold until an administrator sorts out its billing.";
     case "suspended":

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { FocusArea } from "@/types";
@@ -111,7 +112,7 @@ export default function ExpandedCoverage({
               <CustomSelect
                 value={filter === "all" ? "all" : String(filter)}
                 options={[
-                  { value: "all", label: "All sections" },
+                  { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
                   ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
                 ]}
                 onChange={(val) => setFilter(val === "all" ? "all" : Number(val))}
@@ -231,7 +232,7 @@ export default function ExpandedCoverage({
                               const hasRequirement = day.requiredCount > 0;
                               const cellLabel = hasRequirement
                                 ? `${day.filledCount}/${day.requiredCount}`
-                                : "\u2014";
+                                : "-";
                               const ariaLabel = hasRequirement
                                 ? `${sec.focusAreaName} ${day.dayLabel}: ${day.filledCount} of ${day.requiredCount} required slots filled`
                                 : `${sec.focusAreaName} ${day.dayLabel}: no coverage requirement`;

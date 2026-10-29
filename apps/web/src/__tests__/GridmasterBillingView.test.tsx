@@ -238,7 +238,7 @@ describe("GridmasterBillingView", () => {
 
     await screen.findByText("Acme Health");
     await user.click(screen.getByRole("button", { name: "Billing actions for Acme Health" }));
-    const endTrial = await screen.findByRole("menuitem", { name: "End trial…" });
+    const endTrial = await screen.findByRole("menuitem", { name: "End trial" });
     expect(endTrial).toHaveAttribute("aria-disabled", "true");
     expect(endTrial).toHaveAccessibleDescription(
       "Stripe bills this trial. Cancel the subscription to end it.",
@@ -261,7 +261,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await openRowAction(user, "End trial…");
+    await openRowAction(user, "End trial");
     let dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
     expect(within(dialog).getByRole("radio", { name: /Give the usual 3 days/ })).toBeChecked();
     await user.click(within(dialog).getByRole("button", { name: "End trial" }));
@@ -272,7 +272,7 @@ describe("GridmasterBillingView", () => {
       }),
     );
 
-    await openRowAction(user, "End trial…");
+    await openRowAction(user, "End trial");
     dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
     await user.click(within(dialog).getByRole("radio", { name: /Lock now/ }));
     await user.click(within(dialog).getByRole("button", { name: "Lock now" }));
@@ -301,7 +301,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await openRowAction(user, "End trial…");
+    await openRowAction(user, "End trial");
     const dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
     expect(within(dialog).getByRole("radio", { name: /Give the usual 3 days/ })).toBeDisabled();
     expect(within(dialog).getByText("The trial has already ended.")).toBeInTheDocument();

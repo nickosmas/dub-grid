@@ -311,7 +311,7 @@ export function formatShiftRequestType(type: MobileShiftRequest["type"]): string
     return "Swap";
   }
 
-  return "Calloff";
+  return "Call-off";
 }
 
 export function getRequestModeTitle(mode: RequestMode): string {

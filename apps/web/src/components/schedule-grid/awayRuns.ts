@@ -82,8 +82,8 @@ export function awayLockedHint(range: AwayRange, dateKey?: string): string {
   if (range.from !== null) {
     const from = formatReturnDate(range.from, { weekday: true });
     return range.until
-      ? `Away from ${from} until ${formatReturnDate(range.until, { weekday: true })}. Change the planned away on their record to change these days.`
-      : `Away from ${from}. Change the planned away on their record to change these days.`;
+      ? `Away from ${from} until ${formatReturnDate(range.until, { weekday: true })}. Change the planned time away on their record to change these days.`
+      : `Away from ${from}. Change the planned time away on their record to change these days.`;
   }
   return `Away until ${formatReturnDate(range.until ?? "", { weekday: true })}. Change the return date on their record to change these days.`;
 }

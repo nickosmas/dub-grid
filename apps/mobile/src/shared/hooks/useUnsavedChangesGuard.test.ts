@@ -110,12 +110,12 @@ describe("useUnsavedChangesGuard", () => {
     expect(view.result.current.confirmationProps.visible).toBe(false);
   });
 
-  it("offers Keep Editing rather than a second Cancel", () => {
+  it("offers Keep editing rather than a second Cancel", () => {
     // The sheets this replaces label their own dismiss button "Cancel", so a
     // confirmation offering "Cancel" asks the user to cancel their cancel.
     const { view } = renderGuard();
 
-    expect(view.result.current.confirmationProps.cancelLabel).toBe("Keep Editing");
+    expect(view.result.current.confirmationProps.cancelLabel).toBe("Keep editing");
     expect(view.result.current.confirmationProps.confirmTone).toBe("danger");
   });
 

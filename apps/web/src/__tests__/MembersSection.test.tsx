@@ -884,7 +884,7 @@ describe("MembersSection — pending invitation access", () => {
     await user.click(within(row).getByRole("button", { name: "User" }));
     await user.click(screen.getByRole("option", { name: "Admin" }));
 
-    expect(screen.getByText(/^Change invitation access from /)).toBeInTheDocument();
+    expect(screen.getByText(/^Change the invitation for /)).toBeInTheDocument();
     expect(replaceOrganizationInvitationAccessGuarded).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Change and resend" }));
@@ -1364,7 +1364,9 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const result = await screen.findByRole("dialog", { name: "2 people not changed" });
     expect(result).toHaveTextContent("1 person offboarded. Anyone not changed is still selected.");
     expect(result).toHaveTextContent("Alex Chen");
-    expect(result).toHaveTextContent("Their status changed elsewhere. Check it and try again.");
+    expect(result).toHaveTextContent(
+      "Someone else just changed their status. Refresh and try again.",
+    );
     expect(result).toHaveTextContent("Pat Lee");
     expect(result).toHaveTextContent("They're the only Super Admin who can sign in.");
     expect(vi.mocked(toast.success)).not.toHaveBeenCalledWith(expect.stringMatching(/offboarded/i));

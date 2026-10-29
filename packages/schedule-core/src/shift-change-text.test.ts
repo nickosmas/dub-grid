@@ -50,7 +50,7 @@ describe("formatShiftChangePlain", () => {
       "Shift 2: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing (removed)",
       "After (5 hrs):",
       "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing",
-      "Absence: Sick (rest of day) (added)",
+      "Absence: Sick (part of day) (added)",
     ]);
   });
 
@@ -97,7 +97,7 @@ describe("formatShiftChangeCompact", () => {
 
   it("joins a whole day's items (Thu)", () => {
     expect(formatShiftChangeCompact(thursday)).toBe(
-      "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing + Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing → Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing + Sick (rest of day)",
+      "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing + Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing → Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing + Sick (part of day)",
     );
   });
 });

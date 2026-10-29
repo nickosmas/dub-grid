@@ -70,7 +70,7 @@ describe("DomainSelector", () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "No organization found for that domain. Please check and try again.",
+        "No organization found for that domain. Check it and try again.",
         { id: "login-error" },
       );
     });
@@ -162,7 +162,7 @@ describe("DomainSelector", () => {
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "No organization found for that domain. Please check and try again.",
+        "No organization found for that domain. Check it and try again.",
         { id: "login-error" },
       );
     });
@@ -187,7 +187,7 @@ describe("DomainSelector", () => {
     submitSlug("calmhaven");
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "DubGrid is temporarily unavailable. Please try again.",
+        "We can't reach DubGrid right now. Try again in a moment.",
         { id: "login-error" },
       );
     });

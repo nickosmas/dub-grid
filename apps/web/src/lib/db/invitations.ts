@@ -5,6 +5,7 @@ import { rowToInvitation } from "./mappers";
 import type { DbInvitation } from "./types";
 import { resendOrganizationInvitationGuarded, revokeOrganizationInvitationGuarded } from "./access";
 import type { Invitation } from "@/types";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 // ── Invitations ──────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ export async function revokeInvitation(invitationId: string, orgId: string): Pro
     .maybeSingle();
   if (error) throw error;
   if (!invitationRow?.updated_at) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
   await revokeOrganizationInvitationGuarded({
     orgId,
@@ -68,7 +69,7 @@ export async function resendInvitation(
     .maybeSingle();
   if (error) throw error;
   if (!invitationRow?.updated_at) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
   const resent = await resendOrganizationInvitationGuarded({
     orgId,

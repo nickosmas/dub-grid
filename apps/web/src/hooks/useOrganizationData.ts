@@ -432,7 +432,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const loadError = bootstrapQuery.isError
     ? formatClientErrorMessage(
         bootstrapQuery.error,
-        "We couldn't load organization. Refresh and try again.",
+        "We couldn't load your organization. Refresh and try again.",
       )
     : null;
   const bootstrapRetryable =

@@ -23,6 +23,7 @@ import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ function getRequestIp(req: NextRequest): string | null {
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(
     {
-      error: "Employee details changed elsewhere. Refresh and try again.",
+      error: changedElsewhereMessage("their details"),
       code: "EMPLOYEE_IDENTITY_CONFLICT",
       employee,
     },
@@ -68,7 +69,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }

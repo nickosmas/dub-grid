@@ -119,7 +119,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           verifyError,
           retryable
             ? "We couldn't verify your code. Try again."
-            : "Invalid verification code. Please try again.",
+            : "That code isn't right. Try again.",
         ),
       );
       if (!retryable) setCode("");

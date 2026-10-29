@@ -11,7 +11,12 @@ async function requestBillingJson<T>(input: string, init?: RequestInit): Promise
     : null;
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Billing request failed."));
+    throw new Error(
+      formatClientErrorMessage(
+        body?.error,
+        "We couldn't complete that billing request. Try again.",
+      ),
+    );
   }
 
   return body as T;

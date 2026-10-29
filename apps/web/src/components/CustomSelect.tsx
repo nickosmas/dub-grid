@@ -66,7 +66,7 @@ export default function CustomSelect<T extends string | number>({
   // Note: a `value` absent from `options` falls through to "—", which reads as
   // a broken control. Callers that filter their option list must narrow `value`
   // to match — see the schedule Toolbar's span select.
-  const displayLabel = selected?.label ?? placeholder ?? "—";
+  const displayLabel = selected?.label ?? placeholder ?? "-";
 
   const setMenuRef = useCallback(
     (node: HTMLDivElement | null) => {

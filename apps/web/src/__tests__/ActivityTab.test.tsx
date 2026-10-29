@@ -69,11 +69,11 @@ describe("ActivityTab", () => {
     renderTab();
 
     const table = screen.getByRole("table");
-    for (const name of ["Time", "Activity type", "Performed by", "Activity and changes"]) {
+    for (const name of ["Time", "Kind of change", "By", "Activity and changes"]) {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
     // The target is always this person, so naming it in every row is noise.
-    expect(within(table).queryByRole("columnheader", { name: "Target changed" })).toBeNull();
+    expect(within(table).queryByRole("columnheader", { name: "Affected" })).toBeNull();
 
     expect(screen.getByText("Changed Sam Rivera's role to Admin")).toBeInTheDocument();
     expect(screen.getByText(/User → Admin/)).toBeInTheDocument();

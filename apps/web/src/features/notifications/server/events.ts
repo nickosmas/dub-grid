@@ -332,7 +332,7 @@ function normalizeEmployeeRelation(
 }
 
 function getShiftRequestTypeLabel(type: "pickup" | "swap" | "calloff"): string {
-  if (type === "calloff") return "calloff";
+  if (type === "calloff") return "call-off";
   if (type === "swap") return "swap";
   return "pickup";
 }
@@ -440,7 +440,7 @@ function formatNotificationDateRange(start: string, end: string): string {
 
   const startYear = start.slice(0, 4);
   const openEnd = startYear === end.slice(0, 4) ? from.replace(`, ${startYear}`, "") : from;
-  return `${openEnd} \u2013 ${to}`;
+  return `${openEnd} - ${to}`;
 }
 
 /** Never throws: a failed lookup must not cost a security or billing alert its delivery. */
@@ -631,7 +631,7 @@ async function dispatchNotificationEventInternal(
           requestInfo.targetUserId,
           event.orgId,
           "shift_request_new" as NotificationType,
-          `${capitalize(typeLabel)} response needed`,
+          `${capitalize(typeLabel)} request for you`,
           `${requestInfo.requesterName} sent you a ${typeLabel} request.`,
           {
             requestId: event.requestId,
@@ -649,8 +649,8 @@ async function dispatchNotificationEventInternal(
           orgId: event.orgId,
           requestId: event.requestId,
           requestType,
-          title: `New ${typeLabel} request`,
-          message: `${requestInfo.requesterName} submitted a ${typeLabel} request that needs your approval.`,
+          title: `${capitalize(typeLabel)} request to approve`,
+          message: `${requestInfo.requesterName} sent a ${typeLabel} request.`,
         });
       }
       return;
@@ -665,7 +665,7 @@ async function dispatchNotificationEventInternal(
         orgId: event.orgId,
         requestId: event.requestId,
         requestType: "pickup",
-        title: "Pickup request awaiting approval",
+        title: "Pickup request to approve",
         message: `${targetName} offered to pick up ${requesterName}'s shift.`,
       });
       return;
@@ -683,7 +683,7 @@ async function dispatchNotificationEventInternal(
           orgId: event.orgId,
           requestId: event.requestId,
           requestType,
-          title: `${capitalize(typeLabel)} request awaiting approval`,
+          title: `${capitalize(typeLabel)} request to approve`,
           message: `${requestInfo.targetName} accepted ${requestInfo.requesterName}'s ${typeLabel} request.`,
         });
         return;
@@ -714,7 +714,7 @@ async function dispatchNotificationEventInternal(
     case "shift_request_cancelled": {
       const requestInfo = await getRequestInfo(event.requestId);
       const typeLabel = getShiftRequestTypeLabel(requestInfo.requestType ?? "swap");
-      const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+      const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
       const metadata = {
         requestId: event.requestId,
         requestType: requestInfo.requestType ?? "swap",
@@ -727,8 +727,8 @@ async function dispatchNotificationEventInternal(
           requesterUserId,
           event.orgId,
           "shift_request_rejected",
-          "Request cancelled",
-          `Your ${typeLabel} request was cancelled by a manager.${noteText}`,
+          "Request canceled",
+          `A manager canceled your ${typeLabel} request.${noteText}`,
           metadata,
         );
       }
@@ -737,8 +737,8 @@ async function dispatchNotificationEventInternal(
           targetUserId,
           event.orgId,
           "shift_request_rejected",
-          `${capitalize(typeLabel)} cancelled`,
-          `${requestInfo.requesterName}'s ${typeLabel} request was cancelled.${noteText}`,
+          `${capitalize(typeLabel)} canceled`,
+          `${requestInfo.requesterName}'s ${typeLabel} request was canceled.${noteText}`,
           metadata,
         );
       }
@@ -755,21 +755,28 @@ async function dispatchNotificationEventInternal(
         const type: NotificationType = event.approved
           ? "shift_request_approved"
           : "shift_request_rejected";
-        const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+        const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
         // An auto-approved request reaches its requester only when the
         // other party's acceptance settled it, so say that rather than
         // quoting the requester their own name from the note.
         const message = event.autoApproved
           ? `${requestInfo.targetName} accepted your ${typeLabel} request. It's approved and on the schedule.`
-          : `Your ${typeLabel} request has been ${status}.${noteText}`;
+          : `${event.approved ? "The schedule now shows the change." : "Your schedule stays as it was."}${noteText}`;
 
-        await sendNotification(requesterUserId, event.orgId, type, `Request ${status}`, message, {
-          requestId: event.requestId,
-          requestType,
-          approved: event.approved,
-          action: "view_request",
-          tab: "mine",
-        });
+        await sendNotification(
+          requesterUserId,
+          event.orgId,
+          type,
+          `${capitalize(typeLabel)} request ${status}`,
+          message,
+          {
+            requestId: event.requestId,
+            requestType,
+            approved: event.approved,
+            action: "view_request",
+            tab: "mine",
+          },
+        );
       }
 
       // The other party is affected just as directly as the requester: a swap
@@ -779,8 +786,8 @@ async function dispatchNotificationEventInternal(
       // so silence at the final one was a gap, not a boundary (build plan 34).
       const { targetUserId } = requestInfo;
       if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
-        const status = event.approved ? "approved" : "declined";
-        const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+        const status = event.approved ? "approved" : "rejected";
+        const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
         await sendNotification(
           targetUserId,
           event.orgId,
@@ -808,13 +815,13 @@ async function dispatchNotificationEventInternal(
       if (!event.approved && !requestInfo.targetUserId && event.previousTargetEmpId) {
         const claimantUserId = await getEmployeeUserId(event.previousTargetEmpId);
         if (claimantUserId && claimantUserId !== actorUserId) {
-          const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
+          const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
           await sendNotification(
             claimantUserId,
             event.orgId,
             "shift_request_rejected" as NotificationType,
-            "Claim not approved",
-            `Your claim on a ${typeLabel} request wasn't approved. The shift is open again.${noteText}`,
+            "Claim rejected",
+            `Your claim on a ${typeLabel} request was rejected. The shift is open again.${noteText}`,
             {
               requestId: event.requestId,
               requestType,
@@ -1038,7 +1045,7 @@ async function dispatchNotificationEventInternal(
             userId,
             event.orgId,
             "employee_created" as NotificationType,
-            userId === empUserId ? "You were added to an organization" : "Employee added",
+            userId === empUserId ? "You were added to an organization" : "Staff member added",
             userId === empUserId
               ? `${addedByName} added you to ${orgName}.`
               : `${addedByName} added ${empName} to ${orgName}.`,
@@ -1064,7 +1071,7 @@ async function dispatchNotificationEventInternal(
             userId,
             event.orgId,
             "employee_status_changed" as NotificationType,
-            userId === empUserId ? "Your employment status changed" : "Employee status changed",
+            userId === empUserId ? "Your status changed" : "Staff status changed",
             userId === empUserId
               ? `${statusActorName} changed your status from ${transition}.`
               : `${statusActorName} changed ${statusEmpName}'s status from ${transition}.`,
@@ -1111,9 +1118,9 @@ async function dispatchNotificationEventInternal(
 
       let body: string;
       if (event.fields.length === 0) {
-        body = "Your profile was updated.";
+        body = "Open your profile to see what changed.";
       } else if (event.fields.length > 5) {
-        body = "Several details on your profile were updated.";
+        body = "Several details changed.";
       } else {
         const labels = await getOrgCopyLabels(event.orgId);
         const friendly = event.fields.map((f) => friendlyProfileFieldLabel(f, labels));
@@ -1303,7 +1310,7 @@ async function dispatchNotificationEventInternal(
     // ── Expiry sweepers (cron-driven) ──────────────────────────────────
 
     case "shift_request_expired": {
-      const { requesterUserId, requesterName } = await getRequestInfo(event.requestId);
+      const { requesterUserId } = await getRequestInfo(event.requestId);
       // Dedupe — the cron may re-run; once a row exists for this request the
       // sweeper won't re-fire because it filters on status='expired' already,
       // but keep this guard so a transient SQL error mid-run can't double-fire.
@@ -1319,7 +1326,7 @@ async function dispatchNotificationEventInternal(
         event.orgId,
         "shift_request_expired" as NotificationType,
         `${capitalize(typeLabel)} request expired`,
-        `Your ${typeLabel} request expired before it was acted on. ${requesterName === "An employee" ? "Submit a new one if you still need it." : "Submit a new one if you still need it."}`,
+        `Your ${typeLabel} request expired before anyone decided on it. Submit a new one if you still need it.`,
         {
           requestId: event.requestId,
           requestType: event.requestType,

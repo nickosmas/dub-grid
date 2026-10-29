@@ -186,7 +186,7 @@ describe("MyScheduleRow", () => {
     expect(screen.getByText("Vacation")).toBeInTheDocument();
     // One chip per day in the period, including unscheduled placeholders.
     expect(row.querySelectorAll('a[href="/schedule"]')).toHaveLength(weekDates.length);
-    expect(screen.getAllByText("—")).toHaveLength(weekDates.length - 2);
+    expect(screen.getAllByText("-")).toHaveLength(weekDates.length - 2);
   });
 
   it("shows the grid's draft indication on every affected schedule pill", () => {
@@ -230,8 +230,8 @@ describe("MyScheduleRow", () => {
     );
 
     expect(screen.queryByLabelText("New shift")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-draft-badge", "modified");
-    expect(screen.getByLabelText("Deleted shift")).toHaveAttribute("data-draft-badge", "deleted");
+    expect(screen.getByLabelText("Changed shift")).toHaveAttribute("data-draft-badge", "modified");
+    expect(screen.getByLabelText("Removed shift")).toHaveAttribute("data-draft-badge", "deleted");
     expect(screen.getByText("Night shift")).toBeInTheDocument();
   });
 
@@ -273,7 +273,7 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("Edited shift")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Changed shift")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("New shift")).not.toBeInTheDocument();
     const dayPill = screen.getAllByText("Day shift")[0]!.parentElement as HTMLElement;
     const nightPill = screen.getByText("Night shift").parentElement as HTMLElement;
@@ -316,7 +316,10 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Edited shift")).toHaveAttribute("data-publish-badge", "modified");
+    expect(screen.getByLabelText("Changed shift")).toHaveAttribute(
+      "data-publish-badge",
+      "modified",
+    );
   });
 
   it("badges a published time change the way the grid does", () => {
@@ -358,9 +361,9 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    const badge = screen.getByLabelText("Edited shift");
+    const badge = screen.getByLabelText("Changed shift");
     expect(badge).toHaveAttribute("data-publish-badge", "time");
-    expect(badge).toHaveTextContent("Edited");
+    expect(badge).toHaveTextContent("Changed");
   });
 
   it("keeps a long changed shift name readable beside its change pill", () => {
@@ -408,7 +411,7 @@ describe("MyScheduleRow", () => {
 
     const name = screen.getByText(longAssignment.name);
     const pill = name.parentElement as HTMLElement;
-    expect(screen.getByLabelText("Edited shift")).toBeInTheDocument();
+    expect(screen.getByLabelText("Changed shift")).toBeInTheDocument();
     // Only the name line can collide with the pill, but the whole cell moves
     // left together so its lines stay on one edge.
     expect(pill).toHaveStyle({ textAlign: "left" });
@@ -464,7 +467,7 @@ describe("MyScheduleRow", () => {
 
     const name = screen.getByText("Day");
     const pill = name.parentElement as HTMLElement;
-    expect(screen.getByLabelText("Edited shift")).toBeInTheDocument();
+    expect(screen.getByLabelText("Changed shift")).toBeInTheDocument();
     expect(pill.style.textAlign).toBe("");
     expect(name).toHaveStyle({ paddingLeft: "56px", paddingRight: "56px" });
   });
@@ -952,7 +955,7 @@ describe("MyScheduleRow", () => {
       const pills = document.querySelectorAll<HTMLElement>("[data-my-schedule-pill]");
       expect(pills).toHaveLength(2);
       for (const pill of pills) expect(pill).toHaveStyle({ minHeight: "90px" });
-      const emptyDay = screen.getAllByText("\u2014")[0];
+      const emptyDay = screen.getAllByText("-")[0];
       expect(emptyDay).toHaveStyle({ minHeight: "90px" });
     } finally {
       rect.mockRestore();

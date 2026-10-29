@@ -1,3 +1,4 @@
+import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -248,7 +249,7 @@ export default function PeopleScreen() {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not update request",
+        title: "Couldn't update request",
         fallbackMessage: "We couldn't update that profile request right now.",
       });
     },
@@ -353,6 +354,7 @@ export default function PeopleScreen() {
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certifications";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(
@@ -627,7 +629,7 @@ export default function PeopleScreen() {
         ? focusAreasForPerson.join(", ")
         : canManageEmployees
           ? person.email || person.phone || "No contact on file"
-          : "No focus area";
+          : `No ${singularLabelNoun(focusAreaLabel)}`;
     const isSelf =
       (currentEmployeeId !== null && person.id === currentEmployeeId) ||
       (currentUserId !== null && person.userId !== null && person.userId === currentUserId);
@@ -769,9 +771,9 @@ export default function PeopleScreen() {
           </>
         ) : (
           <>
-            <SelectionSection label="Focus area">
+            <SelectionSection label={capitalizeFirst(singularLabelNoun(focusAreaLabel))}>
               <SelectionRow
-                label="All focus areas"
+                label={`All ${pluralLabelNoun(focusAreaLabel)}`}
                 onPress={() => setStaffFilter("focusAreaId", "all")}
                 selected={staffFilters.focusAreaId === "all"}
               />
@@ -788,7 +790,7 @@ export default function PeopleScreen() {
             {certifications.length > 0 ? (
               <SelectionSection label={certificationLabel}>
                 <SelectionRow
-                  label="All certifications"
+                  label={`All ${pluralLabelNoun(certificationLabel)}`}
                   onPress={() => setStaffFilter("certificationId", "all")}
                   selected={staffFilters.certificationId === "all"}
                 />
@@ -810,7 +812,7 @@ export default function PeopleScreen() {
             {roles.length > 0 ? (
               <SelectionSection label={roleLabel}>
                 <SelectionRow
-                  label="All roles"
+                  label={`All ${pluralLabelNoun(roleLabel)}`}
                   onPress={() => setStaffFilter("roleId", "all")}
                   selected={staffFilters.roleId === "all"}
                 />
@@ -962,7 +964,7 @@ export default function PeopleScreen() {
                   <View style={styles.requestCopy}>
                     <Text style={styles.personName}>{request.requesterName}</Text>
                     <Text style={styles.personSubtitle}>
-                      {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
+                      {request.type === "account_deletion" ? "Account deletion" : "Name change"}
                     </Text>
                   </View>
                   <ActionButtons
@@ -1007,7 +1009,7 @@ export default function PeopleScreen() {
         ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
-          body="Your current role does not include mobile staff visibility for this organization."
+          body="Your access level doesn't include the staff directory. Ask an Admin if you need it."
           fillScreen
           tone="warning"
           title="Directory unavailable"
@@ -1018,7 +1020,7 @@ export default function PeopleScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load people"
+          title="Couldn't load people"
           variant="centered"
           onAction={() => {
             void peopleQuery.refetch();
@@ -1052,8 +1054,8 @@ export default function PeopleScreen() {
           fillScreen
           body={
             regularUserMode
-              ? "Try a different name, focus area, certification, or role."
-              : "Try a different name, email, phone, focus area, certification, or role."
+              ? `Try a different name, ${singularLabelNoun(focusAreaLabel)}, ${singularLabelNoun(certificationLabel)}, or ${singularLabelNoun(roleLabel)}.`
+              : `Try a different name, email, phone, ${singularLabelNoun(focusAreaLabel)}, ${singularLabelNoun(certificationLabel)}, or ${singularLabelNoun(roleLabel)}.`
           }
           iconName="search-outline"
           title="No matches"
@@ -1095,10 +1097,10 @@ export default function PeopleScreen() {
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "This teammate's account will lose access. Safeguards run before it does."
+            ? "Their account is deleted and they're removed from your organization. This can't be undone."
             : profileRequestConfirmation?.action === "approve"
-              ? "The change will be applied to this teammate's profile."
-              : "The teammate's profile will stay as it is."
+              ? "Their profile changes right away."
+              : "Their profile stays as it is."
         }
         confirmLabel={profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"}
         confirmTone={

@@ -33,7 +33,7 @@ test.describe("reports states", () => {
     await expect(applyButton).toBeHidden();
 
     // TargetDropdown: its popover carries the title and a Clear action.
-    const targetTrigger = page.getByRole("button", { name: "Focus areas", exact: true });
+    const targetTrigger = page.getByRole("button", { name: "Wings", exact: true });
     await targetTrigger.click();
     const clearButton = page.getByRole("button", { name: "Clear", exact: true });
     await expect(clearButton).toBeVisible();
@@ -57,7 +57,7 @@ test.describe("reports states", () => {
     // query's key, which is already cached fresh (staleTime 30s), so nothing
     // would be fetched. Selecting one focus area changes the filters key and
     // makes Generate issue a real request.
-    await page.getByRole("button", { name: "Focus areas", exact: true }).click();
+    await page.getByRole("button", { name: "Wings", exact: true }).click();
     await page.getByRole("checkbox").first().check();
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Generate report", exact: true }).click();

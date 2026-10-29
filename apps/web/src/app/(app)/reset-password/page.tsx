@@ -260,7 +260,7 @@ function ResetPasswordContent() {
     if (msg.includes("same password") || msg.includes("different")) {
       setFormError("New password must be different from your current password.");
     } else if (msg.includes("weak") || msg.includes("short")) {
-      setFormError("Password is too weak. Please choose a stronger password.");
+      setFormError("That password is too weak. Choose a stronger one.");
     } else if (isRetryableAuthRecoveryError(err)) {
       toast.error(getWebAuthRecoveryMessage(err, "We couldn't update your password. Try again."));
     } else {
@@ -298,7 +298,7 @@ function ResetPasswordContent() {
           <AuthStateCard
             icon="spinner"
             heading="Verifying reset link"
-            message="Please wait while we verify your password reset link."
+            message="Checking your password reset link."
           />
         ) : state === "recovery" ? (
           <AuthStateCard
@@ -310,8 +310,8 @@ function ResetPasswordContent() {
         ) : state === "error" ? (
           <AuthStateCard
             heading="Invalid or expired link"
-            message="This password reset link is invalid or has expired. Please request a new one."
-            primaryCta={{ label: "Request New Link", href: "/forgot-password" }}
+            message="This password reset link is invalid or has expired. Request a new one."
+            primaryCta={{ label: "Request a new link", href: "/forgot-password" }}
             secondaryCta={{ label: "Back to login", href: "/login" }}
           />
         ) : state === "success" ? (

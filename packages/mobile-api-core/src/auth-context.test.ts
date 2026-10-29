@@ -167,7 +167,12 @@ describe("resolveMobileAuthContext decisions", () => {
       403,
       "Gridmaster mobile access is not supported",
     ],
-    ["no membership", { memberships: [] }, 403, "No active organization membership found"],
+    [
+      "no membership",
+      { memberships: [] },
+      403,
+      "You're no longer in an organization. Ask an Admin if that's a mistake.",
+    ],
     [
       "no org claim",
       { claims: { aal: "aal1" } },
@@ -178,26 +183,26 @@ describe("resolveMobileAuthContext decisions", () => {
       "an org claim the user is not a member of",
       { memberships: [membershipRow(OTHER_ORG_ID)] },
       403,
-      "Organization context does not match this user",
+      "You're no longer in this organization. Sign in again to pick another.",
     ],
     ["a missing organization", { organization: null }, 404, "Organization not found"],
     [
       "an archived organization",
       { organization: orgRow({ archivedAt: "2026-01-01T00:00:00.000Z" }) },
       403,
-      "Organization unavailable. Please try again later.",
+      "Organization unavailable. Try again later.",
     ],
     [
       "a billing-locked organization",
       { organization: orgRow({ suspendedAt: "2026-01-01T00:00:00.000Z" }) },
       403,
-      "Organization unavailable. Please try again later.",
+      "Organization unavailable. Try again later.",
     ],
     [
       "an organization mid-setup",
       { setupComplete: false },
       403,
-      "Organization unavailable. Please try again later.",
+      "Organization unavailable. Try again later.",
     ],
   ] as const)("refuses %s", async (_label, options, status, message) => {
     const { input } = buildInput(options as Parameters<typeof buildInput>[0]);
@@ -214,11 +219,15 @@ describe("resolveMobileAuthContext decisions", () => {
       403,
       "Gridmaster mobile access is not supported",
     ],
-    [{ memberships: [], claims: { aal: "aal1" } }, 403, "No active organization membership found"],
+    [
+      { memberships: [], claims: { aal: "aal1" } },
+      403,
+      "You're no longer in an organization. Ask an Admin if that's a mistake.",
+    ],
     [
       { memberships: [membershipRow(OTHER_ORG_ID)], organization: null },
       403,
-      "Organization context does not match this user",
+      "You're no longer in this organization. Sign in again to pick another.",
     ],
     [
       {
@@ -229,7 +238,7 @@ describe("resolveMobileAuthContext decisions", () => {
         setupComplete: false,
       },
       403,
-      "Organization unavailable. Please try again later.",
+      "Organization unavailable. Try again later.",
     ],
   ] as const)("keeps the earliest refusal (%#)", async (options, status, message) => {
     const { input } = buildInput(options as Parameters<typeof buildInput>[0]);

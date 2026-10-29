@@ -418,7 +418,7 @@ describe("api auth helpers", () => {
       expect("response" in result && result.response.status).toBe(503);
       if ("response" in result) {
         await expect(result.response.json()).resolves.toEqual({
-          error: "We couldn't verify your Test Sandbox. Please retry.",
+          error: "We couldn't verify your Test Sandbox. Try again.",
         });
       }
     });

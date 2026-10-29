@@ -124,24 +124,24 @@ describe("NotificationPreferences", () => {
   it("hides Billing & Payments from non-super-admins", async () => {
     render(<NotificationsPanel isGridmaster={false} isSuperAdmin={false} />);
 
-    await screen.findByText("Schedule Changes");
-    expect(screen.queryByText("Billing & Payments")).not.toBeInTheDocument();
-    expect(screen.getByText("Security Alerts")).toBeInTheDocument();
-    expect(screen.getByText("System Notifications")).toBeInTheDocument();
+    await screen.findByText("Schedule changes");
+    expect(screen.queryByText("Billing and payments")).not.toBeInTheDocument();
+    expect(screen.getByText("Security alerts")).toBeInTheDocument();
+    expect(screen.getByText("Product updates")).toBeInTheDocument();
   });
 
   it("shows Billing & Payments to super_admins", async () => {
     render(<NotificationsPanel isGridmaster={false} isSuperAdmin={true} />);
 
-    await screen.findByText("Schedule Changes");
-    expect(screen.getByText("Billing & Payments")).toBeInTheDocument();
+    await screen.findByText("Schedule changes");
+    expect(screen.getByText("Billing and payments")).toBeInTheDocument();
   });
 
   it("shows only the system category to gridmasters", async () => {
     render(<NotificationsPanel isGridmaster={true} isSuperAdmin={false} />);
 
-    await screen.findByText("System Notifications");
-    expect(screen.queryByText("Schedule Changes")).not.toBeInTheDocument();
-    expect(screen.queryByText("Billing & Payments")).not.toBeInTheDocument();
+    await screen.findByText("Product updates");
+    expect(screen.queryByText("Schedule changes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Billing and payments")).not.toBeInTheDocument();
   });
 });

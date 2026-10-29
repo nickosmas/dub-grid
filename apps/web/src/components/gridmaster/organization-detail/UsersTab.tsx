@@ -1,6 +1,6 @@
 import { User } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
+import { changedElsewhereMessage, REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
@@ -102,7 +102,7 @@ export function UsersTab({
     setChangingRole(target.id);
     try {
       if (!target?.updatedAt) {
-        throw new Error("User access data is out of date. Refresh and try again.");
+        throw new Error(changedElsewhereMessage("their access"));
       }
       // The access endpoint dispatches role_changed itself; queueing one here
       // too landed two identical "Your role changed" alerts in the target's
@@ -123,15 +123,17 @@ export function UsersTab({
         );
       });
       if (!completed) return;
-      toast.success("Role updated");
+      toast.success("Access level updated");
       setRoleChangeConfirm(null);
       onUsersChanged();
     } catch (err: unknown) {
       if (err instanceof OrganizationAccessConflictError) {
-        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        toast.error(changedElsewhereMessage("their access"));
         onUsersChanged();
       } else {
-        toast.error(formatClientErrorMessage(err, "We couldn't change role. Try again."));
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't change their access level. Try again."),
+        );
       }
     } finally {
       setChangingRole(null);
@@ -143,7 +145,7 @@ export function UsersTab({
     setRemoving(true);
     try {
       if (!removeConfirm.updatedAt) {
-        throw new Error("User access data is out of date. Refresh and try again.");
+        throw new Error(changedElsewhereMessage("their access"));
       }
       const expectedUpdatedAt = removeConfirm.updatedAt;
       // Removing someone from an organization needs fresh proof (F-96).
@@ -160,7 +162,7 @@ export function UsersTab({
       onUsersChanged();
     } catch (err: unknown) {
       if (err instanceof OrganizationAccessConflictError) {
-        toast.error("User access changed elsewhere. Review the latest values and try again.");
+        toast.error(changedElsewhereMessage("their access"));
         onUsersChanged();
       } else {
         toast.error(formatClientErrorMessage(err, "We couldn't remove user. Try again."));
@@ -317,7 +319,7 @@ export function UsersTab({
               ) : (
                 users.map((u) => (
                   <tr key={u.id}>
-                    <td style={{ ...gmTdStyle, fontWeight: 600 }}>{u.email ?? "—"}</td>
+                    <td style={{ ...gmTdStyle, fontWeight: 600 }}>{u.email ?? "-"}</td>
                     <td style={gmTdStyle}>
                       <CustomSelect
                         value={u.orgRole}
@@ -349,7 +351,7 @@ export function UsersTab({
                       ) : u.orgRole === "super_admin" ? (
                         "All"
                       ) : (
-                        "—"
+                        "-"
                       )}
                     </td>
                     <td style={gmTdStyle}>
@@ -491,12 +493,10 @@ export function UsersTab({
             );
             return changes.length > 0
               ? {
-                  title: "Review Permission Changes",
-                  description:
-                    "Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization.",
+                  title: "Save permission changes?",
+                  description: "They change what this person can see and do in the organization.",
                   changes,
-                  confirmLabel: "Confirm Save",
-                  warningText: "This save updates sensitive admin permissions.",
+                  confirmLabel: "Save",
                 }
               : null;
           }}
@@ -504,7 +504,7 @@ export function UsersTab({
           onSave={async (perms) => {
             const expectedUpdatedAt = editingPerms.updatedAt;
             if (!expectedUpdatedAt) {
-              throw new Error("User access data is out of date. Refresh and try again.");
+              throw new Error(changedElsewhereMessage("their access"));
             }
             try {
               // A Gridmaster's permission change needs fresh proof (41d4, F-61).
@@ -525,9 +525,7 @@ export function UsersTab({
               onUsersChanged();
             } catch (err) {
               if (err instanceof OrganizationAccessConflictError) {
-                toast.error(
-                  "Permissions changed elsewhere. Review the latest values and try again.",
-                );
+                toast.error(changedElsewhereMessage("their permissions"));
                 onUsersChanged();
                 throw err;
               }
@@ -554,7 +552,7 @@ export function UsersTab({
       {roleChangeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
-          confirmLabel="Change role"
+          confirmLabel="Change access level"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
           onConfirm={handleConfirmRoleChange}

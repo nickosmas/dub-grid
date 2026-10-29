@@ -69,7 +69,7 @@ function verificationErrorMessage(err: unknown, enrollment = true): string {
     if (!enrollment) return "Refresh two-factor status before trying again.";
     return "This setup is no longer active. Cancel and start again to get a fresh QR code.";
   }
-  return extractErrorMessage(err, "Verification failed. Please try again.");
+  return extractErrorMessage(err, "That code didn't work. Try again.");
 }
 
 function isVerifiedTotpFactor(factor: Factor): boolean {
@@ -319,8 +319,8 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           }}
         >
           {mfaEnabled
-            ? "Your account is protected with an authenticator app. You can disable it below."
-            : "Add an extra layer of security by requiring a verification code from an authenticator app."}
+            ? "Signing in asks for a code from your authenticator app."
+            : "Signing in will ask for a code from an authenticator app."}
         </p>
         {mfaEnabled ? (
           <Button
@@ -328,7 +328,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             className="dg-btn dg-btn-danger"
             style={{ alignSelf: "flex-start" }}
           >
-            Disable 2FA
+            Turn off two-factor
           </Button>
         ) : (
           <Button
@@ -342,7 +342,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
               spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={14}
             >
-              Enable 2FA
+              Set up two-factor
             </ButtonLoading>
           </Button>
         )}
@@ -358,14 +358,14 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         method={enrolling ? "password" : "totp"}
         description={
           enrolling
-            ? "Confirm your password to set up two-factor authentication."
-            : "Disabling two-factor authentication makes your account less secure. Enter a new code from your authenticator app to confirm."
+            ? "Confirm your password to set up two-factor."
+            : "Signing in will need only your password. Enter a new code from your authenticator app to confirm."
         }
         error={verifyError}
         disabled={loading}
         onCancel={resetState}
         onConfirm={enrolling ? startEnrollment : disableMFA}
-        confirmLabel={enrolling ? "Continue" : "Disable 2FA"}
+        confirmLabel={enrolling ? "Continue" : "Turn off two-factor"}
         variant={enrolling ? "primary" : "danger"}
       />
     );

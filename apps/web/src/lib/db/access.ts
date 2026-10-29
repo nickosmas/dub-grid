@@ -1,5 +1,6 @@
 import type { AdminPermissions, Invitation, OrganizationRole, OrganizationUser } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 interface ErrorBody {
   error?: string;
@@ -12,14 +13,14 @@ interface ErrorBody {
 
 export class OrganizationAccessConflictError extends Error {
   constructor(public readonly latestUser: OrganizationUser) {
-    super("Organization access changed elsewhere.");
+    super(changedElsewhereMessage("their access"));
     this.name = "OrganizationAccessConflictError";
   }
 }
 
 export class InvitationAccessConflictError extends Error {
   constructor(public readonly latestInvitation: Invitation) {
-    super("Invitation changed elsewhere.");
+    super(changedElsewhereMessage("this invitation"));
     this.name = "InvitationAccessConflictError";
   }
 }
@@ -109,7 +110,7 @@ export async function updateOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "We couldn't update invitation. Try again."));
+    throw new Error(getErrorMessage(body, "We couldn't update that invitation. Try again."));
   }
 
   return body.invitation;

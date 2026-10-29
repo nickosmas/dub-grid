@@ -11,6 +11,7 @@ import type {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 import { OrganizationRequestError } from "./api";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {
   orgId: string;
@@ -29,14 +30,14 @@ interface ErrorBody {
 
 export class OrganizationAccessConflictError extends Error {
   constructor(public readonly latestUser: OrganizationUser) {
-    super("Organization access changed elsewhere.");
+    super(changedElsewhereMessage("their access"));
     this.name = "OrganizationAccessConflictError";
   }
 }
 
 export class InvitationAccessConflictError extends Error {
   constructor(public readonly latestInvitation: Invitation) {
-    super("Invitation changed elsewhere.");
+    super(changedElsewhereMessage("this invitation"));
     this.name = "InvitationAccessConflictError";
   }
 }
@@ -370,7 +371,7 @@ export async function updateOrganizationInvitationGuarded(
 
   if (!response.ok || !body?.invitation) {
     throw Object.assign(
-      new Error(getErrorMessage(body, "We couldn't update invitation. Try again.")),
+      new Error(getErrorMessage(body, "We couldn't update that invitation. Try again.")),
       { status: response.status, code: body?.code, method: body?.method },
     );
   }
@@ -467,7 +468,7 @@ export async function revokeInvitation(invitationId: string, orgId: string): Pro
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
   await revokeOrganizationInvitationGuarded({
     orgId,
@@ -483,7 +484,7 @@ export async function resendInvitation(
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
   const resent = await resendOrganizationInvitationGuarded({
     orgId,
@@ -497,7 +498,7 @@ export async function removeUserFromOrganization(userId: string, orgId: string):
   const users = await fetchOrganizationUsers(orgId);
   const organizationUser = users.find((item) => item.id === userId);
   if (!organizationUser?.updatedAt) {
-    throw new Error("User access data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("their access"));
   }
 
   await removeOrganizationMembershipGuarded({
@@ -524,7 +525,7 @@ export async function updatePendingInvitation(
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
 
   await updateOrganizationInvitationGuarded(

@@ -212,7 +212,7 @@ export default function GridmasterLogin({
             setPassword={setPassword}
             loading={loading}
             onSubmit={handleSubmit}
-            submitLabel="Access Portal"
+            submitLabel="Open portal"
             forgotPasswordHref="/forgot-password"
           />
 

@@ -85,7 +85,7 @@ export default function PrintOptionsModal({
   return (
     <>
       <Modal
-        title="Print / Export Options"
+        title="Print schedule"
         onClose={onClose}
         onRequestClose={requestClose}
         style={{ maxWidth: 400 }}
@@ -173,7 +173,7 @@ export default function PrintOptionsModal({
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             <Printer size={13} />
-            Preview & Print
+            Preview
           </Button>
         </div>
       </Modal>

@@ -191,7 +191,7 @@ function dataKeptStat(): BillingStat {
     key: "data",
     label: "Your data",
     value: "Kept",
-    detail: "Nothing has been deleted.",
+    detail: "Schedules, people, and settings.",
     tone: "success",
     icon: "data",
   };
@@ -293,7 +293,7 @@ function trialRunning(summary: Summary, now: Date): Partial<BillingOverview> {
       ? {
           tone: "warning",
           icon: "alarm",
-          message: `Your free trial ends ${phrase}. Start a subscription to keep your organization open. ${afterwards}`,
+          message: `Your free trial ends ${phrase}. ${afterwards}`,
         }
       : null,
     visual: {
@@ -362,14 +362,14 @@ function trialGrace(summary: Summary, now: Date): Partial<BillingOverview> {
     title: "Start a subscription to keep your organization open.",
     lead:
       left != null
-        ? `You have ${days(left)} left before your organization is locked. Your schedules, staff records, and settings are kept either way.`
-        : "Your schedules, staff records, and settings are kept either way.",
+        ? `You have ${days(left)} left before your organization is locked. Your schedules, people, and settings are kept either way.`
+        : "Your schedules, people, and settings are kept either way.",
     banner: {
       tone: "danger",
       icon: "alarm",
       message: graceEnds
-        ? `Your free trial ended${endedOn}. Start a subscription by ${formatLongDate(graceEnds)} to keep your organization open. After that date, your organization will be locked until a subscription is started.`
-        : `Your free trial ended${endedOn}. Start a subscription to keep your organization open.`,
+        ? `Your free trial ended${endedOn}. Start a subscription by ${formatLongDate(graceEnds)}, or your organization locks until you do.`
+        : `Your free trial ended${endedOn}.`,
     },
     visual:
       left != null
@@ -484,7 +484,7 @@ function active(summary: Summary, now: Date): Partial<BillingOverview> {
       banner: {
         tone: "warning",
         icon: "calendar-x",
-        message: `Your subscription won't renew. To keep using DubGrid after ${formatLongDate(summary.cancelAt)}, resume your subscription in the billing portal before that date.`,
+        message: `Your subscription won't renew. To keep using the app after ${formatLongDate(summary.cancelAt)}, resume your subscription in the billing portal before that date.`,
       },
       visual: {
         kind: "ring",
@@ -647,8 +647,7 @@ function paymentNeeded(summary: Summary, now: Date): Partial<BillingOverview> {
 
 function locked(summary: Summary, now: Date): Partial<BillingOverview> {
   const { reason, trialGraceEndsAt } = summary.billingAccess;
-  const kept =
-    "Your schedules, staff records, and settings have all been kept, and nothing has been deleted.";
+  const kept = "Your schedules, people, and settings are all kept.";
   const base = {
     visual: {
       kind: "icon",
@@ -851,7 +850,7 @@ function paused(summary: Summary, now: Date): Partial<BillingOverview> {
 function suspended(summary: Summary): Partial<BillingOverview> {
   return {
     title: "Your organization is suspended.",
-    lead: "DubGrid Support suspended your organization. Contact DubGrid Support for help.",
+    lead: "Contact DubGrid Support to find out why and what happens next.",
     visual: { kind: "icon", icon: "suspended", caption: "Organization suspended", tone: "danger" },
     timeline: [],
     stats: compact([

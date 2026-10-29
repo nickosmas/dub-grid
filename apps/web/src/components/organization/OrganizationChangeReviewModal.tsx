@@ -18,12 +18,11 @@ export default function OrganizationChangeReviewModal({
 }: OrganizationChangeReviewModalProps) {
   return (
     <ChangeReviewModal
-      title="Review Organization Changes"
-      description="Review these organization changes before saving. Sensitive updates should be confirmed carefully because they affect the whole organization."
+      title="Save these changes?"
+      description="They apply to everyone in your organization."
       changes={changes}
       saving={saving}
       confirmLabel="Save"
-      warningText="This save includes sensitive organization changes."
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

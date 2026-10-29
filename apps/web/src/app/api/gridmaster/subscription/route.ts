@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       {
         status: 429,
         headers: {
@@ -403,7 +403,10 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-subscription" } });
     logger.error({ err, path: "/api/gridmaster/subscription" }, "Subscription action failed");
-    return NextResponse.json({ error: "Action failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't complete that billing action. Try again." },
+      { status: 500 },
+    );
   }
 }
 

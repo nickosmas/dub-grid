@@ -45,7 +45,7 @@ export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
         {label}
       </span>
       <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--dg-color-text-primary)" }}>
-        {value || "—"}
+        {value || "-"}
       </span>
     </div>
   );

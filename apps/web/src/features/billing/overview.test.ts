@@ -93,7 +93,7 @@ describe("describeBillingOverview", () => {
     expect(overview.banner).toEqual({
       tone: "warning",
       icon: "alarm",
-      message: `Your free trial ends tomorrow, ${formatLongDate(at(9, 28))}. Start a subscription to keep your organization open. If no subscription has been started by then, you'll have 3 days of grace before your organization is locked.`,
+      message: `Your free trial ends tomorrow, ${formatLongDate(at(9, 28))}. If no subscription has been started by then, you'll have 3 days of grace before your organization is locked.`,
     });
     expect(overview.visual).toMatchObject({ value: 1, unit: "day", tone: "warning" });
   });
@@ -198,7 +198,7 @@ describe("describeBillingOverview", () => {
       "Your organization is locked because the free trial ended without a subscription.",
     );
     expect(overview.banner?.message).toBe(
-      "Your organization stays locked until a subscription is started. Your schedules, staff records, and settings have all been kept, and nothing has been deleted.",
+      "Your organization stays locked until a subscription is started. Your schedules, people, and settings are all kept.",
     );
     expect(overview.visual).toEqual({
       kind: "icon",

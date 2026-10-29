@@ -16,22 +16,22 @@ const featureCards: Record<string, { icon: React.ReactNode; title: string; desc:
     {
       icon: <DashboardIcon size={20} />,
       title: "Dashboard & Insights",
-      desc: "Real-time coverage, staffing metrics, and scheduling overview",
+      desc: "Coverage and staffing for the current period",
     },
     {
       icon: <ScheduleIcon size={20} />,
-      title: "Smart Scheduling",
-      desc: "Build, publish, and manage schedules with conflict prevention",
+      title: "Scheduling",
+      desc: "Build and publish schedules",
     },
     {
       icon: <PeopleIcon size={20} />,
       title: "Staff Management",
-      desc: "Manage employees, certifications, roles, and departments",
+      desc: "Your staff and their details",
     },
     {
       icon: <ShieldIcon size={20} />,
       title: "Full Control",
-      desc: "Configure every aspect of your organization and delegate permissions",
+      desc: "Set up your organization and choose what each Admin can do",
     },
   ],
   admin: [
@@ -43,19 +43,19 @@ const featureCards: Record<string, { icon: React.ReactNode; title: string; desc:
     {
       icon: <PeopleIcon size={20} />,
       title: "Team Overview",
-      desc: "See your team, manage employees, and track staffing",
+      desc: "Your team and their details",
     },
     {
       icon: <DashboardIcon size={20} />,
       title: "Dashboard",
-      desc: "Coverage gaps, shift summaries, and quick actions at a glance",
+      desc: "Coverage gaps and shift totals",
     },
   ],
   user: [
     {
       icon: <ScheduleIcon size={20} />,
       title: "Your Schedule",
-      desc: "View your upcoming shifts, request changes, and stay informed",
+      desc: "Your upcoming shifts and requests",
     },
     {
       icon: <PeopleIcon size={20} />,
@@ -85,7 +85,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
   const subtext = isSaOrientation
     ? "You\u2019ve been added as a super admin. Let\u2019s take a quick look at what you can do."
     : isSuperAdmin
-      ? "Smart staff scheduling built for care facilities. Let\u2019s set up your organization \u2014 it only takes a few minutes."
+      ? "Let\u2019s set up your organization. It takes a few minutes."
       : role === "admin"
         ? "You\u2019ve been added as an administrator. Here\u2019s what you\u2019ll have access to."
         : "You\u2019re all set up and ready to go. Here\u2019s what you\u2019ll find here.";

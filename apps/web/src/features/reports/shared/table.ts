@@ -1,4 +1,9 @@
-import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
+import {
+  EMPLOYMENT_STATUS_LABELS,
+  capitalizeFirst,
+  pluralLabelNoun,
+  singularLabelNoun,
+} from "@dubgrid/domain";
 import type {
   OperationsReportPayload,
   OperationsReportType,
@@ -51,7 +56,7 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   // still render with the current label.
   benched: EMPLOYMENT_STATUS_LABELS.inactive,
   calloff: "Call-off",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
   expired: "Expired",
   full_time: "Full-time",
   "N/A": "Not available",
@@ -112,12 +117,29 @@ function formatInvitationStatus(value: string): string {
   return value.trim() ? `Pending invitation (${value})` : "No pending invitation";
 }
 
-function formatMissingCertification(value: boolean): string {
-  return value ? "Missing certification" : "Certification recorded";
+function formatMissingCertification(value: boolean, certification: string): string {
+  return value ? `Missing ${certification}` : `${capitalizeFirst(certification)} recorded`;
 }
 
-function formatMissingRole(value: boolean): string {
-  return value ? "Missing role" : "Role assigned";
+function formatMissingRole(value: boolean, role: string): string {
+  return value ? `Missing ${role}` : `${capitalizeFirst(role)} assigned`;
+}
+
+/** The organization's own terms, in the forms report headings and cells need. */
+function reportTerms(payload: OperationsReportPayload) {
+  const labels = payload.labels ?? {
+    focusArea: "Focus Areas",
+    certification: "Certifications",
+    role: "Roles",
+  };
+  return {
+    focusArea: singularLabelNoun(labels.focusArea),
+    focusAreas: pluralLabelNoun(labels.focusArea),
+    certification: singularLabelNoun(labels.certification),
+    certifications: pluralLabelNoun(labels.certification),
+    role: singularLabelNoun(labels.role),
+    roles: pluralLabelNoun(labels.role),
+  };
 }
 
 function formatReportTimestampForDisplay(value: string): string {
@@ -141,6 +163,7 @@ export function buildOperationsReportPreviewTable(
   payload: OperationsReportPayload,
   report: OperationsReportType,
 ): OperationsReportPreviewTable {
+  const terms = reportTerms(payload);
   switch (report) {
     case "employee-directory":
       return {
@@ -152,9 +175,9 @@ export function buildOperationsReportPreviewTable(
           { label: "Employment type" },
           { label: "Email" },
           { label: "Phone" },
-          { label: "Focus areas" },
-          { label: "Roles" },
-          { label: "Certification" },
+          { label: capitalizeFirst(terms.focusAreas) },
+          { label: capitalizeFirst(terms.roles) },
+          { label: capitalizeFirst(terms.certification) },
           { label: "Departments" },
         ],
         rows: payload.reports.employeeDirectory.map((row) => [
@@ -164,9 +187,9 @@ export function buildOperationsReportPreviewTable(
           formatKnownReportValue(row.employmentType),
           formatContactValue(row.email, "No email"),
           formatContactValue(row.phone, "No phone"),
-          formatListValue(row.focusAreas, "No focus areas"),
+          formatListValue(row.focusAreas, `No ${terms.focusAreas}`),
           formatListValue(row.roles, "No roles"),
-          formatListValue(row.certification, "No certification"),
+          formatListValue(row.certification, `No ${terms.certification}`),
           formatListValue(row.departments, "No departments"),
         ]),
         emptyText: "No staff records found.",
@@ -256,7 +279,7 @@ export function buildOperationsReportPreviewTable(
         columns: [
           { label: "Staff member" },
           { label: "Date" },
-          { label: "Focus area" },
+          { label: capitalizeFirst(terms.focusArea) },
           { label: "Shift" },
           { label: "Job" },
           { label: "Start time" },
@@ -280,7 +303,7 @@ export function buildOperationsReportPreviewTable(
         title: "Coverage",
         columns: [
           { label: "Date" },
-          { label: "Focus area" },
+          { label: capitalizeFirst(terms.focusArea) },
           { label: "Shift" },
           { label: "Job" },
           { label: "Required" },
@@ -326,13 +349,13 @@ export function buildOperationsReportPreviewTable(
           { label: "Requester's shift date" },
           { label: "Requester's shift" },
           { label: "Requester's job" },
-          { label: "Requester's focus area" },
+          { label: `Requester's ${terms.focusArea}` },
           { label: "Requester's time" },
           { label: "Teammate" },
           { label: "Teammate's shift date" },
           { label: "Teammate's shift" },
           { label: "Teammate's job" },
-          { label: "Teammate's focus area" },
+          { label: `Teammate's ${terms.focusArea}` },
           { label: "Teammate's time" },
           { label: "Absence type" },
           { label: "Submitted" },
@@ -406,8 +429,8 @@ export function buildOperationsReportPreviewTable(
           { label: "Employee" },
           { label: "Staff status" },
           { label: "Employment type" },
-          { label: "Focus areas" },
-          { label: "Roles" },
+          { label: capitalizeFirst(terms.focusAreas) },
+          { label: capitalizeFirst(terms.roles) },
           { label: "Account linked" },
           { label: "Invitation status" },
         ],
@@ -416,7 +439,7 @@ export function buildOperationsReportPreviewTable(
           row.employeeName,
           formatKnownReportValue(row.status),
           formatKnownReportValue(row.employmentType),
-          formatListValue(row.focusAreas, "No focus areas"),
+          formatListValue(row.focusAreas, `No ${terms.focusAreas}`),
           formatListValue(row.roles, "No roles"),
           formatAccountLinked(row.linkedAccount),
           formatInvitationStatus(row.pendingInvitation),
@@ -425,28 +448,28 @@ export function buildOperationsReportPreviewTable(
       };
     case "certification-role-matrix":
       return {
-        title: "Certifications and roles",
+        title: `${capitalizeFirst(terms.certifications)} and ${terms.roles}`,
         columns: [
           { label: "Employee ID" },
           { label: "Employee" },
           { label: "Staff status" },
-          { label: "Certification" },
-          { label: "Roles" },
-          { label: "Focus areas" },
+          { label: capitalizeFirst(terms.certification) },
+          { label: capitalizeFirst(terms.roles) },
+          { label: capitalizeFirst(terms.focusAreas) },
           { label: "Departments" },
-          { label: "Certification status" },
-          { label: "Role status" },
+          { label: `${capitalizeFirst(terms.certification)} status` },
+          { label: `${capitalizeFirst(terms.role)} status` },
         ],
         rows: payload.reports.certificationRoleMatrix.map((row) => [
           formatEmployeeIdValue(row.employeeNumber),
           row.employeeName,
           formatKnownReportValue(row.status),
-          formatListValue(row.certification, "No certification"),
+          formatListValue(row.certification, `No ${terms.certification}`),
           formatListValue(row.roles, "No roles"),
-          formatListValue(row.focusAreas, "No focus areas"),
+          formatListValue(row.focusAreas, `No ${terms.focusAreas}`),
           formatListValue(row.departments, "No departments"),
-          formatMissingCertification(row.missingCertification),
-          formatMissingRole(row.missingRole),
+          formatMissingCertification(row.missingCertification, terms.certification),
+          formatMissingRole(row.missingRole, terms.role),
         ]),
         emptyText: "No staff records found.",
       };
@@ -497,13 +520,13 @@ export function buildOperationsReportPreviewTable(
           { label: "Date" },
           { label: "Employee" },
           { label: "Schedule note" },
-          { label: "Focus area" },
+          { label: capitalizeFirst(terms.focusArea) },
         ],
         rows: payload.reports.shiftNotes.map((row) => [
           formatReportDateForDisplay(row.date),
           row.employeeName,
           row.indicator,
-          formatListValue(row.focusArea, "No focus area"),
+          formatListValue(row.focusArea, `No ${terms.focusArea}`),
         ]),
         emptyText: "No published schedule notes for this range.",
       };
@@ -515,6 +538,7 @@ export function buildOperationsReportMetrics(
   report: OperationsReportType,
 ): ReportMetric[] {
   const summary = payload.reports.shiftPeriodSummary;
+  const terms = reportTerms(payload);
 
   switch (report) {
     case "employee-directory":
@@ -598,7 +622,7 @@ export function buildOperationsReportMetrics(
         { label: "Approved", value: count((row) => row.status === "approved") },
         { label: "Rejected", value: count((row) => row.status === "rejected") },
         {
-          label: "Cancelled or expired",
+          label: "Canceled or expired",
           value: count((row) => row.status === "cancelled" || row.status === "expired"),
         },
         {
@@ -652,14 +676,14 @@ export function buildOperationsReportMetrics(
     case "certification-role-matrix":
       return [
         {
-          label: "Missing certifications",
+          label: `Missing ${terms.certifications}`,
           value: String(
             payload.reports.certificationRoleMatrix.filter((row) => row.missingCertification)
               .length,
           ),
         },
         {
-          label: "Missing roles",
+          label: `Missing ${terms.roles}`,
           value: String(
             payload.reports.certificationRoleMatrix.filter((row) => row.missingRole).length,
           ),

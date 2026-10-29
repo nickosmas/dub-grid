@@ -503,7 +503,7 @@ export async function POST(req: NextRequest) {
 
         if (data.input.kind !== "worked" || data.input.segments.length === 0) {
           return NextResponse.json(
-            { error: "Open-shift volunteering requires a worked assignment" },
+            { error: "You can only volunteer for a shift." },
             { status: 400 },
           );
         }
@@ -671,6 +671,6 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    return apiErrorResponse(error, "Shift request operation failed");
+    return apiErrorResponse(error, "We couldn't update that request. Try again.");
   }
 }

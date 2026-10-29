@@ -60,7 +60,7 @@ function MetricStat({
     >
       <View style={styles.statFigureRow}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[styles.statValue, { color }]}>
-          {value == null ? "\u2014" : displayedValue}
+          {value == null ? "-" : displayedValue}
         </Text>
         {onPress ? (
           <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={14} />
@@ -123,10 +123,10 @@ export function DashboardHeroCard({
         />
       ) : !configured ? (
         <EmptyStateCard
-          body="Set staffing requirements in Settings on the web to track coverage and open gaps here."
+          body="Set how many people each shift needs in Settings on the web, and coverage shows here."
           compact
           iconName="options-outline"
-          title="Coverage requirements not configured"
+          title="Set staffing needs"
         />
       ) : (
         <View style={styles.coverage}>

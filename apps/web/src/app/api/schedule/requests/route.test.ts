@@ -115,7 +115,7 @@ describe("POST /api/schedule/requests", () => {
     // Their own requests, either side of a swap, and nothing else.
     expect(filters[0]).toContain(`requester_emp_id.eq.${MY_EMP_ID}`);
     expect(filters[0]).toContain(`target_emp_id.eq.${MY_EMP_ID}`);
-    // Plus the volunteer pool, or the Available Shifts tab would come up empty.
+    // Plus the volunteer pool, or the Available shifts tab would come up empty.
     expect(filters[0]).toContain("and(type.eq.pickup,status.eq.open,target_emp_id.is.null)");
   });
 

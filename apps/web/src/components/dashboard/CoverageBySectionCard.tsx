@@ -92,7 +92,7 @@ export default function CoverageBySectionCard({
                   ? "Not published yet"
                   : isPartial
                     ? "All published dates covered"
-                    : "All coverage requirements met this week"
+                    : `Fully staffed ${periodLabel}`
             }
             description={
               !hasRequirements
@@ -270,7 +270,7 @@ export default function CoverageBySectionCard({
                     const hasRequirement = day.requiredCount > 0;
                     const cellLabel = hasRequirement
                       ? `${day.filledCount}/${day.requiredCount}`
-                      : "\u2014";
+                      : "-";
                     const ariaLabel = hasRequirement
                       ? `${sec.focusAreaName} ${day.dayLabel}: ${day.filledCount} of ${day.requiredCount} required slots filled`
                       : `${sec.focusAreaName} ${day.dayLabel}: no coverage requirement`;

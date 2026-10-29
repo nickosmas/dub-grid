@@ -72,9 +72,9 @@ export default function AuthVerifyPage() {
         {!tokenHash || !authAction || error ? (
           <AuthStateCard
             heading="Invalid or expired link"
-            message="This link is invalid or has expired. Please request a new one."
+            message="This link is invalid or has expired. Request a new one."
             primaryCta={{
-              label: isRecovery ? "Request New Link" : "Back to Login",
+              label: isRecovery ? "Request a new link" : "Back to Login",
               href: isRecovery ? "/forgot-password" : "/login",
             }}
           />

@@ -38,7 +38,7 @@ const SECRET = "JVPHITUEBVW76FV4MNWGXCNOXQYM5FR4";
 
 async function startEnrollment() {
   render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-  await userEvent.click(screen.getByRole("button", { name: /enable 2fa/i }));
+  await userEvent.click(screen.getByRole("button", { name: /set up two-factor/i }));
   await confirmPassword();
   return screen.findByAltText(/scan this qr code/i);
 }
@@ -87,7 +87,7 @@ describe("MFASetup", () => {
   it("unenrolls an unfinished factor when the setup component unmounts", async () => {
     const { unmount } = render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /enable 2fa/i }));
+    await userEvent.click(screen.getByRole("button", { name: /set up two-factor/i }));
     await confirmPassword();
     await screen.findByAltText(/scan this qr code/i);
     unmount();
@@ -144,7 +144,7 @@ describe("MFASetup", () => {
 
   it("does not remove a verified factor when persisting its status fails", async () => {
     const { unmount } = render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: /enable 2fa/i }));
+    await userEvent.click(screen.getByRole("button", { name: /set up two-factor/i }));
     await confirmPassword();
     await screen.findByAltText(/scan this qr code/i);
     mockVerifyEnrollment.mockResolvedValue({
@@ -164,10 +164,10 @@ describe("MFASetup", () => {
 
   it("does not enroll after a cancelled or incorrect password", async () => {
     render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(mockReauthenticate).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     mockReauthenticate.mockRejectedValue(new Error("Password could not be confirmed"));
     await confirmPassword();
     expect(await screen.findByRole("alert")).toHaveTextContent("Password could not be confirmed");
@@ -193,16 +193,16 @@ describe("MFASetup", () => {
       error: null,
     });
     render(<MFASetup mfaEnabled onStatusChange={onStatusChange} />);
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
-    expect(screen.getByRole("button", { name: "Disable 2FA" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
+    expect(screen.getByRole("button", { name: "Turn off two-factor" })).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Authenticator code"), "123456");
     mockVerifyEnrollment.mockResolvedValueOnce({ error: new Error("Wrong code") });
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     expect(mockDisableFactor).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Authenticator code")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Disable 2FA" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Turn off two-factor" })).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Authenticator code"), "654321");
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     expect(mockDisableFactor).toHaveBeenCalledWith("factor-1", "promoted-session");
     // Another verified factor may exist: do not optimistically claim disabled.
     expect(onStatusChange).toHaveBeenCalledWith(true);
@@ -221,7 +221,7 @@ describe("MFASetup", () => {
 
   it("does not race verification with unmount cleanup", async () => {
     const { unmount } = render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     await confirmPassword();
     await screen.findByAltText(/scan this qr code/i);
     let finish!: (value: unknown) => void;
@@ -242,7 +242,7 @@ describe("MFASetup", () => {
 
   it("clears a rejected password and keeps the error attached to its field", async () => {
     render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     mockReauthenticate.mockRejectedValueOnce(new Error("Password could not be confirmed"));
     await confirmPassword();
     const field = screen.getByLabelText("Password");
@@ -262,7 +262,7 @@ describe("MFASetup", () => {
       }),
     );
     render(<MFASetup mfaEnabled={false} onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Set up two-factor" }));
     const field = screen.getByLabelText("Password");
     fireEvent.change(field, { target: { value: "test-password" } });
     const form = field.closest("form")!;
@@ -281,10 +281,10 @@ describe("MFASetup", () => {
 
   it("cancelling removal discards the code without touching factors", async () => {
     render(<MFASetup mfaEnabled onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     await userEvent.type(screen.getByLabelText("Authenticator code"), "123456");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     expect(screen.getByLabelText("Authenticator code")).toHaveValue("");
     expect(mockVerifyEnrollment).not.toHaveBeenCalled();
     expect(mockDisableFactor).not.toHaveBeenCalled();
@@ -298,9 +298,9 @@ describe("MFASetup", () => {
     });
     mockDisableFactor.mockRejectedValueOnce(new RequestTimeoutError(15_000));
     render(<MFASetup mfaEnabled onStatusChange={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     await userEvent.type(screen.getByLabelText("Authenticator code"), "123456");
-    await userEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn off two-factor" }));
     await screen.findByRole("button", { name: "Refresh status" });
     expect(screen.queryByLabelText("Authenticator code")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Refresh status" }));

@@ -1,5 +1,6 @@
 import { getAvatarTone, getAvatarTypography, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useState, useMemo } from "react";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
@@ -22,6 +23,7 @@ interface ExpandedStaffHoursProps {
    * People table: only staff managers can navigate. */
   canNavigateToDetailsPage: boolean;
   otThreshold?: number;
+  focusAreaLabel?: string;
   onClose: () => void;
 }
 
@@ -32,6 +34,7 @@ export default function ExpandedStaffHours({
   focusAreas,
   canNavigateToDetailsPage,
   otThreshold = 40,
+  focusAreaLabel = "Focus Areas",
   onClose,
 }: ExpandedStaffHoursProps) {
   const { resolvedTheme } = useTheme();
@@ -130,7 +133,7 @@ export default function ExpandedStaffHours({
           <CustomSelect
             value={faFilter === "all" ? "all" : String(faFilter)}
             options={[
-              { value: "all", label: "All sections" },
+              { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
               ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
             ]}
             onChange={(val) => setFaFilter(val === "all" ? "all" : Number(val))}

@@ -62,7 +62,7 @@ function renderGuarded(props: React.ComponentProps<typeof GuardedPage>) {
   );
 }
 
-const DIALOG_TITLE = "Unsaved changes";
+const DIALOG_TITLE = "Discard your changes?";
 
 beforeEach(() => {
   navigate.mockReset();

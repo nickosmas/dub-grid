@@ -128,7 +128,7 @@ describe("NotificationDetailScreen", () => {
 
     render(<NotificationDetailScreen />);
 
-    expect(screen.getByText("Could not load this alert")).toBeTruthy();
+    expect(screen.getByText("Couldn't load this alert")).toBeTruthy();
     expect(screen.queryByText("Alert not available")).toBeNull();
     expect(openNativeRoute).not.toHaveBeenCalled();
   });

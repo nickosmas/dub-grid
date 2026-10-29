@@ -108,7 +108,7 @@ export default function SandboxBanner() {
         }
       >
         <span className="truncate">
-          You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real organization.
+          You&rsquo;re in sandbox mode. Changes here don&rsquo;t affect your organization.
         </span>
       </Banner>
     </>

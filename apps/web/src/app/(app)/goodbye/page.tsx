@@ -4,41 +4,12 @@ import { RunLogoutTeardown, type LogoutReason, type LogoutScope } from "./RunLog
 
 const HEADLINES: ReadonlyArray<string> = [
   "See you soon!",
-  "Catch you later!",
   "Until next time!",
   "Take care!",
-  "That's a wrap!",
-  "All signed out!",
-  "Signed out and squared away!",
-  "Closing things out for now!",
-  "Heading out? We'll be here when you're back.",
-  "Powered down for now. Back soon!",
-  "That's a wrap for today!",
-  "Out for now, back when you're ready.",
-  "All done. Take care!",
-  "Signing off. See you next time!",
-  "Logged out cleanly. Back when you're ready!",
-  "That's it for today, catch you later!",
-  "Heading out, we'll keep things warm!",
-  "End of the line for now. See you soon!",
-  "Out the door! See you next time.",
-  "All wrapped up. Until next time!",
+  "Catch you later!",
 ];
 
-const SUBLINES: ReadonlyArray<string> = [
-  "Sign back in whenever you're ready.",
-  "Come back any time.",
-  "Ready when you are.",
-  "Thank you for using DubGrid.",
-  "Your session has ended.",
-  "Sign back in to continue.",
-  "You have been securely signed out.",
-  "Sign in when you're ready.",
-  "Your data is safe.",
-  "Sign back in any time.",
-  "Sign in below to continue.",
-  "Until your next sign-in.",
-];
+const SUBLINES: ReadonlyArray<string> = ["You're signed out."];
 
 function pickRandom<T>(pool: ReadonlyArray<T>): T {
   return pool[Math.floor(Math.random() * pool.length)];

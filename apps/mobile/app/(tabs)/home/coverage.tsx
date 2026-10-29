@@ -52,7 +52,7 @@ export default function CoverageExpandedScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load coverage"
+          title="Couldn't load coverage"
           variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();
@@ -67,7 +67,7 @@ export default function CoverageExpandedScreen() {
   }
 
   const sections = dashboardQuery.data.coverageBySection;
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Focus Areas";
   const filtered =
     focusAreaFilter === "all"
       ? sections

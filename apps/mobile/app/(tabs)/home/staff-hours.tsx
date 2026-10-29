@@ -1,3 +1,4 @@
+import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../src/shared/components/Text";
@@ -26,6 +27,7 @@ export default function StaffHoursExpandedScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg?.labels?.focusArea ?? "Focus Areas";
   // Drilling in from Home used to lose pull-to-refresh entirely: these routes
   // share Home's cached query, so the only way to refresh was to back out.
   const manualRefresh = useManualRefresh(() => dashboardQuery.refetch());
@@ -61,7 +63,7 @@ export default function StaffHoursExpandedScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load overtime watch"
+          title="Couldn't load overtime watch"
           variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();
@@ -116,9 +118,9 @@ export default function StaffHoursExpandedScreen() {
           />
         </SelectionSection>
 
-        <SelectionSection label="Focus area">
+        <SelectionSection label={capitalizeFirst(singularLabelNoun(focusAreaLabel))}>
           <SelectionRow
-            label="All focus areas"
+            label={`All ${pluralLabelNoun(focusAreaLabel)}`}
             onPress={() => setFocusAreaFilter("all")}
             selected={focusAreaFilter === "all"}
           />

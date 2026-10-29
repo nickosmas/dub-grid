@@ -250,8 +250,8 @@ export default function ProfileTwoFactorScreen() {
       await reconcileStatus(verifiedSession.access_token);
       pushToast({
         tone: "success",
-        title: "Two-factor status refreshed",
-        message: "Your account shows its current protection status.",
+        title: "Two-factor is on",
+        message: "Signing in now asks for a code from your authenticator app.",
       });
       resetMfaEnrollment();
     } catch (error) {
@@ -315,8 +315,8 @@ export default function ProfileTwoFactorScreen() {
         await reconcileStatus(actionAccessToken);
         pushToast({
           tone: "success",
-          title: "Two-factor status refreshed",
-          message: "Your account shows its current protection status.",
+          title: "Two-factor is off",
+          message: "Signing in now needs only your password.",
         });
         resetMfaEnrollment();
       });
@@ -344,14 +344,14 @@ export default function ProfileTwoFactorScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load two-factor status"
+          title="Couldn't load two-factor status"
           variant="centered"
           onAction={() => profileQuery.refetch()}
         />
       ) : phase === "sync" ? (
         <ProfileSection
           title="Refresh status"
-          description="Refresh two-factor status before making another change."
+          description="We couldn't confirm your last change. Check your two-factor status before trying again."
         >
           <ActionButtons
             primaryAction={
@@ -430,12 +430,12 @@ export default function ProfileTwoFactorScreen() {
           ) : mfaEnabled ? (
             <Button
               disabled={mfaLoading}
-              label="Disable 2FA"
+              label="Turn off two-factor"
               onPress={() => setIsConfirmingDisable(true)}
               tone="danger"
             />
           ) : (
-            <Button label="Enable 2FA" loading={mfaLoading} onPress={startMfaEnrollment} />
+            <Button label="Set up two-factor" loading={mfaLoading} onPress={startMfaEnrollment} />
           )}
         </ProfileSection>
       )}
@@ -445,8 +445,8 @@ export default function ProfileTwoFactorScreen() {
         </Text>
       )}
       <ConfirmationModal
-        body="This will make your account less secure."
-        confirmLabel="Disable"
+        body="Signing in will need only your password."
+        confirmLabel="Turn off"
         confirmTone="danger"
         loading={mfaLoading}
         onCancel={() => setIsConfirmingDisable(false)}
@@ -454,7 +454,7 @@ export default function ProfileTwoFactorScreen() {
           setIsConfirmingDisable(false);
           await disableMfa();
         }}
-        title="Disable two-factor authentication?"
+        title="Turn off two-factor?"
         visible={isConfirmingDisable}
       />
       {stepUp.sheet}

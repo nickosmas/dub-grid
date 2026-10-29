@@ -274,7 +274,7 @@ export function buildShiftDiffDescriptors(
     // No pill is left to carry the change, so the cell says what went, as
     // "Changed" like a removed segment, which keeps the marker on the cell
     // while its shifts survive.
-    const detail = `Removed ${label(before!)} for the rest of the day.`;
+    const detail = `Removed ${label(before!)} for part of the day.`;
     return {
       ...result,
       restOfDayDiff: null,
@@ -292,7 +292,7 @@ export function buildShiftDiffDescriptors(
             badge: {
               kind: "new",
               text: "New",
-              detail: `Added ${label(after)} for the rest of the day.`,
+              detail: `Added ${label(after)} for part of the day.`,
             },
           }
         : {

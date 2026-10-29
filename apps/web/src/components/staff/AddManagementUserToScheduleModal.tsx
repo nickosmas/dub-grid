@@ -12,6 +12,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 /** Only the read-only prefill fields this modal actually needs — satisfied by
  *  both `DirectoryPerson` (People directory) and `Employee` (self/detail
@@ -140,7 +141,7 @@ export function AddManagementUserToScheduleModal({
     } catch (err) {
       if (err instanceof EmployeeProfileConflictError) {
         onAdded(err.latestEmployee);
-        toast.error("Staff details changed elsewhere. Review the latest values and try again.");
+        toast.error(changedElsewhereMessage("their details"));
         return;
       }
       toast.error(
@@ -154,7 +155,7 @@ export function AddManagementUserToScheduleModal({
   return (
     <>
       <Modal
-        title="Add to Schedule"
+        title="Add to schedule"
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
@@ -220,7 +221,7 @@ export function AddManagementUserToScheduleModal({
             <CustomSelect
               value={certificationId != null ? String(certificationId) : ""}
               options={[
-                { value: "", label: "— None —" },
+                { value: "", label: "None" },
                 ...certifications.map((item) => ({
                   value: String(item.id),
                   label: item.name !== item.abbr ? `${item.name} (${item.abbr})` : item.name,
@@ -257,7 +258,7 @@ export function AddManagementUserToScheduleModal({
               style={{ opacity: canSubmit ? 1 : 0.5 }}
             >
               <ButtonLoading loading={saving} spinnerSize={16}>
-                Add to Schedule
+                Add to schedule
               </ButtonLoading>
             </Button>
           </div>

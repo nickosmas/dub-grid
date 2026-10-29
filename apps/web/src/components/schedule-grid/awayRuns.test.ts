@@ -137,7 +137,7 @@ describe("planned away in the grid (51g1)", () => {
 
   it("says where to change a planned Away", () => {
     expect(awayLockedHint({ from: "2026-11-03", until: "2026-11-05" })).toBe(
-      "Away from Tue, Nov 3 until Thu, Nov 5. Change the planned away on their record to change these days.",
+      "Away from Tue, Nov 3 until Thu, Nov 5. Change the planned time away on their record to change these days.",
     );
   });
 });

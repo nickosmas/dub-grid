@@ -49,10 +49,13 @@ describe("describeShiftRequest", () => {
       describeShiftRequest({ ...swap, type: "pickup", targetEmpId: null, targetName: null }, null),
     ).toMatchObject({ subtitle: "Offered this shift for pickup", targetShiftLabel: null });
     expect(describeShiftRequest({ ...swap, type: "pickup" }, "emp-2").subtitle).toBe(
-      "Offered to cover your shift",
+      "Asked you to cover their shift",
+    );
+    expect(describeShiftRequest({ ...swap, type: "pickup" }, "emp-1").subtitle).toBe(
+      "Asked Jane Morgan to cover your shift",
     );
     expect(describeShiftRequest({ ...swap, type: "calloff" }, null).subtitle).toBe(
-      "Asked for time off",
+      "Asked to call off this shift",
     );
   });
 
@@ -65,7 +68,7 @@ describe("describeShiftRequest", () => {
       "Offered this shift for pickup, and you claimed it",
     );
     expect(describeShiftRequest({ ...claimed, absenceTypeId: 4 }, "emp-2").subtitle).toBe(
-      "Offered to cover your shift",
+      "Asked you to cover their shift",
     );
   });
 
@@ -100,7 +103,7 @@ describe("describeShiftRequestPill", () => {
       label: "Swap request",
       tone: "kind",
     });
-    expect(describeShiftRequestPill("calloff", "open").label).toBe("Time off request");
+    expect(describeShiftRequestPill("calloff", "open").label).toBe("Call-off request");
   });
 
   it("folds the status into the same pill once the request is not open", () => {
@@ -174,7 +177,7 @@ describe("describeShiftRequestSubmitted", () => {
         { action: "created", type: "calloff", targeted: false },
         { autoApproved: false },
       ),
-    ).toEqual({ title: "Request sent", message: "Calloff request sent." });
+    ).toEqual({ title: "Request sent", message: "Call-off request sent." });
     expect(
       describeShiftRequestSubmitted(
         { action: "created", type: "pickup", targeted: false },

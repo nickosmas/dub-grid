@@ -26,6 +26,7 @@ import { createOrganizationInvitation } from "@/features/organization/client";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import { toast } from "sonner";
 import {
+  changedElsewhereMessage,
   removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
@@ -216,7 +217,7 @@ export function useEmployees(
       } catch (err) {
         Sentry.captureException(err);
         if (added.length === 0) {
-          toast.error(formatClientErrorMessage(err, "We couldn't add employee. Try again."));
+          toast.error(formatClientErrorMessage(err, "We couldn't add that person. Try again."));
           return undefined;
         }
         // Rows are inserted one at a time, so some may already exist. Show
@@ -263,7 +264,7 @@ export function useEmployees(
         // actually exists and can re-edit from the real current row.
         if (err instanceof EmployeeProfileConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their details"));
           return false;
         }
         // Restore only this row: a reorder saves many rows at once, and the
@@ -273,7 +274,7 @@ export function useEmployees(
           setAllLocal((prev) => prev.map((row) => (row.id === emp.id ? previous : row)));
         }
         if (err instanceof FocusAreaShiftsCancelledError) return false;
-        toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
+        toast.error(formatClientErrorMessage(err, "We couldn't save their details. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -304,12 +305,12 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their details"));
           return false;
         }
         setAllLocal(prevAll);
         if (err instanceof FocusAreaShiftsCancelledError) return false;
-        toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
+        toast.error(formatClientErrorMessage(err, "We couldn't save their details. Try again."));
         Sentry.captureException(err);
         return false;
       }
@@ -382,7 +383,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         setAllLocal(prevAll);
@@ -448,7 +449,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         setAllLocal(prevAll);
@@ -484,11 +485,13 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         if (getStepUpMethod(err)) throw err;
-        toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't save their planned time away. Try again."),
+        );
         Sentry.captureException(err);
         return false;
       }
@@ -515,7 +518,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         if (getStepUpMethod(err)) throw err;
@@ -545,7 +548,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't save the end date. Try again."));
@@ -568,7 +571,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't reinstate them. Try again."));
@@ -596,9 +599,7 @@ export function useEmployees(
         } catch (err) {
           if (err instanceof EmployeeStatusConflictError) {
             setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-            toast.error(
-              "Employee status changed elsewhere. Review the latest values and try again.",
-            );
+            toast.error(changedElsewhereMessage("their status"));
             return;
           }
           toast.error(
@@ -631,7 +632,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         setAllLocal(prevAll);
@@ -693,7 +694,7 @@ export function useEmployees(
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           setAllLocal((prev) => replaceEmployeeRow(prev, err.latestEmployee));
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't save the return date. Try again."));

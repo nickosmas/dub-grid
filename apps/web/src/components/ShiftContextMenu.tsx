@@ -71,7 +71,7 @@ export default function ShiftContextMenu({
               }}
             >
               <Copy size={14} />
-              Copy Entry
+              Copy
             </MenuItem>
             <MenuItem
               disabled={!hasClipboard}
@@ -80,7 +80,7 @@ export default function ShiftContextMenu({
               }}
             >
               <ClipboardPaste size={14} />
-              Paste Entry
+              Paste
             </MenuItem>
             {hasShift && (
               <>
@@ -92,7 +92,7 @@ export default function ShiftContextMenu({
                   }}
                 >
                   <Trash2 size={14} />
-                  Remove Entry
+                  Clear day
                 </MenuItem>
               </>
             )}

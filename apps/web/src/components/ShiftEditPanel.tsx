@@ -1924,7 +1924,7 @@ export default function ShiftEditPanel({
               ? "Request pickup"
               : pendingRequestConfirmation.kind === "calloff"
                 ? "Submit call off"
-                : "Submit swap"
+                : "Request swap"
         }
         variant={pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"}
         isLoading={isSubmittingRequestConfirmation}
@@ -2043,8 +2043,7 @@ export default function ShiftEditPanel({
             >
               <div style={choiceTitleStyle}>Offer for pickup</div>
               <div style={choiceBodyStyle}>
-                Post the shift for teammates to claim. It stays yours unless someone claims it and
-                approval completes.
+                Teammates can claim it. It stays yours until a claim is approved.
               </div>
             </div>
           </Button>
@@ -2100,8 +2099,8 @@ export default function ShiftEditPanel({
                 Call off
               </div>
               <div style={choiceBodyStyle}>
-                Use this when you cannot work the shift yourself. Approval records the absence and
-                opens coverage automatically.
+                For a shift you can&apos;t work. Once it&apos;s approved, you&apos;re marked absent
+                and the shift opens for others to pick up.
               </div>
             </div>
           </Button>
@@ -2109,7 +2108,7 @@ export default function ShiftEditPanel({
 
         {activeAbsenceTypes.length === 0 && (
           <Banner tone="warning" icon={CalendarOff}>
-            Call off is unavailable until at least one active absence type is set up.
+            Calling off isn&apos;t set up for your organization yet. Ask an Admin.
           </Banner>
         )}
 
@@ -2570,7 +2569,7 @@ export default function ShiftEditPanel({
                 Back
               </Button>
               <Button type="button" className="dg-btn dg-btn-primary" onClick={handleSubmitSwap}>
-                Submit Swap Request
+                Request swap
               </Button>
             </div>
           </div>
@@ -3897,7 +3896,7 @@ export default function ShiftEditPanel({
                 fontWeight: 500,
               }}
             >
-              Rest of the day
+              Part of the day
             </span>
           )}
           {allowShiftEdits && (
@@ -4078,8 +4077,12 @@ export default function ShiftEditPanel({
 
     if (hasRestOfDayAbsence) {
       const name = absenceName(currentRestOfDayAbsenceTypeId);
-      const from = lastEnd ? `, from ${fmt12h(lastEnd)}` : "";
-      details.push({ label: "Absence", value: `${name} for the rest of the day${from}` });
+      const span = storedAbsenceTimes
+        ? ` ${fmt12h(storedAbsenceTimes.start)} - ${fmt12h(storedAbsenceTimes.end)}`
+        : lastEnd
+          ? ` from ${fmt12h(lastEnd)}`
+          : "";
+      details.push({ label: "Absence", value: `${name}${span}, not worked` });
     }
     return details;
   }
@@ -4141,7 +4144,7 @@ export default function ShiftEditPanel({
     currentLabels.length > 1
       ? "A day with two shifts can't repeat. Remove one to make it repeating."
       : hasRestOfDayAbsence
-        ? "A shift with an absence for the rest of the day can't repeat. Remove the absence to make it repeating."
+        ? "A shift with an absence beside it can't repeat. Remove the absence to make it repeating."
         : null;
   const inViewMode = viewing && hasActiveShift && allowShiftEdits;
 
@@ -4636,7 +4639,7 @@ export default function ShiftEditPanel({
                   <div style={sectionLabel}>Repeating</div>
                   <Hint
                     content={hint(
-                      repeatBlockedReason ?? "Create a recurring pattern (daily, weekly, biweekly)",
+                      repeatBlockedReason ?? "Repeat it daily, weekly or every 2 weeks",
                     )}
                     side="top"
                   >
@@ -4840,7 +4843,9 @@ export default function ShiftEditPanel({
                 <Banner
                   tone={enforceConflicts ? "danger" : "warning"}
                   icon={CalendarX2}
-                  title={enforceConflicts ? "Conflict Blocked" : "Overlap Warning"}
+                  title={
+                    enforceConflicts ? "This shift overlaps another" : "Overlaps another shift"
+                  }
                   className="mt-4"
                 >
                   {overlapWarnings.map((w, i) => (
@@ -5009,11 +5014,11 @@ export default function ShiftEditPanel({
               <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
                 {showSeriesPatternForm
                   ? isAbsence
-                    ? "Save Repeating Absence"
-                    : "Save Repeating Shift"
+                    ? "Save repeating Absence"
+                    : "Save repeating Shift"
                   : isAbsence
                     ? "Create Repeating Absence"
-                    : "Create Repeating Shift"}
+                    : "Create repeating shift"}
               </ButtonLoading>
             </Button>
           </div>

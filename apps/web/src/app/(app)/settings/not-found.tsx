@@ -4,9 +4,9 @@ export default function SettingsNotFound() {
   return (
     <NotFoundBoundary
       title="Settings page not found"
-      message="The settings page you're looking for doesn't exist."
+      message="The link may be old or mistyped."
       backHref="/settings"
-      backLabel="Back to Settings"
+      backLabel="Back to settings"
     />
   );
 }

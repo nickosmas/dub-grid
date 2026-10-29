@@ -239,7 +239,7 @@ describe("StaffTableRow column gating", () => {
     for (const [state, name, kind] of [
       [
         { status: "active", suspendedAt: "2026-10-26T12:00:00Z" },
-        "Suspended: won't see this in the app",
+        "Suspended. They can't sign in to see their shifts.",
         "suspended",
       ],
       [{ status: "inactive", awayUntil: "2027-01-04" }, "Away until Mon, Jan 4", "away"],
@@ -517,8 +517,6 @@ describe("StaffReorderListRow date joined", () => {
   });
 
   it("shows no date for someone who has not joined", () => {
-    expect(dateCell(makeEmployee({ userId: null, createdAt: ADDED, joinedAt: null }))).toBe(
-      "\u2014",
-    );
+    expect(dateCell(makeEmployee({ userId: null, createdAt: ADDED, joinedAt: null }))).toBe("-");
   });
 });

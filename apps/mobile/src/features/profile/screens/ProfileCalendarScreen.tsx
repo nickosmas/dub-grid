@@ -96,7 +96,7 @@ export default function ProfileCalendarScreen() {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not add calendar",
+        title: "Couldn't add calendar",
         fallbackMessage: "We couldn't create your calendar link right now.",
       });
     },
@@ -116,7 +116,7 @@ export default function ProfileCalendarScreen() {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not disable subscription",
+        title: "Couldn't disable subscription",
         fallbackMessage: "We couldn't disable your calendar link right now.",
       });
     },
@@ -174,7 +174,7 @@ export default function ProfileCalendarScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load calendar subscription"
+          title="Couldn't load calendar subscription"
           variant="centered"
           onAction={() => {
             void statusQuery.refetch();

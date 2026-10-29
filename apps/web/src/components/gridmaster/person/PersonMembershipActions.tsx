@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
+import { changedElsewhereMessage, REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { requireCredentialAssurance } from "@/features/account/client";
@@ -25,7 +25,7 @@ const ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
   { value: "super_admin", label: "Super Admin" },
 ];
 
-const CONFLICT_MESSAGE = "Their access changed elsewhere. Review the latest values and try again.";
+const CONFLICT_MESSAGE = changedElsewhereMessage("their access");
 
 /**
  * Role, permissions and removal for one organization's membership, through
@@ -82,7 +82,7 @@ export function PersonMembershipActions({
         );
       });
       if (!completed) return;
-      toast.success("Role updated");
+      toast.success("Access level updated");
       setRoleConfirm(false);
       onChanged();
     } catch (error) {
@@ -124,7 +124,7 @@ export function PersonMembershipActions({
         }}
         disabled={busy}
       >
-        Change role
+        Change access level
       </Button>
       {membership.orgRole === "admin" ? (
         <Button
@@ -145,22 +145,22 @@ export function PersonMembershipActions({
 
       {roleConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title={`Change this person's role in ${organization.org.name}?`}
+          title={`Change this person's access level in ${organization.org.name}?`}
           message={
             <div className="flex flex-col gap-3">
               <span>
-                They&apos;re {formatOrganizationRoleLabel(membership.orgRole)} now. The new role
-                applies at their next sign-in.
+                They&apos;re {formatOrganizationRoleLabel(membership.orgRole)} now. The new access
+                level applies at their next sign-in.
               </span>
               <CustomSelect
-                ariaLabel="New role"
+                ariaLabel="New access level"
                 value={nextRole}
                 options={ROLE_OPTIONS.filter((option) => option.value !== membership.orgRole)}
                 onChange={setNextRole}
               />
             </div>
           }
-          confirmLabel="Change role"
+          confirmLabel="Change access level"
           variant="warning"
           isLoading={busy}
           onConfirm={handleRoleChange}
@@ -198,12 +198,10 @@ export function PersonMembershipActions({
             );
             return changes.length > 0
               ? {
-                  title: "Review Permission Changes",
-                  description:
-                    "Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization.",
+                  title: "Save permission changes?",
+                  description: "They change what this person can see and do in the organization.",
                   changes,
-                  confirmLabel: "Confirm Save",
-                  warningText: "This save updates sensitive admin permissions.",
+                  confirmLabel: "Save",
                 }
               : null;
           }}

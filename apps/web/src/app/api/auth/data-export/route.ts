@@ -137,6 +137,9 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "data-export" } });
     logger.error({ error: err }, "Data export failed");
-    return NextResponse.json({ error: "Data export failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't export your data. Try again." },
+      { status: 500 },
+    );
   }
 }

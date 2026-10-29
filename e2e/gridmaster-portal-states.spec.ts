@@ -86,7 +86,7 @@ test.describe("gridmaster portal states", () => {
     ]);
 
     // The header search lists organizations as buttons named by org name.
-    await page.getByPlaceholder("Search organizations…").first().fill("Calm");
+    await page.getByPlaceholder("Search organizations").first().fill("Calm");
     await page
       .getByRole("button", { name: /^Calm Haven/ })
       .first()
@@ -177,14 +177,16 @@ test.describe("gridmaster portal states", () => {
     // Gridmaster") is unreachable (findings F-74). This pins the boundary
     // that actually renders.
     await page.goto(`${QA_GRIDMASTER_ORIGIN}/gridmaster/does-not-exist`);
-    await expect(page.getByText("404", { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText("This page could not be found.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go Home" })).toBeVisible();
+    await expect(page.getByText("Page not found", { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Check the address, or go back home.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go home" })).toBeVisible();
     await expect(page.getByText("Back to Gridmaster")).toHaveCount(0);
 
     // This crosses origins. An RSC prefetch/client transition would violate
     // connect-src; a document navigation must reach the canonical apex.
-    await page.getByRole("link", { name: "Go Home" }).click();
+    await page.getByRole("link", { name: "Go home" }).click();
     const apex = new URL(QA_GRIDMASTER_ORIGIN);
     apex.hostname = apex.hostname.replace(/^gridmaster\./, "");
     await expect(page).toHaveURL(apex.href);

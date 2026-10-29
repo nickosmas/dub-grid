@@ -12,15 +12,15 @@ type TransitionPhase = "signing-in" | "workspace" | "onboarding";
 const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
   "signing-in": {
     title: "Signing you in",
-    detail: "Securing your session and getting things ready.",
+    detail: "This usually takes a few seconds.",
   },
   workspace: {
-    title: "Loading your workspace",
-    detail: "Just a moment while we prepare everything you need.",
+    title: "Opening your organization",
+    detail: "This usually takes a few seconds.",
   },
   onboarding: {
-    title: "Setting up your workspace",
-    detail: "We’re finishing a few things before you begin.",
+    title: "Setting up your organization",
+    detail: "This usually takes a few seconds.",
   },
 };
 

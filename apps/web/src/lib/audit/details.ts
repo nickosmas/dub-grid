@@ -75,7 +75,7 @@ export function formatDateRange(start: string, end: string): string {
 
   const startYear = start.slice(0, 4);
   const openEnd = startYear === end.slice(0, 4) ? from.replace(`, ${startYear}`, "") : from;
-  return `${openEnd} \u2013 ${to}`;
+  return `${openEnd} - ${to}`;
 }
 
 /**
@@ -99,7 +99,7 @@ export function pluralize(count: number, singular: string, plural = `${singular}
 // ── Labels ───────────────────────────────────────────────────────────────────
 
 const DETAIL_LABELS: Record<string, string> = {
-  absenceTypeId: "Time off type",
+  absenceTypeId: "Absence type",
   accept: "Response",
   actorEmail: "Actor",
   actor_email: "Actor",

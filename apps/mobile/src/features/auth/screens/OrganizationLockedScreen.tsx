@@ -35,7 +35,7 @@ function getDetailLine(
   if (!status) return null;
 
   if (status.state === "suspended") {
-    return "This organization is currently unavailable. Contact support if you need help.";
+    return "This organization isn't available right now. Contact support if you need help.";
   }
 
   if (status.state === "locked") {
@@ -43,23 +43,23 @@ function getDetailLine(
   }
 
   if (status.state === "trial_pending") {
-    return "The trial starts the next time a Super Admin signs in. Try again to refresh access.";
+    return "The trial starts the next time a Super Admin signs in.";
   }
 
   if (status.state === "trial_grace") {
-    return "The trial has ended, but the organization is still in its grace period. Try again to refresh access.";
+    return "The trial has ended, and the organization is in its grace period.";
   }
 
   if (status.state === "trial_ending_soon") {
-    return "The trial is ending soon. Try again to refresh access.";
+    return "The trial is ending soon.";
   }
 
   if (status.state === "payment_attention_required") {
-    return "Billing needs attention, but the organization may still be available. Try again to refresh access.";
+    return "A payment needs attention. A Super Admin can update billing on the web.";
   }
 
   // The org looks fine now, so a billing fix may have just landed.
-  return "This organization may be available again. Try again to refresh access.";
+  return "This organization may be available again.";
 }
 
 export function OrganizationLockedScreen({
@@ -92,7 +92,7 @@ export function OrganizationLockedScreen({
   const body =
     isSuperAdmin || (statusQuery.isError && !status)
       ? formatLockedMessage(message)
-      : "This organization is currently unavailable. Please try again later.";
+      : "This organization isn't available right now. Try again later.";
   const detailLine = isSuperAdmin ? getDetailLine(status) : null;
   const graceDate =
     isSuperAdmin && status?.state === "trial_grace"

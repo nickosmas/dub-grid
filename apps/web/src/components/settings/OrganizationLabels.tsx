@@ -13,6 +13,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export default function OrganizationLabels({
   organization,
@@ -84,8 +85,8 @@ export default function OrganizationLabels({
       return;
     }
     if (!organization.updatedAt) {
-      lastSaveErrorRef.current = new Error("Organization data is out of date.");
-      toast.error("Organization data is out of date. Refresh and try again.");
+      lastSaveErrorRef.current = new Error(changedElsewhereMessage("these settings"));
+      toast.error(changedElsewhereMessage("these settings"));
       return;
     }
     setSaving(true);

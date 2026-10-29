@@ -94,15 +94,15 @@ export default function ProfileSessionsScreen() {
       await sessionsQuery.refetch();
       pushToast({
         tone: "success",
-        title: "Session revoked",
-        message: "That device is signed out.",
+        title: "Device signed out",
+        message: "It has to sign in again to use the app.",
       });
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not revoke session",
-        fallbackMessage: "We couldn't revoke that session right now.",
+        title: "Couldn't sign out that device",
+        fallbackMessage: "Try again in a moment.",
       });
     },
   });
@@ -145,7 +145,7 @@ export default function ProfileSessionsScreen() {
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not update sessions",
+        title: "Couldn't update sessions",
         fallbackMessage: "We couldn't update your sessions right now.",
       });
     } finally {
@@ -219,7 +219,7 @@ export default function ProfileSessionsScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load sessions"
+          title="Couldn't load sessions"
           variant="centered"
           onAction={() => {
             void sessionsQuery.refetch();

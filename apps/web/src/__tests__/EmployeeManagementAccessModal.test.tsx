@@ -34,7 +34,7 @@ vi.mock("@/features/organization/client", () => ({
     latestUser: OrganizationUser;
 
     constructor(latestUser: OrganizationUser) {
-      super("Organization access changed elsewhere.");
+      super("Someone else just changed their access. Refresh and try again.");
       this.latestUser = latestUser;
       this.name = "OrganizationAccessConflictError";
     }
@@ -43,7 +43,7 @@ vi.mock("@/features/organization/client", () => ({
     latestInvitation: Invitation;
 
     constructor(latestInvitation: Invitation) {
-      super("Invitation changed elsewhere.");
+      super("Someone else just changed this invitation. Refresh and try again.");
       this.latestInvitation = latestInvitation;
       this.name = "InvitationAccessConflictError";
     }
@@ -394,7 +394,7 @@ describe("EmployeeManagementAccessEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
     await user.click(screen.getByRole("button", { name: "Operations" }));
-    expect(screen.getByRole("button", { name: "Save Invitation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save invitation" })).toBeInTheDocument();
     await act(async () => {
       await editorRef.current?.save();
     });
@@ -504,7 +504,7 @@ describe("EmployeeManagementAccessEditor", () => {
     // Remove button, and the note below is what says so before saving.
     await user.click(screen.getByRole("button", { name: "Leadership" }));
     expect(screen.getByText(/revokes the pending invitation/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoke invitation" })).toBeInTheDocument();
     await act(async () => {
       await editorRef.current?.save();
     });
@@ -571,7 +571,7 @@ describe("EmployeeManagementAccessEditor", () => {
       resolveUsers([makeOrganizationUser()]);
     });
 
-    expect(await screen.findByRole("button", { name: "Save Access" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Save" })).toBeInTheDocument();
     expect(screen.queryByText(/add an email address in profile details/i)).not.toBeInTheDocument();
   });
 
@@ -595,7 +595,7 @@ describe("EmployeeManagementAccessEditor", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(await screen.findByText(/add an email address in profile details/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Leadership" }));
-    expect(screen.getByRole("button", { name: "Send Invitation" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send invitation" })).toBeDisabled();
     expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
 
@@ -644,9 +644,9 @@ describe("EmployeeManagementAccessEditor", () => {
   });
 
   // Regression: submitLabel used to key off matchedUser too, so a linked
-  // employee's button read "Send Invitation" until the same async lookup
-  // resolved, then relabeled itself to "Save Access" - a visible flash.
-  it("never shows Send Invitation for a linked employee, even before the user lookup resolves", async () => {
+  // employee's button read "Send invitation" until the same async lookup
+  // resolved, then relabeled itself to "Save" - a visible flash.
+  it("never shows Send invitation for a linked employee, even before the user lookup resolves", async () => {
     let resolveUsers: (users: OrganizationUser[]) => void = () => undefined;
     fetchOrganizationUsersMock.mockImplementationOnce(
       () =>
@@ -670,7 +670,7 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Save Access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send invitation/i })).not.toBeInTheDocument();
 
     await act(async () => {
@@ -678,7 +678,7 @@ describe("EmployeeManagementAccessEditor", () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByRole("button", { name: "Save Access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
   it("lets the invite role be chosen before a brand-new hire has ever been invited", async () => {
@@ -836,7 +836,7 @@ describe("EmployeeManagementAccessEditor", () => {
     await screen.findByRole("region", { name: /edit management access/i });
 
     expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Invitation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save invitation" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resend Invitation" })).not.toBeInTheDocument();
   });
 

@@ -221,11 +221,11 @@ describe("ManagementStaffPanel", () => {
     // through the confirm-before-closing flow.
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
-    expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /discard your changes/i })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(
-      within(screen.getByRole("dialog", { name: /unsaved changes/i })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: /discard your changes/i })).getByRole("button", {
         name: /^discard$/i,
       }),
     );
@@ -280,7 +280,7 @@ describe("ManagementStaffPanel", () => {
       const onRevokeInvitation = vi.fn().mockResolvedValue(true);
       const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
 
-      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+      await user.click(screen.getByRole("button", { name: "Revoke invitation" }));
 
       const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
       expect(onRevokeInvitation).not.toHaveBeenCalled();
@@ -297,13 +297,13 @@ describe("ManagementStaffPanel", () => {
       const onRevokeInvitation = vi.fn().mockResolvedValue(true);
       const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
 
-      await user.click(screen.getByRole("button", { name: "Revoke Invitation" }));
+      await user.click(screen.getByRole("button", { name: "Revoke invitation" }));
       const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
       expect(onRevokeInvitation).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Revoke invitation" })).toBeEnabled();
     });
 
     it("asks before reissuing, and resends only once confirmed", async () => {
@@ -312,10 +312,10 @@ describe("ManagementStaffPanel", () => {
       renderPanel(pending, undefined, null, { onResendInvitation });
 
       await user.click(screen.getByRole("button", { name: "Resend Invitation" }));
-      const dialog = await screen.findByRole("dialog", { name: /^Reissue the invitation for / });
+      const dialog = await screen.findByRole("dialog", { name: /^Resend the invitation to / });
       expect(onResendInvitation).not.toHaveBeenCalled();
 
-      await user.click(within(dialog).getByRole("button", { name: "Reissue" }));
+      await user.click(within(dialog).getByRole("button", { name: "Resend" }));
       expect(onResendInvitation).toHaveBeenCalledWith("invite-1");
     });
   });

@@ -117,7 +117,7 @@ export default function ProfileNotificationsScreen() {
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not save preferences",
+        title: "Couldn't save preferences",
         fallbackMessage: "We couldn't save your notification preferences.",
       });
       // Revert by re-syncing from server.
@@ -147,7 +147,7 @@ export default function ProfileNotificationsScreen() {
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not update push notifications",
+        title: "Couldn't update push notifications",
         fallbackMessage: "We couldn't update your push notification setting.",
       });
     }
@@ -180,7 +180,7 @@ export default function ProfileNotificationsScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load preferences"
+          title="Couldn't load preferences"
           variant="centered"
           onAction={() => {
             void prefsQuery.refetch();
@@ -197,7 +197,7 @@ export default function ProfileNotificationsScreen() {
                     {push.isSupported
                       ? push.permissionState === "denied"
                         ? "Notifications are off for DubGrid in your device settings."
-                        : "Receive critical updates instantly even when the app isn't open."
+                        : "Get alerts on this device when the app is closed."
                       : "Push notifications are not supported on this device."}
                   </Text>
                   {/* The OS will not ask again once denied, so the only way

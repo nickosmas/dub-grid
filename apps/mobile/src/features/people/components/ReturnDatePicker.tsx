@@ -19,8 +19,7 @@ import {
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
-export const RETURN_DATE_HINT =
-  "They're back to Active on this day. Leave it empty to mark them active yourself.";
+export const RETURN_DATE_HINT = "Leave it empty to mark them active yourself.";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_SIZE = 36;

@@ -40,13 +40,13 @@ export function ActivityPeriodStats({
       <StatBox
         label="Days with activity"
         value={dayCount}
-        caption={dayCount === 1 ? "1 day" : `${dayCount} days`}
+        caption={periodPhrase}
         icon={<CalendarDays size={18} />}
       />
       <StatBox
         label="People involved"
         value={actorCount}
-        caption={actorCount === 1 ? "1 person" : `${actorCount} people`}
+        caption={periodPhrase}
         icon={<Users size={18} />}
       />
       <StatBox

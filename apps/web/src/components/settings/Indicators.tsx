@@ -174,7 +174,11 @@ function IndicatorRow({
         toast.success(hard ? "Schedule note deleted" : "Schedule note archived");
       } catch (error) {
         Sentry.captureException(error);
-        toast.error(hard ? "Failed to delete schedule note" : "Failed to archive schedule note");
+        toast.error(
+          hard
+            ? "We couldn't delete that schedule note. Try again."
+            : "We couldn't archive that schedule note. Try again.",
+        );
       } finally {
         setDeleting(false);
         setShowDeleteConfirm(false);
@@ -353,7 +357,7 @@ function IndicatorRow({
                     textTransform: "uppercase",
                   }}
                 >
-                  {color.startsWith("#") ? color : "—"}
+                  {color.startsWith("#") ? color : "-"}
                 </span>
               </div>
             </div>
@@ -412,8 +416,8 @@ function IndicatorRow({
                 message={
                   <>
                     <strong>{trimmedName || "this schedule note"}</strong> is currently{" "}
-                    {dependencyInfo!.summary.toLowerCase()}. Archiving removes it from future use
-                    and keeps the notes already placed.
+                    {dependencyInfo!.summary.toLowerCase()}.{" "}
+                    {"Notes already placed stay, but it can't be picked for anything new."}
                   </>
                 }
                 confirmLabel="Archive"
@@ -428,7 +432,7 @@ function IndicatorRow({
             return (
               <ConfirmDialog
                 title={`Archive "${trimmedName || "schedule note"}"?`}
-                message="Archiving removes it from future use and keeps its historical records."
+                message="Notes already placed stay, but it can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting}

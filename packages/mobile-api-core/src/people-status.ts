@@ -41,13 +41,13 @@ import {
   SUSPENDED_UNTIL_INVALID_MESSAGE,
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
+  changedElsewhereMessage,
 } from "@dubgrid/domain";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
-const STATUS_CONFLICT_MESSAGE =
-  "Employee status changed elsewhere. Review the latest values before saving again.";
+const STATUS_CONFLICT_MESSAGE = changedElsewhereMessage("their status");
 
 type PeopleStatusContext = {
   currentOrg: {
@@ -646,7 +646,7 @@ async function lastSuperAdminRefusal(
   ) {
     return {
       kind: "cannot_remove_last_super_admin",
-      error: "Cannot remove the only super admin. Transfer ownership first.",
+      error: "They're the only Super Admin. Make someone else a Super Admin first.",
       status: 400,
     };
   }
@@ -1071,7 +1071,7 @@ async function lastSuperAdminSuspensionRefusal(
   ) {
     return {
       kind: "cannot_remove_last_super_admin",
-      error: "Cannot suspend the only super admin. Transfer ownership first.",
+      error: "They're the only Super Admin. Make someone else a Super Admin first.",
       status: 400,
     };
   }

@@ -191,7 +191,7 @@ export function PillTimeEditor({
               ·{" "}
               {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null]
                 .filter(Boolean)
-                .join(" – ")}
+                .join(" - ")}
               {calcTimeDuration(defaultStart, defaultEnd)
                 ? ` (${calcTimeDuration(defaultStart, defaultEnd)})`
                 : ""}
@@ -234,7 +234,7 @@ export function PillTimeEditor({
               letterSpacing: "0.06em",
             }}
           >
-            Custom Time
+            Custom time
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -246,7 +246,7 @@ export function PillTimeEditor({
                 color: "var(--dg-color-text-secondary)",
               }}
             >
-              {fmt12h(customStart)} – {fmt12h(customEnd)}
+              {fmt12h(customStart)} - {fmt12h(customEnd)}
             </span>
             {duration && (
               <span
@@ -324,7 +324,7 @@ export function PillTimeEditor({
             letterSpacing: "0.06em",
           }}
         >
-          Custom Time
+          Custom time
         </span>
         <div style={{ display: "flex", gap: 6 }}>
           <Button

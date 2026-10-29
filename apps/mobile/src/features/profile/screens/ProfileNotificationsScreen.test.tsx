@@ -112,7 +112,7 @@ describe("ProfileNotificationsScreen", () => {
 
     render(<ProfileNotificationsScreen />);
 
-    expect(screen.getByText("Could not load preferences")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load preferences")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Try again"));
     expect(refetch).toHaveBeenCalled();
   });
