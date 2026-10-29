@@ -530,6 +530,7 @@ describe("middleware: Content-Security-Policy", () => {
       .map((d) => d.trim())
       .find((d) => d.startsWith("connect-src"));
     expect(connectSrc).toContain("https://maps.googleapis.com");
+    expect(connectSrc).toContain("https://places.googleapis.com");
   });
 });
 
