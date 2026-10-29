@@ -4,35 +4,53 @@ import { getShiftRequestAvailability } from "./shiftRequestAvailability";
 
 const TIME_ZONE = "America/Los_Angeles";
 
+const DAY_SHIFT: MobileScheduleEntry["state"] = {
+  kind: "worked",
+  segments: [{ shiftId: 1, jobId: 1, position: 0 }],
+  absenceTypeId: null,
+  customStartTime: null,
+  customEndTime: null,
+  seriesId: null,
+  fromRecurring: false,
+};
+
+const DAY_SHIFT_PRESENTATION: MobileScheduleEntry["presentation"] = {
+  label: "D",
+  shiftName: "Day Shift",
+  focusAreaId: 2,
+  focusAreaName: "ICU",
+  displayFocusAreaName: "ICU",
+  startTime: "07:00:00",
+  endTime: "15:00:00",
+  segments: [
+    {
+      shiftId: 1,
+      jobId: 1,
+      shiftName: "Day Shift",
+      shiftStartTime: "07:00:00",
+      shiftEndTime: "15:00:00",
+      startTime: "07:00:00",
+      endTime: "15:00:00",
+      focusAreaId: 2,
+      displayFocusAreaName: "ICU",
+    },
+  ],
+};
+
 function buildEntry(overrides: Partial<MobileScheduleEntry> = {}): MobileScheduleEntry {
   return {
     employeeId: "emp-1",
     employeeName: "Alex Kim",
+    employeeFocusAreaIds: [2],
     date: "2026-04-16",
-    assignmentIds: [1],
-    shiftLabel: "D",
-    assignmentLabel: "D",
-    shiftName: "Day Shift",
-    absenceTypeId: null,
-    focusAreaId: 2,
-    focusAreaName: "ICU",
-    displayFocusAreaName: "ICU",
-    startTime: "07:00:00",
-    endTime: "15:00:00",
-    customStartTime: null,
-    customEndTime: null,
-    segments: [
-      {
-        shiftId: 1,
-        shiftName: "Day Shift",
-        startTime: "07:00:00",
-        endTime: "15:00:00",
-      },
-    ],
+    state: DAY_SHIFT,
+    presentation: DAY_SHIFT_PRESENTATION,
+    change: null,
     publishedAt: "2026-04-15T18:30:00.000Z",
     publishedByName: "Mina Diaz",
+    indicators: [],
     ...overrides,
-  } as MobileScheduleEntry;
+  };
 }
 
 function availability(
@@ -104,7 +122,12 @@ describe("getShiftRequestAvailability", () => {
   });
 
   it("explains an absence without naming it", () => {
-    const result = availability(buildEntry({ absenceTypeId: 3, shiftName: "Sick" }));
+    const result = availability(
+      buildEntry({
+        state: { ...DAY_SHIFT, kind: "absence", segments: [], absenceTypeId: 3 },
+        presentation: { ...DAY_SHIFT_PRESENTATION, label: "Sick", shiftName: "Sick", segments: [] },
+      }),
+    );
 
     expect(result.canDrop).toBe(false);
     expect(result.notice).toBe("You're off this day, so there's no shift to drop or swap.");
@@ -133,14 +156,12 @@ describe("getShiftRequestAvailability", () => {
 
   it("offers only a drop on a general shift and says why", () => {
     const entry = buildEntry({
-      segments: [
-        {
-          shiftId: null,
-          shiftName: "Training",
-          startTime: "07:00:00",
-          endTime: "15:00:00",
-        },
-      ] as MobileScheduleEntry["segments"],
+      state: { ...DAY_SHIFT, segments: [{ shiftId: null, jobId: 1, position: 0 }] },
+      presentation: {
+        ...DAY_SHIFT_PRESENTATION,
+        shiftName: "Training",
+        segments: [{ ...DAY_SHIFT_PRESENTATION.segments[0], shiftId: null, shiftName: "Training" }],
+      },
     });
 
     expect(availability(entry)).toEqual({

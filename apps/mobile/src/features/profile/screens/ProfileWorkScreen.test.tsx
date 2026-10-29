@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
+import type { MobileProfileResponse } from "@dubgrid/contracts";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 import {
   navigatedActions,
@@ -272,7 +273,9 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByText("#87")).toBeInTheDocument();
   });
 
-  function viewAsRegularUser(linkedEmployee: Partial<typeof profileData.linkedEmployee> = {}) {
+  function viewAsRegularUser(
+    linkedEmployee: Partial<NonNullable<MobileProfileResponse["linkedEmployee"]>> = {},
+  ) {
     const bootstrap = useBootstrap();
     useBootstrap.mockReturnValue({
       ...bootstrap,
