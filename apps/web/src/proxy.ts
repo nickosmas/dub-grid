@@ -223,6 +223,9 @@ export async function proxy(req: NextRequest) {
   // under both policies rather than only where 'strict-dynamic' happens to
   // extend trust to a bundle-created script tag.
   const mapsSrc = "https://maps.googleapis.com https://maps.gstatic.com";
+  // AutocompleteSuggestion and Place.fetchFields (Places API New) call
+  // places.googleapis.com, not the maps host the loader comes from.
+  const mapsConnectSrc = "https://maps.googleapis.com https://places.googleapis.com";
   // @vercel/analytics/next injects its own bootstrap inline script (not via
   // next/script), so it never picks up the per-request nonce and its trust
   // never chains from strict-dynamic — the browser blocks it outright on
@@ -247,7 +250,7 @@ export async function proxy(req: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://maps.googleapis.com ${devConnectExtras};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${mapsConnectSrc} ${devConnectExtras};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
