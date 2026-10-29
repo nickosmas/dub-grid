@@ -2,7 +2,17 @@
 
 import { useMemo } from "react";
 import { useTheme } from "next-themes";
-import { AlertTriangle, CalendarDays, CalendarRange, Clock, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CalendarRange,
+  Clock,
+  Palmtree,
+  TrendingUp,
+} from "lucide-react";
+import { Button } from "@/components/Button";
+import type { TimeOffEntry } from "@/lib/time-off";
+import { formatTimeOffDates } from "./TimeOffTab";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { DAY_LABELS } from "@/lib/constants";
@@ -32,6 +42,9 @@ interface StaffOverviewTabProps {
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
   absenceTypes: AbsenceType[];
+  /** The first time off after today; undefined while it loads. */
+  nextTimeOff?: TimeOffEntry | null;
+  onOpenTimeOff?: () => void;
 }
 
 const sentence = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
@@ -48,6 +61,8 @@ export function StaffOverviewTab({
   shiftCategories,
   jobs,
   absenceTypes,
+  nextTimeOff,
+  onOpenTimeOff,
 }: StaffOverviewTabProps) {
   const assignmentById = useMemo(() => new Map(assignments.map((a) => [a.id, a])), [assignments]);
   const shiftById = useMemo(
@@ -121,6 +136,48 @@ export function StaffOverviewTab({
         jobById={jobById}
         absenceTypes={absenceTypes}
       />
+
+      {nextTimeOff !== undefined && (
+        <section className="dg-card">
+          <div className="dg-card-header">
+            <div className="dg-card-title flex items-center gap-2">
+              <Palmtree className="h-4 w-4 text-[var(--dg-color-text-muted)]" aria-hidden />
+              Next time off
+            </div>
+            {onOpenTimeOff ? (
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={onOpenTimeOff}
+              >
+                Time off
+              </Button>
+            ) : null}
+          </div>
+          <div className="dg-card-body text-[13px]">
+            {nextTimeOff ? (
+              <>
+                <div className="font-medium text-[var(--dg-color-text-primary)]">
+                  {nextTimeOff.name}
+                  {nextTimeOff.detail ? ` · ${nextTimeOff.detail}` : ""}
+                </div>
+                <div className="dg-tabular-nums mt-0.5 text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-subtle)]">
+                  {nextTimeOff.days === null && nextTimeOff.kind === "away"
+                    ? `From ${formatTimeOffDates(nextTimeOff.startDate, nextTimeOff.startDate)}`
+                    : formatTimeOffDates(nextTimeOff.startDate, nextTimeOff.endDate)}
+                  {nextTimeOff.days
+                    ? ` · ${nextTimeOff.days} ${nextTimeOff.days === 1 ? "day" : "days"}`
+                    : ""}
+                </div>
+              </>
+            ) : (
+              <span className="text-[var(--dg-color-text-muted)]">
+                None planned in the next six months.
+              </span>
+            )}
+          </div>
+        </section>
+      )}
 
       <WorkMixCard mix={mix} periodPhrase={periodPhrase} />
     </div>

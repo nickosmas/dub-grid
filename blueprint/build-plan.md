@@ -1234,7 +1234,7 @@
   - [x] 55d. **Shifts** - every shift record in the period: shift and job,
         times, focus area, hours, Draft, Published or Corrected, what it
         was, and schedule notes, with a total and CSV export.
-  - [ ] 55e. **Time off** - absences and time away in the period, planned,
+  - [x] 55e. **Time off** - absences and time away in the period, planned,
         now or taken, with dates and days; part-day absences name their
         times; day off absences are hidden unless shown. Overview gains a
         Next time off card.

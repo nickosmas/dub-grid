@@ -507,6 +507,7 @@ describe("StaffDetailPage", () => {
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
       "Overview",
       "Shifts",
+      "Time off",
       "Access",
       "Activity",
     ]);

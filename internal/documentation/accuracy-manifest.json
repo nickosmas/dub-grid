@@ -792,7 +792,8 @@
             "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Overview and Activity period choices; Overview stats for the period, This week, What they work and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Shifts tab: records in the period with state, what a draft replaces, correction reason, absence, notes, state filter and CSV export"
+            "Shifts tab: records in the period with state, what a draft replaces, correction reason, absence, notes, state filter and CSV export",
+            "Time off tab: absences and time away in the period, runs, part days, states, day off hidden unless shown; Next time off on Overview"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
@@ -812,6 +813,8 @@
             "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
             "apps/web/src/components/staff-detail/tabs/ShiftsTab.tsx",
             "apps/web/src/lib/shift-records.ts",
+            "apps/web/src/components/staff-detail/tabs/TimeOffTab.tsx",
+            "apps/web/src/lib/time-off.ts",
             "apps/web/src/components/staff-detail/WorkMixCard.tsx",
             "apps/web/src/lib/staff-detail-stats.ts",
             "apps/web/src/components/EditEmployeePanel.tsx",
@@ -832,7 +835,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cfb9d6273e7905d4bb33b3afcb2af668e5449baf5bf73ccb19a41e675022f2b9"
+      "evidenceFingerprint": "sha256:def59ad89b6f957d3b7e49204f8fe032450554fc4561247852a68f17705cd65a"
     },
     {
       "id": "invitations",

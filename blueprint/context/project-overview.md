@@ -539,7 +539,7 @@ Item 55 is split:
   they work donut by shift and job in place of the Assignments bar.
 - **55d - Shifts:** shipped; every shift record in the period with its
   state, what it was and schedule notes, a total and CSV export.
-- **55e - Time off:** planned; absences and time away in the period,
+- **55e - Time off:** shipped; absences and time away in the period,
   planned, now or taken, with day off absences hidden unless shown, and a
   Next time off card on Overview.
 - **55f - Requests:** planned; pickups, swaps, call-offs and profile change

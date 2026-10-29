@@ -29,6 +29,7 @@ import {
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
 } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
@@ -104,6 +105,8 @@ import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusAction
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
 import { ShiftsTab } from "./tabs/ShiftsTab";
+import { TimeOffTab } from "./tabs/TimeOffTab";
+import { buildTimeOff, findNextTimeOff } from "@/lib/time-off";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { AccessTab } from "./tabs/AccessTab";
 import { RecurringTab } from "./tabs/RecurringTab";
@@ -114,11 +117,12 @@ interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "shifts" | "recurring" | "access" | "activity";
+export type StaffPageTab = "overview" | "shifts" | "timeoff" | "recurring" | "access" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
   shifts: "Shifts",
+  timeoff: "Time off",
   recurring: "Recurring",
   access: "Access",
   activity: "Activity",
@@ -873,6 +877,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => [
       "overview",
       "shifts",
+      "timeoff",
       ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
       "access",
       ...(canViewActivity ? (["activity"] as const) : []),
@@ -915,8 +920,46 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         period.range.endDate,
       ),
     enabled:
-      Boolean(orgId) && Boolean(employee) && (activeTab === "overview" || activeTab === "shifts"),
+      Boolean(orgId) &&
+      Boolean(employee) &&
+      (activeTab === "overview" || activeTab === "shifts" || activeTab === "timeoff"),
   });
+  const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
+  const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
+  // Next time off looks past the chosen period, so it reads the next six months.
+  const upcomingEnd = useMemo(() => addDaysToIsoDate(today, 180), [today]);
+  const upcomingShiftsQuery = useQuery<ShiftMap>({
+    queryKey: orgId
+      ? [...queryKeys.shifts.all(orgId), "employee", employeeId, today, upcomingEnd]
+      : ["shifts", "anon", "employee", employeeId, "upcoming"],
+    queryFn: () =>
+      fetchEmployeeShifts(
+        employeeId,
+        orgId!,
+        assignmentLabelMapRef.current,
+        absenceTypeMapRef.current,
+        today,
+        upcomingEnd,
+      ),
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
+  });
+  const absenceById = useMemo(
+    () => new Map(absenceTypes.map((absence) => [absence.id, absence])),
+    [absenceTypes],
+  );
+  const nextTimeOff = useMemo(() => {
+    if (!employee || !upcomingShiftsQuery.data) return undefined;
+    return findNextTimeOff(
+      buildTimeOff(
+        employee,
+        upcomingShiftsQuery.data,
+        { startDate: today, endDate: upcomingEnd },
+        today,
+        absenceById,
+        { dayOffAbsenceTypeId: dayOffAbsenceTypeId },
+      ),
+    );
+  }, [absenceById, employee, dayOffAbsenceTypeId, today, upcomingEnd, upcomingShiftsQuery.data]);
   const canSeeCorrections = Boolean(
     perms.isGridmaster || perms.isSuperAdmin || perms.canEditShifts,
   );
@@ -1358,6 +1401,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   </div>
                   {(activeTab === "overview" ||
                     activeTab === "shifts" ||
+                    activeTab === "timeoff" ||
                     activeTab === "activity") && (
                     <PersonPeriodControl
                       period={period}
@@ -1381,6 +1425,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       shiftCategories={shiftCategories}
                       jobs={jobs}
                       absenceTypes={absenceTypes}
+                      nextTimeOff={nextTimeOff}
+                      onOpenTimeOff={() => router.replace(hrefForTab("timeoff"), { scroll: false })}
+                    />
+                  )}
+                  {activeTab === "timeoff" && (
+                    <TimeOffTab
+                      person={employee}
+                      shifts={periodShiftsQuery.data}
+                      loading={periodShiftsQuery.isPending}
+                      range={period.range}
+                      today={today}
+                      periodPhrase={periodRange.phrase}
+                      absenceTypes={absenceTypes}
+                      dayOffAbsenceTypeId={dayOffAbsenceTypeId}
                     />
                   )}
                   {activeTab === "shifts" && (
