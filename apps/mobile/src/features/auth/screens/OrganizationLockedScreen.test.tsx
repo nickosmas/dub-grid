@@ -49,7 +49,7 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(screen.getByText("Organization unavailable")).toBeInTheDocument();
-    expect(screen.getByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/isn't available right now/i)).toBeInTheDocument();
     expect(screen.queryByText(/Grace period ends/)).not.toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe("OrganizationLockedScreen", () => {
       />,
     );
 
-    expect(screen.getByText(/currently unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/isn't available right now/i)).toBeInTheDocument();
     expect(screen.queryByText(/support|suspend/i)).not.toBeInTheDocument();
   });
 
@@ -93,7 +93,7 @@ describe("OrganizationLockedScreen", () => {
   it.each([
     ["trial_pending", /next time a Super Admin signs in/i],
     ["trial_ending_soon", /trial is ending soon/i],
-    ["payment_attention_required", /organization may still be available/i],
+    ["payment_attention_required", /A payment needs attention/i],
   ])("shows truthful recovery detail to a Super Admin for %s", (state, expectedCopy) => {
     mockStatus({ state, isLocked: false, trialGraceEndsAt: null, orgRole: "super_admin" });
 
@@ -203,9 +203,7 @@ describe("OrganizationLockedScreen", () => {
     );
 
     expect(
-      screen.getByText(
-        "The trial starts the next time a Super Admin signs in. Try again to refresh access.",
-      ),
+      screen.getByText("The trial starts the next time a Super Admin signs in."),
     ).toBeInTheDocument();
   });
 });

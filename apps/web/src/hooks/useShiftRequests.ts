@@ -277,7 +277,7 @@ export function useShiftRequests(
   );
 
   // Badge count: what the board will show you. Approvers see every active
-  // request, which is what their Approval Queue tab lists (it used to count
+  // request, which is what their To approve tab lists (it used to count
   // only the pending ones, so the badge and the tab disagreed); everyone else
   // sees the requests waiting on their own answer.
   const badgeCount = useMemo(() => {
@@ -333,7 +333,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return requestId;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't create request. Try again."));
+        toast.error(errMsg(err, "We couldn't send your request. Try again."));
         return null;
       }
     },
@@ -350,7 +350,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't claim shift. Try again."));
+        toast.error(errMsg(err, "We couldn't claim that shift. Try again."));
         return false;
       }
     },
@@ -378,7 +378,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't volunteer for shift. Try again."));
+        toast.error(errMsg(err, "We couldn't volunteer you for that shift. Try again."));
         return false;
       }
     },
@@ -415,7 +415,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't resolve request. Try again."));
+        toast.error(errMsg(err, "We couldn't update that request. Try again."));
         return false;
       }
     },
@@ -427,7 +427,7 @@ export function useShiftRequests(
       if (!orgId) return false;
       try {
         await cancelShiftRequest(requestId, empId, orgId, note);
-        toast.success("Request cancelled");
+        toast.success("Request canceled");
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {

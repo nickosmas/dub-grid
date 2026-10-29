@@ -118,7 +118,7 @@ export function TermsGate({ children }: PropsWithChildren) {
         visible={needsAcceptance}
       >
         <SheetCopy
-          body="Our Terms of Service have changed since you last accepted them. Please review and accept them to keep using the app."
+          body="Our Terms of Service have changed since you last accepted them. Review and accept them to keep using the app."
           error={error}
           linkLabel="Read the Terms of Service"
           onLinkPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}

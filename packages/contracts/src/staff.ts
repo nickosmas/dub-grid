@@ -14,7 +14,7 @@ export function getStaffNameError(value: string, label = "Name"): string | null 
     return `${label} must be 80 characters or fewer`;
   }
   if (CONTROL_CHAR_PATTERN.test(trimmed)) {
-    return `${label} contains unsupported characters`;
+    return `${label} can't include tabs or line breaks`;
   }
   if (URL_LIKE_PATTERN.test(trimmed)) {
     return `${label} cannot contain a URL`;
@@ -53,7 +53,7 @@ export function getStaffNotesError(value: string): string | null {
     return "Notes must be 1000 characters or fewer";
   }
   if (CONTROL_CHAR_PATTERN.test(trimmed)) {
-    return "Notes contain unsupported characters";
+    return "Notes can't include tabs or line breaks";
   }
   return null;
 }
@@ -84,7 +84,7 @@ export function getRequiredStaffEmailError(value: string): string | null {
   }
   const result = z.string().email().safeParse(trimmed);
   if (!result.success) {
-    return "Invalid email address";
+    return "Enter an email like name@example.com";
   }
   return null;
 }
@@ -115,7 +115,7 @@ export function getOptionalStaffEmailError(value: string): string | null {
   }
   const result = z.string().email().safeParse(trimmed);
   if (!result.success) {
-    return "Invalid email address";
+    return "Enter an email like name@example.com";
   }
   return null;
 }
@@ -140,7 +140,7 @@ export const optionalStaffEmailSchema = z
     } catch (error) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: error instanceof Error ? error.message : "Invalid email address",
+        message: error instanceof Error ? error.message : "Enter an email like name@example.com",
       });
     }
   })

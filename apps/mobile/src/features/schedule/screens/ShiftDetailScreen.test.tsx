@@ -1124,8 +1124,8 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.queryByText("Shiftmates")).not.toBeInTheDocument();
-    expect(screen.getByText("Multiple Shifts")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Multiple Shifts, 2 shifts")).toBeNull();
+    expect(screen.getByText("Multiple shifts")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Multiple shifts, 2 shifts")).toBeNull();
     expect(screen.getByLabelText("Shift 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Shift 2")).toBeInTheDocument();
     expect(
@@ -1423,7 +1423,7 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    expect(screen.getByText("Multiple Shifts")).toBeInTheDocument();
+    expect(screen.getByText("Multiple shifts")).toBeInTheDocument();
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
     expect(
       screen.queryByText("Drop and swap actions apply to the shift you choose."),
@@ -1593,7 +1593,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Your shift")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes.",
+        "Pick a teammate's published shift to trade for. The same shift on a different day works too.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Eligible teammates")).toBeInTheDocument();
@@ -1800,7 +1800,7 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    expect(screen.getByLabelText("Rest of the day Sick")).toBeInTheDocument();
+    expect(screen.getByLabelText("Part of the day Sick")).toBeInTheDocument();
     expect(screen.getByLabelText("Absence Sick")).toHaveTextContent("Sick");
     expect(screen.getByText("Drop shift")).toBeInTheDocument();
     expect(screen.getByText("Swap")).toBeInTheDocument();
@@ -2839,7 +2839,7 @@ describe("ShiftDetailScreen", () => {
     });
   });
 
-  it("creates a calloff request from the coverage flow", () => {
+  it("creates a call-off request from the coverage flow", () => {
     const mutate = vi.fn();
     useMutation.mockReturnValue({
       error: null,
@@ -2861,9 +2861,9 @@ describe("ShiftDetailScreen", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(screen.getByText(/A Sick absence will be submitted for your/)).toBeInTheDocument();
+    expect(screen.getByText(/You'll be marked Sick for your/)).toBeInTheDocument();
 
-    confirmDialog("Submit Call-off");
+    confirmDialog("Call off");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "calloff",
@@ -2937,9 +2937,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Submit"));
 
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(
-      screen.getByText(/A Paid time off absence will be submitted for your/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/You'll be marked Paid time off for your/)).toBeInTheDocument();
   });
 
   it("submits a swap request from the full-page sheet without a second popup", () => {
@@ -2995,7 +2993,7 @@ describe("ShiftDetailScreen", () => {
     // The sheet is its own native window; a toast would render behind it.
     expect(screen.getByText("Shift already has a pending request")).toBeInTheDocument();
     expect(pushToast).not.toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Could not create request" }),
+      expect.objectContaining({ title: "Couldn't create request" }),
     );
     // The close button stays: a failure must never strand the user.
     expect(screen.getByLabelText("Close")).toBeInTheDocument();
@@ -3033,7 +3031,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Discard this request?")).toBeInTheDocument();
     expect(screen.getByText("Sick")).toBeInTheDocument();
 
-    confirmDialog("Keep Editing");
+    confirmDialog("Keep editing");
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.getByText("Sick")).toBeInTheDocument();
@@ -3097,7 +3095,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByLabelText("Close"));
     // Not "Cancel": the sheet's own dismiss button is Cancel, so the
     // confirmation would be asking the user to cancel their cancel.
-    confirmDialog("Keep Editing");
+    confirmDialog("Keep editing");
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.getByText("You give")).toBeInTheDocument();

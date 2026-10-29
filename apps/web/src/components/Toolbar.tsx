@@ -152,7 +152,7 @@ function SortMenuButton({
           }}
         >
           <ArrowUpDown size={13} />
-          Sort Staff
+          Sort staff
         </Button>
       </Hint>
       {open && (
@@ -290,7 +290,7 @@ function ToolsMenu({
 
         {/* Requests */}
         {onRequestsToggle && (
-          <Hint content={hint("Manage shift pickups, swaps, and calloffs")} side="left">
+          <Hint content={hint("Review pickup, swap and call-off requests")} side="left">
             <MenuItem
               onClick={() => {
                 onRequestsToggle();
@@ -507,8 +507,8 @@ export default function Toolbar({
       return `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
     }
     return spanWeeks === 2
-      ? `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, 13))}`
-      : `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, 6))}`;
+      ? `${formatDate(weekStart)} - ${formatDate(addDays(weekStart, 13))}`
+      : `${formatDate(weekStart)} - ${formatDate(addDays(weekStart, 6))}`;
   }, [weekStart, spanWeeks]);
 
   const focusAreaOptions: { id: number | null; name: string }[] = [
@@ -631,7 +631,7 @@ export default function Toolbar({
               />
               <input
                 type="text"
-                placeholder="Search staff…"
+                placeholder="Search staff"
                 value={staffSearch}
                 onChange={(e) => onStaffSearchChange(e.target.value)}
                 onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
@@ -913,7 +913,7 @@ export default function Toolbar({
             />
             <input
               type="text"
-              placeholder="Search staff…"
+              placeholder="Search staff"
               value={staffSearch}
               onChange={(e) => onStaffSearchChange(e.target.value)}
               onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}

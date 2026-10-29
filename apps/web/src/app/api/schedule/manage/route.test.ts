@@ -637,7 +637,7 @@ describe("POST /api/schedule/manage", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({
-        error: expect.stringMatching(/absence for the rest of the day/),
+        error: expect.stringMatching(/absence beside it/),
       });
       expect(userRpc).not.toHaveBeenCalled();
     },
@@ -1454,7 +1454,7 @@ describe("POST /api/schedule/manage permission gates", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "Cannot add a schedule note to a cell without a shift",
+      error: "Add a shift to this day before adding a schedule note.",
     });
     expect(serviceFrom).not.toHaveBeenCalledWith("schedule_notes");
   });

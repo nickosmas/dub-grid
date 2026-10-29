@@ -22,6 +22,7 @@ import {
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
 import logger from "@/lib/logger";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -421,7 +422,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     existing.updated_at !== parsed.data.expectedUpdatedAt
   ) {
     return NextResponse.json(
-      { error: "Invitation changed elsewhere. Refresh and try again." },
+      { error: changedElsewhereMessage("this invitation") },
       { status: 409 },
     );
   }
@@ -455,7 +456,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   });
   if (!refresh || refresh.invitation.employee_id !== id) {
     return NextResponse.json(
-      { error: "Invitation changed elsewhere. Refresh and try again." },
+      { error: changedElsewhereMessage("this invitation") },
       { status: 409 },
     );
   }
@@ -525,7 +526,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
   });
   if (!invitation || invitation.employee_id !== id) {
     return NextResponse.json(
-      { error: "Invitation changed elsewhere. Refresh and try again." },
+      { error: changedElsewhereMessage("this invitation") },
       { status: 409 },
     );
   }

@@ -435,7 +435,7 @@ export function BulkImportModal({
         onImported();
       }
     } catch {
-      toast.error("Import failed");
+      toast.error("We couldn't import those people. Try again.");
     } finally {
       setImporting(false);
     }
@@ -477,9 +477,9 @@ export function BulkImportModal({
           }}
         >
           <span className="dg-modal-title">
-            {step === "upload" && "Import Employees"}
+            {step === "upload" && "Import staff"}
             {step === "preview" && `Preview (${rows.length} rows)`}
-            {step === "result" && "Import Results"}
+            {step === "result" && "Import results"}
           </span>
           <CloseButton size="md" onClick={handleRequestClose} aria-label="Close import dialog" />
         </div>
@@ -594,7 +594,7 @@ export function BulkImportModal({
                                       : "1px solid var(--dg-color-border-light)",
                                 }}
                               >
-                                {cell || "—"}
+                                {cell || "-"}
                               </td>
                             ))}
                           </tr>
@@ -785,7 +785,7 @@ export function BulkImportModal({
                                       : { whiteSpace: "nowrap" }),
                                   }}
                                 >
-                                  {previewCellValue(row, col.key) || "—"}
+                                  {previewCellValue(row, col.key) || "-"}
                                 </td>
                               </MaybeHint>
                             ))}

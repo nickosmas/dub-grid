@@ -53,8 +53,7 @@ function logScheduleAudit(
 }
 
 // Recurring shifts don't take a worked shift plus an absence yet (item 45a).
-const RECURRING_REST_OF_DAY_ABSENCE_ERROR =
-  "A recurring shift can't include an absence for the rest of the day.";
+const RECURRING_REST_OF_DAY_ABSENCE_ERROR = "A recurring shift can't include an absence beside it.";
 
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
@@ -380,7 +379,7 @@ export async function POST(req: NextRequest) {
 
         if (data.input.kind === "worked" && data.input.segments.length === 0) {
           return NextResponse.json(
-            { error: "Recurring schedules require at least one worked segment" },
+            { error: "A recurring schedule needs at least one shift." },
             { status: 400 },
           );
         }
@@ -469,7 +468,7 @@ export async function POST(req: NextRequest) {
         );
         if (invalid) {
           return NextResponse.json(
-            { error: "Recurring schedules require at least one worked segment" },
+            { error: "A recurring schedule needs at least one shift." },
             { status: 400 },
           );
         }

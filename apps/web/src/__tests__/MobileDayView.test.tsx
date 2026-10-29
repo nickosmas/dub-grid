@@ -172,7 +172,7 @@ describe("MobileDayView absence for the rest of the day", () => {
   });
 
   it("puts an arrived-late absence first, joined to the shift (item 50d)", () => {
-    renderMixed({ first: true, joinsShift: true, shortTime: "7–11", time: "7:00 AM - 11:00 AM" });
+    renderMixed({ first: true, joinsShift: true, shortTime: "7 - 11", time: "7:00 AM - 11:00 AM" });
 
     const day = screen.getByText("D").closest("button")!;
     const pills = Array.from(day.querySelectorAll("span")).filter(

@@ -301,13 +301,13 @@ describe("coverageCellUnchangedText", () => {
 
   it("says a short cell was already short", () => {
     expect(coverageCellUnchangedText(cell({}))).toBe(
-      "Already short when published. Nothing in this draft changed it.",
+      "Short since it was published. The draft doesn't change that.",
     );
   });
 
   it("says nothing changed otherwise", () => {
     expect(coverageCellUnchangedText(cell({ kind: "staffed", shortage: 0 }))).toBe(
-      "Nothing in this draft changed it.",
+      "The draft doesn't change this count.",
     );
   });
 });

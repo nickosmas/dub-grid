@@ -7,7 +7,7 @@ describe("formatShiftRequestStatusLabel", () => {
     expect(formatShiftRequestStatusLabel("pending_approval")).toBe("Awaiting approval");
     expect(formatShiftRequestStatusLabel("approved")).toBe("Approved");
     expect(formatShiftRequestStatusLabel("rejected")).toBe("Rejected");
-    expect(formatShiftRequestStatusLabel("cancelled")).toBe("Cancelled");
+    expect(formatShiftRequestStatusLabel("cancelled")).toBe("Canceled");
     expect(formatShiftRequestStatusLabel("expired")).toBe("Expired");
   });
 

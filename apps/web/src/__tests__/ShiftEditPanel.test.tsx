@@ -1637,7 +1637,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
 
       const createRepeatingShiftButton = screen.getByRole("button", {
-        name: "Create Repeating Shift",
+        name: "Create repeating shift",
       });
       expect(createRepeatingShiftButton).toBeInTheDocument();
       expect(createRepeatingShiftButton).toBeEnabled();
@@ -1647,7 +1647,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Monday" }));
-      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+      await user.click(screen.getByRole("button", { name: "Create repeating shift" }));
       expect(screen.getByText("Select at least one day.")).toBeInTheDocument();
 
       await user.click(backButtons[0]);
@@ -1658,7 +1658,7 @@ describe("ShiftEditPanel", () => {
         screen.getByRole("button", { name: "Make this a repeating shift" }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Create Repeating Shift" }),
+        screen.queryByRole("button", { name: "Create repeating shift" }),
       ).not.toBeInTheDocument();
     });
 
@@ -1686,7 +1686,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
       await user.click(screen.getByLabelText("On date"));
-      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+      await user.click(screen.getByRole("button", { name: "Create repeating shift" }));
 
       expect(screen.getByText("Select an end date.")).toBeInTheDocument();
     });
@@ -1723,7 +1723,7 @@ describe("ShiftEditPanel", () => {
       const user = userEvent.setup();
       render(<RepeatFlowPanel onRepeatConfirm={onRepeatConfirm} />);
       await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
-      await user.click(screen.getByRole("button", { name: "Create Repeating Shift" }));
+      await user.click(screen.getByRole("button", { name: "Create repeating shift" }));
       return user;
     }
 
@@ -2660,7 +2660,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeDisabled();
       expect(
-        screen.getByText(/A shift with an absence for the rest of the day can.t repeat/),
+        screen.getByText(/A shift with an absence beside it can.t repeat/),
       ).toBeInTheDocument();
     });
 
@@ -2912,7 +2912,7 @@ describe("ShiftEditPanel", () => {
       });
     });
 
-    it("submits a calloff request from the shared coverage chooser", async () => {
+    it("submits a call-off request from the shared coverage chooser", async () => {
       const user = userEvent.setup();
       const { onCallOff } = renderRequestPanel();
 
@@ -2938,9 +2938,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.getByText("Shift requests")).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Call off is unavailable until at least one active absence type is set up.",
-        ),
+        screen.getByText("Calling off isn't set up for your organization yet. Ask an Admin."),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Call off/i })).toBeDisabled();
 
@@ -3009,13 +3007,13 @@ describe("ShiftEditPanel", () => {
       expect(screen.getAllByText("7:00 AM - 3:00 PM · North").length).toBeGreaterThan(0);
       expect(screen.getByText("3:00 PM - 11:00 PM · South")).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Submit Swap Request" }));
+      await user.click(screen.getByRole("button", { name: "Request swap" }));
 
       expect(onSubmitSwap).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
         name: /^Request a swap of your /,
       });
-      await user.click(within(dialog).getByRole("button", { name: "Submit swap" }));
+      await user.click(within(dialog).getByRole("button", { name: "Request swap" }));
 
       expect(onSubmitSwap).toHaveBeenCalledWith("emp-2", "2037-05-05", {
         requesterSegmentIndex: undefined,

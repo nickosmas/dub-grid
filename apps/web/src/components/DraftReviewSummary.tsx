@@ -20,12 +20,12 @@ function getBreakdownItems(breakdown: DraftBreakdown): BreakdownItem[] {
     { key: "newShifts", label: "New shifts", count: breakdown.newShifts },
     {
       key: "modifiedShifts",
-      label: "Edited shifts",
+      label: "Changed shifts",
       count: breakdown.modifiedShifts,
     },
     {
       key: "deletedShifts",
-      label: "Deleted shifts",
+      label: "Removed shifts",
       count: breakdown.deletedShifts,
     },
     { key: "newNotes", label: "New notes", count: breakdown.newNotes },

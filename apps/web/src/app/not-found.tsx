@@ -8,10 +8,10 @@ export default async function NotFound() {
   await connection();
   return (
     <NotFoundBoundary
-      title="404"
-      message="This page could not be found."
+      title="Page not found"
+      message="Check the address, or go back home."
       backHref="/"
-      backLabel="Go Home"
+      backLabel="Go home"
     />
   );
 }

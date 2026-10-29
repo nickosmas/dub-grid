@@ -87,10 +87,10 @@ export function OrgRoleSheet({
       };
     }
     return {
-      title: `Change role to ${ORG_ROLE_LABELS[next]}?`,
+      title: `Change access level to ${ORG_ROLE_LABELS[next]}?`,
       body: "Their access updates right away.",
       points: [],
-      confirmLabel: "Change role",
+      confirmLabel: "Change access level",
       confirmTone: "primary" as const,
     };
   }, [currentRole, invitationEmail, pendingRole]);
@@ -119,7 +119,7 @@ export function OrgRoleSheet({
   return (
     <BottomSheetModal
       footer={error ? <InlineError message={error} /> : undefined}
-      header={<SheetHeader subtitle={displayName} title="App access" />}
+      header={<SheetHeader subtitle={displayName} title="Access level" />}
       overlay={confirmationOverlay}
       scrollable
       visible={visible}

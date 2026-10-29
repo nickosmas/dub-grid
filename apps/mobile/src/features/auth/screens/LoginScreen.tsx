@@ -513,7 +513,7 @@ export default function LoginScreen() {
               maxFontSizeMultiplier={MAX_FONT_SCALE}
               style={styles.progressText}
             >
-              Checking your organization…
+              Checking your organization
             </Text>
           ) : null}
         </View>
@@ -580,7 +580,7 @@ export default function LoginScreen() {
               >
                 {slowSubmission
                   ? "This is taking longer than usual. We’re still checking your organization."
-                  : "Checking your organization…"}
+                  : "Checking your organization"}
               </Text>
             ) : null}
 

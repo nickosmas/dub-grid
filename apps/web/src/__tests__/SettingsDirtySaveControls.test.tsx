@@ -180,12 +180,12 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /review & save/i }));
 
-    expect(screen.getByText(/review organization changes/i)).toBeInTheDocument();
+    expect(screen.getByText(/save these changes/i)).toBeInTheDocument();
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
 
     const reviewDialog = await screen.findByRole("dialog", {
-      name: /review organization changes/i,
+      name: /save these changes/i,
     });
     await user.click(within(reviewDialog).getByRole("button", { name: /^save$/i }));
 
@@ -320,7 +320,7 @@ describe("settings dirty save controls", () => {
     render(<DisplayMode organization={baseOrganization} onSave={onSave} />);
 
     const compactLabelsSwitch = screen.getByRole("switch", {
-      name: /use compact role and certification labels/i,
+      name: /short role and certification names/i,
     });
     expect(compactLabelsSwitch).toHaveAttribute("aria-checked", "false");
 
@@ -343,7 +343,7 @@ describe("settings dirty save controls", () => {
     render(<ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />);
 
     const toggle = screen.getByRole("switch", {
-      name: /enforce shift conflict prevention/i,
+      name: /block overlapping shifts/i,
     });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
@@ -363,8 +363,8 @@ describe("settings dirty save controls", () => {
       <ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />,
     );
 
-    const title = screen.getByText("Enforce shift conflict prevention");
-    const description = screen.getByText("When enabled, overlapping shifts cannot be saved.");
+    const title = screen.getByText("Block overlapping shifts");
+    const description = screen.getByText("Nobody can be given two shifts that overlap.");
     const rows = container.querySelectorAll("[data-schedule-rule-row]");
 
     expect(title).toHaveStyle({
@@ -607,11 +607,13 @@ describe("settings dirty save controls", () => {
     // Clicking the row header again while dirty should prompt before closing.
     await user.click(screen.getByText("Daily Readings"));
 
-    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /discard your changes/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Daily Readings")).toBeInTheDocument();
   });
 
@@ -1669,11 +1671,13 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
-    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /discard your changes/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Days Updated")).toBeInTheDocument();
   });
 
@@ -2021,11 +2025,13 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByText("Mentor Updated"));
 
-    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /discard your changes/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Mentor Updated")).toBeInTheDocument();
   });
 

@@ -22,7 +22,7 @@ export function StaffPagination({
       page={page}
       totalPages={totalPages}
       onPageChange={onPageChange}
-      summary={`Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalCount)} of ${totalCount}`}
+      summary={`Showing ${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, totalCount)} of ${totalCount}`}
     />
   );
 }

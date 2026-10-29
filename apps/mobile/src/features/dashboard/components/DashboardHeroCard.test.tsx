@@ -59,7 +59,7 @@ describe("DashboardHeroCard", () => {
       />,
     );
 
-    expect(screen.getByText("Coverage requirements not configured")).toBeInTheDocument();
+    expect(screen.getByText("Set staffing needs")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByText("open gaps")).not.toBeInTheDocument();
     expect(screen.getByText("pending approvals")).toBeInTheDocument();
@@ -82,12 +82,12 @@ describe("DashboardHeroCard", () => {
     expect(
       screen.getByText("Coverage and open gaps will appear after this period is published."),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Coverage requirements not configured")).not.toBeInTheDocument();
+    expect(screen.queryByText("Set staffing needs")).not.toBeInTheDocument();
     expect(screen.queryByText("100%")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     // Open gaps keeps its place with a dash rather than a zero, and opens nothing.
     const gaps = screen.getByRole("button", { name: "open gaps, not published yet" });
-    expect(gaps).toHaveTextContent("\u2014");
+    expect(gaps).toHaveTextContent("-");
     expect(gaps).toBeDisabled();
   });
 

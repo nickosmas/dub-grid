@@ -48,9 +48,9 @@ export function AddPersonKindSheet({
           onPress={() => onSelect("scheduled")}
         />
         <KindOption
-          description="Needs app access but won't appear on the schedule."
+          description="Signs in to manage, but isn't on the schedule."
           iconName="key-outline"
-          label="Management staff"
+          label="Management"
           onPress={() => onSelect("management")}
         />
       </View>

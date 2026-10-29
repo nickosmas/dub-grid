@@ -20,10 +20,10 @@ describe("OrganizationBootstrapRecovery", () => {
     try {
       render(<OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={onRetry} />);
 
-      expect(screen.getByRole("heading", { name: "Loading your workspace" })).toBeInTheDocument();
       expect(
-        screen.getByText("Just a moment while we prepare everything you need."),
+        screen.getByRole("heading", { name: "Opening your organization" }),
       ).toBeInTheDocument();
+      expect(screen.getByText("This usually takes a few seconds.")).toBeInTheDocument();
 
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
       expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();

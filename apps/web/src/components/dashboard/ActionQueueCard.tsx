@@ -8,6 +8,7 @@ import {
   loadApprovalDraftWarning,
 } from "@/components/shift-requests/approval-draft-warning";
 import { Button } from "@/components/Button";
+import { formatCompactScheduleDate } from "@dubgrid/schedule-core";
 import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import type { ShiftRequest } from "@/types";
@@ -102,8 +103,8 @@ export function buildActionItems({
       items.push({
         id: `approval-${req.id}`,
         type: "approval",
-        title: `${req.requesterName} requested ${formatShiftRequestTypeLabel(req.type).toLowerCase()}`,
-        subtitle: `${shiftName} \u00B7 ${req.requesterShiftDate}`,
+        title: `${req.requesterName} sent a ${formatShiftRequestTypeLabel(req.type).toLowerCase()} request`,
+        subtitle: `${shiftName} \u00B7 ${formatCompactScheduleDate(req.requesterShiftDate)}`,
         urgency: "high",
         action: onResolve
           ? {
@@ -124,7 +125,7 @@ export function buildActionItems({
         id: "draft-changes",
         type: "draft",
         title: `${draftTotal} unpublished change${draftTotal !== 1 ? "s" : ""}`,
-        subtitle: "Review and publish in schedule",
+        subtitle: "Publish from the schedule",
         urgency: "medium",
         href: "/schedule",
       });
@@ -137,8 +138,8 @@ export function buildActionItems({
       items.push({
         id: "coverage-gaps",
         type: "coverage_gap",
-        title: `${highUrgencySlotCount} urgent coverage slot${highUrgencySlotCount !== 1 ? "s" : ""}`,
-        subtitle: "Understaffed shifts need attention",
+        title: `${highUrgencySlotCount} urgent open shift${highUrgencySlotCount !== 1 ? "s" : ""}`,
+        subtitle: "Short of the coverage you set",
         urgency: "high",
         href: "/schedule",
       });
@@ -151,7 +152,7 @@ export function buildActionItems({
         id: `swap-${req.id}`,
         type: "swap_proposal",
         title: `${req.requesterName} wants to swap shifts`,
-        subtitle: `${shiftName} \u00B7 ${req.requesterShiftDate}`,
+        subtitle: `${shiftName} \u00B7 ${formatCompactScheduleDate(req.requesterShiftDate)}`,
         urgency: "high",
         action:
           onRespond && currentEmpId != null
@@ -177,7 +178,7 @@ export function buildActionItems({
         id: `pickup-${req.id}`,
         type: "pickup",
         title: `Open shift: ${shiftName}`,
-        subtitle: `${req.requesterShiftDate}`,
+        subtitle: formatCompactScheduleDate(req.requesterShiftDate),
         urgency: "low",
         action:
           onClaim && currentEmpId != null
@@ -199,10 +200,10 @@ export function buildActionItems({
 
 const TYPE_LABELS: Record<string, string> = {
   approval: "Approvals",
-  swap_proposal: "Swap Proposals",
-  pickup: "Open Pickups",
-  coverage_gap: "Coverage Gaps",
-  draft: "Unpublished Changes",
+  swap_proposal: "Swap requests",
+  pickup: "Open shifts",
+  coverage_gap: "Short shifts",
+  draft: "Unpublished changes",
 };
 
 const TYPE_ORDER = ["approval", "coverage_gap", "draft", "swap_proposal", "pickup"];
@@ -460,15 +461,7 @@ export default function ActionQueueCard({
               marginBottom: 2,
             }}
           >
-            All clear
-          </div>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-small)",
-              color: "var(--dg-color-text-subtle)",
-            }}
-          >
-            No action items right now
+            Nothing to review
           </div>
         </div>
       </div>

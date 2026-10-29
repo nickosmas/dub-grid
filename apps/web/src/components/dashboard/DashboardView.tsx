@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
@@ -188,13 +189,13 @@ export function buildDashboardHeroMetrics(input: {
   const metrics: DashboardHeroMetric[] = [
     {
       label: "Coverage",
-      value: hideCoverageValue ? "\u2014" : `${input.coveragePct}%`,
+      value: hideCoverageValue ? "-" : `${input.coveragePct}%`,
       detail: coverageCaveat,
       href: "/schedule",
     },
     {
       label: "Open gaps",
-      value: hideCoverageValue ? "\u2014" : `${input.openShiftSlotCount}`,
+      value: hideCoverageValue ? "-" : `${input.openShiftSlotCount}`,
       detail: coverageCaveat,
       href: "/schedule",
     },
@@ -301,7 +302,7 @@ export default function DashboardView({
   // The expanded panels below render on sectionCoverage/shiftBreakdown/etc.,
   // which are stubbed empty in user mode (see those useMemos). UserDashboard
   // never opens one, but a panel left open from before a mid-session switch
-  // into user mode (e.g. an admin toggling "View as User") would otherwise
+  // into user mode (e.g. an admin toggling "View as a User") would otherwise
   // keep rendering on that now-empty data instead of closing.
   useEffect(() => {
     if (isUserDashboardMode) {
@@ -833,7 +834,6 @@ export default function DashboardView({
       return {
         statusLabel: "Urgent",
         title: `${urgentGapCount} urgent coverage gap${urgentGapCount === 1 ? "" : "s"}`,
-        description: "Resolve the most critical staffing gaps before the next shift starts.",
         actionLabel: "Review schedule",
         actionHref: "/schedule",
       };
@@ -843,7 +843,6 @@ export default function DashboardView({
       return {
         statusLabel: "Approval",
         title: `${shiftRequests.pendingApproval.length} shift request${shiftRequests.pendingApproval.length === 1 ? "" : "s"} awaiting approval`,
-        description: "Review pending requests and keep your schedule up to date.",
         actionLabel: "Review requests",
         actionHref: "/schedule",
       };
@@ -852,9 +851,8 @@ export default function DashboardView({
     if (showOT && otAlerts.length > 0) {
       return {
         statusLabel: "Warning",
-        title: `${otAlerts.length} projected overtime alert${otAlerts.length === 1 ? "" : "s"}`,
-        description: "Adjust hours or staffing to avoid overtime this period.",
-        actionLabel: "Review OT alerts",
+        title: `${otAlerts.length} ${otAlerts.length === 1 ? "person" : "people"} headed for overtime`,
+        actionLabel: "Review hours",
         actionHref: "/schedule",
       };
     }
@@ -862,8 +860,7 @@ export default function DashboardView({
     if (draftTotal > 0) {
       return {
         statusLabel: "Drafts",
-        title: `${draftTotal} unsaved schedule draft${draftTotal === 1 ? "" : "s"}`,
-        description: "Finalize draft shifts before publishing them to your team.",
+        title: `${draftTotal} unpublished change${draftTotal === 1 ? "" : "s"}`,
         actionLabel: "View drafts",
         actionHref: "/schedule",
       };
@@ -874,8 +871,8 @@ export default function DashboardView({
         statusLabel: "Pending publish",
         title: "This period has not been published yet",
         description: hasCoverageRequirements
-          ? "Coverage and open-gap metrics will appear after the first publish."
-          : "Publish this period so the schedule is visible to your team.",
+          ? "Coverage and open shifts show here once it's published."
+          : "Staff see the schedule once it's published.",
         actionLabel: "Open schedule",
         actionHref: "/schedule",
       };
@@ -884,9 +881,9 @@ export default function DashboardView({
     if (!hasCoverageRequirements) {
       return {
         statusLabel: "Setup",
-        title: "Coverage requirements not configured",
+        title: "Set staffing needs",
         description:
-          "Set staffing requirements so coverage and open-gap tracking can surface here.",
+          "Coverage and open shifts show here once you set how many people each shift needs.",
         actionLabel: permissions.canManageCoverageRequirements
           ? "Configure coverage"
           : "Open schedule",
@@ -900,7 +897,7 @@ export default function DashboardView({
       return {
         statusLabel: "Coverage",
         title: "Coverage is below target",
-        description: "There are still some sections with incomplete staffing this period.",
+        description: `Some ${pluralLabelNoun(org.focusAreaLabel || "Focus Areas")} are short-staffed this period.`,
         actionLabel: "Review coverage",
         actionHref: "/schedule",
       };
@@ -908,8 +905,7 @@ export default function DashboardView({
 
     return {
       statusLabel: "Healthy",
-      title: "Schedule health looks good",
-      description: "No major alert items detected. Keep reviewing your schedule and requests.",
+      title: "Nothing needs attention",
       actionLabel: "Open schedule",
       actionHref: "/schedule",
     };
@@ -924,6 +920,7 @@ export default function DashboardView({
     isCoverageUnpublished,
     hasCoverageRequirements,
     coveragePct,
+    org.focusAreaLabel,
   ]);
 
   const heroMetrics = useMemo(
@@ -1173,7 +1170,7 @@ export default function DashboardView({
         {employees.length === 0 && !isUserDashboardMode && !hasAdminCapability && (
           <EmptyState
             heading="Your organization is being set up"
-            description="Your administrator is configuring the organization. Check back soon."
+            description="Your schedule shows here once setup is finished."
           />
         )}
 
@@ -1185,7 +1182,7 @@ export default function DashboardView({
           <ExpandedCoverage
             sections={sectionCoverage}
             focusAreas={focusAreas}
-            focusAreaLabel={org.focusAreaLabel || "section"}
+            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
             hasRequirements={hasCoverageRequirements}
             publishedWindowState={publishedWindowState}
             onClose={closeExpanded}
@@ -1195,6 +1192,7 @@ export default function DashboardView({
           <ExpandedOpenShifts
             openShifts={openShifts}
             publishedWindowState={publishedWindowState}
+            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
             onClose={closeExpanded}
           />
         )}
@@ -1206,6 +1204,7 @@ export default function DashboardView({
             focusAreas={focusAreas}
             canNavigateToDetailsPage={permissions.canManageEmployees}
             otThreshold={overtimeThreshold}
+            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
             onClose={closeExpanded}
           />
         )}

@@ -19,7 +19,7 @@ describe("stat card stretch", () => {
         actionLabel="Review OT alerts"
         actionHref="/schedule"
         metrics={[
-          { label: "Coverage", value: "—", detail: "Not configured", href: "/schedule" },
+          { label: "Coverage", value: "-", detail: "Not configured", href: "/schedule" },
           { label: "Draft shifts", value: "0", href: "/schedule" },
         ]}
       />,

@@ -22,7 +22,7 @@ export async function signOutFromBrowser(
   if (scope !== "local") {
     try {
       const session = await settleWithRequestTimeout(getBrowserSession());
-      if (!session) throw new Error("Please sign in again before managing devices.");
+      if (!session) throw new Error("Sign in again to manage your devices.");
       await signOutAccountSessions(
         scope,
         session.access_token,
@@ -188,7 +188,7 @@ export async function resetBrowserPasswordForEmail(email: string, redirectTo: st
   const payload = (await response.json().catch(() => null)) as { error?: string } | null;
   return {
     error: {
-      message: payload?.error ?? "Recovery request failed",
+      message: payload?.error ?? "We couldn't complete that. Try again.",
       status: response.status,
     },
   };

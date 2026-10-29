@@ -110,7 +110,7 @@ export default function OnboardingPage() {
             letterSpacing: "-0.03em",
           }}
         >
-          Pending Organization Assignment
+          You're not in an organization yet
         </h1>
 
         <p

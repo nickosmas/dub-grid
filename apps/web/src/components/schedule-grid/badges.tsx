@@ -27,8 +27,8 @@ export type GridDiffBadgeConfig = {
  */
 export function getGridDiffBadgeLabel(kind: GridDiffBadgeConfig["kind"]): string {
   if (kind === "new") return "New";
-  if (kind === "deleted") return "Deleted";
-  return "Edited";
+  if (kind === "deleted") return "Removed";
+  return "Changed";
 }
 
 export function shouldUseShiftColorForDiffState(args: { isCross: boolean }): boolean {

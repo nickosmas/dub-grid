@@ -515,7 +515,7 @@ export default function OrganizationLocationFields({
               fontWeight: 700,
             }}
           >
-            {employeeCountLoading ? "Loading…" : String(employeeCount ?? 0)}
+            {employeeCountLoading ? "Loading" : String(employeeCount ?? 0)}
             {!employeeCountLoading ? (
               <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 500 }}>
                 Managed in People

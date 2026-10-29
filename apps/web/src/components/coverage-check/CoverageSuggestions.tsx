@@ -138,7 +138,7 @@ interface CoverageDayDetailProps {
 
 /** What Apply all does, said wherever it is offered. */
 export const APPLY_ALL_NOTE =
-  "Applies the draft fixes one at a time, counting again after each so no spot is filled twice. Approvals are not included.";
+  "Applies each draft fix in turn, so no spot is filled twice. Pickup approvals aren't included.";
 
 export function hasDraftFix(items: CoverageSuggestionView[]): boolean {
   return items.some(
@@ -197,13 +197,12 @@ export function CoverageDayDetail({
             ))}
           </ul>
         </div>
-      ) : (
+      ) : staffShort > 0 ? (
         <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-          {staffShort > 0
-            ? "No fixes found for this day. Select a short cell to see why each qualified person isn't suggested."
-            : "Nothing to fix on this day."}
+          No fixes found for this day. Select a short cell to see why each qualified person
+          isn&apos;t suggested.
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

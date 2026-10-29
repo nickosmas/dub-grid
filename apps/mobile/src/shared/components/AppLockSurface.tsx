@@ -47,11 +47,11 @@ function AppLockedPage({ retrying, onRetry, onSignOut }: Omit<AppLockSurfaceProp
       <View style={styles.iconFrame}>
         <Ionicons color={mobileColors.brand} name="lock-closed-outline" size={28} />
       </View>
-      <Text style={styles.title}>DubGrid is locked</Text>
+      <Text style={styles.title}>The app is locked</Text>
       <Text style={styles.body}>Verify it's you to continue, or sign out.</Text>
       <ActionButtons
         primaryAction={
-          <Button label="Try again" loading={retrying} onPress={onRetry} tone="primary" />
+          <Button label="Unlock" loading={retrying} onPress={onRetry} tone="primary" />
         }
         style={styles.actions}
       >

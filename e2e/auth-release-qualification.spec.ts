@@ -152,7 +152,7 @@ test.describe("authentication release qualification", () => {
       await page.goto(`${QA_CALM_HAVEN_ORIGIN}/billing-required`);
       await expect(page).toHaveURL(/\/billing-required/);
       await expect(page.getByRole("heading", { name: "Organization unavailable" })).toBeVisible();
-      await expect(page.getByText("This organization is currently unavailable.")).toBeVisible();
+      await expect(page.getByText("This organization isn't available right now.")).toBeVisible();
 
       await setLocalOrganizationSubscription("calmhaven", "active");
       await page.getByRole("button", { name: "Check again" }).click();

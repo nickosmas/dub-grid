@@ -60,7 +60,7 @@ function toBadge(
 }
 
 function deletedBadge(source: GridDiffBadgeConfig["source"], detail: string): CellChangeBadge {
-  return { source, kind: "deleted", text: "Deleted", label: "Deleted", detail };
+  return { source, kind: "deleted", text: "Removed", label: "Removed", detail };
 }
 
 function sortedSegments(segments: ShiftJobSegment[] | undefined): ShiftJobSegment[] {

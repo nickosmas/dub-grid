@@ -389,7 +389,7 @@ describe("NotificationsScreen", () => {
     expect(push).toHaveBeenCalledWith("/(tabs)/requests");
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Could not update alerts" }),
+        expect.objectContaining({ title: "Couldn't update alerts" }),
       );
     });
     // Marked read on tap, put back when the write failed.

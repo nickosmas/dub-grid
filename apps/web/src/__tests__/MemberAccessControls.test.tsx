@@ -25,7 +25,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     render(<MemberAccessControls orgRole="user" onRoleChange={onRoleChange} />);
     await user.click(screen.getByRole("button", { name: "User" }));
     await user.click(await screen.findByRole("option", { name: "Admin" }));
-    await user.click(await screen.findByRole("button", { name: "Change role" }));
+    await user.click(await screen.findByRole("button", { name: "Change access level" }));
   }
 
   it("changes no role and reports no success when step-up is cancelled before the action", async () => {
@@ -34,7 +34,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     await confirmRoleChange(onRoleChange);
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Change role" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument(),
     );
     expect(stepUpRun).toHaveBeenCalledTimes(1);
     expect(onRoleChange).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     await confirmRoleChange(onRoleChange);
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Change role" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument(),
     );
     expect(onRoleChange).toHaveBeenCalledTimes(1);
     expect(onRoleChange).toHaveBeenCalledWith("admin", "stale-token");
@@ -74,11 +74,11 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     await user.click(screen.getByRole("button", { name: "Edit admin access" }));
     await user.click(await screen.findByRole("switch", { name: "Coverage view" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
-    await user.click(await screen.findByRole("button", { name: /confirm save/i }));
+    await user.click(await screen.findByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));
     expect(onPermissionsChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: /confirm save/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     expect(
       screen.getByRole("dialog", { name: "Edit permissions", hidden: true }),
     ).toBeInTheDocument();

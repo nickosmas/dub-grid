@@ -417,7 +417,7 @@ export async function requireAuthenticatedUserWithClaims(
       // state is present but cannot be verified.
       return {
         response: NextResponse.json(
-          { error: "We couldn't verify your Test Sandbox. Please retry." },
+          { error: "We couldn't verify your Test Sandbox. Try again." },
           { status: 503 },
         ),
       };

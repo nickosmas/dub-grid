@@ -57,7 +57,7 @@ export function formatDateRangeLabel(value: DateRangeValue, placeholder: string)
   const to = parseLocalDate(value.to);
   if (from && to) {
     // Both ends read the same way; the year is said once, at the end.
-    return `${DAY_FORMATTER.format(from)} – ${DAY_WITH_YEAR_FORMATTER.format(to)}`;
+    return `${DAY_FORMATTER.format(from)} - ${DAY_WITH_YEAR_FORMATTER.format(to)}`;
   }
   if (from) return `From ${DAY_WITH_YEAR_FORMATTER.format(from)}`;
   if (to) return `Until ${DAY_WITH_YEAR_FORMATTER.format(to)}`;

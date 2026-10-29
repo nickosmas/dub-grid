@@ -165,7 +165,7 @@ describe("PersonStaffActions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
     expect(
       within(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).getByText(
-        "The away planned from Jan 5 is cancelled.",
+        "The time away planned from Jan 5 is canceled.",
       ),
     ).toBeInTheDocument();
   });
@@ -208,7 +208,7 @@ describe("PersonStaffActions", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "Their staff record changed elsewhere. Review the latest values and try again.",
+        "Someone else just changed their details. Refresh and try again.",
       ),
     );
     expect(onChanged).toHaveBeenCalled();

@@ -162,7 +162,7 @@ export function describeCoverageCellChanges(input: DescribeCoverageCellChangesIn
 export function coverageCellUnchangedText(cell: CoverageMatrixCell): string {
   if (!cell.published) return "Not published yet, so there is nothing to compare.";
   if (cell.kind === "short") {
-    return "Already short when published. Nothing in this draft changed it.";
+    return "Short since it was published. The draft doesn't change that.";
   }
-  return "Nothing in this draft changed it.";
+  return "The draft doesn't change this count.";
 }

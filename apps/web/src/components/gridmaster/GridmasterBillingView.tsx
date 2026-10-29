@@ -100,7 +100,7 @@ function MiniCard({
 }
 
 function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString() : "—";
+  return value ? new Date(value).toLocaleDateString() : "-";
 }
 
 // A trialing org with no end date hasn't started its trial yet (no super_admin
@@ -108,7 +108,7 @@ function formatDate(value: string | null) {
 function formatTrialEnds(org: GridmasterBillingOrgSummary) {
   if (org.trialEndsAt) return new Date(org.trialEndsAt).toLocaleDateString();
   if (org.status === "trialing" || !org.status) return "Not started";
-  return "—";
+  return "-";
 }
 
 function statusTone(status: string | null) {
@@ -245,7 +245,7 @@ function BillingRowActions({
       run: () => actions.changeTrial(org),
     },
     {
-      label: "End trial…",
+      label: "End trial",
       disabled: busy || Boolean(trialReasons.end),
       reason: trialReasons.end,
       run: () => actions.endTrial(org),
@@ -539,7 +539,7 @@ export default function GridmasterBillingView({
                               ? new Date(org.trialStartedAt).toLocaleDateString()
                               : isTrialPending(org)
                                 ? "Not started"
-                                : "—"}
+                                : "-"}
                           </td>
                           <td style={gmTdStyle}>{formatTrialEnds(org)}</td>
                           <td style={gmTdStyle}>{formatDate(org.currentPeriodEnd)}</td>
@@ -554,7 +554,7 @@ export default function GridmasterBillingView({
                           >
                             {formatDate(org.cancelAt)}
                           </td>
-                          <td style={gmTdStyle}>{org.seats ?? "—"}</td>
+                          <td style={gmTdStyle}>{org.seats ?? "-"}</td>
                           <td style={gmTdStyle}>{org.appUsers}</td>
                           <td
                             style={{
@@ -566,7 +566,7 @@ export default function GridmasterBillingView({
                               fontWeight: 700,
                             }}
                           >
-                            {org.seatDelta ?? "—"}
+                            {org.seatDelta ?? "-"}
                           </td>
                           <td style={gmTdStyle}>
                             {org.stripeCustomerId ? (

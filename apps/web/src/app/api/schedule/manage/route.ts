@@ -23,6 +23,7 @@ import {
 } from "@/app/api/shared/permissions";
 import { withoutHiddenRequests } from "@dubgrid/data-access";
 import {
+  changedElsewhereMessage,
   CORRECTION_REASON_MAX_LENGTH,
   isSchedulableOn,
   type EmployeeStatus,
@@ -459,8 +460,7 @@ function normalizeScheduleInput(
   };
 }
 
-const SERIES_REST_OF_DAY_ABSENCE_ERROR =
-  "A repeating shift can't include an absence for the rest of the day.";
+const SERIES_REST_OF_DAY_ABSENCE_ERROR = "A repeating shift can't include an absence beside it.";
 
 /** Repeating shifts don't take a worked shift plus an absence yet (item 45a). */
 function seriesHasRestOfDayAbsence(input: ScheduleCellInput): boolean {
@@ -1593,7 +1593,7 @@ export async function POST(req: NextRequest) {
         const timesBefore = cellStateFromSnapshotPayload(draftPayload ?? publishedPayload);
         if (!sourcePayload) {
           return NextResponse.json(
-            { error: "Cannot set custom times without a worked schedule cell" },
+            { error: "Add a shift before changing its times." },
             { status: 400 },
           );
         }
@@ -1778,7 +1778,7 @@ export async function POST(req: NextRequest) {
         }
         if (normalizedInput.kind === "worked" && normalizedInput.segments.length === 0) {
           return NextResponse.json(
-            { error: "Shift series requires at least one worked segment" },
+            { error: "A repeating shift needs at least one shift." },
             { status: 400 },
           );
         }
@@ -1997,7 +1997,7 @@ export async function POST(req: NextRequest) {
         });
         if (normalizedInput.kind === "worked" && normalizedInput.segments.length === 0) {
           return NextResponse.json(
-            { error: "Series updates require at least one worked segment" },
+            { error: "A repeating shift needs at least one shift." },
             { status: 400 },
           );
         }
@@ -2377,7 +2377,7 @@ export async function POST(req: NextRequest) {
           !(await cellHasWorkedShift(auth.serviceClient, data.orgId, data.employeeId, data.date))
         ) {
           return NextResponse.json(
-            { error: "Cannot add a schedule note to a cell without a shift" },
+            { error: "Add a shift to this day before adding a schedule note." },
             { status: 400 },
           );
         }
@@ -2547,7 +2547,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof OptimisticLockConflictError) {
       return NextResponse.json(
         {
-          error: "Schedule changed elsewhere. Refresh and try again.",
+          error: changedElsewhereMessage("the schedule"),
           code: "OPTIMISTIC_LOCK",
           shiftId: error.shiftId,
           expectedVersion: error.expectedVersion,
@@ -2557,6 +2557,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return apiErrorResponse(error, "Schedule request failed");
+    return apiErrorResponse(error, "We couldn't update the schedule. Try again.");
   }
 }

@@ -128,7 +128,7 @@ async function expectBootstrapStates(page: Page, path: string) {
   // dashboard sits behind SetupGuard, which shows the workspace splash.
   const loadingState =
     path === "/dashboard"
-      ? page.getByRole("heading", { name: "Loading your workspace" })
+      ? page.getByRole("heading", { name: "Opening your organization" })
       : page.locator("[data-progress-bar]");
   const releaseBootstrap = await holdRequests(page, `**${BOOTSTRAP_PATH}`);
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
@@ -146,7 +146,7 @@ async function expectBootstrapStates(page: Page, path: string) {
   });
   await page.goto(`${QA_CALM_HAVEN_ORIGIN}${path}`);
   await expect(
-    page.getByRole("heading", { name: "Loading your workspace" }),
+    page.getByRole("heading", { name: "Opening your organization" }),
     `${path} recovery`,
   ).toBeVisible({ timeout: 15_000 });
   // The heading shows from the first attempt now (F-68); the retry button

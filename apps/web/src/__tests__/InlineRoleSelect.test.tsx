@@ -43,7 +43,7 @@ describe("InlineRoleSelect self-guard", () => {
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByRole("option", { name: "Admin" }));
 
-    expect(screen.getByText(/^Change invitation access from /)).toBeTruthy();
+    expect(screen.getByText(/^Change the invitation for /)).toBeTruthy();
     const summary = within(screen.getByRole("region", { name: "Keep in mind" }));
     expect(summary.getByText("The current invite link stops working immediately.")).toBeTruthy();
     expect(summary.getByText("A new invite link is sent to mina@example.com.")).toBeTruthy();
@@ -62,9 +62,11 @@ describe("InlineRoleSelect self-guard", () => {
 
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByRole("option", { name: "Admin" }));
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
 
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Change role" })).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Change access level" })).toBeNull(),
+    );
     expect(stepUpRun).toHaveBeenCalledOnce();
     expect(onChange).not.toHaveBeenCalled();
     expect(toastSuccess).not.toHaveBeenCalled();

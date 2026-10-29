@@ -33,6 +33,7 @@ import {
   type LoadedMobilePerson,
 } from "@/features/mobile/server/person-access";
 import logger from "@/lib/logger";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ function getRequestIp(req: NextRequest): string | null {
 function conflictResponse(person: LoadedMobilePerson["person"]) {
   return NextResponse.json(
     {
-      error: "Management access changed elsewhere. Review the latest values and try again.",
+      error: changedElsewhereMessage("their management access"),
       code: "ORG_ACCESS_CONFLICT",
       person,
     },

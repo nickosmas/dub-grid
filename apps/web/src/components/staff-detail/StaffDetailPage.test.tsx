@@ -92,7 +92,7 @@ vi.mock("@/components/staff/PendingInvitationBanner", () => ({
     <div data-testid="invitation-banner" data-expired={String(Boolean(expired))}>
       {pendingInvitation.id}
       <button type="button" onClick={onReinvite}>
-        Reinvite
+        Resend
       </button>
     </div>
   ),
@@ -287,7 +287,7 @@ describe("StaffDetailPage", () => {
       );
       expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "Reinvite" }));
+      fireEvent.click(screen.getByRole("button", { name: "Resend" }));
       await waitFor(() => expect(resendInvitation).toHaveBeenCalledWith("inv-expired", "org-1"));
     });
 

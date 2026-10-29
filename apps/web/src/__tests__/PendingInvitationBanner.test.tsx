@@ -44,13 +44,13 @@ describe("PendingInvitationBanner", () => {
 
     expect(screen.getByText("Invitation expired")).toBeInTheDocument();
     expect(screen.getByText(/^Sent Jan 1, 2026/)).toHaveTextContent(/Expired Jan 1, 2099/);
-    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
   });
 
   it("hides the Reinvite button when onReinvite is omitted", () => {
     render(<PendingInvitationBanner pendingInvitation={invitation} onRevoke={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "Reinvite" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resend" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke" })).toBeInTheDocument();
   });
 
@@ -66,11 +66,11 @@ describe("PendingInvitationBanner", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Reinvite" }));
+    await user.click(screen.getByRole("button", { name: "Resend" }));
     expect(onReinvite).not.toHaveBeenCalled();
 
-    expect(screen.getByText(/^Reissue the invitation for /)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reissue" }));
+    expect(screen.getByText(/^Resend the invitation to /)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Resend" }));
     expect(onReinvite).toHaveBeenCalledOnce();
   });
 
@@ -115,7 +115,7 @@ describe("PendingInvitationBanner", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Reinvite" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Resend" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Revoke" })).toBeDisabled();
   });
 });

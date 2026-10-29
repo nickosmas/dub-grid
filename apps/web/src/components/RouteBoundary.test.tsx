@@ -16,7 +16,7 @@ vi.mock("next/link", () => ({
 describe("NotFoundBoundary navigation", () => {
   it("uses document navigation for the cross-subdomain home destination", () => {
     render(<NotFoundBoundary />);
-    const link = screen.getByRole("link", { name: "Go Home" });
+    const link = screen.getByRole("link", { name: "Go home" });
     expect(link).toHaveAttribute("href", "/");
     expect(link).not.toHaveAttribute("data-client-link");
   });

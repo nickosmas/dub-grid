@@ -32,6 +32,10 @@ function formatRequestType(type: ProfileChangeRequest["type"]) {
   return type === "account_deletion" ? "Account deletion" : "Profile update";
 }
 
+function requesterLabel(request: ProfileChangeRequest): string {
+  return request.requesterName || request.requesterEmail || "this person";
+}
+
 function resolutionMessage({
   request,
   action,
@@ -41,11 +45,11 @@ function resolutionMessage({
 }) {
   const deletion = request.type === "account_deletion";
   if (action === "approve") {
-    return deletion ? "The requester's account is permanently deleted." : undefined;
+    return deletion
+      ? "Their account is deleted and they're removed from your organization. This can't be undone."
+      : undefined;
   }
-  return deletion
-    ? "The requester's account isn't deleted."
-    : "The requester's profile isn't changed.";
+  return undefined;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -62,7 +66,7 @@ const STATUS_LABELS: Record<ProfileChangeRequest["status"], string> = {
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
 };
 
 const STATUS_TONES: Record<ProfileChangeRequest["status"], StatusPillTone> = {
@@ -324,7 +328,7 @@ export function ProfileChangeRequestQueue({
       toast.success(variables.action === "approve" ? "Request approved." : "Request rejected.");
     },
     onError: (error) => {
-      toast.error(extractErrorMessage(error, "We couldn't resolve request. Try again."));
+      toast.error(extractErrorMessage(error, "We couldn't update that request. Try again."));
     },
   });
 
@@ -413,7 +417,7 @@ export function ProfileChangeRequestQueue({
                 <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <DetailRow label="Resolved at" value={formatDate(request.resolvedAt)} />
-                    <DetailRow label="Cancelled at" value={formatDate(request.cancelledAt)} />
+                    <DetailRow label="Canceled at" value={formatDate(request.cancelledAt)} />
                   </div>
                   {request.resolverNote ? (
                     <p className="m-0 mt-3 whitespace-pre-wrap text-[13px] leading-5 text-[var(--dg-color-text-muted)]">
@@ -449,18 +453,10 @@ export function ProfileChangeRequestQueue({
         <ConfirmDialog
           title={
             pendingResolution.action === "approve"
-              ? `Approve this person's ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
-              : `Reject this person's ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
+              ? `Approve ${requesterLabel(pendingResolution.request)}'s ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
+              : `Reject ${requesterLabel(pendingResolution.request)}'s ${formatRequestType(pendingResolution.request.type).toLowerCase()}?`
           }
           message={resolutionMessage(pendingResolution)}
-          summary={
-            pendingResolution.request.type === "account_deletion" &&
-            pendingResolution.action === "approve"
-              ? {
-                  points: ["They're removed from your organization.", "This can't be undone."],
-                }
-              : undefined
-          }
           confirmLabel={pendingResolution.action === "approve" ? "Approve" : "Reject"}
           variant={
             pendingResolution.request.type === "account_deletion" &&

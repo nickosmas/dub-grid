@@ -153,7 +153,7 @@ describe("describeStatusAction", () => {
     ]);
     expect(describeStatusAction("archive", "Ana").points[0]).toBe("They can no longer sign in.");
     expect(describeStatusAction("archive", "Ana").unchanged).toEqual([
-      "Past records stay, and you can restore them later.",
+      "Their history stays, and you can restore them later.",
     ]);
   });
 
@@ -520,7 +520,7 @@ describe("describeCurrentStatus", () => {
       describeCurrentStatus({ status: "inactive", awayUntil: "2026-10-30", focusAreaIds: [] }),
     ).toEqual({
       text: "Away until Fri, Oct 30",
-      detail: "Keeps sign-in. Not scheduled while away.",
+      detail: "Can sign in but isn't scheduled.",
       tone: "warning",
     });
     expect(
@@ -614,7 +614,7 @@ describe("planned away (51g1)", () => {
   it("says another change today cancels the planned away", () => {
     for (const action of ["markAway", "suspend", "archive"] as const) {
       const copy = describeStatusAction(action, "Ana Diaz", { plannedFrom: "2026-11-10" });
-      expect(copy.points).toContain("The away planned from Nov 10 is cancelled.");
+      expect(copy.points).toContain("The time away planned from Nov 10 is canceled.");
     }
   });
 
@@ -628,7 +628,7 @@ describe("planned away (51g1)", () => {
     const cancel = describeStatusAction("cancelPlannedChange", "Ana Diaz", {
       absenceName: "Vacation",
     });
-    expect(cancel.label).toBe("Cancel planned away");
+    expect(cancel.label).toBe("Cancel planned time away");
     for (const copy of [edit, cancel]) {
       expect(copy.points.length).toBeGreaterThanOrEqual(2);
       for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
@@ -712,21 +712,21 @@ describe("last day (51g2)", () => {
       plannedFrom: "2026-11-02",
       plannedStatus: "away",
     });
-    expect(replacingAway.points).toContain("The away planned from Nov 2 is cancelled.");
+    expect(replacingAway.points).toContain("The time away planned from Nov 2 is canceled.");
     for (const options of [{}, { startDate: "2026-11-02" }]) {
       const copy = describeStatusAction("markAway", "Ana", {
         ...options,
         plannedFrom: "2026-11-09",
         plannedStatus: "removed",
       });
-      expect(copy.points).toContain("The last day planned for Nov 8 is cancelled.");
+      expect(copy.points).toContain("The last day planned for Nov 8 is canceled.");
     }
     expect(
       describeStatusAction("suspend", "Ana", {
         plannedFrom: "2026-11-09",
         plannedStatus: "removed",
       }).points,
-    ).toContain("The last day planned for Nov 8 is cancelled.");
+    ).toContain("The last day planned for Nov 8 is canceled.");
   });
 
   it("changes and cancels a last day", () => {
@@ -748,7 +748,7 @@ describe("last day (51g2)", () => {
       title: "Cancel Ana's last day?",
       message: "They stay Active and can be scheduled after that day again.",
       points: [],
-      done: "Last day cancelled",
+      done: "Last day canceled",
     });
   });
 
@@ -843,7 +843,7 @@ describe("suspended until (51g3)", () => {
       "On Nov 10 they're signed out on every device and can't sign in.",
       "Open requests they're part of are closed then, and pickups they claimed go back up for others.",
       "They get access back on Nov 20.",
-      "The away planned from Nov 2 is cancelled.",
+      "The time away planned from Nov 2 is canceled.",
     ]);
     expect(copy.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
   });
@@ -889,14 +889,14 @@ describe("suspended until (51g3)", () => {
       label: "Cancel planned suspension",
       title: "Cancel Ana's planned suspension?",
       message: "They keep their access.",
-      done: "Planned suspension cancelled",
+      done: "Planned suspension canceled",
     });
     expect(
       describeStatusAction("markAway", "Ana", {
         plannedFrom: "2026-11-10",
         plannedStatus: "suspended",
       }).points,
-    ).toContain("The suspension planned from Nov 10 is cancelled.");
+    ).toContain("The suspension planned from Nov 10 is canceled.");
   });
 
   it("lists Suspended disabled while one is planned, pointing at Edit plan", () => {
@@ -925,7 +925,7 @@ describe("statusMark", () => {
     expect(statusMark({ status: "active" })).toBeNull();
     expect(statusMark({ status: "active", suspendedAt: "2026-10-26T12:00:00Z" })).toEqual({
       kind: "suspended",
-      label: "Suspended: won't see this in the app",
+      label: "Suspended. They can't sign in to see their shifts.",
       tone: "danger",
     });
     expect(statusMark({ status: "inactive", awayUntil: "2027-01-04" })).toEqual({
@@ -985,7 +985,7 @@ describe("describeStatusCard", () => {
     expect(card.current).toMatchObject({
       kind: "away",
       title: "Away until Mon, Jan 4",
-      detail: "Keeps sign-in. Not scheduled while away. Vacation on those days.",
+      detail: "Can sign in but isn't scheduled. Vacation on those days.",
     });
     expect(card.planned).toBeNull();
     expect(
@@ -1036,7 +1036,7 @@ describe("someone with no account", () => {
       "Can be scheduled.",
     );
     expect(describeCurrentStatus({ status: "inactive", ...onSchedule }).detail).toBe(
-      "Not scheduled while away.",
+      "Isn't scheduled.",
     );
     expect(
       statusChoices({ status: "removed", archivedAt: "2026-10-01T00:00:00Z", ...onSchedule })[0]
@@ -1194,10 +1194,10 @@ describe("a planned return (51l)", () => {
     expect(card.current.kind).toBe("archived");
     expect(card.planned).toEqual({
       title: "Returns Tue, Nov 10",
-      detail: "Back to Active then: they can sign in and be scheduled.",
+      detail: "They can sign in and be scheduled from then.",
     });
     expect(describeStatusCard({ ...returning, userId: null }).planned?.detail).toBe(
-      "Back to Active then, and can be scheduled.",
+      "They can be scheduled from then.",
     );
   });
 
@@ -1254,7 +1254,7 @@ describe("a planned return (51l)", () => {
       label: "Cancel planned return",
       title: "Cancel Ana Torres's planned return?",
       message: "They stay Offboarded until someone restores them.",
-      done: "Planned return cancelled",
+      done: "Planned return canceled",
     });
   });
 

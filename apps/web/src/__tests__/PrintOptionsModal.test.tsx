@@ -23,7 +23,7 @@ describe("PrintOptionsModal", () => {
     );
 
     await user.click(screen.getByLabelText(/All Focus Areas/i));
-    await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
+    await user.click(screen.getByRole("button", { name: /Preview/i }));
 
     expect(onPrint).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -50,7 +50,9 @@ describe("PrintOptionsModal", () => {
 
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
-    expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: "Discard your changes?" }),
+    ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Discard" }));
@@ -76,7 +78,7 @@ describe("PrintOptionsModal", () => {
     expect(screen.getByRole("button", { name: "2 Weeks" })).toBeDisabled();
     expect(screen.getByText("Full shift names print one week at a time.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
+    await user.click(screen.getByRole("button", { name: /Preview/i }));
 
     expect(onPrint).toHaveBeenCalledWith(expect.objectContaining({ spanWeeks: 1 }));
   });
@@ -95,7 +97,7 @@ describe("PrintOptionsModal", () => {
 
     expect(screen.queryByRole("button", { name: "Month" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: /Preview & Print/i }));
+    await user.click(screen.getByRole("button", { name: /Preview/i }));
 
     expect(onPrint).toHaveBeenCalledWith(expect.objectContaining({ spanWeeks: 2 }));
   });

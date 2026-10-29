@@ -32,6 +32,7 @@ import {
   sendPendingInvitationEmail,
 } from "@/features/organization/server/invitation-delivery";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +175,7 @@ function isPendingInviteEmailConflict(error: unknown): boolean {
 function buildConflictResponse(latestInvitation: Invitation) {
   return NextResponse.json(
     {
-      error: "Invitation changed elsewhere. Review the latest values before saving again.",
+      error: changedElsewhereMessage("this invitation"),
       code: "ORG_INVITATION_CONFLICT",
       invitation: latestInvitation,
     },
@@ -259,7 +260,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -466,7 +467,7 @@ export async function DELETE(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -563,7 +564,7 @@ export async function POST(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }

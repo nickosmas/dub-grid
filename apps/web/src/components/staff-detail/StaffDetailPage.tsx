@@ -22,6 +22,7 @@ import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
+  changedElsewhereMessage,
   canOffboardAtTier,
   isSelfAction,
   removedFocusAreaIds,
@@ -416,9 +417,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error(
-            "Employee details changed elsewhere. Review the latest values and try again.",
-          );
+          toast.error(changedElsewhereMessage("their details"));
           return;
         }
         setEmployee(previousEmployee);
@@ -472,9 +471,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error(
-            "Employee details changed elsewhere. Review the latest values and try again.",
-          );
+          toast.error(changedElsewhereMessage("their details"));
           return;
         }
         setEmployee(previousEmployee);
@@ -588,7 +585,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         // Revert on failure
@@ -626,9 +623,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         } catch (err) {
           if (err instanceof EmployeeStatusConflictError) {
             syncEmployeeCaches(err.latestEmployee);
-            toast.error(
-              "Employee status changed elsewhere. Review the latest values and try again.",
-            );
+            toast.error(changedElsewhereMessage("their status"));
             return;
           }
           toast.error(
@@ -656,7 +651,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "inactive" } : prev));
@@ -681,7 +676,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         if (getStepUpMethod(err)) throw err;
@@ -704,11 +699,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         if (getStepUpMethod(err)) throw err;
-        toast.error(formatClientErrorMessage(err, "We couldn't save the planned away. Try again."));
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't save their planned time away. Try again."),
+        );
         return false;
       }
     },
@@ -724,7 +721,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't save the end date. Try again."));
@@ -742,7 +739,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't reinstate them. Try again."));
@@ -767,7 +764,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return;
         }
         toast.error(formatClientErrorMessage(err, "We couldn't save the return date. Try again."));
@@ -798,7 +795,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       } catch (err) {
         if (err instanceof EmployeeStatusConflictError) {
           syncEmployeeCaches(err.latestEmployee);
-          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          toast.error(changedElsewhereMessage("their status"));
           return false;
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "active" } : prev));
@@ -1132,11 +1129,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   <div className="dg-card-header">
                     <div>
                       <div className="dg-card-title">Work details</div>
-                      <div className="dg-card-subtitle">
-                        {showScheduleDetails
-                          ? `Employment, ${(org?.focusAreaLabel ?? "focus areas").toLowerCase()}, certification, roles, and notes.`
-                          : "Internal notes."}
-                      </div>
                     </div>
                   </div>
 
@@ -1176,14 +1168,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               employee.focusAreaIds
                                 .map((id) => focusAreas.find((item) => item.id === id)?.name)
                                 .filter(Boolean)
-                                .join(", ") || "—"
+                                .join(", ") || "-"
                             }
                           />
                           <ProfileField
                             label={org?.certificationLabel ?? "Certification"}
                             value={
                               certifications.find((item) => item.id === employee.certificationId)
-                                ?.name ?? "—"
+                                ?.name ?? "-"
                             }
                           />
                           <ProfileField
@@ -1192,7 +1184,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               employee.roleIds
                                 .map((id) => orgRoles.find((item) => item.id === id)?.name)
                                 .filter(Boolean)
-                                .join(", ") || "—"
+                                .join(", ") || "-"
                             }
                           />
                         </>
@@ -1268,7 +1260,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       <div className="dg-card-header">
                         <div>
                           <div className="dg-card-title">Management departments</div>
-                          <div className="dg-card-subtitle">Management department assignment.</div>
                         </div>
                         {canManageManagementAccess && employee.status !== "removed" ? (
                           <Button
@@ -1292,7 +1283,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                                   )
                                   .filter(Boolean)
                                   .join(", ")
-                              : "—"
+                              : "-"
                           }
                         />
                       </div>

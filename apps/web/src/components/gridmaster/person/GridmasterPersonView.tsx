@@ -171,7 +171,7 @@ export default function GridmasterPersonView({
       (userId, accessToken) =>
         updateGridmasterUserActivation({ userId, orgId, deactivate: !deactivated }, accessToken),
       deactivated ? "User reactivated" : "User deactivated",
-      "Action failed",
+      "That didn't work. Try again.",
     );
   }
 

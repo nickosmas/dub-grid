@@ -134,7 +134,7 @@ describe("AddPersonSheet", () => {
     renderWithMutation();
 
     expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
-    expect(screen.getByText("Could not load this form")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load this form")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledTimes(1);
@@ -303,7 +303,7 @@ describe("AddPersonSheet", () => {
 
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalledWith(
-        expect.objectContaining({ tone: "error", title: "Could not add person" }),
+        expect.objectContaining({ tone: "error", title: "Couldn't add person" }),
       );
     });
     expect(onDismiss).not.toHaveBeenCalled();
@@ -346,7 +346,7 @@ describe("AddPersonSheet", () => {
     expect(onDismiss).not.toHaveBeenCalled();
     expect(screen.getByText("Discard this staff profile?")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Keep Editing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(onDismiss).not.toHaveBeenCalled();
     expect(screen.getByLabelText("First name")).toHaveValue("Nia");
   });

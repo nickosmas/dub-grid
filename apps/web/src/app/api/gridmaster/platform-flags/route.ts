@@ -11,6 +11,7 @@ import { invalidatePlatformFlagsCache, PLATFORM_FLAGS_TAG } from "@/lib/feature-
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 /**
  * Drops both caching layers behind isFeatureEnabled: Redis (shared across
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -136,9 +137,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       return NextResponse.json(
         {
-          error: current
-            ? "This flag was changed by someone else. Refresh and try again."
-            : "Unknown feature flag.",
+          error: current ? changedElsewhereMessage("this flag") : "Unknown feature flag.",
           flag: current ? toPlatformFeatureFlag(current as PlatformFlagRow) : null,
         },
         { status: current ? 409 : 404 },
@@ -196,7 +195,7 @@ export async function PUT(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }

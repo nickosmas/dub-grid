@@ -33,7 +33,7 @@ describe("ConfirmationModal", () => {
     render(
       <ConfirmationModal
         body="Send an app invitation to mina@dubgrid.com?"
-        confirmLabel="Send Invitation"
+        confirmLabel="Send invitation"
         onCancel={onCancel}
         onConfirm={onConfirm}
         title="Send invitation?"
@@ -44,7 +44,7 @@ describe("ConfirmationModal", () => {
     expect(onConfirm).not.toHaveBeenCalled();
 
     const dialog = within(screen.getByRole("alert"));
-    fireEvent.click(dialog.getByRole("button", { name: "Send Invitation" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Send invitation" }));
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();

@@ -901,7 +901,7 @@ function ShiftDetailHoverCard({
                           }}
                         >
                           {isNewShiftChange(view)
-                            ? "Not published yet. Staff don't see it until it's published."
+                            ? "Not published yet, so staff can't see it."
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
@@ -2584,7 +2584,7 @@ const SectionBlock = memo(function SectionBlock({
                                 label: restOfDayAbsenceName,
                                 jobName: null,
                                 focusAreaName: null,
-                                timeLabel: absenceLayout?.time ?? "Rest of the day",
+                                timeLabel: absenceLayout?.time ?? "Part of the day",
                                 isCustomTime: false,
                                 isMentored: false,
                               },
@@ -2751,7 +2751,7 @@ const SectionBlock = memo(function SectionBlock({
                               awayRunDay
                                 ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
                                 : shiftLabel && shiftLabel !== "OFF"
-                                  ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
+                                  ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for part of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
                                   : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                             }
                             aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
@@ -3707,7 +3707,8 @@ const SectionBlock = memo(function SectionBlock({
                                                     letterSpacing: "0.02em",
                                                   }}
                                                 >
-                                                  {fmt12hShort(customTimes.start)}–
+                                                  {fmt12hShort(customTimes.start)}
+                                                  {" - "}
                                                   {fmt12hShort(customTimes.end)}
                                                   {isOvernight && (
                                                     <sup
@@ -4370,7 +4371,8 @@ const SectionBlock = memo(function SectionBlock({
                                                           lineHeight: 1,
                                                         }}
                                                       >
-                                                        {fmt12hShort(pillTime!.start)}–
+                                                        {fmt12hShort(pillTime!.start)}
+                                                        {" - "}
                                                         {fmt12hShort(pillTime!.end)}
                                                         {isPillOvernight && (
                                                           <sup
@@ -4606,7 +4608,7 @@ const SectionBlock = memo(function SectionBlock({
                                             publishChangeText ??
                                             (publishDiff.detailsHidden
                                               ? "Removed since the last publish."
-                                              : `Deleted ${deletedLabel}.`),
+                                              : `Removed ${deletedLabel}.`),
                                           timeZone: publicationTimeZone,
                                         })
                                       : undefined;
@@ -4686,7 +4688,7 @@ const SectionBlock = memo(function SectionBlock({
                                         badge={{
                                           source: isDraftDelete ? "draft" : "publish",
                                           kind: "deleted",
-                                          text: "Deleted",
+                                          text: "Removed",
                                           tooltip: deletedTooltip,
                                           topOffset: 0,
                                           leftOffset: 4,
@@ -4769,8 +4771,8 @@ const SectionBlock = memo(function SectionBlock({
                                       entries={deletedHoverEntries}
                                       indicators={hoverIndicatorNames}
                                       requestLabel={null}
-                                      status="Deleted"
-                                      changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                      status="Removed"
+                                      changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
                                       publicationLabel={publicationLabel}
                                     >
@@ -5425,16 +5427,18 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
             allEmployees.length === 0
               ? "No staff added yet"
               : filteredEmployees.length === 0
-                ? "No matching employees"
-                : "No shifts found for this period"
+                ? "No matching staff"
+                : isCellInteractive
+                  ? "Nobody assigned here yet"
+                  : "No shifts found for this period"
           }
           description={
             allEmployees.length === 0
-              ? "Add employees on the Staff page to start building your schedule."
+              ? "Add people on the People page to start building the schedule."
               : filteredEmployees.length === 0
-                ? "Try clearing your search or focus area filter."
+                ? "Clear the search or filters to see everyone."
                 : isCellInteractive
-                  ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                  ? "Assign people here from the People page."
                   : "No shifts have been published for this period yet."
           }
           style={{ marginTop: 34 }}

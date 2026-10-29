@@ -445,24 +445,27 @@ export default function UserDashboard(props: DashboardContentProps) {
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title">
-              {impersonating ? "Viewing with this member's permissions" : "No linked staff profile"}
-            </div>
-            <div className="dg-card-subtitle">
               {impersonating
-                ? "Impersonation applies their access to your own account. Their personal schedule and profile are not shown."
-                : "Your account is not connected to an employee record."}
+                ? "Viewing with this member's permissions"
+                : "Your account isn't linked to a staff profile"}
             </div>
+            {impersonating ? (
+              <div className="dg-card-subtitle">
+                Impersonation applies their access to your own account. Their personal schedule and
+                profile aren&apos;t shown.
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="dg-card-body" style={{ padding: "18px" }}>
           <EmptyState
             size="inline"
             icon={<UserRound size={22} />}
-            title={impersonating ? "No personal schedule in this view" : "Schedule unavailable"}
+            title={impersonating ? "No personal schedule in this view" : "No schedule to show"}
             description={
               impersonating
                 ? "Open the Schedule page to see what this member can see."
-                : "Ask an administrator to link this account to a staff profile."
+                : "Ask an Admin to link your account."
             }
           />
         </div>
@@ -999,7 +1002,7 @@ function getPreviousChangeSummary(input: {
   // A worked cell's absence for the rest of the day (item 45) ends the summary.
   const restOfDay =
     change.fromRestOfDayAbsenceTypeId != null
-      ? `${input.absenceTypeById.get(change.fromRestOfDayAbsenceTypeId)?.name ?? "Absence"} for the rest of the day`
+      ? `${input.absenceTypeById.get(change.fromRestOfDayAbsenceTypeId)?.name ?? "Absence"} for part of the day`
       : null;
   const withRestOfDay = (parts: string[]) =>
     [...parts, ...(restOfDay ? [restOfDay] : [])].join("; ");
@@ -2164,7 +2167,7 @@ function HeroEmptyState({ style }: { style?: CSSProperties }) {
       data-testid="user-dashboard-hero-empty"
       style={{ display: "flex", flexDirection: "column", minWidth: 0, width: "100%", ...style }}
     >
-      <SectionHeader subtitle="Nothing scheduled from today on" title="Up next" />
+      <SectionHeader title="Up next" />
       <div
         className="dg-card-body"
         style={{
@@ -2615,7 +2618,7 @@ function CoverRequestsSection({
         subtitle={
           requests.length > 0
             ? `${requests.length} request${requests.length === 1 ? "" : "s"} needing a response`
-            : "No cover requests right now"
+            : undefined
         }
         title="Cover requests"
       />
@@ -2633,8 +2636,8 @@ function CoverRequestsSection({
           <EmptyState
             size="inline"
             icon={<Check size={20} />}
-            title="All caught up"
-            description="Requests for your shifts will appear here."
+            title="No requests for you"
+            description="When a teammate asks you to swap or cover a shift, it shows here."
           />
         ) : (
           <SummaryMetricPanel
@@ -2677,11 +2680,7 @@ function AvailableShiftsSection({
       }}
     >
       <SectionHeader
-        subtitle={
-          items.length > 0
-            ? `${items.length} available ${periodLabel}`
-            : `Nothing available ${periodLabel}`
-        }
+        subtitle={items.length > 0 ? `${items.length} available ${periodLabel}` : undefined}
         title="Available shifts"
       />
       <div
@@ -2699,12 +2698,12 @@ function AvailableShiftsSection({
             size="inline"
             icon={<CalendarDays size={20} />}
             title="No open shifts"
-            description="Available pickups and coverage gaps will appear here."
+            description="Shifts you can pick up show here."
           />
         ) : (
           <SummaryMetricPanel
             body={summaryParts.length > 0 ? summaryParts.join(" · ") : "Upcoming open shifts"}
-            label="Available upcoming"
+            label="Open to you"
             value={items.length}
           />
         )}
@@ -2758,18 +2757,18 @@ function ActionRailSection({
         }}
       >
         <div className="dg-card-title">Open shifts &amp; requests</div>
-        <div className="dg-card-subtitle">
-          {items.length > 0
-            ? `${items.length} upcoming item${items.length === 1 ? "" : "s"}`
-            : "No upcoming open shifts or requests"}
-        </div>
+        {items.length > 0 ? (
+          <div className="dg-card-subtitle">
+            {`${items.length} upcoming item${items.length === 1 ? "" : "s"}`}
+          </div>
+        ) : null}
       </div>
       {items.length === 0 ? (
         <EmptyState
           size="inline"
           icon={<Check size={20} />}
-          title="All caught up"
-          description="Open shifts and cover requests will appear here."
+          title="Nothing to pick up"
+          description="Open shifts and requests for you show here."
         />
       ) : (
         <div
@@ -2943,12 +2942,12 @@ function MyWeekSection({
   );
 }
 
-function SectionHeader({ subtitle, title }: { subtitle: string; title: string }) {
+function SectionHeader({ subtitle, title }: { subtitle?: string; title: string }) {
   return (
     <div className="dg-card-header">
       <div>
         <div className="dg-card-title">{title}</div>
-        <div className="dg-card-subtitle">{subtitle}</div>
+        {subtitle ? <div className="dg-card-subtitle">{subtitle}</div> : null}
       </div>
     </div>
   );
@@ -3720,7 +3719,7 @@ function getDateParts(date: Date): {
 }
 
 function getHeroStatusLabel(status: HeroStatus): string {
-  if (status === "active") return "On Duty";
+  if (status === "active") return "On duty";
   if (status === "away") return "Away";
   if (status === "upcoming") return "Upcoming";
   if (status === "scheduled") return "Scheduled";

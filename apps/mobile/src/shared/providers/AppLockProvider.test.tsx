@@ -158,7 +158,7 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    expect(screen.getByText("The app is locked")).toBeInTheDocument();
   });
 
   it("tells the app's sheets the lock is up, and when it lifts", async () => {
@@ -210,8 +210,8 @@ describe("AppLockProvider", () => {
 
     await waitFor(() => expect(authenticateAsync).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId("app-lock")).toBeInTheDocument();
-    expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByText("The app is locked")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unlock" })).not.toBeInTheDocument();
   });
 
   it("unlocks when Try again passes after a failed check", async () => {
@@ -224,7 +224,7 @@ describe("AppLockProvider", () => {
       </AppLockProvider>,
     );
 
-    const retry = await screen.findByRole("button", { name: "Try again" });
+    const retry = await screen.findByRole("button", { name: "Unlock" });
     await act(async () => {
       fireEvent.click(retry);
     });
@@ -272,7 +272,7 @@ describe("AppLockProvider", () => {
     });
 
     expect(authenticateAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    expect(screen.getByText("The app is locked")).toBeInTheDocument();
   });
 
   it("stays unlocked through the inactive state the system prompt causes", async () => {

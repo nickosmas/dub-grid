@@ -521,9 +521,7 @@ async function applyProfileUpdateRequest(input: {
     request.requesterEmployeeVersion != null &&
     currentEmployee.version !== request.requesterEmployeeVersion
   ) {
-    throw new Error(
-      "The staff profile changed after this request was submitted. Review the latest values before approving.",
-    );
+    throw new Error("Their profile changed after they asked. Check it again before approving.");
   }
 
   const changes = request.requestedChanges;

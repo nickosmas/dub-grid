@@ -41,10 +41,10 @@ export function describeSignInFailure(error: SignInFailure, registerStatus: stri
   // A 5xx from GoTrue (the custom_access_token_hook or its DB connection
   // blipping) is an infra failure, not a rejected password.
   if (httpStatus !== null && httpStatus >= 500) {
-    return "We could not sign you in just now. Please try again in a moment.";
+    return "We couldn't sign you in just now. Try again in a moment.";
   }
 
   return registerStatus === "existing"
     ? EXISTING_ACCOUNT_MESSAGE
-    : "Unable to sign in. Please try again or contact support.";
+    : "We couldn't sign you in. Try again, or contact support.";
 }
