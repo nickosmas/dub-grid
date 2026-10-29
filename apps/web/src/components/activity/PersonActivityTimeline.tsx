@@ -40,6 +40,11 @@ interface PersonActivityTimelineProps {
   emptyDescription: string;
   /** Adds an organization filter and column, for a history spanning organizations. */
   organizations?: ActivityFilterOption[];
+  /**
+   * A period the host page owns (the staff page's). Given one, the timeline
+   * shows that period and leaves out its own period navigation.
+   */
+  range?: { startDate: string; endDate: string; phrase: string };
 }
 
 /** One person's activity: period navigation, search, filters and the day-grouped table. */
@@ -51,6 +56,7 @@ export function PersonActivityTimeline({
   categories: categoryChoices,
   emptyDescription,
   organizations,
+  range,
 }: PersonActivityTimelineProps) {
   const [selectedEntry, setSelectedEntry] = useState<EmployeeActivityEntry | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -85,9 +91,11 @@ export function PersonActivityTimeline({
     initialAnchorDate: latestDateKey,
   });
 
+  const shownPeriod = range ?? period.period;
+  const periodPhrase = range ? range.phrase : period.phrase;
   const inPeriod = useMemo(
-    () => dated.filter((item) => isDateInPeriod(period.period, item.dateKey)).map((i) => i.entry),
-    [dated, period.period],
+    () => dated.filter((item) => isDateInPeriod(shownPeriod, item.dateKey)).map((i) => i.entry),
+    [dated, shownPeriod],
   );
 
   const hasFilters =
@@ -113,7 +121,7 @@ export function PersonActivityTimeline({
   // Stepping back before someone's first event is as easy to do as stepping
   // into a quiet month, and both need a way out.
   const nearestActivity = useMemo(() => {
-    if (dated.length === 0) return null;
+    if (range || dated.length === 0) return null;
     const earlier = dated.find((item) => item.dateKey < period.period.startDate);
     const target = earlier ?? dated[dated.length - 1];
     const isEarlier = Boolean(earlier);
@@ -121,7 +129,7 @@ export function PersonActivityTimeline({
       label: `the ${isEarlier ? "previous" : "earliest"} activity, ${formatActivityDayDate(target.dateKey)}`,
       onJump: () => period.jumpTo(target.dateKey),
     };
-  }, [dated, period.period.startDate]);
+  }, [dated, period.period.startDate, range]);
 
   if (loading) {
     return <ActivitySkeleton rows={5} />;
@@ -141,18 +149,20 @@ export function PersonActivityTimeline({
   return (
     <div>
       <div className="dg-activity-toolbar dg-field-raised">
-        <PeriodNavigator
-          unit={period.unit}
-          label={period.label}
-          anchorDate={period.anchorDate}
-          isCurrent={period.isCurrent}
-          nextDisabled={period.nextDisabled}
-          onUnitChange={period.setUnit}
-          onPrev={period.goPrev}
-          onNext={period.goNext}
-          onToday={period.goToday}
-          onJumpToDate={period.jumpTo}
-        />
+        {range ? null : (
+          <PeriodNavigator
+            unit={period.unit}
+            label={period.label}
+            anchorDate={period.anchorDate}
+            isCurrent={period.isCurrent}
+            nextDisabled={period.nextDisabled}
+            onUnitChange={period.setUnit}
+            onPrev={period.goPrev}
+            onNext={period.goNext}
+            onToday={period.goToday}
+            onJumpToDate={period.jumpTo}
+          />
+        )}
 
         <div className="dg-activity-toolbar-filters">
           <div className="dg-activity-search">
@@ -199,7 +209,7 @@ export function PersonActivityTimeline({
 
       {visible.length === 0 ? (
         <ActivityEmptyPeriod
-          periodPhrase={period.phrase}
+          periodPhrase={periodPhrase}
           hasFilters={hasFilters}
           onClearFilters={() => {
             setSearchQuery("");
@@ -216,7 +226,7 @@ export function PersonActivityTimeline({
             dayCount={groups.length}
             actorCount={countActors(visible)}
             categories={categories}
-            periodPhrase={period.phrase}
+            periodPhrase={periodPhrase}
           />
 
           <ActivityTable

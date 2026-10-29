@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -85,37 +84,42 @@ import {
   updateOrganizationMembershipGuarded,
 } from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { StaffDetailHeader } from "./StaffDetailHeader";
-import EditEmployeePanel from "@/components/EditEmployeePanel";
+import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { SpanTabs } from "@/components/ui/span-tabs";
+import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
+import { usePersonPeriod } from "@/hooks/usePersonPeriod";
+import { formatPersonPeriodPhrase } from "@/lib/person-period";
+import { PersonPeriodControl } from "./PersonPeriodControl";
+import { StaffPageHeader } from "./StaffPageHeader";
+import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { ActivityTab } from "./tabs/ActivityTab";
-import { RecurringScheduleCard } from "./RecurringScheduleCard";
+import { AccessTab } from "./tabs/AccessTab";
+import { RecurringTab } from "./tabs/RecurringTab";
 import { PersonRecordCard } from "./PersonRecordCard";
 import { getPersonAccountState } from "@/lib/person-account-state";
-import { SettingsShell, type ShellNavGroup } from "@/components/settings/SettingsShell";
-import { ActivityIcon, DashboardIcon, ProfileIcon } from "@/components/icons/NavIcons";
 
 interface StaffDetailPageProps {
   employeeId: string;
 }
 
-type StaffProfileSection = "profile" | "overview" | "activity";
+export type StaffPageTab = "overview" | "recurring" | "access" | "activity";
 
-const HISTORY_NAV_GROUP: ShellNavGroup<StaffProfileSection> = {
-  id: "history",
-  label: "History",
-  items: [
-    {
-      id: "activity",
-      label: "Activity",
-      Icon: ActivityIcon,
-      description:
-        "Profile edits, status changes, access changes, and invitations for this person.",
-    },
-  ],
+const TAB_LABELS: Record<StaffPageTab, string> = {
+  overview: "Overview",
+  recurring: "Recurring",
+  access: "Access",
+  activity: "Activity",
 };
+
+/** The tab an old `?section=` link meant, from before the page had tabs. */
+function tabForLegacySection(section: string): StaffPageTab {
+  return section === "activity" ? "activity" : "overview";
+}
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
@@ -146,6 +150,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [managementAccessDirty, setManagementAccessDirty] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [detailsDirty, setDetailsDirty] = useState(false);
+  const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
+  const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
+  const contentScrollerRef = useClipTrailingWhitespace();
+  const {
+    period,
+    setPreset: setPeriodPreset,
+    setCustomRange: setPeriodRange,
+  } = usePersonPeriod(org?.payPeriodStartDate);
+  const periodRange = useMemo(
+    () => ({ ...period.range, phrase: formatPersonPeriodPhrase(period) }),
+    [period],
+  );
 
   const orgId = perms.orgId ?? org?.id ?? null;
   const overviewRange = useMemo(
@@ -318,6 +336,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     setIsEditingManagementAccess(false);
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
+    setIsEditingDetails(false);
   }, [employeeId]);
 
   const refreshInvitations = useCallback(async () => {
@@ -842,36 +861,35 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const showScheduleDetails = !directoryPerson?.isManagementUser || isOnSchedule;
-  const profileSection = searchParams.get("section");
-  const activeSection: StaffProfileSection =
-    profileSection === "activity" && canViewActivity
-      ? "activity"
-      : profileSection === "overview" || (profileSection === "schedule" && isOnSchedule)
-        ? "overview"
-        : "profile";
-  const profileNavGroups = useMemo<ShellNavGroup<StaffProfileSection>[]>(
+  const availableTabs = useMemo<StaffPageTab[]>(
     () => [
-      {
-        id: "primary",
-        label: "Profile",
-        items: [
-          {
-            id: "profile",
-            label: "Profile",
-            Icon: ProfileIcon,
-          },
-          {
-            id: "overview",
-            label: "Overview",
-            Icon: DashboardIcon,
-            description: "Current work details, assignments, weekly hours, and recurring schedule.",
-          },
-        ],
-      },
-      ...(canViewActivity ? [HISTORY_NAV_GROUP] : []),
+      "overview",
+      ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
+      "access",
+      ...(canViewActivity ? (["activity"] as const) : []),
     ],
-    [canViewActivity],
+    [canViewActivity, perms.canViewRecurringShifts],
   );
+  const legacySection = searchParams.get("section");
+  const requestedTab = searchParams.get("tab");
+  const activeTab: StaffPageTab = availableTabs.includes(requestedTab as StaffPageTab)
+    ? (requestedTab as StaffPageTab)
+    : "overview";
+  const hrefForTab = useCallback(
+    (tab: StaffPageTab) =>
+      tab === "overview" ? `/people/${employeeId}` : `/people/${employeeId}?tab=${tab}`,
+    [employeeId],
+  );
+  useEffect(() => {
+    if (legacySection) router.replace(hrefForTab(tabForLegacySection(legacySection)));
+  }, [hrefForTab, legacySection, router]);
+
+  const closeDetailsEditor = useCallback(() => {
+    setDetailsDirty(false);
+    setIsEditingDetails(false);
+  }, []);
+  const { requestClose: requestDetailsClose, unsavedChangesDialog: detailsUnsavedChangesDialog } =
+    useUnsavedChangesPrompt({ hasUnsavedChanges: detailsDirty, onDiscard: closeDetailsEditor });
   // Matches the directory table's Access column: the membership's role, or the
   // role a pending invitation will grant once it is accepted.
   const effectiveOrgRole = directoryPerson?.orgRole ?? pendingInvite?.roleToAssign ?? null;
@@ -1050,6 +1068,61 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       />
     );
 
+  const canSendInvitation = Boolean(
+    employee &&
+    perms.canManageEmployees &&
+    !pendingInvite &&
+    !expiredInvite &&
+    !employee.userId &&
+    employee.email,
+  );
+  const canAddToManagement = Boolean(
+    employee &&
+    canManageManagementAccess &&
+    !directoryPerson?.isManagementUser &&
+    !hasPendingManagementInvite &&
+    employee.status !== "removed",
+  );
+  const canAddToSchedule = Boolean(
+    employee &&
+    perms.canManageEmployees &&
+    !isOnSchedule &&
+    directoryPerson?.isManagementUser &&
+    employee.userId,
+  );
+  const headerActions =
+    canSendInvitation || canAddToManagement || canAddToSchedule ? (
+      <>
+        {canSendInvitation && (
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={() => setShowInviteModal(true)}
+          >
+            Send invitation
+          </Button>
+        )}
+        {canAddToManagement && (
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={() => setIsEditingManagementAccess(true)}
+          >
+            Add to management
+          </Button>
+        )}
+        {canAddToSchedule && (
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={() => setShowAddToScheduleModal(true)}
+          >
+            Add to schedule
+          </Button>
+        )}
+      </>
+    ) : null;
+
   const isLoading = loading || orgLoading || perms.isLoading;
 
   if (!perms.isLoading && !perms.canViewEmployeeDetails) {
@@ -1081,309 +1154,230 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
           the rendered profile in place; only a first load shows nothing. */}
       {employee && org && (
-        <SettingsShell<StaffProfileSection>
-          basePath={`/people/${employeeId}`}
-          navGroups={profileNavGroups}
-          defaultSection="profile"
-          activeSection={activeSection}
-          footerGroupIds={["history"]}
-          hideContentGroupLabels
-          leadingNavigation={{ href: "/people", label: "Back to People", Icon: ChevronLeft }}
+        <div
+          ref={contentScrollerRef}
+          className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"
         >
-          {activeSection === "profile" && (
-            <div className="space-y-6">
-              <StaffDetailHeader employee={employee} orgRole={effectiveOrgRole} />
-              <EmployeeStatusCard
-                employee={employee}
-                absenceTypes={absenceTypes}
-                action={
-                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
-                    ? statusActions(employee)
-                    : undefined
-                }
-                planAction={
-                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
-                    ? statusActions(employee, "Edit plan")
-                    : undefined
-                }
-              />
+          <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
+            <StaffPageHeader
+              employee={employee}
+              orgRole={effectiveOrgRole}
+              actions={headerActions}
+            />
 
-              {perms.canManageEmployees && pendingInvite && (
-                <PendingInvitationBanner
-                  pendingInvitation={pendingInvite}
-                  onReinvite={() => handleResendInvitation(pendingInvite.id)}
-                  onRevoke={handleRevokeInvitation}
+            {/* Phones read the status first, then who they are, then the tabs; from
+                1024px the cards sit in a column beside both. */}
+            <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[auto_1fr]">
+              <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-1">
+                <EmployeeStatusCard
+                  employee={employee}
+                  absenceTypes={absenceTypes}
+                  action={
+                    perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                      ? statusActions(employee)
+                      : undefined
+                  }
+                  planAction={
+                    perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                      ? statusActions(employee, "Edit plan")
+                      : undefined
+                  }
                 />
-              )}
-              {perms.canManageEmployees && !pendingInvite && expiredInvite && (
-                <PendingInvitationBanner
-                  pendingInvitation={expiredInvite}
-                  onReinvite={() => handleResendInvitation(expiredInvite.id)}
-                  onRevoke={handleRevokeInvitation}
-                  expired
+
+                {perms.canManageEmployees && pendingInvite && (
+                  <PendingInvitationBanner
+                    pendingInvitation={pendingInvite}
+                    onReinvite={() => handleResendInvitation(pendingInvite.id)}
+                    onRevoke={handleRevokeInvitation}
+                  />
+                )}
+                {perms.canManageEmployees && !pendingInvite && expiredInvite && (
+                  <PendingInvitationBanner
+                    pendingInvitation={expiredInvite}
+                    onReinvite={() => handleResendInvitation(expiredInvite.id)}
+                    onRevoke={handleRevokeInvitation}
+                    expired
+                  />
+                )}
+              </div>
+
+              <aside
+                className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1"
+                aria-label="About them"
+              >
+                <ContactCard
+                  employee={employee}
+                  onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
                 />
-              )}
-
-              <section>
-                <div className="dg-card">
-                  <div className="dg-card-header">
-                    <div>
-                      <div className="dg-card-title">Work details</div>
-                    </div>
-                  </div>
-
-                  {canEditDetails ? (
-                    <div className="dg-card-body-sides">
-                      <EditEmployeePanel
-                        flushHorizontal
-                        employee={employee}
-                        orgId={orgId ?? undefined}
-                        focusAreas={focusAreas}
-                        certifications={certifications}
-                        roles={orgRoles}
-                        focusAreaLabel={org?.focusAreaLabel}
-                        certificationLabel={org?.certificationLabel}
-                        roleLabel={org?.roleLabel}
-                        isManagementUser={directoryPerson?.isManagementUser}
-                        persistent
-                        onSave={handleSaveEmployee}
-                        onCancel={() => {}}
-                        pendingInvitation={pendingInvite ?? undefined}
-                        onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-                      />
-                    </div>
-                  ) : (
-                    <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                      {showScheduleDetails && (
-                        <>
-                          <ProfileField
-                            label="Employment"
-                            value={
-                              employee.employmentType === "part_time" ? "Part-time" : "Full-time"
-                            }
-                          />
-                          <ProfileField
-                            label={org?.focusAreaLabel ?? "Focus areas"}
-                            value={
-                              employee.focusAreaIds
-                                .map((id) => focusAreas.find((item) => item.id === id)?.name)
-                                .filter(Boolean)
-                                .join(", ") || "-"
-                            }
-                          />
-                          <ProfileField
-                            label={org?.certificationLabel ?? "Certification"}
-                            value={
-                              certifications.find((item) => item.id === employee.certificationId)
-                                ?.name ?? "-"
-                            }
-                          />
-                          <ProfileField
-                            label={org?.roleLabel ?? "Roles"}
-                            value={
-                              employee.roleIds
-                                .map((id) => orgRoles.find((item) => item.id === id)?.name)
-                                .filter(Boolean)
-                                .join(", ") || "-"
-                            }
-                          />
-                        </>
-                      )}
-                      {employee.contactNotes ? (
-                        <ProfileField label="Internal notes" value={employee.contactNotes} />
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {accountState && (
-                <section>
+                <WorkDetailsCard
+                  employee={employee}
+                  focusAreas={focusAreas}
+                  certifications={certifications}
+                  roles={orgRoles}
+                  focusAreaLabel={org?.focusAreaLabel}
+                  certificationLabel={org?.certificationLabel}
+                  roleLabel={org?.roleLabel}
+                  showScheduleDetails={showScheduleDetails}
+                  onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+                />
+                {accountState && (
                   <PersonRecordCard
                     employee={employee}
                     accountState={accountState}
                     lastSignInAt={directoryPerson?.lastSignInAt}
                   />
-                </section>
-              )}
-
-              {(effectiveOrgRole || employee.userId || pendingInvite) && (
-                <section>
-                  <div className="dg-card">
-                    <div className="dg-card-header">
-                      <div>
-                        <div className="dg-card-title">Access</div>
-                        <div className="dg-card-subtitle">
-                          Organization role and the permissions it carries.
-                        </div>
-                      </div>
-                    </div>
-                    {canManageManagementAccess && effectiveOrgRole ? (
-                      <div className="dg-card-body flex flex-col gap-6">
-                        <MemberAccessControls
-                          orgRole={effectiveOrgRole}
-                          adminPermissions={directoryPerson?.adminPermissions}
-                          onRoleChange={handleRoleChange}
-                          onPermissionsChange={
-                            directoryPerson?.userId ? handlePermissionsChange : undefined
-                          }
-                          isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                          labels={{
-                            focusAreaLabel: org?.focusAreaLabel,
-                            certificationLabel: org?.certificationLabel,
-                            roleLabel: org?.roleLabel,
-                          }}
-                          pendingInvitationEmail={pendingInvite?.email}
-                        />
-                      </div>
-                    ) : (
-                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                        <ProfileField
-                          label="Role"
-                          value={
-                            effectiveOrgRole
-                              ? formatOrganizationRole(effectiveOrgRole)
-                              : "No app access"
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {(canManageManagementAccess || perms.canManageEmployees) &&
-                orgId &&
-                (directoryPerson?.isManagementUser || hasPendingManagementInvite) && (
-                  <section>
-                    <div className="dg-card">
-                      <div className="dg-card-header">
-                        <div>
-                          <div className="dg-card-title">Management departments</div>
-                        </div>
-                        {canManageManagementAccess && employee.status !== "removed" ? (
-                          <Button
-                            type="button"
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                            onClick={() => setIsEditingManagementAccess(true)}
-                          >
-                            Edit access
-                          </Button>
-                        ) : null}
-                      </div>
-                      <div className="dg-card-body grid gap-4 sm:grid-cols-2">
-                        <ProfileField
-                          label="Departments"
-                          value={
-                            directoryPerson?.managementDepartmentIds.length
-                              ? directoryPerson.managementDepartmentIds
-                                  .map(
-                                    (id) =>
-                                      departments.find((department) => department.id === id)?.name,
-                                  )
-                                  .filter(Boolean)
-                                  .join(", ")
-                              : "-"
-                          }
-                        />
-                      </div>
-                    </div>
-                  </section>
                 )}
+              </aside>
 
-              {(perms.canManageEmployees ||
-                (canManageManagementAccess &&
-                  !directoryPerson?.isManagementUser &&
-                  !hasPendingManagementInvite)) && (
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {perms.canManageEmployees &&
-                  !pendingInvite &&
-                  !expiredInvite &&
-                  !employee.userId &&
-                  employee.email ? (
-                    <Button
-                      type="button"
-                      className="dg-btn dg-btn-secondary"
-                      onClick={() => setShowInviteModal(true)}
-                    >
-                      Send invitation
-                    </Button>
-                  ) : null}
-                  {canManageManagementAccess &&
-                  !directoryPerson?.isManagementUser &&
-                  !hasPendingManagementInvite &&
-                  employee.status !== "removed" ? (
-                    <Button
-                      type="button"
-                      className="dg-btn dg-btn-secondary"
-                      onClick={() => setIsEditingManagementAccess(true)}
-                    >
-                      Add to management
-                    </Button>
-                  ) : null}
-                  {perms.canManageEmployees &&
-                  !isOnSchedule &&
-                  directoryPerson?.isManagementUser &&
-                  employee.userId ? (
-                    <Button
-                      type="button"
-                      className="dg-btn dg-btn-secondary"
-                      onClick={() => setShowAddToScheduleModal(true)}
-                    >
-                      Add to schedule
-                    </Button>
-                  ) : null}
+              <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="max-w-full overflow-x-auto">
+                    <SpanTabs<StaffPageTab>
+                      aria-label="Person sections"
+                      className="w-max"
+                      items={availableTabs.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
+                      value={activeTab}
+                      onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
+                    />
+                  </div>
+                  {activeTab === "activity" && (
+                    <PersonPeriodControl
+                      period={period}
+                      payPeriodStartDate={org?.payPeriodStartDate}
+                      onPresetChange={setPeriodPreset}
+                      onCustomRangeChange={setPeriodRange}
+                    />
+                  )}
                 </div>
-              )}
+
+                <section aria-label={TAB_LABELS[activeTab]}>
+                  {activeTab === "overview" && (
+                    <OverviewTab
+                      employee={employee}
+                      shifts={shifts}
+                      assignmentById={assignmentById}
+                      categoryById={categoryById}
+                      focusAreas={focusAreas}
+                      certifications={certifications}
+                      orgRoles={orgRoles}
+                      thisWeekHours={thisWeekHours}
+                      timeZone={org?.timezone}
+                      showDetails={false}
+                    />
+                  )}
+                  {activeTab === "recurring" && orgId && (
+                    <RecurringTab
+                      orgId={orgId}
+                      employeeId={employee.id}
+                      focusAreas={focusAreas}
+                      recurringShifts={recurringShifts}
+                      assignments={assignments}
+                      absenceTypes={absenceTypes}
+                      shiftCategories={shiftCategories}
+                      jobs={jobs}
+                    />
+                  )}
+                  {activeTab === "access" && (
+                    <AccessTab
+                      employee={employee}
+                      orgRole={effectiveOrgRole}
+                      directoryPerson={directoryPerson}
+                      pendingInvitation={pendingInvite}
+                      hasPendingManagementInvite={hasPendingManagementInvite}
+                      departments={departments ?? []}
+                      canManageManagementAccess={canManageManagementAccess}
+                      canManageEmployees={perms.canManageEmployees}
+                      isSelf={isSelfAction(currentUser?.id, employee.userId)}
+                      labels={{
+                        focusAreaLabel: org?.focusAreaLabel,
+                        certificationLabel: org?.certificationLabel,
+                        roleLabel: org?.roleLabel,
+                      }}
+                      onRoleChange={handleRoleChange}
+                      onPermissionsChange={handlePermissionsChange}
+                      onEditManagementAccess={() => setIsEditingManagementAccess(true)}
+                      onInvite={canSendInvitation ? () => setShowInviteModal(true) : undefined}
+                    />
+                  )}
+                  {activeTab === "activity" && (
+                    <ActivityTab
+                      employee={employee}
+                      entries={activityQuery.data ?? []}
+                      timeZone={org?.timezone ?? null}
+                      range={periodRange}
+                      loading={activityQuery.isPending}
+                      error={
+                        activityQuery.error
+                          ? formatClientErrorMessage(
+                              activityQuery.error,
+                              "We couldn't load activity right now.",
+                            )
+                          : null
+                      }
+                    />
+                  )}
+                </section>
+              </div>
             </div>
-          )}
-          {activeSection !== "profile" && (
-            <section>
-              {activeSection === "overview" ? (
-                <OverviewTab
-                  employee={employee}
-                  shifts={shifts}
-                  assignmentById={assignmentById}
-                  categoryById={categoryById}
-                  focusAreas={focusAreas}
-                  focusAreaLabel={org?.focusAreaLabel}
-                  certifications={certifications}
-                  orgRoles={orgRoles}
-                  thisWeekHours={thisWeekHours}
-                  timeZone={org?.timezone}
-                  scheduleOverview={
-                    perms.canViewRecurringShifts ? (
-                      <RecurringScheduleCard
-                        recurringShifts={recurringShifts}
-                        assignments={assignments}
-                        absenceTypes={absenceTypes}
-                        shiftCategories={shiftCategories}
-                        jobs={jobs}
-                      />
-                    ) : undefined
-                  }
-                />
-              ) : null}
-              {activeSection === "activity" ? (
-                <ActivityTab
-                  employee={employee}
-                  entries={activityQuery.data ?? []}
-                  timeZone={org?.timezone ?? null}
-                  loading={activityQuery.isPending}
-                  error={
-                    activityQuery.error
-                      ? formatClientErrorMessage(
-                          activityQuery.error,
-                          "We couldn't load activity right now.",
-                        )
-                      : null
-                  }
-                />
-              ) : null}
-            </section>
-          )}
-        </SettingsShell>
+          </div>
+        </div>
       )}
+
+      {isEditingDetails && employee && (
+        <Modal
+          title="Edit details"
+          onClose={closeDetailsEditor}
+          onRequestClose={requestDetailsClose}
+          className="dg-modal--tight-header"
+          style={{ maxWidth: 640, width: "100%" }}
+          footer={
+            <EditorActionRow
+              secondaryAction={
+                <Button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => detailsEditorRef.current?.requestDismiss()}
+                >
+                  {getEditorDismissLabel({ hasUnsavedChanges: detailsDirty })}
+                </Button>
+              }
+              primaryAction={
+                <Button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  disabled={!detailsDirty || detailsSaveBlocked}
+                  onClick={() => void detailsEditorRef.current?.save()}
+                >
+                  {EDITOR_ACTION_LABELS.save}
+                </Button>
+              }
+            />
+          }
+        >
+          <EditEmployeePanel
+            ref={detailsEditorRef}
+            hideActions
+            flushHorizontal
+            employee={employee}
+            orgId={orgId ?? undefined}
+            focusAreas={focusAreas}
+            certifications={certifications}
+            roles={orgRoles}
+            focusAreaLabel={org?.focusAreaLabel}
+            certificationLabel={org?.certificationLabel}
+            roleLabel={org?.roleLabel}
+            isManagementUser={directoryPerson?.isManagementUser}
+            onSave={handleSaveEmployee}
+            onSaveCompleted={closeDetailsEditor}
+            onCancel={closeDetailsEditor}
+            onDirtyChange={setDetailsDirty}
+            onSaveBlockedChange={setDetailsSaveBlocked}
+            pendingInvitation={pendingInvite ?? undefined}
+            onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+          />
+        </Modal>
+      )}
+      {detailsUnsavedChangesDialog}
 
       {isEditingManagementAccess && orgId && org && employee && (
         <EmployeeManagementAccessEditor
@@ -1461,24 +1455,4 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       )}
     </>
   );
-}
-
-function ProfileField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="dg-type-field-title">{label}</div>
-      <div className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--dg-color-text-primary)]">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function formatOrganizationRole(role: OrganizationRole): string {
-  return {
-    user: "User",
-    admin: "Admin",
-    super_admin: "Super Admin",
-    gridmaster: "Gridmaster",
-  }[role];
 }

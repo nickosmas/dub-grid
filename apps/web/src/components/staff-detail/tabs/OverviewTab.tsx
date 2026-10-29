@@ -40,6 +40,8 @@ interface OverviewTabProps {
   thisWeekHours: EmployeeHours | null;
   scheduleOverview?: ReactNode;
   timeZone?: string | null;
+  /** The staff page shows these fields in its own Work details card. */
+  showDetails?: boolean;
 }
 
 export function OverviewTab({
@@ -54,6 +56,7 @@ export function OverviewTab({
   thisWeekHours,
   scheduleOverview,
   timeZone,
+  showDetails = true,
 }: OverviewTabProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -121,11 +124,12 @@ export function OverviewTab({
     .map((id) => orgRoles.find((role) => role.id === id)?.name)
     .filter(Boolean) as string[];
   const hasDetails =
-    !!employmentLabel ||
-    assignedFocusAreaNames.length > 0 ||
-    !!certificationName ||
-    roleNames.length > 0 ||
-    !!employee.contactNotes;
+    showDetails &&
+    (!!employmentLabel ||
+      assignedFocusAreaNames.length > 0 ||
+      !!certificationName ||
+      roleNames.length > 0 ||
+      !!employee.contactNotes);
 
   return (
     <div className="flex flex-col gap-4">

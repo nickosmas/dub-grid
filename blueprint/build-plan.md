@@ -1208,3 +1208,35 @@
       starts open, and each viewer's browser remembers folding it. Owner
       decisions, 2026-10-28; design reference: the inline prototype approved
       that day.
+- [ ] 55. **One staff page** - the People detail page becomes one page
+      holding everything stored about a person, replacing the separate
+      Profile, Overview and Activity sections. A header (back link, avatar,
+      name with the access star, employee ID, No app access and Send invite
+      when they have no access, previous and next person), a left column of
+      Contact, Work details and Record cards, the status card unchanged,
+      tabs for Overview, Shifts, Time off, Requests, Recurring, Access and
+      Activity, and one period (Current week, Pay period, This month, Last
+      12 weeks or Custom) that every tab covering time follows. Shifts and
+      jobs are spelled out. Web only; the app is unchanged. Owner decisions,
+      2026-10-29; design reference: the inline prototypes approved that day.
+  - [x] 55a. **The page, its tabs and the period** - the header, the left
+        column (Edit opens the existing editor), the status card, tabs for
+        Overview, Recurring, Access and Activity with today's content moved
+        in, and the period control beside the tabs (Custom opens the app's
+        date range picker, Reports and this page share one range helper,
+        and each viewer's browser remembers the choice). Old `?section=` links open the matching tab.
+  - [ ] 55b. **Previous and next person** - arrows and "7 of 37" follow the
+        People list's last filter and sort, name who's next on hover, and
+        hide when the page was opened without a list.
+  - [ ] 55c. **Overview** - stats for the period, This week, Waiting on
+        you, Next time off, and a What they work donut by shift and job
+        (with times, counts and share, a hover and a table view) in place of
+        the Assignments bar.
+  - [ ] 55d. **Shifts** - every shift record in the period: shift and job,
+        times, focus area, hours, Draft, Published or Corrected, what it
+        was, and schedule notes, with a total and CSV export.
+  - [ ] 55e. **Time off** - absences and time away in the period, planned,
+        now or taken, with dates and days; part-day absences name their
+        times; day off absences are hidden unless shown.
+  - [ ] 55f. **Requests** - pickups, swaps, call-offs and profile change
+        requests involving them in the period, with state and who decided.

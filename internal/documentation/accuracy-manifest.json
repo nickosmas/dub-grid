@@ -783,20 +783,25 @@
         {
           "id": "person",
           "claims": [
-            "person page needs view-details permission; Profile, Overview, Activity sections; Back to People",
-            "header contents",
-            "Work details, Record account states, Access, Management departments",
+            "person page needs view-details permission; one page with Back to People",
+            "header contents: name, status icon, access star, employee number, No app access, Send invitation, Add to schedule or management",
+            "Contact, Work details and Record cards beside the tabs; Edit opens the details; Record account states",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview metrics and cards; Activity scope and who sees it",
+            "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Activity period choices and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
             "apps/web/src/components/staff-detail/StaffDetailPage.tsx",
-            "apps/web/src/components/staff-detail/StaffDetailHeader.tsx",
+            "apps/web/src/components/staff-detail/StaffPageHeader.tsx",
+            "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
+            "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/components/staff-detail/tabs/RecurringTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/AccessTab.tsx",
+            "apps/web/src/lib/period-presets.ts",
             "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
@@ -819,7 +824,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e1d5ac273240be82137c537c89b8756776b3c697b8903413d5e76e2ed5a3467e"
+      "evidenceFingerprint": "sha256:091f1de822e8d4188e425671caf7ee850e24381fc0b7e678bbcf5f4760300dab"
     },
     {
       "id": "invitations",
@@ -1405,7 +1410,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:81f71e2cba5ccf0783917305b9c467542387e598d41cd48fa6b9a0cd3a7f0448"
+      "evidenceFingerprint": "sha256:5eca413756d2ed752fa576f674be4211e35e274bcd8a264e9d931ca6c9fae720"
     },
     {
       "id": "profile",
@@ -1780,7 +1785,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8a174463241eec55192048e869852e5b8a3f226aae20e094e3550f632102c513"
+      "evidenceFingerprint": "sha256:a7e3ebbccb257e653befc27561ca1c438780cf79bf70cbe17910b279281c178d"
     },
     {
       "id": "departments-focus-areas",
@@ -2103,7 +2108,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d74c76189d2e42782dc3195b94cb3bf1d81c70136420c027d82621fc177823ff"
+      "evidenceFingerprint": "sha256:7967a9222f120ffaebcebe7487e5b320b6b49bf2a2ab21b360727e2a9a3de190"
     }
   ],
   "surfaceExclusions": [
