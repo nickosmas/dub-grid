@@ -51,6 +51,8 @@ vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(async () => []),
   fetchShiftPreferences: vi.fn(async () => []),
   fetchJobPreferences: vi.fn(async () => []),
+  fetchCorrections: vi.fn(async () => []),
+  fetchScheduleNotes: vi.fn(async () => []),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({

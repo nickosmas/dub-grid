@@ -1231,7 +1231,7 @@
   - [x] 55c. **Overview** - stats for the period, This week, and a What
         they work donut by shift and job (with times, counts and share, a
         hover and a table view) in place of the Assignments bar.
-  - [ ] 55d. **Shifts** - every shift record in the period: shift and job,
+  - [x] 55d. **Shifts** - every shift record in the period: shift and job,
         times, focus area, hours, Draft, Published or Corrected, what it
         was, and schedule notes, with a total and CSV export.
   - [ ] 55e. **Time off** - absences and time away in the period, planned,

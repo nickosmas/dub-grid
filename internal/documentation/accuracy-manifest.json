@@ -791,7 +791,8 @@
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
             "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Overview and Activity period choices; Overview stats for the period, This week, What they work and remembered choice",
             "profile change requests reviewed under People > Requests",
-            "mobile person screen sections and actions"
+            "mobile person screen sections and actions",
+            "Shifts tab: records in the period with state, what a draft replaces, correction reason, absence, notes, state filter and CSV export"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
@@ -809,6 +810,8 @@
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
             "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
             "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/ShiftsTab.tsx",
+            "apps/web/src/lib/shift-records.ts",
             "apps/web/src/components/staff-detail/WorkMixCard.tsx",
             "apps/web/src/lib/staff-detail-stats.ts",
             "apps/web/src/components/EditEmployeePanel.tsx",
@@ -829,7 +832,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:20700431829b86e18a24dcb137843e930156820231cfe5eff6a96d477859e950"
+      "evidenceFingerprint": "sha256:cfb9d6273e7905d4bb33b3afcb2af668e5449baf5bf73ccb19a41e675022f2b9"
     },
     {
       "id": "invitations",
@@ -2113,7 +2116,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:427f557e957220ddeb64a691ffbfff3e12b0accda817dbf7f29221bdec5b73a0"
+      "evidenceFingerprint": "sha256:e2cea1102ad1be405e35ffb5ee33c60f332faf36b06504c966144eda06ee17a5"
     }
   ],
   "surfaceExclusions": [

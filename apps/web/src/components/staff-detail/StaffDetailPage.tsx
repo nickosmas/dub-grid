@@ -23,6 +23,7 @@ import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
   changedElsewhereMessage,
   canOffboardAtTier,
+  correctionReasonLabel,
   isSelfAction,
   removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
@@ -74,7 +75,11 @@ import type {
   OrganizationUser,
   EmployeeActivityEntry,
 } from "@/types";
-import { fetchRecurringShifts } from "@/features/schedule/client";
+import {
+  fetchCorrections,
+  fetchRecurringShifts,
+  fetchScheduleNotes,
+} from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
   replaceOrganizationInvitationAccessGuarded,
@@ -98,6 +103,7 @@ import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
+import { ShiftsTab } from "./tabs/ShiftsTab";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { AccessTab } from "./tabs/AccessTab";
 import { RecurringTab } from "./tabs/RecurringTab";
@@ -108,10 +114,11 @@ interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "recurring" | "access" | "activity";
+export type StaffPageTab = "overview" | "shifts" | "recurring" | "access" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
+  shifts: "Shifts",
   recurring: "Recurring",
   access: "Access",
   activity: "Activity",
@@ -865,6 +872,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const availableTabs = useMemo<StaffPageTab[]>(
     () => [
       "overview",
+      "shifts",
       ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
       "access",
       ...(canViewActivity ? (["activity"] as const) : []),
@@ -906,8 +914,61 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         period.range.startDate,
         period.range.endDate,
       ),
-    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
+    enabled:
+      Boolean(orgId) && Boolean(employee) && (activeTab === "overview" || activeTab === "shifts"),
   });
+  const canSeeCorrections = Boolean(
+    perms.isGridmaster || perms.isSuperAdmin || perms.canEditShifts,
+  );
+  const correctionsQuery = useQuery({
+    queryKey: orgId
+      ? [
+          ...queryKeys.shifts.all(orgId),
+          "corrections",
+          period.range.startDate,
+          period.range.endDate,
+        ]
+      : ["shifts", "anon", "corrections"],
+    queryFn: () => fetchCorrections(orgId!, period.range.startDate, period.range.endDate),
+    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeCorrections,
+  });
+  const canSeeNotes = Boolean(perms.isGridmaster || perms.isSuperAdmin || perms.canViewSchedule);
+  const notesQuery = useQuery({
+    queryKey: orgId
+      ? [...queryKeys.shifts.all(orgId), "notes", period.range.startDate, period.range.endDate]
+      : ["shifts", "anon", "notes"],
+    queryFn: () => fetchScheduleNotes(orgId!, period.range.startDate, period.range.endDate),
+    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeNotes,
+  });
+  const correctionsByDate = useMemo(
+    () =>
+      new Map(
+        (correctionsQuery.data ?? [])
+          .filter((correction) => correction.empId === employeeId)
+          .map((correction) => [
+            correction.date,
+            correction.reason ? correctionReasonLabel(correction.reason) : null,
+          ]),
+      ),
+    [correctionsQuery.data, employeeId],
+  );
+  const noteCountsByDate = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const note of notesQuery.data ?? []) {
+      if (note.empId === employeeId) counts.set(note.date, (counts.get(note.date) ?? 0) + 1);
+    }
+    return counts;
+  }, [employeeId, notesQuery.data]);
+  const shiftRecordLookups = useMemo(
+    () => ({
+      assignmentById,
+      shiftById: categoryById,
+      jobById: new Map(jobs.map((job) => [job.id, job])),
+      focusAreaById: new Map(focusAreas.map((area) => [area.id, area])),
+      absenceById: new Map(absenceTypes.map((absence) => [absence.id, absence])),
+    }),
+    [absenceTypes, assignmentById, categoryById, focusAreas, jobs],
+  );
   const currentWeekDates = useMemo(
     () => getProfileOverviewCurrentWeekDateKeys(overviewRange),
     [overviewRange],
@@ -1295,7 +1356,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
                     />
                   </div>
-                  {(activeTab === "overview" || activeTab === "activity") && (
+                  {(activeTab === "overview" ||
+                    activeTab === "shifts" ||
+                    activeTab === "activity") && (
                     <PersonPeriodControl
                       period={period}
                       payPeriodStartDate={org?.payPeriodStartDate}
@@ -1318,6 +1381,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       shiftCategories={shiftCategories}
                       jobs={jobs}
                       absenceTypes={absenceTypes}
+                    />
+                  )}
+                  {activeTab === "shifts" && (
+                    <ShiftsTab
+                      employee={employee}
+                      shifts={periodShiftsQuery.data}
+                      loading={periodShiftsQuery.isPending}
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
+                      lookups={shiftRecordLookups}
+                      corrections={correctionsByDate}
+                      noteCounts={noteCountsByDate}
                     />
                   )}
                   {activeTab === "recurring" && orgId && (

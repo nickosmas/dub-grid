@@ -20,7 +20,7 @@ import {
   resendInvitation,
   revokeInvitation,
 } from "@/features/organization/client";
-import { fetchRecurringShifts } from "@/features/schedule/client";
+import { fetchCorrections, fetchRecurringShifts } from "@/features/schedule/client";
 import { getProfileOverviewDateRange } from "@/features/account/shared/profile-schedule";
 
 const mockReplace = vi.fn();
@@ -128,6 +128,8 @@ vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(),
   fetchShiftPreferences: vi.fn(async () => []),
   fetchJobPreferences: vi.fn(async () => []),
+  fetchCorrections: vi.fn(async () => []),
+  fetchScheduleNotes: vi.fn(async () => []),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
@@ -286,6 +288,7 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
+      jobs: [],
       departments: [],
       assignmentLabelMap: new Map(),
       absenceTypeMap: new Map(),
@@ -476,12 +479,34 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("button", { name: "Period" })).toBeInTheDocument();
   });
 
+  it("loads corrections for the Shifts tab only for someone who can edit shifts", async () => {
+    mockSearchParams = new URLSearchParams("tab=shifts");
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+    expect(vi.mocked(fetchCorrections)).not.toHaveBeenCalled();
+
+    mockUsePermissions.mockReturnValue({
+      role: "admin",
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: false,
+      canManageEmployees: true,
+      canEditShifts: true,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await waitFor(() => expect(vi.mocked(fetchCorrections)).toHaveBeenCalled());
+  });
+
   it("offers a tab for each section the viewer can see, and switches by URL", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
       "Overview",
+      "Shifts",
       "Access",
       "Activity",
     ]);
@@ -666,6 +691,7 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
+      jobs: [],
       departments: [
         {
           id: 1,
