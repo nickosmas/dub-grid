@@ -121,9 +121,8 @@ export default function OnboardingPage() {
             marginBottom: "40px",
           }}
         >
-          Your account has been successfully created, but you haven&apos;t been assigned to an
-          organization yet. Please contact your administrator and ask them to invite you to their
-          organization.
+          Your account is ready, but you aren&apos;t in an organization yet. Ask your administrator
+          to invite you, then check again.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

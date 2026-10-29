@@ -175,7 +175,11 @@ export async function POST(req: NextRequest) {
           .filter(Boolean)) {
           const id = faNameMap.get(name.toLowerCase());
           if (id) faIds.push(id);
-          else errors.push({ row: originalIndex + 1, error: `Unknown focus area: "${name}"` });
+          else
+            errors.push({
+              row: originalIndex + 1,
+              error: `"${name}" doesn't match any area in your organization.`,
+            });
         }
       }
 

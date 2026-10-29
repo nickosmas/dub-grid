@@ -398,7 +398,7 @@ function AddressLine1Input({
                 aria-label="Address suggestions"
               >
                 {loading ? (
-                  <div className="dg-address-state">Looking up places…</div>
+                  <div className="dg-address-state">Looking up places</div>
                 ) : suggestions.length === 0 ? (
                   <div className="dg-address-state">
                     No matching places yet. Keep typing for a more exact address.

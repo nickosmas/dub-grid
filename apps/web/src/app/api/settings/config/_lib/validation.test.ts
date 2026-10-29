@@ -206,13 +206,13 @@ describe("validateFocusArea", () => {
 
   it("rejects missing and over-long names under the focusArea.name key", async () => {
     const missing = await expectValidationError(validateFocusArea(makeFocusArea({ name: " " })));
-    expect(missing.error).toBe("Focus area name is required");
-    expect(missing.fieldErrors).toEqual({ "focusArea.name": "Focus area name is required" });
+    expect(missing.error).toBe("Name is required");
+    expect(missing.fieldErrors).toEqual({ "focusArea.name": "Name is required" });
 
     const long = await expectValidationError(
       validateFocusArea(makeFocusArea({ name: "x".repeat(81) })),
     );
-    expect(long.error).toBe("Focus area name must be 80 characters or fewer");
+    expect(long.error).toBe("Name must be 80 characters or fewer");
   });
 });
 

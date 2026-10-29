@@ -775,7 +775,7 @@ function ShiftCategoriesSettings({
       <p
         style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)", margin: 0 }}
       >
-        Define the primary shift blocks for each focus area (for example Day, Evening, and Night).
+        {`The main shifts in each ${focusAreaTerm}, such as Day, Evening and Night.`}
       </p>
 
       {focusAreas.length === 0 && (

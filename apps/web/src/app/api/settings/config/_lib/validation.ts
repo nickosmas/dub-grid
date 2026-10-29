@@ -414,7 +414,7 @@ export function validateFocusArea(
       kind: "text",
       key: "name",
       errorKey: "focusArea.name",
-      label: "Focus area name",
+      label: "Name",
       maxLength: FOCUS_AREA_NAME_MAX,
     },
   ]);
