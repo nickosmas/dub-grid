@@ -51,6 +51,13 @@ vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(async () => []),
   fetchShiftPreferences: vi.fn(async () => []),
   fetchJobPreferences: vi.fn(async () => []),
+  fetchCorrections: vi.fn(async () => []),
+  fetchScheduleNotes: vi.fn(async () => []),
+  fetchShiftRequests: vi.fn(async () => []),
+}));
+
+vi.mock("@/features/account/client/api", () => ({
+  fetchPeopleProfileChangeRequests: vi.fn(async () => ({ requests: [] })),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
@@ -64,6 +71,9 @@ vi.mock("./EmployeeStatusActions", () => ({
   StatusCardActions: () => <div />,
 }));
 vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
+vi.mock("./tabs/StaffOverviewTab", () => ({
+  StaffOverviewTab: () => <div data-testid="overview" />,
+}));
 vi.mock("./tabs/ActivityTab", () => ({ ActivityTab: () => <div /> }));
 vi.mock("./RecurringScheduleCard", () => ({ RecurringScheduleCard: () => <div /> }));
 vi.mock("@/components/EditEmployeePanel", () => ({

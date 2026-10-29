@@ -16,7 +16,7 @@ import type {
   FocusAreaDistributionEntry,
 } from "@/types";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
-import { addDaysToIsoDate } from "@dubgrid/schedule-core";
+import { addDaysToIsoDate, formatScheduleTimeRange } from "@dubgrid/schedule-core";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -311,4 +311,124 @@ export function generateEmployeeCSV(
   }
 
   return lines.join("\n");
+}
+
+// ─── Period summary (staff page, item 55c) ──────────────
+
+export interface PeriodHoursSummary {
+  hours: number;
+  shiftCount: number;
+  /** Sunday to Saturday weeks the period touches. */
+  weekCount: number;
+  averagePerWeek: number;
+  /** Weeks whose hours inside the period pass the threshold. */
+  overtimeWeeks: number;
+}
+
+/** Hours and shifts in a period, with weeks counted Sunday to Saturday. */
+export function computePeriodHours(
+  empId: string,
+  shifts: ShiftMap,
+  assignmentById: Map<number, AssignmentDefinition>,
+  range: { startDate: string; endDate: string },
+  categoryById?: Map<number, ShiftCategory>,
+  otThreshold: number = 40,
+): PeriodHoursSummary {
+  const weekHours = new Map<string, number>();
+  let hours = 0;
+  let shiftCount = 0;
+  for (let day = range.startDate; day <= range.endDate; day = addDaysToIsoDate(day, 1)) {
+    const weekStart = addDaysToIsoDate(day, -new Date(`${day}T00:00:00Z`).getUTCDay());
+    if (!weekHours.has(weekStart)) weekHours.set(weekStart, 0);
+    const entry = shifts[`${empId}_${day}`];
+    if (!entry || entry.isDelete || entry.assignmentIds.length === 0) continue;
+    const dayHours = computeShiftDurationHours(
+      entry.assignmentIds,
+      assignmentById,
+      entry.customStartTime,
+      entry.customEndTime,
+      categoryById,
+    );
+    hours += dayHours;
+    shiftCount++;
+    weekHours.set(weekStart, (weekHours.get(weekStart) ?? 0) + dayHours);
+  }
+  const weekCount = weekHours.size;
+  return {
+    hours: Math.round(hours * 10) / 10,
+    shiftCount,
+    weekCount,
+    averagePerWeek: weekCount > 0 ? Math.round((hours / weekCount) * 10) / 10 : 0,
+    overtimeWeeks: [...weekHours.values()].filter((total) => total > otThreshold).length,
+  };
+}
+
+export interface WorkMixEntry {
+  key: string;
+  shiftName: string;
+  /** Null when the shift has no job. */
+  jobName: string | null;
+  /** "7:00 AM - 3:00 PM", or null when the shift has no set times. */
+  time: string | null;
+  count: number;
+  /** Whole percent of the period's shifts. */
+  share: number;
+}
+
+const WORK_MIX_SLICES = 7;
+
+/**
+ * The shift and job pairs someone worked in a period, most first. Past seven
+ * pairs the rest fold into one Other entry, so the chart never needs an
+ * eighth color.
+ */
+export function computeWorkMix(
+  empId: string,
+  shifts: ShiftMap,
+  assignmentById: Map<number, AssignmentDefinition>,
+  shiftById: Map<number, ShiftCategory>,
+  jobById: Map<number, { name: string }>,
+  range: { startDate: string; endDate: string },
+): WorkMixEntry[] {
+  const pairs = new Map<string, Omit<WorkMixEntry, "share">>();
+  let total = 0;
+  for (let day = range.startDate; day <= range.endDate; day = addDaysToIsoDate(day, 1)) {
+    const entry = shifts[`${empId}_${day}`];
+    if (!entry || entry.isDelete || entry.assignmentIds.length === 0) continue;
+    const assignment = entry.assignmentIds
+      .map((id) => assignmentById.get(id))
+      .find((item): item is AssignmentDefinition => Boolean(item));
+    if (!assignment) continue;
+    const shift = assignment.shiftId != null ? shiftById.get(assignment.shiftId) : undefined;
+    const job = assignment.jobId != null ? jobById.get(assignment.jobId) : undefined;
+    const key = shift ? `${shift.id}:${assignment.jobId ?? ""}` : `assignment:${assignment.id}`;
+    const existing = pairs.get(key);
+    if (existing) existing.count++;
+    else
+      pairs.set(key, {
+        key,
+        shiftName: shift?.name ?? assignment.name,
+        jobName: job?.name ?? null,
+        time: formatScheduleTimeRange(
+          shift?.startTime ?? assignment.defaultStartTime ?? null,
+          shift?.endTime ?? assignment.defaultEndTime ?? null,
+        ),
+        count: 1,
+      });
+    total++;
+  }
+  const ranked = [...pairs.values()].sort(
+    (a, b) => b.count - a.count || a.shiftName.localeCompare(b.shiftName),
+  );
+  const withShare = (item: Omit<WorkMixEntry, "share">): WorkMixEntry => ({
+    ...item,
+    share: total > 0 ? Math.round((item.count / total) * 100) : 0,
+  });
+  if (ranked.length <= WORK_MIX_SLICES) return ranked.map(withShare);
+  const kept = ranked.slice(0, WORK_MIX_SLICES - 1);
+  const otherCount = ranked.slice(WORK_MIX_SLICES - 1).reduce((sum, item) => sum + item.count, 0);
+  return [
+    ...kept,
+    { key: "other", shiftName: "Other", jobName: null, time: null, count: otherCount },
+  ].map(withShare);
 }

@@ -20,7 +20,7 @@ import {
   resendInvitation,
   revokeInvitation,
 } from "@/features/organization/client";
-import { fetchRecurringShifts } from "@/features/schedule/client";
+import { fetchCorrections, fetchRecurringShifts } from "@/features/schedule/client";
 import { getProfileOverviewDateRange } from "@/features/account/shared/profile-schedule";
 
 const mockReplace = vi.fn();
@@ -128,10 +128,26 @@ vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(),
   fetchShiftPreferences: vi.fn(async () => []),
   fetchJobPreferences: vi.fn(async () => []),
+  fetchCorrections: vi.fn(async () => []),
+  fetchScheduleNotes: vi.fn(async () => []),
+  fetchShiftRequests: vi.fn(async () => []),
+}));
+
+vi.mock("@/features/account/client/api", () => ({
+  fetchPeopleProfileChangeRequests: vi.fn(async () => ({ requests: [] })),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
   default: ({ loading }: { loading?: boolean }) => (loading ? <div>Loading...</div> : null),
+}));
+
+vi.mock("@/components/staff-detail/tabs/StaffOverviewTab", () => ({
+  StaffOverviewTab: ({ range }: { range: { startDate: string; endDate: string } }) => (
+    <div>
+      <div>Overview content</div>
+      <div data-testid="overview-range">{`${range.startDate}..${range.endDate}`}</div>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
@@ -277,6 +293,7 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
+      jobs: [],
       departments: [],
       assignmentLabelMap: new Map(),
       absenceTypeMap: new Map(),
@@ -442,12 +459,61 @@ describe("StaffDetailPage", () => {
     );
   });
 
+  it("loads the Overview's shifts for the chosen period", async () => {
+    localStorage.setItem(
+      "dg-person-period",
+      JSON.stringify({
+        preset: "custom",
+        range: { startDate: "2026-09-01", endDate: "2026-10-15" },
+      }),
+    );
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByTestId("overview-range")).toHaveTextContent("2026-09-01..2026-10-15");
+    await waitFor(() =>
+      expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
+        "emp-1",
+        "org-1",
+        expect.any(Map),
+        expect.any(Map),
+        "2026-09-01",
+        "2026-10-15",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Period" })).toBeInTheDocument();
+  });
+
+  it("loads corrections for the Shifts tab only for someone who can edit shifts", async () => {
+    mockSearchParams = new URLSearchParams("tab=shifts");
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+    expect(vi.mocked(fetchCorrections)).not.toHaveBeenCalled();
+
+    mockUsePermissions.mockReturnValue({
+      role: "admin",
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: false,
+      canManageEmployees: true,
+      canEditShifts: true,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await waitFor(() => expect(vi.mocked(fetchCorrections)).toHaveBeenCalled());
+  });
+
   it("offers a tab for each section the viewer can see, and switches by URL", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
       "Overview",
+      "Shifts",
+      "Time off",
+      "Requests",
       "Access",
       "Activity",
     ]);
@@ -632,6 +698,7 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
+      jobs: [],
       departments: [
         {
           id: 1,

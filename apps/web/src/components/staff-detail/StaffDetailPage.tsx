@@ -23,11 +23,13 @@ import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
   changedElsewhereMessage,
   canOffboardAtTier,
+  correctionReasonLabel,
   isSelfAction,
   removedFocusAreaIds,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
 } from "@dubgrid/domain";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
@@ -59,7 +61,6 @@ import {
   withKnownJoinedDate,
 } from "@/lib/staff-directory";
 import { isCurrentUsersEmployee } from "@/lib/profile-links";
-import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
 import {
   getProfileOverviewCurrentWeekDateKeys,
   getProfileOverviewDateRange,
@@ -75,7 +76,12 @@ import type {
   OrganizationUser,
   EmployeeActivityEntry,
 } from "@/types";
-import { fetchRecurringShifts } from "@/features/schedule/client";
+import {
+  fetchCorrections,
+  fetchRecurringShifts,
+  fetchScheduleNotes,
+  fetchShiftRequests,
+} from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
   replaceOrganizationInvitationAccessGuarded,
@@ -98,7 +104,13 @@ import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
 import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
-import { OverviewTab } from "./tabs/OverviewTab";
+import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
+import { ShiftsTab } from "./tabs/ShiftsTab";
+import { TimeOffTab } from "./tabs/TimeOffTab";
+import { RequestsTab } from "./tabs/RequestsTab";
+import { buildPersonRequestRows } from "@/lib/person-requests";
+import { fetchPeopleProfileChangeRequests } from "@/features/account/client/api";
+import { buildTimeOff, findNextTimeOff } from "@/lib/time-off";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { AccessTab } from "./tabs/AccessTab";
 import { RecurringTab } from "./tabs/RecurringTab";
@@ -109,10 +121,14 @@ interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "recurring" | "access" | "activity";
+export type StaffPageTab =
+  "overview" | "shifts" | "timeoff" | "requests" | "recurring" | "access" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
+  shifts: "Shifts",
+  timeoff: "Time off",
+  requests: "Requests",
   recurring: "Recurring",
   access: "Access",
   activity: "Activity",
@@ -844,18 +860,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
-  const thisWeekHours = useMemo(() => {
-    if (!employee) return null;
-    return computeEmployeeWeeklyHours(
-      employee.id,
-      getProfileOverviewCurrentWeekDateKeys(overviewRange),
-      shifts,
-      assignmentById,
-      40,
-      categoryById,
-    );
-  }, [assignmentById, categoryById, employee, overviewRange, shifts]);
-
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
   const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
   const closeManagementAccessEditor = useCallback(() => {
@@ -875,14 +879,26 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const showScheduleDetails = !directoryPerson?.isManagementUser || isOnSchedule;
+  // Someone who can't review every request is shown only their own, so the
+  // tab would tell them nothing true about this person.
+  const canReviewRequests = Boolean(
+    perms.isGridmaster ||
+    perms.isSuperAdmin ||
+    perms.canManageEmployees ||
+    perms.canApproveShiftRequests ||
+    perms.canEditShifts,
+  );
   const availableTabs = useMemo<StaffPageTab[]>(
     () => [
       "overview",
+      "shifts",
+      "timeoff",
+      ...(canReviewRequests ? (["requests"] as const) : []),
       ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
       "access",
       ...(canViewActivity ? (["activity"] as const) : []),
     ],
-    [canViewActivity, perms.canViewRecurringShifts],
+    [canReviewRequests, canViewActivity, perms.canViewRecurringShifts],
   );
   const legacySection = searchParams.get("section");
   const requestedTab = searchParams.get("tab");
@@ -897,6 +913,166 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   useEffect(() => {
     if (legacySection) router.replace(hrefForTab(tabForLegacySection(legacySection)));
   }, [hrefForTab, legacySection, router]);
+
+  // The Overview counts the chosen period, loaded on its own so a long custom
+  // range never rides on the page's first load.
+  const periodShiftsQuery = useQuery<ShiftMap>({
+    queryKey: orgId
+      ? [
+          ...queryKeys.shifts.all(orgId),
+          "employee",
+          employeeId,
+          period.range.startDate,
+          period.range.endDate,
+        ]
+      : ["shifts", "anon", "employee", employeeId],
+    queryFn: () =>
+      fetchEmployeeShifts(
+        employeeId,
+        orgId!,
+        assignmentLabelMapRef.current,
+        absenceTypeMapRef.current,
+        period.range.startDate,
+        period.range.endDate,
+      ),
+    enabled:
+      Boolean(orgId) &&
+      Boolean(employee) &&
+      (activeTab === "overview" || activeTab === "shifts" || activeTab === "timeoff"),
+  });
+  const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
+  const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
+  // Next time off looks past the chosen period, so it reads the next six months.
+  const upcomingEnd = useMemo(() => addDaysToIsoDate(today, 180), [today]);
+  const upcomingShiftsQuery = useQuery<ShiftMap>({
+    queryKey: orgId
+      ? [...queryKeys.shifts.all(orgId), "employee", employeeId, today, upcomingEnd]
+      : ["shifts", "anon", "employee", employeeId, "upcoming"],
+    queryFn: () =>
+      fetchEmployeeShifts(
+        employeeId,
+        orgId!,
+        assignmentLabelMapRef.current,
+        absenceTypeMapRef.current,
+        today,
+        upcomingEnd,
+      ),
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
+  });
+  const absenceById = useMemo(
+    () => new Map(absenceTypes.map((absence) => [absence.id, absence])),
+    [absenceTypes],
+  );
+  const nextTimeOff = useMemo(() => {
+    if (!employee || !upcomingShiftsQuery.data) return undefined;
+    return findNextTimeOff(
+      buildTimeOff(
+        employee,
+        upcomingShiftsQuery.data,
+        { startDate: today, endDate: upcomingEnd },
+        today,
+        absenceById,
+        { dayOffAbsenceTypeId: dayOffAbsenceTypeId },
+      ),
+    );
+  }, [absenceById, employee, dayOffAbsenceTypeId, today, upcomingEnd, upcomingShiftsQuery.data]);
+  const shiftRequestsQuery = useQuery({
+    queryKey: orgId
+      ? [...queryKeys.shiftRequests.all(orgId), "employee", employeeId]
+      : ["shiftRequests", "anon", "employee", employeeId],
+    queryFn: () => fetchShiftRequests(orgId!, assignmentLabelMapRef.current, { empId: employeeId }),
+    enabled:
+      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "overview"),
+  });
+  const canSeeProfileRequests = Boolean(
+    perms.isGridmaster || perms.isSuperAdmin || perms.canManageEmployees,
+  );
+  const profileRequestsQuery = useQuery({
+    queryKey: orgId
+      ? queryKeys.org.peopleChangeRequests(orgId, "all")
+      : ["org", "anon", "peopleChangeRequests", "all"],
+    queryFn: async () => (await fetchPeopleProfileChangeRequests(orgId!, null)).requests,
+    enabled:
+      Boolean(orgId) &&
+      canSeeProfileRequests &&
+      (activeTab === "requests" || activeTab === "overview"),
+  });
+  const requestRows = useMemo(() => {
+    if (!shiftRequestsQuery.data) return undefined;
+    const nameOfUser = (userId: string) => {
+      const person = directory.find((entry) => entry.userId === userId);
+      return person ? `${person.firstName} ${person.lastName}`.trim() : null;
+    };
+    return buildPersonRequestRows(
+      employeeId,
+      shiftRequestsQuery.data,
+      profileRequestsQuery.data ?? [],
+      nameOfUser,
+      { focusAreaLabel: org?.focusAreaLabel },
+    );
+  }, [
+    directory,
+    employeeId,
+    org?.focusAreaLabel,
+    profileRequestsQuery.data,
+    shiftRequestsQuery.data,
+  ]);
+  const canSeeCorrections = Boolean(
+    perms.isGridmaster || perms.isSuperAdmin || perms.canEditShifts,
+  );
+  const correctionsQuery = useQuery({
+    queryKey: orgId
+      ? [
+          ...queryKeys.shifts.all(orgId),
+          "corrections",
+          period.range.startDate,
+          period.range.endDate,
+        ]
+      : ["shifts", "anon", "corrections"],
+    queryFn: () => fetchCorrections(orgId!, period.range.startDate, period.range.endDate),
+    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeCorrections,
+  });
+  const canSeeNotes = Boolean(perms.isGridmaster || perms.isSuperAdmin || perms.canViewSchedule);
+  const notesQuery = useQuery({
+    queryKey: orgId
+      ? [...queryKeys.shifts.all(orgId), "notes", period.range.startDate, period.range.endDate]
+      : ["shifts", "anon", "notes"],
+    queryFn: () => fetchScheduleNotes(orgId!, period.range.startDate, period.range.endDate),
+    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeNotes,
+  });
+  const correctionsByDate = useMemo(
+    () =>
+      new Map(
+        (correctionsQuery.data ?? [])
+          .filter((correction) => correction.empId === employeeId)
+          .map((correction) => [
+            correction.date,
+            correction.reason ? correctionReasonLabel(correction.reason) : null,
+          ]),
+      ),
+    [correctionsQuery.data, employeeId],
+  );
+  const noteCountsByDate = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const note of notesQuery.data ?? []) {
+      if (note.empId === employeeId) counts.set(note.date, (counts.get(note.date) ?? 0) + 1);
+    }
+    return counts;
+  }, [employeeId, notesQuery.data]);
+  const shiftRecordLookups = useMemo(
+    () => ({
+      assignmentById,
+      shiftById: categoryById,
+      jobById: new Map(jobs.map((job) => [job.id, job])),
+      focusAreaById: new Map(focusAreas.map((area) => [area.id, area])),
+      absenceById: new Map(absenceTypes.map((absence) => [absence.id, absence])),
+    }),
+    [absenceTypes, assignmentById, categoryById, focusAreas, jobs],
+  );
+  const currentWeekDates = useMemo(
+    () => getProfileOverviewCurrentWeekDateKeys(overviewRange),
+    [overviewRange],
+  );
 
   const closeDetailsEditor = useCallback(() => {
     setDetailsDirty(false);
@@ -1280,7 +1456,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
                     />
                   </div>
-                  {activeTab === "activity" && (
+                  {(activeTab === "overview" ||
+                    activeTab === "shifts" ||
+                    activeTab === "timeoff" ||
+                    activeTab === "requests" ||
+                    activeTab === "activity") && (
                     <PersonPeriodControl
                       period={period}
                       payPeriodStartDate={org?.payPeriodStartDate}
@@ -1292,17 +1472,65 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
                 <section aria-label={TAB_LABELS[activeTab]}>
                   {activeTab === "overview" && (
-                    <OverviewTab
+                    <StaffOverviewTab
                       employee={employee}
-                      shifts={shifts}
-                      assignmentById={assignmentById}
-                      categoryById={categoryById}
-                      focusAreas={focusAreas}
-                      certifications={certifications}
-                      orgRoles={orgRoles}
-                      thisWeekHours={thisWeekHours}
-                      timeZone={org?.timezone}
-                      showDetails={false}
+                      periodShifts={periodShiftsQuery.data}
+                      currentWeekShifts={shifts}
+                      currentWeekDates={currentWeekDates}
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
+                      assignments={assignments}
+                      shiftCategories={shiftCategories}
+                      jobs={jobs}
+                      absenceTypes={absenceTypes}
+                      nextTimeOff={nextTimeOff}
+                      waitingRequests={
+                        canReviewRequests ? requestRows?.filter((row) => row.waiting) : undefined
+                      }
+                      onOpenRequests={() =>
+                        router.replace(hrefForTab("requests"), { scroll: false })
+                      }
+                      onOpenTimeOff={() => router.replace(hrefForTab("timeoff"), { scroll: false })}
+                    />
+                  )}
+                  {activeTab === "requests" && (
+                    <RequestsTab
+                      rows={requestRows}
+                      loading={shiftRequestsQuery.isPending}
+                      error={
+                        shiftRequestsQuery.error
+                          ? formatClientErrorMessage(
+                              shiftRequestsQuery.error,
+                              "We couldn't load their requests right now.",
+                            )
+                          : null
+                      }
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
+                    />
+                  )}
+                  {activeTab === "timeoff" && (
+                    <TimeOffTab
+                      person={employee}
+                      shifts={periodShiftsQuery.data}
+                      loading={periodShiftsQuery.isPending}
+                      range={period.range}
+                      today={today}
+                      periodPhrase={periodRange.phrase}
+                      absenceTypes={absenceTypes}
+                      dayOffAbsenceTypeId={dayOffAbsenceTypeId}
+                    />
+                  )}
+                  {activeTab === "shifts" && (
+                    <ShiftsTab
+                      employee={employee}
+                      shifts={periodShiftsQuery.data}
+                      loading={periodShiftsQuery.isPending}
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
+                      lookups={shiftRecordLookups}
+                      corrections={correctionsByDate}
+                      noteCounts={noteCountsByDate}
                     />
                   )}
                   {activeTab === "recurring" && orgId && (

@@ -62,14 +62,17 @@ export function exportScheduleCSV(
 
   const csvContent = [headerRow, ...dataRows].map((row) => row.join(",")).join("\r\n");
 
-  const resolvedFilename = filename ?? `schedule-${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCsvFile(csvContent, filename ?? `schedule-${new Date().toISOString().slice(0, 10)}.csv`);
+}
 
+/** Hands the browser a CSV file to save. */
+export function downloadCsvFile(csvContent: string, filename: string): void {
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = resolvedFilename;
+  link.download = filename;
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();

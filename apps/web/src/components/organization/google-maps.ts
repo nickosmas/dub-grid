@@ -99,6 +99,8 @@ export interface GoogleMapsNamespace {
 
 let googleMapsPromise: Promise<GoogleMapsNamespace | null> | null = null;
 
+const GOOGLE_MAPS_READY_CALLBACK = "__dgGoogleMapsPlacesReady";
+
 function getGoogleMaps(): GoogleMapsNamespace | null {
   if (typeof window === "undefined") return null;
   return (window as Window & { google?: GoogleMapsNamespace }).google ?? null;
@@ -116,11 +118,7 @@ export function loadGoogleMapsPlaces(apiKey: string): Promise<GoogleMapsNamespac
   if (googleMapsPromise) return googleMapsPromise;
 
   googleMapsPromise = new Promise((resolve) => {
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      'script[data-google-maps-places="true"]',
-    );
-
-    const handleLoad = () => {
+    const handleReady = () => {
       const googleMaps = getGoogleMaps();
       resolve(hasPlacesAccess(googleMaps) ? googleMaps : null);
     };
@@ -130,18 +128,30 @@ export function loadGoogleMapsPlaces(apiKey: string): Promise<GoogleMapsNamespac
       resolve(null);
     };
 
+    // With loading=async the script's load event fires before
+    // google.maps.importLibrary exists, so reading it then finds nothing and
+    // the field never offers suggestions. The callback is Google's ready signal.
+    const callbacks = window as unknown as Record<string, (() => void) | undefined>;
+    const previousReady = callbacks[GOOGLE_MAPS_READY_CALLBACK];
+    callbacks[GOOGLE_MAPS_READY_CALLBACK] = () => {
+      previousReady?.();
+      handleReady();
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-google-maps-places="true"]',
+    );
+
     if (existingScript) {
-      existingScript.addEventListener("load", handleLoad, { once: true });
       existingScript.addEventListener("error", handleError, { once: true });
       return;
     }
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async&v=weekly&callback=${GOOGLE_MAPS_READY_CALLBACK}`;
     script.async = true;
     script.defer = true;
     script.dataset.googleMapsPlaces = "true";
-    script.addEventListener("load", handleLoad, { once: true });
     script.addEventListener("error", handleError, { once: true });
     document.head.appendChild(script);
   });
