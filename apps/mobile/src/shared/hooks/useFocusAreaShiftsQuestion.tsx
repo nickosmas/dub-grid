@@ -10,7 +10,7 @@ import { parseFocusAreaShiftsRefusal } from "../lib/api";
 /** The manager closed the question about their shifts, so nothing was saved. */
 export class FocusAreaShiftsCancelledError extends Error {
   constructor() {
-    super("The save was cancelled.");
+    super("The save was canceled.");
     this.name = "FocusAreaShiftsCancelledError";
   }
 }

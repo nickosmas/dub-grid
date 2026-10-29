@@ -545,7 +545,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Organization unavailable. Please try again later.",
+      error: "Organization unavailable. Try again later.",
     });
   });
 

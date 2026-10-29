@@ -17,10 +17,11 @@ import { rowToEmployee, rowToDepartment, rowToInvitation } from "./mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type { Employee, Department, ShiftMap, Invitation, EmployeeStatus } from "@/types";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export class EmployeeStatusConflictError extends Error {
   constructor(public readonly latestEmployee: Employee) {
-    super("Employee status changed elsewhere.");
+    super(changedElsewhereMessage("their status"));
     this.name = "EmployeeStatusConflictError";
   }
 }

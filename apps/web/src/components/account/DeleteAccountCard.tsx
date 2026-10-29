@@ -88,8 +88,8 @@ export default function DeleteAccountCard() {
             Delete account
           </div>
           <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-            Permanently delete your account and leave every organization you belong to. If you are
-            the only super admin of an organization, transfer ownership first. This is irreversible.
+            Permanently delete your account and leave every organization you belong to. If you're an
+            organization's only Super Admin, make someone else a Super Admin first.
           </p>
         </div>
         <Button

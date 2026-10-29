@@ -55,7 +55,7 @@ export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<Pro
       id: "notifications",
       label: "Alerts",
       Icon: NotificationsIcon,
-      description: "Choose how and when DubGrid contacts you.",
+      description: "How we reach you about each kind of alert.",
     },
   ];
 
@@ -64,8 +64,7 @@ export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<Pro
       id: "overview",
       label: "Overview",
       Icon: DashboardIcon,
-      description:
-        "Your role, focus areas, certifications, recurring schedule, and calendar subscription.",
+      description: "Your work details, recurring schedule, and calendar link.",
     });
   }
 

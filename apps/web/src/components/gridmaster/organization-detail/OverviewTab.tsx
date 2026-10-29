@@ -31,6 +31,7 @@ import { type Employee, type Organization } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 // Overview tab for the gridmaster OrganizationDetail view.
 
@@ -156,7 +157,7 @@ export function OverviewTab({
   async function handleSave() {
     if (!nextOrganization.name) return;
     if (!organization.updatedAt) {
-      toast.error("Organization data is out of date. Refresh and try again.");
+      toast.error(changedElsewhereMessage("these settings"));
       return;
     }
 
@@ -227,7 +228,7 @@ export function OverviewTab({
       }
       setArchiveConfirm(false);
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Operation failed"));
+      toast.error(formatClientErrorMessage(err, "That didn't work. Try again."));
     } finally {
       setArchiving(false);
     }
@@ -490,7 +491,7 @@ export function OverviewTab({
                 ? new Date(organization.trialEndsAt).toLocaleDateString()
                 : organization.subscriptionStatus === "trialing" || !organization.subscriptionStatus
                   ? "Not started"
-                  : "—"
+                  : "-"
             }
           />
           <InfoRow

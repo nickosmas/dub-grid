@@ -41,7 +41,7 @@ export default function ImportResultsModal({
   }
 
   return (
-    <Modal title="Import Results" onClose={onClose}>
+    <Modal title="Import results" onClose={onClose}>
       <p
         style={{
           margin: "0 0 16px",

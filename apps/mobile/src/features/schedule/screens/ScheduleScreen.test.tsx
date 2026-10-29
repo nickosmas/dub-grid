@@ -550,7 +550,7 @@ describe("ScheduleScreen", () => {
   it("renders the redesigned Home page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
     render(<HomeScheduleScreen />);
 
-    expect(screen.getByText("On Duty")).toBeInTheDocument();
+    expect(screen.getByText("On duty")).toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("BS")).toBeInTheDocument();
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
@@ -559,7 +559,7 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Needs your response")).toBeInTheDocument();
     expect(screen.getByText("Sarah Jenkins")).toBeInTheDocument();
-    expect(screen.getByText("Needs shift coverage")).toBeInTheDocument();
+    expect(screen.getByText("Asked you to cover a shift")).toBeInTheDocument();
     expect(screen.getByText("Accept")).toBeInTheDocument();
     expect(screen.getByText("Decline")).toBeInTheDocument();
 
@@ -864,7 +864,7 @@ describe("ScheduleScreen", () => {
     const heroCard = screen.getByTestId("me-hero-card");
 
     expect(screen.getAllByLabelText("Shift 2").length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("Multiple Shifts, 2 shifts")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Multiple shifts, 2 shifts")).not.toBeInTheDocument();
     expect(within(heroCard).getByLabelText("Shift 2")).toBeInTheDocument();
     expect(heroCard).toHaveTextContent("Shift 1");
     expect(heroCard).toHaveTextContent("Shift 2");
@@ -979,7 +979,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Evening Shift").length).toBeGreaterThan(0);
     expect(screen.queryByText("Day Shift / Evening Shift")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Multiple Shifts, 2 shifts")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Multiple shifts, 2 shifts")).not.toBeInTheDocument();
     expect(screen.queryByText("Shift 1")).not.toBeInTheDocument();
     expect(screen.queryByText("Shift 2")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
@@ -1127,7 +1127,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Starting in 2h")).toBeInTheDocument();
     expect(screen.getByLabelText("Thu, Apr 16")).toBeInTheDocument();
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
-    expect(screen.queryByText("On Duty")).not.toBeInTheDocument();
+    expect(screen.queryByText("On duty")).not.toBeInTheDocument();
   });
 
   it("shows general shifts in the job pill section with a General shift label", () => {
@@ -2390,7 +2390,7 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.getByLabelText("Multiple Shifts, 2 shifts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Multiple shifts, 2 shifts")).toBeInTheDocument();
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Evening Shift").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Job Nurse").length).toBeGreaterThan(0);
@@ -2466,7 +2466,7 @@ describe("ScheduleScreen", () => {
 
     const row = screen.getByTestId("upcoming-rest-of-day-row-2026-04-16");
     expect(row).toHaveTextContent("Sick");
-    expect(row).toHaveTextContent("Rest of the day");
+    expect(row).toHaveTextContent("Part of the day");
     const hero = screen.getByTestId("me-hero-card");
     expect(within(hero).getByText("Sick")).toBeInTheDocument();
     expect(hero.textContent!.indexOf("Sick")).toBeGreaterThan(hero.textContent!.indexOf("Mentor"));
@@ -2493,7 +2493,7 @@ describe("ScheduleScreen", () => {
 
     const row = screen.getByTestId("upcoming-rest-of-day-row-2026-04-16");
     expect(row).toHaveTextContent("7:00 AM - 9:00 AM");
-    expect(row).not.toHaveTextContent("Rest of the day");
+    expect(row).not.toHaveTextContent("Part of the day");
     const list = row.closest("[data-testid]")?.parentElement?.parentElement ?? document.body;
     expect(list.textContent!.indexOf("7:00 AM - 9:00 AM")).toBeLessThan(
       list.textContent!.lastIndexOf("Day Shift"),

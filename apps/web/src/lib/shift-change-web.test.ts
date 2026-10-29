@@ -159,7 +159,7 @@ describe("describeCellStateChange", () => {
     expect(change.kind).toBe("multi");
     expect(change.after.items.map((item) => item.plain)).toEqual([
       "Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (4.5 hrs) · Skilled Nursing",
-      "Sick (rest of day)",
+      "Sick (part of day)",
     ]);
   });
 

@@ -122,12 +122,12 @@ function getMobileUserName(user: User): {
 function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
   if (orgRole === "super_admin") {
     if (billingAccess.reason === "suspended") {
-      return "Organization unavailable. Contact DubGrid support for help.";
+      return "Organization unavailable. Contact DubGrid Support for help.";
     }
     return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Organization unavailable. Please try again later.";
+  return "Organization unavailable. Try again later.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
@@ -135,7 +135,7 @@ function getIncompleteSetupMessage(orgRole: string): string {
     return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Organization unavailable. Please try again later.";
+  return "Organization unavailable. Try again later.";
 }
 
 async function requireMobileOrganization(
@@ -145,7 +145,10 @@ async function requireMobileOrganization(
   try {
     const organization = await findMobileOrganizationBySlug(serviceClient, slug);
     if (!organization) {
-      throw new MobileApiRequestError(404, "No organization matched that slug.");
+      throw new MobileApiRequestError(
+        404,
+        "We couldn't find that organization. Check the domain and try again.",
+      );
     }
 
     return organization;
@@ -504,7 +507,10 @@ export async function resolveMobileAuthContext<
 
   const membershipRows = await membershipRowsResult;
   if (membershipRows.length === 0) {
-    throw new MobileApiRequestError(403, "No active organization membership found");
+    throw new MobileApiRequestError(
+      403,
+      "You're no longer in an organization. Ask an Admin if that's a mistake.",
+    );
   }
 
   if (!currentOrgId || !orgReads) {
@@ -518,7 +524,10 @@ export async function resolveMobileAuthContext<
     (membership) => membership.organization.id === currentOrgId,
   );
   if (!currentMembership) {
-    throw new MobileApiRequestError(403, "Organization context does not match this user");
+    throw new MobileApiRequestError(
+      403,
+      "You're no longer in this organization. Sign in again to pick another.",
+    );
   }
 
   const currentOrgRow = await orgReads.orgRow;
@@ -530,7 +539,7 @@ export async function resolveMobileAuthContext<
   const orgRole = currentMembership.org_role ?? "user";
   const currentOrg = input.mapOrganization(currentOrgRow);
   if (currentOrg.archivedAt) {
-    throw new MobileApiRequestError(403, "Organization unavailable. Please try again later.");
+    throw new MobileApiRequestError(403, "Organization unavailable. Try again later.");
   }
   const billingAccess = evaluateBillingAccessWithPolicy(
     {

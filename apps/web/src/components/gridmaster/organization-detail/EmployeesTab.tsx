@@ -141,7 +141,7 @@ export function EmployeesTab({
                         color: "var(--dg-color-text-muted)",
                       }}
                     >
-                      {emp.phone || "—"}
+                      {emp.phone || "-"}
                     </td>
                     <td
                       style={{
@@ -150,7 +150,7 @@ export function EmployeesTab({
                         color: "var(--dg-color-text-muted)",
                       }}
                     >
-                      {emp.email || "—"}
+                      {emp.email || "-"}
                     </td>
                   </tr>
                 ))

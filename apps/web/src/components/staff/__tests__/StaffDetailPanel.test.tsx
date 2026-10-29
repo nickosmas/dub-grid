@@ -222,7 +222,9 @@ describe("StaffDetailPanel access controls", () => {
     const card = screen.getByRole("region", { name: "Status" });
     expect(card).toHaveTextContent("Suspended since Oct 26");
     expect(screen.queryByTestId("employee-status-actions")).toBeNull();
-    expect(screen.getByRole("img", { name: "Suspended: won't see this in the app" })).toBeTruthy();
+    expect(
+      screen.getByRole("img", { name: "Suspended. They can't sign in to see their shifts." }),
+    ).toBeTruthy();
   });
 
   it("adds a dashed planned card with its own Edit plan when an away is planned", () => {
@@ -242,7 +244,7 @@ describe("StaffDetailPanel access controls", () => {
     expect(screen.getByRole("img", { name: "Away from Nov 10, back Jan 4" })).toBeTruthy();
   });
 
-  it("puts Send Invitation in the same row as Add to Management, not stacked above it", () => {
+  it("puts Send invitation in the same row as Add to Management, not stacked above it", () => {
     renderPanel({
       employee: { ...employee, userId: null, email: "pat@example.com" },
       canManageEmployees: true,
@@ -253,7 +255,7 @@ describe("StaffDetailPanel access controls", () => {
     });
 
     const manageButton = screen.getByRole("button", { name: /Add to Management/ });
-    const inviteButton = screen.getByRole("button", { name: /Send Invitation/ });
+    const inviteButton = screen.getByRole("button", { name: /Send invitation/ });
     expect(inviteButton.parentElement).toBe(manageButton.parentElement);
   });
 

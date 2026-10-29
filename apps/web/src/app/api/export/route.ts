@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
@@ -300,6 +300,6 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "export" } });
     logger.error({ error: err }, "Export failed");
-    return NextResponse.json({ error: "Export failed" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't export that. Try again." }, { status: 500 });
   }
 }

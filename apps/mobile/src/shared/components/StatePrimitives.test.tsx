@@ -29,7 +29,7 @@ describe("mobile shared state components", () => {
           actionLabel="Retry"
           body="Something went wrong."
           onAction={onRetry}
-          title="Could not load data"
+          title="Couldn't load data"
         />
         <EmptyStateCard
           actionLabel="Explore"
@@ -41,7 +41,7 @@ describe("mobile shared state components", () => {
       </>,
     );
 
-    expect(screen.getByText("Could not load data")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load data")).toBeInTheDocument();
     expect(screen.getByText("No items yet")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Retry"));

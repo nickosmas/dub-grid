@@ -26,7 +26,7 @@ describe("describeSignInFailure", () => {
   it("does not claim the address is taken when GoTrue or the JWT hook 5xx'd", () => {
     const message = describeSignInFailure({ status: 500 }, "existing");
     expect(message).not.toBe(EXISTING_ACCOUNT_MESSAGE);
-    expect(message).toMatch(/try again in a moment/);
+    expect(message).toMatch(/Try again in a moment/);
   });
 
   it("passes the disabled-account sentinel straight through", () => {
@@ -54,7 +54,7 @@ describe("describeSignInFailure", () => {
 
   it("keeps the generic wording for a freshly created account", () => {
     expect(describeSignInFailure({ status: 400 }, "created")).toBe(
-      "Unable to sign in. Please try again or contact support.",
+      "We couldn't sign you in. Try again, or contact support.",
     );
   });
 });

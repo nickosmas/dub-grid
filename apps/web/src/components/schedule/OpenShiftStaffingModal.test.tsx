@@ -116,7 +116,7 @@ describe("OpenShiftStaffingModal", () => {
     expect(within(dialog).getByText("2 people needed")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada Nurse")).toBeInTheDocument();
     expect(within(dialog).getByText("Available all day")).toBeInTheDocument();
-    expect(within(dialog).getByText("Evening · Support, 3:00 PM–11:00 PM")).toBeInTheDocument();
+    expect(within(dialog).getByText("Evening · Support, 3:00 PM - 11:00 PM")).toBeInTheDocument();
     expect(within(dialog).getByText("Absent: Annual leave")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: /Ada Nurse/ })).toHaveAttribute(
       "aria-checked",
@@ -134,7 +134,7 @@ describe("OpenShiftStaffingModal", () => {
     const { onAssign } = renderModal({ candidates: list });
 
     const ada = screen.getByRole("radio", { name: /Ada Nurse/ });
-    expect(ada).toHaveAccessibleName(/Suspended: won't see this in the app/);
+    expect(ada).toHaveAccessibleName(/Suspended. They can't sign in to see their shifts./);
     expect(screen.getByRole("radio", { name: /Grace Nurse/ })).not.toHaveAccessibleName(
       /Suspended/,
     );

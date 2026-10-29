@@ -193,7 +193,7 @@ function OrgSearchCombobox({
         )}
         <input
           type="text"
-          placeholder="Search organizations…"
+          placeholder="Search organizations"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

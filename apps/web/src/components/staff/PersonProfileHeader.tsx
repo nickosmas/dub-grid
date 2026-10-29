@@ -42,7 +42,7 @@ export function PersonProfileHeader({
     ? employmentType === "part_time"
       ? "Part-time"
       : "Full-time"
-    : "—";
+    : "-";
 
   return (
     <header className="pb-2">
@@ -75,13 +75,13 @@ export function PersonProfileHeader({
         </div>
 
         <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
-          <BioField label="Email" value={email || "—"} />
-          <BioField label="Phone" value={phone || "—"} />
+          <BioField label="Email" value={email || "-"} />
+          <BioField label="Phone" value={phone || "-"} />
           {employmentType !== undefined && <BioField label="Employment" value={employmentLabel} />}
           {employeeNumber !== undefined && (
             <BioField
               label="Employee ID"
-              value={employeeNumber != null ? `#${employeeNumber}` : "—"}
+              value={employeeNumber != null ? `#${employeeNumber}` : "-"}
             />
           )}
         </div>

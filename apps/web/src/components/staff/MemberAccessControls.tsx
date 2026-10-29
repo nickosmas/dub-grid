@@ -118,8 +118,8 @@ export function MemberAccessControls({
             <ConfirmDialog
               title={
                 pendingInvitationEmail
-                  ? `Change invitation access from ${ROLE_LABELS[orgRole] ?? orgRole} to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
-                  : `Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
+                  ? `Change the invitation for ${pendingInvitationEmail} to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
+                  : `Change their access level to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
               }
               message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
               summary={
@@ -132,7 +132,7 @@ export function MemberAccessControls({
                     }
                   : undefined
               }
-              confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change role"}
+              confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access level"}
               variant="warning"
               onCancel={() => setPendingRole(null)}
               // Awaited rather than fired into a `void` IIFE: the dialog stays
@@ -153,12 +153,15 @@ export function MemberAccessControls({
                   toast.success(
                     pendingInvitationEmail
                       ? `Invitation replaced with ${ROLE_LABELS[next] ?? next} access.`
-                      : `Role updated to ${ROLE_LABELS[next] ?? next}.`,
+                      : `Access level changed to ${ROLE_LABELS[next] ?? next}.`,
                   );
                   setPendingRole(null);
                 } catch (error) {
                   toast.error(
-                    formatClientErrorMessage(error, "We couldn't change that role. Try again."),
+                    formatClientErrorMessage(
+                      error,
+                      "We couldn't change their access level. Try again.",
+                    ),
                   );
                 } finally {
                   setChangingRole(false);
@@ -188,11 +191,10 @@ export function MemberAccessControls({
                 const changes = buildAdminPermissionChanges(initial, perms);
                 return changes.length > 0
                   ? {
-                      title: "Review permission changes",
-                      description:
-                        "Review these changes before saving. They take effect for this admin right away.",
+                      title: "Save permission changes?",
+                      description: "They take effect right away.",
                       changes,
-                      confirmLabel: "Confirm save",
+                      confirmLabel: "Save",
                     }
                   : null;
               }}

@@ -23,13 +23,13 @@ describe("DraftReviewSummary", () => {
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("New shifts")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("Edited shifts")).toBeInTheDocument();
+    expect(screen.getByText("Changed shifts")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("New notes")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("Removed notes")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.queryByText("Deleted shifts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Removed shifts")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when there are no unpublished changes", () => {

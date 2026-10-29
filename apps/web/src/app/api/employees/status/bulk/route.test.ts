@@ -418,7 +418,7 @@ describe("POST /api/employees/status/bulk", () => {
 
     expect(list.map((r) => r.ok)).toEqual([true, false]);
     expect(list[1].error).toBe(
-      "They're the only Super Admin who can sign in. Transfer ownership first.",
+      "They're the only Super Admin who can sign in. Make someone else a Super Admin first.",
     );
     expect(tables.employees[1].suspended_at ?? null).toBeNull();
   });

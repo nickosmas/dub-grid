@@ -164,10 +164,10 @@ describe("describeBulkStatusAction", () => {
   it("counts the planned changes it cancels", () => {
     const planned = person({ plannedStatus: "suspended", plannedFrom: "2026-11-10" });
     expect(describeBulkStatusAction("archive", [active, planned]).points).toContain(
-      "The change planned for 1 of them is cancelled.",
+      "The change planned for 1 of them is canceled.",
     );
     expect(describeBulkStatusAction("markAway", [planned, planned, active]).points).toContain(
-      "Changes planned for 2 of them are cancelled.",
+      "Changes planned for 2 of them are canceled.",
     );
     expect(describeBulkStatusAction("restore", [offboarded, offboarded]).points).toEqual([]);
   });
@@ -183,7 +183,7 @@ describe("describeBulkStatusAction", () => {
       person({ userId: null, plannedStatus: "away", plannedFrom: "2099-01-05" }),
     ]);
     expect(copy.title).toBe("Offboard Jamie Rivera?");
-    expect(copy.points).toContain("The away planned from Jan 5 is cancelled.");
+    expect(copy.points).toContain("The time away planned from Jan 5 is canceled.");
     expect(copy.done).toBe("Offboarded");
   });
 });

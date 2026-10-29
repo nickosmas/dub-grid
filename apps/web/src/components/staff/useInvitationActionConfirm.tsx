@@ -31,8 +31,8 @@ export const INVITATION_ACTION_COPY: Record<
       "Their invite link stops working right away, but you can send them a new invitation if you change your mind.",
   },
   resend: {
-    title: (who) => `Reissue the invitation for ${who}?`,
-    confirmLabel: "Reissue",
+    title: (who) => `Resend the invitation to ${who}?`,
+    confirmLabel: "Resend",
     variant: "warning",
     // Reissuing rotates the token on the same invitation, so the link the
     // invitee already holds dies the moment this is confirmed.

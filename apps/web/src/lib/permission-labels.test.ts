@@ -26,7 +26,7 @@ describe("summarizePermissionChanges", () => {
     const after = Object.fromEntries(Object.keys(before).map((key) => [key, false]));
 
     expect(summarizePermissionChanges(before, after)).toBe(
-      "removed your access to view staff, view schedule, view organization labels, and 2 more",
+      "removed your access to view staff, view the schedule, view organization labels, and 2 more",
     );
   });
 });

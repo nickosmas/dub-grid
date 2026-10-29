@@ -1039,7 +1039,7 @@ export function ManagementStaffPanel({
           actions={
             showPersonActionFooter ? (
               <div className="flex flex-col gap-2.5">
-                {/* Add to Schedule — show for any linked management user who
+                {/* Add to schedule — show for any linked management user who
                     isn't already on the schedule grid. The old `source ===
                     "user_only"` check fell apart once every member got an
                     employees row (Flow B + seed backfill); now we gate on the
@@ -1067,7 +1067,7 @@ export function ManagementStaffPanel({
                       <line x1="8" y1="2" x2="8" y2="6" />
                       <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
-                    Add to Schedule
+                    Add to schedule
                   </Button>
                 )}
 
@@ -1092,7 +1092,7 @@ export function ManagementStaffPanel({
                     style={{ width: "100%", color: "var(--dg-color-danger)" }}
                   >
                     <ButtonLoading loading={revoking} spinnerSize={14}>
-                      Revoke Invitation
+                      Revoke invitation
                     </ButtonLoading>
                   </Button>
                 )}

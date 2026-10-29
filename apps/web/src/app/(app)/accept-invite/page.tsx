@@ -305,7 +305,7 @@ function AcceptInviteContent() {
                   : "Setting up your account"
                 : "Loading"
             }
-            message="Please wait while we process your invitation."
+            message="Opening your invitation."
           />
         ) : state === "invalid" ? (
           // One message for accepted, expired, revoked, replaced and unknown
@@ -318,7 +318,7 @@ function AcceptInviteContent() {
         ) : state === "no-token" ? (
           <AuthStateCard
             heading="Invalid link"
-            message="This invitation link is missing a token. Please check the link you received and try again."
+            message="This invitation link is incomplete. Open the link from your email again."
             primaryCta={{ label: "Go to login", href: "/login" }}
           />
         ) : state === "success" ? (
@@ -475,7 +475,7 @@ function AcceptInviteContent() {
                   spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >
-                  {existingAccount ? "Sign In & Accept" : "Set Password & Accept"}
+                  {existingAccount ? "Sign in and accept" : "Set Password & Accept"}
                 </ButtonLoading>
               </button>
             </Form>

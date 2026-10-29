@@ -319,7 +319,7 @@ export function formatReturnDate(isoDate: string, { weekday = false } = {}): str
 export const SUSPENDED_LABEL = "Suspended";
 
 /** Wherever someone schedules a suspended person, who can't sign in to see it (51d). */
-export const SUSPENDED_SCHEDULE_NOTE = "Suspended: won't see this in the app";
+export const SUSPENDED_SCHEDULE_NOTE = "Suspended. They can't sign in to see their shifts.";
 
 /**
  * A suspended person (51c) is stored `active`, so suspension wins over the
@@ -617,11 +617,11 @@ export function describeStatusAction(
     ? []
     : plannedStatus === "removed"
       ? [
-          `The last day planned for ${formatReturnDate(plannedLastDay({ plannedStatus, plannedFrom }) ?? plannedFrom)} is cancelled.`,
+          `The last day planned for ${formatReturnDate(plannedLastDay({ plannedStatus, plannedFrom }) ?? plannedFrom)} is canceled.`,
         ]
       : plannedStatus === "suspended"
-        ? [`The suspension planned from ${formatReturnDate(plannedFrom)} is cancelled.`]
-        : [`The away planned from ${formatReturnDate(plannedFrom)} is cancelled.`];
+        ? [`The suspension planned from ${formatReturnDate(plannedFrom)} is canceled.`]
+        : [`The time away planned from ${formatReturnDate(plannedFrom)} is canceled.`];
   const leavingSchedule = [
     "Any upcoming shifts come off the schedule in the draft.",
     "Recurring schedules set up for them are removed.",
@@ -701,11 +701,11 @@ export function describeStatusAction(
       }
       return {
         label: "Save changes",
-        title: `Change ${name}'s planned away?`,
+        title: `Change ${name}'s planned time away?`,
         message: startDate ? plannedAwaySentence(startDate, returnDate) : "",
         points: startDate ? plannedAwayPoints(startDate, returnDate, absenceName) : [],
         unchanged: [],
-        done: "Planned away changed",
+        done: "Planned time away changed",
       };
     case "cancelPlannedChange":
       if (plannedStatus === "active") {
@@ -715,7 +715,7 @@ export function describeStatusAction(
           message: `They stay ${EMPLOYMENT_STATUS_LABELS.removed} until someone restores them.`,
           points: [],
           unchanged: [],
-          done: "Planned return cancelled",
+          done: "Planned return canceled",
         };
       }
       if (plannedStatus === "suspended") {
@@ -725,7 +725,7 @@ export function describeStatusAction(
           message: "They keep their access.",
           points: [],
           unchanged: [],
-          done: "Planned suspension cancelled",
+          done: "Planned suspension canceled",
         };
       }
       if (plannedStatus === "removed") {
@@ -735,12 +735,12 @@ export function describeStatusAction(
           message: "They stay Active and can be scheduled after that day again.",
           points: [],
           unchanged: [],
-          done: "Last day cancelled",
+          done: "Last day canceled",
         };
       }
       return {
-        label: "Cancel planned away",
-        title: `Cancel ${name}'s planned away?`,
+        label: "Cancel planned time away",
+        title: `Cancel ${name}'s planned time away?`,
         message: "",
         points: [
           "They stay Active and can be scheduled on those days again.",
@@ -749,7 +749,7 @@ export function describeStatusAction(
             : []),
         ],
         unchanged: absenceName ? [] : ["Shifts already taken off those days stay off."],
-        done: "Planned away cancelled",
+        done: "Planned time away canceled",
       };
     case "setReturnDate":
       return describeSetReturnDate(name, returnDate, currentReturnDate, absenceName);
@@ -776,7 +776,7 @@ export function describeStatusAction(
           "Open requests they're part of are closed, and pickups they claimed go back up for others.",
           ...cancelsPlan,
         ],
-        unchanged: ["Past records stay, and you can restore them later."],
+        unchanged: ["Their history stays, and you can restore them later."],
         done: "Offboarded",
       };
     case "markActive":
@@ -873,7 +873,7 @@ export interface StatusChoiceOptions {
   canOffboard?: boolean;
 }
 
-const AWAY_DETAIL = "Keeps sign-in. Not scheduled while away.";
+const AWAY_DETAIL = "Can sign in but isn't scheduled.";
 const SUSPENDED_DETAIL = "Can't sign in. Stays on the schedule.";
 const ARCHIVED_DETAIL = "No longer on staff. Can't sign in or be scheduled.";
 const ACTIVE_DETAIL = "Can sign in and be scheduled.";
@@ -885,7 +885,7 @@ function hasAccount(state: { userId?: string | null }): boolean {
 
 const NO_ACCOUNT_DETAILS = {
   active: "Can be scheduled.",
-  away: "Not scheduled while away.",
+  away: "Isn't scheduled.",
   archived: "No longer on staff. Can't be scheduled.",
 } as const;
 
@@ -941,8 +941,8 @@ export function statusChoices(
       label: EMPLOYMENT_STATUS_LABELS.inactive,
       detail: account ? AWAY_DETAIL : NO_ACCOUNT_DETAILS.away,
       outcome: account
-        ? "They'll be Away: they keep sign-in, and they aren't scheduled."
-        : "They'll be Away, and they aren't scheduled.",
+        ? "They'll be Away, so they won't be scheduled but can still sign in."
+        : "They'll be Away, so they won't be scheduled.",
     },
     awayReason,
   );
@@ -953,7 +953,7 @@ export function statusChoices(
       action: "suspend",
       label: SUSPENDED_LABEL,
       detail: SUSPENDED_DETAIL,
-      outcome: "They'll be Suspended: they can't sign in, and they stay on the schedule.",
+      outcome: "They'll be Suspended, so they can't sign in but stay on the schedule.",
     },
     kind !== "active"
       ? NOT_SUSPENDABLE_MESSAGE
@@ -970,8 +970,8 @@ export function statusChoices(
       label: EMPLOYMENT_STATUS_LABELS.removed,
       detail: account ? ARCHIVED_DETAIL : NO_ACCOUNT_DETAILS.archived,
       outcome: account
-        ? "They'll be Offboarded: no longer on staff, and they can't sign in or be scheduled."
-        : "They'll be Offboarded: no longer on staff, and they can't be scheduled.",
+        ? "They'll be Offboarded, so they're no longer on staff and can't sign in or be scheduled."
+        : "They'll be Offboarded, so they're no longer on staff and can't be scheduled.",
     },
     !canOffboard
       ? OFFBOARD_OUT_OF_REACH_MESSAGE
@@ -988,9 +988,9 @@ export function statusChoices(
           kind: "active",
           action: "reinstate",
           label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: account ? "Can sign in again on the web and in the app." : "Back to Active.",
+          detail: account ? "Can sign in again." : "Back to Active.",
           outcome: account
-            ? "They'll be Active again and can sign in on the web and in the app."
+            ? "They'll be Active again and can sign in."
             : "They'll be Active again.",
         }),
         away,
@@ -1267,8 +1267,8 @@ export function describeStatusCard(
       ? {
           title: describeReturn(returnDay, { weekday: true }),
           detail: hasAccount(state)
-            ? "Back to Active then: they can sign in and be scheduled."
-            : "Back to Active then, and can be scheduled.",
+            ? "They can sign in and be scheduled from then."
+            : "They can be scheduled from then.",
         }
       : kind === "active" && lastDay
         ? {

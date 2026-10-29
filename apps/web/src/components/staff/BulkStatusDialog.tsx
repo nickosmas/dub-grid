@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  changedElsewhereMessage,
   bulkStatusDone,
   countPeople,
   describeBulkStatusAction,
@@ -42,7 +43,7 @@ export interface BulkStatusDialogState {
   result: { changed: number; notChanged: BulkStatusPersonNote[] } | null;
 }
 
-const CONFLICT_REASON = "Their status changed elsewhere. Check it and try again.";
+const CONFLICT_REASON = changedElsewhereMessage("their status");
 const FAILED_REASON = "We couldn't change their status. Try again.";
 
 /** Who a bulk change didn't reach, and why, from the server's answer per person. */

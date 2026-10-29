@@ -133,7 +133,7 @@ export function formatDetails(entry: ActivityEntryLike & { action: string }): De
 /** Compact inline summary for a table cell. */
 export function summarizeDetails(entry: ActivityEntryLike & { action: string }): string {
   const items = formatDetails(entry);
-  if (items.length === 0) return "—";
+  if (items.length === 0) return "-";
   return items.map((i) => `${i.label}: ${i.value}`).join(" · ");
 }
 

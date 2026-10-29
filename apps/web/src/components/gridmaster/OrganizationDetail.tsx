@@ -376,7 +376,7 @@ export default function OrganizationDetail({
                 value={
                   orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt
                     ? formatDateTimeLabel(orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt)
-                    : "—"
+                    : "-"
                 }
               />
               <InfoRow
@@ -386,7 +386,7 @@ export default function OrganizationDetail({
                     ? formatDateTimeLabel(
                         orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt,
                       )
-                    : "—"
+                    : "-"
                 }
               />
               <InfoRow
@@ -459,7 +459,7 @@ export default function OrganizationDetail({
             fontSize: "var(--dg-fs-label)",
           }}
         >
-          Loading…
+          Loading
         </div>
       )}
 

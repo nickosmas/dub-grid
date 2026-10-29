@@ -294,7 +294,7 @@ export async function upsertShiftCategory(
 ): Promise<ShiftCategory> {
   const body = await postSettingsAction<{ item: ShiftCategory }>(
     { action: "upsertShiftCategory", shiftCategory },
-    "We couldn't save shift. Try again.",
+    "We couldn't save that shift. Try again.",
   );
   return body.item;
 }
@@ -306,7 +306,7 @@ export function deleteShiftCategory(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteShiftCategory", orgId, itemId: categoryId, hard },
-    "We couldn't delete shift. Try again.",
+    "We couldn't delete that shift. Try again.",
   );
 }
 

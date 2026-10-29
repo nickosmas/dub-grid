@@ -126,7 +126,7 @@ function createNonJsonApiErrorMessage(baseUrl: string, path: string, response: R
   void baseUrl;
   void path;
   void response;
-  return "Please try again in a moment.";
+  return "Something went wrong on our end. Try again in a moment.";
 }
 
 const TOKEN_EXPIRY_MARGIN_SECONDS = 30;
@@ -749,7 +749,7 @@ export function requestPasswordRecovery(email: string): Promise<{ success: true 
         value === null ||
         (value as { success?: unknown }).success !== true
       ) {
-        throw new Error("Recovery request failed");
+        throw new Error("We couldn't complete that. Try again.");
       }
       return { success: true as const };
     },

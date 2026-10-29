@@ -18,27 +18,27 @@ const sections = [
   {
     icon: <DashboardIcon size={22} />,
     name: "Dashboard & Insights",
-    desc: "Real-time coverage metrics, staffing overview, and quick actions all in one place.",
+    desc: "Coverage, staffing, and shortcuts for today.",
   },
   {
     icon: <ScheduleIcon size={22} />,
     name: "Schedule",
-    desc: "Build, publish, and manage schedules with conflict prevention and recurring schedules.",
+    desc: "Build and publish schedules, with recurring schedules and overlap checks.",
   },
   {
     icon: <PeopleIcon size={22} />,
     name: "People",
-    desc: "Manage employees, send invitations, assign roles, and track certifications.",
+    desc: "Your staff directory, invitations, and each person's details.",
   },
   {
     icon: <SettingsIcon size={22} />,
     name: "Settings",
-    desc: "Review and configure departments, shifts, jobs, roles, and all organization options.",
+    desc: "Departments, shifts, jobs, and how your organization works.",
   },
   {
     icon: <ShieldIcon size={22} />,
     name: "Admin Management",
-    desc: "Invite admins, configure granular permissions, and delegate access across your organization.",
+    desc: "Invite Admins and choose what each one can do.",
   },
 ];
 
@@ -48,8 +48,8 @@ export default function SuperAdminOrientationStep({
 }: SuperAdminOrientationStepProps) {
   return (
     <StepLayout
-      title="Getting Around as a Super Admin"
-      description="Here's a quick overview of everything you have access to."
+      title="Getting around as a Super Admin"
+      description="The main pages you'll use."
       onNext={onNext}
       onBack={onBack}
       nextLabel="Continue"

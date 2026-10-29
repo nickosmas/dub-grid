@@ -73,7 +73,7 @@ describe("useInvitationActionConfirm", () => {
 
     await user.click(screen.getByRole("button", { name: "resend" }));
 
-    expect(screen.getByText("Reissue the invitation for mina@example.com?")).toBeInTheDocument();
+    expect(screen.getByText("Resend the invitation to mina@example.com?")).toBeInTheDocument();
     expect(
       screen.getByText(
         "A new invitation link is sent, and the current one stops working immediately.",

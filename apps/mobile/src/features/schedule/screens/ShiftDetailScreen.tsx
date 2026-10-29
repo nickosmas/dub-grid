@@ -12,7 +12,7 @@ import {
   type MobileScheduleEntrySegment,
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
-import { describeShiftRequestSubmitted, indefiniteArticle } from "@dubgrid/domain";
+import { capitalizeFirst, describeShiftRequestSubmitted, singularLabelNoun } from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import {
   BottomSheetModal,
@@ -253,6 +253,9 @@ export default function ShiftDetailScreen() {
   }>();
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
+  const focusAreaFieldLabel = capitalizeFirst(
+    singularLabelNoun(bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas"),
+  );
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [requestMode, setRequestMode] = useState<RequestMode>(null);
@@ -341,7 +344,7 @@ export default function ShiftDetailScreen() {
     if (teamScheduleQuery.error) {
       pushClientFriendlyErrorToast(pushToast, {
         error: teamScheduleQuery.error,
-        title: "Could not load working-with list",
+        title: "Couldn't load working-with list",
         fallbackMessage: "We couldn't load who is working with you right now.",
       });
     }
@@ -474,7 +477,7 @@ export default function ShiftDetailScreen() {
     if (shouldCheckExistingRequests && requestsQuery.error) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsQuery.error,
-        title: "Could not verify existing requests",
+        title: "Couldn't verify existing requests",
         fallbackMessage: "We couldn't verify existing requests for this shift.",
       });
     }
@@ -771,7 +774,7 @@ export default function ShiftDetailScreen() {
   const focusAreaName = shiftEntry ? getMobileScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
   const jobChip = shiftEntry ? getEntryJobChip(mobileColors, isDark, shiftEntry) : null;
   const detailCardTitle = hasSplitShift
-    ? "Multiple Shifts"
+    ? "Multiple shifts"
     : shiftEntry
       ? getScheduleEntryTitle(shiftEntry)
       : "";
@@ -936,10 +939,12 @@ export default function ShiftDetailScreen() {
 
     setPendingConfirmation({
       title: "Submit this call-off?",
-      body: `${indefiniteArticle(absenceTypeLabel) === "an" ? "An" : "A"} ${absenceTypeLabel} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.${
-        canApproveShiftRequests ? " As an admin, it goes on the schedule right away." : ""
+      body: `You'll be marked ${absenceTypeLabel} for your ${shiftLabel} shift on ${shiftDateLabel}.${
+        canApproveShiftRequests
+          ? " You can approve requests, so it goes on the schedule right away."
+          : ""
       }`,
-      confirmLabel: "Submit Call-off",
+      confirmLabel: "Call off",
       confirmTone: "danger",
       onConfirm: () =>
         submitCoverageRequest("calloff", {
@@ -1117,7 +1122,7 @@ export default function ShiftDetailScreen() {
           <View style={styles.coverageOptionList}>
             <CoverageOptionCard
               active={coverageRequestType === "pickup"}
-              body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
+              body="Teammates can claim it. It stays yours until a claim is approved."
               disabled={createRequestMutation.isPending}
               onPress={() => {
                 setCoverageRequestType("pickup");
@@ -1128,7 +1133,7 @@ export default function ShiftDetailScreen() {
             />
             <CoverageOptionCard
               active={coverageRequestType === "calloff"}
-              body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
+              body="For a shift you can't work. Once it's approved, you're marked absent and the shift opens for others to pick up."
               disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
               onPress={() => {
                 setCoverageRequestType("calloff");
@@ -1140,7 +1145,7 @@ export default function ShiftDetailScreen() {
           </View>
           {activeAbsenceTypes.length === 0 ? (
             <Text style={styles.coverageNotice}>
-              Call off is unavailable until at least one active absence type is set up.
+              {"Calling off isn't set up for your organization yet. Ask an Admin."}
             </Text>
           ) : null}
           {coverageRequestType === "pickup" ? (
@@ -1228,7 +1233,7 @@ export default function ShiftDetailScreen() {
           <Text style={styles.subsectionBody}>
             {selectedTargetEntry
               ? "Review the trade below, then submit your swap request."
-              : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
+              : "Pick a teammate's published shift to trade for. The same shift on a different day works too."}
           </Text>
           {shiftEntry ? (
             <>
@@ -1261,7 +1266,7 @@ export default function ShiftDetailScreen() {
                       swapOptionsQuery.error,
                       "We couldn't load teammate shifts.",
                     )}
-                    title="Could not load teammate shifts"
+                    title="Couldn't load teammate shifts"
                     onAction={() => {
                       void swapOptionsQuery.refetch();
                     }}
@@ -1404,7 +1409,7 @@ export default function ShiftDetailScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load shift"
+          title="Couldn't load shift"
           variant="centered"
           onAction={() => {
             void Promise.all([
@@ -1485,7 +1490,7 @@ export default function ShiftDetailScreen() {
               {!hasMultipleSegments && focusAreaName ? (
                 <DetailInfoRow
                   iconName="location-outline"
-                  label="Focus area"
+                  label={focusAreaFieldLabel}
                   tone="green"
                   value={focusAreaName}
                 />
@@ -1493,7 +1498,7 @@ export default function ShiftDetailScreen() {
               {restOfDayChip ? (
                 <DetailInfoRow
                   iconName="calendar-clear-outline"
-                  label={restOfDayAbsenceTimeLabel(shiftEntry) ? "Absence" : "Rest of the day"}
+                  label={restOfDayAbsenceTimeLabel(shiftEntry) ? "Absence" : "Part of the day"}
                   tone="green"
                   value={
                     restOfDayAbsenceTimeLabel(shiftEntry)
@@ -1543,7 +1548,7 @@ export default function ShiftDetailScreen() {
               </View>
             ) : null}
 
-            <PreviousShiftFooter entry={shiftEntry} />
+            <PreviousShiftFooter entry={shiftEntry} focusAreaFieldLabel={focusAreaFieldLabel} />
 
             {publishedSummary ? (
               <DetailPublishedFooter
@@ -1844,7 +1849,13 @@ function getPreviousPresentationFocusAreaName(
   return presentation.displayFocusAreaName?.trim() || null;
 }
 
-function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
+function PreviousShiftFooter({
+  entry,
+  focusAreaFieldLabel,
+}: {
+  entry: MobileScheduleEntry;
+  focusAreaFieldLabel: string;
+}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [showPreviousShift, setShowPreviousShift] = useState(false);
@@ -1961,7 +1972,7 @@ function PreviousShiftFooter({ entry }: { entry: MobileScheduleEntry }) {
             {previousFocusAreaName ? (
               <DetailInfoRow
                 iconName="location-outline"
-                label="Focus area"
+                label={focusAreaFieldLabel}
                 tone="green"
                 value={previousFocusAreaName}
               />

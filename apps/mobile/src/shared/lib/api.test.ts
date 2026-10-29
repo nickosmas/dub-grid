@@ -297,7 +297,7 @@ describe("mobileApiRequest", () => {
         overtimeThresholdHours: 40,
         heroSummary: {
           statusLabel: "Healthy",
-          title: "Schedule health looks good",
+          title: "Nothing needs attention",
           description: "No open gaps or pending requests right now.",
         },
         metrics: {
@@ -526,7 +526,9 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { lookupOrganization } = await import("./api");
 
-    await expect(lookupOrganization("calmhaven")).rejects.toThrow("Please try again in a moment.");
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
+      "Something went wrong on our end. Try again in a moment.",
+    );
   });
 
   it("sends JSON content headers for body-based mobile requests", async () => {

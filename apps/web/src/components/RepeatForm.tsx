@@ -635,7 +635,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       {/* Day picker (weekly / biweekly) */}
       {showDayPicker && (
         <div style={sectionBlockStyle}>
-          <div style={sectionLabelStyle}>Days of Week</div>
+          <div style={sectionLabelStyle}>Days of the week</div>
           <div role="group" aria-label="Days of week" style={dayPickerRowStyle}>
             {DAY_NAMES_SHORT.map((name, i) => {
               const active = daysOfWeek.includes(i);
@@ -681,7 +681,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
 
       {/* Start date */}
       <div style={sectionBlockStyle}>
-        <div style={sectionLabelStyle}>Start Date</div>
+        <div style={sectionLabelStyle}>Start date</div>
         <CalendarField
           value={start}
           minDate={todayStr}
@@ -716,7 +716,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                     ? "Never"
                     : type === "on_date"
                       ? "On date"
-                      : "After N occurrences"
+                      : "After a number of shifts"
                 }
                 style={{ accentColor: "var(--dg-color-brand)" }}
               />
@@ -731,7 +731,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                   ? "Never"
                   : type === "on_date"
                     ? "On date"
-                    : "After N occurrences"}
+                    : "After a number of shifts"}
               </span>
               {type === "after_n" && endType === "after_n" && (
                 <NumberField
@@ -836,8 +836,8 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           {patternChange && <div>{patternChangeText(patternChange)}</div>}
           {isCapped && (
             <div>
-              Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date
-              range or &ldquo;After N occurrences&rdquo; for more control.
+              A series can&apos;t run past 6 months, so this one stops after{" "}
+              {MAX_SERIES_OCCURRENCES} shifts.
             </div>
           )}
           {preview.overwrites > 0 && (

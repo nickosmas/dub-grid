@@ -99,24 +99,21 @@ describe("handleApiError", () => {
   it("handles Failed to fetch with connectivity toast", async () => {
     await handleApiError(new Error("Failed to fetch"));
     expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("trouble connecting"),
+      expect.stringContaining("can't connect right now"),
       expect.any(Object),
     );
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  it("handles generic error with 'Something went wrong' toast", async () => {
+  it("shows a readable error on its own", async () => {
     await handleApiError(new Error("some unknown error"));
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("Something went wrong"),
-      expect.any(Object),
-    );
+    expect(mockToastError).toHaveBeenCalledWith("some unknown error", expect.any(Object));
   });
 
   it("includes action context when provided", async () => {
     await handleApiError(new Error("connection refused"), "save employee");
     expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to save employee"),
+      expect.stringContaining("We couldn't save employee."),
       expect.any(Object),
     );
   });

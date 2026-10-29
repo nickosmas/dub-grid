@@ -24,19 +24,19 @@ function formatDateRange(start: Date, end: Date, mode: ViewMode): string {
 
   if (mode === "week") {
     if (sMonth === eMonth) {
-      return `${sMonth} ${sDay} \u2013 ${eDay}, ${year}`;
+      return `${sMonth} ${sDay} - ${eDay}, ${year}`;
     }
-    return `${sMonth} ${sDay} \u2013 ${eMonth} ${eDay}, ${eYear}`;
+    return `${sMonth} ${sDay} - ${eMonth} ${eDay}, ${eYear}`;
   }
 
   // 2weeks
   if (sMonth === eMonth) {
-    return `${sMonth} ${sDay} \u2013 ${eDay}, ${year}`;
+    return `${sMonth} ${sDay} - ${eDay}, ${year}`;
   }
   if (year === eYear) {
-    return `${sMonth} ${sDay} \u2013 ${eMonth} ${eDay}, ${year}`;
+    return `${sMonth} ${sDay} - ${eMonth} ${eDay}, ${year}`;
   }
-  return `${sMonth} ${sDay}, ${year} \u2013 ${eMonth} ${eDay}, ${eYear}`;
+  return `${sMonth} ${sDay}, ${year} - ${eMonth} ${eDay}, ${eYear}`;
 }
 
 interface DashboardHeaderProps {

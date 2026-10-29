@@ -51,8 +51,8 @@ describe("ActivityDetailsDialog", () => {
       within(dialog).queryByText("Nic Kosmas (nickosmas@outlook.com)"),
     ).not.toBeInTheDocument();
 
-    expect(within(dialog).getByText("Target changed")).toBeInTheDocument();
-    expect(within(dialog).getByText("Activity type")).toBeInTheDocument();
+    expect(within(dialog).getByText("Affected")).toBeInTheDocument();
+    expect(within(dialog).getByText("Kind of change")).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "What changed" })).toHaveClass(
       "dg-activity-details-changes",
     );

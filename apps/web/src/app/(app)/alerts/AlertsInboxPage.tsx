@@ -369,7 +369,7 @@ export function InboxView({
       })
       .catch((err) => {
         if (cancelled || seq !== requestSeq.current) return;
-        setError(formatClientErrorMessage(err, "Failed to load alerts"));
+        setError(formatClientErrorMessage(err, "Refresh and try again."));
       })
       .finally(() => {
         if (!cancelled && seq === requestSeq.current) setLoadingPage(false);
@@ -418,7 +418,7 @@ export function InboxView({
       setCursor(response.nextCursor);
       setHasMore(incoming.length >= PAGE_SIZE);
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "Failed to load more"));
+      toast.error(formatClientErrorMessage(err, "We couldn't load more alerts. Try again."));
     } finally {
       setLoadingMore(false);
     }
@@ -488,7 +488,7 @@ export function InboxView({
                 : "Restored";
         toast.success(successMessage);
       } catch (err) {
-        toast.error(formatClientErrorMessage(err, "Action failed"));
+        toast.error(formatClientErrorMessage(err, "We couldn't update your alerts. Try again."));
       } finally {
         setBusy(false);
       }
@@ -505,7 +505,7 @@ export function InboxView({
       refreshFacets();
       toast.success("All alerts marked as read");
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "Action failed"));
+      toast.error(formatClientErrorMessage(err, "We couldn't update your alerts. Try again."));
     } finally {
       setBusy(false);
       setConfirmingMarkAllRead(false);
@@ -961,7 +961,7 @@ function Toolbar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={clearSearchOnEscape(onClearSearch)}
-          placeholder="Search title or message…"
+          placeholder="Search title or message"
           aria-label="Search alerts"
           className="dg-input"
           style={{ paddingLeft: 32, paddingRight: search ? SEARCH_CLEAR_PADDING : 12 }}

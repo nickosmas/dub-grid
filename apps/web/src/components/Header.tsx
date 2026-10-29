@@ -315,9 +315,9 @@ export default function Header({ orgName }: HeaderProps) {
     isInSandbox ? (
       <ConfirmDialog
         returnFocus={accountTriggerRef}
-        title="Exit sandbox to sign out"
-        message="Signing out permanently discards your sandbox and all its changes."
-        confirmLabel="Exit & sign out"
+        title="Sign out and discard your sandbox?"
+        message="Your sandbox and its changes are deleted."
+        confirmLabel="Sign out"
         cancelLabel="Cancel"
         variant="danger"
         isLoading={exitingForLogout}
@@ -759,7 +759,7 @@ export default function Header({ orgName }: HeaderProps) {
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
-                    {isUserViewActive ? "Exit User View" : "View as User"}
+                    {isUserViewActive ? "Exit User view" : "View as a User"}
                   </Button>
                 </>
               )}

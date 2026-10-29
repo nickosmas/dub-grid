@@ -11,9 +11,9 @@ import {
 } from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { Invitation } from "@/types";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
-const CONFLICT_MESSAGE =
-  "That invitation changed elsewhere. Review the latest values and try again.";
+const CONFLICT_MESSAGE = changedElsewhereMessage("this invitation");
 
 /**
  * Resend or revoke an open invitation. The resend route rotates an expired

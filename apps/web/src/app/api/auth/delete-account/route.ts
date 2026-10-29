@@ -45,7 +45,7 @@ export async function DELETE(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         {
           status: 429,
           headers: { "Retry-After": String(retryAfterSeconds(reset)) },
@@ -127,7 +127,10 @@ export async function DELETE(req: NextRequest) {
           .is("archived_at", null);
         if ((count ?? 0) <= 1) {
           return NextResponse.json(
-            { error: "You are the only super admin of an organization. Transfer ownership first." },
+            {
+              error:
+                "You're the only Super Admin of an organization. Make someone else a Super Admin first.",
+            },
             { status: 409 },
           );
         }
@@ -239,6 +242,9 @@ export async function DELETE(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "account-deletion" } });
     logger.error({ error: err }, "Account deletion failed");
-    return NextResponse.json({ error: "Account deletion failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't delete your account. Try again." },
+      { status: 500 },
+    );
   }
 }

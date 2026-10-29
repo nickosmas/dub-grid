@@ -19,7 +19,7 @@ export function emailContactConflict(reason: EmailConflictReason): EmployeeConta
       ? "That email is already used by another person."
       : reason === "gridmaster"
         ? "That email address is reserved."
-        : "That email belongs to a different user account.";
+        : "Someone else already signs in with that email. Use a different one.";
   return { code: EMPLOYEE_CONTACT_CONFLICT_CODE, error: message, field: "email", message };
 }
 
@@ -58,9 +58,9 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
   if (text.includes("employees_org_name_active_unique")) {
     return {
       code: EMPLOYEE_CONTACT_CONFLICT_CODE,
-      error: "An employee with that name already exists.",
+      error: "Someone in this organization already has that name.",
       field: "name",
-      message: "An employee with that name already exists.",
+      message: "Someone in this organization already has that name.",
     };
   }
 

@@ -77,7 +77,7 @@ describe("PermissionsEditor", () => {
     // A stored set that never mentions a key starts from the admin baseline:
     // Schedule edit, Publish, Recurring (view included), Reports, plus the
     // Requests view and Dashboard those bring with them.
-    expect(screen.getByText("7 of 16 access levels enabled")).toBeInTheDocument();
+    expect(screen.getByText("7 of 16 turned on")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Reports view" })).toHaveAttribute(
       "aria-checked",
       "true",
@@ -85,7 +85,7 @@ describe("PermissionsEditor", () => {
 
     // One switch, two stored keys behind it.
     await user.click(screen.getByRole("switch", { name: "Departments & labels view" }));
-    expect(screen.getByText("8 of 16 access levels enabled")).toBeInTheDocument();
+    expect(screen.getByText("8 of 16 turned on")).toBeInTheDocument();
   });
 
   it("brings View along with Edit and reports it as included while Edit stays on", async () => {
@@ -134,7 +134,7 @@ describe("PermissionsEditor", () => {
     const user = userEvent.setup();
     const { onSave } = renderEditor({
       buildReview: () => ({
-        title: "Review permission changes",
+        title: "Save permission changes?",
         description: "Check these first.",
         changes: [
           {
@@ -160,7 +160,7 @@ describe("PermissionsEditor", () => {
     renderEditor({
       obscured: true,
       buildReview: () => ({
-        title: "Review permission changes",
+        title: "Save permission changes?",
         description: "Check these first.",
         changes: [
           {
@@ -188,7 +188,7 @@ describe("PermissionsEditor", () => {
       onSave,
       onClose,
       buildReview: () => ({
-        title: "Review permission changes",
+        title: "Save permission changes?",
         description: "Check these first.",
         changes: [
           {
@@ -204,12 +204,12 @@ describe("PermissionsEditor", () => {
 
     await user.click(screen.getByRole("switch", { name: "Coverage view" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
-    await user.click(screen.getByRole("button", { name: /confirm save/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText("Check these first.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /confirm save/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     // The review is modal, so the editor beneath it is out of the accessibility tree.
     expect(screen.getByRole("switch", { name: "Coverage view", hidden: true })).toHaveAttribute(
       "aria-checked",

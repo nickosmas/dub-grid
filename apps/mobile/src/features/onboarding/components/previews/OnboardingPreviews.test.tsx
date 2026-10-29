@@ -63,7 +63,7 @@ describe("UpcomingShiftPreview", () => {
   it("shows the sample shift on duty today", () => {
     render(<UpcomingShiftPreview />);
 
-    expect(screen.getByText("On Duty")).toBeInTheDocument();
+    expect(screen.getByText("On duty")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.getByText("Sheltered Care")).toBeInTheDocument();
     expect(screen.getByText("7:00 AM - 3:30 PM")).toBeInTheDocument();

@@ -1206,7 +1206,7 @@ export function RecurringScheduleSection({
             </svg>
           }
           title="No staff members"
-          description="Add employees in the Members section to set up recurring shifts."
+          description="Add staff on the People page to set up recurring schedules."
         />
       ) : sortedEmployees.length === 0 ? (
         <EmptyState
@@ -1545,12 +1545,12 @@ export function RecurringScheduleSection({
         <ConfirmDialog
           title={
             pendingRecurringAction === "save"
-              ? `Save ${dirtyCount} Recurring Schedule Change${dirtyCount === 1 ? "" : "s"}?`
-              : `Discard ${dirtyCount} Recurring Schedule Draft Change${dirtyCount === 1 ? "" : "s"}?`
+              ? `Save ${dirtyCount} recurring schedule change${dirtyCount === 1 ? "" : "s"}?`
+              : `Discard ${dirtyCount} unsaved recurring schedule change${dirtyCount === 1 ? "" : "s"}?`
           }
           message={
             pendingRecurringAction === "save"
-              ? "These templates affect future schedule generation."
+              ? "Auto-build and Fill from Recurring Schedules use them from now on."
               : "This can't be undone."
           }
           confirmLabel={pendingRecurringAction === "save" ? "Save" : "Discard"}

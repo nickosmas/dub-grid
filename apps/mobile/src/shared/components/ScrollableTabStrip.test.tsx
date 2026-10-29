@@ -69,7 +69,7 @@ describe("ScrollableTabStrip", () => {
   it("uses the tab role and the bare label as the accessible name", () => {
     renderStrip();
 
-    expect(screen.queryByRole("button", { name: "Select All" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Select all" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
   });
 

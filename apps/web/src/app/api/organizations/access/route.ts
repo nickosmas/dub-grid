@@ -23,7 +23,11 @@ import { dispatchNotificationEvent } from "@/features/notifications/server/event
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import { offboardRemovedMember, requestInfo } from "@/features/employees/server/status-change";
-import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
+import {
+  changedElsewhereMessage,
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 import { READ_ONLY_PERMS } from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -152,7 +156,7 @@ async function fetchOrganizationUser(
 function buildConflictResponse(latestUser: OrganizationUser) {
   return NextResponse.json(
     {
-      error: "Organization access changed elsewhere. Review the latest values before saving again.",
+      error: changedElsewhereMessage("their access"),
       code: "ORG_ACCESS_CONFLICT",
       user: latestUser,
     },
@@ -212,7 +216,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -419,7 +423,7 @@ export async function DELETE(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -480,7 +484,7 @@ export async function DELETE(req: NextRequest) {
       if (error) throw error;
       if ((count ?? 0) <= 1) {
         return NextResponse.json(
-          { error: "Cannot remove the only super admin. Transfer ownership first." },
+          { error: "They're the only Super Admin. Make someone else a Super Admin first." },
           { status: 400 },
         );
       }

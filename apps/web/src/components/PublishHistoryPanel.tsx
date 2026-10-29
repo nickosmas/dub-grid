@@ -68,7 +68,7 @@ function formatDateRange(start: string, end: string): string {
     year: "numeric",
   };
   if (start === end) return s.toLocaleDateString("en-US", opts);
-  return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${e.toLocaleDateString("en-US", opts)}`;
+  return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${e.toLocaleDateString("en-US", opts)}`;
 }
 
 function ChangeBreakdown({
@@ -110,7 +110,7 @@ function ChangeBreakdown({
             fontWeight: 600,
           }}
         >
-          {modCount} modified
+          {modCount} changed
         </span>
       )}
       {delCount > 0 && (
@@ -379,7 +379,7 @@ function ChangeRow({
           }}
         />
         <span style={{ minWidth: 100 }}>{dateStr}</span>
-        <span style={{ opacity: 0.5 }}>—</span>
+        <span style={{ opacity: 0.5 }}>-</span>
         {mainDescription}
       </div>
       {timeAnnotation && (
@@ -432,7 +432,7 @@ function NoteChangeRow({ change }: { change: NotePublishChange }) {
         }}
       />
       <span style={{ minWidth: 100 }}>{dateStr}</span>
-      <span style={{ color: "var(--dg-color-text-muted)" }}>—</span>
+      <span style={{ color: "var(--dg-color-text-muted)" }}>-</span>
       <span>
         {change.kind === "deleted" ? "Removed note" : "Added note"}: {change.indicatorName}
       </span>
@@ -844,7 +844,7 @@ export default function PublishHistoryPanel({
                         className="dg-btn dg-btn-secondary"
                         style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
                       >
-                        Show on Grid
+                        Show on grid
                       </Button>
                     </Hint>
                   </div>
@@ -875,7 +875,7 @@ export default function PublishHistoryPanel({
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 16px" }}
               >
                 <ButtonLoading loading={loadMore.isRunning} spinnerSize={14}>
-                  Load More
+                  Load more
                 </ButtonLoading>
               </Button>
             </div>

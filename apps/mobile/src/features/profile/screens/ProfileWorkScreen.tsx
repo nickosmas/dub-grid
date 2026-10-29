@@ -469,9 +469,9 @@ export default function ProfileWorkScreen() {
     ? [
         ...(isNameRequest ? ["An admin reviews your new name."] : []),
         ...(isNameRequest && hasOtherChanges ? ["Other edits you made are saved."] : []),
-        "This change applies to every organization you belong to, not just this one.",
+        "Your email changes for every organization you belong to.",
         "You'll confirm it's you first.",
-        "To finish, check your email.",
+        "We'll email the new address a link to finish the change.",
       ]
     : [];
   const guard = useUnsavedChangesGuard({
@@ -575,7 +575,7 @@ export default function ProfileWorkScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load profile"
+          title="Couldn't load profile"
           variant="centered"
           onAction={() => {
             void profileQuery.refetch();
@@ -781,7 +781,7 @@ function EditPanel({
     <>
       {!canEditProfileDirectly ? (
         <StatusBanner
-          body="Name changes need admin review. Email and phone updates apply immediately."
+          body="An Admin reviews name changes. A new phone number saves right away, and a new email needs confirming from your inbox."
           title="Editing your profile"
           tone="info"
         />
@@ -932,7 +932,7 @@ function EditPanel({
 
       {isNameRequest ? (
         <ProfileSection
-          description="You can't change your own name directly. Add an optional note and send the request to your admin for review."
+          description="Add a note for the Admin who reviews it, if it helps."
           title="Name change request"
         >
           <ProfilePanel>

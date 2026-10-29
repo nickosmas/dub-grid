@@ -85,7 +85,7 @@ export function getMobileRequestActionFeedback({
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
   const claimMessage = viewerCanApprove
-    ? "As an admin, it goes on the schedule right away."
+    ? "You can approve requests, so it goes on the schedule right away."
     : "It's sent to your admin for approval.";
 
   switch (getActionVariant(body)) {
@@ -107,7 +107,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Accept",
         key,
-        message: "It moves on to manager review if approval is required.",
+        message: "If approval is needed, a manager decides next.",
         title: "Accept request?",
       };
     case "decline":
@@ -122,7 +122,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Approve",
         key,
-        message: "This finalizes the staffing change.",
+        message: "It goes on the schedule right away.",
         title: "Approve request?",
         warning: approvalWarning(request),
       };
@@ -170,27 +170,27 @@ export function getMobileRequestActionSuccessToast(
     case "decline":
       return {
         title: "Request declined",
-        message: "Your response was sent.",
+        message: "They'll see your answer.",
       };
     case "approve":
       return {
         title: "Request approved",
-        message: "The staffing change was finalized.",
+        message: "It's on the schedule.",
       };
     case "reject":
       return {
         title: "Request rejected",
-        message: "The original schedule was kept.",
+        message: "The schedule stays as it was.",
       };
     case "cancel":
       return {
         title: "Request canceled",
-        message: "The request is no longer active.",
+        message: "Nobody can respond to it now.",
       };
     default:
       return {
         title: "Request updated",
-        message: "Your change was completed.",
+        message: "Your change is saved.",
       };
   }
 }

@@ -13,4 +13,4 @@
 export const ORG_NOT_FOUND_PARAM = "org_not_found";
 
 export const ORG_NOT_FOUND_MESSAGE =
-  "No organization found for that domain. Please check and try again.";
+  "No organization found for that domain. Check it and try again.";

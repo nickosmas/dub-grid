@@ -187,7 +187,12 @@ export default function OrganizationSetupWizard({
           toast.success(`Organization created & invitation sent to ${superAdmin.displayName}`);
         } else if (superAdmin.kind === "invite-error") {
           toast.success("Organization created");
-          toast.error(formatClientErrorMessage(superAdmin.message, "Failed to create invitation"));
+          toast.error(
+            formatClientErrorMessage(
+              superAdmin.message,
+              "We couldn't create the invitation. Try again.",
+            ),
+          );
         } else {
           toast.success("Organization created");
         }
@@ -203,7 +208,7 @@ export default function OrganizationSetupWizard({
         await create();
       }
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to create organization"));
+      toast.error(formatClientErrorMessage(err, "We couldn't create the organization. Try again."));
     } finally {
       setSaving(false);
     }
@@ -250,7 +255,7 @@ export default function OrganizationSetupWizard({
       }
       setCurrentStep("employees");
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to save configuration"));
+      toast.error(formatClientErrorMessage(err, "We couldn't save the setup. Try again."));
     } finally {
       setSaving(false);
     }
@@ -297,7 +302,7 @@ export default function OrganizationSetupWizard({
         onCreated(createdOrg);
       }
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to create employees"));
+      toast.error(formatClientErrorMessage(err, "We couldn't add the staff. Try again."));
     } finally {
       setSaving(false);
     }
@@ -1883,7 +1888,7 @@ export default function OrganizationSetupWizard({
                     }}
                     style={{ accentColor: "var(--dg-color-primary)" }}
                   />
-                  Select All
+                  Select all
                 </label>
 
                 {/* Header */}

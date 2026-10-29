@@ -72,7 +72,7 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
     expect(screen.queryByText("D")).not.toBeInTheDocument();
     // The second day in range has no entry -> empty placeholder, not dropped.
-    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("-")).toBeInTheDocument();
   });
 
   it("marks a pill's schedule notes with one icon in its corner, a stack when several", () => {
@@ -171,7 +171,7 @@ describe("MyScheduleCard", () => {
     // absence type's own name and colours. Only a day with nothing on it at all
     // falls through to the em dash.
     expect(screen.getByText("PTO")).toBeInTheDocument();
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.queryByText("-")).not.toBeInTheDocument();
   });
 
   it("puts the absence for the rest of the day after the shift and says it", () => {
@@ -203,7 +203,7 @@ describe("MyScheduleCard", () => {
     render(<MyScheduleCard accessToken="token" onOpenDay={vi.fn()} />);
 
     const day = screen.getByRole("button", {
-      name: "Monday, May 11. Sick for the rest of the day",
+      name: "Monday, May 11. Sick for part of the day",
     });
     expect(day.textContent!.indexOf("Sick")).toBeGreaterThan(day.textContent!.indexOf("Day Shift"));
   });
@@ -273,7 +273,7 @@ describe("MyScheduleCard", () => {
     render(<MyScheduleCard accessToken="token" />);
 
     expect(screen.queryByText("You're not scheduled this week")).not.toBeInTheDocument();
-    expect(screen.getByText("Could not load your schedule")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load your schedule")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledTimes(1);
@@ -419,7 +419,7 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
     expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
     expect(screen.getByText("Supervisor")).toBeInTheDocument();
-    expect(screen.getByText("7:00 AM–3:00 PM")).toBeInTheDocument();
-    expect(screen.getByText("3:00 PM–11:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("3:00 PM - 11:00 PM")).toBeInTheDocument();
   });
 });

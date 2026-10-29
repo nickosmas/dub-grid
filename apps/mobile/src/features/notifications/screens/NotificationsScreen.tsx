@@ -244,7 +244,7 @@ export default function NotificationsScreen() {
           patchNotificationReadAt(notification.id, null);
           pushClientFriendlyErrorToast(pushToast, {
             error,
-            title: "Could not update alerts",
+            title: "Couldn't update alerts",
             fallbackMessage: "We couldn't mark that alert as read.",
           });
         });
@@ -278,7 +278,7 @@ export default function NotificationsScreen() {
       } catch (error) {
         pushClientFriendlyErrorToast(pushToast, {
           error,
-          title: "Could not update alerts",
+          title: "Couldn't update alerts",
           fallbackMessage: "We couldn't archive that alert.",
         });
       } finally {
@@ -303,7 +303,7 @@ export default function NotificationsScreen() {
       } catch (error) {
         pushClientFriendlyErrorToast(pushToast, {
           error,
-          title: "Could not update alerts",
+          title: "Couldn't update alerts",
           fallbackMessage: "We couldn't update that alert.",
         });
       } finally {
@@ -324,7 +324,7 @@ export default function NotificationsScreen() {
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Could not update alerts",
+        title: "Couldn't update alerts",
         fallbackMessage: "We couldn't mark all alerts as read.",
       });
     } finally {
@@ -434,7 +434,7 @@ export default function NotificationsScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load alerts"
+          title="Couldn't load alerts"
           variant="centered"
           onAction={() => notificationsQuery.refetch()}
         />

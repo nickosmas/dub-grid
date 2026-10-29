@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
     verified.userId,
   );
   if (membershipRows.length === 0) {
-    return NextResponse.json({ error: "No active organization membership found" }, { status: 403 });
+    return NextResponse.json(
+      { error: "You're no longer in an organization. Ask an Admin if that's a mistake." },
+      { status: 403 },
+    );
   }
 
   const claimOrgId =
@@ -73,7 +76,7 @@ export async function GET(req: NextRequest) {
   );
   if (!currentMembership) {
     return NextResponse.json(
-      { error: "Organization context does not match this user" },
+      { error: "You're no longer in this organization. Sign in again to pick another." },
       { status: 403 },
     );
   }

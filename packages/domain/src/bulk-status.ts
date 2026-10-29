@@ -174,8 +174,8 @@ export function describeBulkStatusAction(
     points: [
       ...copy.points,
       planned === 1
-        ? "The change planned for 1 of them is cancelled."
-        : `Changes planned for ${planned} of them are cancelled.`,
+        ? "The change planned for 1 of them is canceled."
+        : `Changes planned for ${planned} of them are canceled.`,
     ],
   };
 }

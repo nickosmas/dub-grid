@@ -140,7 +140,7 @@ export function PlatformBillingPolicyCard() {
           <PolicyRows values={platform} />
         ) : (
           <span style={{ color: "var(--dg-color-text-muted)" }}>
-            {policyQuery.isError ? "We couldn't load the billing policy." : "Loading…"}
+            {policyQuery.isError ? "We couldn't load the billing policy." : "Loading"}
           </span>
         )}
         <p

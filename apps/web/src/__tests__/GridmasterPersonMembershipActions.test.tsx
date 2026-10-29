@@ -99,14 +99,13 @@ describe("PersonMembershipActions", () => {
   it("changes the role in the card's organization through step-up", async () => {
     const { onChanged } = renderActions();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Change this person's role in / })).getByRole(
-        "button",
-        {
-          name: "Change role",
-        },
-      ),
+      within(
+        screen.getByRole("dialog", { name: /^Change this person's access level in / }),
+      ).getByRole("button", {
+        name: "Change access level",
+      }),
     );
 
     await waitFor(() =>
@@ -131,21 +130,20 @@ describe("PersonMembershipActions", () => {
     stepUpRun.mockResolvedValueOnce(false);
     const { onChanged } = renderActions();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Change this person's role in / })).getByRole(
-        "button",
-        {
-          name: "Change role",
-        },
-      ),
+      within(
+        screen.getByRole("dialog", { name: /^Change this person's access level in / }),
+      ).getByRole("button", {
+        name: "Change access level",
+      }),
     );
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("dialog", { name: /^Change this person's role in / }),
+      screen.getByRole("dialog", { name: /^Change this person's access level in / }),
     ).toBeInTheDocument();
   });
 
@@ -244,7 +242,7 @@ describe("PersonMembershipActions", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "Their access changed elsewhere. Review the latest values and try again.",
+        "Someone else just changed their access. Refresh and try again.",
       ),
     );
     expect(onChanged).toHaveBeenCalled();
@@ -263,7 +261,7 @@ describe("PersonMembershipActions", () => {
     unmount();
 
     renderActions(organization({ orgRole: "user", adminPermissions: null }));
-    expect(screen.getByRole("button", { name: "Change role" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change access level" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit permissions" })).not.toBeInTheDocument();
   });
 });

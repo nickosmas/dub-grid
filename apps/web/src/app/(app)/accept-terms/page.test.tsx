@@ -103,7 +103,7 @@ describe("AcceptTermsPage recovery", () => {
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith(
-        "DubGrid is temporarily unavailable. Please try again.",
+        "We can't reach DubGrid right now. Try again in a moment.",
       );
     });
     expect(screen.queryByText("private provider detail")).not.toBeInTheDocument();

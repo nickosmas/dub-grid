@@ -128,9 +128,9 @@ describe("AdminDashboard", () => {
 
     expect(screen.getByText("Review queue")).toBeInTheDocument();
     expect(screen.getByText("Approvals (1)")).toBeInTheDocument();
-    expect(screen.getByText("Casey Lee requested pickup")).toBeInTheDocument();
-    expect(screen.getByText("Day shift \u00b7 2026-05-11")).toBeInTheDocument();
-    expect(screen.getByText("2 urgent coverage slots")).toBeInTheDocument();
+    expect(screen.getByText("Casey Lee sent a pickup request")).toBeInTheDocument();
+    expect(screen.getByText("Day shift \u00b7 Mon, May 11")).toBeInTheDocument();
+    expect(screen.getByText("2 urgent open shifts")).toBeInTheDocument();
     expect(screen.getByText("1 unpublished change")).toBeInTheDocument();
     expect(screen.getByText("these 2 weeks \u00b7 required vs scheduled")).toBeInTheDocument();
     expect(screen.getByText("2 unfilled these 2 weeks")).toBeInTheDocument();

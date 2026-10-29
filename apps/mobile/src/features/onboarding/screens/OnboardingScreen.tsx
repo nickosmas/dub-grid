@@ -37,12 +37,12 @@ const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
   {
     visual: <UpcomingShiftPreview />,
     title: "Your schedule, always with you",
-    body: "See your shifts at a glance, so you always know when and where you're working, and what's coming up next.",
+    body: "See when and where you're working, and what's coming up next.",
   },
   {
     visual: <CoverShiftsPreview />,
     title: "Cover shifts on the go",
-    body: "Pick up open shifts, swap with teammates, or request time off. With manager approval built in.",
+    body: "Pick up open shifts, swap with teammates, or call off, with your manager's approval.",
   },
   // The permission step. It says what the OS prompt is for before the prompt
   // appears, so the reasons card stands where the other slides have a mock-up.

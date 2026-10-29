@@ -246,7 +246,7 @@ describe("audit copy never leaks implementation detail", () => {
       const entry = { action, details: {} };
       expect(describeAction(entry).trim().length).toBeGreaterThan(0);
       expect(formatDetails(entry)).toEqual([]);
-      expect(summarizeDetails(entry)).toBe("—");
+      expect(summarizeDetails(entry)).toBe("-");
     }
   });
 
@@ -292,7 +292,7 @@ describe("audit copy never leaks implementation detail", () => {
         },
       });
     expect(shift(4)).toEqual([
-      { label: "Shift", value: "Working, then an absence for the rest of the day" },
+      { label: "Shift", value: "Working, then an absence for part of the day" },
     ]);
     expect(shift(null)).toEqual([{ label: "Shift", value: "Working" }]);
   });
@@ -316,7 +316,7 @@ describe("audit copy never leaks implementation detail", () => {
     ).toEqual([
       {
         label: "Shift",
-        value: "Working, 7:00 AM – 11:00 AM, with an absence, 11:00 AM – 3:00 PM",
+        value: "Working, 7:00 AM - 11:00 AM, with an absence, 11:00 AM - 3:00 PM",
       },
     ]);
   });

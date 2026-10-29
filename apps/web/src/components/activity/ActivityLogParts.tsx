@@ -60,16 +60,13 @@ export function ActivityDetailsDialog({
 
   const rows: Array<[string, React.ReactNode]> = [
     ["Date and time", formatActivityTimestamp(entry.createdAt, timeZone)],
+    ["By", <ActivityDetailIdentity key="actor" primary={actor} secondary={actorSecondary} />],
     [
-      "Performed by",
-      <ActivityDetailIdentity key="actor" primary={actor} secondary={actorSecondary} />,
-    ],
-    [
-      "Target changed",
+      "Affected",
       <ActivityDetailIdentity key="target" primary={target} secondary={targetSecondary} />,
     ],
-    ["Item type", getResourceTypeLabel(entry.resourceType)],
-    ["Activity type", getAuditCategoryLabel(entry.action)],
+    ["Item", getResourceTypeLabel(entry.resourceType)],
+    ["Kind of change", getAuditCategoryLabel(entry.action)],
   ];
 
   if (showOrganization) {

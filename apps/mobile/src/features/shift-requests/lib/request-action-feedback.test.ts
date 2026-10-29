@@ -12,14 +12,14 @@ describe("getMobileRequestActionFeedback", () => {
     );
     expect(
       getMobileRequestActionFeedback({ requestId: "r1", body, viewerCanApprove: true }).message,
-    ).toBe("As an admin, it goes on the schedule right away.");
+    ).toBe("You can approve requests, so it goes on the schedule right away.");
     expect(
       getMobileRequestActionFeedback({
         requestId: "r1",
         body: { action: "volunteer_open_shift" },
         viewerCanApprove: true,
       }).message,
-    ).toBe("As an admin, it goes on the schedule right away.");
+    ).toBe("You can approve requests, so it goes on the schedule right away.");
   });
 
   it("cautions that the other person hasn't answered when a cancel goes over their head", () => {
@@ -112,7 +112,7 @@ describe("getMobileRequestActionSuccessToast", () => {
     ).toEqual({ title: "Swap approved", message: "Both schedules are updated." });
     expect(getMobileRequestActionSuccessToast({ action: "respond", accept: false })).toEqual({
       title: "Request declined",
-      message: "Your response was sent.",
+      message: "They'll see your answer.",
     });
   });
 });

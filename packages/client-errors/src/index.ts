@@ -25,7 +25,7 @@ export const NETWORK_ERROR_TITLE = "Network connection issue";
 export const NETWORK_ERROR_MESSAGE = "Check your internet connection and try again.";
 
 /** Default fallback when an error can't be translated and isn't safe to show. */
-export const DEFAULT_ERROR_FALLBACK = "Something went wrong. Please try again.";
+export const DEFAULT_ERROR_FALLBACK = "That didn't work. Try again.";
 
 /**
  * Canonical error messages returned by web API route handlers. Use these
@@ -50,6 +50,7 @@ export const API_ERRORS = {
    * named the mechanism and left the reader with nothing to do.
    */
   SERVICE_UNAVAILABLE: "We're having trouble completing that right now. Try again in a moment.",
+  RATE_LIMITED: "Too many tries in a short time. Wait a minute and try again.",
   // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
   // for any forbidden/unauthorized error that isn't one of the specific
   // causes below. Prefer a specific constant at new call sites.
@@ -59,10 +60,8 @@ export const API_ERRORS = {
     "You don't have permission to perform this action. Ask an admin for help.",
   CANNOT_MANAGE_EMPLOYEES:
     "You don't have permission to manage employees. Ask an admin to make this change.",
-  CANNOT_ASSIGN_SUPER_ADMIN: "Only a super admin or gridmaster can assign the super admin role.",
-  SUPER_ADMIN_OR_GRIDMASTER_ONLY: "Only a super admin or gridmaster can send invitations.",
-  GRIDMASTER_ONLY: "This action is restricted to gridmaster accounts.",
-  SUPER_ADMIN_ONLY: "Only a super admin can do this.",
+  CANNOT_ASSIGN_SUPER_ADMIN: "Only a Super Admin can make someone a Super Admin.",
+  SUPER_ADMIN_ONLY: "Only a Super Admin can do this.",
   CANNOT_ACT_FOR_OTHERS: "You can only do this for your own shift requests.",
   CANNOT_VIEW_EMPLOYEE_DETAILS: "You don't have permission to view this employee's details.",
   CANNOT_VIEW_MANAGEMENT_PROFILE: "You don't have permission to view management profiles.",
@@ -135,7 +134,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     // tries to invite, reactivate, or re-add a platform-terminated account.
     pattern: /ACCOUNT_TERMINATED/,
     message:
-      "This account was terminated by the DubGrid platform team. Only a gridmaster can reinstate it.",
+      "DubGrid Support closed this account, so it can't be added. Contact them if it should be reopened.",
   },
   {
     pattern: /unauthorized|forbidden|not authorized|permission denied/i,

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
@@ -119,7 +119,11 @@ export async function POST(req: NextRequest) {
           { status: 403 },
         );
       }
-      return apiErrorResponse(result.error, "We couldn't change role. Try again.", 400);
+      return apiErrorResponse(
+        result.error,
+        "We couldn't change their access level. Try again.",
+        400,
+      );
     }
 
     const resultData = (result.data ?? { status: "success" }) as Record<string, unknown>;

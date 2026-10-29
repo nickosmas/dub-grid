@@ -19,7 +19,7 @@ export default function PrintLegend({
 
   return (
     <div className="print-legend">
-      <div className="print-legend__title">Shift Key</div>
+      <div className="print-legend__title">Shift key</div>
       <div className="print-legend__grid">
         {items.map((s) => (
           <div key={s.id} className="print-legend__item">

@@ -53,10 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
     if (!auth.sessionId) {
-      return NextResponse.json(
-        { error: "Please sign in again before managing devices." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Sign in again to manage your devices." }, { status: 401 });
     }
     try {
       await revokeBulkSessions({

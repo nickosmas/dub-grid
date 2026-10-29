@@ -8,17 +8,17 @@ import type { AdminPermissions } from "@/types";
  * itself against a React component.
  */
 export const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
-  canViewSchedule: "View schedule",
+  canViewSchedule: "View the schedule",
   canEditShifts: "Edit shifts",
-  canPublishSchedule: "Publish schedule",
-  canApplyRecurringSchedule: "Apply recurring schedule",
+  canPublishSchedule: "Publish the schedule",
+  canApplyRecurringSchedule: "Fill from recurring schedules",
   canEditNotes: "Edit schedule notes",
   canViewRecurringShifts: "View recurring shifts",
   canManageRecurringShifts: "Manage recurring shifts",
-  canManageShiftSeries: "Manage shift series",
+  canManageShiftSeries: "Manage repeating shifts",
   canViewStaff: "View staff",
-  canViewEmployeeDetails: "View employee details",
-  canManageEmployees: "Manage employees",
+  canViewEmployeeDetails: "View staff details",
+  canManageEmployees: "Manage staff",
   canViewFocusAreas: "View focus areas",
   canManageFocusAreas: "Manage focus areas",
   canViewScheduleDefinitions: "View shifts and jobs",
@@ -83,7 +83,7 @@ function summarizeList(items: string[]): string {
 
 /**
  * Describe what a permission change actually did, as a sentence fragment:
- * "gave you access to publish schedule" / "removed your access to edit shifts".
+ * "gave you access to publish the schedule" / "removed your access to edit shifts".
  * Returns null when nothing meaningful changed, so the caller can fall back.
  *
  * Only meant for a permission-only edit on someone who stays an admin. A role

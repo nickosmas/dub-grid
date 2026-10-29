@@ -458,9 +458,9 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Jo Park"));
 
     expect(routerPush).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resend invite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoke invite" })).toBeInTheDocument();
     // The sheet names the departments too — the row behind it already does, so
     // both are on screen.
     expect(screen.getAllByText("Clinical Leadership").length).toBeGreaterThan(1);
@@ -587,7 +587,7 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText("Add person"));
     expect(screen.getByText("Scheduled staff")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Management staff"));
+    fireEvent.click(screen.getByText("Management"));
 
     // The chooser leaves first, then the form is presented: iOS refuses a
     // present that overlaps a dismiss.

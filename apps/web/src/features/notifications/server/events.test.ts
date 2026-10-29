@@ -93,7 +93,7 @@ describe("dispatchNotificationEvent", () => {
       "target-user",
       "org-1",
       "shift_request_new",
-      "Swap response needed",
+      "Swap request for you",
       "Alex North sent you a swap request.",
       {
         requestId: "request-1",
@@ -145,8 +145,8 @@ describe("dispatchNotificationEvent", () => {
       "super-admin-user",
       "org-1",
       "shift_request_new",
-      "New calloff request",
-      "Alex North submitted a calloff request that needs your approval.",
+      "Call-off request to approve",
+      "Alex North sent a call-off request.",
       {
         requestId: "request-1",
         requestType: "calloff",
@@ -158,8 +158,8 @@ describe("dispatchNotificationEvent", () => {
       "approver-user",
       "org-1",
       "shift_request_new",
-      "New calloff request",
-      "Alex North submitted a calloff request that needs your approval.",
+      "Call-off request to approve",
+      "Alex North sent a call-off request.",
       {
         requestId: "request-1",
         requestType: "calloff",
@@ -836,16 +836,16 @@ describe("dispatchNotificationEvent", () => {
       "requester-user",
       "org-1",
       "shift_request_rejected",
-      "Request rejected",
-      expect.stringContaining("has been rejected"),
+      "Pickup request rejected",
+      expect.stringContaining("Your schedule stays as it was."),
       expect.objectContaining({ requestId: "req-1" }),
     );
     expect(sendNotification).toHaveBeenCalledWith(
       "claimant-user",
       "org-1",
       "shift_request_rejected",
-      "Claim not approved",
-      expect.stringContaining("wasn't approved"),
+      "Claim rejected",
+      expect.stringContaining("was rejected"),
       expect.objectContaining({ requestId: "req-1", approved: false }),
     );
   });
@@ -853,7 +853,7 @@ describe("dispatchNotificationEvent", () => {
   // Build plan 34: the swap partner is affected as directly as the requester.
   it.each([
     [true, "shift_request_approved", "Swap approved", "was approved"],
-    [false, "shift_request_rejected", "Swap declined", "was declined"],
+    [false, "shift_request_rejected", "Swap rejected", "was rejected"],
   ] as const)(
     "notifies the swap partner at final resolution (approved=%s)",
     async (approved, type, title, phrase) => {
@@ -883,7 +883,7 @@ describe("dispatchNotificationEvent", () => {
         "requester-user",
         "org-1",
         type,
-        expect.stringMatching(/^Request/),
+        expect.stringMatching(/^Swap request/),
         expect.anything(),
         expect.anything(),
       );
@@ -892,7 +892,7 @@ describe("dispatchNotificationEvent", () => {
         "org-1",
         type,
         title,
-        `The swap with Sam Lee ${phrase}. Note: Covered`,
+        `The swap with Sam Lee ${phrase}. Manager's note: Covered`,
         expect.objectContaining({ requestId: "req-1", requestType: "swap", approved }),
       );
     },
@@ -923,16 +923,16 @@ describe("dispatchNotificationEvent", () => {
       "requester-user",
       "org-1",
       "shift_request_rejected",
-      "Request cancelled",
-      "Your swap request was cancelled by a manager. Note: Covered another way",
+      "Request canceled",
+      "A manager canceled your swap request. Manager's note: Covered another way",
       expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
     );
     expect(sendNotification).toHaveBeenCalledWith(
       "partner-user",
       "org-1",
       "shift_request_rejected",
-      "Swap cancelled",
-      "Sam Lee's swap request was cancelled. Note: Covered another way",
+      "Swap canceled",
+      "Sam Lee's swap request was canceled. Manager's note: Covered another way",
       expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
     );
   });
@@ -995,8 +995,8 @@ describe("dispatchNotificationEvent", () => {
       "requester-user",
       "org-1",
       "shift_request_rejected",
-      "Request rejected",
-      expect.stringContaining("has been rejected"),
+      "Pickup request rejected",
+      expect.stringContaining("Your schedule stays as it was."),
       expect.anything(),
     );
   });
@@ -1129,7 +1129,7 @@ describe("dispatchNotificationEvent", () => {
         "approver-user",
         "org-1",
         "shift_request_approved",
-        "Request approved",
+        "Swap request approved",
         "Sam Lee accepted your swap request. It's approved and on the schedule.",
         expect.objectContaining({ requestId: "request-1", approved: true }),
       );

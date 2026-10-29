@@ -641,7 +641,7 @@ describe("PersonDetailScreen", () => {
     expect(emptyStateTitles).not.toContain("Person not found");
   });
 
-  // The layout's static "Staff Profile" is a placeholder for a title that is
+  // The layout's static "Staff profile" is a placeholder for a title that is
   // really the person's name, and leaving it up while the rest of the page is
   // a skeleton reads as the page having loaded with that as the name. Nothing
   // here may feed the bar a title while there is no person to name it after.
@@ -1294,7 +1294,7 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
-          "Away. Not scheduled while away.",
+          "Away. Isn't scheduled.",
           "Suspended. Only someone with an account can be suspended.",
           "Offboarded. No longer on staff. Can't be scheduled.",
         ],
@@ -1374,7 +1374,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Change to")).toBeInTheDocument();
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
-          "Away. Keeps sign-in. Not scheduled while away.",
+          "Away. Can sign in but isn't scheduled.",
           "Suspended. Can't sign in. Stays on the schedule.",
           "Offboarded. No longer on staff. Can't sign in or be scheduled.",
         ],
@@ -1416,7 +1416,7 @@ describe("PersonDetailScreen", () => {
     it("draws the status icon after the name", () => {
       renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
       expect(
-        screen.getByRole("image", { name: "Suspended: won't see this in the app" }),
+        screen.getByRole("image", { name: "Suspended. They can't sign in to see their shifts." }),
       ).toBeInTheDocument();
       cleanup();
       renderWithStatusMutation({ status: "inactive", awayUntil: "2027-01-04" });
@@ -1559,8 +1559,8 @@ describe("PersonDetailScreen", () => {
       expect(
         screen.getAllByText(`Away from ${formatReturnDate(day(5), { weekday: true })}`),
       ).toHaveLength(1);
-      fireEvent.click(screen.getByRole("button", { name: "Cancel planned away" }));
-      confirm("Cancel planned away");
+      fireEvent.click(screen.getByRole("button", { name: "Cancel planned time away" }));
+      confirm("Cancel planned time away");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "cancelPlannedChange",
@@ -1779,14 +1779,14 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
-          "Away. Keeps sign-in. Not scheduled while away.",
+          "Away. Can sign in but isn't scheduled.",
           "Suspended. Can't sign in. Stays on the schedule.",
           `Offboarded. Leaving ${formatReturnDate(day(4), { weekday: true })}. Change it with Edit plan.`,
         ],
       );
       pick(/^Suspended/);
       expect(screen.getByLabelText("Changes")).toHaveTextContent(
-        `The last day planned for ${formatReturnDate(day(4))} is cancelled.`,
+        `The last day planned for ${formatReturnDate(day(4))} is canceled.`,
       );
     });
 
@@ -1895,9 +1895,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Reinstate" }));
       expect(screen.getAllByText("Suspended since Oct 26")).toHaveLength(1);
-      expect(
-        screen.getByText("They'll be Active again and can sign in on the web and in the app."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("They'll be Active again and can sign in.")).toBeInTheDocument();
       confirm("Reinstate");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "reinstate", expectedVersion: 7 });
@@ -2068,9 +2066,9 @@ describe("PersonDetailScreen", () => {
       const names = screen
         .getAllByRole("button")
         .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-      const footStart = names.indexOf("Reinvite");
+      const footStart = names.indexOf("Resend invite");
       expect(names.slice(footStart)).toEqual([
-        "Reinvite",
+        "Resend invite",
         "Revoke invite",
         "Add to schedule",
         "Add to management",
@@ -2082,7 +2080,7 @@ describe("PersonDetailScreen", () => {
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
       expect(
-        assignments.compareDocumentPosition(screen.getByRole("button", { name: "Reinvite" })) &
+        assignments.compareDocumentPosition(screen.getByRole("button", { name: "Resend invite" })) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       // The pair sits above the sections.
@@ -2372,7 +2370,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(accessRow());
       fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
-      confirmDialog("Change role");
+      confirmDialog("Change access level");
 
       expect(allMutatePayloads(mutationCalls)).toContain("admin");
     });
@@ -2523,13 +2521,13 @@ describe("PersonDetailScreen", () => {
       expect(stepUpRun).not.toHaveBeenCalled();
     });
 
-    it("offers Add to Schedule to someone who isn't on it", () => {
+    it("offers Add to schedule to someone who isn't on it", () => {
       renderForSchedule({ focusAreaIds: [], managementDepartmentIds: [9] });
 
       expect(screen.getByRole("button", { name: "Add to schedule" })).toBeInTheDocument();
     });
 
-    it("withholds Add to Schedule from someone already on it", () => {
+    it("withholds Add to schedule from someone already on it", () => {
       renderForSchedule({ focusAreaIds: [2] });
 
       expect(screen.queryByRole("button", { name: "Add to schedule" })).not.toBeInTheDocument();

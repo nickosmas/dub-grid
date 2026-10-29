@@ -55,7 +55,7 @@ function existingWorkLabel(
 
   const assignments = candidate.existingAssignments.map(({ assignmentId, timeRange }) => {
     const label = assignmentLabelById.get(assignmentId) ?? "Unavailable assignment";
-    return timeRange ? `${label}, ${fmt12h(timeRange.start)}–${fmt12h(timeRange.end)}` : label;
+    return timeRange ? `${label}, ${fmt12h(timeRange.start)} - ${fmt12h(timeRange.end)}` : label;
   });
   return assignments.join("; ");
 }
@@ -192,7 +192,7 @@ export function OpenShiftStaffingModal({
         <div className="dg-open-shift-staffing-empty" role="status">
           <UserRound aria-hidden="true" size={22} />
           <strong>No eligible staff</strong>
-          <span>Everyone is unavailable, outside this focus area, or missing a requirement.</span>
+          <span>Nobody qualified is free that day.</span>
         </div>
       ) : visibleCandidates.length === 0 ? (
         <div className="dg-open-shift-staffing-empty" role="status">

@@ -563,7 +563,7 @@ export function computeOpenShifts(
 
     let timeRange = "";
     if (sc.defaultStartTime && sc.defaultEndTime) {
-      timeRange = `${formatTime12h(sc.defaultStartTime)}\u2013${formatTime12h(sc.defaultEndTime)}`;
+      timeRange = `${formatTime12h(sc.defaultStartTime)} - ${formatTime12h(sc.defaultEndTime)}`;
     }
 
     const label =

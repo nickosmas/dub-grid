@@ -145,7 +145,7 @@ function describeScheduleCell(d: AuditDetails): string | null {
   const kind = typeof input.kind === "string" ? input.kind : null;
 
   if (kind === "deleted") return "Cleared";
-  if (kind === "absence") return "Time off";
+  if (kind === "absence") return "Absence";
   if (kind !== "worked") return null;
 
   const segments = Array.isArray(input.segments) ? input.segments : [];
@@ -156,7 +156,7 @@ function describeScheduleCell(d: AuditDetails): string | null {
   parts.push(
     segments.length > 1 ? `Working, ${pluralize(segments.length, "assignment")}` : "Working",
   );
-  if (start && end) parts.push(`${formatClockTime(start)} – ${formatClockTime(end)}`);
+  if (start && end) parts.push(`${formatClockTime(start)} - ${formatClockTime(end)}`);
   // A worked cell's absence type is the absence beside its shifts (items 45
   // and 50), with the time it covers once that is stored.
   if (typeof input.absenceTypeId === "number") {
@@ -164,8 +164,8 @@ function describeScheduleCell(d: AuditDetails): string | null {
     const absenceEnd = typeof input.absenceEndTime === "string" ? input.absenceEndTime : null;
     parts.push(
       absenceStart && absenceEnd
-        ? `with an absence, ${formatClockTime(absenceStart)} – ${formatClockTime(absenceEnd)}`
-        : "then an absence for the rest of the day",
+        ? `with an absence, ${formatClockTime(absenceStart)} - ${formatClockTime(absenceEnd)}`
+        : "then an absence for part of the day",
     );
   }
   return parts.join(", ");
@@ -541,7 +541,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.restore_plan_cancelled": {
     category: "people",
     severity: "update",
-    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned return`,
+    headline: (d, ctx) => `Canceled ${who(d, ctx, "a team member")}'s planned return`,
     suppressKeys: ["returnDate"],
   },
   "employee.away_planned": {
@@ -561,7 +561,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.away_plan_changed": {
     category: "people",
     severity: "update",
-    headline: (d, ctx) => `Changed ${who(d, ctx, "a team member")}'s planned away`,
+    headline: (d, ctx) => `Changed ${who(d, ctx, "a team member")}'s planned time away`,
     suppressKeys: [
       "fromPlannedFrom",
       "fromPlannedUntil",
@@ -573,7 +573,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.away_plan_cancelled": {
     category: "people",
     severity: "update",
-    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned away`,
+    headline: (d, ctx) => `Canceled ${who(d, ctx, "a team member")}'s planned time away`,
     suppressKeys: ["plannedFrom", "plannedUntil"],
   },
   "employee.last_day_set": {
@@ -616,7 +616,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.last_day_cancelled": {
     category: "people",
     severity: "update",
-    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s last day`,
+    headline: (d, ctx) => `Canceled ${who(d, ctx, "a team member")}'s last day`,
     suppressKeys: ["lastDay"],
   },
   "employee.suspended": {
@@ -682,7 +682,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   "employee.suspension_plan_cancelled": {
     category: "people",
     severity: "update",
-    headline: (d, ctx) => `Cancelled ${who(d, ctx, "a team member")}'s planned suspension`,
+    headline: (d, ctx) => `Canceled ${who(d, ctx, "a team member")}'s planned suspension`,
     suppressKeys: ["plannedFrom", "plannedUntil"],
   },
   "employee.removed": {
@@ -1090,7 +1090,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   // ── Setup: single records ──────────────────────────────────────────────────
   ...configRecordSpecs("focus_area", "focus area"),
   ...configRecordSpecs("assignment", "schedule option"),
-  ...configRecordSpecs("absence_type", "time off type"),
+  ...configRecordSpecs("absence_type", "absence type"),
   ...configRecordSpecs("shift_category", "shift"),
   ...configRecordSpecs("job", "job"),
   ...configRecordSpecs("indicator_type", "schedule note"),
@@ -1821,7 +1821,7 @@ export function matchesAuditCategory(action: string, categoryValue: string): boo
 // ── Resource types ───────────────────────────────────────────────────────────
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
-  absence_type: "Time off type",
+  absence_type: "Absence type",
   assignment: "Schedule option",
   audit_log: "Activity log",
   billing: "Billing",

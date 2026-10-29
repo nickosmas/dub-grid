@@ -555,7 +555,7 @@ describe("ReportsPageContent", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Friday, May 8th, 2026/ }));
     expect(screen.getByLabelText("Range")).not.toHaveTextContent("May 4 - May 8");
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
-    expect(screen.getByText("May 4 \u2013 May 8, 2026")).toHaveStyle({
+    expect(screen.getByText("May 4 - May 8, 2026")).toHaveStyle({
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",

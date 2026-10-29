@@ -183,8 +183,6 @@ describe("dashboard empty states", () => {
     expect(screen.getByLabelText("Front Desk Mon: 1 of 2 required slots filled")).toHaveTextContent(
       "1/2",
     );
-    expect(screen.getByLabelText("Front Desk Tue: no coverage requirement")).toHaveTextContent(
-      "\u2014",
-    );
+    expect(screen.getByLabelText("Front Desk Tue: no coverage requirement")).toHaveTextContent("-");
   });
 });

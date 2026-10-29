@@ -193,9 +193,9 @@ describe("describeSeatBreakdown", () => {
     const { billed } = describeSeatBreakdown({ ...base, awayManaging: 1, total: 43 });
     expect(billed[1]).toEqual({
       key: "away-managing",
-      label: "Away staff who can manage",
+      label: "Away Admins and Super Admins",
       count: 1,
-      detail: "People who are away keep their seat while they still have management access.",
+      detail: "They keep their seat while away, since they can still sign in and manage.",
     });
   });
 
@@ -217,17 +217,17 @@ describe("describeSeatBreakdown", () => {
         ACTIVE,
         {
           key: "management-only",
-          label: "Managers without a staff record",
+          label: "Members not on staff",
           count: 2,
-          detail: "People who can sign in to manage the organization but aren't on the schedule.",
+          detail: "People who can sign in but have no staff profile.",
         },
       ],
       notBilled: [
         {
           key: "away",
-          label: "Away staff who can't manage",
+          label: "Other Away staff",
           count: 2,
-          detail: "They don't take a seat until they're back.",
+          detail: "They take a seat again once they're back.",
         },
         {
           key: "archived",

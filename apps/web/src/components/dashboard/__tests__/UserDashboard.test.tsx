@@ -414,7 +414,7 @@ describe("UserDashboard", () => {
     expect(screen.getByTestId("user-dashboard-hero")).toHaveStyle({
       height: "100%",
     });
-    expect(screen.getByText("On Duty")).toBeInTheDocument();
+    expect(screen.getByText("On duty")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("user-dashboard-hero")).queryByText("Avery Stone"),
     ).not.toBeInTheDocument();
@@ -560,10 +560,10 @@ describe("UserDashboard", () => {
     );
 
     const heroBadge = within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
-      "Edited shift",
+      "Changed shift",
     );
     expect(heroBadge).toHaveAttribute("data-publish-badge", "time");
-    expect(heroBadge).toHaveTextContent("Edited");
+    expect(heroBadge).toHaveTextContent("Changed");
     expect(
       within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
         "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
@@ -625,7 +625,7 @@ describe("UserDashboard", () => {
     );
 
     const hero = screen.getByTestId("user-dashboard-hero");
-    expect(within(hero).getByLabelText("Edited shift")).toHaveTextContent("Edited");
+    expect(within(hero).getByLabelText("Changed shift")).toHaveTextContent("Changed");
     expect(within(hero).queryByText(/^Was/)).not.toBeInTheDocument();
     expect(within(hero).queryByLabelText(/Previous shift/)).not.toBeInTheDocument();
   });
@@ -1290,7 +1290,7 @@ describe("UserDashboard", () => {
       const hero = screen.getByTestId("user-dashboard-hero");
 
       // Org-local 1:00 PM → mid-shift. Browser-UTC math would mark it finished.
-      expect(within(hero).getByText("On Duty")).toBeInTheDocument();
+      expect(within(hero).getByText("On duty")).toBeInTheDocument();
       expect(within(hero).getByText(/Ends in/)).toBeInTheDocument();
       expect(within(hero).queryByText("Completed")).not.toBeInTheDocument();
     } finally {
@@ -1683,7 +1683,7 @@ describe("UserDashboard", () => {
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     expect(
       within(myWeek).getByLabelText(
-        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care; Sick for the rest of the day",
+        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care; Sick for part of the day",
       ),
     ).toBeInTheDocument();
     expect(within(myWeek).queryByText("Sick")).not.toBeInTheDocument();
@@ -1736,7 +1736,7 @@ describe("UserDashboard", () => {
     render(<UserDashboard {...makeProps({ currentEmpId: null, currentEmployee: undefined })} />);
 
     expect(screen.getByTestId("user-dashboard-unlinked")).toBeInTheDocument();
-    expect(screen.getByText("No linked staff profile")).toBeInTheDocument();
+    expect(screen.getByText("Your account isn't linked to a staff profile")).toBeInTheDocument();
   });
 });
 

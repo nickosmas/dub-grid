@@ -66,8 +66,8 @@ describe("ImportResultsModal", () => {
 
     render(
       <ImportResultsModal
-        sourceRange="Jul 19, 2026 – Aug 1, 2026"
-        targetRange="Aug 2, 2026 – Aug 15, 2026"
+        sourceRange="Jul 19, 2026 - Aug 1, 2026"
+        targetRange="Aug 2, 2026 - Aug 15, 2026"
         outcomes={outcomes}
         breakdown={breakdown}
         nameByEmpId={nameByEmpId}
@@ -98,8 +98,8 @@ describe("ImportResultsModal", () => {
 
     render(
       <ImportResultsModal
-        sourceRange="Jul 19, 2026 – Aug 1, 2026"
-        targetRange="Aug 2, 2026 – Aug 15, 2026"
+        sourceRange="Jul 19, 2026 - Aug 1, 2026"
+        targetRange="Aug 2, 2026 - Aug 15, 2026"
         outcomes={outcomes}
         breakdown={breakdown}
         nameByEmpId={new Map()}
@@ -123,8 +123,8 @@ describe("ImportResultsModal", () => {
 
     render(
       <ImportResultsModal
-        sourceRange="Jul 19, 2026 – Aug 1, 2026"
-        targetRange="Aug 2, 2026 – Aug 15, 2026"
+        sourceRange="Jul 19, 2026 - Aug 1, 2026"
+        targetRange="Aug 2, 2026 - Aug 15, 2026"
         outcomes={outcomes}
         breakdown={summarizeImportPreviousOutcomes(outcomes)}
         nameByEmpId={buildEmployeeNameById([

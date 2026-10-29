@@ -61,6 +61,7 @@ import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Banner } from "@/components/ui/Banner";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 interface ProfilePanelProps {
   user: User | null;
@@ -85,7 +86,7 @@ interface ProfilePanelProps {
    *  panels use before letting anyone edit a person's management access. */
   canManageManagementAccess: boolean;
   /** True when the viewer can manage employees — the same gate the People
-   *  directory panels use before showing "Add to Schedule". */
+   *  directory panels use before showing "Add to schedule". */
   canManageScheduleEmployees: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
@@ -121,7 +122,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
           color: value ? "var(--dg-color-text-primary)" : "var(--dg-color-text-subtle)",
         }}
       >
-        {value || "—"}
+        {value || "-"}
       </span>
     </div>
   );
@@ -518,9 +519,7 @@ export function ProfilePanel({
     } catch (err) {
       if (err instanceof EmployeeProfileConflictError) {
         setEmployee(err.latestEmployee);
-        toast.error(
-          "Your staff profile changed elsewhere. Review the latest values and try again.",
-        );
+        toast.error(changedElsewhereMessage("your profile"));
         return;
       }
       toast.error(extractErrorMessage(err, "We couldn't update your profile. Try again."));
@@ -606,8 +605,8 @@ export function ProfilePanel({
       setChangeRequests((cur) => cur.map((r) => (r.id === result.request.id ? result.request : r)));
       toast.success(
         request.type === "account_deletion"
-          ? "Account deletion request cancelled."
-          : "Name change request cancelled.",
+          ? "Account deletion request canceled."
+          : "Name change request canceled.",
       );
     } catch (err) {
       toast.error(extractErrorMessage(err, "We couldn't cancel that request. Try again."));
@@ -633,7 +632,7 @@ export function ProfilePanel({
       ? {
           title: "Save your account and contact changes?",
           message: undefined,
-          confirmLabel: "Confirm save",
+          confirmLabel: "Save",
           variant: "info" as const,
           loading: saving,
         }
@@ -871,7 +870,7 @@ export function ProfilePanel({
                   onClick={() => setIsEditingManagementAccess(true)}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
-                  {showManagementAccess ? "Edit management access" : "Add to Management"}
+                  {showManagementAccess ? "Edit management access" : "Add to management"}
                 </Button>
               )}
             </div>
@@ -891,7 +890,7 @@ export function ProfilePanel({
                 onClick={() => setShowAddToSchedule(true)}
                 className="dg-btn dg-btn-secondary dg-btn-sm self-start"
               >
-                Add to Schedule
+                Add to schedule
               </Button>
             )}
           </div>

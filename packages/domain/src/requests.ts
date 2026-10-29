@@ -5,7 +5,7 @@ export type ShiftRequestStatus =
 
 const SHIFT_REQUEST_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
   canceled: "Canceled",
   expired: "Expired",
   open: "Open",

@@ -260,7 +260,7 @@ describe("OrgLogin submit states", () => {
       expect(submitBtn).toBeDisabled();
       // Spinner SVG replaces button text while loading
       expect(submitBtn.querySelector("svg")).toBeInTheDocument();
-      expect(screen.queryByText("Signing you in…")).not.toBeInTheDocument();
+      expect(screen.queryByText("Signing you in")).not.toBeInTheDocument();
     });
   });
 
@@ -889,7 +889,7 @@ describe("OrgLogin submit states", () => {
     submitForm(container);
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        "DubGrid is temporarily unavailable. Please try again.",
+        "We can't reach DubGrid right now. Try again in a moment.",
       );
     });
     submitForm(container);

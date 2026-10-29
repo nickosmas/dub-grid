@@ -18,8 +18,8 @@ describe("DraftBanner", () => {
 
     const counts = screen.getByLabelText("Change counts and color key");
     expect(screen.getByText("1 new")).toBeInTheDocument();
-    expect(screen.getByText("2 edited")).toBeInTheDocument();
-    expect(screen.getByText("1 deleted")).toBeInTheDocument();
+    expect(screen.getByText("2 changed")).toBeInTheDocument();
+    expect(screen.getByText("1 removed")).toBeInTheDocument();
     expect(counts.querySelector('[data-change-legend-dot="modified"]')).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
@@ -43,8 +43,8 @@ describe("DraftBanner", () => {
 
     const counts = screen.getByLabelText("Change counts and color key");
     expect(screen.getByText("3 new")).toBeInTheDocument();
-    expect(screen.queryByText(/edited/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/deleted/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/changed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/removed/)).not.toBeInTheDocument();
     expect(counts.querySelector('[data-change-legend-dot="deleted"]')).toBeNull();
   });
 

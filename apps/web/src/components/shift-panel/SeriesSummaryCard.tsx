@@ -141,7 +141,7 @@ export function SeriesSummaryCard({
           title="Repeating"
           subtitle={
             status === "loading"
-              ? "Loading its dates…"
+              ? "Loading its dates"
               : status === "failed"
                 ? "We couldn't load its dates."
                 : null

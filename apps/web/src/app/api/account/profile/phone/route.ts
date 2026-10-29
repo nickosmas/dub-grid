@@ -13,6 +13,7 @@ import { z } from "zod";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { extractRawErrorMessage } from "@/lib/client-facing";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 const phoneUpdateSchema = z.object({
   orgId: z.string().uuid(),
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest) {
     if (profileConflict.code === "EMPLOYEE_CONFLICT" && profileConflict.employee) {
       return NextResponse.json(
         {
-          error: "Your staff profile changed elsewhere. Review the latest values and try again.",
+          error: changedElsewhereMessage("your profile"),
           code: "EMPLOYEE_CONFLICT",
           employee: profileConflict.employee,
         },

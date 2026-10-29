@@ -52,12 +52,7 @@ export function ActivityEmptyPeriod({
             ? "No matching activity"
             : `No activity ${periodPhrase}`
       }
-      description={
-        description ??
-        (hasFilters
-          ? "Nothing in this period matches the current filters."
-          : "Nothing was recorded in this period.")
-      }
+      description={description}
       action={action}
     />
   );

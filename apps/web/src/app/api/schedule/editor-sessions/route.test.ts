@@ -192,7 +192,7 @@ describe("/api/schedule/editor-sessions", () => {
 
       expect(response.status).toBe(503);
       const body = (await response.json()) as { error: string };
-      expect(body.error).toMatch(/isn't available/i);
+      expect(body.error).toMatch(/can't close your other schedule tabs/i);
       expect(body.error).not.toMatch(/try again/i);
     });
 

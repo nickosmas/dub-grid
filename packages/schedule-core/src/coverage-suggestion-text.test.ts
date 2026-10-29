@@ -195,8 +195,7 @@ describe("describeCoverageSuggestion", () => {
       title:
         "Approve Ben Shepherd's pickup request for Day Shift · Med Aide in Skilled Nursing on Mon, Oct 26",
       detail: "Ben Shepherd asked to pick up this shift, and the request is waiting for approval.",
-      outcome:
-        "Publishes right away: staff see it without a publish, and it replaces any draft of that day.",
+      outcome: "Publishes right away and replaces any draft change to that day.",
       effect: "Closes 1 gap",
       changes: [
         "Mon, Oct 26 · Skilled Nursing · Day Shift · Med Aide: 1/2 staffed now, 2/2 after (staffed)",
@@ -244,7 +243,8 @@ describe("describeCoverageSuggestion", () => {
     );
     expect(first("pattern", suggestions)).toEqual({
       title: "Skilled Nursing · Day Shift · Med Aide is short every Monday in this period",
-      detail: "Nobody qualified is free on those days. A repeating shift would stop it recurring.",
+      detail:
+        "Nobody qualified is free on those days. A recurring schedule for someone would fill them each week.",
       outcome: null,
       effect: null,
       changes: [],
@@ -267,7 +267,7 @@ describe("describeCoverageRuledOut", () => {
 
   it.each([
     [{ kind: "absence", absenceTypeId: 7 }, "Ana Crawford: Sick that day"],
-    [{ kind: "restOfDayAbsence", absenceTypeId: 7 }, "Ana Crawford: Sick for the rest of the day"],
+    [{ kind: "restOfDayAbsence", absenceTypeId: 7 }, "Ana Crawford: Sick for part of the day"],
     [
       { kind: "overlap", dateKey: MON, assignmentId: EVE_SC },
       "Ana Crawford: works Evening Shift that day, which overlaps",

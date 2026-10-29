@@ -88,7 +88,7 @@ export default function RequestDemoPage() {
           orgNameError ??
           industryError ??
           messageError ??
-          "Please fill in all required fields.",
+          "Fill in all required fields.",
       );
       return;
     }

@@ -58,9 +58,9 @@ describe("management confirmation errors", () => {
   });
 
   it.each([
-    ["member", "Remove from Management", "Remove access"],
-    ["pending_invite", "Reinvite", "Reissue Invitation"],
-    ["pending_invite", "Revoke Invitation", "Revoke Invitation"],
+    ["member", "Remove from management", "Remove access"],
+    ["pending_invite", "Resend invite", "Resend"],
+    ["pending_invite", "Revoke invite", "Revoke"],
   ] as const)(
     "shows %s / %s failures in the active confirmation",
     async (source, trigger, confirm) => {

@@ -21,11 +21,9 @@ export default function GlobalError({
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <div className="dg-fatal">
-          <h1>Something went wrong</h1>
-          <p>
-            We couldn&apos;t load DubGrid. Try again, and refresh the page if it keeps happening.
-          </p>
-          <Button onClick={reset}>Try Again</Button>
+          <h1>This page didn&apos;t load</h1>
+          <p>If trying again doesn&apos;t help, refresh the page.</p>
+          <Button onClick={reset}>Try again</Button>
           <a href={SERVICE_STATUS_URL} target="_blank" rel="noopener noreferrer">
             Check service status
           </a>

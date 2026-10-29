@@ -76,7 +76,7 @@ export function TwoFactorReenrollGate({ children }: PropsWithChildren) {
         onDismiss={() => {}}
         visible={visible}
       >
-        <SheetCopy body="DubGrid support reset two-factor sign-in on your account. Set up an authenticator app to keep using DubGrid." />
+        <SheetCopy body="DubGrid Support reset two-factor on your account. Set it up again to keep using the app." />
       </BottomSheetModal>
     </>
   );
