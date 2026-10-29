@@ -1,0 +1,473 @@
+<title>Footer Dividers</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one rule up top, then three before/after rows (card, popup, slideover) drawn with DubGrid's own tokens. */
+:root {
+  --bg: #fcfcfc;
+  --bg-secondary: #eeeeee;
+  --surface: #ffffff;
+  --border: #e5e5e5;
+  --border-light: #ededed;
+  --control-border: #d4d4d4;
+  --text: #171717;
+  --text-muted: #525252;
+  --brand: #2563eb;
+  --brand-soft: #eff4ff;
+  --on-brand: #ffffff;
+  --danger: #dc2626;
+  --scrim: rgba(23, 23, 23, 0.32);
+  --page-ghost: #f3f3f3;
+  --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.18);
+  --mark-before: #b45309;
+  --mark-after: #15803d;
+  --highlight: rgba(37, 99, 235, 0.55);
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --line: var(--border-light);
+  --fill-slight: #f8f8f8;
+  --fill-gray: #eeeeee;
+  --foot-fill: var(--fill-slight);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #02070f; --bg-secondary: #1c1c1f; --surface: #121214; --border: #2e2e33;
+    --border-light: #2a2a2f; --control-border: #2e2e33; --text: #f1f1f3; --text-muted: #a1a1aa;
+    --brand: #2075ff; --brand-soft: #0f1d36; --on-brand: #ffffff; --danger: #f87171;
+    --scrim: rgba(0, 0, 0, 0.6); --page-ghost: #0b1018; --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.85);
+    --mark-before: #f59e0b; --mark-after: #4ade80; --highlight: rgba(32, 117, 255, 0.7);
+    --fill-slight: #17171a; --fill-gray: #1c1c1f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #02070f; --bg-secondary: #1c1c1f; --surface: #121214; --border: #2e2e33;
+  --border-light: #2a2a2f; --control-border: #2e2e33; --text: #f1f1f3; --text-muted: #a1a1aa;
+  --brand: #2075ff; --brand-soft: #0f1d36; --on-brand: #ffffff; --danger: #f87171;
+  --scrim: rgba(0, 0, 0, 0.6); --page-ghost: #0b1018; --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.85);
+  --mark-before: #f59e0b; --mark-after: #4ade80; --highlight: rgba(32, 117, 255, 0.7);
+  --fill-slight: #17171a; --fill-gray: #1c1c1f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* Intro */
+.intro { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.intro p { margin: 0; color: var(--text-muted); font-size: 15px; max-width: 65ch; }
+.rule {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+@media (max-width: 640px) { .rule { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rule div { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.rule dt { font-size: 12px; color: var(--text-muted); }
+.rule dd { margin: 0; font-weight: 600; font-size: 13.5px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+.control { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-muted); }
+.seg { display: inline-flex; border: 1px solid var(--control-border); border-radius: 8px; padding: 2px; background: var(--surface); }
+.seg button {
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--text-muted);
+  border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--bg-secondary); color: var(--text); }
+.seg button:focus-visible, .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Rows */
+section.row { display: flex; flex-direction: column; gap: 16px; }
+.row-head { display: flex; flex-direction: column; gap: 4px; }
+.row-head h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.row-head p { margin: 0; color: var(--text-muted); max-width: 70ch; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+figcaption { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+figcaption .dot { width: 8px; height: 8px; border-radius: 99px; }
+.before figcaption { color: var(--mark-before); }
+.before .dot { background: var(--mark-before); }
+.after figcaption { color: var(--mark-after); }
+.after .dot { background: var(--mark-after); }
+figcaption span.note { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); }
+
+/* DubGrid primitives */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 38px; padding: 0 16px; border-radius: 6px; border: 0;
+  font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: default;
+}
+.btn-primary { background: var(--brand); color: var(--on-brand); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--control-border); }
+.btn-danger-ghost { background: transparent; color: var(--danger); padding: 0 10px; }
+.btn[disabled] { opacity: 0.5; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  --pad: 20px;
+}
+.card-head { padding: 14px var(--pad); border-bottom: 1px solid var(--border-light); font-weight: 600; font-size: 15px; }
+.card-body { padding: var(--pad); display: flex; flex-direction: column; gap: 14px; }
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.setting > div { min-width: 0; }
+.setting b { display: block; font-weight: 600; font-size: 14px; }
+.setting small { display: block; color: var(--text-muted); font-size: 13px; }
+.select {
+  flex-shrink: 0; height: 36px; padding: 0 10px; min-width: 128px;
+  border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface);
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13.5px;
+}
+.select::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--text-muted); border-bottom: 1.5px solid var(--text-muted); transform: translateY(-2px) rotate(45deg); }
+.switch { flex-shrink: 0; width: 40px; height: 22px; border-radius: 99px; background: var(--brand); position: relative; }
+.switch::after { content: ""; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 99px; background: #fff; }
+.switch.off { background: var(--control-border); }
+.switch.off::after { right: auto; left: 3px; }
+
+/* The footer under test */
+.foot {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 12px;
+  padding: 14px var(--pad);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.after .foot, .choice .foot { background: var(--foot-fill); }
+.f-white { --foot-fill: var(--surface); }
+.f-gray { --foot-fill: var(--fill-gray); }
+.foot .note { flex: 1 1 220px; min-width: 0; font-size: 12.5px; color: var(--text-muted); }
+.foot .spacer { flex: 1; }
+.inline-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+/* Inset variant: the line stops at the content edge instead of the container edge. */
+.v-inset .after .foot { margin-inline: var(--pad); padding-inline: 0; }
+
+.show-lines .after .foot { box-shadow: inset 0 1px 0 0 var(--highlight); border-top-color: transparent; }
+
+/* Popup */
+.stage {
+  position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+  background: var(--page-ghost); min-height: 340px; display: grid; place-items: center; padding: 24px 16px;
+}
+.stage::before { content: ""; position: absolute; inset: 0; background: var(--scrim); }
+.ghost-lines { position: absolute; inset: 18px; display: flex; flex-direction: column; gap: 10px; }
+.ghost-lines i { display: block; height: 10px; border-radius: 4px; background: var(--border); }
+.modal {
+  position: relative; width: 100%; max-width: 400px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-modal); overflow: hidden; --pad: 28px;
+}
+.modal-body { padding: 24px var(--pad) 20px; display: flex; flex-direction: column; gap: 8px; }
+.modal-body h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.modal-body p { margin: 0; color: var(--text-muted); font-size: 13.5px; }
+.modal-body .inline-actions { margin-top: 16px; }
+.modal .foot { padding-block: 16px; }
+
+/* Slideover */
+.stage.side { place-items: stretch; justify-items: end; padding: 0; min-height: 460px; }
+.panel {
+  position: relative; width: min(360px, 88%); height: 100%;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; --pad: 20px;
+}
+.panel-head { padding: 16px var(--pad); border-bottom: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 2px; }
+.panel-head b { font-size: 15px; }
+.panel-head small { color: var(--text-muted); font-size: 12.5px; }
+.panel-body { flex: 1; padding: 16px var(--pad); display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 500; color: var(--text-muted); }
+.input { height: 36px; border: 1px solid var(--control-border); border-radius: 6px; padding: 0 10px; display: flex; align-items: center; font-size: 13.5px; background: var(--surface); }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { height: 30px; padding: 0 12px; border-radius: 6px; display: inline-flex; align-items: center; font-weight: 600; font-size: 13px; background: #a5f3fc; color: #155e75; }
+.pill.e { background: #c7d2fe; color: #3730a3; }
+.pill.n { background: #bbf7d0; color: #166534; }
+.panel .inline-actions { padding-top: 4px; }
+.panel .foot { margin-top: auto; }
+
+/* Decision */
+.decide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .decide { grid-template-columns: minmax(0, 1fr); } }
+.choice { display: flex; flex-direction: column; gap: 10px; }
+.choice h3 { margin: 0; font-size: 15px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.choice p { margin: 0; color: var(--text-muted); font-size: 13.5px; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--brand-soft); color: var(--brand); }
+.choice .modal { max-width: none; }
+.choice.inset .foot { margin-inline: var(--pad); padding-inline: 0; }
+
+.scope { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.scope li { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.scope b { font-size: 13.5px; }
+.scope span { color: var(--text-muted); font-size: 13px; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 480px) {
+  h1 { font-size: 23px; }
+  .setting { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .foot { transition: box-shadow 160ms ease, margin 160ms ease, padding 160ms ease; }
+}
+</style>
+
+<div class="wrap" id="root">
+  <header class="intro">
+    <span class="eyebrow">DubGrid prototype · web</span>
+    <h1>A line above every row of bottom buttons</h1>
+    <p>Cards, popups and slideovers all end the same way: a thin line across the container, then the buttons in a footer strip, right-aligned. Each row below shows how the surface looks today and how it would look. Use the toggles to try the footer fill and how far the line reaches.</p>
+    <dl class="rule">
+      <div><dt>Line</dt><dd>1px, border-light</dd></div>
+      <div><dt>Footer fill</dt><dd id="fill-label">Slight gray</dd></div>
+      <div><dt>Spacing</dt><dd>14 to 16px above and below</dd></div>
+      <div><dt>Buttons</dt><dd>Right; Delete alone on the left</dd></div>
+    </dl>
+    <div class="controls">
+      <div class="control">
+        <span id="lbl-fill">Footer fill</span>
+        <div class="seg" role="group" aria-labelledby="lbl-fill">
+          <button type="button" data-fill="f-white" aria-pressed="false">White</button>
+          <button type="button" data-fill="" aria-pressed="true">Slight gray</button>
+          <button type="button" data-fill="f-gray" aria-pressed="false">Gray</button>
+        </div>
+      </div>
+      <div class="control">
+        <span id="lbl-variant">Line reaches</span>
+        <div class="seg" role="group" aria-labelledby="lbl-variant">
+          <button type="button" id="v-edge" aria-pressed="true">Edge to edge</button>
+          <button type="button" id="v-inset" aria-pressed="false">Content width</button>
+        </div>
+      </div>
+      <div class="control">
+        <span id="lbl-hl">Highlight the line</span>
+        <div class="seg" role="group" aria-labelledby="lbl-hl">
+          <button type="button" id="hl-off" aria-pressed="true">Off</button>
+          <button type="button" id="hl-on" aria-pressed="false">On</button>
+        </div>
+      </div>
+      <div class="control">
+        <span id="lbl-theme">Theme</span>
+        <div class="seg" role="group" aria-labelledby="lbl-theme">
+          <button type="button" data-theme-set="" aria-pressed="true">System</button>
+          <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="row" aria-labelledby="h-card">
+    <div class="row-head">
+      <h2 id="h-card">Card · Settings &gt; Schedule Rules</h2>
+      <p>Save sits in the body today, right under the last setting, so it reads as part of that setting. It moves into a footer like Display and Billing already have.</p>
+    </div>
+    <div class="pair">
+      <figure class="before">
+        <figcaption><i class="dot"></i>Today <span class="note">Save inside the body</span></figcaption>
+        <div class="card">
+          <div class="card-head">Schedule rules</div>
+          <div class="card-body">
+            <div class="setting"><div><b>Block overlapping shifts</b><small>When on, overlapping shifts can't be saved.</small></div><span class="switch"></span></div>
+            <div class="setting"><div><b>Day off absence</b><small>Auto-build writes it into each empty day.</small></div><span class="select">Day Off</span></div>
+            <div class="setting"><div><b>Show call-off vacancies to staff</b><small>Open shifts left by a call-off.</small></div><span class="select">Always</span></div>
+            <div class="inline-actions"><button class="btn btn-primary" type="button" tabindex="-1">Save</button></div>
+          </div>
+        </div>
+      </figure>
+      <figure class="after">
+        <figcaption><i class="dot"></i>Proposed <span class="note">Save in a footer under a line</span></figcaption>
+        <div class="card">
+          <div class="card-head">Schedule rules</div>
+          <div class="card-body">
+            <div class="setting"><div><b>Block overlapping shifts</b><small>When on, overlapping shifts can't be saved.</small></div><span class="switch"></span></div>
+            <div class="setting"><div><b>Day off absence</b><small>Auto-build writes it into each empty day.</small></div><span class="select">Day Off</span></div>
+            <div class="setting"><div><b>Show call-off vacancies to staff</b><small>Open shifts left by a call-off.</small></div><span class="select">Always</span></div>
+          </div>
+          <div class="foot"><button class="btn btn-secondary" type="button" tabindex="-1">Discard</button><button class="btn btn-primary" type="button" tabindex="-1">Save</button></div>
+        </div>
+      </figure>
+    </div>
+    <div class="pair">
+      <figure class="before">
+        <figcaption><i class="dot"></i>Today <span class="note">Billing before this morning: full gray</span></figcaption>
+        <div class="card">
+          <div class="card-head">DubGrid subscription</div>
+          <div class="card-body"><div class="setting"><div><b>Your free trial ends on Sunday, January 10, 2027.</b><small>That's 73 days from today. You won't be charged until the trial ends.</small></div></div></div>
+          <div class="foot" style="background: var(--bg-secondary)"><span class="note">Payment methods and invoices are managed in the Stripe billing portal.</span><button class="btn btn-secondary" type="button" tabindex="-1">Refresh</button><button class="btn btn-primary" type="button" tabindex="-1">Start subscription</button></div>
+        </div>
+      </figure>
+      <figure class="after">
+        <figcaption><i class="dot"></i>Proposed <span class="note">A footer note sits left of the buttons</span></figcaption>
+        <div class="card">
+          <div class="card-head">DubGrid subscription</div>
+          <div class="card-body"><div class="setting"><div><b>Your free trial ends on Sunday, January 10, 2027.</b><small>That's 73 days from today. You won't be charged until the trial ends.</small></div></div></div>
+          <div class="foot"><span class="note">Payment methods and invoices are managed in the Stripe billing portal.</span><button class="btn btn-secondary" type="button" tabindex="-1">Refresh</button><button class="btn btn-primary" type="button" tabindex="-1">Start subscription</button></div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="h-modal">
+    <div class="row-head">
+      <h2 id="h-modal">Popup · Publish schedule</h2>
+      <p>Confirmation popups place their buttons straight under the message. Popups that already have a footer draw the line, but only across the text width.</p>
+    </div>
+    <div class="pair">
+      <figure class="before">
+        <figcaption><i class="dot"></i>Today <span class="note">Buttons under the text, no line</span></figcaption>
+        <div class="stage">
+          <div class="ghost-lines" aria-hidden="true"><i style="width:40%"></i><i></i><i></i><i style="width:70%"></i><i></i><i style="width:55%"></i></div>
+          <div class="modal" role="presentation">
+            <div class="modal-body">
+              <h3>Publish Nov 2 to Nov 15?</h3>
+              <p>14 people get a schedule change alert. The draft closes 3 coverage gaps and opens none.</p>
+              <div class="inline-actions"><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Publish</button></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <figure class="after">
+        <figcaption><i class="dot"></i>Proposed <span class="note">Line, then the buttons</span></figcaption>
+        <div class="stage">
+          <div class="ghost-lines" aria-hidden="true"><i style="width:40%"></i><i></i><i></i><i style="width:70%"></i><i></i><i style="width:55%"></i></div>
+          <div class="modal" role="presentation">
+            <div class="modal-body">
+              <h3>Publish Nov 2 to Nov 15?</h3>
+              <p>14 people get a schedule change alert. The draft closes 3 coverage gaps and opens none.</p>
+            </div>
+            <div class="foot"><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Publish</button></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="h-panel">
+    <div class="row-head">
+      <h2 id="h-panel">Slideover · Edit a shift</h2>
+      <p>The footer is pinned to the bottom of the panel, so the line also marks where the scrolling form ends and the buttons begin. A destructive action keeps the left edge.</p>
+    </div>
+    <div class="pair">
+      <figure class="before">
+        <figcaption><i class="dot"></i>Today <span class="note">Buttons follow the last field</span></figcaption>
+        <div class="stage side">
+          <div class="ghost-lines" aria-hidden="true"><i style="width:30%"></i><i style="width:60%"></i><i style="width:45%"></i><i style="width:55%"></i></div>
+          <div class="panel">
+            <div class="panel-head"><b>Maria Lopez</b><small>Tuesday, November 4</small></div>
+            <div class="panel-body">
+              <div class="field"><label>Shifts</label><div class="pills"><span class="pill">D</span><span class="pill e">EVE</span><span class="pill n">N</span></div></div>
+              <div class="field"><label>Time</label><div class="input">7:00 AM - 3:00 PM</div></div>
+              <div class="field"><label>Focus area</label><div class="input">North Wing</div></div>
+              <div class="inline-actions"><button class="btn btn-danger-ghost" type="button" tabindex="-1">Delete</button><span style="flex:1"></span><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Save</button></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <figure class="after">
+        <figcaption><i class="dot"></i>Proposed <span class="note">Pinned footer under a line</span></figcaption>
+        <div class="stage side">
+          <div class="ghost-lines" aria-hidden="true"><i style="width:30%"></i><i style="width:60%"></i><i style="width:45%"></i><i style="width:55%"></i></div>
+          <div class="panel">
+            <div class="panel-head"><b>Maria Lopez</b><small>Tuesday, November 4</small></div>
+            <div class="panel-body">
+              <div class="field"><label>Shifts</label><div class="pills"><span class="pill">D</span><span class="pill e">EVE</span><span class="pill n">N</span></div></div>
+              <div class="field"><label>Time</label><div class="input">7:00 AM - 3:00 PM</div></div>
+              <div class="field"><label>Focus area</label><div class="input">North Wing</div></div>
+            </div>
+            <div class="foot"><button class="btn btn-danger-ghost" type="button" tabindex="-1">Delete</button><span class="spacer"></span><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Save</button></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="h-decide">
+    <div class="row-head">
+      <h2 id="h-decide">One choice to make: how far the line reaches</h2>
+      <p>Cards and slideovers run the line edge to edge. Popups today stop it at the text. Picking one makes every container match; the toggle at the top switches all the proposed mockups.</p>
+    </div>
+    <div class="decide">
+      <div class="choice">
+        <h3>Edge to edge <span class="tag">Recommended</span></h3>
+        <p>Matches the card header's divider and the existing card and slideover footers, so a popup reads as the same object.</p>
+        <div class="modal"><div class="modal-body"><h3>Remove this day?</h3><p>Vacation on Thu, Nov 6 is removed from the draft. You can undo it.</p></div><div class="foot"><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Remove</button></div></div>
+      </div>
+      <div class="choice inset">
+        <h3>Content width</h3>
+        <p>How popup footers draw it today. Lighter, but it no longer lines up with the card and slideover footers, and a gray fill can't stop short of the edge without looking like a floating box.</p>
+        <div class="modal"><div class="modal-body"><h3>Remove this day?</h3><p>Vacation on Thu, Nov 6 is removed from the draft. You can undo it.</p></div><div class="foot"><button class="btn btn-secondary" type="button" tabindex="-1">Cancel</button><button class="btn btn-primary" type="button" tabindex="-1">Remove</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="h-scope">
+    <div class="row-head">
+      <h2 id="h-scope">Where it lands in code</h2>
+      <p>A few shared pieces carry most screens, so the change is mostly in them, then the one-off rows move onto them.</p>
+    </div>
+    <ul class="scope">
+      <li><b>Popups</b><span><code>Modal</code> footer runs edge to edge; <code>ConfirmDialog</code> moves its buttons into the footer.</span></li>
+      <li><b>Slideovers</b><span><code>SheetFooter</code> and the panel footers share one bordered, pinned footer.</span></li>
+      <li><b>Cards</b><span>One card footer for Settings, billing and Gridmaster; inline Save rows move into it.</span></li>
+      <li><b>Exceptions</b><span>Short choice lists that end in one button (the quiet popup footer) keep no line.</span></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById("root");
+  function press(group, active) {
+    group.forEach(function (b) { b.setAttribute("aria-pressed", String(b === active)); });
+  }
+  var edge = document.getElementById("v-edge"), inset = document.getElementById("v-inset");
+  edge.addEventListener("click", function () { root.classList.remove("v-inset"); press([edge, inset], edge); });
+  inset.addEventListener("click", function () { root.classList.add("v-inset"); press([edge, inset], inset); });
+  var on = document.getElementById("hl-on"), off = document.getElementById("hl-off");
+  on.addEventListener("click", function () { root.classList.add("show-lines"); press([on, off], on); });
+  off.addEventListener("click", function () { root.classList.remove("show-lines"); press([on, off], off); });
+  var fillBtns = Array.prototype.slice.call(document.querySelectorAll("[data-fill]"));
+  var fillLabel = document.getElementById("fill-label");
+  fillBtns.forEach(function (b) {
+    b.addEventListener("click", function () {
+      root.classList.remove("f-white", "f-gray");
+      var c = b.getAttribute("data-fill");
+      if (c) root.classList.add(c);
+      fillLabel.textContent = b.textContent;
+      press(fillBtns, b);
+    });
+  });
+  var themeBtns = Array.prototype.slice.call(document.querySelectorAll("[data-theme-set]"));
+  themeBtns.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var v = b.getAttribute("data-theme-set");
+      if (v) document.documentElement.setAttribute("data-theme", v);
+      else document.documentElement.removeAttribute("data-theme");
+      press(themeBtns, b);
+    });
+  });
+})();
+</script>
