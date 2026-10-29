@@ -75,7 +75,7 @@ export function BillingHistoryCard() {
       </div>
       {!report ? (
         <div style={{ ...sectionBodyStyle, ...mutedStyle }}>
-          {historyQuery.isError ? "We couldn't load the billing history." : "Loading…"}
+          {historyQuery.isError ? "We couldn't load the billing history." : "Loading"}
         </div>
       ) : report.months.length === 0 ? (
         <div style={{ ...sectionBodyStyle, ...mutedStyle }}>
@@ -131,7 +131,7 @@ export function OrgSeatHistoryCard({ orgId }: { orgId: string }) {
       <div style={sectionHeaderStyle}>Seat history</div>
       {!rows ? (
         <div style={{ ...sectionBodyStyle, ...mutedStyle }}>
-          {seatsQuery.isError ? "We couldn't load the seat history." : "Loading…"}
+          {seatsQuery.isError ? "We couldn't load the seat history." : "Loading"}
         </div>
       ) : rows.length === 0 ? (
         <div style={{ ...sectionBodyStyle, ...mutedStyle }}>No seat changes recorded yet.</div>

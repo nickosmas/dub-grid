@@ -212,7 +212,7 @@ describe("ProfileSecurityScreen", () => {
 
     expect(
       screen.getByText(
-        "Ask for Face ID, Touch ID, or your passcode whenever you return to DubGrid.",
+        "Ask for Face ID, Touch ID, or your passcode whenever you come back to the app.",
       ),
     ).toBeInTheDocument();
   });
@@ -228,7 +228,7 @@ describe("ProfileSecurityScreen", () => {
 
     expect(
       screen.getByText(
-        "Ask for your fingerprint, face, or screen lock whenever you return to DubGrid.",
+        "Ask for your fingerprint, face, or screen lock whenever you come back to the app.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Face ID/)).not.toBeInTheDocument();
@@ -265,7 +265,7 @@ describe("ProfileSecurityScreen", () => {
 
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalledWith(
-        expect.objectContaining({ tone: "error", title: "Could not enable app lock" }),
+        expect.objectContaining({ tone: "error", title: "Couldn't enable app lock" }),
       );
       expect(appLockSwitch).not.toBeChecked();
     });

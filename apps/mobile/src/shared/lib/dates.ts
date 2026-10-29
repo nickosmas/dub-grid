@@ -89,10 +89,10 @@ export function formatDashboardDateRange(startDate: string, endDate: string): st
   const eDay = end.getDate();
 
   if (sMonth === eMonth && year === eYear) {
-    return `${sMonth} ${sDay}–${eDay}, ${year}`;
+    return `${sMonth} ${sDay} - ${eDay}, ${year}`;
   }
   if (year === eYear) {
-    return `${sMonth} ${sDay} – ${eMonth} ${eDay}, ${year}`;
+    return `${sMonth} ${sDay} - ${eMonth} ${eDay}, ${year}`;
   }
-  return `${sMonth} ${sDay}, ${year} – ${eMonth} ${eDay}, ${eYear}`;
+  return `${sMonth} ${sDay}, ${year} - ${eMonth} ${eDay}, ${eYear}`;
 }

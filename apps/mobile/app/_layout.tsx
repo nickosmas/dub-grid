@@ -89,7 +89,7 @@ function RootLayoutContent({
         // Native large-title headers inherit React Navigation's `card`
         // colour while an interactive pop is in progress. The design-token
         // card is white in light mode, but mobile pages are slate, so it
-        // flashed white above the People list behind Staff Profile.
+        // flashed white above the People list behind Staff profile.
         background: mobileColors.background,
         card: mobileColors.background,
         border: mobileColors.borderSubtle,
@@ -151,12 +151,12 @@ function RootLayoutContent({
                                 />
                                 <Stack.Screen
                                   name="shift/[employeeId]/[date]"
-                                  options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                                  options={createDetailStackOptions(mobileColors, "Shift detail")}
                                 />
                                 <Stack.Screen
                                   name="person/[id]/index"
                                   options={{
-                                    ...createDetailStackOptions(mobileColors, "Staff Profile", {
+                                    ...createDetailStackOptions(mobileColors, "Staff profile", {
                                       scrollEdge: true,
                                     }),
                                     // PersonDetailScreen replaces this placeholder with
@@ -168,7 +168,7 @@ function RootLayoutContent({
                                     },
                                   }}
                                 />
-                                {/* Add to Schedule is a pushed screen rather than a
+                                {/* Add to schedule is a pushed screen rather than a
                                   sheet: it is a three-picker form, and stacking
                                   it over the person page put a third modal on a
                                   stack iOS is unreliable about tearing down.
@@ -178,7 +178,7 @@ function RootLayoutContent({
                                   name="person/[id]/schedule"
                                   options={createDetailStackOptions(
                                     mobileColors,
-                                    "Add to Schedule",
+                                    "Add to schedule",
                                     {
                                       largeTitle: true,
                                     },

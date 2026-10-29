@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { Department, FocusArea } from "@/types";
 import { Button } from "@/components/Button";
 import {
@@ -379,7 +380,7 @@ function DepartmentSection({
           focusArea.id,
           focusArea.name.trim().length > 0
             ? getLineTextError(focusArea.name, {
-                label: "Focus area name",
+                label: `${capitalizeFirst(singularLabelNoun(focusAreaLabel))} name`,
                 maxLength: 80,
                 required: true,
                 disallowUrl: true,
@@ -416,7 +417,7 @@ function DepartmentSection({
     for (const names of duplicateByDepartment.values()) {
       const duplicate = names.find((name, index) => names.indexOf(name) !== index);
       if (duplicate) {
-        return `Duplicate focus area name: "${duplicate}"`;
+        return `Two ${pluralLabelNoun(focusAreaLabel)} are named "${duplicate}". Give each a different name.`;
       }
     }
     return null;
@@ -616,7 +617,7 @@ function DepartmentSection({
           .map((focusArea) => ({
             ...focusArea,
             name: normalizeLineText(focusArea.name, {
-              label: "Focus area name",
+              label: `${capitalizeFirst(singularLabelNoun(focusAreaLabel))} name`,
               maxLength: 80,
               required: true,
               disallowUrl: true,
@@ -680,7 +681,9 @@ function DepartmentSection({
       // and trigger a stale-updatedAt conflict.
       if (savedDepts) {
         onDepartmentsChange(savedDepts);
-        toast.error(`${title} saved, but some focus areas didn't update. Review and try again.`);
+        toast.error(
+          `${title} saved, but some ${pluralLabelNoun(focusAreaLabel)} didn't update. Review and try again.`,
+        );
       } else {
         toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
       }
@@ -1193,8 +1196,8 @@ function DepartmentSection({
                 message={
                   <>
                     <strong>{deleteConfirm.dept.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}. Archiving removes it from active use and keeps
-                    its historical records.
+                    {deps!.summary.toLowerCase()}.{" "}
+                    {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
                 confirmLabel="Archive"
@@ -1204,7 +1207,7 @@ function DepartmentSection({
                   setDeleteConfirm(null);
                 }}
                 onCancel={() => setDeleteConfirm(null)}
-                secondaryConfirmLabel="Rename Instead"
+                secondaryConfirmLabel="Rename instead"
                 onSecondaryConfirm={() => {
                   setDeleteConfirm(null);
                   requestAnimationFrame(() => {
@@ -1219,7 +1222,7 @@ function DepartmentSection({
             return (
               <ConfirmDialog
                 title={`Archive "${deleteConfirm.dept.name}"?`}
-                message="Archiving removes it from active use and keeps its historical records."
+                message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {
@@ -1257,8 +1260,8 @@ function DepartmentSection({
                 message={
                   <>
                     <strong>{faDeleteConfirm.fa.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}. Archiving removes it from active use and keeps
-                    its historical records.
+                    {deps!.summary.toLowerCase()}.{" "}
+                    {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
                 confirmLabel="Archive"
@@ -1275,7 +1278,7 @@ function DepartmentSection({
             return (
               <ConfirmDialog
                 title={`Archive "${faDeleteConfirm.fa.name}"?`}
-                message="Archiving removes it from active use and keeps its historical records."
+                message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 onConfirm={() => {
@@ -1289,7 +1292,7 @@ function DepartmentSection({
           return (
             <ConfirmDialog
               title={`Delete "${faDeleteConfirm.fa.name}"?`}
-              message={`Nothing uses ${faDeleteConfirm.fa.name || "this focus area"}, so it's deleted permanently.`}
+              message={`Nothing uses ${faDeleteConfirm.fa.name || `this ${singularLabelNoun(focusAreaLabel)}`}, so it's deleted permanently.`}
               confirmLabel="Delete"
               variant="danger"
               onConfirm={() => {

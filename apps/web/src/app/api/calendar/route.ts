@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
       );
     }
@@ -61,6 +61,9 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "calendar-export" } });
     logger.error({ error: err }, "Calendar export failed");
-    return NextResponse.json({ error: "Calendar export failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't build your calendar. Try again." },
+      { status: 500 },
+    );
   }
 }

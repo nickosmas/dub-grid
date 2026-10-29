@@ -28,8 +28,7 @@ export interface CoverageSuggestionText {
 }
 
 const DRAFT_OUTCOME = "Changes the draft only. Staff see it after you publish.";
-const APPROVAL_OUTCOME =
-  "Publishes right away: staff see it without a publish, and it replaces any draft of that day.";
+const APPROVAL_OUTCOME = "Publishes right away and replaces any draft change to that day.";
 
 function formatNumber(value: number): string {
   return String(Number(value.toFixed(2)));
@@ -164,7 +163,7 @@ export function describeCoverageSuggestion(
       return {
         title: `${lookups.rowLabel(subject.rowKey) ?? shift} is short every ${weekday} in this period`,
         detail:
-          "Nobody qualified is free on those days. A repeating shift would stop it recurring.",
+          "Nobody qualified is free on those days. A recurring schedule for someone would fill them each week.",
         outcome: null,
         effect: null,
         changes: [],
@@ -179,7 +178,7 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
     case "absence":
       return `${lookups.absenceName(reason.absenceTypeId)} that day`;
     case "restOfDayAbsence":
-      return `${lookups.absenceName(reason.absenceTypeId)} for the rest of the day`;
+      return `${lookups.absenceName(reason.absenceTypeId)} for part of the day`;
     case "overlap": {
       const shift = lookups.assignmentName(reason.assignmentId);
       if (reason.dateKey === entry.dateKey) return `works ${shift} that day, which overlaps`;

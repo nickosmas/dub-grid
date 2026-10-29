@@ -108,7 +108,10 @@ export async function POST(req: NextRequest) {
         .is("archived_at", null);
       if ((count ?? 0) <= 1) {
         return NextResponse.json(
-          { error: "You are the only super admin of an organization. Transfer ownership first." },
+          {
+            error:
+              "You're the only Super Admin of an organization. Make someone else a Super Admin first.",
+          },
           { status: 409 },
         );
       }
@@ -130,7 +133,10 @@ export async function POST(req: NextRequest) {
 
     if (rpcError) {
       logger.error({ error: rpcError, userId }, "GDPR erasure RPC failed");
-      return NextResponse.json({ error: "Data erasure failed" }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't erase that data. Try again." },
+        { status: 500 },
+      );
     }
 
     // Delete the auth user
@@ -167,6 +173,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gdpr-erase" } });
     logger.error({ error: err }, "GDPR erasure failed");
-    return NextResponse.json({ error: "Data erasure failed" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't erase that data. Try again." }, { status: 500 });
   }
 }

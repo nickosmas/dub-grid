@@ -930,7 +930,7 @@ function SchedulerContent({
           spanWeeks === "month"
             ? new Date(group.periodStart.getFullYear(), group.periodStart.getMonth() + 1, 0)
             : addDays(group.periodStart, spanWeeks * 7 - 1);
-        return `${formatDate(group.periodStart)}–${formatDate(end)}`;
+        return `${formatDate(group.periodStart)} - ${formatDate(end)}`;
       }),
     [outOfWindowDraftGroups, spanWeeks],
   );
@@ -4319,7 +4319,7 @@ function SchedulerContent({
   const handleShiftWriteConflict = useCallback(async () => {
     const orgId = org?.id;
     if (!orgId) return;
-    toast.error("This shift was modified elsewhere. Reloading the latest version.");
+    toast.error("Someone else just changed this shift. Showing the latest version.");
     // Peers may be holding the optimistic diff this tab broadcast before the
     // write was refused; tell them to go back to the server.
     broadcastDraftReconcile();
@@ -4625,7 +4625,7 @@ function SchedulerContent({
         if (!deleteUpdate) return false;
         void applyShiftDeleteUpdates([deleteUpdate], {
           broadcast: true,
-          failureMessage: "We couldn't delete shift. Try again.",
+          failureMessage: "We couldn't delete that shift. Try again.",
         });
         return true;
       } else {
@@ -6057,7 +6057,7 @@ function SchedulerContent({
         return;
       }
 
-      const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+      const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
       setAutoFillPreview({ count, dateRange, cellKeys });
       setShowAutoFillConfirm(true);
     } finally {
@@ -6070,7 +6070,7 @@ function SchedulerContent({
     if (!org || !autoFillPreview) return;
     if (!guardActiveSession()) return;
     const { startDate, endDate } = getAutoFillRange();
-    const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+    const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
     startScheduleOperation({
       kind: "autofill",
       title: "Filling from recurring schedules",
@@ -8415,7 +8415,7 @@ function SchedulerContent({
                     disabled={visibleBulkDeleteTargets.length === 0}
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
                   >
-                    Select All
+                    Select all
                   </Button>
                   <Button
                     type="button"
@@ -8584,7 +8584,7 @@ function SchedulerContent({
                               }
                               className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
-                              {`${formatDate(startDate)}–${formatDate(endDate)}`}{" "}
+                              {`${formatDate(startDate)} - ${formatDate(endDate)}`}{" "}
                               <span style={{ marginLeft: 4 }}>({group.changeCount})</span>
                             </Button>
                           </Hint>
@@ -8648,7 +8648,7 @@ function SchedulerContent({
                           </Button>
                         )
                       ) : isMobile ? (
-                        // Publish History's "Show on Grid" reaches the overlay
+                        // Publish History's "Show on grid" reaches the overlay
                         // on a phone too, so the way back out has to live here
                         // rather than only on the wide layout.
                         showPublishDiff ? (
@@ -9609,6 +9609,7 @@ function SchedulerContent({
           {/* ── Coverage Panel (slide-out) ── */}
           {showCoveragePanel && canViewCoveragePanel && (
             <CoveragePanel
+              focusAreaLabel={org?.focusAreaLabel}
               matrix={coverageMatrix}
               publishedDateKeys={publishedDateSet}
               focusAreas={orderedFocusAreas}

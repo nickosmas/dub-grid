@@ -113,8 +113,8 @@ export function useScheduleImport({
       }
 
       setImportPreview({
-        sourceRange: `${formatDate(sourceStart)} – ${formatDate(sourceEnd)}`,
-        targetRange: `${formatDate(weekStart)} – ${formatDate(targetEnd)}`,
+        sourceRange: `${formatDate(sourceStart)} - ${formatDate(sourceEnd)}`,
+        targetRange: `${formatDate(weekStart)} - ${formatDate(targetEnd)}`,
         sourceStartDate: sourceStartKey,
         sourceEndDate: sourceEndKey,
         targetStartDate: targetStartKey,

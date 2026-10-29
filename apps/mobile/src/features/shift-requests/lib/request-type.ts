@@ -10,7 +10,7 @@ import type { CountBadgeTone } from "../../dashboard/components/CountBadge";
 export const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
   pickup: "Pickup",
   swap: "Swap",
-  calloff: "Time off",
+  calloff: "Call-off",
 };
 
 export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTone> = {

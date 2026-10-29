@@ -127,7 +127,7 @@ describe("POST /api/schedule/recurring", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
-      error: expect.stringMatching(/absence for the rest of the day/),
+      error: expect.stringMatching(/absence beside it/),
     });
     expect(rpc).not.toHaveBeenCalled();
   });

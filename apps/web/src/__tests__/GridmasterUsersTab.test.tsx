@@ -201,7 +201,7 @@ describe("Gridmaster Users tab: permissions (41d4, F-61)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Configure" }));
     fireEvent.click(await screen.findByRole("switch", { name: "Coverage view" }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    const confirm = screen.queryByRole("button", { name: /confirm save/i });
+    const confirm = screen.queryByRole("button", { name: /^save$/i });
     if (confirm) fireEvent.click(confirm);
   }
 
@@ -259,7 +259,7 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
 
   it("changes the role with the assured token", async () => {
     await chooseAdminForMember();
-    fireEvent.click(await screen.findByRole("button", { name: "Change role" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change access level" }));
 
     await waitFor(() =>
       expect(updateOrganizationMembershipGuarded).toHaveBeenCalledWith(
@@ -277,17 +277,19 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
     expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
       updateOrganizationMembershipGuarded.mock.invocationCallOrder[0],
     );
-    expect(toast.success).toHaveBeenCalledWith("Role updated");
+    expect(toast.success).toHaveBeenCalledWith("Access level updated");
   });
 
   it("changes nothing when step-up is cancelled, and clears the loading state", async () => {
     stepUpRun.mockResolvedValue(false);
 
     await chooseAdminForMember();
-    fireEvent.click(await screen.findByRole("button", { name: "Change role" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change access level" }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Change role" })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Change access level" })).toBeEnabled(),
+    );
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -299,7 +301,7 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
 
     expect(screen.getByRole("button", { name: "User" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("dialog", { name: "Confirm it's you" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change role" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument();
   });
 });
 

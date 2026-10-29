@@ -72,8 +72,21 @@ describe("TrialWelcomeModal", () => {
     renderModal();
 
     expect(
-      await screen.findByText(/you’ll still have 5 extra days to add billing/),
+      await screen.findByText(/you have 5 more days to start a subscription/),
     ).toBeInTheDocument();
+  });
+
+  it("leaves out the extra time when there's no grace period", async () => {
+    vi.mocked(fetchTrialWelcomeState).mockResolvedValue({
+      shouldShowWelcome: true,
+      trialEndsAt: "2026-10-01T00:00:00.000Z",
+      trialGraceDays: 0,
+    });
+
+    renderModal();
+
+    expect(await screen.findByText("Your trial has started!")).toBeInTheDocument();
+    expect(screen.queryByText("If you need more time")).not.toBeInTheDocument();
   });
 
   // The trial clock starts on the super admin's first sign-in, which is the

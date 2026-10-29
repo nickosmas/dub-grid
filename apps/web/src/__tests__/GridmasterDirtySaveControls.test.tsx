@@ -222,7 +222,7 @@ describe("gridmaster dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /review & save/i }));
 
-    expect(screen.getByText(/review organization changes/i)).toBeInTheDocument();
+    expect(screen.getByText(/save these changes/i)).toBeInTheDocument();
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
   });

@@ -24,6 +24,7 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -87,8 +88,7 @@ function getRequestIp(req: NextRequest): string | null {
 function buildConflictResponse(latestOrg: ReturnType<typeof rowToOrganization>) {
   return NextResponse.json(
     {
-      error:
-        "Organization settings changed elsewhere. Review the latest values before saving again.",
+      error: changedElsewhereMessage("these settings"),
       code: "ORG_SETTINGS_CONFLICT",
       organization: latestOrg,
     },
@@ -117,7 +117,7 @@ export async function PUT(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }

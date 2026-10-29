@@ -79,7 +79,10 @@ export function buildShiftChangeAlert(input: {
     days.length === 1
       ? `Your schedule for ${labels[0]} changed`
       : `Your schedule changed on ${days.length} days`;
-  const summary = `Your schedule changed on ${listDays(labels)}. Open the schedule to see it now.`;
+  const summary =
+    days.length === 1
+      ? "Open the schedule to see what changed."
+      : `On ${listDays(labels)}. Open the schedule to see what changed.`;
   const message = input.showDetails
     ? days
         .map((day, index) => `${labels[index]}: ${formatShiftChangeCompact(day.change)}`)

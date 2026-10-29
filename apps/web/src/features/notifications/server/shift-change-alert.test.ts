@@ -128,7 +128,7 @@ describe("buildShiftChangeAlert", () => {
       {
         label: "Sat, Oct 24 After (5 hrs)",
         value:
-          "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing; Absence: Sick (rest of day) (added)",
+          "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing; Absence: Sick (part of day) (added)",
       },
     ]);
   });
@@ -140,7 +140,7 @@ describe("buildShiftChangeAlert", () => {
       publishHistoryId: "h-1",
     });
     const summary =
-      "Your schedule changed on Tue, Oct 20, Thu, Oct 22 and Sat, Oct 24. Open the schedule to see it now.";
+      "On Tue, Oct 20, Thu, Oct 22 and Sat, Oct 24. Open the schedule to see what changed.";
 
     expect(alert?.message).toBe(summary);
     expect(alert?.email).toEqual({ intro: summary, details: [], closing: "" });

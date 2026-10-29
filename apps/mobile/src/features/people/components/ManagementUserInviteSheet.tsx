@@ -177,7 +177,7 @@ export function ManagementUserInviteSheet({
     >
       {managementDepartments.length === 0 ? (
         <AppText tone="secondary" variant="body">
-          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before inviting anyone into management.`}
+          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one in Settings on the web before inviting anyone into management.`}
         </AppText>
       ) : (
         <View style={styles.body}>

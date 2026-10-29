@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from "react";
 import { JobDefinition, Organization, ShiftCategory, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
+import { singularLabelNoun } from "@dubgrid/domain";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -13,6 +14,7 @@ import { useTheme } from "next-themes";
 import { borderColor, resolveShiftPillColors } from "@/lib/colors";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Switch } from "@/components/ui/switch";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 const PREVIEW_DAYS = [
   { shortLabel: "Mon", dateNumber: "21" },
@@ -369,6 +371,8 @@ export default function DisplayMode({
   onSave: (org: Organization) => void;
 }) {
   const [selected, setSelected] = useState<ShiftDisplayMode>(organization.shiftDisplayMode);
+  const roleTerm = singularLabelNoun(organization.roleLabel || "Roles");
+  const certificationTerm = singularLabelNoun(organization.certificationLabel || "Certifications");
   const [showShiftDetailHoverCards, setShowShiftDetailHoverCards] = useState(
     organization.showShiftDetailHoverCards ?? true,
   );
@@ -391,7 +395,7 @@ export default function DisplayMode({
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
-      toast.error("Organization data is out of date. Refresh and try again.");
+      toast.error(changedElsewhereMessage("these settings"));
       return;
     }
     setSaving(true);
@@ -645,7 +649,7 @@ export default function DisplayMode({
                 color: "var(--dg-color-text-primary)",
               }}
             >
-              Use compact role and certification labels
+              Short {roleTerm} and {certificationTerm} names
             </div>
             <div
               style={{
@@ -655,15 +659,14 @@ export default function DisplayMode({
                 lineHeight: 1.5,
               }}
             >
-              Show saved abbreviations throughout DubGrid instead of full role and certification
-              names.
+              Show their abbreviations everywhere in the app instead of full names.
             </div>
           </div>
           <Switch
             checked={useCompactLabels}
             onChange={setUseCompactLabels}
             disabled={saving}
-            ariaLabel="Use compact role and certification labels"
+            ariaLabel={`Short ${roleTerm} and ${certificationTerm} names`}
           />
         </div>
 

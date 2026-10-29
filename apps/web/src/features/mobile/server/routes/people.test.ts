@@ -491,7 +491,7 @@ describe("POST mobile people route (create)", () => {
   it("rejects focus areas that don't belong to the org", async () => {
     requireMobileAuth.mockResolvedValue(makeCreateAuth());
     validateStaffOrgReferences.mockResolvedValue({
-      focusAreaIds: "Select valid focus areas from this organization",
+      focusAreaIds: "One of these was removed. Refresh and choose again.",
     });
 
     const { POST } = await import("./people");
@@ -507,7 +507,7 @@ describe("POST mobile people route (create)", () => {
 
     expect(response.status).toBe(400);
     const body = await response.json();
-    expect(body.error).toBe("Select valid focus areas from this organization");
+    expect(body.error).toBe("One of these was removed. Refresh and choose again.");
   });
 
   it("creates the employee at the next seniority slot and returns it", async () => {

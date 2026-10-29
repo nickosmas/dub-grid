@@ -283,7 +283,7 @@ export default function EnhancedImpersonation({
                 value={orgSearch}
                 onChange={(e) => setOrgSearch(e.target.value)}
                 onKeyDown={clearSearchOnEscape(() => setOrgSearch(""))}
-                placeholder="Search organizations…"
+                placeholder="Search organizations"
                 aria-label="Search organizations"
                 style={{
                   width: "100%",
@@ -565,7 +565,7 @@ export default function EnhancedImpersonation({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={clearSearchOnEscape(() => setSearch(""))}
-                placeholder="Search by email…"
+                placeholder="Search by email"
                 aria-label="Search users by email"
                 style={{ width: "100%", paddingRight: search ? SEARCH_CLEAR_PADDING : undefined }}
               />
@@ -581,7 +581,7 @@ export default function EnhancedImpersonation({
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
-                Loading users…
+                Loading users
               </div>
             ) : usersQuery.error instanceof Error ? (
               <div

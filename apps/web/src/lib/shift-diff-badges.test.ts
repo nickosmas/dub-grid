@@ -257,7 +257,7 @@ describe("rest-of-day absence diffs (item 45)", () => {
     });
     expect(result.restOfDayDiff).toEqual({
       borderKind: "new",
-      badge: { kind: "new", text: "New", detail: "Added Sick for the rest of the day." },
+      badge: { kind: "new", text: "New", detail: "Added Sick for part of the day." },
     });
     expect(result.pillDiffs[0]?.badge ?? null).toBeNull();
   });
@@ -285,7 +285,7 @@ describe("rest-of-day absence diffs (item 45)", () => {
     expect(result.cellBadge).toEqual({
       kind: "modified",
       text: "Changed",
-      detail: "Removed Sick for the rest of the day.",
+      detail: "Removed Sick for part of the day.",
     });
   });
 

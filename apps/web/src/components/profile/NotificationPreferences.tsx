@@ -36,23 +36,23 @@ const DEFAULT_PREFS: AllPrefs = {
 const ALWAYS_ON_CATEGORY = "security";
 
 const CATEGORY_LABELS: Record<string, string> = {
-  schedule: "Schedule Changes",
-  shift_requests: "Shift Requests",
-  membership: "Membership & Invitations",
-  account: "Account & Organization",
-  billing: "Billing & Payments",
-  security: "Security Alerts",
-  system: "System Notifications",
+  schedule: "Schedule changes",
+  shift_requests: "Shift requests",
+  membership: "Membership and invitations",
+  account: "Account and organization",
+  billing: "Billing and payments",
+  security: "Security alerts",
+  system: "Product updates",
 };
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   schedule: "Shift changes, published schedules, recurring updates",
   shift_requests: "New, approved, or rejected shift requests",
   membership: "Invitations, role changes, and removal from organizations",
-  account: "Employee record updates and organization settings",
+  account: "Changes to your details and your organization's settings",
   billing: "Subscription changes, payment failures, receipts",
-  security: "Password, email, MFA, new-device, and account-access alerts",
-  system: "Role changes and system updates",
+  security: "Password, email, two-factor, and new sign-in alerts",
+  system: "Product updates and notices",
 };
 
 /**
@@ -222,12 +222,6 @@ export function NotificationPreferences({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <p
-        style={{ margin: 0, fontSize: "var(--dg-fs-body-sm)", color: "var(--dg-color-text-muted)" }}
-      >
-        Choose how you want to be notified for each category.
-      </p>
-
       {/* Header row */}
       <div
         style={{

@@ -81,7 +81,7 @@ vi.mock("@/hooks/useSharedStepUp", () => ({
   }),
 }));
 
-// Note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
+// Manager's note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
 // real QueryClient so `useQuery` + `useQueryClient` work as in production.
 // `mockInvalidateQueries` is retained for compatibility but is unused.
 void mockInvalidateQueries;
@@ -89,13 +89,13 @@ void mockInvalidateQueries;
 vi.mock("@/features/employees/client", () => {
   class MockEmployeeProfileConflictError extends Error {
     constructor(public readonly latestEmployee: unknown) {
-      super("Employee details changed elsewhere.");
+      super("Someone else just changed their details. Refresh and try again.");
     }
   }
   class MockEmployeeContactConflictError extends Error {}
   class MockEmployeeStatusConflictError extends Error {
     constructor(public readonly latestEmployee: unknown) {
-      super("Employee status changed elsewhere.");
+      super("Someone else just changed their status. Refresh and try again.");
     }
   }
   class MockEmployeeAccessDeniedError extends Error {}
@@ -419,7 +419,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Edit details form")).toBeInTheDocument();
     // Once in the banner, once as the Record card's account state.
     expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
@@ -431,8 +431,8 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
 
-    fireEvent.click(screen.getByRole("button", { name: "Reinvite" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Reissue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resend" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Resend" }));
 
     await waitFor(() => {
       expect(resendInvitation).toHaveBeenCalledWith("invite-1", "org-1");
@@ -534,7 +534,7 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
     expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 

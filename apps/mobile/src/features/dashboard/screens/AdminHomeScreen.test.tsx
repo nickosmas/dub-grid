@@ -108,7 +108,7 @@ const EMPTY_DASHBOARD_DATA = {
   overtimeThresholdHours: 40,
   heroSummary: {
     statusLabel: "Healthy",
-    title: "Schedule health looks good",
+    title: "Nothing needs attention",
     description: "No open gaps or pending requests right now.",
   },
   metrics: { coveragePct: 96, openGapCount: 0, pendingApprovalsCount: 0, draftSummary: null },
@@ -226,7 +226,7 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByText("Could not load dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load dashboard")).toBeInTheDocument();
   });
 
   it("shows the pending-approvals queue and personal schedule for an admin", () => {

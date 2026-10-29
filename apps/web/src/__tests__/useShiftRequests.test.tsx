@@ -274,7 +274,7 @@ describe("useShiftRequests", () => {
     expect(result.current.badgeCount).toBe(1);
   });
 
-  it("counts every active request for an approver, matching the Approval Queue tab", async () => {
+  it("counts every active request for an approver, matching the To approve tab", async () => {
     mockFetchShiftRequests.mockResolvedValue([
       buildRequest({ id: "public-pickup" }),
       buildRequest({ id: "pending-swap", type: "swap", status: "pending_approval" }),

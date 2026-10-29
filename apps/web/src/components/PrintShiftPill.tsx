@@ -163,7 +163,7 @@ export function PrintShiftPill({
                 letterSpacing: "0.01em",
               }}
             >
-              {timeLabel ?? `${fmt12hShort(time!.start)}–${fmt12hShort(time!.end)}`}
+              {timeLabel ?? `${fmt12hShort(time!.start)} - ${fmt12hShort(time!.end)}`}
             </span>
           </span>
         )}

@@ -52,13 +52,11 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
   const message = (
     <div>
       <p style={{ margin: "0 0 12px 0" }}>
-        Sandbox mode gives you a private, fully-isolated copy of{sourceLabel}
-        &nbsp;you can experiment in. Create, edit, publish, delete — none of it touches your real
-        data.
+        You get a private copy of{sourceLabel} to try things in. Nothing you do there touches your
+        real schedule or people.
       </p>
       <p style={{ margin: "0 0 12px 0" }}>
-        You stay signed in on this same page. Exit at any time from the banner at the top of the
-        screen and everything is discarded.
+        Exit from the banner at the top of the screen whenever you like, and the copy is discarded.
       </p>
       {error ? (
         <Banner tone="danger" role="alert" className="mt-2">

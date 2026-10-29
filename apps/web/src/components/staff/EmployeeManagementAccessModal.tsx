@@ -32,6 +32,7 @@ import type {
   Invitation,
   OrganizationUser,
 } from "@/types";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 interface EmployeeManagementAccessEditorProps {
   employee: Employee;
@@ -201,12 +202,12 @@ export const EmployeeManagementAccessEditor = forwardRef<
   const isCreating = !isEditingExistingAccess;
   const dismissLabel = getEditorDismissLabel({ hasUnsavedChanges, isCreating });
   const submitLabel = isLinkedUser
-    ? "Save Access"
+    ? "Save"
     : inviteSaveAction === "revoke"
-      ? "Revoke Invitation"
+      ? "Revoke invitation"
       : inviteSaveAction === "update"
-        ? "Save Invitation"
-        : "Send Invitation";
+        ? "Save invitation"
+        : "Send invitation";
   // Only ever a consequence of saving. The "select at least one" case is a
   // missing answer, and stays as the field's own error under the tags.
   const accessNotices =
@@ -251,7 +252,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
 
     if (matchedUser.orgRole !== role && matchedUser.orgRole !== "super_admin") {
       if (!matchedUser.updatedAt) {
-        throw new Error("User access data is out of date. Refresh and try again.");
+        throw new Error(changedElsewhereMessage("their access"));
       }
       const expectedUpdatedAt = matchedUser.updatedAt;
       const completed = await stepUp.run(async (accessToken) => {
@@ -280,7 +281,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
     // Revoked last, so a cancelled step-up leaves it pending.
     if (pendingInvitation) {
       if (!pendingInvitation.updatedAt) {
-        throw new Error("Invitation data is out of date. Refresh and try again.");
+        throw new Error(changedElsewhereMessage("this invitation"));
       }
       await revokeOrganizationInvitationGuarded({
         orgId,
@@ -302,7 +303,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
         await onCompleted(null);
       } else if (inviteSaveAction === "revoke" && pendingInvitation) {
         if (!pendingInvitation.updatedAt) {
-          throw new Error("Invitation data is out of date. Refresh and try again.");
+          throw new Error(changedElsewhereMessage("this invitation"));
         }
         await revokeOrganizationInvitationGuarded({
           orgId,
@@ -313,7 +314,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
         await onCompleted(null);
       } else if (pendingInvitation) {
         if (!pendingInvitation.updatedAt) {
-          throw new Error("Invitation data is out of date. Refresh and try again.");
+          throw new Error(changedElsewhereMessage("this invitation"));
         }
         // The email comes from Profile details. This only updates
         // role/departments, so there is nothing to resend.
@@ -363,7 +364,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
         err instanceof OrganizationAccessConflictError ||
         err instanceof InvitationAccessConflictError
       ) {
-        toast.error("Access changed elsewhere. Review the latest values and try again.");
+        toast.error(changedElsewhereMessage("their access"));
         return;
       }
       toast.error(formatClientErrorMessage(err, "We couldn't update management access."));

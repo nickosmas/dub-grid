@@ -207,9 +207,7 @@ describe("ProfilePanel", () => {
       target: { value: "new@example.com" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm save" }),
-    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(order).toEqual(["assurance", "employee", "email"]));
     expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
@@ -225,9 +223,7 @@ describe("ProfilePanel", () => {
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm save" }),
-    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
     expect(screen.getByLabelText("First name")).toHaveValue("Draft");
@@ -250,13 +246,11 @@ describe("ProfilePanel", () => {
     renderPanel({ setEmployee });
     fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm save" }),
-    );
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(setEmployee).toHaveBeenCalledWith(latestEmployee));
     expect(toast.error).toHaveBeenCalledWith(
-      "Your staff profile changed elsewhere. Review the latest values and try again.",
+      "Someone else just changed your profile. Refresh and try again.",
     );
   });
 
@@ -283,7 +277,7 @@ describe("ProfilePanel", () => {
         managementDepartmentIds: [],
       });
 
-      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit management access" }),
       ).not.toBeInTheDocument();
@@ -314,7 +308,7 @@ describe("ProfilePanel", () => {
         refetchProfile,
       });
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
 
       const dialog = screen.getByRole("dialog", { name: "Add to management" });
       expect(within(dialog).getByTestId("employee-management-access-editor")).toBeInTheDocument();
@@ -389,7 +383,7 @@ describe("ProfilePanel change-request loading", () => {
         expect(screen.getByRole("button", { name: /^delete account$/i })).toBeInTheDocument(),
       );
       expect(
-        screen.getByText(/only super admin of an organization, transfer ownership first/i),
+        screen.getByText(/only Super Admin, make someone else a Super Admin first/i),
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /request account deletion/i }),

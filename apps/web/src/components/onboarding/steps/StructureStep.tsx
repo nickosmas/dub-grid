@@ -148,7 +148,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
 
         <CompositeSection
           title={certLabel}
-          description="Skill levels or certifications your staff hold. These help ensure the right qualifications are scheduled for each shift."
+          description={`The ${certLabel.toLowerCase()} your staff hold. Jobs can require them, so the right people are scheduled.`}
         >
           <StringListSettings
             label={certLabel}

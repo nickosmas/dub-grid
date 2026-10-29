@@ -346,7 +346,7 @@ export default function AllUsersView({
                       <td
                         style={{ ...gmTdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}
                       >
-                        {u.email ?? "—"}
+                        {u.email ?? "-"}
                         <StatusBadge
                           deactivatedAt={u.deactivatedAt as string | null}
                           terminatedAt={u.terminatedAt}
@@ -380,7 +380,7 @@ export default function AllUsersView({
                             {u.orgName}
                           </Button>
                         ) : (
-                          <span style={{ color: "var(--dg-color-text-muted)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-muted)" }}>-</span>
                         )}
                       </td>
                       <td

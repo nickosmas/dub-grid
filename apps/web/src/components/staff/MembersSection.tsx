@@ -675,7 +675,12 @@ export function MembersSection({
       const res = await fetch(`/api/export?type=staff&orgId=${orgId}`);
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        toast.error(formatClientErrorMessage(data?.error, "Export failed"));
+        toast.error(
+          formatClientErrorMessage(
+            data?.error,
+            "We couldn't export the staff directory. Try again.",
+          ),
+        );
         return;
       }
       const blob = await res.blob();
@@ -690,7 +695,7 @@ export function MembersSection({
       URL.revokeObjectURL(url);
       toast.success("Staff data exported");
     } catch {
-      toast.error("Export failed");
+      toast.error("We couldn't export the staff directory. Try again.");
     }
   }
 
@@ -1946,9 +1951,7 @@ export function MembersSection({
                           {canViewEmployeeDetails && (
                             <TableCell className="w-[100px] border-r border-[var(--dg-color-border-light)] py-4 pl-6">
                               <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--dg-color-text-faint)]">
-                                {person.employeeNumber !== null
-                                  ? `#${person.employeeNumber}`
-                                  : "\u2014"}
+                                {person.employeeNumber !== null ? `#${person.employeeNumber}` : "-"}
                               </span>
                             </TableCell>
                           )}
@@ -2041,7 +2044,7 @@ export function MembersSection({
                             <span className="text-[13px] text-[var(--dg-color-text-muted)]">
                               {personDepts.length > 0
                                 ? personDepts.map((department) => department.name).join(", ")
-                                : "\u2014"}
+                                : "-"}
                             </span>
                           </TableCell>
 
@@ -2095,7 +2098,7 @@ export function MembersSection({
                 title={
                   searchQuery || managementHasActiveFilters
                     ? "No results found"
-                    : "No management members yet"
+                    : "Nobody in management yet"
                 }
                 description={
                   searchQuery || managementHasActiveFilters
@@ -2554,8 +2557,8 @@ export function MembersSection({
 
       {exportConfirm ? (
         <ConfirmDialog
-          title="Export Staff Data?"
-          message="Export the current staff directory data as a downloadable file?"
+          title="Export the staff directory?"
+          message="You'll get a CSV file of your staff."
           confirmLabel="Export"
           variant="info"
           // Closing first unmounted the dialog before the export started, so

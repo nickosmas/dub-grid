@@ -93,7 +93,7 @@ function formatDuration(
 }
 
 function formatReason(reason: string | null): string {
-  if (!reason) return "—";
+  if (!reason) return "-";
   switch (reason) {
     case "manual":
       return "Manual";
@@ -223,7 +223,7 @@ export default function ImpersonationHistory() {
                               color: "var(--dg-color-text-muted)",
                             }}
                           >
-                            {e.targetOrgName ?? "—"}
+                            {e.targetOrgName ?? "-"}
                           </td>
                           <td
                             style={{
@@ -242,7 +242,7 @@ export default function ImpersonationHistory() {
                             }}
                           >
                             <MaybeHint content={e.justification} side="bottom">
-                              <span style={{ display: "block" }}>{e.justification || "—"}</span>
+                              <span style={{ display: "block" }}>{e.justification || "-"}</span>
                             </MaybeHint>
                           </td>
                           <td
@@ -286,7 +286,7 @@ export default function ImpersonationHistory() {
                                 })}
                               </>
                             ) : (
-                              "—"
+                              "-"
                             )}
                           </td>
                           <td
@@ -316,7 +316,7 @@ export default function ImpersonationHistory() {
                               fontFamily: "var(--font-dm-mono, monospace)",
                             }}
                           >
-                            {e.ipAddress ?? "—"}
+                            {e.ipAddress ?? "-"}
                           </td>
                         </tr>
                       );
@@ -334,7 +334,7 @@ export default function ImpersonationHistory() {
             page={page + 1}
             hasNext={entries.length >= PAGE_SIZE}
             onPageChange={(next) => setPage(next - 1)}
-            summary={`Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + entries.length}`}
+            summary={`Showing ${page * PAGE_SIZE + 1} - ${page * PAGE_SIZE + entries.length}`}
             className="mt-4"
           />
         </>

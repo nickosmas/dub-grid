@@ -42,8 +42,8 @@ const bodyStyle = {
 export function ErrorBoundary({
   error,
   reset,
-  title = "Something went wrong",
-  message = "We couldn't load this page. Refresh and try again.",
+  title = "This page didn't load",
+  message = "If trying again doesn't help, refresh the page.",
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -80,7 +80,7 @@ export function NotFoundBoundary({
   title = "Page not found",
   message,
   backHref = "/",
-  backLabel = "Go Home",
+  backLabel = "Go home",
 }: {
   title?: string;
   message?: string;
@@ -94,7 +94,7 @@ export function NotFoundBoundary({
     <div style={shellStyle}>
       <DubGridLogo size={48} />
       <p style={titleStyle}>{title}</p>
-      <p style={bodyStyle}>{message ?? "The page you're looking for doesn't exist."}</p>
+      <p style={bodyStyle}>{message ?? "The link may be old or mistyped."}</p>
       <BackLink href={backHref} className="dg-btn dg-btn-primary" style={{ marginTop: 8 }}>
         {backLabel}
       </BackLink>

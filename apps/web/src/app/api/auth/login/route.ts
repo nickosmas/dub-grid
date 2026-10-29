@@ -448,7 +448,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Sign-in is busy right now. Please wait a moment and try again.",
+        error: "Sign-in is busy right now. Wait a moment and try again.",
         retryAfter,
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },

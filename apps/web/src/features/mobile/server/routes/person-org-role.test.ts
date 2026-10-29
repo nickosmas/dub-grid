@@ -284,7 +284,7 @@ describe("mobile person org-role route", () => {
     );
     changeMobileMembershipOrgRole.mockResolvedValue({
       status: "blocked",
-      message: "Cannot demote the only super admin. Transfer ownership first.",
+      message: "They're the only Super Admin. Make someone else a Super Admin first.",
     });
 
     const { PATCH } = await import("./person-org-role");
@@ -295,7 +295,7 @@ describe("mobile person org-role route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload.error).toContain("only super admin");
+    expect(payload.error).toContain("only Super Admin");
     expect(insertMobileAuditLogEntry).not.toHaveBeenCalled();
   });
 

@@ -20,7 +20,7 @@ describe("layoutAbsencePill", () => {
     ).toEqual({
       first: false,
       joinsShift: true,
-      shortTime: "11–3",
+      shortTime: "11 - 3",
       time: "11:00 AM - 3:00 PM",
     });
   });
@@ -31,7 +31,7 @@ describe("layoutAbsencePill", () => {
       shifts: [{ start: "11:00", end: "15:00" }],
       absence: { start: "07:00", end: "11:00" },
     });
-    expect(layout).toMatchObject({ first: true, joinsShift: true, shortTime: "7–11" });
+    expect(layout).toMatchObject({ first: true, joinsShift: true, shortTime: "7 - 11" });
   });
 
   it("names the next day on a time past midnight", () => {
@@ -40,7 +40,7 @@ describe("layoutAbsencePill", () => {
       shifts: [{ start: "23:00", end: "03:00" }],
       absence: { start: "03:00", end: "07:00" },
     });
-    expect(layout.shortTime).toBe("Fri 3–7");
+    expect(layout.shortTime).toBe("Fri 3 - 7");
     expect(layout.time).toBe("Fri 3:00 AM - 7:00 AM");
   });
 
@@ -75,8 +75,8 @@ describe("layoutAbsencePill", () => {
 
 describe("overnightShortRange", () => {
   it("names the next day on an overnight end", () => {
-    expect(overnightShortRange(THURSDAY, { start: "23:00", end: "03:00" })).toBe("11–Fri 3");
-    expect(overnightShortRange(THURSDAY, { start: "07:00", end: "11:00" })).toBe("7–11");
+    expect(overnightShortRange(THURSDAY, { start: "23:00", end: "03:00" })).toBe("11 - Fri 3");
+    expect(overnightShortRange(THURSDAY, { start: "07:00", end: "11:00" })).toBe("7 - 11");
   });
 });
 
@@ -95,7 +95,7 @@ describe("layoutEntryAbsence", () => {
         },
         THURSDAY,
       ),
-    ).toMatchObject({ first: true, joinsShift: true, shortTime: "7–11" });
+    ).toMatchObject({ first: true, joinsShift: true, shortTime: "7 - 11" });
   });
 
   it("reads pipe-joined times for two shifts", () => {
@@ -109,7 +109,7 @@ describe("layoutEntryAbsence", () => {
       },
       THURSDAY,
     );
-    expect(layout).toMatchObject({ first: false, joinsShift: true, shortTime: "7–11" });
+    expect(layout).toMatchObject({ first: false, joinsShift: true, shortTime: "7 - 11" });
   });
 
   it("leaves the absence untimed beside a shift with no time", () => {

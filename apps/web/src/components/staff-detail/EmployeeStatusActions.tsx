@@ -96,8 +96,7 @@ export interface EmployeeStatusActionsProps {
   stepUpOpen?: boolean;
 }
 
-const RETURN_DATE_HINT =
-  "They're back to Active on this day. Leave it empty to mark them active yourself.";
+const RETURN_DATE_HINT = "Leave it empty to mark them active yourself.";
 
 function ReturnDateField({
   value,
@@ -210,8 +209,7 @@ function LastDayField({
   );
 }
 
-const SUSPENSION_END_HINT =
-  "They get access back on this day. Leave it empty to reinstate them yourself.";
+const SUSPENSION_END_HINT = "Leave it empty to reinstate them yourself.";
 
 /** A suspension's end, the first day they have access again (51g3); empty for none. */
 function SuspensionEndField({
@@ -249,13 +247,11 @@ function SuspensionEndField({
   );
 }
 
-const LAST_DAY_HINT =
-  "They stay Active through this day and are offboarded the day after. Leave it empty to offboard them now.";
+const LAST_DAY_HINT = "Leave it empty to offboard them now.";
 
 const NO_ABSENCE = 0;
 
-const AWAY_ABSENCE_HINT =
-  "Every day until they're back shows this absence in the draft. Leave it as No absence to keep those days empty.";
+const AWAY_ABSENCE_HINT = "Choose No absence to leave those days empty.";
 
 function AwayAbsenceField({
   value,
@@ -836,8 +832,8 @@ export function EmployeeStatusActions({
           )}
           <PlanCancelToggle
             cancelling={cancellingPlan}
-            cancelLabel="Cancel planned away"
-            keepLabel="Keep planned away"
+            cancelLabel="Cancel planned time away"
+            keepLabel="Keep planned time away"
             onToggle={() => setCancellingPlan((value) => !value)}
           />
         </div>
@@ -866,7 +862,7 @@ export function EmployeeStatusActions({
                     ? `Change ${displayName}'s planned suspension?`
                     : plannedLeave
                       ? `Change ${displayName}'s last day?`
-                      : `Change ${displayName}'s planned away?`
+                      : `Change ${displayName}'s planned time away?`
             : `Change ${displayName}'s status?`)
         }
         message={

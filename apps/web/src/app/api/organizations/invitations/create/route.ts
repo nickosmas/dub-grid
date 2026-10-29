@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
       }
       if (limit.limited) {
         return NextResponse.json(
-          { error: "Too many requests" },
+          { error: API_ERRORS.RATE_LIMITED },
           { status: 429, headers: { "Retry-After": String(retryAfterSeconds(limit.reset)) } },
         );
       }

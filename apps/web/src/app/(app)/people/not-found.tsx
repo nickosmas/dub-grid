@@ -3,10 +3,10 @@ import { NotFoundBoundary } from "@/components/RouteBoundary";
 export default function PeopleNotFound() {
   return (
     <NotFoundBoundary
-      title="Page not found"
-      message="The page you're looking for doesn't exist."
+      title="Person not found"
+      message="The link may be old or mistyped."
       backHref="/people"
-      backLabel="Back to People"
+      backLabel="Back to people"
     />
   );
 }

@@ -69,7 +69,7 @@ describe("PublishChangeSummary", () => {
 
     const card = screen.getByRole("region", { name: /Your drafts summary/i });
     expect(within(card).getByText("New shifts")).toBeInTheDocument();
-    expect(within(card).getByText("Edited shifts")).toBeInTheDocument();
+    expect(within(card).getByText("Changed shifts")).toBeInTheDocument();
     expect(within(card).getByText("3")).toBeInTheDocument();
   });
 

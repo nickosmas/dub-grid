@@ -136,7 +136,7 @@ export function AdminHomeScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load dashboard"
+          title="Couldn't load dashboard"
           variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();

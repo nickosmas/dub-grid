@@ -30,7 +30,7 @@ export default function ChangeReviewModal({
   description,
   changes,
   saving = false,
-  confirmLabel = "Confirm Save",
+  confirmLabel = "Save",
   warningText,
   onCancel,
   onConfirm,

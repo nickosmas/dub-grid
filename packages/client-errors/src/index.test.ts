@@ -67,7 +67,7 @@ describe("formatClientErrorMessage", () => {
         "fallback",
       ),
     ).toBe(
-      "This account was terminated by the DubGrid platform team. Only a gridmaster can reinstate it.",
+      "DubGrid Support closed this account, so it can't be added. Contact them if it should be reopened.",
     );
   });
 

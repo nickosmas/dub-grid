@@ -901,7 +901,7 @@ function ShiftDetailHoverCard({
                           }}
                         >
                           {isNewShiftChange(view)
-                            ? "Not published yet. Staff don't see it until it's published."
+                            ? "Not published yet, so staff can't see it."
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
@@ -1680,6 +1680,10 @@ const SectionBlock = memo(function SectionBlock({
             onClick={() => setAwayAllPeriodFolded(!awayAllPeriodFolded)}
             aria-expanded={!awayAllPeriodFolded}
             style={{
+              // Stays in view while a narrow grid scrolls sideways, beside the
+              // pinned name column.
+              position: "sticky",
+              left: 12,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -1952,10 +1956,11 @@ const SectionBlock = memo(function SectionBlock({
           borderRadius: "0 0 var(--dg-radius-md) var(--dg-radius-md)",
           border: "1px solid var(--dg-color-border)",
           borderTop: 0,
-          // Change chips intentionally cross the top edge of a shift pill.
-          // The card cannot clip that layer; horizontal clipping belongs only
-          // to the scrollable narrow-grid path below.
-          overflow: fitToContainer ? "visible" : "clip",
+          // Clips to the inner curve of the rounded corners, so the last row's
+          // square cells never paint over them. A change chip still clears its
+          // pill's top edge: the first row's chip has the scroller's top
+          // padding, and every other chip hangs into the row above, inside.
+          overflow: "clip",
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
@@ -2022,7 +2027,7 @@ const SectionBlock = memo(function SectionBlock({
                     backgroundPosition: "0 100%",
                     backgroundRepeat: "no-repeat",
                     backgroundSize: "100% 2px",
-                    boxShadow: "1px 0 0 0 var(--dg-color-border)",
+                    boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
                   }}
                 >
                   <svg
@@ -2584,7 +2589,7 @@ const SectionBlock = memo(function SectionBlock({
                                 label: restOfDayAbsenceName,
                                 jobName: null,
                                 focusAreaName: null,
-                                timeLabel: absenceLayout?.time ?? "Rest of the day",
+                                timeLabel: absenceLayout?.time ?? "Part of the day",
                                 isCustomTime: false,
                                 isMentored: false,
                               },
@@ -2751,7 +2756,7 @@ const SectionBlock = memo(function SectionBlock({
                               awayRunDay
                                 ? `${getEmployeeDisplayName(emp)}, Away on ${formatReturnDate(dateKey, { weekday: true })}`
                                 : shiftLabel && shiftLabel !== "OFF"
-                                  ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for the rest of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
+                                  ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${restOfDayAbsenceName && absenceFirst && absenceLayout?.time ? `${restOfDayAbsenceName} ${absenceLayout.time}, then ${shiftLabel}` : `${shiftLabel}${restOfDayAbsenceName ? (absenceLayout?.time ? `, then ${restOfDayAbsenceName} ${absenceLayout.time}` : `, then ${restOfDayAbsenceName} for part of the day`) : ""}`}${isBulkSelected ? ", selected for removal" : ""}`
                                   : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                             }
                             aria-selected={bulkDeleteMode ? isBulkSelected : undefined}
@@ -2785,7 +2790,10 @@ const SectionBlock = memo(function SectionBlock({
                             data-bulk-selectable={isBulkSelectable ? "true" : undefined}
                             data-bulk-selected={isBulkSelected ? "true" : undefined}
                             style={{
-                              height: GRID_CELL_HEIGHT,
+                              // A floor, not a fixed height: a name cell taller than
+                              // the day cells grows the row, and every day cell must
+                              // grow with it or its dividers stop short of the next row.
+                              minHeight: GRID_CELL_HEIGHT,
                               background: isBulkSelected
                                 ? "var(--dg-color-brand-bg)"
                                 : showDiffCellTint
@@ -3707,7 +3715,8 @@ const SectionBlock = memo(function SectionBlock({
                                                     letterSpacing: "0.02em",
                                                   }}
                                                 >
-                                                  {fmt12hShort(customTimes.start)}–
+                                                  {fmt12hShort(customTimes.start)}
+                                                  {" - "}
                                                   {fmt12hShort(customTimes.end)}
                                                   {isOvernight && (
                                                     <sup
@@ -4370,7 +4379,8 @@ const SectionBlock = memo(function SectionBlock({
                                                           lineHeight: 1,
                                                         }}
                                                       >
-                                                        {fmt12hShort(pillTime!.start)}–
+                                                        {fmt12hShort(pillTime!.start)}
+                                                        {" - "}
                                                         {fmt12hShort(pillTime!.end)}
                                                         {isPillOvernight && (
                                                           <sup
@@ -4606,7 +4616,7 @@ const SectionBlock = memo(function SectionBlock({
                                             publishChangeText ??
                                             (publishDiff.detailsHidden
                                               ? "Removed since the last publish."
-                                              : `Deleted ${deletedLabel}.`),
+                                              : `Removed ${deletedLabel}.`),
                                           timeZone: publicationTimeZone,
                                         })
                                       : undefined;
@@ -4686,7 +4696,7 @@ const SectionBlock = memo(function SectionBlock({
                                         badge={{
                                           source: isDraftDelete ? "draft" : "publish",
                                           kind: "deleted",
-                                          text: "Deleted",
+                                          text: "Removed",
                                           tooltip: deletedTooltip,
                                           topOffset: 0,
                                           leftOffset: 4,
@@ -4769,8 +4779,8 @@ const SectionBlock = memo(function SectionBlock({
                                       entries={deletedHoverEntries}
                                       indicators={hoverIndicatorNames}
                                       requestLabel={null}
-                                      status="Deleted"
-                                      changeDetails={[deletedTooltip ?? `Deleted ${deletedLabel}.`]}
+                                      status="Removed"
+                                      changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
                                       publicationLabel={publicationLabel}
                                     >
@@ -5425,16 +5435,18 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
             allEmployees.length === 0
               ? "No staff added yet"
               : filteredEmployees.length === 0
-                ? "No matching employees"
-                : "No shifts found for this period"
+                ? "No matching staff"
+                : isCellInteractive
+                  ? "Nobody assigned here yet"
+                  : "No shifts found for this period"
           }
           description={
             allEmployees.length === 0
-              ? "Add employees on the Staff page to start building your schedule."
+              ? "Add people on the People page to start building the schedule."
               : filteredEmployees.length === 0
-                ? "Try clearing your search or focus area filter."
+                ? "Clear the search or filters to see everyone."
                 : isCellInteractive
-                  ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                  ? "Assign people here from the People page."
                   : "No shifts have been published for this period yet."
           }
           style={{ marginTop: 34 }}

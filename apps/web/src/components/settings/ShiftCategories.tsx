@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { ShiftCategory, FocusArea, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
 import {
@@ -71,6 +72,7 @@ function ShiftCategoriesSettings({
   onChange,
   canManageScheduleDefinitions,
   shiftDisplayMode = "code",
+  focusAreaLabel = "Focus Areas",
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
@@ -78,7 +80,10 @@ function ShiftCategoriesSettings({
   onChange: (categories: ShiftCategory[]) => void;
   canManageScheduleDefinitions: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
+  focusAreaLabel?: string;
 }) {
+  const focusAreaTerm = singularLabelNoun(focusAreaLabel);
+  const focusAreasTerm = pluralLabelNoun(focusAreaLabel);
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
@@ -315,7 +320,7 @@ function ShiftCategoriesSettings({
       setEditingId(null);
       toast.success("Category saved");
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "Failed to save category"));
+      toast.error(formatClientErrorMessage(err, "We couldn't save that shift. Try again."));
       Sentry.captureException(err);
     } finally {
       setSaving(null);
@@ -477,7 +482,7 @@ function ShiftCategoriesSettings({
                       color: "var(--dg-color-text-muted)",
                     }}
                   >
-                    {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
+                    {fmt12h(cat.startTime)} - {fmt12h(cat.endTime)}
                     {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
                       <span
                         style={{
@@ -563,7 +568,7 @@ function ShiftCategoriesSettings({
                   color: "var(--dg-color-danger)",
                 }}
               >
-                {nameError ?? "Another shift in this focus area already uses that name."}
+                {nameError ?? `Another shift in this ${focusAreaTerm} already uses that name.`}
               </p>
             ) : null}
           </div>
@@ -591,7 +596,7 @@ function ShiftCategoriesSettings({
                     color: "var(--dg-color-danger)",
                   }}
                 >
-                  {abbrError ?? "Another shift in this focus area already uses that code."}
+                  {abbrError ?? `Another shift in this ${focusAreaTerm} already uses that code.`}
                 </p>
               ) : null}
             </div>
@@ -776,8 +781,8 @@ function ShiftCategoriesSettings({
       {focusAreas.length === 0 && (
         <EmptyState
           size="compact"
-          title="No focus areas yet"
-          description="Create focus areas first, then add shifts to each one."
+          title={`No ${focusAreasTerm} yet`}
+          description={`Create ${focusAreasTerm} first, then add shifts to each one.`}
         />
       )}
 
@@ -864,15 +869,10 @@ function ShiftCategoriesSettings({
                 title={`Archive "${cat.name}"?`}
                 message={
                   <>
-                    <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.
+                    <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.{" "}
+                    {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
-                summary={{
-                  points: [
-                    "Historical records are kept.",
-                    "Any compatibility labels derived from this shift become uncategorized.",
-                  ],
-                }}
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting === confirmDeleteId}
@@ -885,7 +885,7 @@ function ShiftCategoriesSettings({
             return (
               <ConfirmDialog
                 title={`Archive "${cat.name}"?`}
-                message="Archiving keeps its historical records."
+                message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting === confirmDeleteId}

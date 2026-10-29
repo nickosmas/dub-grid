@@ -80,7 +80,7 @@ export default function DomainSelector() {
     if (submittingRef.current) return;
     const normalized = slug.trim().toLowerCase();
     if (!normalized) {
-      setError("Please enter your organization's domain.");
+      setError("Enter your organization's domain.");
       return;
     }
     // Reject anything that isn't a valid subdomain rather than silently
@@ -125,7 +125,7 @@ export default function DomainSelector() {
       }
       shouldNavigate = true;
     } catch (err) {
-      showToast(getWebAuthRecoveryMessage(err, "Unable to verify that domain. Please try again."));
+      showToast(getWebAuthRecoveryMessage(err, "We couldn't check that domain. Try again."));
       return;
     } finally {
       if (!shouldNavigate) {

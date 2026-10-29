@@ -93,12 +93,12 @@ describe("DashboardHeader", () => {
   it("shows only the period beneath the greeting", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" periodLabel="Jul 5–11, 2026" />);
+    render(<DashboardHeader firstName="Jordan" periodLabel="Jul 5 - 11, 2026" />);
 
     // The organization name and the facility clock left the header: the org
     // is on Profile and the clock on Schedule, and the header was the busiest
     // thing on the page.
-    expect(screen.getByText("Jul 5–11, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Jul 5 - 11, 2026")).toBeInTheDocument();
     expect(screen.queryByText(/Facility time/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\|/)).not.toBeInTheDocument();
   });

@@ -27,6 +27,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { NumberField } from "@/components/ui/number-field";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -745,7 +746,7 @@ function FocusAreaCoverageCard({
         <EmptyState
           size="compact"
           title="No coverage targets yet"
-          description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
+          description={`Create shifts or scheduled jobs for ${focusArea.name} before adding coverage.`}
           style={{ margin: "12px 16px" }}
         />
       ) : (
@@ -830,6 +831,7 @@ export default function CoverageRequirementsSettings({
   onCoverageRequirementsChange,
   canEdit,
   defaultShiftEnabled = true,
+  focusAreaLabel = "Focus Areas",
 }: {
   orgId: string;
   focusAreas: FocusArea[];
@@ -841,7 +843,9 @@ export default function CoverageRequirementsSettings({
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canEdit: boolean;
   defaultShiftEnabled?: boolean;
+  focusAreaLabel?: string;
 }) {
+  const focusAreasTerm = pluralLabelNoun(focusAreaLabel);
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const assignableOptions = useMemo(
     () =>
@@ -928,11 +932,13 @@ export default function CoverageRequirementsSettings({
     return (
       <EmptyState
         size="compact"
-        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
+        title={
+          activeFocusAreas.length === 0 ? `No ${focusAreasTerm} yet` : "No coverage targets yet"
+        }
         description={
           activeFocusAreas.length === 0
-            ? "Create focus areas first to configure coverage."
-            : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."
+            ? `Create ${focusAreasTerm} first, then set coverage for each.`
+            : "Create shifts or scheduled jobs first, then set how many people each needs."
         }
       />
     );

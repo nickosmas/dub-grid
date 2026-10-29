@@ -520,7 +520,7 @@ describe("GridmasterPersonView", () => {
 
   it("shows the server's reason when the email is taken", async () => {
     changeGridmasterPersonEmail.mockRejectedValue(
-      new Error("That email belongs to a different user account."),
+      new Error("Someone else already signs in with that email. Use a different one."),
     );
     renderView(linkedRecord());
 
@@ -532,7 +532,9 @@ describe("GridmasterPersonView", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Change email" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("That email belongs to a different user account."),
+      expect(toast.error).toHaveBeenCalledWith(
+        "Someone else already signs in with that email. Use a different one.",
+      ),
     );
     expect(
       screen.getByRole("dialog", { name: "Change this account's sign-in email?" }),

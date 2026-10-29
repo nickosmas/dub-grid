@@ -59,7 +59,7 @@ export default function ActivityExpandedScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load activity"
+          title="Couldn't load activity"
           variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();

@@ -40,7 +40,7 @@ export function DataPrivacyPanel() {
               Cookie preferences
             </div>
             <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-              Adjust which cookies and analytics DubGrid uses on this device.
+              Choose which cookies and analytics the app uses on this device.
             </p>
           </div>
           <Button

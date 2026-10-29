@@ -58,9 +58,9 @@ export function ActivityTable<T extends ActivityTableEntry>({
         <TableHeader>
           <TableRow className="dg-activity-head-row hover:bg-transparent">
             <TableHead>Time</TableHead>
-            <TableHead className="hidden sm:table-cell">Activity type</TableHead>
-            <TableHead className="hidden md:table-cell">Performed by</TableHead>
-            {showTarget && <TableHead className="hidden md:table-cell">Target changed</TableHead>}
+            <TableHead className="hidden sm:table-cell">Kind of change</TableHead>
+            <TableHead className="hidden md:table-cell">By</TableHead>
+            {showTarget && <TableHead className="hidden md:table-cell">Affected</TableHead>}
             {showOrganization && (
               <TableHead className="hidden lg:table-cell">Organization</TableHead>
             )}
@@ -186,7 +186,7 @@ function ActivityRow<T extends ActivityTableEntry>({
           </div>
         )}
         <div className="dg-activity-context md:hidden">
-          Performed by {actorLabel}
+          By {actorLabel}
           {showTarget ? ` · Target: ${targetLabel}` : ""}
         </div>
       </TableCell>

@@ -117,7 +117,7 @@ export function normalizeStaffTextFields(input: StaffTextValidationInput): {
 } {
   const fieldErrors = getStaffFieldErrors(input);
   if (Object.keys(fieldErrors).length > 0) {
-    throw new Error(Object.values(fieldErrors)[0] ?? "Invalid input");
+    throw new Error(Object.values(fieldErrors)[0] ?? "Check the highlighted fields and try again.");
   }
 
   return {
@@ -147,7 +147,7 @@ export function getStaffFieldErrorsFromZod(error: ZodError): StaffFieldErrors {
 
 export function buildStaffValidationErrorResponse(
   fieldErrors: StaffFieldErrors,
-  fallbackMessage = "Invalid input",
+  fallbackMessage = "Check the highlighted fields and try again.",
 ) {
   const message = Object.values(fieldErrors)[0] ?? fallbackMessage;
   return Response.json(
@@ -205,7 +205,7 @@ export async function validateStaffOrgReferences(
     checks.push(
       fetchActiveIds(serviceClient, "focus_areas", orgId, focusAreaIds).then((validIds) => {
         if (validIds.size !== focusAreaIds.length) {
-          fieldErrors.focusAreaIds = "Select valid focus areas from this organization";
+          fieldErrors.focusAreaIds = "One of these was removed. Refresh and choose again.";
         }
       }),
     );
@@ -224,7 +224,7 @@ export async function validateStaffOrgReferences(
 
         const roles = data ?? [];
         if (roles.length !== roleIds.length) {
-          fieldErrors.roleIds = "Select valid roles from this organization";
+          fieldErrors.roleIds = "One of these was removed. Refresh and choose again.";
           return;
         }
 
@@ -291,7 +291,7 @@ export async function validateStaffOrgReferences(
     checks.push(
       fetchActiveIds(serviceClient, "departments", orgId, departmentIds).then((validIds) => {
         if (validIds.size !== departmentIds.length) {
-          fieldErrors.departmentIds = "Select valid departments from this organization";
+          fieldErrors.departmentIds = "One of these was removed. Refresh and choose again.";
         }
       }),
     );
@@ -316,8 +316,7 @@ export async function validateStaffOrgReferences(
       checks.push(
         fetchActiveIds(serviceClient, "departments", orgId, deptAdminIds).then((validIds) => {
           if (validIds.size !== deptAdminIds.length) {
-            fieldErrors.deptAdminIds =
-              "Select valid department admin departments from this organization";
+            fieldErrors.deptAdminIds = "One of these was removed. Refresh and choose again.";
           }
         }),
       );

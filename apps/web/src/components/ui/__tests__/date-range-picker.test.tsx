@@ -78,7 +78,7 @@ describe("DateRangePicker", () => {
 
   it("reads both ends the same way with the year said once", () => {
     expect(formatDateRangeLabel({ from: "2026-09-06", to: "2026-09-26" }, "Any")).toBe(
-      "Sep 6 – Sep 26, 2026",
+      "Sep 6 - Sep 26, 2026",
     );
     expect(formatDateRangeLabel({ from: "2026-09-06", to: "" }, "Any")).toBe("From Sep 6, 2026");
     expect(formatDateRangeLabel({ from: "", to: "" }, "Any")).toBe("Any");

@@ -4,7 +4,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AbsenceType, Organization } from "@/types";
 import { resolveDayOffAbsenceType } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
-import { DEFAULT_OPEN_SHIFT_VISIBILITY, type OpenShiftVisibilityMode } from "@dubgrid/domain";
+import {
+  changedElsewhereMessage,
+  DEFAULT_OPEN_SHIFT_VISIBILITY,
+  type OpenShiftVisibilityMode,
+} from "@dubgrid/domain";
 import { toast } from "sonner";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import CustomSelect from "@/components/CustomSelect";
@@ -106,7 +110,7 @@ export default function ScheduleRules({
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
-      toast.error("Organization data is out of date. Refresh and try again.");
+      toast.error(changedElsewhereMessage("these settings"));
       return;
     }
 
@@ -207,16 +211,14 @@ export default function ScheduleRules({
           }}
         >
           <div>
-            <div style={ruleTitleStyle}>Enforce shift conflict prevention</div>
-            <div style={ruleDescriptionStyle}>
-              When enabled, overlapping shifts cannot be saved.
-            </div>
+            <div style={ruleTitleStyle}>Block overlapping shifts</div>
+            <div style={ruleDescriptionStyle}>Nobody can be given two shifts that overlap.</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <Switch
               checked={enforceConflictPrevention}
               onChange={setEnforceConflictPrevention}
-              ariaLabel="Enforce shift conflict prevention"
+              ariaLabel="Block overlapping shifts"
             />
           </div>
         </div>
@@ -227,8 +229,8 @@ export default function ScheduleRules({
               Biweekly pay period start date
             </label>
             <div style={ruleDescriptionStyle}>
-              Set one anchor date and DubGrid will align every 2-week schedule view to that
-              repeating pay period. Leave blank to keep 2-week views aligned to calendar weeks.
+              Pick the first day of any pay period, and 2 Weeks view lines up with your pay periods.
+              Leave it blank to follow calendar weeks.
             </div>
           </div>
           <div style={{ maxWidth: 260 }}>
@@ -296,9 +298,8 @@ export default function ScheduleRules({
               Show coverage shortages to staff
             </label>
             <div style={ruleDescriptionStyle}>
-              Open shifts created when a published schedule is short of its coverage requirements.
-              Schedulers always see these. Always shows them to staff regardless of their own
-              schedule; hidden keeps staff from seeing them even when short-staffed.
+              Open shifts made when a published schedule is short. Staff see them when the shift
+              fits their availability, always, or never. Schedulers always see them.
             </div>
           </div>
           <CustomSelect
@@ -315,9 +316,8 @@ export default function ScheduleRules({
               Show call-off vacancies to staff
             </label>
             <div style={ruleDescriptionStyle}>
-              Open shifts left behind when someone calls off and their shift is offered up for
-              pickup. Always shows them to staff regardless of their own schedule; hidden keeps the
-              vacancy off the staff view.
+              Open shifts left when someone calls off. Staff see them when the shift fits their
+              availability, always, or never.
             </div>
           </div>
           <CustomSelect
@@ -330,8 +330,8 @@ export default function ScheduleRules({
 
         {confirmOpen && (
           <ConfirmDialog
-            title="Save Schedule Rule"
-            message="Updates a scheduling rule for the whole organization. Review it carefully before saving."
+            title="Save schedule rules?"
+            message="They apply to everyone in your organization."
             confirmLabel="Save"
             variant="info"
             isLoading={saving}

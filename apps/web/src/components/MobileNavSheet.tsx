@@ -250,7 +250,7 @@ export default function MobileNavSheet({
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
-                    {isUserViewActive ? "Exit User View" : "View as User"}
+                    {isUserViewActive ? "Exit User view" : "View as a User"}
                   </Button>
                 )}
                 <Button

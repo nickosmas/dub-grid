@@ -212,7 +212,7 @@ export default function ProfilePasswordScreen() {
   }
 
   function showPasswordError(message: string) {
-    pushToast({ tone: "error", title: "Could not change password", message });
+    pushToast({ tone: "error", title: "Couldn't change password", message });
   }
 
   function requestPasswordChange() {
@@ -382,7 +382,7 @@ export default function ProfilePasswordScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Could not load your account"
+          title="Couldn't load your account"
           variant="centered"
           onAction={() => {
             void profileQuery.refetch();
@@ -498,7 +498,7 @@ export default function ProfilePasswordScreen() {
       >
         {confirmError ? (
           <View style={styles.confirmErrorBlock}>
-            <Text style={styles.confirmErrorTitle}>Could not change password</Text>
+            <Text style={styles.confirmErrorTitle}>Couldn't change password</Text>
             <InlineError message={confirmError} />
           </View>
         ) : null}

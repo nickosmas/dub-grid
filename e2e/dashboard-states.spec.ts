@@ -23,7 +23,7 @@ test.describe("dashboard states", () => {
     // Until the bootstrap lands, sign-in and SetupGuard both show the branded
     // splash. The progress bar this used to wait for belongs to the data the
     // dashboard loads afterwards, which a held bootstrap never lets it reach.
-    await expect(page.getByRole("heading", { name: "Loading your workspace" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Opening your organization" })).toBeVisible({
       timeout: 15_000,
     });
     releaseBootstrap();

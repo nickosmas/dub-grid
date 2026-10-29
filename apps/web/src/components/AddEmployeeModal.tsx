@@ -225,7 +225,7 @@ export default function AddEmployeeModal({
   return (
     <>
       <Modal
-        title="Add Staff Members"
+        title="Add staff members"
         onClose={onClose}
         onRequestClose={requestClose}
         aria-describedby={descriptionId}
@@ -512,7 +512,7 @@ export default function AddEmployeeModal({
                         <CustomSelect
                           value={row.certificationId != null ? String(row.certificationId) : ""}
                           options={[
-                            { value: "", label: "— None —" },
+                            { value: "", label: "None" },
                             ...certifications.map((d) => ({
                               value: String(d.id),
                               label: d.name !== d.abbr ? `${d.name} (${d.abbr})` : d.name,

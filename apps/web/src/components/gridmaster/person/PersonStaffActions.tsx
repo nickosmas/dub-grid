@@ -1,6 +1,11 @@
 "use client";
 
-import { canMarkInactive, describeStatusAction, statusUndoAction } from "@dubgrid/domain";
+import {
+  changedElsewhereMessage,
+  canMarkInactive,
+  describeStatusAction,
+  statusUndoAction,
+} from "@dubgrid/domain";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
@@ -22,8 +27,7 @@ import type { Employee } from "@/types";
 
 type StatusChange = "activate" | "deactivate" | "remove";
 
-const CONFLICT_MESSAGE =
-  "Their staff record changed elsewhere. Review the latest values and try again.";
+const CONFLICT_MESSAGE = changedElsewhereMessage("their details");
 
 function toEmployee(record: GridmasterStaffRecord): Employee {
   const {

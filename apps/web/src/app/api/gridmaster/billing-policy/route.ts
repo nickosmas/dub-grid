@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import {
+  changedElsewhereMessage,
   BILLING_POLICY_KEYS,
   BILLING_POLICY_LIMITS,
   BILLING_POLICY_OVERRIDE_COLUMNS,
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: API_ERRORS.RATE_LIMITED },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds(reset)) } },
     );
   }
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
       if (!updated) {
         return NextResponse.json(
           {
-            error: "The billing policy was changed by someone else. Review it and try again.",
+            error: changedElsewhereMessage("the billing policy"),
             platform: platformFromRow(before as unknown as Record<string, unknown>),
           },
           { status: 409 },

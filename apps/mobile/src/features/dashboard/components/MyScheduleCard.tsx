@@ -147,7 +147,7 @@ function buildDaySegmentPills(
     const startTime = segment.startTime ?? (index === 0 ? entry.presentation.startTime : null);
     const endTime = segment.endTime ?? (index === 0 ? entry.presentation.endTime : null);
     const timeRangeLabel =
-      startTime && endTime ? `${formatUsTime(startTime)}–${formatUsTime(endTime)}` : null;
+      startTime && endTime ? `${formatUsTime(startTime)} - ${formatUsTime(endTime)}` : null;
 
     const rawPillColor =
       readOptionalText(segment.jobColor) ??
@@ -288,7 +288,7 @@ export function MyScheduleCard({
               restOfDay
                 ? restOfDayAbsenceTimeLabel(openableEntry)
                   ? `${restOfDay.name || restOfDay.label} ${restOfDayAbsenceTimeLabel(openableEntry)}`
-                  : `${restOfDay.name || restOfDay.label} for the rest of the day`
+                  : `${restOfDay.name || restOfDay.label} for part of the day`
                 : null,
               notes.length > 0 ? scheduleNotesSpokenLabel(notes) : null,
             ].filter(Boolean);
@@ -389,7 +389,7 @@ export function MyScheduleCard({
                   // they render as their own coloured pill above.
                   <View style={styles.emptyPill}>
                     <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.emptyText}>
-                      —
+                      -
                     </Text>
                   </View>
                 )}
@@ -409,7 +409,7 @@ export function MyScheduleCard({
             query.error,
             "We couldn't load your schedule right now.",
           )}
-          title="Could not load your schedule"
+          title="Couldn't load your schedule"
           onAction={() => {
             void query.refetch();
           }}

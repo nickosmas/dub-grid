@@ -38,7 +38,7 @@ const DESIGNATIONS: NamedItem[] = [
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
   { id: 3, orgId: "org-1", name: "CSN II", abbr: "CSN II", sortOrder: 2 },
   { id: 4, orgId: "org-1", name: "STAFF", abbr: "STAFF", sortOrder: 3 },
-  { id: 5, orgId: "org-1", name: "—", abbr: "—", sortOrder: 4 },
+  { id: 5, orgId: "org-1", name: "-", abbr: "-", sortOrder: 4 },
 ];
 const ROLES: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "DCSN", abbr: "DCSN", sortOrder: 0 },

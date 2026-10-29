@@ -134,7 +134,7 @@ export default function NotificationDetailScreen() {
             "We couldn't load that alert right now.",
           )}
           fillScreen
-          title="Could not load this alert"
+          title="Couldn't load this alert"
           variant="centered"
           onAction={() => {
             void detailQuery.refetch();

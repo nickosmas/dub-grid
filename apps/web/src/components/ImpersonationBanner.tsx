@@ -114,7 +114,7 @@ export default function ImpersonationBanner() {
         {imp.justification && (
           <MaybeHint content={imp.justification} side="bottom">
             <span className="ml-1 inline-block max-w-[300px] truncate align-bottom text-[length:var(--dg-fs-footnote)]">
-              — {imp.justification}
+              · {imp.justification}
             </span>
           </MaybeHint>
         )}

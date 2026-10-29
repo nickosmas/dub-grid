@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (limited) {
     const retryAfter = retryAfterSeconds(reset);
     return NextResponse.json(
-      { valid: false, error: "Too many requests" },
+      { valid: false, error: API_ERRORS.RATE_LIMITED },
       {
         status: 429,
         headers: { "Retry-After": String(retryAfter) },

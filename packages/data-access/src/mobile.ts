@@ -1998,7 +1998,7 @@ export async function changeMobileMembershipOrgRole(
     if (message.includes("last super_admin")) {
       return {
         status: "blocked",
-        message: "Cannot demote the only super admin. Transfer ownership first.",
+        message: "They're the only Super Admin. Make someone else a Super Admin first.",
       };
     }
     if (message.includes("SELF_ACTION_FORBIDDEN")) {

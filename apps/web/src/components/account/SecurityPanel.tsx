@@ -166,13 +166,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       if (msg.includes("same") || msg.includes("different")) {
         setError("New password must be different from your current password.");
       } else if (msg.includes("reauthentication") || msg.includes("recently")) {
-        setError("Please sign out and sign in again before changing your password.");
+        setError("Sign out and sign in again before changing your password.");
       } else if (msg.includes("weak") || msg.includes("short")) {
-        setError("Password is too weak. Please choose a stronger password.");
+        setError("That password is too weak. Choose a stronger one.");
       } else {
         toast.error(
           passwordUpdated
-            ? "Password updated, but we couldn't sign you out. Please sign out and sign in again."
+            ? "Password updated, but we couldn't sign you out. Sign out and sign in again."
             : "We couldn't update your password. Try again.",
         );
       }
@@ -365,7 +365,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               Sessions
             </div>
             <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-              Manage sign-in state across browsers and devices.
+              Sign out of devices you&apos;re not using.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -396,7 +396,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 Devices
               </div>
               <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Inspect authenticated devices and recent sign-in history.
+                Where you&apos;re signed in, and when you last signed in.
               </div>
             </div>
             <SessionList onOtherSessionCountChange={handleOtherSessionCountChange} />

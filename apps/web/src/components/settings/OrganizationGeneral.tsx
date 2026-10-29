@@ -27,6 +27,7 @@ import {
 } from "@/lib/form-validation";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export default function OrganizationGeneral({
   organization,
@@ -106,8 +107,8 @@ export default function OrganizationGeneral({
       return;
     }
     if (!organization.updatedAt) {
-      lastSaveErrorRef.current = new Error("Organization data is out of date.");
-      toast.error("Organization data is out of date. Refresh and try again.");
+      lastSaveErrorRef.current = new Error(changedElsewhereMessage("these settings"));
+      toast.error(changedElsewhereMessage("these settings"));
       return;
     }
     setSaving(true);

@@ -268,9 +268,7 @@ describe("BillingSettings", () => {
     expect(await screen.findByText("Suspended")).toBeInTheDocument();
     expect(screen.getByText("Your organization is suspended.")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "DubGrid Support suspended your organization. Contact DubGrid Support for help.",
-      ),
+      screen.getByText("Contact DubGrid Support to find out why and what happens next."),
     ).toBeInTheDocument();
   });
 

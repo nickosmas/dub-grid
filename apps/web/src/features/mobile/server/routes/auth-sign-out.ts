@@ -23,10 +23,7 @@ interface BulkCaller {
 }
 
 function expired() {
-  return NextResponse.json(
-    { error: "Please sign in again before managing devices." },
-    { status: 401 },
-  );
+  return NextResponse.json({ error: "Sign in again to manage your devices." }, { status: 401 });
 }
 
 /**

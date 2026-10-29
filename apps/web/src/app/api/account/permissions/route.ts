@@ -221,7 +221,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
     });
   } catch (error) {
     logger.error({ error }, "account permissions GET failed");
-    return jsonError("Failed to load permissions");
+    return jsonError("We couldn't load your permissions. Refresh and try again.");
   }
 }
 

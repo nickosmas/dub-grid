@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
     const organization = await findMobileOrganizationBySlug(serviceClient, slug);
 
     if (!organization) {
-      return json({ error: "No organization matched that slug." }, { status: 404 });
+      return json(
+        { error: "We couldn't find that organization. Check the domain and try again." },
+        { status: 404 },
+      );
     }
 
     return json(

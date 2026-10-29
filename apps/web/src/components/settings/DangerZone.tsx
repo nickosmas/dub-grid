@@ -118,8 +118,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
               lineHeight: 1.5,
             }}
           >
-            Closing {organization.name} cancels its subscription and removes access for every
-            member. Reach out to support if you need it restored.
+            Everyone loses access and billing stops. Only DubGrid Support can bring it back.
           </p>
         </div>
       </div>

@@ -53,7 +53,7 @@ export interface PermissionReviewConfig {
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  CORE: "Core Operations",
+  CORE: "Scheduling and staff",
   ADMINISTRATION: "Administration",
 };
 
@@ -103,7 +103,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     id: "staff",
     title: "Staff",
     description: (labels) =>
-      `View employee profiles, contact details, and ${inSentence(labels.certificationLabel)}. Edit adds inviting people and granting management access.`,
+      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add and invite people, change their status, and set their access level.`,
     icon: "users",
     category: "CORE",
     viewKeys: ["canViewEmployeeDetails"],
@@ -112,7 +112,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   {
     id: "shift-requests",
     title: "Shift requests",
-    description: "Approve or deny pickup, swap, and call-off requests.",
+    description: "Approve or reject pickup, swap, and call-off requests.",
     icon: "checkCircle",
     category: "CORE",
     viewKeys: [],
@@ -598,7 +598,7 @@ export default function PermissionsEditor({
             </p>
             {showPermissionCounter && (
               <p className="text-[12px] text-[var(--dg-color-text-faint)] mt-1">
-                {levelCount.enabled} of {levelCount.total} access levels enabled
+                {levelCount.enabled} of {levelCount.total} turned on
               </p>
             )}
             <div className="flex gap-2 mt-3">
@@ -607,21 +607,21 @@ export default function PermissionsEditor({
                 onClick={() => setAll(true)}
                 style={{ fontSize: 12 }}
               >
-                Select All
+                Select all
               </Button>
               <Button
                 className="dg-btn dg-btn-ghost"
                 onClick={() => setAll(false)}
                 style={{ fontSize: 12 }}
               >
-                Clear All
+                Clear all
               </Button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="dg-type-table-heading hidden grid-cols-12 gap-4 border-b border-[var(--dg-color-border-light)] px-6 py-3 md:grid">
-              <div className="col-span-8">Module & access level</div>
+              <div className="col-span-8">Permission</div>
               <div className="col-span-2 text-center">View</div>
               <div className="col-span-2 text-center">Edit</div>
             </div>

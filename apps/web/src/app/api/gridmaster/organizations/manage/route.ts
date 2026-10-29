@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
       .eq("id", parsed.data.orgId)
       .maybeSingle();
     if (targetOrgError) {
-      return apiErrorResponse(targetOrgError, "Gridmaster organization request failed");
+      return apiErrorResponse(targetOrgError, "We couldn't update that organization. Try again.");
     }
     if (targetOrg?.workspace_kind === "sandbox") {
       return NextResponse.json(
@@ -559,8 +559,8 @@ export async function POST(req: NextRequest) {
         ? error.message
         : String((error as { message?: unknown })?.message ?? "");
     if (message.includes("ACCOUNT_TERMINATED")) {
-      return apiErrorResponse(error, "Gridmaster organization request failed", 409);
+      return apiErrorResponse(error, "We couldn't update that organization. Try again.", 409);
     }
-    return apiErrorResponse(error, "Gridmaster organization request failed");
+    return apiErrorResponse(error, "We couldn't update that organization. Try again.");
   }
 }

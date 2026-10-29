@@ -42,7 +42,7 @@ describe("createOptimisticMutationLifecycle", () => {
         ),
       ],
       successToast: { tone: "success", message: "Saved" },
-      errorToast: { title: "Could not save", fallbackMessage: "Try again." },
+      errorToast: { title: "Couldn't save", fallbackMessage: "Try again." },
       announceOnSuccess: "Counter saved",
       ...overrides,
     };
@@ -87,7 +87,7 @@ describe("createOptimisticMutationLifecycle", () => {
     expect(queryClient.getQueryData(COUNTER_KEY)).toEqual({ value: 1 });
     expect(notify).toHaveBeenCalledWith("error");
     expect(pushToast).toHaveBeenCalledWith(
-      expect.objectContaining({ tone: "error", title: "Could not save" }),
+      expect.objectContaining({ tone: "error", title: "Couldn't save" }),
     );
   });
 

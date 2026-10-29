@@ -230,7 +230,11 @@ function AbsenceTypeRow({
         toast.success(hard ? "Absence type deleted" : "Absence type archived");
       } catch (error) {
         Sentry.captureException(error);
-        toast.error(hard ? "Failed to delete absence type" : "Failed to archive absence type");
+        toast.error(
+          hard
+            ? "We couldn't delete that absence type. Try again."
+            : "We couldn't archive that absence type. Try again.",
+        );
       } finally {
         setDeleting(false);
         setShowDeleteConfirm(false);
@@ -292,7 +296,7 @@ function AbsenceTypeRow({
                 whiteSpace: isNameMode ? "normal" : "nowrap",
               }}
             >
-              {previewLabel || "…"}
+              {previewLabel || ""}
             </span>
           );
         })()}
@@ -474,8 +478,8 @@ function AbsenceTypeRow({
                 message={
                   <>
                     <strong>{form.name}</strong> is currently{" "}
-                    {dependencyInfo!.summary.toLowerCase()}. Archiving removes it from future
-                    scheduling and keeps its history.
+                    {dependencyInfo!.summary.toLowerCase()}.{" "}
+                    {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
                 confirmLabel="Archive"
@@ -490,7 +494,7 @@ function AbsenceTypeRow({
             return (
               <ConfirmDialog
                 title={`Archive "${form.name}"?`}
-                message="Archiving removes it from future scheduling and keeps its historical records intact."
+                message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
                 variant="warning"
                 isLoading={deleting}

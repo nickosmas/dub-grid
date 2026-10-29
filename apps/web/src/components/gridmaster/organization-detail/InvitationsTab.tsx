@@ -15,6 +15,7 @@ import {
   gmTdStyle,
   gmThStyle,
 } from "@/components/gridmaster/table-styles";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 // Invitations tab for the gridmaster OrganizationDetail view.
 
@@ -68,7 +69,7 @@ export function InvitationsTab({
 
   async function handleRevoke(inv: InvitationRow) {
     if (!inv.updated_at) {
-      toast.error("Invitation data is out of date. Refresh and try again.");
+      toast.error(changedElsewhereMessage("this invitation"));
       return;
     }
     setRevoking(inv.id);
@@ -82,7 +83,7 @@ export function InvitationsTab({
       onRefresh();
     } catch (err: unknown) {
       if (err instanceof InvitationAccessConflictError) {
-        toast.error("Invitation changed elsewhere. Review the latest values and try again.");
+        toast.error(changedElsewhereMessage("this invitation"));
         onRefresh();
       } else {
         toast.error(

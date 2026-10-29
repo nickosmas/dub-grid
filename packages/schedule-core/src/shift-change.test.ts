@@ -99,7 +99,7 @@ describe("describeShiftChangeItem", () => {
       { date: WED },
     );
     expect(allDay.plain).toBe("Vacation (all day)");
-    expect(restOfDay.plain).toBe("Sick (rest of day)");
+    expect(restOfDay.plain).toBe("Sick (part of day)");
     expect(restOfDay.detail).toEqual([]);
     expect(restOfDay.minutes).toBeNull();
   });

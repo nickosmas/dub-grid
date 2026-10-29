@@ -71,6 +71,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ request }, { status: 201 });
   } catch (error) {
-    return apiErrorResponse(error, "We couldn't create request. Try again.", 400);
+    return apiErrorResponse(error, "We couldn't send your request. Try again.", 400);
   }
 }

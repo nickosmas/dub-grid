@@ -199,43 +199,44 @@ export default function TrialWelcomeModal() {
                 While you&rsquo;re trying it out
               </div>
               <div style={{ fontSize: 12, color: "var(--dg-color-text-muted)", lineHeight: 1.4 }}>
-                You get full access, there&rsquo;s just one plan so there&rsquo;s nothing extra to
-                unlock later.
+                Everything&rsquo;s included. There&rsquo;s one plan, so nothing is held back for an
+                upgrade.
               </div>
             </div>
           </div>
-          <div
-            style={{
-              padding: "12px 14px",
-              background: "var(--dg-color-surface-subtle, var(--dg-color-surface))",
-              borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--dg-color-border)",
-              display: "flex",
-              gap: 10,
-              alignItems: "flex-start",
-            }}
-          >
-            <div style={{ color: "var(--dg-color-brand)", flexShrink: 0, marginTop: 2 }}>
-              <Hourglass size={18} />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-primary)",
-                  marginBottom: 2,
-                }}
-              >
-                If you need more time
+          {graceDays > 0 && (
+            <div
+              style={{
+                padding: "12px 14px",
+                background: "var(--dg-color-surface-subtle, var(--dg-color-surface))",
+                borderRadius: "var(--dg-radius-md)",
+                border: "1px solid var(--dg-color-border)",
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ color: "var(--dg-color-brand)", flexShrink: 0, marginTop: 2 }}>
+                <Hourglass size={18} />
               </div>
-              <div style={{ fontSize: 12, color: "var(--dg-color-text-muted)", lineHeight: 1.4 }}>
-                No rush, you&rsquo;ll still have {graceDays} extra{" "}
-                {graceDays === 1 ? "day" : "days"} to add billing before the organization loses
-                access.
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--dg-color-text-primary)",
+                    marginBottom: 2,
+                  }}
+                >
+                  If you need more time
+                </div>
+                <div style={{ fontSize: 12, color: "var(--dg-color-text-muted)", lineHeight: 1.4 }}>
+                  After it ends, you have {graceDays} more {graceDays === 1 ? "day" : "days"} to
+                  start a subscription before your organization locks.
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </Modal>

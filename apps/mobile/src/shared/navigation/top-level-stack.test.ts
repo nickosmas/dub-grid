@@ -12,7 +12,7 @@ describe("top-level stack options", () => {
       headerBackButtonDisplayMode: "minimal",
       headerBackVisible: true,
     });
-    expect(createDetailStackOptions(mobileColors, "Shift Detail")).toMatchObject({
+    expect(createDetailStackOptions(mobileColors, "Shift detail")).toMatchObject({
       headerBackButtonDisplayMode: "minimal",
       headerBackVisible: true,
       headerLargeTitle: false,

@@ -1,3 +1,4 @@
+import { singularLabelNoun } from "@dubgrid/domain";
 import { absenceSideOf } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
@@ -14,6 +15,7 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import { fetchAllRows } from "@/lib/db/shared";
+import { formatShiftRequestStatusLabel, formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import { getBrandSymbolLockupLayout } from "@dubgrid/design-tokens";
 import { pdfBrandMarkCommands } from "./pdf-brand-mark";
 import {
@@ -292,6 +294,8 @@ export interface OperationsReportPayload {
   orgId: string;
   orgName: string;
   orgTimezone: string | null;
+  /** Absent on payloads saved before reports named the organization's labels. */
+  labels?: OperationsReportLabels;
   generatedAt: string;
   range: OperationsReportRange;
   payPeriodStartDate: string | null;
@@ -351,7 +355,27 @@ type OrganizationRow = {
   name: string;
   timezone: string | null;
   pay_period_start_date: string | null;
+  focus_area_label?: string | null;
+  certification_label?: string | null;
+  role_label?: string | null;
 };
+
+/** The organization's own names for focus areas, certifications and roles. */
+export interface OperationsReportLabels {
+  focusArea: string;
+  certification: string;
+  role: string;
+}
+
+export function reportLabelsFor(
+  org: Pick<OrganizationRow, "focus_area_label" | "certification_label" | "role_label">,
+): OperationsReportLabels {
+  return {
+    focusArea: org.focus_area_label?.trim() || "Focus Areas",
+    certification: org.certification_label?.trim() || "Certifications",
+    role: org.role_label?.trim() || "Roles",
+  };
+}
 
 type EmployeeReportRow = {
   id: string;
@@ -803,6 +827,9 @@ export function buildOperationsReportPayload(
     historicalEmployeeDirectory.map((row) => [row.id, formatName(row)]),
   );
   const focusAreaById = buildMap(source.focusAreas);
+  const labels = reportLabelsFor(source.org);
+  const unknownFocusArea = `Unknown ${singularLabelNoun(labels.focusArea)}`;
+  const unknownCertification = `Unknown ${singularLabelNoun(labels.certification)}`;
   const roleById = buildMap(source.roles);
   const certificationById = buildMap(source.certifications);
   const departmentById = buildMap(source.departments);
@@ -934,7 +961,7 @@ export function buildOperationsReportPayload(
       focusArea:
         note.focus_area_id == null
           ? ""
-          : (focusAreaById.get(note.focus_area_id) ?? "Unknown focus area"),
+          : (focusAreaById.get(note.focus_area_id) ?? unknownFocusArea),
     }))
     .sort(
       (left, right) =>
@@ -970,12 +997,12 @@ export function buildOperationsReportPayload(
     employmentType: employee.employment_type ?? "full_time",
     email: employee.email ?? "",
     phone: employee.phone ?? "",
-    focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
+    focusAreas: formatList(employee.focus_area_ids, focusAreaById, unknownFocusArea),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
     certification:
       employee.certification_id == null
         ? ""
-        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
+        : (certificationById.get(employee.certification_id) ?? unknownCertification),
     departments: formatList(
       resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
       departmentById,
@@ -1034,7 +1061,7 @@ export function buildOperationsReportPayload(
       employeeId: employee.id,
       employeeName: formatName(employee),
       status: employee.status ?? "unknown",
-      focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
+      focusAreas: formatList(employee.focus_area_ids, focusAreaById, unknownFocusArea),
       scheduledHours,
       shiftCount: workedEntries.length,
       workedDays,
@@ -1065,8 +1092,8 @@ export function buildOperationsReportPayload(
             date: entry.date,
             focusArea:
               focusAreaId == null
-                ? "No focus area"
-                : (focusAreaById.get(focusAreaId) ?? "Unknown focus area"),
+                ? `No ${singularLabelNoun(labels.focusArea)}`
+                : (focusAreaById.get(focusAreaId) ?? unknownFocusArea),
             shift:
               segment.shiftId == null
                 ? "No shift"
@@ -1148,7 +1175,7 @@ export function buildOperationsReportPayload(
       const scheduled = scheduledEmployeeIds.size;
       coverage.push({
         date,
-        focusArea: focusAreaById.get(requirement.focus_area_id) ?? "Unknown focus area",
+        focusArea: focusAreaById.get(requirement.focus_area_id) ?? unknownFocusArea,
         shift:
           requirement.preferred_shift_id == null
             ? "Any shift"
@@ -1362,7 +1389,7 @@ export function buildOperationsReportPayload(
       );
       const requestBreakdownValues = new Map<string, { count: number }>();
       for (const event of employeeEvents) {
-        const label = `${event.participation === "initiated" ? "Initiated" : "Received"} ${event.requestType} (${event.status})`;
+        const label = `${event.participation === "initiated" ? "Sent" : "Received"} ${formatShiftRequestTypeLabel(event.requestType).toLowerCase()} (${formatShiftRequestStatusLabel(event.status).toLowerCase()})`;
         const current = requestBreakdownValues.get(label) ?? { count: 0 };
         current.count += 1;
         requestBreakdownValues.set(label, current);
@@ -1458,12 +1485,12 @@ export function buildOperationsReportPayload(
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     employmentType: employee.employment_type ?? "full_time",
-    focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
+    focusAreas: formatList(employee.focus_area_ids, focusAreaById, unknownFocusArea),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
     certification:
       employee.certification_id == null
         ? ""
-        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
+        : (certificationById.get(employee.certification_id) ?? unknownCertification),
     departments: formatList(
       resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
       departmentById,
@@ -1480,9 +1507,9 @@ export function buildOperationsReportPayload(
     certification:
       employee.certification_id == null
         ? ""
-        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
+        : (certificationById.get(employee.certification_id) ?? unknownCertification),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
-    focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
+    focusAreas: formatList(employee.focus_area_ids, focusAreaById, unknownFocusArea),
     departments: formatList(
       resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
       departmentById,
@@ -1558,6 +1585,7 @@ export function buildOperationsReportPayload(
     orgId: source.org.id,
     orgName: source.org.name,
     orgTimezone: source.org.timezone,
+    labels: reportLabelsFor(source.org),
     generatedAt: source.generatedAt ?? new Date().toISOString(),
     range,
     payPeriodStartDate: source.org.pay_period_start_date,
@@ -2376,7 +2404,9 @@ export async function loadOperationsReport(
     fetchTableRows<OrganizationRow>((from, to) =>
       serviceClient
         .from("organizations")
-        .select("id, name, timezone, pay_period_start_date")
+        .select(
+          "id, name, timezone, pay_period_start_date, focus_area_label, certification_label, role_label",
+        )
         .eq("id", input.orgId)
         .limit(1)
         .order("id", { ascending: true })

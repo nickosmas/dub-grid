@@ -169,7 +169,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Unsaved changes" });
+    const dialog = screen.getByRole("dialog", { name: "Discard your changes?" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(navigate).not.toHaveBeenCalled();
     // Opening the confirmation preserves the draft in the underlying panel.
@@ -196,7 +196,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
     await user.click(
-      within(screen.getByRole("dialog", { name: "Unsaved changes" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "Discard your changes?" })).getByRole("button", {
         name: "Discard",
       }),
     );
@@ -210,7 +210,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
     expect(navigate).toHaveBeenCalledTimes(1);
   });
   // Regression: the departments draft stays empty until the user enters edit
@@ -223,7 +223,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
     expect(navigate).toHaveBeenCalledTimes(1);
   });
 
@@ -237,7 +237,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
   });
 });

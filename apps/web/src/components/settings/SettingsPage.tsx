@@ -352,6 +352,7 @@ export default function SettingsPage({
             onChange={onShiftCategoriesChange}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             shiftDisplayMode={organization.shiftDisplayMode}
+            focusAreaLabel={focusAreaLabel}
           />
         )}
 
@@ -389,6 +390,7 @@ export default function SettingsPage({
         (canManageCoverageRequirements || canViewCoverageRequirements) && (
           <Coverage
             orgId={organization.id}
+            focusAreaLabel={focusAreaLabel}
             focusAreas={focusAreas}
             shiftCategories={shiftCategories}
             jobs={jobs}

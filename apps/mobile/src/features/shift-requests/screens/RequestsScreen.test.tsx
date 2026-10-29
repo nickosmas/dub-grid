@@ -226,7 +226,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Could not load requests")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load requests")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Try again"));
     expect(refetch).toHaveBeenCalled();
   });
@@ -266,7 +266,7 @@ describe("RequestsScreen", () => {
     expect(pushToast).toHaveBeenCalledWith({
       tone: "success",
       title: "Request approved",
-      message: "The staffing change was finalized.",
+      message: "It's on the schedule.",
     });
   });
 
@@ -429,7 +429,7 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
     // This viewer can approve, so the claim lands on the schedule at once.
     expect(
-      screen.getByText("As an admin, it goes on the schedule right away."),
+      screen.getByText("You can approve requests, so it goes on the schedule right away."),
     ).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
     fireEvent.click(
@@ -730,7 +730,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     fireEvent.click(screen.getByText("Available"));
-    expect(screen.getAllByLabelText("Multiple Shifts, 2 shifts").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Multiple shifts, 2 shifts").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
     expect(screen.getByText("Evening Shift")).toBeInTheDocument();
 
@@ -859,7 +859,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.queryByText("Could not update request")).not.toBeInTheDocument();
+    expect(screen.queryByText("Couldn't update request")).not.toBeInTheDocument();
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
     expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent("Mentored");
     expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
@@ -968,7 +968,7 @@ describe("RequestsScreen", () => {
         /The other person hasn't responded to this swap yet\. Cancelling withdraws it/,
       ),
     ).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Note to Jane and Laura? (Optional)"), {
+    fireEvent.change(screen.getByLabelText("Note to Jane and Laura (optional)"), {
       target: { value: " Covered another way " },
     });
     fireEvent.click(screen.getAllByRole("button", { name: "Cancel request" }).at(-1)!);
@@ -1014,7 +1014,7 @@ describe("RequestsScreen", () => {
     // The decision opens a sheet rather than a confirmation: it holds a field.
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Approve request?")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Note to Mina? (Optional)"), {
+    fireEvent.change(screen.getByLabelText("Note to Mina (optional)"), {
       target: { value: "  Thanks for covering  " },
     });
     // The card's own Approve is still on the page behind the sheet.
@@ -1166,7 +1166,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Could not load history")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load history")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Try again"));
     expect(historyRefetch).toHaveBeenCalledTimes(1);
   });
@@ -1215,7 +1215,7 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("Active Request")).toBeInTheDocument();
     expect(screen.getByText("Approve")).toBeInTheDocument();
-    expect(screen.queryByText("Could not load history")).not.toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load history")).not.toBeInTheDocument();
   });
 
   it("loads another history page and deduplicates repeated boundary rows", () => {

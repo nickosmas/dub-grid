@@ -3,6 +3,7 @@
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
+  changedElsewhereMessage,
   parseFocusAreaShiftsQuestion,
   SELF_ACTION_FORBIDDEN_CODE,
   SelfActionForbiddenError,
@@ -46,14 +47,14 @@ export class OptimisticLockError extends Error {
 
 export class EmployeeStatusConflictError extends Error {
   constructor(public readonly latestEmployee: Employee) {
-    super("Employee status changed elsewhere.");
+    super(changedElsewhereMessage("their status"));
     this.name = "EmployeeStatusConflictError";
   }
 }
 
 export class EmployeeProfileConflictError extends Error {
   constructor(public readonly latestEmployee: Employee) {
-    super("Employee details changed elsewhere.");
+    super(changedElsewhereMessage("their details"));
     this.name = "EmployeeProfileConflictError";
   }
 }
@@ -117,7 +118,7 @@ async function requestEmployeesJson<T>(input: string, init?: RequestInit): Promi
     );
   }
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(payload?.error, "Employee request failed."));
+    throw new Error(formatClientErrorMessage(payload?.error, "We couldn't save that. Try again."));
   }
 
   return payload as T;
@@ -213,7 +214,7 @@ export function insertEmployee(employee: Omit<Employee, "id">, orgId: string): P
 /** The manager closed the question about their shifts, so nothing was saved. */
 export class FocusAreaShiftsCancelledError extends Error {
   constructor() {
-    super("The save was cancelled.");
+    super("The save was canceled.");
     this.name = "FocusAreaShiftsCancelledError";
   }
 }
@@ -567,12 +568,12 @@ export function plannedChangeToast(
 ): string {
   if (plan && "lastDay" in plan) return "Last day changed";
   if (plannedStatus === "active")
-    return plan ? "Planned return changed" : "Planned return cancelled";
+    return plan ? "Planned return changed" : "Planned return canceled";
   if (plannedStatus === "suspended") {
-    return plan ? "Planned suspension changed" : "Planned suspension cancelled";
+    return plan ? "Planned suspension changed" : "Planned suspension canceled";
   }
-  if (plan) return "Planned away changed";
-  return plannedStatus === "removed" ? "Last day cancelled" : "Planned away cancelled";
+  if (plan) return "Planned time away changed";
+  return plannedStatus === "removed" ? "Last day canceled" : "Planned time away canceled";
 }
 
 /**

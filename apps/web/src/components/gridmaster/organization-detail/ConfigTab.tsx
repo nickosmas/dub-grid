@@ -181,7 +181,7 @@ export function ConfigTab({
                           borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        {shift.abbr?.trim() || "—"}
+                        {shift.abbr?.trim() || "-"}
                       </td>
                       <td
                         style={{
@@ -195,7 +195,7 @@ export function ConfigTab({
                       >
                         {hasTime
                           ? `${shift.startTime ? fmt12h(shift.startTime) : "—"} - ${shift.endTime ? fmt12h(shift.endTime) : "—"}`
-                          : "—"}
+                          : "-"}
                       </td>
                       <td
                         style={{

@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
     if (limited) {
       return NextResponse.json(
-        { error: "Too many requests" },
+        { error: API_ERRORS.RATE_LIMITED },
         {
           status: 429,
           headers: {

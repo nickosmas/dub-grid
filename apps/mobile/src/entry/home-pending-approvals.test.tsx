@@ -84,7 +84,7 @@ describe("PendingApprovalsExpandedScreen", () => {
 
     render(<PendingApprovalsExpandedScreen />);
 
-    expect(screen.getByText("Could not load pending approvals")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load pending approvals")).toBeInTheDocument();
   });
 
   it("shows the empty state when nothing is waiting", () => {

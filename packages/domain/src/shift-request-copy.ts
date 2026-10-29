@@ -51,7 +51,7 @@ export function describeShiftRequest(
   if (request.type === "swap") {
     subtitle = target ? `Asked ${target} to swap shifts` : "Asked to swap shifts";
   } else if (request.type === "calloff") {
-    subtitle = "Asked for time off";
+    subtitle = "Asked to call off this shift";
   } else if (request.parentRequestId != null) {
     subtitle = target
       ? `Called off this shift, and ${target} claimed it`
@@ -59,7 +59,9 @@ export function describeShiftRequest(
   } else if (target && request.absenceTypeId === null) {
     subtitle = `Offered this shift for pickup, and ${target} claimed it`;
   } else if (target) {
-    subtitle = `Offered to cover ${targetIsViewer ? "your" : possessive(target)} shift`;
+    // A targeted pickup hands the requester's shift to a teammate who is off
+    // that day, and the requester takes the absence.
+    subtitle = `Asked ${target} to cover ${requesterIsViewer ? "your" : "their"} shift`;
   } else {
     subtitle = "Offered this shift for pickup";
   }
@@ -78,14 +80,14 @@ export type ShiftRequestPill = {
 const KIND_LABEL: Record<ShiftRequestCopyInput["type"], string> = {
   pickup: "Pickup",
   swap: "Swap",
-  calloff: "Time off",
+  calloff: "Call-off",
 };
 
 const STATUS_LABEL: Record<Exclude<ShiftRequestStatus, "open">, string> = {
   pending_approval: "Pending approval",
   approved: "Approved",
   rejected: "Rejected",
-  cancelled: "Cancelled",
+  cancelled: "Canceled",
   expired: "Expired",
 };
 
@@ -219,7 +221,7 @@ export function describeShiftRequestSubmitted(
   switch (submission.action) {
     case "created":
       if (submission.type === "calloff") {
-        return { title: "Request sent", message: "Calloff request sent." };
+        return { title: "Request sent", message: "Call-off request sent." };
       }
       if (submission.type === "swap" || submission.targeted) {
         const kind = submission.type === "swap" ? "Swap" : "Pickup";

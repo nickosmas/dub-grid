@@ -80,16 +80,16 @@ const SESSION_STATUS_TONES: Record<GridmasterUserSession["status"], StatusPillTo
 };
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return formatDateTimeLabel(date);
 }
 
 function formatRelative(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return "—";
+  if (Number.isNaN(time)) return "-";
   const minutes = Math.floor((Date.now() - time) / 60_000);
   if (minutes < 1) return "Now";
   if (minutes < 60) return `${minutes}m ago`;
@@ -192,7 +192,7 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
           color: "var(--dg-color-text-primary)",
         }}
       >
-        {value || "—"}
+        {value || "-"}
       </div>
     </div>
   );
@@ -249,22 +249,22 @@ function SessionDetailPanel({
         </div>
         <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
-          <DetailRow label="User name" value={session.userName ?? "—"} />
+          <DetailRow label="User name" value={session.userName ?? "-"} />
           <DetailRow label="User email" value={session.userEmail ?? "Unknown email"} />
           <DetailRow label="User ID" value={session.userId} />
           <DetailRow label="Organization" value={sessionOrgLabel(session)} />
-          <DetailRow label="Org ID" value={session.org?.orgId ?? "—"} />
-          <DetailRow label="Org slug" value={session.org?.orgSlug ?? "—"} />
+          <DetailRow label="Org ID" value={session.org?.orgId ?? "-"} />
+          <DetailRow label="Org slug" value={session.org?.orgSlug ?? "-"} />
           <DetailRow
             label="Org role"
-            value={session.org?.orgRole ? formatOrganizationRoleLabel(session.org.orgRole) : "—"}
+            value={session.org?.orgRole ? formatOrganizationRoleLabel(session.org.orgRole) : "-"}
           />
           <DetailRow label="Registry ID" value={session.id} />
-          <DetailRow label="Supabase session" value={session.supabaseSessionId ?? "—"} />
+          <DetailRow label="Supabase session" value={session.supabaseSessionId ?? "-"} />
           <DetailRow label="Platform" value={session.platform ?? "unknown"} />
-          <DetailRow label="App version" value={session.appVersion ?? "—"} />
+          <DetailRow label="App version" value={session.appVersion ?? "-"} />
           <DetailRow label="Device" value={session.deviceLabel ?? "Unknown device"} />
-          <DetailRow label="IP address" value={session.ipAddress ?? "—"} />
+          <DetailRow label="IP address" value={session.ipAddress ?? "-"} />
           <DetailRow label="Last active" value={formatDateTime(session.lastActiveAt)} />
           <DetailRow label="Created" value={formatDateTime(session.createdAt)} />
         </div>
@@ -413,7 +413,7 @@ function SessionsTable({
                         {session.appVersion ? ` / ${session.appVersion}` : ""}
                       </div>
                     </td>
-                    <td style={gmTdStyle}>{session.ipAddress ?? "—"}</td>
+                    <td style={gmTdStyle}>{session.ipAddress ?? "-"}</td>
                     <td style={gmTdStyle}>{formatRelative(session.lastActiveAt)}</td>
                     <td style={gmTdStyle}>{formatDateTime(session.createdAt)}</td>
                   </tr>
@@ -526,7 +526,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           >
             {sessions.length === 0
               ? "0 sessions"
-              : `${page * SESSIONS_PAGE_SIZE + 1}–${page * SESSIONS_PAGE_SIZE + sessions.length}`}
+              : `${page * SESSIONS_PAGE_SIZE + 1} - ${page * SESSIONS_PAGE_SIZE + sessions.length}`}
           </span>
         </div>
 
@@ -797,7 +797,7 @@ export default function GridmasterSecurityView({
                           >
                             {entry.targetUserId}
                           </td>
-                          <td style={gmTdStyle}>{entry.justification || "—"}</td>
+                          <td style={gmTdStyle}>{entry.justification || "-"}</td>
                           <td style={gmTdStyle}>{formatDateTime(entry.createdAt)}</td>
                           <td style={gmTdStyle}>{formatDateTime(entry.endedAt)}</td>
                         </tr>

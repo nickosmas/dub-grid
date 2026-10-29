@@ -14,7 +14,7 @@ function makeOpenShift(overrides: {
   return {
     presentation: {
       segments: [],
-      label: "Open Shift",
+      label: "Open shift",
       shiftName: null,
       displayFocusAreaName: null,
       startTime: null,

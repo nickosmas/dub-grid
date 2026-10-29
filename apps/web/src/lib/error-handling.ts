@@ -63,7 +63,7 @@ export async function handleApiError(error: unknown, action?: string) {
     (error instanceof Error && error.name === "TypeError")
   ) {
     toast.error(
-      "We're having trouble connecting. If you use an adblocker or privacy shield, try pausing it.",
+      "We can't connect right now. Check your connection, or pause any ad blocker for this site.",
       { id: "network-error", duration: 8000 },
     );
     return;
@@ -73,9 +73,12 @@ export async function handleApiError(error: unknown, action?: string) {
     console.error("handleApiError:", rawMessage);
   }
 
-  const prefix = action ? `Failed to ${action}` : "Something went wrong";
-  const detail = message && message.length < 120 ? `: ${message}` : ". Please try again.";
-  toast.error(`${prefix}${detail}`, {
+  const lead = action ? `We couldn't ${action}.` : "";
+  const detail = message && message.length < 120 ? message : "";
+  const text = lead
+    ? `${lead} ${detail || "Try again."}`
+    : detail || "That didn't work. Try again.";
+  toast.error(text, {
     id: action ? `error-${action.replace(/\s+/g, "-")}` : "generic-error",
   });
 }

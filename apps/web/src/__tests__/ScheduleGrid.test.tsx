@@ -484,14 +484,13 @@ describe("ScheduleGrid", () => {
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     const body = getGridBody("North schedule grid");
-    // The fitted grid does not scroll, so neither container may crop a chip
-    // that deliberately crosses the shift pill's top edge.
+    // The fitted grid does not scroll, so the scroller may not crop a chip
+    // that deliberately crosses the shift pill's top edge. The card clips to
+    // its rounded corners; the scroller's top padding leaves the chip room.
     const scroller = body.parentElement as HTMLElement | null;
     expect(scroller?.style.overflowX).toBe("visible");
     expect(scroller?.style.overflowY).toBe("visible");
-    expect((body.parentElement?.parentElement as HTMLElement | null)?.style.overflow).toBe(
-      "visible",
-    );
+    expect((body.parentElement?.parentElement as HTMLElement | null)?.style.overflow).toBe("clip");
   });
 
   it("preserves the staff column width when navigating to an empty 2-week grid", () => {
@@ -782,7 +781,7 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).not.toBe("72px");
+    expect(firstCell.style.minHeight).not.toBe("72px");
     expect(firstCell.style.zIndex).toBe("8");
     expect(cellContent?.style.zIndex).toBe("4");
     expect(pill?.style.justifyContent).toBe("center");
@@ -791,7 +790,7 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.boxShadow).toMatch(/^0 0 0 2px /);
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
     expect(badge).not.toBeNull();
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
@@ -873,7 +872,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(firstCell.style.background).toBe("var(--dg-color-surface)");
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
   });
 
   it("rings side-by-side pills inward so two shifts in one cell never overlap", () => {
@@ -1093,11 +1092,11 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="time"]') as HTMLElement | null;
 
-    expect(firstCell.style.height).not.toBe("72px");
+    expect(firstCell.style.minHeight).not.toBe("72px");
     expect(
       within(firstCell).queryByText(/Edited time|Added time|Time removed/),
     ).not.toBeInTheDocument();
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
 
     expect(badge?.getAttribute("aria-label")).toContain(
       "Changed custom time 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
@@ -1143,9 +1142,9 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
@@ -1183,7 +1182,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(pill).toHaveStyle({
       borderStyle: "dashed",
       borderWidth: "2px",
@@ -1292,7 +1291,7 @@ describe("ScheduleGrid", () => {
     // The mentored pill says so — a dashed border with nothing naming the edit
     // left the reader guessing which of the two shifts had changed.
     expect(firstCell.querySelectorAll("[data-draft-badge]")).toHaveLength(1);
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toBe("Marked mentored for N.");
     expect(pills[1].contains(badge)).toBe(true);
     expect(pills[0]).toHaveStyle({
@@ -1355,7 +1354,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
@@ -1416,7 +1415,7 @@ describe("ScheduleGrid", () => {
       (candidate) => (candidate as HTMLElement).style.left !== "",
     ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.style.borderRadius).toBe("3px");
     expect(badge?.style.top).toBe("0px");
     expect(badge?.style.transform).toBe("translateY(-50%)");
@@ -1457,7 +1456,7 @@ describe("ScheduleGrid", () => {
       (candidate) => (candidate as HTMLElement).style.left !== "",
     ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toBe("Was D.");
     expect(
       (badge?.closest('[data-shift-pill="single"]') as HTMLElement | null)?.style.overflow,
@@ -1925,7 +1924,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -1960,7 +1959,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toBe("Was D.");
   });
 
@@ -2018,7 +2017,7 @@ describe("ScheduleGrid", () => {
       (candidate) => (candidate as HTMLElement).style.left !== "",
     ) as HTMLElement | undefined;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(firstCell.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
     expect(badge?.style.left).toBe("4px");
   });
@@ -2043,7 +2042,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.style.left).toBe("4px");
   });
 
@@ -2074,7 +2073,7 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | undefined;
     const dots = firstCell.querySelector('[data-mentored-badge="true"]')?.parentElement;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.style.left).toBe("2px");
     expect(dots).not.toBeNull();
   });
@@ -2241,7 +2240,10 @@ describe("ScheduleGrid", () => {
     expect(pills[0].parentElement?.style.gridTemplateRows).toBe(
       "minmax(min-content, 1fr) minmax(min-content, 1fr)",
     );
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
+    // Never a fixed height: the cell stretches to a row the name cell made
+    // taller, so its dividers reach the next row.
+    expect(firstCell.style.height).toBe("");
     expect(row.style.getPropertyValue("--dg-grid-row-cell-height")).toMatch(
       /^max\(var\(--dg-grid-cell-height\), calc\(/,
     );
@@ -2837,7 +2839,7 @@ describe("ScheduleGrid", () => {
         restOfDayAbsenceLayoutForKey: () => ({
           first: false,
           joinsShift: true,
-          shortTime: "11–3",
+          shortTime: "11 - 3",
           time: "11:00 AM - 3:00 PM",
         }),
         getCustomShiftTimes: () => ({ start: "07:00", end: "11:00" }),
@@ -2847,7 +2849,7 @@ describe("ScheduleGrid", () => {
       const absencePill = firstCell.querySelector<HTMLElement>(
         '[data-shift-pill="rest-of-day-absence"]',
       )!;
-      expect(absencePill).toHaveTextContent("11–3");
+      expect(absencePill).toHaveTextContent("11 - 3");
       expect(absencePill).not.toHaveTextContent("from");
       expect(screen.getAllByLabelText(/then Sick 11:00 AM - 3:00 PM/).length).toBeGreaterThan(0);
     });
@@ -2865,7 +2867,7 @@ describe("ScheduleGrid", () => {
         restOfDayAbsenceLayoutForKey: () => ({
           first: true,
           joinsShift: true,
-          shortTime: "7–11",
+          shortTime: "7 - 11",
           time: "7:00 AM - 11:00 AM",
         }),
         getCustomShiftTimes: () => ({ start: "11:00", end: "15:00" }),
@@ -2878,7 +2880,7 @@ describe("ScheduleGrid", () => {
       const shiftPill = firstCell.querySelector<HTMLElement>('[data-shift-pill="multi"]')!;
       expect(absencePill.style.order).toBe("0");
       expect(shiftPill.style.order).toBe("1");
-      expect(absencePill).toHaveTextContent("7–11");
+      expect(absencePill).toHaveTextContent("7 - 11");
       // Joined on the absence's right and the shift's left.
       expect(absencePill.style.borderRightStyle).toBe("none");
       expect(absencePill.style.borderRadius).toBe("8px 0 0 8px");
@@ -2898,7 +2900,7 @@ describe("ScheduleGrid", () => {
         restOfDayAbsenceLayoutForKey: () => ({
           first: false,
           joinsShift: false,
-          shortTime: "4–8",
+          shortTime: "4 - 8",
           time: "4:00 PM - 8:00 PM",
         }),
       });
@@ -3124,7 +3126,7 @@ describe("ScheduleGrid", () => {
       });
 
       expect(screen.getAllByRole("gridcell")[0]).toHaveAccessibleName(
-        expect.stringMatching(/D\/N, then Sick for the rest of the day$/),
+        expect.stringMatching(/D\/N, then Sick for part of the day$/),
       );
     });
 
@@ -3326,7 +3328,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.style.left).toBe("4px");
   });
 
@@ -3594,7 +3596,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -3747,7 +3749,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
@@ -3795,7 +3797,7 @@ describe("ScheduleGrid", () => {
     // The compact grid marker reads "Edited" for every published edit; the
     // tooltip is what names the mentored change. Before this, the overlay
     // dropped the mentored flags and painted a tinted cell with no badge.
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toContain("Marked mentored.");
   });
 
@@ -3898,7 +3900,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
@@ -3941,7 +3943,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
   });
 
@@ -3986,7 +3988,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toContain("Was Day Shift.");
     expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
@@ -4041,8 +4043,8 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
-    expect(badge?.textContent).toBe("Edited");
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
+    expect(badge?.textContent).toBe("Changed");
     expect(badge).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
@@ -4094,7 +4096,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Edited");
+    expect(badge?.textContent).toBe("Changed");
     expect(badge?.getAttribute("aria-label")).toContain(
       "Changed custom time for D 7:00 AM - 3:00 PM to 8:00 AM - 4:00 PM.",
     );
@@ -4160,8 +4162,8 @@ describe("ScheduleGrid", () => {
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).not.toBe("72px");
-    expect(badge?.textContent).toBe("Deleted");
+    expect(firstCell.style.minHeight).not.toBe("72px");
+    expect(badge?.textContent).toBe("Removed");
     expect(badge).toHaveStyle({
       background: "rgba(220, 38, 38, 0.94)",
     });
@@ -4242,7 +4244,7 @@ describe("ScheduleGrid", () => {
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(authorPill?.style.justifyContent).toBe("flex-start");
@@ -4278,7 +4280,7 @@ describe("ScheduleGrid", () => {
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("84px");
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
   });
 
   it("wraps open shift chips vertically inside narrow day cells", () => {
@@ -4696,9 +4698,7 @@ describe("ScheduleGrid", () => {
     fireEvent.mouseEnter(pill);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Not published yet. Staff don't see it until it's published."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Not published yet, so staff can't see it.")).toBeInTheDocument();
     });
     expect(screen.getByText(/^Added: /)).toBeInTheDocument();
     expect(screen.queryByText(/Staff still see the published shift/)).not.toBeInTheDocument();
@@ -5062,7 +5062,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-draft-badge="deleted"]') as HTMLElement | null;
 
-    expect(badge?.textContent).toBe("Deleted");
+    expect(badge?.textContent).toBe("Removed");
     expect(screen.queryByText("OFF")).not.toBeInTheDocument();
   });
 
@@ -5197,7 +5197,7 @@ describe("ScheduleGrid", () => {
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(secondAuthorPill?.style.left).toBe("6px");
@@ -5229,7 +5229,7 @@ describe("ScheduleGrid", () => {
     const authorBody = authorText.parentElement as HTMLElement | null;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
     expect(authorPillIcon?.querySelector("svg")).not.toBeNull();
@@ -5276,7 +5276,7 @@ describe("ScheduleGrid", () => {
     const authorPill = authorPills[0] as HTMLElement | undefined;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(multiPills).toHaveLength(2);
     expect(authorPills).toHaveLength(1);
     expect(authorPill?.style.left).toBe("4px");
@@ -5343,7 +5343,7 @@ describe("ScheduleGrid", () => {
     const nightLabel = within(firstCell).getByText(longNightName) as HTMLElement;
 
     expect(root.dataset.gridFit).toBe("false");
-    expect(firstCell.style.height).toBe(GRID_CELL_HEIGHT);
+    expect(firstCell.style.minHeight).toBe(GRID_CELL_HEIGHT);
     expect(multiPills).toHaveLength(2);
     expect(authorPill).not.toBeNull();
     expect(dayLabel.closest('[data-shift-pill="multi"]')).not.toBeNull();
@@ -5452,7 +5452,7 @@ describe("ScheduleGrid", () => {
     const natural = vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (
       this: Element,
     ) {
-      const isTime = this.hasAttribute("data-pill-fit") && this.textContent?.includes("–");
+      const isTime = this.hasAttribute("data-pill-fit") && this.textContent?.includes(" - ");
       return isTime ? 100 * fitScaleOf(this) : 0;
     });
     const room = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(60);
@@ -5461,11 +5461,11 @@ describe("ScheduleGrid", () => {
 
       const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
       const lines = Array.from(firstCell.querySelectorAll<HTMLElement>("[data-pill-fit]"));
-      const time = lines.find((line) => line.textContent?.includes("–")) as HTMLElement;
+      const time = lines.find((line) => line.textContent?.includes(" - ")) as HTMLElement;
 
       expect(fitScaleOf(time)).toBeCloseTo(0.6);
       expect(time.style.textOverflow).toBe("");
-      expect(time).toHaveTextContent("7:30–3:30");
+      expect(time).toHaveTextContent("7:30 - 3:30");
       expect(lines.filter((line) => line !== time).every((line) => fitScaleOf(line) === 1)).toBe(
         true,
       );

@@ -151,7 +151,9 @@ async function requestJson<T>(
 
   if (!response.ok) {
     throw Object.assign(
-      new Error(formatClientErrorMessage(body?.error, "Account request failed.")),
+      new Error(
+        formatClientErrorMessage(body?.error, "We couldn't update your account. Try again."),
+      ),
       { status: response.status, code: body?.code, method: body?.method },
     );
   }

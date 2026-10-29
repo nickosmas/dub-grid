@@ -805,7 +805,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     <CustomSelect
                       value={form.certificationId != null ? String(form.certificationId) : ""}
                       options={[
-                        { value: "", label: "— None —" },
+                        { value: "", label: "None" },
                         ...certifications.map((d) => ({
                           value: String(d.id),
                           label: d.name,
@@ -934,7 +934,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                       <polyline points="22,6 12,13 2,6" />
                     </svg>
-                    Send Invitation
+                    Send invitation
                   </Button>
                 ) : null}
               </div>

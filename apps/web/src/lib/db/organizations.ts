@@ -21,6 +21,7 @@ import type {
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 import { updateOrganizationInvitationGuarded, updateOrganizationMembershipGuarded } from "./access";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
@@ -256,7 +257,7 @@ export async function updatePendingInvitation(
 
   if (error) throw error;
   if (!invitationRow?.updated_at) {
-    throw new Error("Invitation data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("this invitation"));
   }
 
   await updateOrganizationInvitationGuarded({
@@ -289,7 +290,7 @@ export async function updateAdminPermissions(
 
   if (error) throw error;
   if (!membershipRow?.updated_at) {
-    throw new Error("User access data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("their access"));
   }
 
   await updateOrganizationMembershipGuarded({
@@ -320,7 +321,7 @@ export async function changeOrganizationUserRole(
 
   if (error) throw error;
   if (!membershipRow?.updated_at) {
-    throw new Error("User access data is out of date. Refresh and try again.");
+    throw new Error(changedElsewhereMessage("their access"));
   }
 
   await updateOrganizationMembershipGuarded({

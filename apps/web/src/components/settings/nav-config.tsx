@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import {
   BuildingIcon,
   BillingIcon,
@@ -82,7 +83,6 @@ export interface NavItem {
   id: SectionId;
   label: string;
   Icon: NavIconComponent;
-  helpHint?: string;
   description?: string;
 }
 
@@ -116,6 +116,9 @@ export function buildNavGroups(
   overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
+  const focusArea = singularLabelNoun(overrides?.focusAreaLabel ?? "Focus Areas");
+  const roles = pluralLabelNoun(overrides?.roleLabel ?? "Roles");
+  const certifications = pluralLabelNoun(overrides?.certificationLabel ?? "Certifications");
 
   // General — basic org identity + terminology
   if (perms.canAccessSettings) {
@@ -132,7 +135,6 @@ export function buildNavGroups(
         id: "org-labels",
         label: "Labels",
         Icon: LabelsIcon,
-        helpHint: "Labels rename visible wording across DubGrid but do not change behavior.",
         description:
           "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'.",
       });
@@ -155,27 +157,20 @@ export function buildNavGroups(
         id: "staff-departments",
         label: "Departments",
         Icon: DepartmentsIcon,
-        helpHint: "Scheduled departments drive the grid; management departments are app-only.",
-        description:
-          "Includes scheduled departments for the grid and management departments for app-only staff.",
       });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels)
       staffItems.push({
         id: "staff-roles",
         label: overrides?.roleLabel ?? "Roles",
         Icon: RolesIcon,
-        helpHint: "Roles are visible tags; only schedule-eligible roles can gate jobs.",
-        description:
-          "Manage visible role tags and choose which ones actually count for job eligibility on the schedule.",
+        description: `The ${roles} your staff can hold, and which of them qualify someone for a job.`,
       });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels)
       staffItems.push({
         id: "staff-certifications",
         label: overrides?.certificationLabel ?? "Certifications",
         Icon: AwardIcon,
-        helpHint: "Certifications can display on staff and can restrict assignments.",
-        description:
-          "The certification badge shown next to the employee's name on the schedule grid.",
+        description: `The ${certifications} your staff hold. They show beside each name on the schedule and can limit who's given a job.`,
       });
     if (staffItems.length > 0)
       groups.push({ id: "staff", label: "Staff designations", items: staffItems });
@@ -189,15 +184,15 @@ export function buildNavGroups(
         id: "org-display",
         label: "Shift Display Mode",
         Icon: DisplayIcon,
-        helpHint: "Choose between readable full names and denser short shift codes.",
-        description: "Choose how shifts appear on the schedule grid: short codes or full names.",
+        description: "How shifts look on the schedule, and what staff see after a publish.",
       });
     if (perms.isSuperAdmin)
       schedItems.push({
         id: "schedule-rules",
         label: "Schedule Rules",
         Icon: ShieldIcon,
-        description: "Configure automated scheduling rules and constraints.",
+        description:
+          "Overlapping shifts, pay periods, mentored coverage, and which open shifts staff see.",
       });
     if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions)
       schedItems.push({
@@ -212,7 +207,6 @@ export function buildNavGroups(
         id: "schedule-jobs",
         label: "Jobs",
         Icon: JobsIcon,
-        helpHint: "Jobs can be scheduled or general and can restrict qualification.",
         description:
           "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
       });
@@ -221,17 +215,14 @@ export function buildNavGroups(
         id: "schedule-absence-types",
         label: "Absence Types",
         Icon: AbsenceIcon,
-        helpHint: "Absences replace worked assignments and are excluded from coverage.",
-        description: "Manage PTO, sick, vacation, calloff, and other non-worked schedule labels.",
+        description: "Sick, vacation, and the other reasons someone isn't working a shift.",
       });
     if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements)
       schedItems.push({
         id: "schedule-coverage",
         label: "Coverage",
         Icon: CoverageIcon,
-        helpHint: "Coverage sets minimum headcount by focus area, shift, and job.",
-        description:
-          "Set how many people each shift and job needs in each focus area, and the most Auto-build schedules.",
+        description: `How many people each shift and job needs in each ${focusArea}, and the most Auto-build will schedule.`,
       });
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes)
       schedItems.push({
@@ -255,8 +246,6 @@ export function buildNavGroups(
           id: "org-billing",
           label: "Subscription",
           Icon: BillingIcon,
-          helpHint:
-            "Seats are active staff, Away staff who can manage, and managers without a staff record. Archived staff are not billed.",
           description: "Review subscription status, seats, and Stripe billing access.",
         },
       ],
@@ -273,9 +262,7 @@ export function buildNavGroups(
           id: "org-activity",
           label: "Activity Log",
           Icon: ActivityIcon,
-          helpHint: "A record of changes made across your organization.",
-          description:
-            "Review the audit trail of role, membership, billing, and configuration changes across your organization.",
+          description: "Every change made in your organization, who made it, and when.",
         },
       ],
     });
@@ -291,9 +278,7 @@ export function buildNavGroups(
           id: "org-danger",
           label: "Delete Organization",
           Icon: DangerIcon,
-          helpHint: "This cancels billing and removes access for everyone.",
-          description:
-            "Permanently close this organization. Billing stops and all members lose access.",
+          description: "Close your organization for good.",
         },
       ],
     });
