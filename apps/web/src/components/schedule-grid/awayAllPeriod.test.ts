@@ -82,4 +82,21 @@ describe("orderAwayAllPeriod", () => {
     expect(employees.map((employee) => employee.id)).toEqual(["a", "b"]);
     expect(awayAllPeriod.size).toBe(0);
   });
+
+  it("groups someone leaving before the period only for an editor", () => {
+    const leaving = {
+      ...person("a"),
+      plannedStatus: "removed" as const,
+      plannedFrom: "2026-10-30",
+    };
+    const order = (isScheduleEditor: boolean) =>
+      orderAwayAllPeriod([leaving, person("b")], {
+        dates,
+        isScheduleEditor,
+        assignmentIdsForKey: () => [],
+        absenceName: (id) => names[id],
+      });
+    expect([...order(true).awayAllPeriod.keys()]).toEqual(["a"]);
+    expect(order(false).awayAllPeriod.size).toBe(0);
+  });
 });

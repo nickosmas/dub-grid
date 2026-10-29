@@ -302,27 +302,46 @@ async function isManagementEmployee(
 }
 
 function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employee {
-  // Preserve userId on the caller's own row so the dashboard / schedule can
-  // still locate it (the caller already knows their own auth id; suppressing
-  // it here just breaks self-lookup). Other rows get the link nulled so
-  // view-only callers can't map an employee → an auth account.
-  const isSelf = employee.userId === callerUserId;
+  // Your own row stays whole apart from the managers' notes: the dashboard and
+  // schedule find it by userId, and your profile shows your own details.
+  if (employee.userId === callerUserId) {
+    return { ...employee, contactNotes: "", statusNote: "", deptAdminIds: [] };
+  }
+  return coworkerDirectoryEntry(employee);
+}
+
+/**
+ * A coworker as a view-only caller sees them: who they are and where they can
+ * be scheduled. Built field by field rather than by stripping, so a new
+ * employee column stays hidden until someone decides a coworker needs it.
+ * Contact details, the account link (and the joined date that implies one),
+ * HR facts (employment type, number, seniority, dates) and suspensions or
+ * planned status changes keep their empty values, matching the mobile people
+ * endpoints. `awayUntil` stays for the Away bar of someone Away now.
+ */
+function coworkerDirectoryEntry(employee: Employee): Employee {
   return {
-    ...employee,
-    contactNotes: "",
+    id: employee.id,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    status: employee.status,
+    awayUntil: employee.awayUntil ?? null,
+    archivedAt: employee.archivedAt ?? null,
+    certificationId: employee.certificationId,
+    roleIds: employee.roleIds,
+    focusAreaIds: employee.focusAreaIds,
+    departmentIds: employee.departmentIds,
+    version: employee.version,
+    employmentType: "full_time",
+    statusChangedAt: null,
     statusNote: "",
+    seniority: 0,
+    phone: "",
+    email: "",
+    contactNotes: "",
+    userId: null,
     deptAdminIds: [],
-    userId: isSelf ? employee.userId : null,
-    // A coworker's email and phone are personal contact details, not roster
-    // facts: care staff are invited on personal addresses and personal mobiles.
-    // Withholding them from view-only callers matches what the mobile people
-    // endpoint has always done (packages/mobile-api-core/src/read.ts). Your own
-    // row keeps them, for the same reason userId survives above.
-    email: isSelf ? employee.email : "",
-    phone: isSelf ? employee.phone : "",
-    // A joined date says the person has an account, which the nulled userId
-    // above exists to withhold.
-    joinedAt: isSelf ? employee.joinedAt : null,
+    joinedAt: null,
   };
 }
 
@@ -602,7 +621,13 @@ export async function POST(req: NextRequest) {
           if (!isManager) {
             query = query.eq("status", "active");
           }
-          return withoutHiddenStaff(query, hiddenUserIds).order("seniority").range(from, to);
+          const visible = withoutHiddenStaff(query, hiddenUserIds);
+          // View-only callers get no seniority, so their order mustn't reveal it.
+          return (
+            isManager
+              ? visible.order("seniority")
+              : visible.order("last_name").order("first_name").order("id")
+          ).range(from, to);
         };
 
         const rows = await fetchAllRows<DbEmployee>(buildPage);

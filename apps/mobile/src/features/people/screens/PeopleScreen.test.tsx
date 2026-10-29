@@ -961,6 +961,10 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     expect(screen.getByText("Ava Cole")).toBeInTheDocument();
+    // The row says why it doesn't open, and reads as everything it shows.
+    expect(screen.getByText("Management")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ava Cole, Admin, No focus area")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mina Diaz, Skilled Nursing")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Ava Cole"));
     expect(routerPush).not.toHaveBeenCalled();
@@ -970,6 +974,51 @@ describe("PeopleScreen", () => {
       pathname: "/person/[id]",
       params: { id: "emp-1" },
     });
+  });
+
+  it("shows a coworker's suspension and planned last day only to someone who sees employee details", () => {
+    const today = getIsoDateInTimeZone(new Date(), null);
+    const coworker = buildPerson({
+      id: "emp-2",
+      firstName: "June",
+      lastName: "Patel",
+      focusAreaIds: [2],
+      suspendedAt: "2026-04-24T12:00:00.000Z",
+      suspendedUntil: addDaysToIsoDate(today, 20),
+      plannedStatus: "removed",
+      plannedFrom: addDaysToIsoDate(today, 10),
+    });
+    const renderAs = (permissions: Record<string, boolean>) => {
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: { labels: { department: "Departments" } },
+          focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+          permissions,
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      useQuery.mockReturnValue({
+        data: { people: [coworker] },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      return render(<PeopleScreen />);
+    };
+
+    const { unmount } = renderAs({ canManageEmployees: false, canViewEmployeeDetails: false });
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+    expect(screen.queryByText(/Suspended|Leaving/)).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-label^="Suspended"]')).toBeNull();
+    expect(screen.getByLabelText("June Patel, Skilled Nursing")).toBeInTheDocument();
+    unmount();
+
+    renderAs({ canManageEmployees: false, canViewEmployeeDetails: true });
+    expect(screen.getAllByText(/Suspended/).length).toBeGreaterThan(0);
   });
 
   it("filters the directory by focus area from the filter button", () => {

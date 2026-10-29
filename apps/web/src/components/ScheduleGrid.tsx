@@ -146,8 +146,8 @@ import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/a
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
 import {
   awayLockedHint,
-  awayRangeOf,
   buildRowAwayDays,
+  gridAwayRange,
   isBeforeRangeFirstDay,
   LEAVING_RUN_LABEL,
   startsRunLabel,
@@ -247,6 +247,8 @@ interface LegacyScheduleGridProps {
   isCellInteractive?: boolean;
   /** Narrows which cells open on click; every cell opens when omitted. */
   canOpenCell?: (empId: string, date: Date) => boolean;
+  /** Whether the viewer can edit shifts or notes (see ScheduleGridOptions). Defaults to true. */
+  isScheduleEditor?: boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
   canDragShifts?: boolean;
   noteMarksForKey?: (
@@ -320,6 +322,9 @@ interface LegacyScheduleGridProps {
   shiftDisplayMode?: ShiftDisplayMode;
   /** Whether roles and certifications use their saved compact labels. */
   useCompactRoleCertificationLabels?: boolean;
+  /** The organization's names for certifications and roles. */
+  certificationLabel: string;
+  roleLabel: string;
   /** Whether shift pills reveal full cell details on hover. */
   showShiftDetailHoverCards?: boolean;
   /** Resolves a user UUID to a display name for publish tooltips */
@@ -377,6 +382,7 @@ interface SectionBlockProps {
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
   canOpenCell?: (empId: string, date: Date) => boolean;
+  isScheduleEditor: boolean;
   canDragShifts?: boolean;
   noteMarksForKey?: (
     empId: string,
@@ -438,6 +444,8 @@ interface SectionBlockProps {
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: ShiftDisplayMode;
   useCompactRoleCertificationLabels?: boolean;
+  certificationLabel: string;
+  roleLabel: string;
   showShiftDetailHoverCards?: boolean;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
@@ -608,11 +616,15 @@ function EmployeeDetailHoverCard({
   employeeName,
   certificationName,
   roleNames,
+  certificationLabel,
+  roleLabel,
   children,
 }: {
   employeeName: string;
   certificationName: string;
   roleNames: string[];
+  certificationLabel: string;
+  roleLabel: string;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
   >;
@@ -681,7 +693,7 @@ function EmployeeDetailHoverCard({
                 <dt
                   style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}
                 >
-                  Certification
+                  {certificationLabel}
                 </dt>
                 <dd style={{ margin: "2px 0 0", fontSize: "var(--dg-fs-label)" }}>
                   {certificationName || "None"}
@@ -691,7 +703,7 @@ function EmployeeDetailHoverCard({
                 <dt
                   style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}
                 >
-                  Roles
+                  {roleLabel}
                 </dt>
                 <dd style={{ margin: "2px 0 0", fontSize: "var(--dg-fs-label)" }}>
                   {roleNames.length > 0 ? roleNames.join(", ") : "None"}
@@ -1131,6 +1143,7 @@ const SectionBlock = memo(function SectionBlock({
   indicatorTypes,
   isCellInteractive,
   canOpenCell,
+  isScheduleEditor,
   canDragShifts = isCellInteractive,
   noteMarksForKey,
   getCustomShiftTimes,
@@ -1159,6 +1172,8 @@ const SectionBlock = memo(function SectionBlock({
   activeRequestForKey,
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
+  certificationLabel,
+  roleLabel,
   showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
@@ -2244,7 +2259,7 @@ const SectionBlock = memo(function SectionBlock({
               // Someone away until a date (51e) has a bar from the day they went
               // away; with an Away planned (51g1) or past a planned last day
               // (51g2), from today on. Nothing else shows there.
-              const rowAwayRange = awayRanges?.get(emp.id) ?? awayRangeOf(emp);
+              const rowAwayRange = gridAwayRange(emp, awayRanges, isScheduleEditor);
               const rowAwayDays = buildRowAwayDays(
                 rowAwayRange,
                 weekDates.map((date) => formatDateKey(date)),
@@ -2253,8 +2268,9 @@ const SectionBlock = memo(function SectionBlock({
               );
               const rowAwayAbsenceTypeId =
                 rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
+              // The absence behind someone's away days is theirs and their managers'.
               const rowAwayAbsence =
-                rowAwayAbsenceTypeId != null
+                isScheduleEditor && rowAwayAbsenceTypeId != null
                   ? (absenceTypeMap?.get(rowAwayAbsenceTypeId) ?? null)
                   : null;
               const rowShiftLabels = weekDates.map((date, index) =>
@@ -2411,13 +2427,17 @@ const SectionBlock = memo(function SectionBlock({
                               {getEmployeeDisplayName(emp)}
                             </span>
                           </MaybeHint>
-                          <StatusMarkIcon person={emp} size={12} only={GRID_STATUS_MARKS} />
+                          {isScheduleEditor && (
+                            <StatusMarkIcon person={emp} size={12} only={GRID_STATUS_MARKS} />
+                          )}
                         </div>
                         {emp.roleIds.length > 0 && (
                           <EmployeeDetailHoverCard
                             employeeName={getEmployeeDisplayName(emp)}
                             certificationName={certificationName}
                             roleNames={roleNames}
+                            certificationLabel={certificationLabel}
+                            roleLabel={roleLabel}
                           >
                             <div style={{ minWidth: 0 }}>
                               <span
@@ -2441,6 +2461,8 @@ const SectionBlock = memo(function SectionBlock({
                           employeeName={getEmployeeDisplayName(emp)}
                           certificationName={certificationName}
                           roleNames={roleNames}
+                          certificationLabel={certificationLabel}
+                          roleLabel={roleLabel}
                         >
                           <div style={{ flexShrink: 0 }}>
                             <span
@@ -2684,8 +2706,9 @@ const SectionBlock = memo(function SectionBlock({
                         const awayRunDay = rowAwayDays?.runs[index] ?? null;
                         // Before the return date nothing can be scheduled for them.
                         const isAwayLocked = !!rowAwayDays?.locked[index];
+                        // The hint says where to change the days, which only an editor can.
                         const awayHint =
-                          isAwayLocked && rowAwayRange
+                          isScheduleEditor && isAwayLocked && rowAwayRange
                             ? awayLockedHint(rowAwayRange, dateKey)
                             : undefined;
                         // Days before a first day (51g4) carry its own label and no absence.
@@ -5058,6 +5081,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   indicatorTypes = [],
   isCellInteractive = true,
   canOpenCell,
+  isScheduleEditor = true,
   canDragShifts,
   noteMarksForKey,
   activeFocusArea = null,
@@ -5087,6 +5111,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   activeRequestForKey,
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
+  certificationLabel,
+  roleLabel,
   showShiftDetailHoverCards = true,
   resolvePublisherName,
   openShifts,
@@ -5308,6 +5334,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
         const ordered = orderAwayAllPeriod([...homeEmps, ...guestEmps], {
           dates: allDates,
           awayRanges,
+          isScheduleEditor,
           absenceTypeIdForKey,
           assignmentIdsForKey,
           dayOffAbsenceTypeId,
@@ -5335,6 +5362,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     assignments,
     openShifts,
     awayRanges,
+    isScheduleEditor,
     absenceTypeIdForKey,
     dayOffAbsenceTypeId,
     absenceTypeMap,
@@ -5354,8 +5382,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
     Math.floor(((containerWidth ?? 0) - nameColWidth) / (spanWeeks * 7)),
   );
   const hasAnySections = renderedDepartmentSections.length > 0;
-  // A viewer limited by canOpenCell doesn't edit, so setup advice isn't theirs.
-  const canEditSchedule = isCellInteractive && !canOpenCell;
   const hasHighlightedSearch = (highlightEmpIds?.size ?? 0) > 0;
 
   const sectionIndexById = useMemo(() => {
@@ -5441,7 +5467,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
           title={
             filteredEmployees.length === 0 && allEmployees.length > 0
               ? "No matching staff"
-              : !canEditSchedule
+              : !isScheduleEditor
                 ? "No shifts found for this period"
                 : allEmployees.length === 0
                   ? "No staff added yet"
@@ -5450,7 +5476,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
           description={
             filteredEmployees.length === 0 && allEmployees.length > 0
               ? "Clear the search or filters to see everyone."
-              : !canEditSchedule
+              : !isScheduleEditor
                 ? "No shifts have been published for this period yet."
                 : allEmployees.length === 0
                   ? "Add people on the People page to start building the schedule."
@@ -5525,6 +5551,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     indicatorTypes={indicatorTypes}
                     isCellInteractive={isCellInteractive}
                     canOpenCell={canOpenCell}
+                    isScheduleEditor={isScheduleEditor}
                     canDragShifts={canDragShifts ?? isCellInteractive}
                     noteMarksForKey={noteMarksForKey}
                     getCustomShiftTimes={getCustomShiftTimes}
@@ -5553,6 +5580,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     activeRequestForKey={activeRequestForKey}
                     shiftDisplayMode={shiftDisplayMode}
                     useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
+                    certificationLabel={certificationLabel}
+                    roleLabel={roleLabel}
                     showShiftDetailHoverCards={showShiftDetailHoverCards}
                     resolvePublisherName={resolvePublisherName}
                     openShifts={sectionOpenShifts}
@@ -5766,12 +5795,15 @@ const ScheduleGrid = memo(function ScheduleGrid({
           indicatorTypes={model.indicatorTypes}
           isCellInteractive={model.options.isCellInteractive}
           canOpenCell={model.accessors.canOpenCell}
+          isScheduleEditor={model.options.isScheduleEditor}
           canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
           noteMarksForKey={model.accessors.noteMarksForKey}
           activeFocusArea={model.activeFocusArea}
           certifications={model.certifications}
           orgRoles={model.orgRoles}
           useCompactRoleCertificationLabels={model.useCompactRoleCertificationLabels}
+          certificationLabel={model.certificationLabel}
+          roleLabel={model.roleLabel}
           getCustomShiftTimes={model.accessors.getCustomShiftTimes}
           getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
           draftKindForKey={model.accessors.draftKindForKey}

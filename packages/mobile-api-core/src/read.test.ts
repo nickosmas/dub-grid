@@ -196,6 +196,66 @@ describe("loadMobilePeoplePayload", () => {
     });
   });
 
+  it("withholds a coworker's HR details, suspension and planned changes from a regular user", async () => {
+    const hrDetails = {
+      employeeNumber: 42,
+      employmentType: "part_time",
+      seniority: 3,
+      statusChangedAt: "2026-10-01T12:00:00.000Z",
+      awayAbsenceTypeId: 5,
+      suspendedAt: "2026-10-20T12:00:00.000Z",
+      suspendedUntil: "2026-11-20",
+      plannedStatus: "removed",
+      plannedFrom: "2026-11-09",
+      plannedUntil: null,
+      plannedAbsenceTypeId: 6,
+      firstDay: "2026-11-02",
+      membershipUpdatedAt: "2026-10-02T12:00:00.000Z",
+      managementDepartmentIds: [8],
+      orgRole: "admin",
+    };
+    const coworker = makePerson({ id: "employee-coworker", ...hrDetails });
+    const load = (canManageEmployees: boolean) =>
+      loadMobilePeoplePayload(
+        {
+          currentOrg: { id: ORG_ID },
+          serviceClient: {},
+          user: { id: USER_ID },
+          permissions: {
+            canManageEmployees,
+            canViewStaff: true,
+            canViewEmployeeDetails: canManageEmployees,
+          },
+        } as never,
+        {
+          fetchMobilePeople: vi.fn(async () => [coworker]),
+          mapEmployeeToMobilePerson: vi.fn((person) => person),
+        } as never,
+      );
+
+    const regular = await load(false);
+    expect(regular.people[0]).toMatchObject({
+      employeeNumber: 0,
+      employmentType: "full_time",
+      seniority: 0,
+      statusChangedAt: null,
+      awayAbsenceTypeId: null,
+      suspendedAt: null,
+      suspendedUntil: null,
+      plannedStatus: null,
+      plannedFrom: null,
+      plannedAbsenceTypeId: null,
+      firstDay: null,
+      membershipUpdatedAt: null,
+      // What the directory row still needs: the role badge and management mark.
+      orgRole: "admin",
+      managementDepartmentIds: [8],
+    });
+
+    const manager = await load(true);
+    expect(manager.people[0]).toMatchObject(hrDetails);
+  });
+
   it("keeps administrator directory data unchanged", async () => {
     const self = makePerson({ id: "employee-self", userId: USER_ID });
 

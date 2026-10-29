@@ -215,6 +215,11 @@ export default function PeopleScreen() {
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const regularUserMode = !canManageEmployees;
+  // A suspension or a planned change is their managers' business, as on the
+  // person page: everyone else sees the name, role and focus areas.
+  const canViewEmployeeDetails = Boolean(
+    bootstrapQuery.data?.permissions.canViewEmployeeDetails || canManageEmployees,
+  );
   const canManageManagementAccess = Boolean(
     bootstrapQuery.data?.permissions.canManageManagementAccess,
   );
@@ -644,8 +649,9 @@ export default function PeopleScreen() {
           isLast={isLast}
           name={getFullName(person)}
           navigable={navigable}
+          unavailable={navigable ? undefined : MANAGEMENT_PROFILE_UNAVAILABLE}
           orgRole={person.orgRole}
-          staffStatus={person}
+          staffStatus={canViewEmployeeDetails ? person : undefined}
           onPress={() => {
             if (isSelf) {
               router.push("/(tabs)/profile");
@@ -1171,11 +1177,18 @@ function AddPersonButton({
 
 const PERSON_ROW_INSET = mobileSpace.sm;
 
+/** A management profile opens for staff managers only (the person endpoint refuses it). */
+const MANAGEMENT_PROFILE_UNAVAILABLE = {
+  label: "Management",
+  hint: "Management profiles open for managers only.",
+};
+
 function PersonRow({
   id,
   avatarSeed,
   name,
   navigable,
+  unavailable,
   orgRole,
   staffStatus,
   subtitle,
@@ -1187,8 +1200,13 @@ function PersonRow({
   avatarSeed: string;
   name: string;
   navigable: boolean;
+  /** Why a row that doesn't open can't: a word in place of the chevron, and its hint. */
+  unavailable?: { label: string; hint: string };
   orgRole: MobileOrgRole;
-  /** A staff record's status; a pill names it unless they're Active. */
+  /**
+   * A staff record's status; a pill names it unless they're Active. Left out
+   * for a viewer who can't see employee details.
+   */
   staffStatus?: Pick<
     MobilePerson,
     | "status"
@@ -1228,7 +1246,10 @@ function PersonRow({
   return (
     <View style={!isLast && styles.personRowDivider}>
       <PressableRow
-        accessibilityLabel={name}
+        accessibilityLabel={[name, orgRoleBadge?.label, statusPill?.label, plannedLabel, subtitle]
+          .filter(Boolean)
+          .join(", ")}
+        accessibilityHint={navigable ? undefined : unavailable?.hint}
         disabled={!navigable}
         onPress={onPress}
         style={styles.personRow}
@@ -1283,6 +1304,10 @@ function PersonRow({
         </View>
         {navigable ? (
           <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+        ) : unavailable ? (
+          <Text fit="compact" numberOfLines={1} style={styles.personUnavailable}>
+            {unavailable.label}
+          </Text>
         ) : null}
       </PressableRow>
     </View>
@@ -1415,5 +1440,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTabularText,
       color: mobileColors.textMuted,
       flexShrink: 1,
+    },
+    personUnavailable: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      flexShrink: 0,
     },
   });

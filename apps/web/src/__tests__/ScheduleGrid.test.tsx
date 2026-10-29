@@ -240,8 +240,11 @@ interface RenderGridOptions {
   indicatorTypes?: IndicatorType[];
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
+  certificationLabel?: string;
+  roleLabel?: string;
   isCellInteractive?: boolean;
   canOpenCell?: (empId: string, date: Date) => boolean;
+  isScheduleEditor?: boolean;
   canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   noteMarksForKey?: (
@@ -401,6 +404,8 @@ function renderGrid(options: RenderGridOptions = {}) {
     indicatorTypes: options.indicatorTypes ?? indicatorTypes,
     certifications: options.certifications ?? [],
     orgRoles: options.orgRoles ?? [],
+    certificationLabel: options.certificationLabel,
+    roleLabel: options.roleLabel,
     coverageRequirements: options.coverageRequirements,
     absenceTypeMap: options.absenceTypeMap,
     cellEditors: options.cellEditors,
@@ -410,6 +415,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     highlightEmpIds: options.highlightEmpIds,
     highlightScrollKey: options.highlightScrollKey,
     isCellInteractive: options.isCellInteractive ?? true,
+    isScheduleEditor: options.isScheduleEditor,
     canDragShifts: options.canDragShifts,
     shiftDisplayMode: options.shiftDisplayMode ?? "code",
     useCompactRoleCertificationLabels: options.useCompactRoleCertificationLabels ?? false,
@@ -2715,6 +2721,68 @@ describe("ScheduleGrid", () => {
       expect(cellsOf("emp-away")[10].getAttribute("title")).toBeNull();
     });
 
+    it("shows a viewer who can't edit the schedule a plain Away bar and no locked-day hint", () => {
+      observedWidth = 1600;
+      const withAbsence = people.map((person) =>
+        person.id === "emp-away" ? { ...person, awayAbsenceTypeId: 9 } : person,
+      );
+      renderAway({
+        filteredEmployees: withAbsence,
+        allEmployees: withAbsence,
+        absenceTypeMap: new Map([
+          [
+            9,
+            {
+              id: 9,
+              orgId: "org-1",
+              label: "S",
+              name: "Sick",
+              color: "#FECACA",
+              border: "#DC2626",
+              text: "#7F1D1D",
+              sortOrder: 2,
+            },
+          ],
+        ]),
+        isScheduleEditor: false,
+      });
+
+      expect(screen.getAllByText("Away")).toHaveLength(2);
+      expect(screen.queryByText("Away · Sick")).not.toBeInTheDocument();
+      const cell = cellsOf("emp-away")[3];
+      expect(cell.getAttribute("title")).toBeNull();
+      expect(cell.getAttribute("aria-description")).toBeNull();
+    });
+
+    it("draws a coworker's planned last day and suspension only for an editor", () => {
+      observedWidth = 1600;
+      const leaving: Employee = {
+        ...employees[0],
+        id: "emp-leaving",
+        firstName: "Sam",
+        lastName: "Reed",
+        seniority: 4,
+        status: "active",
+        plannedStatus: "removed",
+        plannedFrom: "2024-01-12",
+        suspendedAt: "2024-01-01T00:00:00.000Z",
+      };
+      const roster = [employees[0], leaving];
+
+      const { unmount } = renderAway({ filteredEmployees: roster, allEmployees: roster });
+      expect(cellsOf("emp-leaving")[5].dataset.awayLocked).toBe("true");
+      expect(cellsOf("emp-leaving")[5].getAttribute("title")).toMatch(/^Last day /);
+      expect(document.querySelector('[data-status-mark="suspended"]')).not.toBeNull();
+      unmount();
+
+      renderAway({ filteredEmployees: roster, allEmployees: roster, isScheduleEditor: false });
+      const cells = cellsOf("emp-leaving");
+      expect(cells.some((cell) => cell.dataset.awayLocked || cell.dataset.awayRun)).toBe(false);
+      expect(cells.some((cell) => cell.getAttribute("title"))).toBe(false);
+      expect(document.querySelector("[data-away-run-bar]")).toBeNull();
+      expect(document.querySelector('[data-status-mark="suspended"]')).toBeNull();
+    });
+
     it("keeps away days out of editing and the return date on", () => {
       observedWidth = 1600;
       const onActivateCell = vi.fn();
@@ -4786,6 +4854,8 @@ describe("ScheduleGrid", () => {
         { id: 7, orgId: "org-1", name: "Registered Nurse", abbr: "RN", sortOrder: 0 },
       ],
       orgRoles: [{ id: 8, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 }],
+      certificationLabel: "Skill Levels",
+      roleLabel: "Duties",
     });
 
     fireEvent.mouseEnter(screen.getByText("CN").parentElement as HTMLElement);
@@ -4801,6 +4871,10 @@ describe("ScheduleGrid", () => {
     });
     expect(within(card).getByText("Registered Nurse")).toBeInTheDocument();
     expect(within(card).getByText("Charge Nurse")).toBeInTheDocument();
+    // The organization's own names head each field.
+    expect(within(card).getByText("Skill Levels")).toBeInTheDocument();
+    expect(within(card).getByText("Duties")).toBeInTheDocument();
+    expect(within(card).queryByText("Certification")).not.toBeInTheDocument();
   });
 
   it("shows the general shift name before its type label in the hover card", async () => {

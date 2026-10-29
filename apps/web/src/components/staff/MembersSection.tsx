@@ -1665,7 +1665,7 @@ export function MembersSection({
                         <div className="dg-staff-directory-head-cell flex">
                           {certificationLabel}
                         </div>
-                        <div className="dg-staff-directory-head-cell flex">Roles</div>
+                        <div className="dg-staff-directory-head-cell flex">{roleLabel}</div>
                         <div className="dg-staff-directory-head-cell flex">Account</div>
                         <div className="dg-staff-directory-head-cell flex">Access</div>
                         <div className="dg-staff-directory-head-cell flex">Date joined</div>
@@ -1771,7 +1771,7 @@ export function MembersSection({
                             {certificationLabel}
                           </TableHead>
                           <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                            Roles
+                            {roleLabel}
                           </TableHead>
                           {canViewEmployeeDetails && (
                             <TableHead className="border-r border-[var(--dg-color-border-light)]">

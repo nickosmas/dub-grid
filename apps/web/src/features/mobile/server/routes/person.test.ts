@@ -80,6 +80,19 @@ function mockManagementMemberships(rows: Array<{ user_id: string; department_ids
   );
 }
 
+/** What a regular user mustn't learn about a coworker (51c, 51g, 51g4 and HR facts). */
+const HR_DETAILS = {
+  employmentType: "part_time",
+  seniority: 4,
+  awayAbsenceTypeId: 5,
+  suspendedAt: "2026-10-20T12:00:00.000Z",
+  suspendedUntil: "2026-11-20",
+  plannedStatus: "removed",
+  plannedFrom: "2026-11-09",
+  plannedAbsenceTypeId: 6,
+  firstDay: "2026-11-02",
+};
+
 function makeEmployee(overrides: Record<string, unknown> = {}) {
   return {
     id: "d660d308-4e0d-4daf-84fd-6753405e6740",
@@ -234,6 +247,7 @@ describe("mobile person route", () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),
     );
+    rowToEmployee.mockReturnValue(makeEmployee(HR_DETAILS));
     mockManagementMemberships([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
       id: "11111111-1111-4111-8111-111111111111",
@@ -264,14 +278,42 @@ describe("mobile person route", () => {
       managementDepartmentIds: [],
       managementDeptAdminIds: [],
       pendingInvitation: null,
-      roleIds: [],
+      // Roles stay, as in the people list the person screen came from.
+      roleIds: [3],
       statusNote: "",
       userId: null,
       // Personal contact details, withheld here exactly as the people list
       // already withholds them.
       email: "",
       phone: "",
+      employeeNumber: 0,
+      employmentType: "full_time",
+      seniority: 0,
+      statusChangedAt: null,
+      awayAbsenceTypeId: null,
+      suspendedAt: null,
+      suspendedUntil: null,
+      plannedStatus: null,
+      plannedFrom: null,
+      plannedAbsenceTypeId: null,
+      firstDay: null,
+      membershipUpdatedAt: null,
     });
+  });
+
+  it("keeps a coworker's HR details for a staff manager", async () => {
+    requireMobileAuth.mockResolvedValue(makeAuth());
+    rowToEmployee.mockReturnValue(makeEmployee(HR_DETAILS));
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) },
+    );
+
+    expect((await response.json()).person).toMatchObject(HR_DETAILS);
   });
 
   it("does not return the signed-in user's own employee through the person endpoint", async () => {

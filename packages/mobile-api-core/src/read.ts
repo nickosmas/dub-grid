@@ -564,22 +564,54 @@ export async function loadMobilePeoplePayload(
         return mobilePerson;
       }
 
-      // Regular users get a directory payload, not an account or contact
-      // export. Keep the visible scheduling qualifications used by the list
-      // while removing hidden fields and auth-account links.
-      return {
-        ...mobilePerson,
-        contactNotes: "",
-        deptAdminIds: [],
-        departmentIds: [],
-        email: "",
-        managementDeptAdminIds: [],
-        pendingInvitation: null,
-        phone: "",
-        statusNote: "",
-        userId: null,
-      };
+      return toCoworkerMobilePerson(mobilePerson);
     }),
+  };
+}
+
+/**
+ * A coworker as a regular user sees them: a directory entry, not an account,
+ * contact or HR export. Every field is named so a new one has to be decided
+ * here. Kept: name, status, org role, certification, roles, focus areas,
+ * management areas (which mark a management row) and `awayUntil`. Contact
+ * details, account links, HR facts, suspensions and planned status changes
+ * take their schema defaults.
+ */
+export function toCoworkerMobilePerson(person: MobilePerson): MobilePerson {
+  return {
+    id: person.id,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    status: person.status,
+    orgRole: person.orgRole,
+    certificationId: person.certificationId,
+    roleIds: person.roleIds,
+    focusAreaIds: person.focusAreaIds,
+    managementDepartmentIds: person.managementDepartmentIds,
+    awayUntil: person.awayUntil,
+    version: person.version,
+    employeeNumber: 0,
+    employmentType: "full_time",
+    phone: "",
+    email: "",
+    seniority: 0,
+    departmentIds: [],
+    deptAdminIds: [],
+    managementDeptAdminIds: [],
+    contactNotes: "",
+    statusChangedAt: null,
+    statusNote: "",
+    awayAbsenceTypeId: null,
+    suspendedAt: null,
+    suspendedUntil: null,
+    plannedStatus: null,
+    plannedFrom: null,
+    plannedUntil: null,
+    plannedAbsenceTypeId: null,
+    firstDay: null,
+    userId: null,
+    membershipUpdatedAt: null,
+    pendingInvitation: null,
   };
 }
 

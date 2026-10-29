@@ -324,6 +324,77 @@ describe("POST /api/employees/manage", () => {
       });
     });
 
+    describe("a coworker's HR details", () => {
+      const hrDetails = {
+        employeeNumber: 1042,
+        employmentType: "part_time",
+        seniority: 4,
+        statusChangedAt: "2026-10-01T12:00:00.000Z",
+        awayAbsenceTypeId: 5,
+        suspendedAt: "2026-10-20T12:00:00.000Z",
+        suspendedUntil: "2026-11-20",
+        plannedStatus: "removed",
+        plannedFrom: "2026-11-09",
+        plannedUntil: null,
+        plannedAbsenceTypeId: 6,
+        firstDay: "2026-11-02",
+        createdAt: "2026-01-05T12:00:00.000Z",
+      };
+
+      beforeEach(() => {
+        rowToEmployee.mockReturnValue(
+          makeEmployee({ ...hrDetails, certificationId: 7, roleIds: [9], focusAreaIds: [2] }),
+        );
+      });
+
+      it("withholds them from a view-only caller and keeps the directory fields", async () => {
+        mockAuth({});
+
+        const { employee } = await (await POST(fetchEmployeeByIdRequest())).json();
+
+        expect(employee).toEqual({
+          id: EMPLOYEE_ID,
+          firstName: "Mina",
+          lastName: "Diaz",
+          status: "active",
+          awayUntil: null,
+          archivedAt: null,
+          certificationId: 7,
+          roleIds: [9],
+          focusAreaIds: [2],
+          departmentIds: [],
+          version: 0,
+          employmentType: "full_time",
+          statusChangedAt: null,
+          statusNote: "",
+          seniority: 0,
+          phone: "",
+          email: "",
+          contactNotes: "",
+          userId: null,
+          deptAdminIds: [],
+          joinedAt: null,
+        });
+      });
+
+      it("keeps them on the caller's own row", async () => {
+        mockAuth({});
+        rowToEmployee.mockReturnValue(makeEmployee({ ...hrDetails, userId: VIEWER_USER_ID }));
+
+        const { employee } = await (await POST(fetchEmployeeByIdRequest())).json();
+
+        expect(employee).toMatchObject(hrDetails);
+      });
+
+      it("hands them to a viewer who can see employee details", async () => {
+        mockAuth({ canViewEmployeeDetails: true });
+
+        const { employee } = await (await POST(fetchEmployeeByIdRequest())).json();
+
+        expect(employee).toMatchObject(hrDetails);
+      });
+    });
+
     it("keeps the caller's own contact details on their own row", async () => {
       mockAuth({});
       rowToEmployee.mockReturnValue(makeEmployee({ userId: VIEWER_USER_ID }));
@@ -960,6 +1031,7 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
   ];
 
   let internalIds: string[] = [];
+  const employeeOrder: string[] = [];
 
   function makeListClient() {
     return {
@@ -967,9 +1039,13 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
         let rows: Array<{ user_id: string | null }> =
           table === "organization_memberships" ? membershipRows : employeeRows;
         const chain: Record<string, unknown> = {};
-        for (const method of ["select", "is", "in", "order"]) {
+        for (const method of ["select", "is", "in"]) {
           chain[method] = vi.fn(() => chain);
         }
+        chain.order = vi.fn((column: string) => {
+          if (table === "employees") employeeOrder.push(column);
+          return chain;
+        });
         if (table === "profiles") {
           chain.eq = vi.fn(() => chain);
           chain.then = (resolve: (value: unknown) => unknown) =>
@@ -1023,6 +1099,7 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     membershipFilters.length = 0;
+    employeeOrder.length = 0;
     internalIds = [];
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
@@ -1067,6 +1144,15 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
 
     expect(joined.get("emp-joined")).toBeNull();
     expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
+  });
+
+  it("orders a view-only caller's list by name, so it can't reveal seniority", async () => {
+    await listAs({});
+    expect(employeeOrder).toEqual(["last_name", "first_name", "id"]);
+
+    employeeOrder.length = 0;
+    await listAs({ canManageEmployees: true });
+    expect(employeeOrder).toEqual(["seniority"]);
   });
 });
 

@@ -20,6 +20,7 @@ import { mobileListRow, type MobileColors } from "../theme/tokens";
 export function PressableRow({
   children,
   accessibilityLabel,
+  accessibilityHint,
   accessibilityRole = "button",
   selected,
   checked,
@@ -30,6 +31,7 @@ export function PressableRow({
 }: {
   children: ReactNode;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
   accessibilityRole?: "button" | "link" | "checkbox" | "radio";
   selected?: boolean;
   /** For a checkbox or radio row: whether it is on. */
@@ -55,6 +57,7 @@ export function PressableRow({
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityRole={accessibilityRole}
       accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected, checked }}
       android_ripple={isDisabled ? undefined : { color: mobileColors.rippleNeutral }}
