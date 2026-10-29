@@ -5,11 +5,13 @@ import {
   awayReturnDate,
   awayRunLabel,
   buildRowAwayDays,
+  gridAwayRange,
   isAwayOn,
   isInAwayRange,
   isOnScheduleGrid,
   LEAVING_RUN_LABEL,
   startsRunLabel,
+  type AwayRange,
 } from "./awayRuns";
 
 const period = { lastDateKey: "2026-11-07", todayKey: "2026-11-02" };
@@ -296,5 +298,43 @@ describe("the day someone went away", () => {
       false,
     );
     expect(isOnScheduleGrid(away, lastWeek)).toBe(false);
+  });
+});
+
+describe("gridAwayRange", () => {
+  const base = { id: "emp-1", status: "active" as const, awayUntil: null, archivedAt: null };
+  const noRanges = new Map<string, AwayRange>();
+
+  it("gives an editor every range", () => {
+    const leaving = { ...base, plannedStatus: "removed" as const, plannedFrom: "2026-11-06" };
+    expect(gridAwayRange(leaving, noRanges, true)).toEqual(awayRangeOf(leaving));
+  });
+
+  it("gives anyone else only someone Away now, without their first day", () => {
+    const away = {
+      ...base,
+      status: "inactive" as const,
+      awayUntil: "2026-11-05",
+      firstDay: "2026-10-01",
+    };
+    expect(gridAwayRange(away, noRanges, false)).toEqual({ from: null, until: "2026-11-05" });
+
+    const dated = new Map([[away.id, { from: null, until: "2026-11-05", since: "2026-10-20" }]]);
+    expect(gridAwayRange(away, dated, false)).toEqual({
+      from: null,
+      until: "2026-11-05",
+      since: "2026-10-20",
+    });
+  });
+
+  it("hides a planned away, a last day and a first day from anyone else", () => {
+    for (const person of [
+      { ...base, plannedStatus: "away" as const, plannedFrom: "2026-11-04", plannedUntil: null },
+      { ...base, plannedStatus: "removed" as const, plannedFrom: "2026-11-06" },
+      { ...base, firstDay: "2026-11-04" },
+    ]) {
+      expect(gridAwayRange(person, noRanges, true)).not.toBeNull();
+      expect(gridAwayRange(person, noRanges, false)).toBeNull();
+    }
   });
 });

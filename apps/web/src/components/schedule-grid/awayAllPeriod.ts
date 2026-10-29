@@ -1,6 +1,6 @@
 import { describeFirstDay, EMPLOYMENT_STATUS_LABELS, formatReturnDate } from "@dubgrid/domain";
 import { formatLocalDateKey } from "@dubgrid/schedule-core";
-import { awayRangeOf, isAwayOn, type AwayRange } from "./awayRuns";
+import { awayRangeOf, gridAwayRange, isAwayOn, type AwayRange } from "./awayRuns";
 
 export interface AwayAllPeriodInput {
   dateKeys: readonly string[];
@@ -55,6 +55,8 @@ function rangeReason(range: AwayRange, dateKeys: readonly string[]): string {
 interface OrderInput {
   dates: readonly Date[];
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  /** False for a viewer who can't edit the schedule (see gridAwayRange). */
+  isScheduleEditor?: boolean;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   dayOffAbsenceTypeId?: number | null;
@@ -72,7 +74,7 @@ export function orderAwayAllPeriod<T extends Parameters<typeof awayRangeOf>[0] &
   for (const employee of employees) {
     const why = awayAllPeriodReason({
       dateKeys: days.map((day) => day.key),
-      range: input.awayRanges?.get(employee.id) ?? awayRangeOf(employee),
+      range: gridAwayRange(employee, input.awayRanges, input.isScheduleEditor ?? true),
       absenceTypeIdOn: (key) => {
         const date = dateOf.get(key);
         return date ? (input.absenceTypeIdForKey?.(employee.id, date) ?? null) : null;

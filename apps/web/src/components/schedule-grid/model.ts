@@ -91,6 +91,11 @@ export interface ScheduleGridOptions {
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   isCellInteractive: boolean;
+  /**
+   * Whether the viewer can edit shifts or notes. Without it, rows hide why a
+   * day is locked and any planned status change (see gridAwayRange).
+   */
+  isScheduleEditor: boolean;
   canDragShifts: boolean;
   shiftDisplayMode: ShiftDisplayMode;
   showShiftDetailHoverCards: boolean;
@@ -143,6 +148,9 @@ export interface ScheduleGridModel {
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
+  /** The organization's names for certifications and roles. */
+  certificationLabel: string;
+  roleLabel: string;
   useCompactRoleCertificationLabels: boolean;
   openShifts: GridOpenShift[];
   coverageRequirements?: CoverageRequirement[];
@@ -235,10 +243,13 @@ export interface BuildScheduleGridModelInput {
   highlightEmpIds?: Set<string>;
   highlightScrollKey?: string;
   isCellInteractive?: boolean;
+  isScheduleEditor?: boolean;
   canDragShifts?: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
   showShiftDetailHoverCards?: boolean;
   useCompactRoleCertificationLabels?: boolean;
+  certificationLabel?: string;
+  roleLabel?: string;
   showPublishDiffOverlay?: boolean;
   showAudit?: boolean;
   accessors: ScheduleGridAccessors;
@@ -278,10 +289,13 @@ export function buildScheduleGridModel({
   highlightEmpIds,
   highlightScrollKey,
   isCellInteractive = true,
+  isScheduleEditor = true,
   canDragShifts = isCellInteractive,
   shiftDisplayMode = "code",
   showShiftDetailHoverCards = true,
   useCompactRoleCertificationLabels = false,
+  certificationLabel = "Certifications",
+  roleLabel = "Roles",
   showPublishDiffOverlay,
   showAudit = false,
   accessors,
@@ -435,6 +449,7 @@ export function buildScheduleGridModel({
             {
               dates: allDates,
               awayRanges,
+              isScheduleEditor,
               absenceTypeIdForKey: accessors.absenceTypeIdForKey,
               assignmentIdsForKey: accessors.assignmentIdsForKey,
               dayOffAbsenceTypeId,
@@ -494,6 +509,8 @@ export function buildScheduleGridModel({
     indicatorTypes,
     certifications,
     orgRoles,
+    certificationLabel,
+    roleLabel,
     useCompactRoleCertificationLabels,
     openShifts,
     coverageRequirements,
@@ -505,6 +522,7 @@ export function buildScheduleGridModel({
       highlightEmpIds,
       highlightScrollKey,
       isCellInteractive,
+      isScheduleEditor,
       canDragShifts,
       shiftDisplayMode,
       showShiftDetailHoverCards,

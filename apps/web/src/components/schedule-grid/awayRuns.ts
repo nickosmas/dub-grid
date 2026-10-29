@@ -130,6 +130,24 @@ function statusRangeOf(employee: RangeFields, timeZone?: string | null): AwayRan
   return null;
 }
 
+/**
+ * The range a grid row draws. Someone who can't edit the schedule sees only
+ * that a person is Away now: a planned Away, a last day or a first day ahead
+ * are the record's business, so those rows draw no bar and lock nothing.
+ */
+export function gridAwayRange(
+  employee: RangeFields & { id: string },
+  awayRanges: ReadonlyMap<string, AwayRange> | undefined,
+  isScheduleEditor: boolean,
+): AwayRange | null {
+  const range = awayRanges?.get(employee.id) ?? awayRangeOf(employee);
+  if (isScheduleEditor || !range) return range;
+  if (range.from !== null || range.until === null || range.lastDay) return null;
+  return range.since
+    ? { from: null, until: range.until, since: range.since }
+    : { from: null, until: range.until };
+}
+
 /** An Away person's first day back (YYYY-MM-DD), or null for anyone else. */
 export function awayReturnDate(employee: AwayFields): string | null {
   return employee.status === "inactive" && !employee.archivedAt && employee.awayUntil
