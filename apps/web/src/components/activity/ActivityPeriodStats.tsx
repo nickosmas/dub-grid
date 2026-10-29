@@ -14,7 +14,6 @@ interface ActivityPeriodStatsProps {
   periodPhrase: string;
   /** The period held more events than one page. */
   truncated?: boolean;
-  pageSize?: number;
 }
 
 export function ActivityPeriodStats({
@@ -24,14 +23,13 @@ export function ActivityPeriodStats({
   categories,
   periodPhrase,
   truncated = false,
-  pageSize,
 }: ActivityPeriodStatsProps) {
   const topCategory = categories[0] ?? null;
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatBox
-        label={truncated && pageSize ? `Latest ${pageSize} events` : "Events"}
+        label={truncated ? "Latest events" : "Events"}
         value={total}
         caption={periodPhrase}
         icon={<TrendingUp size={18} />}

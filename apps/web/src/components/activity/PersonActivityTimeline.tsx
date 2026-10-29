@@ -16,7 +16,8 @@ import CustomSelect from "@/components/CustomSelect";
 import { SearchClearButton, clearSearchOnEscape } from "@/components/ui/search-clear";
 import { isDateInPeriod } from "@/lib/activity-period";
 import { getAuditCategoryOptions, type AuditCategory } from "@/lib/audit/registry";
-import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityItemDialog } from "@/components/activity/ActivityLogParts";
+import { groupActivityEntries, type ActivityListItem } from "@/lib/audit/grouping";
 import { ActivityTable } from "@/components/activity/ActivityTable";
 import { ActivitySkeleton } from "@/components/activity/ActivitySkeleton";
 import { ActivityPeriodStats } from "@/components/activity/ActivityPeriodStats";
@@ -58,7 +59,9 @@ export function PersonActivityTimeline({
   organizations,
   range,
 }: PersonActivityTimelineProps) {
-  const [selectedEntry, setSelectedEntry] = useState<EmployeeActivityEntry | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ActivityListItem<EmployeeActivityEntry> | null>(
+    null,
+  );
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [organizationFilter, setOrganizationFilter] = useState("all");
@@ -112,7 +115,7 @@ export function PersonActivityTimeline({
   );
 
   const groups = useMemo(
-    () => groupByDay(visible, { timeZone, todayDate: period.todayDate }),
+    () => groupByDay(groupActivityEntries(visible), { timeZone, todayDate: period.todayDate }),
     [visible, timeZone, period.todayDate],
   );
   const categories = useMemo(() => summarizeCategories(visible), [visible]);
@@ -234,16 +237,16 @@ export function PersonActivityTimeline({
             timeZone={timeZone}
             showTarget={false}
             showOrganization={Boolean(organizations)}
-            onSelect={setSelectedEntry}
+            onSelect={setSelectedItem}
           />
         </>
       )}
 
-      {selectedEntry ? (
-        <ActivityDetailsDialog
-          entry={selectedEntry}
+      {selectedItem ? (
+        <ActivityItemDialog
+          item={selectedItem}
           timeZone={timeZone}
-          onClose={() => setSelectedEntry(null)}
+          onClose={() => setSelectedItem(null)}
         />
       ) : null}
     </div>

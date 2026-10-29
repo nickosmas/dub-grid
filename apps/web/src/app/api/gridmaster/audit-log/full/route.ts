@@ -8,6 +8,8 @@ import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 import { enrichAuditRows } from "@/lib/audit/enrich";
 import { withShiftChanges } from "@/lib/audit/shift-changes";
 import { fetchShiftChangeResolvers } from "@/app/api/shared/schedule";
+import { collectGroupedPage } from "@/lib/audit/grouped-page";
+import { groupActivityEntries } from "@/lib/audit/grouping";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -40,6 +42,11 @@ const querySchema = z.object({
     .optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
   offset: z.coerce.number().int().min(0).optional(),
+  // Pages count entries, a run of the same change by one person counting once.
+  group: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -57,6 +64,7 @@ export async function GET(req: NextRequest) {
       highRiskOnly: req.nextUrl.searchParams.get("highRiskOnly") ?? undefined,
       limit: req.nextUrl.searchParams.get("limit") ?? undefined,
       offset: req.nextUrl.searchParams.get("offset") ?? undefined,
+      group: req.nextUrl.searchParams.get("group") ?? undefined,
     });
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
@@ -73,18 +81,31 @@ export async function GET(req: NextRequest) {
     if (scope.kind === "allowlist" && scope.actions.length === 0) {
       return NextResponse.json({ entries: [] });
     }
+    const { group, ...query } = parsed.data;
     const filters = {
-      ...parsed.data,
+      ...query,
       orgId: reader.orgId,
       actionPrefixes: scope.kind === "open" ? scope.prefixes : scope.actions,
     };
 
-    const rows = await fetchFilteredAuditRows(reader.serviceClient, filters);
+    const page = group
+      ? await collectGroupedPage(
+          (offset, limit) =>
+            fetchFilteredAuditRows(reader.serviceClient, { ...filters, offset, limit }),
+          { offset: filters.offset ?? 0, limit: filters.limit ?? 50 },
+        )
+      : { rows: await fetchFilteredAuditRows(reader.serviceClient, filters), nextOffset: null };
     const entries = await withShiftChanges(
-      await enrichAuditRows(reader.serviceClient, rows),
+      await enrichAuditRows(reader.serviceClient, page.rows),
       (orgId) => fetchShiftChangeResolvers(reader.serviceClient, orgId),
     );
 
+    if (group) {
+      return NextResponse.json({
+        entries: groupActivityEntries(entries),
+        nextOffset: page.nextOffset,
+      });
+    }
     return NextResponse.json({
       entries,
     });

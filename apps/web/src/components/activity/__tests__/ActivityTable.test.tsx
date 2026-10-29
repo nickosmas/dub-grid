@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ActivityTable, type ActivityTableEntry } from "@/components/activity/ActivityTable";
-import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityDetailsDialog, ActivityItemDialog } from "@/components/activity/ActivityLogParts";
+import { groupActivityEntries, isActivityGroup } from "@/lib/audit/grouping";
 import { describeShiftChange } from "@dubgrid/schedule-core";
 import { groupByDay } from "@/lib/activity-log-utils";
 
@@ -185,5 +186,52 @@ describe("ActivityDetailsDialog", () => {
     );
 
     expect(screen.getByText("Platform-wide")).toBeInTheDocument();
+  });
+});
+
+describe("grouped runs", () => {
+  const run = ["Ana Torres", "Leo Grant", "Ana Torres"].map((name, index) =>
+    entry({
+      id: `run-${index}`,
+      action: "shift.created",
+      resourceType: "shift",
+      resourceId: `employee-${index}:2026-11-0${index + 3}`,
+      targetLabel: name,
+      targetEmail: null,
+      details: {},
+      createdAt: `2026-09-06T14:0${3 - index}:00.000Z`,
+    }),
+  );
+
+  it("shows a run of shift edits as one row with its counts", () => {
+    const items = groupActivityEntries(run);
+    render(
+      <ActivityTable
+        groups={groupByDay(items, { timeZone: NEW_YORK, todayDate: "2026-09-06" })}
+        timeZone={NEW_YORK}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("row", { name: /Edited the draft for Nov 3 - Nov 5, 2026/ });
+    const counts = [...row.querySelectorAll(".dg-activity-group-count")].map(
+      (chip) => chip.textContent,
+    );
+    expect(counts).toEqual(["3 shifts", "2 people", "3 added"]);
+    expect(within(row).getByText("10:01 - 10:03 AM")).toBeInTheDocument();
+    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(1);
+  });
+
+  it("lists who a run touched, opening each to its changes", async () => {
+    const user = userEvent.setup();
+    const [group] = groupActivityEntries(run);
+    if (!isActivityGroup(group)) throw new Error("expected a group");
+    render(<ActivityItemDialog item={group} onClose={vi.fn()} timeZone={NEW_YORK} />);
+
+    const ana = screen.getByRole("button", { name: /Ana Torres\s*2 shifts/ });
+    expect(ana).toHaveAttribute("aria-expanded", "false");
+    await user.click(ana);
+    expect(ana).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText(/Added a shift on Nov/)).toHaveLength(2);
   });
 });

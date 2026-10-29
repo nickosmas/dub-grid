@@ -23,6 +23,7 @@ import type {
   PlatformUser,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import type { ActivityListItem } from "@/lib/audit/grouping";
 import type {
   GridmasterPersonNotifications,
   GridmasterPersonRecord,
@@ -698,7 +699,7 @@ export function fetchAuditLogDayCounts(options: {
   );
 }
 
-export function fetchGridmasterFullAuditLog(options?: {
+type AuditLogQueryOptions = {
   orgId?: string;
   action?: string;
   actionPrefix?: string;
@@ -716,7 +717,9 @@ export function fetchGridmasterFullAuditLog(options?: {
   highRiskOnly?: boolean;
   limit?: number;
   offset?: number;
-}): Promise<FullAuditLogEntry[]> {
+};
+
+function auditLogQuery(options?: AuditLogQueryOptions): URLSearchParams {
   const params = new URLSearchParams();
   if (options?.orgId) {
     params.set("orgId", options.orgId);
@@ -754,10 +757,28 @@ export function fetchGridmasterFullAuditLog(options?: {
   if (typeof options?.offset === "number") {
     params.set("offset", String(options.offset));
   }
-  const suffix = params.toString();
+  return params;
+}
+
+export function fetchGridmasterFullAuditLog(
+  options?: AuditLogQueryOptions,
+): Promise<FullAuditLogEntry[]> {
+  const suffix = auditLogQuery(options).toString();
   return requestGridmasterJson<{ entries: FullAuditLogEntry[] }>(
     `/api/gridmaster/audit-log/full${suffix ? `?${suffix}` : ""}`,
   ).then((data) => data.entries);
+}
+
+/** One page of the log with runs grouped; `nextOffset` is null on the last page. */
+export function fetchGroupedAuditLog(
+  options?: AuditLogQueryOptions,
+): Promise<{ entries: ActivityListItem<FullAuditLogEntry>[]; nextOffset: number | null }> {
+  const params = auditLogQuery(options);
+  params.set("group", "true");
+  return requestGridmasterJson<{
+    entries: ActivityListItem<FullAuditLogEntry>[];
+    nextOffset: number | null;
+  }>(`/api/gridmaster/audit-log/full?${params.toString()}`);
 }
 
 export function exportGridmasterAuditLog(

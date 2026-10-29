@@ -9,6 +9,10 @@ const mockFetchGridmasterFullAuditLog = vi.fn();
 
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterFullAuditLog: (options: unknown) => mockFetchGridmasterFullAuditLog(options),
+  fetchGroupedAuditLog: async (options: unknown) => ({
+    entries: (await mockFetchGridmasterFullAuditLog(options)) ?? [],
+    nextOffset: null,
+  }),
 }));
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";

@@ -2005,6 +2005,103 @@ button.dg-cc-sg-main {
 .dg-activity-details-note dt {
   margin-bottom: 2px;
 }
+.dg-activity-group-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 5px;
+}
+.dg-activity-group-count {
+  padding: 1px 8px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: 999px;
+  color: var(--dg-color-text-secondary);
+  font-size: var(--dg-fs-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dg-activity-group-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.dg-activity-group-total {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-radius-lg);
+}
+.dg-activity-group-total-count {
+  color: var(--dg-color-text-primary);
+  font-size: var(--dg-fs-heading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dg-activity-group-targets {
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: var(--dg-radius-lg);
+}
+.dg-activity-group-target + .dg-activity-group-target {
+  border-top: 1px solid var(--dg-color-border-light);
+}
+.dg-activity-group-targets > .dg-activity-details-empty {
+  padding: 10px 12px;
+}
+.dg-activity-group-target-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--dg-color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dg-activity-group-target-toggle:hover {
+  background: var(--dg-color-row-alt);
+}
+.dg-activity-group-target-toggle:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+}
+.dg-activity-group-target-toggle .dg-activity-details-identity-primary {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-activity-group-target-count {
+  color: var(--dg-color-text-muted);
+  font-size: var(--dg-fs-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dg-activity-group-target-chevron {
+  flex: none;
+  color: var(--dg-color-text-muted);
+  transition: transform 150ms ease;
+}
+.dg-activity-group-target-toggle[aria-expanded="true"] .dg-activity-group-target-chevron {
+  transform: rotate(180deg);
+}
+.dg-activity-group-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 2px 12px 12px;
+  list-style: none;
+}
 .dg-activity-details-empty {
   color: var(--dg-type-metadata-color);
   font-size: var(--dg-type-metadata-size);
