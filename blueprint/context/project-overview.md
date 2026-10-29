@@ -535,15 +535,16 @@ Item 55 is split:
 - **55b - Previous and next person:** shipped; arrows and "7 of 37" follow
   the People list's last filter and sort, name who's next on hover, and hide
   when the page was opened without a list.
-- **55c - Overview:** planned; stats for the period, This week, Waiting on
-  you, Next time off, and a What they work donut by shift and job in place
-  of the Assignments bar.
+- **55c - Overview:** shipped; stats for the period, This week, and a What
+  they work donut by shift and job in place of the Assignments bar.
 - **55d - Shifts:** planned; every shift record in the period with its
   state, what it was and schedule notes, a total and CSV export.
 - **55e - Time off:** planned; absences and time away in the period,
-  planned, now or taken, with day off absences hidden unless shown.
+  planned, now or taken, with day off absences hidden unless shown, and a
+  Next time off card on Overview.
 - **55f - Requests:** planned; pickups, swaps, call-offs and profile change
-  requests involving them in the period, with state and who decided.
+  requests involving them in the period, with state and who decided, and a
+  Waiting on you card on Overview.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

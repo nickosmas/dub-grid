@@ -134,6 +134,15 @@ vi.mock("@/components/ProgressBar", () => ({
   default: ({ loading }: { loading?: boolean }) => (loading ? <div>Loading...</div> : null),
 }));
 
+vi.mock("@/components/staff-detail/tabs/StaffOverviewTab", () => ({
+  StaffOverviewTab: ({ range }: { range: { startDate: string; endDate: string } }) => (
+    <div>
+      <div>Overview content</div>
+      <div data-testid="overview-range">{`${range.startDate}..${range.endDate}`}</div>
+    </div>
+  ),
+}));
+
 vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
   OverviewTab: ({ scheduleOverview }: { scheduleOverview?: ReactNode }) => (
     <div>
@@ -440,6 +449,31 @@ describe("StaffDetailPage", () => {
       range.startDate,
       range.endDate,
     );
+  });
+
+  it("loads the Overview's shifts for the chosen period", async () => {
+    localStorage.setItem(
+      "dg-person-period",
+      JSON.stringify({
+        preset: "custom",
+        range: { startDate: "2026-09-01", endDate: "2026-10-15" },
+      }),
+    );
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByTestId("overview-range")).toHaveTextContent("2026-09-01..2026-10-15");
+    await waitFor(() =>
+      expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
+        "emp-1",
+        "org-1",
+        expect.any(Map),
+        expect.any(Map),
+        "2026-09-01",
+        "2026-10-15",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Period" })).toBeInTheDocument();
   });
 
   it("offers a tab for each section the viewer can see, and switches by URL", async () => {

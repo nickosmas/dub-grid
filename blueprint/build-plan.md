@@ -1228,15 +1228,16 @@
   - [x] 55b. **Previous and next person** - arrows and "7 of 37" follow the
         People list's last filter and sort, name who's next on hover, and
         hide when the page was opened without a list.
-  - [ ] 55c. **Overview** - stats for the period, This week, Waiting on
-        you, Next time off, and a What they work donut by shift and job
-        (with times, counts and share, a hover and a table view) in place of
-        the Assignments bar.
+  - [x] 55c. **Overview** - stats for the period, This week, and a What
+        they work donut by shift and job (with times, counts and share, a
+        hover and a table view) in place of the Assignments bar.
   - [ ] 55d. **Shifts** - every shift record in the period: shift and job,
         times, focus area, hours, Draft, Published or Corrected, what it
         was, and schedule notes, with a total and CSV export.
   - [ ] 55e. **Time off** - absences and time away in the period, planned,
         now or taken, with dates and days; part-day absences name their
-        times; day off absences are hidden unless shown.
+        times; day off absences are hidden unless shown. Overview gains a
+        Next time off card.
   - [ ] 55f. **Requests** - pickups, swaps, call-offs and profile change
         requests involving them in the period, with state and who decided.
+        Overview gains a Waiting on you card.

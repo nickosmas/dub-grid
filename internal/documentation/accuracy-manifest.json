@@ -789,7 +789,7 @@
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Activity period choices and remembered choice",
+            "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Overview and Activity period choices; Overview stats for the period, This week, What they work and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions"
           ],
@@ -808,6 +808,9 @@
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
             "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
+            "apps/web/src/components/staff-detail/WorkMixCard.tsx",
+            "apps/web/src/lib/staff-detail-stats.ts",
             "apps/web/src/components/EditEmployeePanel.tsx",
             "apps/web/src/app/api/employees/manage/route.ts",
             "apps/web/src/features/employees/server/login-email-follow-up.ts",
@@ -826,7 +829,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:da3d67d99c654bd29bb969a22b87cb003ac8489b3068a7e131f0122e10c29b5a"
+      "evidenceFingerprint": "sha256:20700431829b86e18a24dcb137843e930156820231cfe5eff6a96d477859e950"
     },
     {
       "id": "invitations",

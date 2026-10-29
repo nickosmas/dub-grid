@@ -59,7 +59,6 @@ import {
   withKnownJoinedDate,
 } from "@/lib/staff-directory";
 import { isCurrentUsersEmployee } from "@/lib/profile-links";
-import { computeEmployeeWeeklyHours } from "@/lib/dashboard-stats";
 import {
   getProfileOverviewCurrentWeekDateKeys,
   getProfileOverviewDateRange,
@@ -98,7 +97,7 @@ import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
 import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
-import { OverviewTab } from "./tabs/OverviewTab";
+import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { AccessTab } from "./tabs/AccessTab";
 import { RecurringTab } from "./tabs/RecurringTab";
@@ -844,18 +843,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [employee, orgId, syncEmployeeCaches],
   );
 
-  const thisWeekHours = useMemo(() => {
-    if (!employee) return null;
-    return computeEmployeeWeeklyHours(
-      employee.id,
-      getProfileOverviewCurrentWeekDateKeys(overviewRange),
-      shifts,
-      assignmentById,
-      40,
-      categoryById,
-    );
-  }, [assignmentById, categoryById, employee, overviewRange, shifts]);
-
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
   const canManageManagementAccess = perms.isSuperAdmin || perms.isGridmaster;
   const closeManagementAccessEditor = useCallback(() => {
@@ -897,6 +884,34 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   useEffect(() => {
     if (legacySection) router.replace(hrefForTab(tabForLegacySection(legacySection)));
   }, [hrefForTab, legacySection, router]);
+
+  // The Overview counts the chosen period, loaded on its own so a long custom
+  // range never rides on the page's first load.
+  const periodShiftsQuery = useQuery<ShiftMap>({
+    queryKey: orgId
+      ? [
+          ...queryKeys.shifts.all(orgId),
+          "employee",
+          employeeId,
+          period.range.startDate,
+          period.range.endDate,
+        ]
+      : ["shifts", "anon", "employee", employeeId],
+    queryFn: () =>
+      fetchEmployeeShifts(
+        employeeId,
+        orgId!,
+        assignmentLabelMapRef.current,
+        absenceTypeMapRef.current,
+        period.range.startDate,
+        period.range.endDate,
+      ),
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
+  });
+  const currentWeekDates = useMemo(
+    () => getProfileOverviewCurrentWeekDateKeys(overviewRange),
+    [overviewRange],
+  );
 
   const closeDetailsEditor = useCallback(() => {
     setDetailsDirty(false);
@@ -1280,7 +1295,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
                     />
                   </div>
-                  {activeTab === "activity" && (
+                  {(activeTab === "overview" || activeTab === "activity") && (
                     <PersonPeriodControl
                       period={period}
                       payPeriodStartDate={org?.payPeriodStartDate}
@@ -1292,17 +1307,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
                 <section aria-label={TAB_LABELS[activeTab]}>
                   {activeTab === "overview" && (
-                    <OverviewTab
+                    <StaffOverviewTab
                       employee={employee}
-                      shifts={shifts}
-                      assignmentById={assignmentById}
-                      categoryById={categoryById}
-                      focusAreas={focusAreas}
-                      certifications={certifications}
-                      orgRoles={orgRoles}
-                      thisWeekHours={thisWeekHours}
-                      timeZone={org?.timezone}
-                      showDetails={false}
+                      periodShifts={periodShiftsQuery.data}
+                      currentWeekShifts={shifts}
+                      currentWeekDates={currentWeekDates}
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
+                      assignments={assignments}
+                      shiftCategories={shiftCategories}
+                      jobs={jobs}
+                      absenceTypes={absenceTypes}
                     />
                   )}
                   {activeTab === "recurring" && orgId && (

@@ -64,6 +64,9 @@ vi.mock("./EmployeeStatusActions", () => ({
   StatusCardActions: () => <div />,
 }));
 vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
+vi.mock("./tabs/StaffOverviewTab", () => ({
+  StaffOverviewTab: () => <div data-testid="overview" />,
+}));
 vi.mock("./tabs/ActivityTab", () => ({ ActivityTab: () => <div /> }));
 vi.mock("./RecurringScheduleCard", () => ({ RecurringScheduleCard: () => <div /> }));
 vi.mock("@/components/EditEmployeePanel", () => ({

@@ -313,7 +313,7 @@ const METRIC_CARD_TONES = {
 } as const;
 
 /** The directory's summary card, reused so a person reads like the roster. */
-function MetricCard({
+export function MetricCard({
   label,
   value,
   detail,
