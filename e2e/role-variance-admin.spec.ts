@@ -43,10 +43,10 @@ test.describe("role variance: qa-admin route entry contract", () => {
         marker: (p) => p.getByRole("button", { name: "Add", exact: true }),
       },
       {
-        // canEditDetails: StaffDetailPage renders the persistent EditEmployeePanel.
+        // canEditDetails: the person page offers Edit on their Work details.
         path: employeeHref,
         finalUrl: new RegExp(`${employeeHref.replace(/\//g, "\\/")}$`),
-        marker: (p) => p.getByRole("button", { name: "Save", exact: true }),
+        marker: (p) => p.getByRole("button", { name: "Edit work details", exact: true }),
       },
       {
         path: "/profile",
