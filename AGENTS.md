@@ -72,8 +72,20 @@ A pull request into `dev` that an agent opened, or was asked to drive, merges
 without a further ask once every GitHub check on its current head is green and
 it has no conflict (owner, 2026-10-26): squash-merge it as one conventional
 commit. The release-PR rules above still bind it: never past a red or
-still-running check, never `--admin`, never `--auto`. A release PR into `main`
-still needs its own explicit authorization.
+still-running check, never `--admin`, never `--auto`.
+
+Every change goes all the way to production without a further ask (owner,
+2026-10-29). Once a pull request into `dev` merges, open or update the release
+PR from `dev` to `main`, audit its diff, and merge it with `--merge` once every
+check on it is green; that merge is the production release. A failing check on
+a pull request an agent opened or drives, the release PR included, is
+root-caused, fixed and pushed without asking, round after round until it is
+green. The rules above still bind: never past a red or still-running check,
+never `--admin`, never `--auto`, never skip or disable a test. One stop
+remains: when the release carries a migration production has not applied
+(`npm run db:migrations:inspect`), report it before merging the release PR and
+follow `internal/operations/production-migration-safety.md`, since the web
+code would otherwise run against an older schema.
 
 ### Several agents share this checkout
 
