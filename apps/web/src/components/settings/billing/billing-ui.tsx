@@ -177,7 +177,7 @@ export function CardFooter({ children }: { children: ReactNode }) {
       style={{
         padding: "12px 20px",
         borderTop: "1px solid var(--dg-color-border-light)",
-        background: "var(--dg-color-bg-secondary)",
+        background: "var(--dg-color-surface)",
       }}
     >
       {children}
