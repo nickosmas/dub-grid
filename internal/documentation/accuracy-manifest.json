@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:84a6243cf1b896833d5a58679b20cdd14052822ba4c54686edb6642f0d5934d9"
+      "evidenceFingerprint": "sha256:dda7aa626dd6a1c3ee1ba273ccc3aca38a57a73823c89092632114cb40c7e184"
     },
     {
       "id": "person-detail",
@@ -783,20 +783,27 @@
         {
           "id": "person",
           "claims": [
-            "person page needs view-details permission; Profile, Overview, Activity sections; Back to People",
-            "header contents",
-            "Work details, Record account states, Access, Management departments",
+            "person page needs view-details permission; one page with Back to People",
+            "header contents: name, status icon, access star, employee number, No app access, Send invitation, Add to schedule or management; previous and next person in the People list's order",
+            "Contact, Work details and Record cards beside the tabs; Edit opens the details; Record account states",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview metrics and cards; Activity scope and who sees it",
+            "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Activity period choices and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
             "apps/web/src/components/staff-detail/StaffDetailPage.tsx",
-            "apps/web/src/components/staff-detail/StaffDetailHeader.tsx",
+            "apps/web/src/components/staff-detail/StaffPageHeader.tsx",
+            "apps/web/src/components/staff-detail/PersonPager.tsx",
+            "apps/web/src/lib/people-order.ts",
+            "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
+            "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/components/staff-detail/tabs/RecurringTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/AccessTab.tsx",
+            "apps/web/src/lib/period-presets.ts",
             "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
@@ -819,7 +826,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e1d5ac273240be82137c537c89b8756776b3c697b8903413d5e76e2ed5a3467e"
+      "evidenceFingerprint": "sha256:da3d67d99c654bd29bb969a22b87cb003ac8489b3068a7e131f0122e10c29b5a"
     },
     {
       "id": "invitations",
@@ -882,7 +889,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:07bcd355ad92299636a7fd768d8a8c832a2fd392b53edf2ab89ca4a04bc2ad08"
+      "evidenceFingerprint": "sha256:553768386ebac1a2d4b034bab10c80d3568c4509d8b47600951aa1c5d60bfe4b"
     },
     {
       "id": "organization",
@@ -1405,7 +1412,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:81f71e2cba5ccf0783917305b9c467542387e598d41cd48fa6b9a0cd3a7f0448"
+      "evidenceFingerprint": "sha256:5eca413756d2ed752fa576f674be4211e35e274bcd8a264e9d931ca6c9fae720"
     },
     {
       "id": "profile",
@@ -1780,7 +1787,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8a174463241eec55192048e869852e5b8a3f226aae20e094e3550f632102c513"
+      "evidenceFingerprint": "sha256:f174ed4ae4cfcb2c1f4c740d657e3a820e8071724691674cb0c79b3231a164fa"
     },
     {
       "id": "departments-focus-areas",
@@ -2103,7 +2110,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d74c76189d2e42782dc3195b94cb3bf1d81c70136420c027d82621fc177823ff"
+      "evidenceFingerprint": "sha256:427f557e957220ddeb64a691ffbfff3e12b0accda817dbf7f29221bdec5b73a0"
     }
   ],
   "surfaceExclusions": [

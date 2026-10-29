@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import {
   Table,
@@ -11,22 +11,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MaybeHint } from "@/components/ui/hint";
-import { getAvatarInitials } from "@/lib/utils";
 import {
   describeAction,
   formatActivityDayDate,
   formatActivityRowDetails,
   formatActivityTime,
   formatActivityTimestamp,
-  getActionSeverity,
   getAuditActorLabel,
   getAuditActorSecondaryLabel,
-  getAuditCategoryLabel,
   getAuditTargetLabel,
   type ActivityDayGroup,
   type ActivityRowDetails,
 } from "@/lib/activity-log-utils";
-import { ACTION_TONES, ActivityKindIcon, type ActivityEntryLike } from "./ActivityLogParts";
+import { ActivityKindIcon, ActivityKindLabel, type ActivityEntryLike } from "./ActivityLogParts";
 
 export type ActivityTableEntry = ActivityEntryLike & { id: string | number };
 
@@ -53,10 +50,12 @@ export function ActivityTable<T extends ActivityTableEntry>({
   dayCounts,
   onSelect,
 }: ActivityTableProps<T>) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  useStickyAtScrollEdge(shellRef);
   const columnCount = 3 + (showTarget ? 1 : 0) + (showOrganization ? 1 : 0) + 1;
 
   return (
-    <div className="dg-activity-table-shell" data-settings-table-layout="available">
+    <div ref={shellRef} className="dg-activity-table-shell" data-settings-table-layout="available">
       <Table scrollable={false} className="dg-activity-table">
         <TableHeader>
           <TableRow className="dg-activity-head-row hover:bg-transparent">
@@ -110,11 +109,43 @@ export function ActivityTable<T extends ActivityTableEntry>({
   );
 }
 
+/**
+ * A sticky heading stops at the scroll container's padding edge, so rows that
+ * scroll past would still show in that padding above it. Pulling the sticky
+ * offset up by the padding pins the heading flush to the visible top.
+ */
+function useStickyAtScrollEdge(shellRef: React.RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    let scroller = shell.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement;
+    }
+    if (!scroller) return;
+    const container = scroller;
+    const update = () => {
+      const padding = parseFloat(getComputedStyle(container).paddingTop) || 0;
+      shell.style.setProperty("--dg-activity-sticky-top", `${-padding}px`);
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [shellRef]);
+}
+
 function DayCount({ count }: { count: number }) {
   return (
-    <span className="dg-activity-day-count">
-      {count} {count === 1 ? "event" : "events"}
-    </span>
+    <>
+      <span className="dg-activity-day-separator" aria-hidden>
+        ·
+      </span>
+      <span className="dg-activity-day-count">
+        {count} {count === 1 ? "event" : "events"}
+      </span>
+    </>
   );
 }
 
@@ -158,12 +189,7 @@ function ActivityRow<T extends ActivityTableEntry>({
         <div className="dg-activity-main">
           <ActivityKindIcon action={entry.action} />
           <div className="min-w-0">
-            <div
-              className="dg-activity-kind"
-              data-tone={ACTION_TONES[getActionSeverity(entry.action)]}
-            >
-              {getAuditCategoryLabel(entry.action)}
-            </div>
+            <ActivityKindLabel action={entry.action} />
             <div className="dg-activity-description">{description}</div>
             <ActivityRowDetailLines {...rowDetails} />
             <div className="dg-activity-context md:hidden">
@@ -175,11 +201,7 @@ function ActivityRow<T extends ActivityTableEntry>({
       </TableCell>
 
       <TableCell className="dg-activity-cell dg-activity-cell--identity hidden md:table-cell">
-        <ActivityIdentity
-          primary={actorLabel}
-          secondary={getAuditActorSecondaryLabel(entry)}
-          withAvatar
-        />
+        <ActivityIdentity primary={actorLabel} secondary={getAuditActorSecondaryLabel(entry)} />
       </TableCell>
 
       {showTarget && (
@@ -240,23 +262,9 @@ function ActivityRowDetailLines({ change, details }: ActivityRowDetails) {
   );
 }
 
-function ActivityIdentity({
-  primary,
-  secondary,
-  withAvatar = false,
-}: {
-  primary: string;
-  secondary?: string | null;
-  /** Only the actor is always a person; the affected item often isn't. */
-  withAvatar?: boolean;
-}) {
+function ActivityIdentity({ primary, secondary }: { primary: string; secondary?: string | null }) {
   return (
     <div className="dg-activity-identity">
-      {withAvatar && (
-        <span className="dg-activity-avatar" aria-hidden>
-          {getAvatarInitials(primary)}
-        </span>
-      )}
       <MaybeHint content={secondary && secondary !== primary ? secondary : null}>
         <span className="dg-activity-identity-primary">{primary}</span>
       </MaybeHint>

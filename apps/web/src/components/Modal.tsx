@@ -11,6 +11,8 @@ interface ModalProps {
   title: string;
   /** A muted line under the title, such as who the dialog is about. */
   subtitle?: string;
+  /** Richer header content shown in place of the title text; `title` still names the dialog. */
+  heading?: React.ReactNode;
   /** Shows a back button before the title, for a dialog with steps. */
   onBack?: () => void;
   onClose: () => void;
@@ -37,6 +39,7 @@ interface ModalProps {
 export default function Modal({
   title,
   subtitle,
+  heading,
   onBack,
   onClose,
   children,
@@ -119,10 +122,12 @@ export default function Modal({
                     <ChevronLeft size={20} strokeWidth={2.25} aria-hidden="true" />
                   </button>
                 ) : null}
-                <div className="dg-modal-titles">
-                  <span className="dg-modal-title">{title}</span>
-                  {subtitle ? <span className="dg-modal-subtitle">{subtitle}</span> : null}
-                </div>
+                {heading ?? (
+                  <div className="dg-modal-titles">
+                    <span className="dg-modal-title">{title}</span>
+                    {subtitle ? <span className="dg-modal-subtitle">{subtitle}</span> : null}
+                  </div>
+                )}
               </div>
               {showCloseButton ? (
                 <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />

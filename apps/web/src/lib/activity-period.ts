@@ -60,7 +60,10 @@ export function shiftActivityPeriod(period: ActivityPeriod, delta: -1 | 1): Acti
   return getActivityPeriod("month", addMonthsToIsoDate(period.startDate, delta));
 }
 
-export function isDateInPeriod(period: ActivityPeriod, isoDate: string): boolean {
+export function isDateInPeriod(
+  period: Pick<ActivityPeriod, "startDate" | "endDate">,
+  isoDate: string,
+): boolean {
   return isoDate >= period.startDate && isoDate <= period.endDate;
 }
 

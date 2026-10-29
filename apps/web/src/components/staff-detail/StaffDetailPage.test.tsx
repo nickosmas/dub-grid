@@ -49,6 +49,8 @@ vi.mock("@/features/employees/client", () => ({
 
 vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(async () => []),
+  fetchShiftPreferences: vi.fn(async () => []),
+  fetchJobPreferences: vi.fn(async () => []),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
@@ -57,13 +59,6 @@ vi.mock("@/components/ProgressBar", () => ({
   ),
 }));
 
-vi.mock("@/components/settings/SettingsShell", () => ({
-  SettingsShell: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="staff-detail-shell">{children}</div>
-  ),
-}));
-
-vi.mock("./StaffDetailHeader", () => ({ StaffDetailHeader: () => <div /> }));
 vi.mock("./EmployeeStatusActions", () => ({
   EmployeeStatusActions: () => <div />,
   StatusCardActions: () => <div />,
@@ -169,6 +164,8 @@ const JOINED_DAY = new Date(employee.joinedAt).toLocaleDateString(undefined, {
   day: "numeric",
 });
 
+const findPage = () => screen.findByRole("heading", { level: 1, name: "Ada Lovelace" });
+
 function renderPage(employeeId = "emp-2") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -181,6 +178,7 @@ function renderPage(employeeId = "emp-2") {
 describe("StaffDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of [...searchParams.keys()]) searchParams.delete(key);
     vi.mocked(usePermissions).mockReturnValue(permissions as never);
     vi.mocked(useOrganizationData).mockReturnValue(organizationData() as never);
     vi.mocked(useDirectory).mockReturnValue({
@@ -193,7 +191,7 @@ describe("StaffDetailPage", () => {
 
   it("renders another person's profile after one load", async () => {
     renderPage();
-    expect(await screen.findByTestId("staff-detail-shell")).toBeInTheDocument();
+    expect(await findPage()).toBeInTheDocument();
     expect(fetchEmployeeById).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -202,12 +200,12 @@ describe("StaffDetailPage", () => {
     vi.mocked(fetchEmployeeById).mockResolvedValue({ ...employee, userId: "user-me" } as never);
     renderPage();
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/profile"));
-    expect(screen.queryByTestId("staff-detail-shell")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   });
 
   it("keeps the rendered profile when the org label maps are rebuilt", async () => {
     const { rerender } = renderPage();
-    await screen.findByTestId("staff-detail-shell");
+    await findPage();
 
     vi.mocked(useOrganizationData).mockReturnValue(organizationData() as never);
     rerender(
@@ -216,11 +214,11 @@ describe("StaffDetailPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByTestId("staff-detail-shell")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Ada Lovelace" })).toBeInTheDocument();
     expect(fetchEmployeeById).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the record card on the Profile section, joined date included", async () => {
+  it("shows the record card beside the tabs, joined date included", async () => {
     renderPage();
 
     expect(await screen.findByText("Record")).toBeInTheDocument();
@@ -237,6 +235,7 @@ describe("StaffDetailPage", () => {
     } as never);
     renderPage();
 
+    fireEvent.click(await screen.findByRole("button", { name: "Edit work details" }));
     fireEvent.click(await screen.findByRole("button", { name: "Save details" }));
 
     await waitFor(() => expect(updateEmployee).toHaveBeenCalledTimes(1));
@@ -324,6 +323,7 @@ describe("StaffDetailPage", () => {
     };
 
     function renderWith(overrides: Record<string, unknown>) {
+      searchParams.set("tab", "access");
       vi.mocked(usePermissions).mockReturnValue({ ...permissions, ...overrides } as never);
       vi.mocked(useOrganizationData).mockReturnValue({
         ...organizationData(),

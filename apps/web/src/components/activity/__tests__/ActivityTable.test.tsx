@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ActivityTable, type ActivityTableEntry } from "@/components/activity/ActivityTable";
 import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { describeShiftChange } from "@dubgrid/schedule-core";
 import { groupByDay } from "@/lib/activity-log-utils";
 
 const NEW_YORK = "America/New_York";
@@ -120,6 +121,37 @@ describe("ActivityTable", () => {
 });
 
 describe("ActivityDetailsDialog", () => {
+  it("keeps a correction's reason beside its Before and After", () => {
+    const day = {
+      kind: "shift" as const,
+      key: "1:10",
+      shiftName: "Day Shift",
+      jobName: "Supervisor",
+      focusAreaName: null,
+      start: "07:00",
+      end: "15:00",
+    };
+    render(
+      <ActivityDetailsDialog
+        entry={entry({
+          id: "a",
+          action: "shift.corrected",
+          resourceType: "shift",
+          details: { reason: "Called off" },
+          shiftChange: describeShiftChange(
+            { items: [day] },
+            { items: [{ ...day, start: "07:00", end: "11:00" }] },
+            { date: "2026-09-05" },
+          ),
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Reason")).toBeInTheDocument();
+    expect(screen.getByText("Called off")).toBeInTheDocument();
+  });
+
   it("times the event in the organization's zone", () => {
     render(
       <ActivityDetailsDialog
@@ -136,11 +168,10 @@ describe("ActivityDetailsDialog", () => {
     const { unmount } = render(
       <ActivityDetailsDialog entry={entry({ id: "a" })} onClose={vi.fn()} />,
     );
-    expect(screen.queryByText("Organization")).toBeNull();
+    expect(screen.queryByText("Calm Haven")).toBeNull();
     unmount();
 
     render(<ActivityDetailsDialog entry={entry({ id: "a" })} onClose={vi.fn()} showOrganization />);
-    expect(screen.getByText("Organization")).toBeInTheDocument();
     expect(screen.getByText("Calm Haven")).toBeInTheDocument();
   });
 

@@ -34,12 +34,15 @@ describe("ActivityDetailsDialog", () => {
     const dialog = screen.getByRole("dialog", { name: "Activity details" });
     expect(dialog).toHaveClass("dg-activity-details-modal");
 
-    const headline = within(dialog).getByText("Changed a shift on Sep 5, 2026");
+    // The header leads with the event: its kind, then the headline, then when.
+    const headline = within(dialog).getByRole("heading", {
+      level: 2,
+      name: "Changed a shift on Sep 5, 2026",
+    });
     expect(headline).toHaveClass("dg-activity-details-headline");
-
-    const categoryBadge = dialog.querySelector('[data-status-pill-variant="category"]');
-    expect(categoryBadge).toHaveTextContent("Schedule");
-    expect(categoryBadge?.parentElement).toHaveClass("dg-activity-details-summary");
+    const kind = within(dialog).getByText("Schedule");
+    expect(kind).toHaveClass("dg-activity-kind");
+    expect(kind.parentElement).toHaveClass("dg-activity-details-titles");
 
     expect(within(dialog).getByText("Nic Kosmas")).toHaveClass(
       "dg-activity-details-identity-primary",
@@ -52,7 +55,8 @@ describe("ActivityDetailsDialog", () => {
     ).not.toBeInTheDocument();
 
     expect(within(dialog).getByText("Affected")).toBeInTheDocument();
-    expect(within(dialog).getByText("Kind of change")).toBeInTheDocument();
+    // The header already names the kind, so no row repeats it.
+    expect(within(dialog).queryByText("Kind of change")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "What changed" })).toHaveClass(
       "dg-activity-details-changes",
     );
@@ -64,9 +68,9 @@ describe("ActivityDetailsDialog", () => {
       readFileSync(path.resolve(__dirname, "../../../app/globals.css"), "utf8") +
       readFileSync(path.resolve(__dirname, "../../../app/app-ui.css"), "utf8");
 
-    expect(css).toMatch(/\.dg-activity-details-summary\s*\{[\s\S]*?align-items:\s*flex-start;/);
+    expect(css).toMatch(/\.dg-activity-details-heading\s*\{[\s\S]*?align-items:\s*flex-start;/);
     expect(css).toMatch(
-      /\.dg-activity-details-headline\s*\{[\s\S]*?font-size:\s*var\(--dg-type-component-heading-size\);/,
+      /\.dg-activity-details-headline\s*\{[\s\S]*?font-size:\s*var\(--dg-fs-heading\);/,
     );
     expect(css).toMatch(
       /\.dg-activity-details-label\s*\{[\s\S]*?font-weight:\s*var\(--dg-type-field-title-weight\);/,

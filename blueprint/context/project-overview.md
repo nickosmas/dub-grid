@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 54 are
-shipped. Item 40 is in progress.
+shipped. Items 40 and 55 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -89,6 +89,7 @@ shipped. Item 40 is in progress.
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 | 53   | Shipped     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
 | 54   | Shipped     | People away or absent all period sit last in their section, under a group row that folds.                                       |
+| 55   | In progress | One staff page holds everything stored about a person, in tabs that follow one chosen period.                                   |
 
 Item 40 is split:
 
@@ -510,6 +511,39 @@ their section under a group row "Away all period · 2" that folds; folded, it
 names each person and why. The day off absence alone doesn't count, the
 group starts open, and each viewer's browser remembers folding it (owner
 decisions, 2026-10-28).
+
+Item 55, one staff page, is in progress. The People detail page becomes one page
+holding everything stored about a person, replacing the separate Profile,
+Overview and Activity sections: a header with the back link, avatar, name
+with the access star, employee ID, No app access and Send invite when they
+have no access, and previous and next person; a left column of Contact, Work
+details and Record cards; the status card unchanged; and tabs for Overview,
+Shifts, Time off, Requests, Recurring, Access and Activity. One period
+(Current week, Pay period, This month, Last 12 weeks or Custom, up to a year)
+applies to every tab that covers time. Shifts and jobs are spelled out. Web
+only; the app is unchanged (owner decisions, 2026-10-29). Design reference:
+the inline prototypes approved that day.
+
+Item 55 is split:
+
+- **55a - The page, its tabs and the period:** shipped; the header, the left
+  column (Edit opens the existing editor), the status card, tabs for
+  Overview, Recurring, Access and Activity with today's content moved in,
+  and the period control beside the tabs; Custom opens the app's date range
+  picker. Reports and this page share one range helper, each viewer's browser remembers the choice, and old
+  `?section=` links open the matching tab.
+- **55b - Previous and next person:** shipped; arrows and "7 of 37" follow
+  the People list's last filter and sort, name who's next on hover, and hide
+  when the page was opened without a list.
+- **55c - Overview:** planned; stats for the period, This week, Waiting on
+  you, Next time off, and a What they work donut by shift and job in place
+  of the Assignments bar.
+- **55d - Shifts:** planned; every shift record in the period with its
+  state, what it was and schedule notes, a total and CSV export.
+- **55e - Time off:** planned; absences and time away in the period,
+  planned, now or taken, with day off absences hidden unless shown.
+- **55f - Requests:** planned; pickups, swaps, call-offs and profile change
+  requests involving them in the period, with state and who decided.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

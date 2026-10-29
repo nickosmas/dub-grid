@@ -126,14 +126,12 @@ vi.mock("@/features/organization/client", () => ({
 
 vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn(),
+  fetchShiftPreferences: vi.fn(async () => []),
+  fetchJobPreferences: vi.fn(async () => []),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
   default: ({ loading }: { loading?: boolean }) => (loading ? <div>Loading...</div> : null),
-}));
-
-vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
-  StaffDetailHeader: () => <div>Personal details header</div>,
 }));
 
 vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
@@ -164,19 +162,19 @@ let lastEditEmployeePanelSaveWithReinvite:
     ) => void | Promise<void>)
   | null = null;
 let lastEditEmployeePanelPendingInvitation: unknown = undefined;
-let lastEditEmployeePanelPersistent = false;
+let lastEditEmployeePanelHideActions = false;
 
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: (props: {
     onSave: (updatedEmployee: unknown) => void | Promise<void>;
     onSaveWithReinvite?: (updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>;
     pendingInvitation?: unknown;
-    persistent?: boolean;
+    hideActions?: boolean;
   }) => {
     lastEditEmployeePanelSave = props.onSave;
     lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
     lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
-    lastEditEmployeePanelPersistent = props.persistent ?? false;
+    lastEditEmployeePanelHideActions = props.hideActions ?? false;
     return <div>Edit details form</div>;
   },
 }));
@@ -232,6 +230,11 @@ function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): Director
     isManagementUser: false,
     ...overrides,
   } as DirectoryPerson;
+}
+
+async function openDetailsEditor() {
+  fireEvent.click(await screen.findByRole("button", { name: "Edit work details" }));
+  return screen.findByRole("dialog", { name: "Edit details" });
 }
 
 const mockEmployee = makeEmployee({
@@ -325,6 +328,73 @@ describe("StaffDetailPage", () => {
     vi.unstubAllGlobals();
   });
 
+  describe("previous and next person", () => {
+    function saveOrder(ids: string[]) {
+      window.sessionStorage.setItem("dg-people-order", JSON.stringify({ orgId: "org-1", ids }));
+    }
+    function directoryOf(...people: Array<[string, string, string | null]>) {
+      mockUseDirectory.mockReturnValue({
+        directory: people.map(([employeeId, firstName, userId]) =>
+          makeDirectoryPerson({
+            personId: employeeId,
+            employeeId,
+            firstName,
+            lastName: "Lane",
+            userId,
+          }),
+        ),
+        loading: false,
+        error: null,
+      });
+    }
+
+    afterEach(() => window.sessionStorage.clear());
+
+    it("steps through the People list's order, keeping the open tab", async () => {
+      saveOrder(["emp-0", "emp-1", "emp-2"]);
+      directoryOf(["emp-0", "Ann", null], ["emp-1", "Margaret", null], ["emp-2", "Cal", null]);
+      mockSearchParams = new URLSearchParams("tab=activity");
+
+      render(<StaffDetailPage employeeId="emp-1" />);
+
+      const pager = within(await screen.findByRole("group", { name: "Move between people" }));
+      expect(pager.getByText("2 of 3")).toBeInTheDocument();
+      fireEvent.click(pager.getByRole("button", { name: "Next: Cal Lane" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-2?tab=activity");
+      fireEvent.click(pager.getByRole("button", { name: "Previous: Ann Lane" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-0?tab=activity");
+    });
+
+    it("stops at the ends and steps over your own record", async () => {
+      saveOrder(["emp-me", "emp-1", "emp-2"]);
+      directoryOf(["emp-me", "Viewer", "viewer-user-id"], ["emp-1", "Margaret", null]);
+
+      render(<StaffDetailPage employeeId="emp-1" />);
+
+      const pager = within(await screen.findByRole("group", { name: "Move between people" }));
+      expect(pager.getByText("1 of 2")).toBeInTheDocument();
+      expect(pager.getByRole("button", { name: "Previous person" })).toBeDisabled();
+      fireEvent.click(pager.getByRole("button", { name: "Next person" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-2");
+    });
+
+    it("offers no arrows without a saved list, or for someone not in it", async () => {
+      render(<StaffDetailPage employeeId="emp-1" />);
+      await screen.findByText("Work details");
+      expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
+    });
+
+    it("ignores a list saved for another organization", async () => {
+      window.sessionStorage.setItem(
+        "dg-people-order",
+        JSON.stringify({ orgId: "org-2", ids: ["emp-0", "emp-1"] }),
+      );
+      render(<StaffDetailPage employeeId="emp-1" />);
+      await screen.findByText("Work details");
+      expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
+    });
+  });
+
   it("redirects to /people when employee detail access is denied", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: false,
@@ -345,13 +415,16 @@ describe("StaffDetailPage", () => {
     expect(mockedFetchEmployeeInvitations).not.toHaveBeenCalled();
   });
 
-  it("defaults to the overview section", async () => {
+  it("opens on the Overview tab beside the person's cards", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Work details")).toBeInTheDocument();
-    expect(screen.getByText("Personal details header")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Margaret Sullivan" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Work details")).toBeInTheDocument();
+    expect(screen.getByText("Overview content")).toBeInTheDocument();
     expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
   it("bounds the staff Overview shift load to the shared twelve-week metrics window", async () => {
@@ -369,32 +442,75 @@ describe("StaffDetailPage", () => {
     );
   });
 
-  it("uses a flat primary profile navigation with Activity in the footer", async () => {
+  it("offers a tab for each section the viewer can see, and switches by URL", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Work details")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Account" })).not.toBeInTheDocument();
-    expect(screen.queryByText("My work")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
-      "href",
-      "/people/emp-1?section=overview",
-    );
-    expect(screen.queryByRole("link", { name: "Schedule" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute(
-      "href",
-      "/people/emp-1?section=activity",
-    );
+    const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
+    expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Access",
+      "Activity",
+    ]);
+    expect(tabs.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(tabs.getByRole("button", { name: "Activity" }));
+    expect(mockReplace).toHaveBeenCalledWith("/people/emp-1?tab=activity", { scroll: false });
+    fireEvent.click(tabs.getByRole("button", { name: "Overview" }));
+    expect(mockReplace).toHaveBeenCalledWith("/people/emp-1", { scroll: false });
   });
 
-  it("maps a legacy Schedule link to Overview", async () => {
-    mockSearchParams = new URLSearchParams("section=schedule");
+  it("opens the tab a ?tab= link names", async () => {
+    mockSearchParams = new URLSearchParams("tab=activity");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByText("Activity panel")).toBeInTheDocument();
+    expect(screen.queryByText("Overview content")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["schedule", "/people/emp-1"],
+    ["overview", "/people/emp-1"],
+    ["profile", "/people/emp-1"],
+    ["activity", "/people/emp-1?tab=activity"],
+  ])("sends an old ?section=%s link to its tab", async (section, href) => {
+    mockSearchParams = new URLSearchParams(`section=${section}`);
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(href));
+  });
+
+  it("falls back to Overview for a tab the viewer can't see", async () => {
+    mockSearchParams = new URLSearchParams("tab=recurring");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Overview content")).toBeInTheDocument();
+    expect(screen.queryByText("Recurring schedule card")).not.toBeInTheDocument();
   });
 
-  it("shows recurring schedules in Overview only when permitted", async () => {
+  it("keeps Activity away from a viewer who can't read it", async () => {
+    mockUsePermissions.mockReturnValue({
+      role: "user",
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: false,
+      canManageEmployees: false,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockSearchParams = new URLSearchParams("tab=activity");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByText("Overview content")).toBeInTheDocument();
+    const tabs = within(screen.getByRole("group", { name: "Person sections" }));
+    expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
+  });
+
+  it("shows recurring schedules on the Recurring tab when permitted", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,
       canViewRecurringShifts: true,
@@ -404,19 +520,21 @@ describe("StaffDetailPage", () => {
       isLoading: false,
       orgId: "org-1",
     });
-    mockSearchParams = new URLSearchParams("section=overview");
+    mockSearchParams = new URLSearchParams("tab=recurring");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Recurring schedule card")).toBeInTheDocument();
+    expect(await screen.findByText("Shift preferences")).toBeInTheDocument();
+    expect(await screen.findByText("Any shift")).toBeInTheDocument();
   });
 
-  it("uses a focused sidebar instead of an actions menu", async () => {
+  it("keeps the editor in a popup and the status and invitation on the page", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
 
     expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
-    expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
     // Once in the banner, once as the Record card's account state.
     expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
@@ -453,8 +571,8 @@ describe("StaffDetailPage", () => {
     });
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
-    expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    const dialog = await openDetailsEditor();
+    expect(within(dialog).getByText("Edit details form")).toBeInTheDocument();
   });
 
   it("shows management access controls and invite flows in the detail page", async () => {
@@ -531,6 +649,7 @@ describe("StaffDetailPage", () => {
       loading: false,
     });
 
+    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
     expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
@@ -545,13 +664,17 @@ describe("StaffDetailPage", () => {
     expect(within(dialog).getByText("Management access editor")).toBeInTheDocument();
   });
 
-  it("keeps the work-details form focused on biodata, without invite UI leaking in", async () => {
+  it("keeps the details editor focused on biodata, without invite UI leaking in", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    expect(await screen.findByRole("link", { name: "Back to People" })).toHaveAttribute(
+      "href",
+      "/people",
+    );
+    const dialog = await openDetailsEditor();
 
-    expect(screen.getByText("Edit details form")).toBeInTheDocument();
-    expect(lastEditEmployeePanelPersistent).toBe(true);
-    expect(screen.getByRole("link", { name: "Back to People" })).toHaveAttribute("href", "/people");
+    expect(within(dialog).getByText("Edit details form")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(lastEditEmployeePanelHideActions).toBe(true);
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();
   });
@@ -585,13 +708,32 @@ describe("StaffDetailPage", () => {
       error: null,
     });
 
+    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
 
-    expect(screen.getByText("Access")).toBeInTheDocument();
+    expect(
+      screen.getByText("Organization role and the permissions it carries."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Role")).toBeInTheDocument();
     // Not a management user, so the management card stays away entirely.
     expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+  });
+
+  it("says someone has no app access, and offers an invite where they can be invited", async () => {
+    mockSearchParams = new URLSearchParams("tab=access");
+    mockedFetchEmployeeInvitations.mockResolvedValue([]);
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+    await screen.findByText("Work details");
+
+    // Once as the header pill and once as the Access tab's empty state.
+    expect(screen.getAllByText("No app access")).toHaveLength(2);
+    expect(
+      screen.getByText("They can't sign in until they accept an invitation."),
+    ).toBeInTheDocument();
+    // In the header and in the empty state.
+    expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(2);
   });
 
   it("leaves the role out of the management card, which now covers departments only", async () => {
@@ -621,6 +763,7 @@ describe("StaffDetailPage", () => {
       error: null,
     });
 
+    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Work details");
 
@@ -631,7 +774,7 @@ describe("StaffDetailPage", () => {
 
   it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await openDetailsEditor();
 
     if (!lastEditEmployeePanelSave) {
       throw new Error("Expected EditEmployeePanel to receive onSave");
@@ -651,7 +794,7 @@ describe("StaffDetailPage", () => {
 
   it("shows the plain saved toast when the email is unchanged, even with a pending invitation present", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await openDetailsEditor();
 
     if (!lastEditEmployeePanelSave) {
       throw new Error("Expected EditEmployeePanel to receive onSave");
@@ -668,7 +811,7 @@ describe("StaffDetailPage", () => {
 
   it("passes the live pending invitation and a reinvite handler into EditEmployeePanel", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await openDetailsEditor();
 
     expect(lastEditEmployeePanelPendingInvitation).toMatchObject({
       id: "invite-1",
@@ -692,7 +835,7 @@ describe("StaffDetailPage", () => {
     );
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await openDetailsEditor();
 
     if (!lastEditEmployeePanelSaveWithReinvite) {
       throw new Error("Expected EditEmployeePanel to receive onSaveWithReinvite");
@@ -745,7 +888,8 @@ describe("StaffDetailPage", () => {
     // canViewEmployeeDetails can be granted without canManageEmployees (a
     // per-person admin permission bit) — that viewer must see the read-only
     // summary, never the live editable form.
-    expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit work details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit contact" })).not.toBeInTheDocument();
     expect(screen.getByText("Employment")).toBeInTheDocument();
   });
 

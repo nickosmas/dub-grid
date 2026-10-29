@@ -75,9 +75,10 @@ describe("AuditLogView", () => {
     expect(within(dialog).queryByText("Stripe Event Type")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Customer Subscription Deleted")).not.toBeInTheDocument();
     expect(within(dialog).getByText("No additional details were recorded.")).toBeInTheDocument();
-    expect(within(dialog).getByText("Item")).toBeInTheDocument();
-    expect(within(dialog).getByText("Organization")).toBeInTheDocument();
-    expect(within(dialog).getByText("Acme Health")).toBeInTheDocument();
+    // The platform-wide view names the organization in the header, before the time.
+    expect(within(dialog).getByText("Acme Health").parentElement).toHaveClass(
+      "dg-activity-details-meta",
+    );
     expect(screen.queryByText("Billing sub_123")).not.toBeInTheDocument();
     expect(screen.queryByText("sub_123")).not.toBeInTheDocument();
     expect(screen.queryByText("billing.subscription_canceled")).not.toBeInTheDocument();

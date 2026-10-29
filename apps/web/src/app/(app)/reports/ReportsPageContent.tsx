@@ -17,6 +17,14 @@ import SetupGuard from "@/components/SetupGuard";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { useClientFeatureFlags, useOrganizationData, usePermissions } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import {
+  addDays,
+  buildPeriodOptions,
+  getWeekStart,
+  parseIsoDate,
+  resolvePeriodPreset,
+  toIsoDate,
+} from "@/lib/period-presets";
 import { queryKeys } from "@/lib/query-keys";
 import {
   REPORT_OPTIONS,
@@ -37,7 +45,8 @@ import {
   formatReportCellForDisplay,
 } from "@/features/reports/shared/table";
 
-type QuickRange = "current-week" | "pay-period" | "custom";
+const REPORT_PERIODS = ["current-week", "pay-period", "custom"] as const;
+type QuickRange = (typeof REPORT_PERIODS)[number];
 type ReportTargetControl =
   "people" | "focusAreas" | "shiftCategories" | "jobs" | "indicators" | "dates";
 type ReportUiMetadata = {
@@ -46,16 +55,6 @@ type ReportUiMetadata = {
 };
 
 type TargetEmployeeOption = OperationsReportPayload["filterOptions"]["employees"][number];
-
-const QUICK_RANGES: Array<{ value: QuickRange; label: string }> = [
-  { value: "current-week", label: "Current week" },
-  { value: "pay-period", label: "Pay period" },
-  { value: "custom", label: "Custom" },
-];
-
-const QUICK_RANGE_LABELS = new Map<QuickRange, string>(
-  QUICK_RANGES.map((option) => [option.value, option.label]),
-);
 
 const EMPTY_REPORT_FILTERS: OperationsReportFilters = {
   employeeIds: [],
@@ -122,33 +121,6 @@ const REPORT_UI_METADATA: Record<OperationsReportType, ReportUiMetadata> = {
   },
 };
 
-function toIsoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-// NOTE: These date helpers are intentionally UTC-based and distinct from the
-// local-time `getWeekStart`/`addDays` in `@/lib/utils`. The entire reports date
-// pipeline runs on UTC ISO strings (`toIsoDate` -> `toISOString`, `parseIsoDate`,
-// and every formatter passes `timeZone: "UTC"`), so week math must also be UTC —
-// using the local-time shared helpers would shift the resulting ISO date by the
-// viewer's timezone offset. Do not replace with the `@/lib/utils` versions.
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function getWeekStart(date: Date): Date {
-  const start = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  start.setUTCDate(start.getUTCDate() - start.getUTCDay());
-  return start;
-}
-
-function parseIsoDate(date: string): Date | null {
-  const parsed = new Date(`${date}T00:00:00.000Z`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
 function formatDateLabel(date: string): string {
   const parsed = parseIsoDate(date);
   if (!parsed) return date || "Choose date";
@@ -160,85 +132,12 @@ function formatDateLabel(date: string): string {
   }).format(parsed);
 }
 
-function formatCompactRangeLabel(range: OperationsReportRange): string {
-  const start = parseIsoDate(range.startDate);
-  const end = parseIsoDate(range.endDate);
-  if (!start || !end) return `${range.startDate} - ${range.endDate}`;
-  const includeYear = start.getUTCFullYear() !== end.getUTCFullYear();
-  const dateOptions: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  };
-  if (includeYear) {
-    dateOptions.year = "numeric";
-  }
-  const formatter = new Intl.DateTimeFormat("en-US", dateOptions);
-  return `${formatter.format(start)} - ${formatter.format(end)}`;
-}
-
 function getDefaultRange(): OperationsReportRange {
   const start = getWeekStart(new Date());
   return {
     startDate: toIsoDate(start),
     endDate: toIsoDate(addDays(start, 6)),
   };
-}
-
-function resolveQuickRange(
-  quickRange: QuickRange,
-  payPeriodStartDate: string | null | undefined,
-): OperationsReportRange | null {
-  const weekStart = getWeekStart(new Date());
-  if (quickRange === "current-week") {
-    return {
-      startDate: toIsoDate(weekStart),
-      endDate: toIsoDate(addDays(weekStart, 6)),
-    };
-  }
-  if (quickRange === "pay-period") {
-    return resolveCurrentPayPeriodRangeLocal(payPeriodStartDate);
-  }
-  return null;
-}
-
-function resolveCurrentPayPeriodRangeLocal(
-  anchorDate: string | null | undefined,
-): OperationsReportRange | null {
-  if (!anchorDate) return null;
-  const anchor = new Date(`${anchorDate}T00:00:00.000Z`);
-  if (Number.isNaN(anchor.getTime())) return null;
-  const today = new Date();
-  const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-  const diffDays = Math.floor((todayUtc.getTime() - anchor.getTime()) / 86_400_000);
-  const periodStart = addDays(anchor, Math.floor(diffDays / 14) * 14);
-  return {
-    startDate: toIsoDate(periodStart),
-    endDate: toIsoDate(addDays(periodStart, 13)),
-  };
-}
-
-function buildQuickRangeOptions(
-  range: OperationsReportRange,
-  payPeriodStartDate: string | null | undefined,
-  customRangeSelected: boolean,
-): SelectOption<QuickRange>[] {
-  return QUICK_RANGES.map((option) => {
-    const baseLabel = QUICK_RANGE_LABELS.get(option.value) ?? option.label;
-    if (option.value === "custom" && !customRangeSelected) {
-      return {
-        value: option.value,
-        label: baseLabel,
-      };
-    }
-    const resolved =
-      option.value === "custom" ? range : resolveQuickRange(option.value, payPeriodStartDate);
-    const rangeLabel = resolved ? formatCompactRangeLabel(resolved) : "not set";
-    return {
-      value: option.value,
-      label: `${baseLabel} (${rangeLabel})`,
-    };
-  });
 }
 
 function serializeFilters(filters: OperationsReportFilters): string {
@@ -492,7 +391,7 @@ function ReportsContent() {
     [org?.certificationLabel, org?.roleLabel],
   );
   const quickRangeOptions = useMemo(
-    () => buildQuickRangeOptions(range, org?.payPeriodStartDate, customRangeSelected),
+    () => buildPeriodOptions(REPORT_PERIODS, range, org?.payPeriodStartDate, customRangeSelected),
     [customRangeSelected, org?.payPeriodStartDate, range],
   );
 
@@ -527,7 +426,7 @@ function ReportsContent() {
     resetAppliedReport();
     if (nextQuickRange === "custom") return;
     setCustomRangeSelected(false);
-    const resolved = resolveQuickRange(nextQuickRange, org?.payPeriodStartDate);
+    const resolved = resolvePeriodPreset(nextQuickRange, org?.payPeriodStartDate);
     if (resolved) {
       updateRange(resolved);
       return;
@@ -535,7 +434,9 @@ function ReportsContent() {
     if (nextQuickRange === "pay-period") {
       toast.info("Set a pay period start date in Settings > Schedule Rules to use this range.");
       setQuickRange("current-week");
-      updateRange(resolveQuickRange("current-week", org?.payPeriodStartDate) ?? getDefaultRange());
+      updateRange(
+        resolvePeriodPreset("current-week", org?.payPeriodStartDate) ?? getDefaultRange(),
+      );
     }
   };
 

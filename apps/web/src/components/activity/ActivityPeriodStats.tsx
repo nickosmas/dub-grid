@@ -95,7 +95,7 @@ function StatBox({
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
             isBrand
               ? "bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]"
-              : "bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-subtle)]"
+              : "bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-secondary)]"
           }`}
         >
           {icon}

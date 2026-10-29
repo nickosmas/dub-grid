@@ -11,6 +11,8 @@ interface ActivityTabProps {
   loading: boolean;
   error: string | null;
   timeZone?: string | null;
+  /** The staff page's period, which the timeline follows. */
+  range?: { startDate: string; endDate: string; phrase: string };
 }
 
 export function ActivityTab({
@@ -19,6 +21,7 @@ export function ActivityTab({
   loading,
   error,
   timeZone = null,
+  range,
 }: ActivityTabProps) {
   return (
     <PersonActivityTimeline
@@ -26,6 +29,7 @@ export function ActivityTab({
       loading={loading}
       error={error}
       timeZone={timeZone}
+      range={range}
       categories={PERSON_ACTIVITY_CATEGORIES}
       emptyDescription={`Changes to ${getEmployeeDisplayName(employee)}'s profile, status, access, or invitations will show up here.`}
     />

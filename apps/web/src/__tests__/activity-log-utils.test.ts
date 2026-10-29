@@ -278,3 +278,23 @@ describe("formatActivityRowDetails", () => {
     });
   });
 });
+
+describe("paired from and to details", () => {
+  it("reads a status change as one Before and After row", () => {
+    const entry = makeEntry({
+      action: "employee.activated",
+      details: { note: "", toStatus: "active", fromStatus: "inactive", changedFields: ["status"] },
+    });
+
+    expect(formatDetails(entry)).toEqual([{ label: "Status", value: "Away → Active" }]);
+  });
+
+  it("keeps the changed-field list when nothing pairs", () => {
+    const entry = makeEntry({
+      action: "employee.last_day_cancelled",
+      details: { lastDay: "2026-10-29", changedFields: ["planned_status"] },
+    });
+
+    expect(formatDetails(entry).map((item) => item.label)).toContain("Changed");
+  });
+});
