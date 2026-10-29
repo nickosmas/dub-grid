@@ -2114,6 +2114,7 @@ export function MembersSection({
         <BulkImportModal
           orgId={orgId}
           focusAreas={focusAreas}
+          focusAreaLabel={focusAreaLabel}
           certifications={certifications}
           roles={roles}
           onClose={() => setShowImport(false)}

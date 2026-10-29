@@ -69,7 +69,7 @@ describe("ActivityTab", () => {
     renderTab();
 
     const table = screen.getByRole("table");
-    for (const name of ["Time", "Kind of change", "By", "Activity and changes"]) {
+    for (const name of ["Time", "Activity", "By"]) {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
     // The target is always this person, so naming it in every row is noise.

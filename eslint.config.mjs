@@ -10,6 +10,7 @@ import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
 import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
+import { noCopyStyleDrift } from "./eslint-rules/no-copy-style-drift.mjs";
 
 const tooltipPlugin = {
   rules: {
@@ -32,6 +33,7 @@ const copyPlugin = {
   rules: {
     "no-technical-user-copy": noTechnicalUserCopy,
     "no-raw-error-in-toast": noRawErrorInToast,
+    "no-copy-style-drift": noCopyStyleDrift,
   },
 };
 
@@ -214,7 +216,26 @@ const eslintConfig = defineConfig([
     rules: {
       "copy/no-technical-user-copy": "error",
       "copy/no-raw-error-in-toast": "error",
+      "copy/no-copy-style-drift": "error",
     },
+  },
+  {
+    // These name the focus area label itself (Settings > Labels, Gridmaster's
+    // organization setup and views, onboarding's labels step and the label
+    // validation), or speak about the product in general (legal and
+    // marketing pages), so "focus area" is the subject, not hardcoded copy.
+    files: [
+      "apps/web/src/components/settings/OrganizationLabels.tsx",
+      "apps/web/src/components/onboarding/steps/IdentityStep.tsx",
+      "apps/web/src/components/gridmaster/**/*.{ts,tsx}",
+      "apps/web/src/lib/organization-settings.ts",
+      "apps/web/src/app/api/organizations/settings/route.ts",
+      "apps/web/src/app/page.tsx",
+      "apps/web/src/app/privacy/**/*.{ts,tsx}",
+      "apps/web/src/app/terms/**/*.{ts,tsx}",
+    ],
+    plugins: { copy: copyPlugin },
+    rules: { "copy/no-copy-style-drift": ["error", { allowFocusArea: true }] },
   },
   {
     // Every mobile text goes through `shared/components/Text`, which applies

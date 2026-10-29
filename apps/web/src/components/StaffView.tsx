@@ -427,6 +427,7 @@ export default function StaffView({
                 assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
                 canManage={canManageRecurringShifts ?? false}
                 focusAreas={focusAreas}
+                focusAreaLabel={focusAreaLabel}
                 certifications={certifications}
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}

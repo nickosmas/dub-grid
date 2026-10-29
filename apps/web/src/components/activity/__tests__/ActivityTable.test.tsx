@@ -46,7 +46,7 @@ describe("ActivityTable", () => {
     renderTable([entry({ id: "a" })]);
 
     const table = screen.getByRole("table");
-    for (const name of ["Time", "Kind of change", "By", "Affected"]) {
+    for (const name of ["Time", "Activity", "By", "Affected"]) {
       expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
     }
     expect(within(table).queryByRole("columnheader", { name: "Organization" })).toBeNull();
@@ -76,9 +76,9 @@ describe("ActivityTable", () => {
     ]);
 
     expect(screen.getByText("Today")).toBeInTheDocument();
-    expect(screen.getByLabelText("2 events")).toHaveTextContent("2");
+    expect(screen.getByText("2 events")).toBeInTheDocument();
     expect(screen.getByText("Wednesday, September 2, 2026")).toBeInTheDocument();
-    expect(screen.getByLabelText("1 event")).toHaveTextContent("1");
+    expect(screen.getByText("1 event")).toBeInTheDocument();
   });
 
   it("shows the clock time in the organization's zone", () => {
@@ -102,6 +102,14 @@ describe("ActivityTable", () => {
     await user.keyboard(" ");
     expect(onSelect).toHaveBeenCalledTimes(3);
     expect(screen.queryByRole("button", { name: "View details" })).toBeNull();
+  });
+
+  it("names the kind of change above the headline", () => {
+    renderTable([entry({ id: "a" })]);
+
+    const row = screen.getByRole("row", { name: /Open details/ });
+    expect(within(row).getByText("Access & roles")).toHaveClass("dg-activity-kind");
+    expect(within(row).getByText("Changed Sam Rivera's role to Admin")).toBeInTheDocument();
   });
 
   it("repeats the actor under the description for narrow screens", () => {

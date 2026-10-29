@@ -1,4 +1,5 @@
 "use client";
+import { pluralLabelNoun } from "@dubgrid/domain";
 import { PencilLine, Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -502,6 +503,7 @@ function RecurringShiftPill({
 }
 
 export interface RecurringScheduleSectionProps {
+  focusAreaLabel?: string;
   employees: Employee[];
   orgId: string;
   currentUserId: string | null;
@@ -533,6 +535,7 @@ export function RecurringScheduleSection({
   absenceTypes = [],
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
+  focusAreaLabel = "Focus Areas",
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -1001,13 +1004,13 @@ export function RecurringScheduleSection({
 
   const focusAreaOptions: SelectOption<number | "">[] = useMemo(
     () => [
-      { value: "" as const, label: "All Focus Areas" },
+      { value: "" as const, label: `All ${pluralLabelNoun(focusAreaLabel)}` },
       ...focusAreas.map((focusArea) => ({
         value: focusArea.id,
         label: focusArea.name,
       })),
     ],
-    [focusAreas],
+    [focusAreas, focusAreaLabel],
   );
 
   const activeCellEmp = activeCell

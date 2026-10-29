@@ -2483,7 +2483,7 @@ function JobRow({
                 margin: 0,
               }}
             >
-              Select at least one focus area.
+              {`Select at least one ${singularLabelNoun(focusAreaLabel)}.`}
             </p>
           ) : null}
 
@@ -2926,8 +2926,7 @@ export default function JobsSettings({
             lineHeight: 1.45,
           }}
         >
-          Create at least one scheduled department with a focus area and shift before adding
-          scheduled jobs.
+          {`Create at least one scheduled department with a ${singularLabelNoun(focusAreaLabel)} and shift before adding scheduled jobs.`}
         </div>
       ) : null}
 

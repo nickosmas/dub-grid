@@ -13,6 +13,7 @@ import {
   addDaysToIsoDate,
   formatDate,
   formatShiftChangeCompact,
+  formatShiftChangeCompactSides,
   getIsoDateInTimeZone,
 } from "@dubgrid/schedule-core";
 import {
@@ -128,6 +129,21 @@ export function formatDetails(entry: ActivityEntryLike & { action: string }): De
     : ALWAYS_SUPPRESSED_DETAIL_KEYS;
 
   return flattenDetails(details, { skipKeys });
+}
+
+export interface ActivityRowDetails {
+  /** A shift edit's Before and After, set apart for the table to draw. */
+  change: { before: string | null; after: string } | null;
+  /** Every other detail; formatDetails lists the change first. */
+  details: DetailItem[];
+}
+
+export function formatActivityRowDetails(
+  entry: ActivityEntryLike & { action: string },
+): ActivityRowDetails {
+  const details = formatDetails(entry);
+  const change = entry.shiftChange ? formatShiftChangeCompactSides(entry.shiftChange) : null;
+  return { change, details: change ? details.slice(1) : details };
 }
 
 /** Compact inline summary for a table cell. */

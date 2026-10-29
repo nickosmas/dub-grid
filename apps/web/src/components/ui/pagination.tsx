@@ -108,7 +108,7 @@ export function Pagination({
                   aria-hidden="true"
                   className="w-4 text-center text-[length:var(--dg-fs-caption)] select-none"
                 >
-                  &hellip;
+                  ...
                 </span>
               ) : (
                 <Button
