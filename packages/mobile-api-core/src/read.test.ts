@@ -237,7 +237,7 @@ describe("loadMobilePeoplePayload", () => {
     expect(regular.people[0]).toMatchObject({
       employeeNumber: 0,
       employmentType: "full_time",
-      seniority: 0,
+      seniority: 3,
       statusChangedAt: null,
       awayAbsenceTypeId: null,
       suspendedAt: null,

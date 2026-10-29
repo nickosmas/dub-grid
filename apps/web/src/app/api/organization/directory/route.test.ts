@@ -119,7 +119,6 @@ describe("GET /api/organization/directory", () => {
     expect(coworker).toMatchObject({
       userId: null,
       employeeNumber: null,
-      seniority: null,
       invitationStatus: null,
       membershipUpdatedAt: null,
       email: "",

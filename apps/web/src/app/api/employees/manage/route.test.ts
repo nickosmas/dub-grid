@@ -367,7 +367,7 @@ describe("POST /api/employees/manage", () => {
           employmentType: "full_time",
           statusChangedAt: null,
           statusNote: "",
-          seniority: 0,
+          seniority: 4,
           phone: "",
           email: "",
           contactNotes: "",
@@ -1031,7 +1031,6 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
   ];
 
   let internalIds: string[] = [];
-  const employeeOrder: string[] = [];
 
   function makeListClient() {
     return {
@@ -1039,13 +1038,9 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
         let rows: Array<{ user_id: string | null }> =
           table === "organization_memberships" ? membershipRows : employeeRows;
         const chain: Record<string, unknown> = {};
-        for (const method of ["select", "is", "in"]) {
+        for (const method of ["select", "is", "in", "order"]) {
           chain[method] = vi.fn(() => chain);
         }
-        chain.order = vi.fn((column: string) => {
-          if (table === "employees") employeeOrder.push(column);
-          return chain;
-        });
         if (table === "profiles") {
           chain.eq = vi.fn(() => chain);
           chain.then = (resolve: (value: unknown) => unknown) =>
@@ -1099,7 +1094,6 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     membershipFilters.length = 0;
-    employeeOrder.length = 0;
     internalIds = [];
     validateCsrfOrigin.mockReturnValue(null);
     requireAuthenticatedUser.mockResolvedValue({ user: { id: VIEWER_USER_ID } });
@@ -1144,15 +1138,6 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
 
     expect(joined.get("emp-joined")).toBeNull();
     expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
-  });
-
-  it("orders a view-only caller's list by name, so it can't reveal seniority", async () => {
-    await listAs({});
-    expect(employeeOrder).toEqual(["last_name", "first_name", "id"]);
-
-    employeeOrder.length = 0;
-    await listAs({ canManageEmployees: true });
-    expect(employeeOrder).toEqual(["seniority"]);
   });
 });
 

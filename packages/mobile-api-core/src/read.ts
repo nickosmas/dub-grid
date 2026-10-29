@@ -594,7 +594,8 @@ export function toCoworkerMobilePerson(person: MobilePerson): MobilePerson {
     employmentType: "full_time",
     phone: "",
     email: "",
-    seniority: 0,
+    // Seniority sets the list order everyone sees, so it isn't hidden.
+    seniority: person.seniority,
     departmentIds: [],
     deptAdminIds: [],
     managementDeptAdminIds: [],

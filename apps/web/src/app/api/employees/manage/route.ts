@@ -315,7 +315,7 @@ function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employ
  * be scheduled. Built field by field rather than by stripping, so a new
  * employee column stays hidden until someone decides a coworker needs it.
  * Contact details, the account link (and the joined date that implies one),
- * HR facts (employment type, number, seniority, dates) and suspensions or
+ * HR facts (employment type, number, dates) and suspensions or
  * planned status changes keep their empty values, matching the mobile people
  * endpoints. `awayUntil` stays for the Away bar of someone Away now.
  */
@@ -335,7 +335,8 @@ function coworkerDirectoryEntry(employee: Employee): Employee {
     employmentType: "full_time",
     statusChangedAt: null,
     statusNote: "",
-    seniority: 0,
+    // Seniority sets the roster order everyone sees, so it isn't hidden.
+    seniority: employee.seniority,
     phone: "",
     email: "",
     contactNotes: "",
@@ -621,13 +622,7 @@ export async function POST(req: NextRequest) {
           if (!isManager) {
             query = query.eq("status", "active");
           }
-          const visible = withoutHiddenStaff(query, hiddenUserIds);
-          // View-only callers get no seniority, so their order mustn't reveal it.
-          return (
-            isManager
-              ? visible.order("seniority")
-              : visible.order("last_name").order("first_name").order("id")
-          ).range(from, to);
+          return withoutHiddenStaff(query, hiddenUserIds).order("seniority").range(from, to);
         };
 
         const rows = await fetchAllRows<DbEmployee>(buildPage);

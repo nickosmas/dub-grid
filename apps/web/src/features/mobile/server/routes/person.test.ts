@@ -288,7 +288,7 @@ describe("mobile person route", () => {
       phone: "",
       employeeNumber: 0,
       employmentType: "full_time",
-      seniority: 0,
+      seniority: 4,
       statusChangedAt: null,
       awayAbsenceTypeId: null,
       suspendedAt: null,

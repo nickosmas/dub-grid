@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     // manager keeps them without a second grant.
     const canSeeContactDetails = canSeePermissions || orgAuth.permissions.canViewEmployeeDetails;
     // The same holds for a coworker's HR and account facts: employee number,
-    // seniority, invitation state and the link to their sign-in account, which
+    // invitation state and the link to their sign-in account, which
     // the employees route also withholds from view-only callers. Your own row
     // keeps its user id so the page can still find you.
     const canSeeHrDetails = canSeeContactDetails;
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         focusAreaIds: (row.focus_area_ids as number[]) ?? [],
         certificationId: (row.certification_id as number | null) ?? null,
         roleIds: (row.role_ids as number[]) ?? [],
-        seniority: canSeeHrDetails ? ((row.seniority as number | null) ?? null) : null,
+        seniority: (row.seniority as number | null) ?? null,
         lastSignInAt: canSeeActivity ? ((row.last_sign_in_at as string | null) ?? null) : null,
         invitationStatus: canSeeHrDetails
           ? ((row.invitation_status as "pending" | "expired" | null) ?? null)
