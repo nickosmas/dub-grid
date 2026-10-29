@@ -1858,7 +1858,7 @@ describe("PersonDetailScreen", () => {
     it("changes an Away person's return date from the menu, as Save changes", async () => {
       const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
 
-      await fromMore("Change return date", "Change Mina Diaz's return date?");
+      await fromMore("Edit time away", "Change Mina Diaz's time away?");
       expect(screen.queryByRole("radio", { name: /^Offboarded/ })).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
@@ -1879,7 +1879,7 @@ describe("PersonDetailScreen", () => {
         awayAbsenceTypeId: 134,
       });
 
-      await fromMore("Change return date", "Change Mina Diaz's return date?");
+      await fromMore("Edit time away", "Change Mina Diaz's time away?");
       fireEvent.click(screen.getByRole("radio", { name: "Sick" }));
       confirm("Save changes");
 

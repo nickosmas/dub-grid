@@ -890,11 +890,11 @@ describe("EmployeeStatusActions", () => {
     expect(cardButtons()).toEqual(["Mark active", "More status changes"]);
     await user.click(screen.getByRole("button", { name: "More status changes" }));
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Change return date",
+      "Edit time away",
       "Offboard",
     ]);
-    await user.click(screen.getByRole("menuitem", { name: "Change return date" }));
-    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's return date?" });
+    await user.click(screen.getByRole("menuitem", { name: "Edit time away" }));
+    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's time away?" });
     expect(within(dialog).getByRole("button", { name: "Return date" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
   });
