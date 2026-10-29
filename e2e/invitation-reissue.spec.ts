@@ -312,7 +312,7 @@ test.describe("invitation reissue and revoke", () => {
       await askAndCancel(
         page,
         testInfo,
-        panel.getByRole("button", { name: "Revoke Invitation" }),
+        panel.getByRole("button", { name: "Revoke invitation" }),
         REVOKE,
         "2-management-revoke-confirmation",
       );
@@ -366,7 +366,7 @@ test.describe("invitation reissue and revoke", () => {
         .nth(2)
         .click();
       const panel = page.getByRole("dialog", { name: "Management staff detail" });
-      await panel.getByRole("button", { name: "Revoke Invitation" }).click();
+      await panel.getByRole("button", { name: "Revoke invitation" }).click();
       const confirm = page.getByRole("dialog", { name: /^Revoke the invitation for / });
       await confirm.getByRole("button", { name: "Revoke" }).click();
       await expect(page.getByText("Invitation revoked")).toBeVisible();
