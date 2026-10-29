@@ -66,7 +66,8 @@ function awaySpans(person: TimeOffPerson, today: string) {
       absenceTypeId: person.awayAbsenceTypeId ?? null,
     });
   }
-  if (person.plannedStatus === AWAY && person.plannedFrom) {
+  // A planned change names Away as "away"; the status itself stores "inactive".
+  if (person.plannedStatus === "away" && person.plannedFrom) {
     spans.push({
       key: "away-planned",
       start: person.plannedFrom,

@@ -1208,7 +1208,7 @@
       starts open, and each viewer's browser remembers folding it. Owner
       decisions, 2026-10-28; design reference: the inline prototype approved
       that day.
-- [ ] 55. **One staff page** - the People detail page becomes one page
+- [x] 55. **One staff page** - the People detail page becomes one page
       holding everything stored about a person, replacing the separate
       Profile, Overview and Activity sections. A header (back link, avatar,
       name with the access star, employee ID, No app access and Send invite
@@ -1238,6 +1238,6 @@
         now or taken, with dates and days; part-day absences name their
         times; day off absences are hidden unless shown. Overview gains a
         Next time off card.
-  - [ ] 55f. **Requests** - pickups, swaps, call-offs and profile change
+  - [x] 55f. **Requests** - pickups, swaps, call-offs and profile change
         requests involving them in the period, with state and who decided.
         Overview gains a Waiting on you card.

@@ -130,6 +130,11 @@ vi.mock("@/features/schedule/client", () => ({
   fetchJobPreferences: vi.fn(async () => []),
   fetchCorrections: vi.fn(async () => []),
   fetchScheduleNotes: vi.fn(async () => []),
+  fetchShiftRequests: vi.fn(async () => []),
+}));
+
+vi.mock("@/features/account/client/api", () => ({
+  fetchPeopleProfileChangeRequests: vi.fn(async () => ({ requests: [] })),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
@@ -508,6 +513,7 @@ describe("StaffDetailPage", () => {
       "Overview",
       "Shifts",
       "Time off",
+      "Requests",
       "Access",
       "Activity",
     ]);

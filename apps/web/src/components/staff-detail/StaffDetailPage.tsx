@@ -80,6 +80,7 @@ import {
   fetchCorrections,
   fetchRecurringShifts,
   fetchScheduleNotes,
+  fetchShiftRequests,
 } from "@/features/schedule/client";
 import {
   createOrganizationInvitation,
@@ -106,6 +107,9 @@ import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
 import { ShiftsTab } from "./tabs/ShiftsTab";
 import { TimeOffTab } from "./tabs/TimeOffTab";
+import { RequestsTab } from "./tabs/RequestsTab";
+import { buildPersonRequestRows } from "@/lib/person-requests";
+import { fetchPeopleProfileChangeRequests } from "@/features/account/client/api";
 import { buildTimeOff, findNextTimeOff } from "@/lib/time-off";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { AccessTab } from "./tabs/AccessTab";
@@ -117,12 +121,14 @@ interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "shifts" | "timeoff" | "recurring" | "access" | "activity";
+export type StaffPageTab =
+  "overview" | "shifts" | "timeoff" | "requests" | "recurring" | "access" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
   shifts: "Shifts",
   timeoff: "Time off",
+  requests: "Requests",
   recurring: "Recurring",
   access: "Access",
   activity: "Activity",
@@ -873,16 +879,26 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const showScheduleDetails = !directoryPerson?.isManagementUser || isOnSchedule;
+  // Someone who can't review every request is shown only their own, so the
+  // tab would tell them nothing true about this person.
+  const canReviewRequests = Boolean(
+    perms.isGridmaster ||
+    perms.isSuperAdmin ||
+    perms.canManageEmployees ||
+    perms.canApproveShiftRequests ||
+    perms.canEditShifts,
+  );
   const availableTabs = useMemo<StaffPageTab[]>(
     () => [
       "overview",
       "shifts",
       "timeoff",
+      ...(canReviewRequests ? (["requests"] as const) : []),
       ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
       "access",
       ...(canViewActivity ? (["activity"] as const) : []),
     ],
-    [canViewActivity, perms.canViewRecurringShifts],
+    [canReviewRequests, canViewActivity, perms.canViewRecurringShifts],
   );
   const legacySection = searchParams.get("section");
   const requestedTab = searchParams.get("tab");
@@ -960,6 +976,47 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       ),
     );
   }, [absenceById, employee, dayOffAbsenceTypeId, today, upcomingEnd, upcomingShiftsQuery.data]);
+  const shiftRequestsQuery = useQuery({
+    queryKey: orgId
+      ? [...queryKeys.shiftRequests.all(orgId), "employee", employeeId]
+      : ["shiftRequests", "anon", "employee", employeeId],
+    queryFn: () => fetchShiftRequests(orgId!, assignmentLabelMapRef.current, { empId: employeeId }),
+    enabled:
+      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "overview"),
+  });
+  const canSeeProfileRequests = Boolean(
+    perms.isGridmaster || perms.isSuperAdmin || perms.canManageEmployees,
+  );
+  const profileRequestsQuery = useQuery({
+    queryKey: orgId
+      ? queryKeys.org.peopleChangeRequests(orgId, "all")
+      : ["org", "anon", "peopleChangeRequests", "all"],
+    queryFn: async () => (await fetchPeopleProfileChangeRequests(orgId!, null)).requests,
+    enabled:
+      Boolean(orgId) &&
+      canSeeProfileRequests &&
+      (activeTab === "requests" || activeTab === "overview"),
+  });
+  const requestRows = useMemo(() => {
+    if (!shiftRequestsQuery.data) return undefined;
+    const nameOfUser = (userId: string) => {
+      const person = directory.find((entry) => entry.userId === userId);
+      return person ? `${person.firstName} ${person.lastName}`.trim() : null;
+    };
+    return buildPersonRequestRows(
+      employeeId,
+      shiftRequestsQuery.data,
+      profileRequestsQuery.data ?? [],
+      nameOfUser,
+      { focusAreaLabel: org?.focusAreaLabel },
+    );
+  }, [
+    directory,
+    employeeId,
+    org?.focusAreaLabel,
+    profileRequestsQuery.data,
+    shiftRequestsQuery.data,
+  ]);
   const canSeeCorrections = Boolean(
     perms.isGridmaster || perms.isSuperAdmin || perms.canEditShifts,
   );
@@ -1402,6 +1459,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   {(activeTab === "overview" ||
                     activeTab === "shifts" ||
                     activeTab === "timeoff" ||
+                    activeTab === "requests" ||
                     activeTab === "activity") && (
                     <PersonPeriodControl
                       period={period}
@@ -1426,7 +1484,29 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       jobs={jobs}
                       absenceTypes={absenceTypes}
                       nextTimeOff={nextTimeOff}
+                      waitingRequests={
+                        canReviewRequests ? requestRows?.filter((row) => row.waiting) : undefined
+                      }
+                      onOpenRequests={() =>
+                        router.replace(hrefForTab("requests"), { scroll: false })
+                      }
                       onOpenTimeOff={() => router.replace(hrefForTab("timeoff"), { scroll: false })}
+                    />
+                  )}
+                  {activeTab === "requests" && (
+                    <RequestsTab
+                      rows={requestRows}
+                      loading={shiftRequestsQuery.isPending}
+                      error={
+                        shiftRequestsQuery.error
+                          ? formatClientErrorMessage(
+                              shiftRequestsQuery.error,
+                              "We couldn't load their requests right now.",
+                            )
+                          : null
+                      }
+                      range={period.range}
+                      periodPhrase={periodRange.phrase}
                     />
                   )}
                   {activeTab === "timeoff" && (

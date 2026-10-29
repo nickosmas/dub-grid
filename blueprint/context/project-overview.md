@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 54 are
-shipped. Items 40 and 55 are in progress.
+shipped, and so is item 55. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -89,7 +89,7 @@ shipped. Items 40 and 55 are in progress.
 | 52   | Shipped     | A whole-day absence on days in a row reads as one bar per week in the grid, labeled with its name and a count of days.          |
 | 53   | Shipped     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
 | 54   | Shipped     | People away or absent all period sit last in their section, under a group row that folds.                                       |
-| 55   | In progress | One staff page holds everything stored about a person, in tabs that follow one chosen period.                                   |
+| 55   | Shipped     | One staff page holds everything stored about a person, in tabs that follow one chosen period.                                   |
 
 Item 40 is split:
 
@@ -512,7 +512,7 @@ names each person and why. The day off absence alone doesn't count, the
 group starts open, and each viewer's browser remembers folding it (owner
 decisions, 2026-10-28).
 
-Item 55, one staff page, is in progress. The People detail page becomes one page
+Item 55, one staff page, has shipped. The People detail page becomes one page
 holding everything stored about a person, replacing the separate Profile,
 Overview and Activity sections: a header with the back link, avatar, name
 with the access star, employee ID, No app access and Send invite when they
@@ -542,7 +542,7 @@ Item 55 is split:
 - **55e - Time off:** shipped; absences and time away in the period,
   planned, now or taken, with day off absences hidden unless shown, and a
   Next time off card on Overview.
-- **55f - Requests:** planned; pickups, swaps, call-offs and profile change
+- **55f - Requests:** shipped; pickups, swaps, call-offs and profile change
   requests involving them in the period, with state and who decided, and a
   Waiting on you card on Overview.
 

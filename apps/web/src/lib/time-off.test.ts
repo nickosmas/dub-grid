@@ -115,7 +115,7 @@ describe("buildTimeOff", () => {
 
     const planned: TimeOffPerson = {
       ...active,
-      plannedStatus: "inactive",
+      plannedStatus: "away",
       plannedFrom: "2026-11-10",
       plannedUntil: null,
     };

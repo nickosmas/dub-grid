@@ -313,11 +313,12 @@ export function cancelOwnProfileChangeRequest(
   });
 }
 
+/** People's profile change requests; a null status reads every status. */
 export function fetchPeopleProfileChangeRequests(
   orgId: string,
-  status = "pending",
+  status: string | null = "pending",
 ): Promise<{ requests: ProfileChangeRequest[] }> {
-  const params = new URLSearchParams({ orgId, status });
+  const params = new URLSearchParams({ orgId, ...(status ? { status } : {}) });
   return requestJson(`/api/people/change-requests?${params}`);
 }
 

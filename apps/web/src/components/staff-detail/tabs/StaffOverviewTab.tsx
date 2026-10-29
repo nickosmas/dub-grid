@@ -7,11 +7,13 @@ import {
   CalendarDays,
   CalendarRange,
   Clock,
+  Inbox,
   Palmtree,
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/Button";
 import type { TimeOffEntry } from "@/lib/time-off";
+import type { PersonRequestRow } from "@/lib/person-requests";
 import { formatTimeOffDates } from "./TimeOffTab";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
@@ -45,6 +47,9 @@ interface StaffOverviewTabProps {
   /** The first time off after today; undefined while it loads. */
   nextTimeOff?: TimeOffEntry | null;
   onOpenTimeOff?: () => void;
+  /** Requests about them still awaiting approval; undefined hides the card. */
+  waitingRequests?: PersonRequestRow[];
+  onOpenRequests?: () => void;
 }
 
 const sentence = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
@@ -63,6 +68,8 @@ export function StaffOverviewTab({
   absenceTypes,
   nextTimeOff,
   onOpenTimeOff,
+  waitingRequests,
+  onOpenRequests,
 }: StaffOverviewTabProps) {
   const assignmentById = useMemo(() => new Map(assignments.map((a) => [a.id, a])), [assignments]);
   const shiftById = useMemo(
@@ -136,6 +143,49 @@ export function StaffOverviewTab({
         jobById={jobById}
         absenceTypes={absenceTypes}
       />
+
+      {waitingRequests !== undefined && (
+        <section className="dg-card">
+          <div className="dg-card-header">
+            <div className="dg-card-title flex items-center gap-2">
+              <Inbox className="h-4 w-4 text-[var(--dg-color-text-muted)]" aria-hidden />
+              Waiting on you
+            </div>
+            {onOpenRequests ? (
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={onOpenRequests}
+              >
+                Requests
+              </Button>
+            ) : null}
+          </div>
+          <div className="dg-card-body flex flex-col gap-2 text-[13px]">
+            {waitingRequests.length === 0 ? (
+              <span className="text-[var(--dg-color-text-muted)]">Nothing awaiting approval.</span>
+            ) : (
+              waitingRequests.slice(0, 3).map((row) => (
+                <div key={row.key}>
+                  <div className="font-medium text-[var(--dg-color-text-primary)]">
+                    {row.type} · {row.details}
+                  </div>
+                  {row.secondary ? (
+                    <div className="text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-subtle)]">
+                      {row.secondary}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+            {waitingRequests.length > 3 ? (
+              <span className="text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-subtle)]">
+                and {waitingRequests.length - 3} more
+              </span>
+            ) : null}
+          </div>
+        </section>
+      )}
 
       {nextTimeOff !== undefined && (
         <section className="dg-card">
