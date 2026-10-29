@@ -93,6 +93,8 @@ import { usePersonPeriod } from "@/hooks/usePersonPeriod";
 import { formatPersonPeriodPhrase } from "@/lib/person-period";
 import { PersonPeriodControl } from "./PersonPeriodControl";
 import { StaffPageHeader } from "./StaffPageHeader";
+import { PersonPager } from "./PersonPager";
+import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
 import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
@@ -171,6 +173,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [org?.timezone],
   );
   const { directory } = useDirectory(orgId);
+  // Your own record opens your profile, so the arrows step over it.
+  const ownEmployeeId = useMemo(
+    () => directory.find((entry) => currentUser?.id && entry.userId === currentUser.id)?.employeeId,
+    [currentUser?.id, directory],
+  );
+  const neighbors = useMemo(() => {
+    if (!orgId) return null;
+    const ids = readPeopleOrder(orgId);
+    return ids
+      ? findNeighbors(ids, employeeId, new Set(ownEmployeeId ? [ownEmployeeId] : []))
+      : null;
+  }, [employeeId, orgId, ownEmployeeId]);
   const queryClient = useQueryClient();
   // Label maps are rebuilt whenever the org bootstrap refetches in the
   // background. Read them through refs so that never restarts this page's
@@ -1090,9 +1104,35 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     directoryPerson?.isManagementUser &&
     employee.userId,
   );
+  const personName = (id: string) => {
+    const person = directory.find((entry) => entry.employeeId === id);
+    return person ? `${person.firstName} ${person.lastName}`.trim() : null;
+  };
+  const openPerson = (id: string) =>
+    router.push(activeTab === "overview" ? `/people/${id}` : `/people/${id}?tab=${activeTab}`);
+  const pager = neighbors ? (
+    <PersonPager
+      position={neighbors.position}
+      total={neighbors.total}
+      previous={
+        neighbors.previousId
+          ? {
+              name: personName(neighbors.previousId),
+              onOpen: () => openPerson(neighbors.previousId!),
+            }
+          : null
+      }
+      next={
+        neighbors.nextId
+          ? { name: personName(neighbors.nextId), onOpen: () => openPerson(neighbors.nextId!) }
+          : null
+      }
+    />
+  ) : null;
   const headerActions =
-    canSendInvitation || canAddToManagement || canAddToSchedule ? (
+    pager || canSendInvitation || canAddToManagement || canAddToSchedule ? (
       <>
+        {pager}
         {canSendInvitation && (
           <Button
             type="button"

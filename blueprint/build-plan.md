@@ -1225,7 +1225,7 @@
         in, and the period control beside the tabs (Custom opens the app's
         date range picker, Reports and this page share one range helper,
         and each viewer's browser remembers the choice). Old `?section=` links open the matching tab.
-  - [ ] 55b. **Previous and next person** - arrows and "7 of 37" follow the
+  - [x] 55b. **Previous and next person** - arrows and "7 of 37" follow the
         People list's last filter and sort, name who's next on hover, and
         hide when the page was opened without a list.
   - [ ] 55c. **Overview** - stats for the period, This week, Waiting on

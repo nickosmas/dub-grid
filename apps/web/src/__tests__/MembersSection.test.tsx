@@ -988,6 +988,31 @@ describe("MembersSection — management roster filters", () => {
     expect(screen.queryByText("Jamie Rivera")).not.toBeInTheDocument();
   });
 
+  it("saves the roster's order for the person page, following a search", async () => {
+    const user = userEvent.setup();
+    window.sessionStorage.clear();
+    renderMembersSection({
+      employees: [
+        makeEmployee({ id: "emp-b", firstName: "Bea", lastName: "Lane", seniority: 2 }),
+        makeEmployee({ id: "emp-a", firstName: "Ann", lastName: "Hart", seniority: 1 }),
+        makeEmployee({ id: "emp-c", firstName: "Cal", lastName: "Moss", seniority: 3 }),
+      ],
+    });
+    await settleInvitations();
+    const saved = () =>
+      JSON.parse(window.sessionStorage.getItem("dg-people-order") ?? "null") as {
+        orgId: string;
+        ids: string[];
+      } | null;
+
+    await waitFor(() =>
+      expect(saved()).toEqual({ orgId: "org-1", ids: ["emp-a", "emp-b", "emp-c"] }),
+    );
+
+    await user.type(screen.getByPlaceholderText(/^Search by name/), "Cal");
+    await waitFor(() => expect(saved()?.ids).toEqual(["emp-c"]));
+  });
+
   it("sorts the roster alphabetically, and by access level on request", async () => {
     const user = userEvent.setup();
     // Zoe outranks Alex, so the two sorts disagree and the order is a real

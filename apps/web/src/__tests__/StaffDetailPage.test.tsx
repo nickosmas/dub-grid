@@ -328,6 +328,73 @@ describe("StaffDetailPage", () => {
     vi.unstubAllGlobals();
   });
 
+  describe("previous and next person", () => {
+    function saveOrder(ids: string[]) {
+      window.sessionStorage.setItem("dg-people-order", JSON.stringify({ orgId: "org-1", ids }));
+    }
+    function directoryOf(...people: Array<[string, string, string | null]>) {
+      mockUseDirectory.mockReturnValue({
+        directory: people.map(([employeeId, firstName, userId]) =>
+          makeDirectoryPerson({
+            personId: employeeId,
+            employeeId,
+            firstName,
+            lastName: "Lane",
+            userId,
+          }),
+        ),
+        loading: false,
+        error: null,
+      });
+    }
+
+    afterEach(() => window.sessionStorage.clear());
+
+    it("steps through the People list's order, keeping the open tab", async () => {
+      saveOrder(["emp-0", "emp-1", "emp-2"]);
+      directoryOf(["emp-0", "Ann", null], ["emp-1", "Margaret", null], ["emp-2", "Cal", null]);
+      mockSearchParams = new URLSearchParams("tab=activity");
+
+      render(<StaffDetailPage employeeId="emp-1" />);
+
+      const pager = within(await screen.findByRole("group", { name: "Move between people" }));
+      expect(pager.getByText("2 of 3")).toBeInTheDocument();
+      fireEvent.click(pager.getByRole("button", { name: "Next: Cal Lane" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-2?tab=activity");
+      fireEvent.click(pager.getByRole("button", { name: "Previous: Ann Lane" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-0?tab=activity");
+    });
+
+    it("stops at the ends and steps over your own record", async () => {
+      saveOrder(["emp-me", "emp-1", "emp-2"]);
+      directoryOf(["emp-me", "Viewer", "viewer-user-id"], ["emp-1", "Margaret", null]);
+
+      render(<StaffDetailPage employeeId="emp-1" />);
+
+      const pager = within(await screen.findByRole("group", { name: "Move between people" }));
+      expect(pager.getByText("1 of 2")).toBeInTheDocument();
+      expect(pager.getByRole("button", { name: "Previous person" })).toBeDisabled();
+      fireEvent.click(pager.getByRole("button", { name: "Next person" }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/people/emp-2");
+    });
+
+    it("offers no arrows without a saved list, or for someone not in it", async () => {
+      render(<StaffDetailPage employeeId="emp-1" />);
+      await screen.findByText("Work details");
+      expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
+    });
+
+    it("ignores a list saved for another organization", async () => {
+      window.sessionStorage.setItem(
+        "dg-people-order",
+        JSON.stringify({ orgId: "org-2", ids: ["emp-0", "emp-1"] }),
+      );
+      render(<StaffDetailPage employeeId="emp-1" />);
+      await screen.findByText("Work details");
+      expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
+    });
+  });
+
   it("redirects to /people when employee detail access is denied", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: false,

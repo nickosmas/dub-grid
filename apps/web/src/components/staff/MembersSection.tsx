@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
+import { savePeopleOrder } from "@/lib/people-order";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -462,6 +463,10 @@ export function MembersSection({
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection, selectOnly } =
     useStaffSelection();
   const reorder = useStaffReorder({ sorted, onSave });
+  // A person's page steps through this list in this order (item 55b).
+  useEffect(() => {
+    if (orgId) savePeopleOrder(orgId, sorted.map(getEmployeeId));
+  }, [orgId, sorted]);
   const {
     isReordering,
     isDirty,

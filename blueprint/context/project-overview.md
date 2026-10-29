@@ -532,7 +532,7 @@ Item 55 is split:
   and the period control beside the tabs; Custom opens the app's date range
   picker. Reports and this page share one range helper, each viewer's browser remembers the choice, and old
   `?section=` links open the matching tab.
-- **55b - Previous and next person:** planned; arrows and "7 of 37" follow
+- **55b - Previous and next person:** shipped; arrows and "7 of 37" follow
   the People list's last filter and sort, name who's next on hover, and hide
   when the page was opened without a list.
 - **55c - Overview:** planned; stats for the period, This week, Waiting on

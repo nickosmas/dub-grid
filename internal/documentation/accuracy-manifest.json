@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:84a6243cf1b896833d5a58679b20cdd14052822ba4c54686edb6642f0d5934d9"
+      "evidenceFingerprint": "sha256:dda7aa626dd6a1c3ee1ba273ccc3aca38a57a73823c89092632114cb40c7e184"
     },
     {
       "id": "person-detail",
@@ -784,7 +784,7 @@
           "id": "person",
           "claims": [
             "person page needs view-details permission; one page with Back to People",
-            "header contents: name, status icon, access star, employee number, No app access, Send invitation, Add to schedule or management",
+            "header contents: name, status icon, access star, employee number, No app access, Send invitation, Add to schedule or management; previous and next person in the People list's order",
             "Contact, Work details and Record cards beside the tabs; Edit opens the details; Record account states",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
@@ -797,6 +797,8 @@
             "apps/web/src/app/(app)/people/[id]/page.tsx",
             "apps/web/src/components/staff-detail/StaffDetailPage.tsx",
             "apps/web/src/components/staff-detail/StaffPageHeader.tsx",
+            "apps/web/src/components/staff-detail/PersonPager.tsx",
+            "apps/web/src/lib/people-order.ts",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
             "apps/web/src/components/staff-detail/tabs/RecurringTab.tsx",
@@ -824,7 +826,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:091f1de822e8d4188e425671caf7ee850e24381fc0b7e678bbcf5f4760300dab"
+      "evidenceFingerprint": "sha256:da3d67d99c654bd29bb969a22b87cb003ac8489b3068a7e131f0122e10c29b5a"
     },
     {
       "id": "invitations",
@@ -887,7 +889,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:07bcd355ad92299636a7fd768d8a8c832a2fd392b53edf2ab89ca4a04bc2ad08"
+      "evidenceFingerprint": "sha256:553768386ebac1a2d4b034bab10c80d3568c4509d8b47600951aa1c5d60bfe4b"
     },
     {
       "id": "organization",
@@ -2108,7 +2110,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:7967a9222f120ffaebcebe7487e5b320b6b49bf2a2ab21b360727e2a9a3de190"
+      "evidenceFingerprint": "sha256:427f557e957220ddeb64a691ffbfff3e12b0accda817dbf7f29221bdec5b73a0"
     }
   ],
   "surfaceExclusions": [
