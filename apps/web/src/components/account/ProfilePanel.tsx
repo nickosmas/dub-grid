@@ -110,6 +110,15 @@ const ROLE_LABELS: Record<string, string> = {
 
 type PendingConfirm = "account-details" | "name-change-request" | "account-deletion" | null;
 
+function namesFor(ids: number[], items: { id: number; name: string }[]): string | null {
+  return (
+    ids
+      .map((id) => items.find((item) => item.id === id)?.name)
+      .filter(Boolean)
+      .join(", ") || null
+  );
+}
+
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -647,7 +656,7 @@ export function ProfilePanel({
         : pendingConfirm === "account-deletion"
           ? {
               title: "Request account deletion?",
-              message: "An admin reviews and approves the request before your account is removed.",
+              message: "An Admin reviews the request before your account is deleted.",
               confirmLabel: "Request deletion",
               variant: "danger" as const,
               loading: requestingDeletion,
@@ -674,7 +683,9 @@ export function ProfilePanel({
                 Profile details
               </div>
               <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Account and contact information. Changes stay editable on this page.
+                {canEditProfileDirectly
+                  ? "Your name and contact details."
+                  : "Your contact details."}
               </div>
             </div>
           </div>
@@ -793,6 +804,39 @@ export function ProfilePanel({
         </SectionCard>
       )}
 
+      {!canEditProfileDirectly && employee && isOnSchedule && (
+        <SectionCard>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
+                Work details
+              </div>
+              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+                Ask an Admin to change your employment,{" "}
+                {(focusAreaLabel ?? "focus areas").toLowerCase()},{" "}
+                {(certificationLabel ?? "certification").toLowerCase()} or{" "}
+                {(roleLabel ?? "roles").toLowerCase()}.
+              </div>
+            </div>
+            <div role="group" aria-label="Work details" className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Employment"
+                value={employee.employmentType === "part_time" ? "Part-time" : "Full-time"}
+              />
+              <Field
+                label={focusAreaLabel ?? "Focus Areas"}
+                value={namesFor(employee.focusAreaIds, focusAreas)}
+              />
+              <Field
+                label={certificationLabel ?? "Certification"}
+                value={certifications.find((item) => item.id === employee.certificationId)?.name}
+              />
+              <Field label={roleLabel ?? "Roles"} value={namesFor(employee.roleIds, roles)} />
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
       <SectionCard>
         <div className="flex flex-wrap justify-end gap-2">
           {hasAnyChanges && (
@@ -828,7 +872,7 @@ export function ProfilePanel({
             <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
               {isGridmaster
                 ? "Your platform role. Gridmasters administer every organization and hold no organization role of their own."
-                : "Your organization role and the permissions it carries."}
+                : "Your access level and what it allows."}
             </div>
           </div>
           {isGridmaster ? (
@@ -843,7 +887,7 @@ export function ProfilePanel({
               labels={{ focusAreaLabel, certificationLabel, roleLabel }}
             />
           ) : (
-            <Field label="Role" value={ROLE_LABELS[role] ?? role} />
+            <Field label="Access level" value={ROLE_LABELS[role] ?? role} />
           )}
         </div>
       </SectionCard>
@@ -948,7 +992,7 @@ export function ProfilePanel({
                 Name change requests
               </div>
               <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Ask an admin to update your name. Email and phone are managed in Account details.
+                Ask an Admin to change your name. Your email and phone are in Profile details above.
               </div>
             </div>
 
@@ -969,7 +1013,7 @@ export function ProfilePanel({
                   </Button>
                 }
               >
-                A name change request is pending admin review.
+                Your name change is waiting for an Admin to review it.
               </Banner>
             )}
 
@@ -1001,7 +1045,7 @@ export function ProfilePanel({
               aria-label="Request note"
               className="dg-input"
               disabled={!!pendingNameRequest}
-              placeholder="Note for admins"
+              placeholder="Note for Admins"
               rows={3}
               value={requestNote}
               onChange={(e) => setRequestNote(e.target.value)}
@@ -1061,7 +1105,7 @@ export function ProfilePanel({
                 Delete account
               </div>
               <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                Request that an admin delete your account. This is irreversible.
+                Ask an Admin to delete your account. This can&apos;t be undone.
               </p>
             </div>
             {pendingDeletion ? (
@@ -1081,7 +1125,7 @@ export function ProfilePanel({
                   </Button>
                 }
               >
-                Account deletion request pending admin review.
+                Your account deletion is waiting for an Admin to review it.
               </Banner>
             ) : (
               <Button
