@@ -293,6 +293,31 @@ function formatChangeEntry(change: AuditChangeEntry): DetailItem {
 // ── Flattening ───────────────────────────────────────────────────────────────
 
 /**
+ * `fromStatus` beside `toStatus` (or `from_status` beside `to_status`) record one
+ * change, so they read as one "Status: Away → Active" row. Keyed by the from key.
+ */
+function pairedChangeKeys(
+  source: Record<string, unknown>,
+  skip: ReadonlySet<string> | undefined,
+): Map<string, string> {
+  const pairs = new Map<string, string>();
+  for (const key of Object.keys(source)) {
+    if (skip?.has(key)) continue;
+    const camel = /^from([A-Z]\w*)$/.exec(key);
+    const snake = /^from_(\w+)$/.exec(key);
+    const toKey = camel ? `to${camel[1]}` : snake ? `to_${snake[1]}` : null;
+    if (!toKey || skip?.has(toKey)) continue;
+    if (formatValue(key, source[key]) && formatValue(toKey, source[toKey])) pairs.set(key, toKey);
+  }
+  return pairs;
+}
+
+function pairedChangeField(fromKey: string): string {
+  const field = fromKey.replace(/^from_?/, "");
+  return field.charAt(0).toLowerCase() + field.slice(1);
+}
+
+/**
  * Turn an arbitrary details blob into display rows, dropping anything we can't
  * name. This is the fallback for actions with no bespoke `details` renderer,
  * and the reason a new write site can't put "[object Object]" on screen.
@@ -305,12 +330,29 @@ export function flattenDetails(
   const skip = options.skipKeys;
 
   const walk = (source: Record<string, unknown>, prefix: string, depth: number) => {
+    const pairs = pairedChangeKeys(source, skip);
+    const pairedToKeys = new Set(pairs.values());
     for (const [key, value] of Object.entries(source)) {
       if (skip?.has(key)) continue;
       // Bookkeeping the UI resolves elsewhere — the actor label already says it.
       if (key === "initiated_by") continue;
       if (value === null || value === undefined) continue;
       if (isIdKey(key)) continue;
+      if (pairedToKeys.has(key)) continue;
+      // The field list only repeats the change the paired rows already show.
+      if (key === "changedFields" && pairs.size > 0) continue;
+
+      const toKey = pairs.get(key);
+      if (toKey) {
+        const field = pairedChangeField(key);
+        const from = formatValue(key, value) ?? "";
+        const to = formatValue(toKey, source[toKey]) ?? "";
+        items.push({
+          label: prefix ? friendlyLabel(`${prefix} ${field}`) : friendlyLabel(field),
+          value: from === to ? to : `${from} → ${to}`,
+        });
+        continue;
+      }
 
       const label = prefix ? friendlyLabel(`${prefix} ${key}`) : friendlyLabel(key);
 
