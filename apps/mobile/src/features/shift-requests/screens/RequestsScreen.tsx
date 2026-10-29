@@ -9,7 +9,7 @@ import {
   isAwaitingRecipient,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -121,6 +121,11 @@ function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest
 }
 
 type RequestTab = "available" | "all" | "mine" | "approval" | "history";
+
+function getMineEmptyBody(hasHistory: boolean): string {
+  const prompt = "Open one of your shifts in Schedule to drop or swap it.";
+  return hasHistory ? `${prompt} Your past requests are in History.` : prompt;
+}
 type RequestActionBody =
   | { action: "cancel"; empId: string; note?: string }
   | { action: "claim"; claimerEmpId: string }
@@ -868,7 +873,7 @@ export default function RequestsScreen() {
             void refreshRequests();
           }}
         />
-      ) : contentState.kind === "empty" && activeTab !== "history" ? (
+      ) : contentState.kind === "empty" && activeTab !== "history" && activeTab !== "mine" ? (
         <EmptyStateCard
           fillScreen
           body="Pickup, swap, and call-off requests show up here."
@@ -962,10 +967,12 @@ export default function RequestsScreen() {
         <View style={styles.section}>
           {myRequests.length === 0 ? (
             <EmptyStateCard
+              actionLabel="Go to Schedule"
+              body={getMineEmptyBody(historyRequests.length > 0)}
               fillScreen
-              body="Your requests stay here until they're resolved or canceled."
               iconName="document-text-outline"
-              title="You haven't made any requests"
+              onAction={() => router.push("/(tabs)/team")}
+              title="No open requests"
             />
           ) : (
             myRequests.map((request) => (

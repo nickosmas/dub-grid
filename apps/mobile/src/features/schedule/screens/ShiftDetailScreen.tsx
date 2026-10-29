@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   MAX_MOBILE_SCHEDULE_RANGE_DAYS,
@@ -19,6 +19,7 @@ import {
   SheetActions,
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { Button } from "../../../shared/components/Button";
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { PressableRow } from "../../../shared/components/PressableRow";
@@ -42,6 +43,7 @@ import {
   getOrgSchedule,
   getShiftRequests,
   getShiftSwapOptions,
+  updateShiftRequest,
 } from "../../../shared/lib/api";
 import {
   getClientFriendlyErrorMessage,
@@ -98,6 +100,11 @@ import {
   sortScheduleEntries,
 } from "../lib/schedule";
 import { scheduleNoteGroups } from "../lib/scheduleNotes";
+import { getShiftRequestAvailability } from "../lib/shiftRequestAvailability";
+import {
+  getMobileRequestActionFeedback,
+  getMobileRequestActionSuccessToast,
+} from "../../shift-requests/lib/request-action-feedback";
 import {
   buildRestOfDayAbsenceChip,
   restOfDayAbsenceTimeLabel,
@@ -117,7 +124,6 @@ import {
   formatShiftRequestStatus,
   formatShiftRequestType,
   formatWeekRangeLabel,
-  getAbsenceTypeLabelForEntry,
   getAbsenceTypeOptionLabel,
   getActionSegmentLabel,
   getActionSegmentOptions,
@@ -131,7 +137,6 @@ import {
   hasAnyRequestableScheduleEntrySegment,
   hasScheduleEntrySegmentStarted,
   hasScheduledWorkedAssignment,
-  hasWorkedAssignment,
   isGeneralDetailEntry,
   isGeneralDetailSegment,
   readOptionalColor,
@@ -423,6 +428,28 @@ export default function ShiftDetailScreen() {
     },
   });
 
+  const cancelRequestMutation = useMutation({
+    mutationFn: (request: MobileShiftRequest) =>
+      updateShiftRequest(accessToken!, request.id, {
+        action: "cancel",
+        empId: request.requesterEmpId,
+      }),
+    onSuccess: async () => {
+      pushToast({
+        tone: "success",
+        ...getMobileRequestActionSuccessToast({ action: "cancel" }),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["mobile", "requests"] });
+    },
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Couldn't cancel request",
+        fallbackMessage: "We couldn't cancel that request. Try again.",
+      });
+    },
+  });
+
   const scheduleEntries = useMemo(() => {
     const entries = [
       ...(myScheduleQuery.data?.entries ?? []),
@@ -702,21 +729,16 @@ export default function ShiftDetailScreen() {
       : (activeAbsenceTypes.find(
           (absenceType) => absenceType.id === selectedCalloffAbsenceTypeId,
         ) ?? null);
-  const canCreateRequestsForShift = Boolean(
-    shiftEntry &&
-    linkedEmployeeId &&
-    shiftEntry.employeeId === linkedEmployeeId &&
-    shiftEntry.change?.kind !== "deleted" &&
-    hasAnyRequestableScheduleEntrySegment(shiftEntry, timeZone) &&
-    getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
-    hasWorkedAssignment(shiftEntry) &&
-    !isCheckingExistingRequests &&
-    !shiftRequestCheckError &&
-    !activeShiftRequest,
-  );
-  const canCreateSwapForShift = Boolean(
-    canCreateRequestsForShift && shiftEntry && hasScheduledWorkedAssignment(shiftEntry),
-  );
+  const requestAvailability = getShiftRequestAvailability({
+    entry: shiftEntry,
+    linkedEmployeeId,
+    timeZone,
+    isCheckingExistingRequests,
+    hasExistingRequestCheckError: Boolean(shiftRequestCheckError),
+    hasActiveRequest: activeShiftRequest != null,
+  });
+  const canCreateRequestsForShift = requestAvailability.canDrop;
+  const canCreateSwapForShift = requestAvailability.canSwap;
   const canSubmitRequest = Boolean(
     linkedEmployeeId && shiftEntry && requestMode === "swap" && selectedTargetEntry,
   );
@@ -971,6 +993,29 @@ export default function ShiftDetailScreen() {
     });
   }
 
+  function confirmCancelActiveRequest(request: MobileShiftRequest) {
+    const feedback = getMobileRequestActionFeedback({
+      requestId: request.id,
+      body: { action: "cancel" },
+      request,
+    });
+
+    setPendingConfirmation({
+      title: feedback.title,
+      body: feedback.message ?? "",
+      confirmLabel: feedback.confirmLabel,
+      confirmTone: feedback.confirmStyle === "destructive" ? "danger" : "primary",
+      onConfirm: () => cancelRequestMutation.mutate(request),
+    });
+  }
+
+  function openActiveRequestInRequests(request: MobileShiftRequest) {
+    router.push({
+      pathname: "/(tabs)/requests",
+      params: { tab: "mine", requestId: request.id },
+    });
+  }
+
   function handleSubmitRequest() {
     if (!shiftEntry || !selectedTargetShift || !selectedTargetEntry) {
       return;
@@ -1162,14 +1207,14 @@ export default function ShiftDetailScreen() {
               <Text style={styles.subsectionBody}>
                 {selectedTargetedPickupEntry
                   ? "Review your request below, then submit."
-                  : "Only teammates with an absence on this date are shown."}
+                  : "Teammates who are off that day."}
               </Text>
               <View style={styles.swapDateFilteredList}>
                 {targetedPickupOptions.length === 0 ? (
                   <EmptyStateCard
                     compact
                     iconName="person-remove-outline"
-                    title="No absent teammates on this date"
+                    title="Nobody else is off that day"
                   />
                 ) : (
                   <View style={styles.swapOptions}>
@@ -1181,7 +1226,7 @@ export default function ShiftDetailScreen() {
                         key={`${entry.employeeId}-${entry.date}`}
                         active={selectedTargetedPickupEmployeeId === entry.employeeId}
                         disabled={createRequestMutation.isPending}
-                        detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
+                        detailLabel="Off"
                         entry={entry}
                         showSegments={false}
                         onPress={() => {
@@ -1547,6 +1592,20 @@ export default function ShiftDetailScreen() {
                 ) : null}
               </View>
             ) : null}
+            {requestAvailability.notice ? (
+              <View style={styles.detailActionNotice}>
+                <Text style={styles.detailActionNoticeText}>{requestAvailability.notice}</Text>
+                {requestAvailability.canRetry ? (
+                  <Button
+                    compact
+                    label="Try again"
+                    loading={requestsQuery.isFetching}
+                    onPress={() => requestsQuery.refetch()}
+                    tone="secondary"
+                  />
+                ) : null}
+              </View>
+            ) : null}
 
             <PreviousShiftFooter entry={shiftEntry} focusAreaFieldLabel={focusAreaFieldLabel} />
 
@@ -1599,11 +1658,28 @@ export default function ShiftDetailScreen() {
               title="Request already in progress"
               body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
               detail={
-                activeShiftRequest.adminNote ? (
-                  <Text style={styles.detailFootnote}>
-                    Manager note: {activeShiftRequest.adminNote}
-                  </Text>
-                ) : undefined
+                <View style={styles.activeRequestDetail}>
+                  {activeShiftRequest.adminNote ? (
+                    <Text style={styles.detailFootnote}>
+                      Manager note: {activeShiftRequest.adminNote}
+                    </Text>
+                  ) : null}
+                  <ActionButtons
+                    primaryAction={
+                      <Button
+                        label="View in Requests"
+                        onPress={() => openActiveRequestInRequests(activeShiftRequest)}
+                      />
+                    }
+                  >
+                    <Button
+                      label="Cancel request"
+                      loading={cancelRequestMutation.isPending}
+                      onPress={() => confirmCancelActiveRequest(activeShiftRequest)}
+                      tone="neutral"
+                    />
+                  </ActionButtons>
+                </View>
               }
             />
           ) : null}
@@ -1644,13 +1720,6 @@ export default function ShiftDetailScreen() {
       {requestMode == null ? requestConfirmations("modal") : null}
     </Screen>
   );
-}
-
-function getPickupTargetDetailLabel(
-  absenceTypes: Array<{ id: number; label: string; name?: string | null }>,
-  entry: MobileScheduleEntry,
-) {
-  return getAbsenceTypeLabelForEntry(absenceTypes, entry);
 }
 
 function DetailDateTile({ date }: { date: string }) {

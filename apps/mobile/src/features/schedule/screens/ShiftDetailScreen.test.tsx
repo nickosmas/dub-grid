@@ -9,6 +9,7 @@ const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const routerReplace = vi.fn();
+const routerPush = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -28,6 +29,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("expo-router", () => ({
   router: {
+    push: routerPush,
     replace: routerReplace,
   },
   useLocalSearchParams,
@@ -75,6 +77,7 @@ describe("ShiftDetailScreen", () => {
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
     routerReplace.mockReset();
+    routerPush.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({
@@ -1856,6 +1859,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("This shift was removed, so it can't be dropped or swapped."),
+    ).toBeInTheDocument();
   });
 
   it("hides shift actions for an ongoing shift", () => {
@@ -1955,6 +1961,39 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("This shift has started, so it can't be dropped or swapped."),
+    ).toBeInTheDocument();
+  });
+
+  it("says why the actions are off when the existing-request check fails, and retries it", () => {
+    const refetchRequests = vi.fn().mockResolvedValue(undefined);
+    const defaultQuery = useQuery.getMockImplementation()!;
+    useQuery.mockImplementation((options: { queryKey: unknown[] }) => {
+      if (options.queryKey[1] === "requests") {
+        return {
+          data: undefined,
+          error: new Error("offline"),
+          isFetching: false,
+          isLoading: false,
+          refetch: refetchRequests,
+        };
+      }
+
+      return defaultQuery(options);
+    });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't check for an existing request on this shift, so drop and swap are off for now.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetchRequests).toHaveBeenCalledTimes(1);
   });
 
   it("hides shift actions when an active request already exists for the shift", () => {
@@ -2057,6 +2096,50 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Manager note: Reviewing coverage now.")).toBeInTheDocument();
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
+    expect(screen.queryByText(/can't be dropped or swapped/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "View in Requests" }));
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/requests",
+      params: { tab: "mine", requestId: "request-1" },
+    });
+  });
+
+  it("cancels the shift's request in progress after a confirmation", () => {
+    const mutate = vi.fn();
+    const defaultQuery = useQuery.getMockImplementation()!;
+    const request = {
+      id: "request-1",
+      requesterEmpId: "emp-1",
+      requesterShiftDate: "2026-04-16",
+      status: "open",
+      type: "pickup",
+      targetEmpId: null,
+      targetName: null,
+      adminNote: null,
+    };
+    useQuery.mockImplementation((options: { queryKey: unknown[] }) => {
+      if (options.queryKey[1] === "requests") {
+        return {
+          data: { requests: [request], openShifts: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return defaultQuery(options);
+    });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate, reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Cancel request?")).toBeInTheDocument();
+    confirmDialog("Cancel request");
+    expect(mutate).toHaveBeenCalledWith(request);
   });
 
   it("filters swap options to meaningful teammate worked shifts only", () => {
@@ -2810,7 +2893,10 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByLabelText("Eligible pickup dates")).not.toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("Zoe Adams")).toBeInTheDocument();
-    expect(screen.getAllByText("Sick").length).toBeGreaterThan(0);
+    expect(screen.getByText("Teammates who are off that day.")).toBeInTheDocument();
+    // A requester sees that a teammate is off, never their absence reason.
+    expect(screen.getAllByText("Off")).toHaveLength(2);
+    expect(screen.queryByText("Sick")).not.toBeInTheDocument();
     expect(screen.queryByText("PTO")).not.toBeInTheDocument();
     expect(screen.queryByText("Sam Worker")).not.toBeInTheDocument();
     const zoeRow = screen.getByText("Zoe Adams");

@@ -123,6 +123,17 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     detailActionButtonWrap: {
       flex: 1,
     },
+    detailActionNotice: {
+      gap: mobileSpace.sm,
+      alignItems: "flex-start",
+    },
+    detailActionNoticeText: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    activeRequestDetail: {
+      gap: mobileSpace.md,
+    },
     detailPublishedFooter: {
       borderTopWidth: 1,
       borderTopColor: mobileColors.borderSubtle,
