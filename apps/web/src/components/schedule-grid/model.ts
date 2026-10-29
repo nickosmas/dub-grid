@@ -85,6 +85,8 @@ export interface ScheduleGridAccessors {
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
+  /** Narrows which cells open on click; every cell opens when omitted. */
+  canOpenCell?: (empId: string, date: Date) => boolean;
 }
 
 export interface ScheduleGridOptions {

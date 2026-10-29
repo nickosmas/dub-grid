@@ -4209,6 +4209,14 @@ function SchedulerContent({
     [currentEmpId, shiftForKey],
   );
 
+  // Someone who can't edit opens only their own shift, so the grid draws every
+  // other cell as plain rather than inviting a click that does nothing.
+  const canViewerOpenCell = useCallback(
+    (empId: string, date: Date): boolean =>
+      canOpenOwnRequestPanel(empId, date) || canOpenOwnShiftDetails(empId, date),
+    [canOpenOwnRequestPanel, canOpenOwnShiftDetails],
+  );
+
   const activeIndicatorIdsForKey = useCallback(
     (
       empId: string,
@@ -7873,6 +7881,7 @@ function SchedulerContent({
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
           activeRequestForKey,
+          canOpenCell: isScheduleEditor ? undefined : canViewerOpenCell,
         },
       }),
     [
@@ -7930,6 +7939,8 @@ function SchedulerContent({
       createdByNameForKey,
       absenceTypeIdForKey,
       activeRequestForKey,
+      isScheduleEditor,
+      canViewerOpenCell,
     ],
   );
 
@@ -8877,6 +8888,8 @@ function SchedulerContent({
                 certifications={certifications}
                 orgRoles={orgRoles}
                 isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
+                canOpenCell={isScheduleEditor ? undefined : canViewerOpenCell}
+                canEditSchedule={isScheduleEditor}
                 noteMarksForKey={noteMarksForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}

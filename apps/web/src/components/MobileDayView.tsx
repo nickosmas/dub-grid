@@ -48,6 +48,10 @@ interface MobileDayViewProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
+  /** Narrows which cells open on tap; every cell opens when omitted. */
+  canOpenCell?: (empId: string, date: Date) => boolean;
+  /** Whether the viewer edits the schedule, which decides the empty-state advice. */
+  canEditSchedule?: boolean;
   /** The page's note marks, so each shift shows its indicators by name and colour. */
   noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
@@ -85,6 +89,8 @@ export default function MobileDayView({
   focusAreas,
   assignments,
   isCellInteractive = false,
+  canOpenCell,
+  canEditSchedule = isCellInteractive,
   indicatorTypes = [],
   noteMarksForKey,
   activeFocusArea,
@@ -561,11 +567,14 @@ export default function MobileDayView({
                         ),
                     );
 
+                    const opensOnTap =
+                      isCellInteractive && (!canOpenCell || canOpenCell(emp.id, date));
+
                     return (
                       <Button
                         key={dk}
                         onClick={() => {
-                          if (isCellInteractive) handleCellClick(emp, date, sectionName);
+                          if (opensOnTap) handleCellClick(emp, date, sectionName);
                         }}
                         style={{
                           minHeight: 36,
@@ -576,7 +585,7 @@ export default function MobileDayView({
                           background: isToday ? "var(--dg-color-today-bg)" : "transparent",
                           border: "none",
                           borderLeft: "1px solid var(--dg-color-border)",
-                          cursor: isCellInteractive ? "pointer" : "default",
+                          cursor: opensOnTap ? "pointer" : "default",
                           padding: "2px 1px",
                           fontFamily: "inherit",
                           gap: 0,
@@ -752,8 +761,8 @@ export default function MobileDayView({
           icon={<CalendarOff size={22} />}
           title="No shifts found for this period"
           description={
-            isCellInteractive
-              ? "No employees are assigned to this focus area. Add employees in the Staff view."
+            canEditSchedule
+              ? "No employees are assigned to this focus area. Add them on the People page."
               : "No shifts have been published for this period yet."
           }
         />

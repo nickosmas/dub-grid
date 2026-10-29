@@ -4,17 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
-import {
-  Award,
-  Briefcase,
-  Building2,
-  Calendar,
-  Layers,
-  Mail,
-  Phone,
-  Tag,
-  UserCircle,
-} from "lucide-react";
+import { Award, Briefcase, Building2, Layers, Mail, Phone, Tag, UserCircle } from "lucide-react";
 import type { Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
@@ -117,13 +107,7 @@ export function StaffReadOnlyDetailPanel({
         aria-label="Staff detail"
       >
         {/* Header */}
-        <div
-          className="staff-detail-header"
-          style={{
-            background: `linear-gradient(180deg, ${avatarTone.backgroundColor} 0%, var(--dg-color-surface) 100%)`,
-            borderBottom: "1px solid var(--dg-color-border)",
-          }}
-        >
+        <div className="staff-detail-header">
           <CloseButton
             size="md"
             className="self-end"
@@ -132,13 +116,13 @@ export function StaffReadOnlyDetailPanel({
           />
 
           <div
-            style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}
           >
             <div
               style={{
-                ...getAvatarTypography(56),
-                width: 56,
-                height: 56,
+                ...getAvatarTypography(44),
+                width: 44,
+                height: 44,
                 borderRadius: "50%",
                 background: avatarTone.backgroundColor,
                 display: "flex",
@@ -163,13 +147,12 @@ export function StaffReadOnlyDetailPanel({
                 <span
                   style={{
                     fontWeight: 700,
-                    fontSize: 18,
+                    fontSize: "var(--dg-fs-body)",
                     color: "var(--dg-color-text-primary)",
                     letterSpacing: "-0.01em",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    lineHeight: 1.2,
                     minWidth: 0,
                   }}
                 >
@@ -312,29 +295,6 @@ export function StaffReadOnlyDetailPanel({
                 isLast
               />
             </ReadOnlySection>
-          )}
-
-          {employee.statusChangedAt && (
-            <div
-              style={{
-                marginTop: 4,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-faint)",
-              }}
-            >
-              <Calendar size={12} strokeWidth={2} />
-              <span>
-                On staff since{" "}
-                {new Date(employee.statusChangedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
           )}
         </div>
         <ScrollOverflowCue />

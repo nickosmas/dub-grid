@@ -2857,7 +2857,9 @@ button.dg-cc-sg-main {
 .dg-grid-cell[data-absence-run]:focus-visible {
   z-index: auto;
 }
-.dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
+.dg-grid-cell[data-interactive="true"][data-addable="true"][data-empty="true"]:not(
+    [data-locked="true"]
+  ):hover::after {
   content: "+";
   position: absolute;
   font-size: 25px;

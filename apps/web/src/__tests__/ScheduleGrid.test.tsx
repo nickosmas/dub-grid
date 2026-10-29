@@ -241,6 +241,7 @@ interface RenderGridOptions {
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
   isCellInteractive?: boolean;
+  canOpenCell?: (empId: string, date: Date) => boolean;
   canDragShifts?: boolean;
   activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   noteMarksForKey?: (
@@ -446,6 +447,7 @@ function renderGrid(options: RenderGridOptions = {}) {
       createdByNameForKey: options.createdByNameForKey,
       absenceTypeIdForKey: options.absenceTypeIdForKey,
       activeRequestForKey: options.activeRequestForKey,
+      canOpenCell: options.canOpenCell,
     },
   });
 
@@ -2479,6 +2481,57 @@ describe("ScheduleGrid", () => {
           cellId: expect.objectContaining({ dateKey: formatDateKey(week1[1]) }),
         }),
       );
+    });
+  });
+
+  describe("a viewer who can't edit", () => {
+    const ownCell = (empId: string, date: Date) => empId === "emp-1" && isFirstDay(date);
+
+    it("opens only the cells they can act on and offers no new shift", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      const onOpenCellMenu = vi.fn();
+      renderGrid({
+        canOpenCell: ownCell,
+        canDragShifts: false,
+        shiftForKey: (empId, date) => (ownCell(empId, date) ? "D" : null),
+        assignmentIdsForKey: (empId, date) => (ownCell(empId, date) ? [1] : []),
+        onActivateCell,
+        onOpenCellMenu,
+      });
+
+      const cells = screen.getAllByRole("gridcell") as HTMLElement[];
+      const own = cells.find(
+        (cell) =>
+          cell.dataset.empId === "emp-1" && cell.dataset.dateKey === formatDateKey(week1[0]),
+      )!;
+      const other = cells.find(
+        (cell) =>
+          cell.dataset.empId === "emp-1" && cell.dataset.dateKey === formatDateKey(week1[1]),
+      )!;
+
+      expect(own.dataset.interactive).toBe("true");
+      expect(own.tabIndex).toBe(0);
+      expect(other.dataset.interactive).toBe("false");
+      expect(other.tabIndex).toBe(-1);
+      expect(cells.some((cell) => cell.dataset.addable)).toBe(false);
+
+      fireEvent.click(other);
+      fireEvent.contextMenu(other);
+      expect(onActivateCell).not.toHaveBeenCalled();
+      expect(onOpenCellMenu).not.toHaveBeenCalled();
+
+      fireEvent.click(own);
+      expect(onActivateCell).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the new-shift hint for someone who places shifts", () => {
+      observedWidth = 1600;
+      renderGrid({ canDragShifts: true, shiftForKey: () => null, assignmentIdsForKey: () => [] });
+
+      const cells = screen.getAllByRole("gridcell") as HTMLElement[];
+      expect(cells.every((cell) => cell.dataset.interactive === "true")).toBe(true);
+      expect(cells.every((cell) => cell.dataset.addable === "true")).toBe(true);
     });
   });
 

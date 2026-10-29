@@ -245,6 +245,8 @@ interface LegacyScheduleGridProps {
   jobs?: JobDefinition[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
+  /** Narrows which cells open on click; every cell opens when omitted. */
+  canOpenCell?: (empId: string, date: Date) => boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
   canDragShifts?: boolean;
   noteMarksForKey?: (
@@ -374,6 +376,7 @@ interface SectionBlockProps {
   jobs?: JobDefinition[];
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
+  canOpenCell?: (empId: string, date: Date) => boolean;
   canDragShifts?: boolean;
   noteMarksForKey?: (
     empId: string,
@@ -1127,6 +1130,7 @@ const SectionBlock = memo(function SectionBlock({
   jobs = [],
   indicatorTypes,
   isCellInteractive,
+  canOpenCell,
   canDragShifts = isCellInteractive,
   noteMarksForKey,
   getCustomShiftTimes,
@@ -1580,7 +1584,7 @@ const SectionBlock = memo(function SectionBlock({
         return;
       }
 
-      if (isCellInteractive) {
+      if (isCellInteractive && (!canOpenCell || canOpenCell(emp.id, date))) {
         handleCellClick(emp, date, sectionName, trigger);
       }
     },
@@ -1588,6 +1592,7 @@ const SectionBlock = memo(function SectionBlock({
       buildCellId,
       bulkDeleteMode,
       bulkSelectableCellKeys,
+      canOpenCell,
       handleCellClick,
       isCellInteractive,
       onToggleBulkDeleteCell,
@@ -1608,10 +1613,11 @@ const SectionBlock = memo(function SectionBlock({
         return;
       }
       if (!onCellContextMenu || !isCellInteractive) return;
+      if (canOpenCell && !canOpenCell(emp.id, date)) return;
       event.preventDefault();
       onCellContextMenu(event, anchorEl, cellId, emp, date);
     },
-    [bulkDeleteMode, isCellInteractive, onCellContextMenu],
+    [bulkDeleteMode, canOpenCell, isCellInteractive, onCellContextMenu],
   );
 
   if (employees.length === 0 && (!openShifts || openShifts.length === 0)) {
@@ -2685,7 +2691,10 @@ const SectionBlock = memo(function SectionBlock({
                         // Days before a first day (51g4) carry its own label and no absence.
                         const awayRunBeforeFirstDay =
                           !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
-                        const isDayInteractive = isCellInteractive && !isAwayLocked;
+                        const isDayInteractive =
+                          isCellInteractive &&
+                          !isAwayLocked &&
+                          (!canOpenCell || canOpenCell(emp.id, date));
                         // A past day is finished (53b): it opens for a correction,
                         // and nothing moves into or out of it.
                         const isPastDay = isPastDateKey(dateKey, todayKey);
@@ -2762,6 +2771,9 @@ const SectionBlock = memo(function SectionBlock({
                             data-interactive={isDayInteractive ? "true" : "false"}
                             data-peer-editing={hasPeerEditor ? "true" : "false"}
                             data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            // The empty cell's "+" offers a new shift, so only
+                            // someone who can place shifts sees it.
+                            data-addable={canDragShifts ? "true" : undefined}
                             data-slot="cell"
                             data-leading-divider={
                               index === 0 || absenceRunInside
@@ -5043,6 +5055,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   jobs = [],
   indicatorTypes = [],
   isCellInteractive = true,
+  canOpenCell,
   canDragShifts,
   noteMarksForKey,
   activeFocusArea = null,
@@ -5430,11 +5443,11 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
           }
           description={
             allEmployees.length === 0
-              ? "Add employees on the Staff page to start building your schedule."
+              ? "Add employees on the People page to start building your schedule."
               : filteredEmployees.length === 0
                 ? "Try clearing your search or focus area filter."
-                : isCellInteractive
-                  ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                : isCellInteractive && !canOpenCell
+                  ? "No employees are assigned to this focus area. Add them on the People page."
                   : "No shifts have been published for this period yet."
           }
           style={{ marginTop: 34 }}
@@ -5505,6 +5518,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     jobs={jobs}
                     indicatorTypes={indicatorTypes}
                     isCellInteractive={isCellInteractive}
+                    canOpenCell={canOpenCell}
                     canDragShifts={canDragShifts ?? isCellInteractive}
                     noteMarksForKey={noteMarksForKey}
                     getCustomShiftTimes={getCustomShiftTimes}
@@ -5745,6 +5759,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           jobs={model.jobs}
           indicatorTypes={model.indicatorTypes}
           isCellInteractive={model.options.isCellInteractive}
+          canOpenCell={model.accessors.canOpenCell}
           canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
           noteMarksForKey={model.accessors.noteMarksForKey}
           activeFocusArea={model.activeFocusArea}
