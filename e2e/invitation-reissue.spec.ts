@@ -205,9 +205,9 @@ async function askAndCancel(
 }
 
 const REISSUE = {
-  title: /^Reissue the invitation for /,
+  title: /^Resend the invitation to /,
   consequence: /current one stops working immediately/,
-  confirmLabel: "Reissue",
+  confirmLabel: "Resend",
 };
 const REVOKE = {
   title: /^Revoke the invitation for /,
@@ -264,7 +264,7 @@ test.describe("invitation reissue and revoke", () => {
       // The pending row's access select.
       await row.getByRole("button", { name: "User" }).click();
       await page.getByRole("option", { name: "Admin", exact: true }).click();
-      const changeAccess = page.getByRole("dialog", { name: /^Change invitation access from / });
+      const changeAccess = page.getByRole("dialog", { name: /^Change the invitation for / });
       await expect(changeAccess).toContainText(
         "The current invite link stops working immediately.",
       );
@@ -281,7 +281,7 @@ test.describe("invitation reissue and revoke", () => {
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Reinvite" }),
+        page.getByRole("button", { name: "Resend" }),
         REISSUE,
         "4a-slideover-reinvite-confirmation",
       );
@@ -323,7 +323,7 @@ test.describe("invitation reissue and revoke", () => {
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Reinvite" }),
+        page.getByRole("button", { name: "Resend" }),
         REISSUE,
         "3a-detail-page-reinvite-confirmation",
       );
@@ -442,14 +442,14 @@ test.describe("invitation reissue and revoke", () => {
         }
         await page.getByText("Invitation pending").first().waitFor({ timeout: 120_000 });
 
-        await page.getByRole("button", { name: "Reinvite" }).click();
-        const confirm = page.getByRole("dialog", { name: /^Reissue the invitation for / });
+        await page.getByRole("button", { name: "Resend" }).click();
+        const confirm = page.getByRole("dialog", { name: /^Resend the invitation to / });
         const resend = page.waitForResponse(
           (response) =>
             response.url().endsWith("/api/organizations/invitations") &&
             response.request().method() === "POST",
         );
-        await confirm.getByRole("button", { name: "Reissue" }).click();
+        await confirm.getByRole("button", { name: "Resend" }).click();
         const delivered = (await resend).ok();
         await expect(confirm).toBeHidden();
         await evidence(page, testInfo, `reinvite-${kind}-result`);
@@ -496,7 +496,7 @@ test.describe("invitation reissue and revoke", () => {
       await row.waitFor({ timeout: 60_000 });
       await row.getByRole("button", { name: "User" }).click();
       await page.getByRole("option", { name: "Admin", exact: true }).click();
-      const confirm = page.getByRole("dialog", { name: /^Change invitation access from / });
+      const confirm = page.getByRole("dialog", { name: /^Change the invitation for / });
       const replace = page.waitForResponse(
         (response) =>
           response.url().endsWith("/api/organizations/invitations") &&
