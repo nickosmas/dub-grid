@@ -789,7 +789,7 @@
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
+            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; a month at a time with arrows, Today and Dates; Overview stats for the period with What they work under them, focus areas when they differ, This week and Needs attention",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
             "Schedule tab: recurring schedule with preferences, then shifts and time off as a month calendar first for every period (the period's days stand out, the rest of the month dimmed) or as a list grouped by week from Show as list, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
@@ -817,7 +817,7 @@
             "apps/web/src/lib/shift-records.ts",
             "apps/web/src/lib/time-off.ts",
             "apps/web/src/lib/person-requests.ts",
-            "apps/web/src/components/staff-detail/WorkMixCard.tsx",
+            "apps/web/src/components/staff-detail/WorkMixBreakdown.tsx",
             "apps/web/src/lib/staff-detail-stats.ts",
             "apps/web/src/components/EditEmployeePanel.tsx",
             "apps/web/src/app/api/employees/manage/route.ts",
@@ -836,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c7a5eb3dcfebc5eb0a98f13498ce3e9c5cbe74841eaeb6db02ca51c64ca4f7a7"
+      "evidenceFingerprint": "sha256:bb9124850576f329cc4d9363ae128dc15afc94860aa198ba8c4c62d9f124ab96"
     },
     {
       "id": "invitations",
@@ -1497,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f32d9361a552c83a01a1feac01ba8dec16ff568e747c9f90a891095f32064192"
+      "evidenceFingerprint": "sha256:9c9e6161260fb54ca9ec7d0b4cef364e82298ec9e2b32e7a0c08aadfc4fd4904"
     },
     {
       "id": "security-sessions",

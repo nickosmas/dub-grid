@@ -67,18 +67,18 @@ describe("PersonMonthCalendar", () => {
     const day = within(grid).getByRole("gridcell", { name: "2026-10-29" });
     expect(within(day).getByText("Day Shift")).toBeInTheDocument();
     expect(within(day).getByText("Mentor")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Previous month" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Earlier month in these dates" })).toBeDisabled();
     // A card with a job and one without are the same size.
     const cards = document.querySelectorAll("[data-calendar-pill]");
     expect(cards.length).toBeGreaterThan(0);
     for (const card of cards) expect(card).toHaveClass("h-10");
 
-    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Later month in these dates" }));
     const november = screen.getByRole("grid", { name: "November 2026" });
     expect(
       within(within(november).getByRole("gridcell", { name: "2026-11-02" })).getByText("Day Shift"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Later month in these dates" })).toBeDisabled();
   });
 
   it("shows one month with no arrows when the period is that month", () => {
@@ -93,7 +93,7 @@ describe("PersonMonthCalendar", () => {
     );
 
     expect(screen.getByRole("grid", { name: "October 2026" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Next month" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Later month in these dates" })).toBeNull();
   });
 
   it("fills the whole month around a shorter period when it can load it", async () => {
@@ -113,6 +113,6 @@ describe("PersonMonthCalendar", () => {
     expect(
       await within(screen.getByRole("gridcell", { name: "2026-10-29" })).findByText("Day Shift"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Next month" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Later month in these dates" })).toBeNull();
   });
 });
