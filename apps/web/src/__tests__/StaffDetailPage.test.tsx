@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
-import type { DirectoryPerson } from "@/types";
+import type { DirectoryPerson, RecurringShift } from "@/types";
 import {
   fetchEmployeeById,
   fetchEmployeeShifts,
@@ -623,6 +623,29 @@ describe("StaffDetailPage", () => {
       orgId: "org-1",
     });
     mockSearchParams = new URLSearchParams("tab=schedule");
+    mockedFetchRecurringShifts.mockResolvedValue([
+      {
+        id: "recurring-1",
+        empId: "emp-1",
+        orgId: "org-1",
+        dayOfWeek: 1,
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 5, jobId: 9, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: true,
+        },
+        absenceTypeId: null,
+        shiftLabel: "D",
+        effectiveFrom: "2026-01-01",
+        effectiveUntil: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ] as RecurringShift[]);
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
@@ -631,6 +654,24 @@ describe("StaffDetailPage", () => {
       within(recurringSchedule).getByRole("link", { name: "Edit on Recurring Shifts" }),
     ).toBeVisible();
     expect(screen.getByRole("heading", { name: "Shifts and time off" })).toBeInTheDocument();
+  });
+
+  it("leaves out the recurring schedule when they have none", async () => {
+    mockUsePermissions.mockReturnValue({
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: true,
+      canManageEmployees: true,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await screen.findByRole("heading", { name: "Shifts and time off" });
+    expect(screen.queryByRole("region", { name: "Recurring schedule" })).not.toBeInTheDocument();
   });
 
   it("keeps the editor in a popup and the status and invitation on the page", async () => {

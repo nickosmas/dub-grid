@@ -47,8 +47,13 @@ describe("WorkMixBreakdown", () => {
 
     const rows = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent("Day Shift Supervisor · 7:00 AM - 3:00 PM");
-    for (const text of ["Day Shift", "39 shifts", "83%"]) {
+    for (const text of [
+      "Day Shift",
+      "Day Shift Supervisor",
+      "7:00 AM - 3:00 PM",
+      "39 shifts",
+      "83%",
+    ]) {
       expect(within(rows[0]).getByText(text)).toBeInTheDocument();
     }
     expect(

@@ -26,6 +26,11 @@ Owner's choice (2026-10-30), option A of three sketched:
   when there's more than one kind, and a row per shift and job with its focus
   area (when they differ), job, times, count and share. One kind of work is
   one plain row. The rows are the table, so the table toggle is gone.
+- Each row reads the shift, then its focus area and job, then its time on a
+  line of its own (owner, 2026-10-30).
+- The Schedule tab leaves out Recurring schedule when they have no recurring
+  shifts and no shift preferences, rather than showing an empty card (owner,
+  2026-10-30).
 - The calendar's own arrows, shown only for picked dates spanning months, are
   named "Earlier month in these dates" and "Later month in these dates".
 

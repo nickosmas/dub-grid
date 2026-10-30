@@ -106,11 +106,14 @@ export function WorkMixBreakdown({
               <span className="block text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                 {item.shiftName}
               </span>
-              {details(item) || item.time ? (
-                <span className="dg-tabular-nums block text-[13px] text-[var(--dg-color-text-subtle)]">
+              {details(item) ? (
+                <span className="block text-[13px] text-[var(--dg-color-text-muted)]">
                   {details(item)}
-                  {details(item) && item.time ? " · " : null}
-                  {item.time ? <span className="whitespace-nowrap">{item.time}</span> : null}
+                </span>
+              ) : null}
+              {item.time ? (
+                <span className="dg-tabular-nums block whitespace-nowrap text-[13px] text-[var(--dg-color-text-subtle)]">
+                  {item.time}
                 </span>
               ) : null}
             </span>
