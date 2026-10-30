@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StaffDetailPage } from "./StaffDetailPage";
@@ -172,7 +172,7 @@ const employee = {
   statusNote: "",
 };
 
-const JOINED_LINE = `joined ${new Intl.DateTimeFormat("en-US", {
+const JOINED_DAY = `${new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   year: "numeric",
@@ -232,10 +232,11 @@ describe("StaffDetailPage", () => {
     expect(fetchEmployeeById).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the record in one line under About, joined date included", async () => {
+  it("shows the record in its own card under About, joined date included", async () => {
     renderPage();
 
-    expect(await screen.findByTestId("person-record-line")).toHaveTextContent(JOINED_LINE);
+    const record = await screen.findByTestId("person-record");
+    expect(within(record).getByText("Joined").nextElementSibling).toHaveTextContent(JOINED_DAY);
     expect(screen.getByText("Account").nextElementSibling).toHaveTextContent("Linked account");
   });
 
@@ -248,12 +249,14 @@ describe("StaffDetailPage", () => {
     } as never);
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit work details" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit details" }));
     fireEvent.click(await screen.findByRole("button", { name: "Save details" }));
 
     await waitFor(() => expect(updateEmployee).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByTestId("person-record-line")).toHaveTextContent(JOINED_LINE),
+      expect(
+        within(screen.getByTestId("person-record")).getByText("Joined").nextElementSibling,
+      ).toHaveTextContent(JOINED_DAY),
     );
   });
 

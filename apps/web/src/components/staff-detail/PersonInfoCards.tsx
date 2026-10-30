@@ -60,19 +60,6 @@ function AboutCard({
   );
 }
 
-function EditButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <Button
-      type="button"
-      className="dg-btn dg-btn-secondary dg-btn-sm"
-      onClick={onClick}
-      aria-label={label}
-    >
-      Edit
-    </Button>
-  );
-}
-
 const namesOf = (ids: number[], items: ReadonlyArray<{ id: number; name: string }>) =>
   ids
     .map((id) => items.find((item) => item.id === id)?.name)
@@ -88,7 +75,6 @@ interface WorkCardProps {
   roleLabel?: string;
   /** Management-only people have no schedule fields to show. */
   showScheduleDetails: boolean;
-  onEdit?: () => void;
 }
 
 export function WorkCard({
@@ -100,16 +86,12 @@ export function WorkCard({
   certificationLabel = "Certification",
   roleLabel = "Roles",
   showScheduleDetails,
-  onEdit,
 }: WorkCardProps) {
   const certification = certifications.find((item) => item.id === employee.certificationId);
   const list = (names: string[]) => (names.length > 0 ? names.join(", ") : <Missing>None</Missing>);
 
   return (
-    <AboutCard
-      title="Work"
-      action={onEdit ? <EditButton label="Edit work details" onClick={onEdit} /> : null}
-    >
+    <AboutCard title="Work">
       {showScheduleDetails ? (
         <dl className="m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2">
           <InfoField label={focusAreaLabel}>
@@ -172,7 +154,9 @@ export function AccessCard({
       Send invitation
     </Button>
   ) : onEditAccess ? (
-    <EditButton label="Edit access" onClick={onEditAccess} />
+    <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onEditAccess}>
+      Change access
+    </Button>
   ) : null;
 
   return (
@@ -222,32 +206,46 @@ export function AccessCard({
   );
 }
 
-/** The quiet facts of their record, in one line under the cards. */
-export function RecordLine({ employee }: { employee: Employee }) {
+/** The facts of their record: who they are on file and when things happened. */
+export function RecordCard({ employee }: { employee: Employee }) {
   const planned =
     (employee.status === "active" || plannedReturn(employee)) &&
     describePlannedChangeInFull(employee);
-  const parts = [
-    employee.employeeNumber != null ? `Employee ID #${employee.employeeNumber}` : null,
-    employee.createdAt ? `Added ${DAY.format(new Date(employee.createdAt))}` : null,
-    employee.joinedAt ? `joined ${DAY.format(new Date(employee.joinedAt))}` : null,
-    employee.firstDay ? `first day ${formatFirstDay(employee.firstDay)}` : null,
-    employee.statusChangedAt
-      ? `status changed ${DAY.format(new Date(employee.statusChangedAt))}`
-      : null,
-    planned ? `planned: ${planned}` : null,
-  ].filter((part): part is string => Boolean(part));
+  const day = (value: string | null | undefined) =>
+    value ? DAY.format(new Date(value)) : <Missing>Not recorded</Missing>;
 
-  if (parts.length === 0 && !employee.statusNote) return null;
   return (
-    <div
-      data-testid="person-record-line"
-      className="dg-tabular-nums flex flex-col gap-1 px-0.5 text-[13px] leading-[1.6] text-[var(--dg-color-text-subtle)]"
-    >
-      {parts.length > 0 ? <p className="m-0">{parts.join(" · ")}</p> : null}
+    <AboutCard title="Record">
+      <dl
+        data-testid="person-record"
+        className="dg-tabular-nums m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2"
+      >
+        <InfoField label="Employee ID">
+          {employee.employeeNumber != null ? (
+            `#${employee.employeeNumber}`
+          ) : (
+            <Missing>None</Missing>
+          )}
+        </InfoField>
+        <InfoField label="Added">{day(employee.createdAt)}</InfoField>
+        {employee.joinedAt !== undefined ? (
+          <InfoField label="Joined">
+            {employee.joinedAt ? day(employee.joinedAt) : <Missing>Not joined</Missing>}
+          </InfoField>
+        ) : null}
+        {employee.firstDay ? (
+          <InfoField label="First day">{formatFirstDay(employee.firstDay)}</InfoField>
+        ) : null}
+        <InfoField label="Status changed">{day(employee.statusChangedAt)}</InfoField>
+        {planned ? <InfoField label="Planned">{planned}</InfoField> : null}
+      </dl>
       {employee.statusNote ? (
-        <p className="m-0 whitespace-pre-wrap">Status note: {employee.statusNote}</p>
+        <dl className="m-0 mt-4 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3">
+          <InfoField label="Status note">
+            <span className="whitespace-pre-wrap">{employee.statusNote}</span>
+          </InfoField>
+        </dl>
       ) : null}
-    </div>
+    </AboutCard>
   );
 }
