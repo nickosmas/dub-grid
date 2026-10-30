@@ -99,6 +99,8 @@ type MyScheduleRowProps = Pick<
   indicatorTypes?: DashboardContentProps["indicatorTypes"];
   /** Sees draft notes, as on the schedule page. */
   isScheduleEditor?: boolean;
+  /** The card's wording when it shows someone else's days, as on the staff page. */
+  copy?: { title: string; emptyTitle: string; emptyDescription: string };
 };
 
 type MyScheduleShift = {
@@ -895,6 +897,7 @@ export default function MyScheduleRow({
   scheduleNotes = NO_NOTES,
   indicatorTypes = NO_INDICATOR_TYPES,
   isScheduleEditor = false,
+  copy,
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -967,7 +970,7 @@ export default function MyScheduleRow({
     <div className="dg-card" data-testid="my-schedule-row">
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">Your schedule</div>
+          <div className="dg-card-title">{copy?.title ?? "Your schedule"}</div>
           <div className="dg-card-subtitle">{periodLabel}</div>
         </div>
       </div>
@@ -976,8 +979,11 @@ export default function MyScheduleRow({
           <EmptyState
             size="inline"
             icon={<CalendarDays size={20} />}
-            title={`You're not scheduled ${periodLabel}`}
-            description="When your shifts get published, they'll show up right here."
+            title={copy?.emptyTitle ?? `You're not scheduled ${periodLabel}`}
+            description={
+              copy?.emptyDescription ??
+              "When your shifts get published, they'll show up right here."
+            }
           />
         ) : (
           <div

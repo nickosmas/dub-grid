@@ -21,7 +21,7 @@ import {
   revokeInvitation,
 } from "@/features/organization/client";
 import { fetchCorrections, fetchRecurringShifts } from "@/features/schedule/client";
-import { getProfileOverviewDateRange } from "@/features/account/shared/profile-schedule";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -142,10 +142,17 @@ vi.mock("@/components/ProgressBar", () => ({
 }));
 
 vi.mock("@/components/staff-detail/tabs/StaffOverviewTab", () => ({
-  StaffOverviewTab: ({ range }: { range: { startDate: string; endDate: string } }) => (
+  StaffOverviewTab: ({
+    range,
+    about,
+  }: {
+    range: { startDate: string; endDate: string };
+    about: ReactNode;
+  }) => (
     <div>
       <div>Overview content</div>
       <div data-testid="overview-range">{`${range.startDate}..${range.endDate}`}</div>
+      {about}
     </div>
   ),
 }));
@@ -161,7 +168,8 @@ vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
   ),
 }));
 
-vi.mock("@/components/staff-detail/RecurringScheduleCard", () => ({
+vi.mock("@/components/staff-detail/RecurringScheduleCard", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/staff-detail/RecurringScheduleCard")>()),
   RecurringScheduleCard: () => <div>Recurring schedule card</div>,
 }));
 
@@ -397,7 +405,7 @@ describe("StaffDetailPage", () => {
 
     it("offers no arrows without a saved list, or for someone not in it", async () => {
       render(<StaffDetailPage employeeId="emp-1" />);
-      await screen.findByText("Work details");
+      await screen.findByText("Internal notes");
       expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
     });
 
@@ -407,7 +415,7 @@ describe("StaffDetailPage", () => {
         JSON.stringify({ orgId: "org-2", ids: ["emp-0", "emp-1"] }),
       );
       render(<StaffDetailPage employeeId="emp-1" />);
-      await screen.findByText("Work details");
+      await screen.findByText("Internal notes");
       expect(screen.queryByRole("group", { name: "Move between people" })).not.toBeInTheDocument();
     });
   });
@@ -438,24 +446,26 @@ describe("StaffDetailPage", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Margaret Sullivan" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Work details")).toBeInTheDocument();
+    expect(screen.getByText("Internal notes")).toBeInTheDocument();
     expect(screen.getByText("Overview content")).toBeInTheDocument();
     expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
-  it("bounds the staff Overview shift load to the shared twelve-week metrics window", async () => {
+  it("loads today and the next six days for the Next 7 days strip", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    await screen.findByText("Work details");
-    const range = getProfileOverviewDateRange(new Date(), "Pacific/Honolulu");
-    expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
-      "emp-1",
-      "org-1",
-      expect.any(Map),
-      expect.any(Map),
-      range.startDate,
-      range.endDate,
+    await screen.findByText("Internal notes");
+    const today = getIsoDateInTimeZone(new Date(), "Pacific/Honolulu");
+    await waitFor(() =>
+      expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
+        "emp-1",
+        "org-1",
+        expect.any(Map),
+        expect.any(Map),
+        today,
+        addDaysToIsoDate(today, 6),
+      ),
     );
   });
 
@@ -484,10 +494,10 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("button", { name: "Period" })).toBeInTheDocument();
   });
 
-  it("loads corrections for the Shifts tab only for someone who can edit shifts", async () => {
-    mockSearchParams = new URLSearchParams("tab=shifts");
+  it("loads corrections for the Schedule tab only for someone who can edit shifts", async () => {
+    mockSearchParams = new URLSearchParams("tab=schedule");
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Shifts and time off");
     expect(vi.mocked(fetchCorrections)).not.toHaveBeenCalled();
 
     mockUsePermissions.mockReturnValue({
@@ -511,10 +521,7 @@ describe("StaffDetailPage", () => {
     const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
       "Overview",
-      "Shifts",
-      "Time off",
-      "Requests",
-      "Access",
+      "Schedule",
       "Activity",
     ]);
     expect(tabs.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-pressed", "true");
@@ -547,13 +554,26 @@ describe("StaffDetailPage", () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(href));
   });
 
-  it("falls back to Overview for a tab the viewer can't see", async () => {
-    mockSearchParams = new URLSearchParams("tab=recurring");
+  it("falls back to Overview for a tab it doesn't know", async () => {
+    mockSearchParams = new URLSearchParams("tab=billing");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Overview content")).toBeInTheDocument();
-    expect(screen.queryByText("Recurring schedule card")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["shifts", "/people/emp-1?tab=schedule"],
+    ["timeoff", "/people/emp-1?tab=schedule"],
+    ["recurring", "/people/emp-1?tab=schedule"],
+    ["requests", "/people/emp-1?tab=activity"],
+    ["access", "/people/emp-1"],
+  ])("sends an old ?tab=%s link to the tab that holds it now", async (tab, href) => {
+    mockSearchParams = new URLSearchParams(`tab=${tab}`);
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(href));
   });
 
   it("keeps Activity away from a viewer who can't read it", async () => {
@@ -576,7 +596,7 @@ describe("StaffDetailPage", () => {
     expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
   });
 
-  it("shows recurring schedules on the Recurring tab when permitted", async () => {
+  it("shows their usual week and preferences on the Schedule tab when permitted", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,
       canViewRecurringShifts: true,
@@ -586,18 +606,18 @@ describe("StaffDetailPage", () => {
       isLoading: false,
       orgId: "org-1",
     });
-    mockSearchParams = new URLSearchParams("tab=recurring");
+    mockSearchParams = new URLSearchParams("tab=schedule");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Recurring schedule card")).toBeInTheDocument();
-    expect(await screen.findByText("Shift preferences")).toBeInTheDocument();
-    expect(await screen.findByText("Any shift")).toBeInTheDocument();
+    const usualWeek = await screen.findByRole("region", { name: "Usual week" });
+    expect(within(usualWeek).getByRole("link", { name: "Edit on Recurring Shifts" })).toBeVisible();
+    expect(screen.getByText("Shifts and time off")).toBeInTheDocument();
   });
 
   it("keeps the editor in a popup and the status and invitation on the page", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
 
     expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
     expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
@@ -613,7 +633,7 @@ describe("StaffDetailPage", () => {
       expiresAt: "2099-01-04T00:00:00.000Z",
     });
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
 
     fireEvent.click(screen.getByRole("button", { name: "Resend" }));
     fireEvent.click(await screen.findByRole("button", { name: "Resend" }));
@@ -716,16 +736,16 @@ describe("StaffDetailPage", () => {
       loading: false,
     });
 
-    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
-    expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
+    await screen.findByText("Internal notes");
+    expect(screen.getByText("Manages")).toBeInTheDocument();
+    expect(screen.getByText("HR")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
     // Management settings always open in a popup, never inline in the card.
-    fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit management access" }));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByText("Management access editor")).toBeInTheDocument();
@@ -775,31 +795,28 @@ describe("StaffDetailPage", () => {
       error: null,
     });
 
-    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
 
-    expect(
-      screen.getByText("Organization role and the permissions it carries."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Role")).toBeInTheDocument();
-    // Not a management user, so the management card stays away entirely.
-    expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+    expect(screen.getByText("Access level")).toBeInTheDocument();
+    expect(screen.getByText("User")).toBeInTheDocument();
+    // Not a management user, so what they manage stays away entirely.
+    expect(screen.queryByText("Manages")).not.toBeInTheDocument();
+
+    // The role and permissions open in a popup.
+    fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit access" });
+    expect(within(dialog).getByText("Role")).toBeInTheDocument();
   });
 
   it("says someone has no app access, and offers an invite where they can be invited", async () => {
-    mockSearchParams = new URLSearchParams("tab=access");
     mockedFetchEmployeeInvitations.mockResolvedValue([]);
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
 
-    // Once as the header pill and once as the Access tab's empty state.
-    expect(screen.getAllByText("No app access")).toHaveLength(2);
-    expect(
-      screen.getByText("They can't sign in until they accept an invitation."),
-    ).toBeInTheDocument();
-    // In the header and in the empty state.
+    expect(screen.getByText("No app access")).toBeInTheDocument();
+    // In the header and on the Access card.
     expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(2);
   });
 
@@ -830,13 +847,12 @@ describe("StaffDetailPage", () => {
       error: null,
     });
 
-    mockSearchParams = new URLSearchParams("tab=access");
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
 
-    expect(screen.getByText("Management departments")).toBeInTheDocument();
-    // One Role label, in the Access card, not duplicated in the card below.
-    expect(screen.getAllByText("Role")).toHaveLength(1);
+    // One access level, and what they manage beside it.
+    expect(screen.getAllByText("Access level")).toHaveLength(1);
+    expect(screen.getByText("Manages")).toBeInTheDocument();
   });
 
   it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {
@@ -951,13 +967,13 @@ describe("StaffDetailPage", () => {
     });
 
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Work details");
+    await screen.findByText("Internal notes");
     // canViewEmployeeDetails can be granted without canManageEmployees (a
     // per-person admin permission bit) — that viewer must see the read-only
     // summary, never the live editable form.
     expect(screen.queryByRole("button", { name: "Edit work details" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit contact" })).not.toBeInTheDocument();
-    expect(screen.getByText("Employment")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
+    expect(screen.getByText("Focus Areas")).toBeInTheDocument();
   });
 
   it.each([

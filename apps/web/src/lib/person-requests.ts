@@ -23,6 +23,8 @@ export interface PersonRequestRow {
   decidedBy: string | null;
   /** Still waiting on a manager. */
   waiting: boolean;
+  /** Where a manager reviews it. */
+  reviewHref: string;
 }
 
 const DAY = new Intl.DateTimeFormat("en-US", {
@@ -101,6 +103,7 @@ export function buildPersonRequestRows(
           ? nameOfUser(request.adminUserId)
           : null,
       waiting: request.status === "pending_approval",
+      reviewHref: "/schedule?requests=approval",
     });
   }
 
@@ -129,6 +132,7 @@ export function buildPersonRequestRows(
           ? nameOfUser(request.resolverUserId)
           : null,
       waiting: request.status === "pending",
+      reviewHref: "/people",
     });
   }
 

@@ -19,7 +19,7 @@ interface PersonRecordCardProps {
   lastSignInAt?: string | null;
 }
 
-const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
+export const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
   linked: "Linked account",
   pending: "Invitation pending",
   expired: "Invitation expired",

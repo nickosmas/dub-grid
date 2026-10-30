@@ -1,6 +1,6 @@
 ---
 title: "Person Page"
-description: "Everything about one person: their work details, record, access, schedule pattern, and history."
+description: "Everything about one person in three tabs: an overview, their schedule, and their activity."
 ---
 
 Each person has a page with everything about them. Open it by selecting their name on **People**. You need permission to view staff details; you see your own details on your profile instead.
@@ -9,31 +9,22 @@ Everything is on one page. **Back to People** returns to the directory.
 
 ## The header
 
-Their name, with a status icon after it unless they're Active and a star for an Admin or Super Admin, and their employee number. **No app access** shows when they have no account or invitation. Depending on your permissions and the person, the header also offers **Send invitation** (they have an email but no account or invitation yet), and **Add to schedule** or **Add to management**.
+Their name, with a star for an Admin or Super Admin and a status icon after it unless they're Active. Under the name are their roles, focus areas and employment type, then their email and phone. Depending on your permissions and the person, the header offers **Send invitation** (they have an email but no account or invitation yet), **Add to schedule** or **Add to management**, and **Edit details** if you can manage staff.
 
 Opened from **People**, the header also shows where they are in that list, such as **7 of 37**, with arrows to the previous and next person in the same order and filters.
 
-## Beside the tabs
-
-- **Contact**: their email and phone.
-- **Work details**: employment type, focus areas, certification, roles, and internal notes.
-- **Record**: when they were added and joined, their first day if one is set, their status and when it last changed with any note, whether they have an account, and when they were last active. The account line reads **Linked account**, **Invitation pending**, **Invitation expired**, **Not invited**, or **No email**.
-
-If you can manage staff, **Edit** on Contact or Work details opens their details to change.
-
-Above the tabs, a card says where their status stands, with **Change status** in it when you can change it, or a button named for the one change possible right now, such as **Offboard**. A [first day](/staff/roster#a-first-day) still ahead or a planned change has its own card beside it. See [People](/staff/roster) for what each status means. If their invitation is pending or expired, a banner says so, with **Resend** and **Revoke**. See [Invitations](/staff/invitations).
+Under the header, a card says where their status stands, with **Change status** in it when you can change it, or a button named for the one change possible right now, such as **Offboard**. A [first day](/staff/roster#a-first-day) still ahead or a planned change has its own card beside it. See [People](/staff/roster) for what each status means. If their invitation is pending or expired, a banner says so, with **Resend** and **Revoke**. See [Invitations](/staff/invitations).
 
 ## Tabs
 
-- **Overview**: their hours, average hours per week, shifts, and weeks with overtime for the period, this week day by day, their next time off in the coming six months, requests about them **Waiting on you** if you can review requests, and **What they work**, their shifts and jobs in the period as a chart, with a table view.
-- **Shifts**: every shift in the period, newest first: the shift and job, its times, focus area and hours, and whether it's a draft, published or corrected, with what a draft replaces, a correction's reason, an absence beside it, and how many schedule notes it has. Filter by state, and **Export CSV** to download the rows shown.
-- **Time off**: absences and time away in the period, newest first, with their dates, how many days, and whether they're planned, happening now or taken. Absences on days in a row read as one entry; part of a day names the time it covers. Your organization's day off absence is left out unless you show it.
-- **Requests**: their pickups, swaps, call-offs, and profile change requests sent in the period, newest first, with whether each is awaiting approval, approved, rejected, canceled or expired, and who decided. You see it if you can review requests.
-- **Recurring**: their **Recurring schedule**, the weekly pattern for repeating assignments, and their shift preferences, with a link to change them on **Recurring Shifts**. You see it if you can view recurring schedules.
-- **Access**: their role and the permissions it carries, and the departments they manage, if any. A Super Admin can change the role, choose which permissions an Admin has, and edit the departments; see [Roles and permissions](/reference/roles). Someone with no app access shows what's needed to invite them.
-- **Activity**: profile edits, status changes, access changes, and invitations for this person. Super Admins see it, as do Admins who can view staff details.
+- **Overview**: their hours, shifts, and average hours per week for the period; **Next 7 days**, today and the six days after it, shown as on your dashboard; **Needs attention**, requests about them waiting on you, when there are any and you can review requests, each with **Review**; and **What they work**, their shifts and jobs in the period as a chart, with a table view. Under **About**:
+  - **Work**: focus areas, certification, roles, and internal notes.
+  - **Access**: their access level, how many permissions an Admin has, the departments they manage, if any, whether they have an account (**Linked account**, **Invitation pending**, **Invitation expired**, **Not invited**, or **No email**), and when they were last active. A Super Admin can **Edit** the access level and choose which permissions an Admin has; see [Roles and permissions](/reference/roles). Someone with an email and no app access offers **Send invitation**.
+  - One line with their employee ID, when they were added and joined, their first day if one is set, when their status last changed, any planned change, and any status note.
+- **Schedule**: their **Usual week**, the weekly pattern for repeating assignments, with their shift and job preferences and a link to change them on **Recurring Shifts** (if you can view recurring schedules). Then **Shifts and time off** in the period, newest first, grouped by week: each shift with its job, times, focus area, what a draft replaces, a correction's reason, an absence beside it, and how many schedule notes it has; and each absence or time away with its dates and days. Drafts, corrections, and time off that's planned or happening now are marked. Show **All**, **Shifts**, or **Time off**, and **Export CSV** to download the shifts. Your organization's day off absence is left out unless you show it.
+- **Activity**: their pickups, swaps, call-offs, and profile change requests sent in the period, newest first, with whether each is awaiting approval, approved, rejected, canceled or expired, and who decided, if you can review requests; then profile edits, status changes, access changes, and invitations for this person, which Super Admins see, as do Admins who can view staff details. Show **All**, **Requests**, or **Changes**. The tab shows how many requests are waiting on you.
 
-On **Overview**, **Shifts**, **Time off**, **Requests**, and **Activity**, choose the period they cover: **Current week**, **Pay period**, **This month**, **Last 12 weeks**, or **Custom** dates, up to a year. Pay period needs your organization's pay period set in [Schedule Rules](/configuration/schedule-rules-and-display). Your browser remembers the period you chose.
+Choose the period the tabs cover: **Current week**, **Pay period**, **This month**, **Last 12 weeks**, or **Custom** dates, up to a year. Pay period needs your organization's pay period set in [Schedule Rules](/configuration/schedule-rules-and-display). Your browser remembers the period you chose. Older links to a Shifts, Time off, Recurring, Requests, or Access tab open the tab that holds it now.
 
 ## Editing a person
 

@@ -63,12 +63,14 @@ describe("buildPersonRequestRows", () => {
       state: "Awaiting approval",
       tone: "warning",
       waiting: true,
+      reviewHref: "/schedule?requests=approval",
     });
     expect(rows[1]).toMatchObject({
       type: "Profile change",
       details: "Last name, Wings",
       secondary: "Married",
       waiting: true,
+      reviewHref: "/people",
     });
   });
 
