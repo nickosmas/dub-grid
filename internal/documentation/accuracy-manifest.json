@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9e60518103e8035da2d079fe0cb79ede5964ad7a85e0576c7b8df063906d4396"
+      "evidenceFingerprint": "sha256:f6bfd9cc82971905200ea9c018ce613c8ccd907d6e006277d6a7127e43f66728"
     },
     {
       "id": "realtime",
@@ -789,11 +789,12 @@
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Schedule and Activity tabs; older tab links open the tab that holds them; who sees Usual week and Activity; period choices; Overview stats for the period, Next 7 days, Needs attention, What they work and remembered choice",
+            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Schedule tab: Usual week with preferences, then shifts and time off in the period grouped by week, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the All, Shifts and Time off filter, CSV export, and day off hidden unless shown",
-            "Activity tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, then the change log; the All, Requests and Changes filter and the waiting count"
+            "Schedule tab: recurring schedule with preferences, a month calendar of the period with drafts outlined, then shifts and time off grouped by week, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
+            "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, the filter dropdown and the waiting count",
+            "Activity tab: the change log for the period, filtered by kind from its dropdown"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
@@ -806,6 +807,8 @@
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/lib/schedule-rows.ts",
             "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/RequestsTab.tsx",
+            "apps/web/src/components/staff-detail/PersonMonthCalendar.tsx",
             "apps/web/src/components/dashboard/MyScheduleRow.tsx",
             "apps/web/src/lib/period-presets.ts",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
@@ -833,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5243f83d51380736dd4e45461b083c965bf563294bccbbdb205fe32373905b03"
+      "evidenceFingerprint": "sha256:1625660d7e9d4698627f9ed9d87de424400f73c0c8c3bb65a0c3bf2d97e1c7ba"
     },
     {
       "id": "invitations",
@@ -1494,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ab688af1af37f12a61b0fa72fbc28809e6193a92d5bb200915da6aae3cad536f"
+      "evidenceFingerprint": "sha256:bad24e9d3c9064629dc9608a4bb3a165caba308d3503263f64ca85f0b12237c5"
     },
     {
       "id": "security-sessions",
@@ -1573,7 +1576,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:210a3a683087ca976b0465798f82d063af1a75526ba31e2baeebfe2c25cc0216"
+      "evidenceFingerprint": "sha256:d0a09b6ef0c82ed98b068ee472e86cc5f8ff63660e24c5a890a7eef352d70131"
     },
     {
       "id": "privacy-controls",

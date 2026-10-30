@@ -366,8 +366,10 @@ export function computePeriodHours(
 export interface WorkMixEntry {
   key: string;
   shiftName: string;
-  /** Null when the shift has no job. */
+  /** Null when the shift has no job, or the job only repeats the shift's name. */
   jobName: string | null;
+  /** The focus area the shift belongs to; shift names repeat across focus areas. */
+  focusAreaName: string | null;
   /** "7:00 AM - 3:00 PM", or null when the shift has no set times. */
   time: string | null;
   count: number;
@@ -389,6 +391,7 @@ export function computeWorkMix(
   shiftById: Map<number, ShiftCategory>,
   jobById: Map<number, { name: string }>,
   range: { startDate: string; endDate: string },
+  focusAreaById: Map<number, { name: string }> = new Map(),
 ): WorkMixEntry[] {
   const pairs = new Map<string, Omit<WorkMixEntry, "share">>();
   let total = 0;
@@ -403,12 +406,16 @@ export function computeWorkMix(
     const job = assignment.jobId != null ? jobById.get(assignment.jobId) : undefined;
     const key = shift ? `${shift.id}:${assignment.jobId ?? ""}` : `assignment:${assignment.id}`;
     const existing = pairs.get(key);
+    const shiftName = shift?.name ?? assignment.name;
+    const focusAreaId = shift?.focusAreaId ?? assignment.focusAreaId ?? null;
     if (existing) existing.count++;
     else
       pairs.set(key, {
         key,
-        shiftName: shift?.name ?? assignment.name,
-        jobName: job?.name ?? null,
+        shiftName,
+        jobName:
+          job && job.name.trim().toLowerCase() !== shiftName.trim().toLowerCase() ? job.name : null,
+        focusAreaName: focusAreaId != null ? (focusAreaById.get(focusAreaId)?.name ?? null) : null,
         time: formatScheduleTimeRange(
           shift?.startTime ?? assignment.defaultStartTime ?? null,
           shift?.endTime ?? assignment.defaultEndTime ?? null,
@@ -429,6 +436,13 @@ export function computeWorkMix(
   const otherCount = ranked.slice(WORK_MIX_SLICES - 1).reduce((sum, item) => sum + item.count, 0);
   return [
     ...kept,
-    { key: "other", shiftName: "Other", jobName: null, time: null, count: otherCount },
+    {
+      key: "other",
+      shiftName: "Other",
+      jobName: null,
+      focusAreaName: null,
+      time: null,
+      count: otherCount,
+    },
   ].map(withShare);
 }

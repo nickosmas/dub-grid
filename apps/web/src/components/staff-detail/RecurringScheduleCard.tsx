@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useMemo } from "react";
 import { useTheme } from "next-themes";
 import { CalendarClock } from "lucide-react";
@@ -182,12 +183,11 @@ export function RecurringScheduleCard({
       </div>
       <div className="dg-card-body">
         {recurringShifts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <CalendarClock className="mb-3 h-7 w-7 text-[var(--dg-color-text-faint)]" />
-            <p className="text-[13px] text-[var(--dg-color-text-muted)]">
-              No recurring shifts configured
-            </p>
-          </div>
+          <EmptyState
+            size="compact"
+            icon={<CalendarClock size={20} />}
+            title="No recurring shifts configured"
+          />
         ) : (
           <div>
             <div className="grid grid-cols-7 items-stretch gap-1 text-center">

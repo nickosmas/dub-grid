@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { ChartPie } from "lucide-react";
@@ -52,6 +53,8 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
   const [asTable, setAsTable] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const total = mix.reduce((sum, item) => sum + item.count, 0);
+  // Shift names repeat across focus areas, so name the area once they differ.
+  const showFocusArea = new Set(mix.map((item) => item.focusAreaName).filter(Boolean)).size > 1;
 
   // A pair keeps its color however the counts move: slots follow the pairs'
   // own order (shift, then job), never their rank.
@@ -107,9 +110,7 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
 
       <div className="dg-card-body">
         {total === 0 ? (
-          <p className="py-6 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            No shifts {periodPhrase}.
-          </p>
+          <EmptyState size="inline" title={`No shifts ${periodPhrase}`} />
         ) : asTable ? (
           <table className="w-full text-[13px]">
             <thead>
@@ -126,6 +127,12 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
                   <td className="py-2 pr-2">
                     <div className="font-medium text-[var(--dg-color-text-primary)]">
                       {item.shiftName}
+                      {showFocusArea && item.focusAreaName ? (
+                        <span className="font-normal text-[var(--dg-color-text-muted)]">
+                          {" "}
+                          · {item.focusAreaName}
+                        </span>
+                      ) : null}
                     </div>
                     {item.time ? (
                       <div className="dg-tabular-nums text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-subtle)]">
@@ -162,7 +169,7 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
                   onMouseEnter={() => setActive(item.key)}
                   className="transition-opacity duration-150"
                 >
-                  <title>{`${item.shiftName}${item.jobName ? ` as ${item.jobName}` : ""}: ${item.count} shifts, ${item.share}%`}</title>
+                  <title>{`${item.shiftName}${showFocusArea && item.focusAreaName ? ` in ${item.focusAreaName}` : ""}${item.jobName ? ` as ${item.jobName}` : ""}: ${item.count} shifts, ${item.share}%`}</title>
                 </path>
               ))}
               <text
@@ -201,6 +208,12 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
                   <span className="min-w-0">
                     <span className="block text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                       {item.shiftName}
+                      {showFocusArea && item.focusAreaName ? (
+                        <span className="font-normal text-[var(--dg-color-text-muted)]">
+                          {" "}
+                          · {item.focusAreaName}
+                        </span>
+                      ) : null}
                     </span>
                     {item.jobName ? (
                       <span className="block text-[13px] text-[var(--dg-color-text-muted)]">

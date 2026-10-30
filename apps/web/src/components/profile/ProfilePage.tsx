@@ -297,7 +297,7 @@ export function ProfilePage() {
                 lookups={lookups}
                 absenceTypes={absenceTypes}
                 dayOffAbsenceTypeId={org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null}
-                usualWeek={{
+                recurringSchedule={{
                   orgId: null,
                   editHref: null,
                   recurringShifts,
@@ -307,7 +307,7 @@ export function ProfilePage() {
                   focusAreas,
                   absenceTypes,
                 }}
-                afterUsualWeek={<CalendarSubscriptionCard />}
+                afterRecurringSchedule={<CalendarSubscriptionCard />}
               />
             )}
 

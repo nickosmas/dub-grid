@@ -36,6 +36,8 @@ interface StaffOverviewTabProps {
     periodLabel: string;
     emptyTitle: string;
     emptyDescription: string;
+    /** Shows drafts and their marks, as the schedule does for editors. */
+    editorView?: boolean;
   };
   /** "About", or "About you" on your own profile. */
   aboutTitle?: string;
@@ -77,6 +79,10 @@ export function StaffOverviewTab({
     [shiftCategories],
   );
   const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const focusAreaById = useMemo(
+    () => new Map(focusAreas.map((area) => [area.id, area])),
+    [focusAreas],
+  );
 
   const summary = useMemo(
     () =>
@@ -88,9 +94,17 @@ export function StaffOverviewTab({
   const mix = useMemo(
     () =>
       periodShifts
-        ? computeWorkMix(employee.id, periodShifts, assignmentById, shiftById, jobById, range)
+        ? computeWorkMix(
+            employee.id,
+            periodShifts,
+            assignmentById,
+            shiftById,
+            jobById,
+            range,
+            focusAreaById,
+          )
         : [],
-    [assignmentById, employee.id, jobById, periodShifts, range, shiftById],
+    [assignmentById, employee.id, focusAreaById, jobById, periodShifts, range, shiftById],
   );
 
   const firstName = employee.firstName || "They";
@@ -134,7 +148,7 @@ export function StaffOverviewTab({
           focusAreas={focusAreas}
           periodDates={nextDays.dates}
           periodLabel={nextDaysCopy?.periodLabel ?? "Today and the next six days"}
-          isScheduleEditor={!nextDaysCopy}
+          isScheduleEditor={nextDaysCopy ? Boolean(nextDaysCopy.editorView) : true}
           copy={
             nextDaysCopy ?? {
               title: "Next 7 days",

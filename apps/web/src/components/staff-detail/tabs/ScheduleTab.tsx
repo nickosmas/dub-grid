@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
 import { StatusPill } from "@/components/ui/status-pill";
-import { SpanTabs } from "@/components/ui/span-tabs";
+import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 import { describePreference, shiftLabel } from "@/components/staff/PreferencesModal";
 import { fetchJobPreferences, fetchShiftPreferences } from "@/features/schedule/client";
 import { DAY_LABELS } from "@/lib/constants";
@@ -27,6 +28,7 @@ import type {
   ShiftMap,
 } from "@/types";
 import { buildDayPills, type DayPill } from "../RecurringScheduleCard";
+import { PersonMonthCalendar } from "../PersonMonthCalendar";
 
 type Filter = "all" | "shift" | "timeoff";
 
@@ -43,10 +45,12 @@ interface ScheduleTabProps {
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;
-  /** Shown between the usual week and the list, such as the calendar subscription. */
-  afterUsualWeek?: ReactNode;
+  /** Lets the calendar load any month; without it the calendar stays inside the period. */
+  loadMonth?: ComponentProps<typeof PersonMonthCalendar>["loadMonth"];
+  /** Shown between the recurring schedule and the list, such as the calendar subscription. */
+  afterRecurringSchedule?: ReactNode;
   /** Null when this viewer can't see recurring schedules. */
-  usualWeek: {
+  recurringSchedule: {
     /** Loads their shift and job preferences; null leaves them out. */
     orgId: string | null;
     /** Where the pattern is changed; null when this viewer can't change it. */
@@ -60,7 +64,7 @@ interface ScheduleTabProps {
   } | null;
 }
 
-/** Their usual week, then every shift and time off in the period. */
+/** Their recurring schedule, then every shift and time off in the period. */
 export function ScheduleTab({
   employee,
   shifts,
@@ -73,8 +77,9 @@ export function ScheduleTab({
   noteCounts,
   absenceTypes,
   dayOffAbsenceTypeId,
-  usualWeek,
-  afterUsualWeek,
+  recurringSchedule,
+  afterRecurringSchedule,
+  loadMonth,
 }: ScheduleTabProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [includeDayOff, setIncludeDayOff] = useState(false);
@@ -121,8 +126,18 @@ export function ScheduleTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {usualWeek ? <UsualWeekCard employeeId={employee.id} {...usualWeek} /> : null}
-      {afterUsualWeek}
+      {recurringSchedule ? (
+        <RecurringWeekCard employeeId={employee.id} {...recurringSchedule} />
+      ) : null}
+      {afterRecurringSchedule}
+      <PersonMonthCalendar
+        employeeId={employee.id}
+        shifts={shifts}
+        range={range}
+        today={today}
+        lookups={lookups}
+        loadMonth={loadMonth}
+      />
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -137,15 +152,15 @@ export function ScheduleTab({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SpanTabs<Filter>
-            aria-label="Show"
-            items={[
-              { value: "all", label: "All" },
-              { value: "shift", label: "Shifts" },
-              { value: "timeoff", label: "Time off" },
-            ]}
+          <CustomSelect<Filter>
+            ariaLabel="Show"
             value={filter}
             onChange={setFilter}
+            options={[
+              { value: "all", label: "Shifts and time off" },
+              { value: "shift", label: "Shifts only" },
+              { value: "timeoff", label: "Time off only" },
+            ]}
           />
           {dayOffName && filter !== "shift" ? (
             <Button
@@ -168,17 +183,13 @@ export function ScheduleTab({
         </div>
       </div>
 
-      <section className="dg-card overflow-hidden" aria-label="Shifts and time off">
-        {loading ? (
-          <p className="m-0 px-5 py-8 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            Loading their schedule
-          </p>
-        ) : weeks.length === 0 ? (
-          <p className="m-0 px-5 py-8 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            Nothing {periodPhrase}.
-          </p>
-        ) : (
-          weeks.map((week, weekIndex) => (
+      {loading ? (
+        <EmptyState size="compact" title="Loading their schedule" />
+      ) : weeks.length === 0 ? (
+        <EmptyState size="compact" title={`Nothing ${periodPhrase}`} />
+      ) : (
+        <section className="dg-card overflow-hidden" aria-label="Shifts and time off">
+          {weeks.map((week, weekIndex) => (
             <div key={week.weekStart}>
               <div
                 className={`bg-[var(--dg-color-bg-secondary)] px-5 pb-2 pt-3 text-[13px] font-semibold text-[var(--dg-color-text-secondary)] ${weekIndex > 0 ? "border-t border-[var(--dg-color-border)]" : ""}`}
@@ -215,14 +226,14 @@ export function ScheduleTab({
                 </div>
               ))}
             </div>
-          ))
-        )}
-      </section>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
 
-function UsualWeekCard({
+function RecurringWeekCard({
   orgId,
   editHref = "/people?section=recurring-schedule",
   employeeId,
@@ -232,7 +243,7 @@ function UsualWeekCard({
   jobs,
   focusAreas,
   absenceTypes,
-}: NonNullable<ScheduleTabProps["usualWeek"]> & { employeeId: string }) {
+}: NonNullable<ScheduleTabProps["recurringSchedule"]> & { employeeId: string }) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const lookups = useMemo(
@@ -280,9 +291,9 @@ function UsualWeekCard({
     .map((shift) => `${DAY_LABELS[shift.dayOfWeek]} until ${shift.effectiveUntil}`);
 
   return (
-    <section className="dg-card" aria-label="Usual week">
+    <section className="dg-card" aria-label="Recurring schedule">
       <div className="dg-card-header">
-        <div className="dg-card-title">Usual week</div>
+        <div className="dg-card-title">Recurring schedule</div>
         {editHref ? (
           <Link
             href={editHref}
@@ -294,9 +305,7 @@ function UsualWeekCard({
       </div>
       <div className="dg-card-body">
         {recurringShifts.length === 0 ? (
-          <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
-            No recurring shifts yet.
-          </p>
+          <EmptyState size="inline" title="No recurring shifts yet" />
         ) : (
           <div className="dg-no-scrollbar overflow-x-auto">
             <div className="grid min-w-[700px] grid-cols-7 gap-2.5">
@@ -339,7 +348,7 @@ function UsualWeekCard({
   );
 }
 
-/** The dashboard's Your schedule card, for a day of the usual week. */
+/** The dashboard's Your schedule card, for a day of the recurring schedule. */
 function WeekPill({ pill }: { pill: DayPill }) {
   return (
     <div

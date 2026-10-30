@@ -130,6 +130,7 @@ describe("computeWorkMix", () => {
         key: "10:100",
         shiftName: "Day Shift",
         jobName: "Day Shift Supervisor",
+        focusAreaName: null,
         time: "7:00 AM - 3:00 PM",
         count: 2,
         share: 50,
@@ -138,6 +139,7 @@ describe("computeWorkMix", () => {
         key: "10:101",
         shiftName: "Day Shift",
         jobName: "Charge Nurse",
+        focusAreaName: null,
         time: "7:00 AM - 3:00 PM",
         count: 1,
         share: 25,
@@ -146,10 +148,38 @@ describe("computeWorkMix", () => {
         key: "11:",
         shiftName: "Evening Shift",
         jobName: null,
+        focusAreaName: null,
         time: "3:00 PM - 11:00 PM",
         count: 1,
         share: 25,
       },
+    ]);
+  });
+
+  it("names each shift's focus area, since focus areas reuse shift names", () => {
+    const byId = new Map<number, ShiftCategory>([
+      [20, { id: 20, name: "Day Shift", focusAreaId: 1 } as ShiftCategory],
+      [21, { id: 21, name: "Day Shift", focusAreaId: 2 } as ShiftCategory],
+    ]);
+    const twoAreas = new Map<number, AssignmentDefinition>([
+      [5, { id: 5, name: "Day", shiftId: 20, jobId: 102 } as AssignmentDefinition],
+      [6, { id: 6, name: "Day", shiftId: 21, jobId: 102 } as AssignmentDefinition],
+    ]);
+    const mix = computeWorkMix(
+      "emp",
+      { "emp_2026-10-01": on(5), "emp_2026-10-02": on(6) } as ShiftMap,
+      twoAreas,
+      byId,
+      new Map([[102, { name: "Day Shift" }]]),
+      range,
+      new Map([
+        [1, { name: "Skilled Nursing" }],
+        [2, { name: "Sheltered Care" }],
+      ]),
+    );
+    expect(mix.map((item) => [item.shiftName, item.jobName, item.focusAreaName])).toEqual([
+      ["Day Shift", null, "Skilled Nursing"],
+      ["Day Shift", null, "Sheltered Care"],
     ]);
   });
 
