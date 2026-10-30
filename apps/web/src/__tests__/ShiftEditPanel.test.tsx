@@ -1744,7 +1744,7 @@ describe("ShiftEditPanel", () => {
       const onRepeatConfirm = vi.fn();
       const user = await submitRepeat(onRepeatConfirm);
 
-      const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
+      const dialog = await screen.findByRole("alertdialog", { name: "Replace existing shifts?" });
       expect(dialog).toHaveTextContent(
         "2 of these days already have a shift or absence. Replace puts the repeating shift in their place. Keep existing leaves them as they are and skips those days.",
       );
@@ -1761,7 +1761,7 @@ describe("ShiftEditPanel", () => {
       const onRepeatConfirm = vi.fn();
       await submitRepeat(onRepeatConfirm);
 
-      const dialog = await screen.findByRole("dialog", { name: "Replace existing shifts?" });
+      const dialog = await screen.findByRole("alertdialog", { name: "Replace existing shifts?" });
       expect(dialog).toHaveTextContent("Some of these days may already have a shift or absence.");
       expect(onRepeatConfirm).not.toHaveBeenCalled();
     });
@@ -1800,7 +1800,7 @@ describe("ShiftEditPanel", () => {
       const { onSelect, onRemoveAbsenceRun } = renderRunPanel();
 
       await user.click(screen.getByRole("button", { name: "Remove absence" }));
-      const dialog = await screen.findByRole("dialog", {
+      const dialog = await screen.findByRole("alertdialog", {
         name: 'Remove the absence "Vacation" on Mon, Jan 15?',
       });
       const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
@@ -1820,10 +1820,10 @@ describe("ShiftEditPanel", () => {
       const { onSelect, onRemoveAbsenceRun, onClose } = renderRunPanel();
 
       await user.click(screen.getByRole("button", { name: "Remove absence" }));
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await screen.findByRole("alertdialog");
       await user.click(within(dialog).getByRole("radio", { name: /All 4 days/ }));
       expect(
-        await screen.findByRole("dialog", { name: 'Remove all 4 days of "Vacation"?' }),
+        await screen.findByRole("alertdialog", { name: 'Remove all 4 days of "Vacation"?' }),
       ).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Remove all 4 days" }));
 
@@ -1845,7 +1845,9 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.queryByRole("group", { name: "Apply changes to" })).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Remove" }));
-      const dialog = await screen.findByRole("dialog", { name: /^Remove the repeating shift / });
+      const dialog = await screen.findByRole("alertdialog", {
+        name: /^Remove the repeating shift /,
+      });
       const choices = within(dialog).getByRole("radiogroup", { name: "Days to remove" });
       expect(
         within(choices)
@@ -1874,7 +1876,9 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove" }));
-      const dialog = await screen.findByRole("dialog", { name: /^Remove the repeating shift / });
+      const dialog = await screen.findByRole("alertdialog", {
+        name: /^Remove the repeating shift /,
+      });
       await user.click(within(dialog).getByRole("radio", { name: /This and earlier days/ }));
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
@@ -1892,7 +1896,7 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Edit" }));
-      const dialog = await screen.findByRole("dialog", { name: /Edit repeating shift/ });
+      const dialog = await screen.findByRole("alertdialog", { name: /Edit repeating shift/ });
       await user.click(within(dialog).getByRole("radio", { name: /This and later days/ }));
       await user.click(within(dialog).getByRole("button", { name: "Continue" }));
 
@@ -2028,7 +2032,7 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove Sick" }));
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await screen.findByRole("alertdialog");
       expect(dialog).toHaveTextContent(/Remove Sick on .*\?/);
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
@@ -2056,7 +2060,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: /^Remove Day Shift/ }));
       await user.click(
-        within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }),
+        within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }),
       );
 
       expect(onSelect).toHaveBeenLastCalledWith(
@@ -2073,7 +2077,7 @@ describe("ShiftEditPanel", () => {
       const { onSelect } = renderDay({ currentRestOfDayAbsenceTypeId: 8 });
 
       await user.click(screen.getByRole("button", { name: "Remove shift and absence" }));
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await screen.findByRole("alertdialog");
       expect(dialog).toHaveTextContent(/Remove the shift ".*" and the absence "Sick" on .*\?/);
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
@@ -2101,7 +2105,7 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Remove both shifts" }));
-      expect(await screen.findByRole("dialog")).toHaveTextContent(
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent(
         /Remove both shifts, ".*" and ".*", on .*\?/,
       );
     });
@@ -2425,7 +2429,7 @@ describe("ShiftEditPanel", () => {
         await pick(user, "Left at", "AM or PM", "PM");
 
         await user.click(screen.getByRole("button", { name: "Remove Sick" }));
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await screen.findByRole("alertdialog");
         const summary = within(dialog).getByRole("region", { name: "Keep in mind" });
         expect(within(dialog).getByText("Remove Sick on 1/15?")).toBeInTheDocument();
         expect(
@@ -2585,7 +2589,7 @@ describe("ShiftEditPanel", () => {
         });
 
         await user.click(screen.getByRole("button", { name: "Remove Sick" }));
-        const dialog = screen.getByRole("dialog");
+        const dialog = screen.getByRole("alertdialog");
         expect(dialog).toHaveTextContent(
           /Remove Sick on .*\?\s*The Day Shift goes back to 7:00 AM - 3:00 PM \(8 hrs\)\./,
         );
@@ -2609,7 +2613,7 @@ describe("ShiftEditPanel", () => {
         renderDay({ currentRestOfDayAbsenceTypeId: 8, onCustomTimeChange: vi.fn() });
 
         await user.click(screen.getByRole("button", { name: "Remove Sick" }));
-        expect(screen.getByRole("dialog")).not.toHaveTextContent("goes back to");
+        expect(screen.getByRole("alertdialog")).not.toHaveTextContent("goes back to");
       });
 
       it("brings back the absence and its time with Cancel", async () => {
@@ -2668,7 +2672,7 @@ describe("ShiftEditPanel", () => {
       const user = userEvent.setup();
       const editDays = async (choice: RegExp) => {
         await user.click(screen.getByRole("button", { name: "Edit" }));
-        const dialog = await screen.findByRole("dialog", { name: /Edit repeating shift/ });
+        const dialog = await screen.findByRole("alertdialog", { name: /Edit repeating shift/ });
         await user.click(within(dialog).getByRole("radio", { name: choice }));
         await user.click(within(dialog).getByRole("button", { name: "Continue" }));
       };
@@ -2701,7 +2705,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
@@ -2722,7 +2726,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: /Offer for pickup/i }));
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Offer your .* for pickup\?$/,
       });
       const confirmButton = within(dialog).getByRole("button", {
@@ -2740,7 +2744,7 @@ describe("ShiftEditPanel", () => {
       resolveRequest("request-1");
       await waitFor(() => {
         expect(
-          screen.queryByRole("dialog", { name: /^Offer your .* for pickup\?$/ }),
+          screen.queryByRole("alertdialog", { name: /^Offer your .* for pickup\?$/ }),
         ).not.toBeInTheDocument();
       });
     });
@@ -2780,7 +2784,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: /Offer for pickup/i }));
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
@@ -2872,7 +2876,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
       await user.click(
         within(
-          screen.getByRole("dialog", {
+          screen.getByRole("alertdialog", {
             name: /^Offer your .* for pickup\?$/,
           }),
         ).getByRole("button", { name: "Offer for pickup" }),
@@ -2900,7 +2904,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: /Bob Jones/i }));
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Request pickup of your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Request pickup" }));
@@ -2921,7 +2925,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: /Vacation/i }));
 
       expect(onCallOff).not.toHaveBeenCalled();
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Submit a call off for your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Submit call off" }));
@@ -2946,7 +2950,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Offer to everyone" }));
 
       expect(onMakeAvailable).not.toHaveBeenCalled();
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Offer your .* for pickup\?$/,
       });
       await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
@@ -3010,7 +3014,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Request swap" }));
 
       expect(onSubmitSwap).not.toHaveBeenCalled();
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: /^Request a swap of your /,
       });
       await user.click(within(dialog).getByRole("button", { name: "Request swap" }));
@@ -3151,7 +3155,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
       await user.click(screen.getByRole("button", { name: "Remove shift" }));
-      const dialog = await screen.findByRole("dialog", { name: /Remove/i });
+      const dialog = await screen.findByRole("alertdialog", { name: /Remove/i });
       await user.click(within(dialog).getByRole("button", { name: "Remove" }));
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
 

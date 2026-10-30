@@ -260,14 +260,7 @@ export default function GridmasterDashboard({
       {overview && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 28 }}>
           <div>
-            <h3
-              style={{
-                margin: "0 0 10px",
-                fontSize: "var(--dg-fs-body-sm)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
+            <h3 className="dg-section-heading" style={{ marginBottom: 10 }}>
               Platform Oversight
             </h3>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -320,14 +313,7 @@ export default function GridmasterDashboard({
 
           {overview.orgRisk.riskiestOrganizations.length > 0 && (
             <div>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: "var(--dg-fs-body-sm)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-secondary)",
-                }}
-              >
+              <h3 className="dg-section-heading" style={{ marginBottom: 10 }}>
                 Highest Risk Organizations
               </h3>
               <div style={sectionStyle}>
@@ -483,14 +469,7 @@ export default function GridmasterDashboard({
       {/* Platform Activity Trends */}
       {overview && overview.activitySummary.last7dCount > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <h3
-            style={{
-              margin: "0 0 12px",
-              fontSize: "var(--dg-fs-body-sm)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
+          <h3 className="dg-section-heading" style={{ marginBottom: 12 }}>
             Platform Activity
           </h3>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
@@ -642,14 +621,7 @@ export default function GridmasterDashboard({
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <h3
-            style={{
-              margin: "0 0 12px",
-              fontSize: "var(--dg-fs-body-sm)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
+          <h3 className="dg-section-heading" style={{ marginBottom: 12 }}>
             Recent Activity
           </h3>
           <div
@@ -666,14 +638,7 @@ export default function GridmasterDashboard({
       )}
 
       {/* Organization list */}
-      <h3
-        style={{
-          margin: "0 0 12px",
-          fontSize: "var(--dg-fs-body-sm)",
-          fontWeight: 700,
-          color: "var(--dg-color-text-secondary)",
-        }}
-      >
+      <h3 className="dg-section-heading" style={{ marginBottom: 12 }}>
         All Organizations
       </h3>
       <div style={sectionStyle}>

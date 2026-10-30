@@ -15,6 +15,7 @@ import { fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { NumberField } from "@/components/ui/number-field";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -798,19 +799,8 @@ function ShiftCategoriesSettings({
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--dg-color-border-light)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontWeight: 700,
-                fontSize: "var(--dg-fs-label)",
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              {focusArea.name}
+            <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
+              <div className="dg-card-title">{focusArea.name}</div>
             </div>
             {areaCats.length > 0 ? (
               <div style={{ padding: "0 16px" }}>
@@ -884,6 +874,7 @@ function ShiftCategoriesSettings({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${cat.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
@@ -896,6 +887,7 @@ function ShiftCategoriesSettings({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${cat.name}"?`}
               message={`Nothing uses ${cat.name || "this category"}, so it's deleted permanently.`}
               confirmLabel="Delete"

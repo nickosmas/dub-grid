@@ -51,7 +51,7 @@ describe("PrintOptionsModal", () => {
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
     expect(
-      await screen.findByRole("dialog", { name: "Discard your changes?" }),
+      await screen.findByRole("alertdialog", { name: "Discard your changes?" }),
     ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 

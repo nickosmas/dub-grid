@@ -117,28 +117,20 @@ export function StaffReadOnlyDetailPanel({
         aria-label="Staff detail"
       >
         {/* Header */}
-        <div
-          className="staff-detail-header"
-          style={{
-            background: `linear-gradient(180deg, ${avatarTone.backgroundColor} 0%, var(--dg-color-surface) 100%)`,
-            borderBottom: "1px solid var(--dg-color-border)",
-          }}
-        >
+        <div className="staff-detail-header">
           <CloseButton
-            size="md"
-            className="self-end"
+            size="lg"
+            className="staff-detail-header__close"
             onClick={closePanel}
             aria-label="Close detail panel"
           />
 
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}
-          >
+          <div className="staff-detail-header__profile">
             <div
               style={{
-                ...getAvatarTypography(56),
-                width: 56,
-                height: 56,
+                ...getAvatarTypography(44),
+                width: 44,
+                height: 44,
                 borderRadius: "50%",
                 background: avatarTone.backgroundColor,
                 display: "flex",
@@ -160,21 +152,7 @@ export function StaffReadOnlyDetailPanel({
                   minWidth: 0,
                 }}
               >
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 18,
-                    color: "var(--dg-color-text-primary)",
-                    letterSpacing: "-0.01em",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    lineHeight: 1.2,
-                    minWidth: 0,
-                  }}
-                >
-                  {displayName}
-                </span>
+                <span className="dg-overlay-title staff-detail-header__name">{displayName}</span>
                 <AccessInsignia orgRole={orgRole} size="md" />
                 {showEmployment && (
                   <span

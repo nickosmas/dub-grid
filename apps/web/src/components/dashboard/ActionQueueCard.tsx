@@ -452,21 +452,7 @@ export default function ActionQueueCard({
       style={isHero ? { padding: "0 0 8px" } : undefined}
     >
       <div>
-        <div
-          className={isHero ? undefined : "dg-card-title"}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            ...(isHero
-              ? {
-                  fontSize: "var(--dg-fs-body)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-primary)",
-                }
-              : {}),
-          }}
-        >
+        <div className="dg-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           Review queue
         </div>
       </div>

@@ -104,7 +104,7 @@ function invitation(overrides: Partial<Invitation> = {}): Invitation {
 
 function confirm(dialogName: string | RegExp, buttonName: string) {
   fireEvent.click(
-    within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
+    within(screen.getByRole("alertdialog", { name: dialogName })).getByRole("button", {
       name: buttonName,
     }),
   );
@@ -164,7 +164,7 @@ describe("PersonStaffActions", () => {
     expect(screen.queryByRole("button", { name: "Mark away" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
     expect(
-      within(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).getByText(
+      within(screen.getByRole("alertdialog", { name: "Offboard Ada Lovelace?" })).getByText(
         "The time away planned from Jan 5 is canceled.",
       ),
     ).toBeInTheDocument();
@@ -174,9 +174,9 @@ describe("PersonStaffActions", () => {
     render(<PersonStaffActions employee={staff({ userId: null })} onChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Offboard" }));
-    expect(screen.getByRole("dialog", { name: "Offboard Ada Lovelace?" })).not.toHaveTextContent(
-      /sign in/i,
-    );
+    expect(
+      screen.getByRole("alertdialog", { name: "Offboard Ada Lovelace?" }),
+    ).not.toHaveTextContent(/sign in/i);
   });
 
   it("restores an archived record", async () => {
@@ -246,7 +246,7 @@ describe("PersonStaffActions", () => {
       expect(toast.error).toHaveBeenCalledWith("That email is already used by another person."),
     );
     expect(updateEmployee.mock.calls[0][0]).toMatchObject({ email: "grace@example.com" });
-    expect(screen.getByRole("dialog", { name: "Edit staff record" })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Edit staff record" })).toBeInTheDocument();
   });
 });
 

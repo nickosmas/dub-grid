@@ -82,7 +82,7 @@ function renderHarness(org: GridmasterBillingOrgSummary) {
 }
 
 function whatHappens(dialogName: string | RegExp) {
-  const dialog = screen.getByRole("dialog", { name: dialogName });
+  const dialog = screen.getByRole("alertdialog", { name: dialogName });
   return within(within(dialog).getByRole("region", { name: "Keep in mind" }));
 }
 
@@ -130,7 +130,7 @@ describe("billing hold actions", () => {
 
     await user.click(screen.getByRole("button", { name: "open resume" }));
     expect(
-      within(screen.getByRole("dialog", { name: /^Resume billing for / })).getByText(
+      within(screen.getByRole("alertdialog", { name: /^Resume billing for / })).getByText(
         /^The trial end moves 4 days later, to .*, giving back the paused time\.$/,
       ),
     ).toBeTruthy();

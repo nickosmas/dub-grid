@@ -69,28 +69,8 @@ export default function DraftReviewSummary({
         }}
       >
         <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-fs-body-sm)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            {title}
-          </h3>
-          {description ? (
-            <p
-              style={{
-                margin: "4px 0 0",
-                fontSize: "var(--dg-fs-footnote)",
-                lineHeight: 1.4,
-                color: "var(--dg-color-text-subtle)",
-              }}
-            >
-              {description}
-            </p>
-          ) : null}
+          <h3 className="dg-card-title">{title}</h3>
+          {description ? <p className="dg-card-description">{description}</p> : null}
         </div>
 
         <div

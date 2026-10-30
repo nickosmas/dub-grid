@@ -175,7 +175,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Claim" }));
     expect(onClaim).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("dialog", { name: /^Claim .* on Apr 16, 2026\?$/ }),
+      screen.getByRole("alertdialog", { name: /^Claim .* on Apr 16, 2026\?$/ }),
     ).toBeInTheDocument();
     await confirmDialogAction(user, "Claim");
 

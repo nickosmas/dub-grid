@@ -206,7 +206,7 @@ export function StaffOverviewTab({
         </div>
       ) : null}
 
-      <h2 className="m-0 mt-6 text-[17px] font-semibold tracking-tight text-[var(--dg-color-text-primary)]">
+      <h2 className="dg-section-heading" style={{ marginTop: 24 }}>
         {aboutTitle}
       </h2>
       {about}

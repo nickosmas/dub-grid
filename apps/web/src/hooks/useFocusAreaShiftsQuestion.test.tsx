@@ -31,7 +31,7 @@ async function ask() {
   const done = vi.fn();
   render(<Harness done={done} />);
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByRole("dialog", {
+  await screen.findByRole("alertdialog", {
     name: "Clear Barbara Trent's upcoming shifts in East Wing?",
   });
   return done;

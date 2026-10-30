@@ -6,6 +6,7 @@ import type { Organization } from "@/types";
 import { Button } from "@/components/Button";
 import { SectionCard } from "./shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Trash2 } from "lucide-react";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import * as Sentry from "@/lib/sentry";
 import { useIsInSandbox, useLogout } from "@/hooks";
@@ -100,24 +101,8 @@ export default function DangerZone({ organization }: DangerZoneProps) {
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <h2
-            style={{
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-primary)",
-              margin: 0,
-            }}
-          >
-            Delete this organization
-          </h2>
-          <p
-            style={{
-              fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--dg-color-text-muted)",
-              margin: "6px 0 0",
-              lineHeight: 1.5,
-            }}
-          >
+          <h2 className="dg-card-title">Delete this organization</h2>
+          <p className="dg-card-description">
             Everyone loses access and billing stops. Only DubGrid Support can bring it back.
           </p>
         </div>
@@ -125,6 +110,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
 
       {confirmOpen && !stepUp.dialog && (
         <ConfirmDialog
+          icon={Trash2}
           title={`Delete ${organization.name}?`}
           variant="danger"
           confirmLabel="Delete organization"

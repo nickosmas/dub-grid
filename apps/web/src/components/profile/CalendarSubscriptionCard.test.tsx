@@ -94,7 +94,7 @@ describe("CalendarSubscriptionCard", () => {
     render(<CalendarSubscriptionCard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Replace link" }));
-    const replaceDialog = screen.getByRole("dialog", { name: "Replace private link?" });
+    const replaceDialog = screen.getByRole("alertdialog", { name: "Replace private link?" });
     expect(
       within(within(replaceDialog).getByRole("region", { name: "Keep in mind" })).getByText(
         "The previous URL stops working immediately.",
@@ -106,7 +106,9 @@ describe("CalendarSubscriptionCard", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Disable subscription" }));
-    const disableDialog = screen.getByRole("dialog", { name: "Disable calendar subscription?" });
+    const disableDialog = screen.getByRole("alertdialog", {
+      name: "Disable calendar subscription?",
+    });
     expect(
       within(disableDialog).getByText(
         "Calendar apps stop receiving updates until you create a new link.",
@@ -125,7 +127,7 @@ describe("CalendarSubscriptionCard", () => {
     render(<CalendarSubscriptionCard />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Disable subscription" }));
-    const dialog = screen.getByRole("dialog", { name: "Disable calendar subscription?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Disable calendar subscription?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

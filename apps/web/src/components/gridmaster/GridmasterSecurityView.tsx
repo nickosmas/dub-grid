@@ -20,7 +20,7 @@ import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle } from "@/lib/styles";
+import { sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
 import {
   gmHeaderStyle,
@@ -218,36 +218,21 @@ function SessionDetailPanel({
       >
         <div
           style={{
-            padding: "18px 20px",
-            borderBottom: "1px solid var(--dg-color-border-light)",
+            padding: "20px 20px 0",
             display: "flex",
             alignItems: "flex-start",
             gap: 12,
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
-              {session.deviceLabel ?? "Unknown device"}
-            </div>
-            <div
-              style={{
-                marginTop: 3,
-                fontSize: "var(--dg-fs-label)",
-                color: "var(--dg-color-text-muted)",
-              }}
-            >
+            <div className="dg-overlay-title">{session.deviceLabel ?? "Unknown device"}</div>
+            <div className="dg-overlay-subtitle">
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <CloseButton size="md" onClick={close} aria-label="Close session details" />
+          <CloseButton size="lg" onClick={close} aria-label="Close session details" />
         </div>
-        <div style={{ flex: 1, minHeight: 0, padding: "8px 20px 24px", overflowY: "auto" }}>
+        <div style={{ flex: 1, minHeight: 0, padding: "20px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
           <DetailRow label="User name" value={session.userName ?? "-"} />
           <DetailRow label="User email" value={session.userEmail ?? "Unknown email"} />
@@ -487,7 +472,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div
           style={{
-            padding: "12px 16px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             alignItems: "center",
@@ -496,22 +481,8 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           }}
         >
           <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
-              User sessions
-            </div>
-            <div
-              style={{
-                marginTop: 2,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-muted)",
-              }}
-            >
+            <div className="dg-card-title">User sessions</div>
+            <div className="dg-card-description">
               All tracked web and mobile session records, newest first.
             </div>
           </div>
@@ -627,7 +598,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div
           style={{
-            padding: "12px 16px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--dg-color-border-light)",
             display: "flex",
             alignItems: "center",
@@ -636,22 +607,8 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           }}
         >
           <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
-              Gridmaster sessions
-            </div>
-            <div
-              style={{
-                marginTop: 2,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-muted)",
-              }}
-            >
+            <div className="dg-card-title">Gridmaster sessions</div>
+            <div className="dg-card-description">
               Platform account sessions, kept separate from organization users.
             </div>
           </div>
@@ -743,17 +700,7 @@ export default function GridmasterSecurityView({
           </div>
 
           <div style={{ ...sectionStyle, marginBottom: 24 }}>
-            <div
-              style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--dg-color-border-light)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                color: "var(--dg-color-text-primary)",
-              }}
-            >
-              Impersonation Governance
-            </div>
+            <div style={sectionHeaderStyle}>Impersonation Governance</div>
             {security.impersonation.recent.length === 0 ? (
               <div style={{ padding: 16 }}>
                 <EmptyState

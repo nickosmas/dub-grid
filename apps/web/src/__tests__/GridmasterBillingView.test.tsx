@@ -156,7 +156,7 @@ describe("GridmasterBillingView", () => {
     await openRowAction(user, "Change trial");
     await user.clear(await screen.findByLabelText("Trial days left"));
     await user.type(screen.getByLabelText("Trial days left"), "21");
-    const trialDialog = await screen.findByRole("dialog", { name: /^Change .*'s trial\?$/ });
+    const trialDialog = await screen.findByRole("alertdialog", { name: /^Change .*'s trial\?$/ });
     expect(within(trialDialog).getByText(/^The trial will end on /)).toBeInTheDocument();
     await user.click(within(trialDialog).getByRole("button", { name: "Save trial" }));
 
@@ -201,7 +201,7 @@ describe("GridmasterBillingView", () => {
     await user.clear(await screen.findByLabelText("Trial days left"));
     await user.type(screen.getByLabelText("Trial days left"), "400");
 
-    const trialDialog = screen.getByRole("dialog", { name: /^Change .*'s trial\?$/ });
+    const trialDialog = screen.getByRole("alertdialog", { name: /^Change .*'s trial\?$/ });
     expect(
       within(trialDialog).getByText("That's more than a year of free access."),
     ).toBeInTheDocument();
@@ -262,7 +262,7 @@ describe("GridmasterBillingView", () => {
 
     await screen.findByText("Acme Health");
     await openRowAction(user, "End trial");
-    let dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
+    let dialog = await screen.findByRole("alertdialog", { name: /^End .*'s trial\?$/ });
     expect(within(dialog).getByRole("radio", { name: /Give the usual 3 days/ })).toBeChecked();
     await user.click(within(dialog).getByRole("button", { name: "End trial" }));
     await waitFor(() =>
@@ -273,7 +273,7 @@ describe("GridmasterBillingView", () => {
     );
 
     await openRowAction(user, "End trial");
-    dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
+    dialog = await screen.findByRole("alertdialog", { name: /^End .*'s trial\?$/ });
     await user.click(within(dialog).getByRole("radio", { name: /Lock now/ }));
     await user.click(within(dialog).getByRole("button", { name: "Lock now" }));
     await waitFor(() =>
@@ -302,7 +302,7 @@ describe("GridmasterBillingView", () => {
 
     await screen.findByText("Acme Health");
     await openRowAction(user, "End trial");
-    const dialog = await screen.findByRole("dialog", { name: /^End .*'s trial\?$/ });
+    const dialog = await screen.findByRole("alertdialog", { name: /^End .*'s trial\?$/ });
     expect(within(dialog).getByRole("radio", { name: /Give the usual 3 days/ })).toBeDisabled();
     expect(within(dialog).getByText("The trial has already ended.")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: /Lock now/ })).toBeChecked();
@@ -335,7 +335,7 @@ describe("GridmasterBillingView", () => {
 
     await screen.findByText("Acme Health");
     await openRowAction(user, "Cancel at period end");
-    const dialog = await screen.findByRole("dialog", {
+    const dialog = await screen.findByRole("alertdialog", {
       name: /^Cancel .*'s subscription at period end\?$/,
     });
     await user.click(within(dialog).getByRole("button", { name: "Cancel at period end" }));
@@ -372,7 +372,9 @@ describe("GridmasterBillingView", () => {
 
     await screen.findByText("Acme Health");
     await openRowAction(user, "Active");
-    const dialog = await screen.findByRole("dialog", { name: /^Set .*'s billing status to .*\?$/ });
+    const dialog = await screen.findByRole("alertdialog", {
+      name: /^Set .*'s billing status to .*\?$/,
+    });
     const summary = within(within(dialog).getByRole("region", { name: "Keep in mind" }));
     expect(summary.getByText("The organization stays open with full access.")).toBeInTheDocument();
     expect(

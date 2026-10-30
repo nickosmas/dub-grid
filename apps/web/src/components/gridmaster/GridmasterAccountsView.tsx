@@ -9,6 +9,7 @@ import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import Modal from "@/components/Modal";
+import { UserMinus, LogOut } from "lucide-react";
 import {
   SEARCH_CLEAR_PADDING,
   SearchClearButton,
@@ -527,6 +528,7 @@ export default function GridmasterAccountsView({
 
       {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
+          icon={LogOut}
           title={`End every session for ${forceLogoutConfirm.email}?`}
           message="They need to sign in again."
           confirmLabel="Force logout"
@@ -563,6 +565,7 @@ export default function GridmasterAccountsView({
 
       {demoteTarget && !stepUp.dialog && (
         <Modal
+          alert={{ icon: UserMinus, tone: "warning" }}
           title="Demote Gridmaster"
           onClose={() => setDemoteTarget(null)}
           style={{ maxWidth: 460 }}

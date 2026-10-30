@@ -35,23 +35,8 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
         }}
       >
         <div>
-          <h3
-            style={{
-              margin: "0 0 4px",
-              fontSize: "var(--dg-fs-heading)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            Get started with DubGrid
-          </h3>
-          <p
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-fs-body)",
-              color: "var(--dg-color-text-muted)",
-            }}
-          >
+          <h3 className="dg-card-title">Get started with DubGrid</h3>
+          <p className="dg-card-description">
             Complete these steps to set up your organization. {doneCount} of {steps.length} done.
           </p>
         </div>

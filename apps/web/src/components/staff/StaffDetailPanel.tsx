@@ -24,7 +24,6 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
-import { StatusPill } from "@/components/ui/status-pill";
 import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StaffPanelFooter } from "./StaffPanelFooter";
 import {
@@ -281,14 +280,15 @@ export function StaffDetailPanel({
       >
         {/* Panel header */}
         <div className="staff-detail-header">
-          <div className="flex w-full items-center justify-end gap-2">
-            <CloseButton size="md" onClick={handleRequestClose} aria-label="Close detail panel" />
-          </div>
+          <CloseButton
+            size="lg"
+            className="staff-detail-header__close"
+            onClick={handleRequestClose}
+            aria-label="Close detail panel"
+          />
 
           {/* Profile card area */}
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}
-          >
+          <div className="staff-detail-header__profile">
             <div
               style={{
                 ...getAvatarTypography(44),
@@ -308,28 +308,17 @@ export function StaffDetailPanel({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 22,
-                    lineHeight: "var(--dg-type-section-title-line-height)",
-                    color: "var(--dg-color-text-primary)",
-                    letterSpacing: "-0.01em",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span className="dg-overlay-title staff-detail-header__name">
                   {getEmployeeDisplayName(employee)}
                 </span>
                 <StatusMarkIcon person={employee} size={14} />
                 <AccessInsignia orgRole={orgRole} size="lg" />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                 {employee.email && (
                   <span
                     style={{
-                      fontSize: "var(--dg-fs-footnote)",
+                      fontSize: "var(--dg-fs-body-sm)",
                       color: "var(--dg-color-text-muted)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -342,7 +331,7 @@ export function StaffDetailPanel({
                 {employee.phone && (
                   <span
                     style={{
-                      fontSize: "var(--dg-fs-footnote)",
+                      fontSize: "var(--dg-fs-body-sm)",
                       color: "var(--dg-color-text-faint)",
                       flexShrink: 0,
                     }}
@@ -390,11 +379,7 @@ export function StaffDetailPanel({
                   pendingInvitationEmail={pendingInvitation?.email}
                 />
               </div>
-            ) : (
-              <StatusPill tone="neutral" className="shrink-0">
-                No app access
-              </StatusPill>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -408,6 +393,9 @@ export function StaffDetailPanel({
               employee={employee}
               absenceTypes={absenceTypes}
               action={showEmploymentStatusActions ? cardActions : undefined}
+              badge={
+                orgRole ? undefined : <span className="dg-status-card-note">· No app access</span>
+              }
               planAction={showEmploymentStatusActions ? statusActions("Edit plan") : undefined}
             />
           </div>

@@ -75,11 +75,9 @@ const CATEGORY_ICONS: Record<AuditCategory, LucideIcon> = {
 /** The kind of change as an icon tile, tinted by how much it changed. */
 export function ActivityKindIcon({
   action,
-  size = "md",
   tone,
 }: {
   action: string;
-  size?: "md" | "lg";
   /** Overrides the action's own tint, for a group mixing kinds of change. */
   tone?: StatusPillTone;
 }) {
@@ -88,10 +86,9 @@ export function ActivityKindIcon({
   return (
     <span
       className="dg-activity-kind-icon"
-      data-size={size}
       data-tone={tone ?? ACTION_TONES[getActionSeverity(action)]}
     >
-      <Icon size={size === "lg" ? 18 : 15} strokeWidth={2} aria-hidden />
+      <Icon size={15} strokeWidth={2} aria-hidden />
     </span>
   );
 }
@@ -202,7 +199,6 @@ export function ActivityDetailsDialog({
       title="Activity details"
       heading={
         <div className="dg-activity-details-heading">
-          <ActivityKindIcon action={entry.action} size="lg" />
           <div className="dg-activity-details-titles">
             <ActivityKindLabel action={entry.action} />
             <h2 className="dg-activity-details-headline">{describeAction(entry)}</h2>
@@ -337,7 +333,6 @@ function ActivityGroupDialog({
       title="Activity details"
       heading={
         <div className="dg-activity-details-heading">
-          <ActivityKindIcon action={newest.action} size="lg" tone={tone} />
           <div className="dg-activity-details-titles">
             <ActivityKindLabel action={newest.action} tone={tone} />
             <h2 className="dg-activity-details-headline">{summary.headline}</h2>

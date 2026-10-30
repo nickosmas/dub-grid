@@ -7,6 +7,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
@@ -1145,6 +1146,7 @@ export default function StringListSettings({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${deleteConfirm.item.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
@@ -1159,6 +1161,7 @@ export default function StringListSettings({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${deleteConfirm.item.name}"?`}
               message={`Nothing uses ${deleteConfirm.item.name}, so it's deleted permanently.`}
               confirmLabel="Delete"

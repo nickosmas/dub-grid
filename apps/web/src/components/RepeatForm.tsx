@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Repeat, Replace } from "lucide-react";
 import { useTheme } from "next-themes";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
@@ -851,6 +851,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
 
       {overwritePrompt && (
         <ConfirmDialog
+          icon={Replace}
           title="Replace existing shifts?"
           message={overwritePromptMessage(overwritePrompt.count, isAbsence)}
           confirmLabel="Replace"
