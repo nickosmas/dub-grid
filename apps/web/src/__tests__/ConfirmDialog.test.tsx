@@ -19,7 +19,7 @@ describe("ConfirmDialog", () => {
       />,
     );
 
-    expect(screen.getByRole("dialog")).toHaveStyle({ maxWidth: "620px" });
+    expect(screen.getByRole("alertdialog")).toHaveStyle({ maxWidth: "620px" });
     expect(
       screen
         .getAllByRole("button")
@@ -129,11 +129,11 @@ describe("ConfirmDialog dismissal", () => {
         screen.getByRole("button", { name: action === "primary" ? "Discard mine" : "Discard all" }),
       );
       expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
-      // Every confirmation has a close button (owner, 2026-10-27); a running
-      // request blocks it like every other exit.
-      fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+      // A confirmation is an alert dialog (owner, 2026-10-30): no X, and a
+      // click outside never closes it, so Escape is the exit to block.
+      expect(screen.queryByRole("button", { name: "Close modal" })).toBeNull();
       fireEvent.click(screen.getByRole("presentation"));
-      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
       await new Promise((resolve) => setTimeout(resolve, 180));
       expect(onCancel).not.toHaveBeenCalled();
       await act(async () => {

@@ -136,9 +136,7 @@ export function ScheduleTab({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 className="m-0 text-[17px] font-semibold tracking-tight text-[var(--dg-color-text-primary)]">
-            Shifts and time off
-          </h2>
+          <h2 className="dg-section-heading">Shifts and time off</h2>
           {loading ? null : (
             <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
               {records.length} {records.length === 1 ? "shift" : "shifts"}, {totalHours} hours,{" "}

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { Monitor, Smartphone } from "lucide-react";
+import { Monitor, Smartphone, LogOut } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   fetchAccountSessions,
@@ -384,6 +384,7 @@ export function SessionList({
       )}
       {confirmCurrentSessionSignOut && (
         <ConfirmDialog
+          icon={LogOut}
           title="Sign out this device?"
           message="You'll need to sign in again to use the app on this device."
           confirmLabel="Sign out"

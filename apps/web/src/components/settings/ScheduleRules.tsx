@@ -331,7 +331,7 @@ export default function ScheduleRules({
         {confirmOpen && (
           <ConfirmDialog
             title="Save schedule rules?"
-            message="They apply to everyone in your organization."
+            message="They apply to your whole organization."
             confirmLabel="Save"
             variant="info"
             isLoading={saving}

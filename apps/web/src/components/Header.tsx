@@ -1,5 +1,5 @@
 "use client";
-import { ChevronDown, User } from "lucide-react";
+import { ChevronDown, User, LogOut } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -314,6 +314,7 @@ export default function Header({ orgName }: HeaderProps) {
   const logoutConfirmDialog = logoutConfirmOpen ? (
     isInSandbox ? (
       <ConfirmDialog
+        icon={LogOut}
         returnFocus={accountTriggerRef}
         title="Sign out and discard your sandbox?"
         message="Your sandbox and its changes are deleted."
@@ -326,6 +327,7 @@ export default function Header({ orgName }: HeaderProps) {
       />
     ) : (
       <ConfirmDialog
+        icon={LogOut}
         returnFocus={accountTriggerRef}
         title="Sign out"
         message="You'll be signed out on this device."

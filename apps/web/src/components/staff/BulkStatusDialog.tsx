@@ -8,7 +8,9 @@ import {
   type BulkStatusAction,
 } from "@dubgrid/domain";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { STATUS_ACTION_ICONS } from "@/components/staff/status-action-icons";
 import Modal from "@/components/Modal";
+
 import { Button } from "@/components/Button";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import { addDays, formatDateKey } from "@/lib/utils";
@@ -173,6 +175,7 @@ export function BulkStatusDialog({
 
   return (
     <ConfirmDialog
+      icon={STATUS_ACTION_ICONS[action]}
       title={copy.title}
       message={
         <div className="flex flex-col gap-3.5">

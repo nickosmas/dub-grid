@@ -36,10 +36,8 @@ export function DataPrivacyPanel() {
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-              Cookie preferences
-            </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+            <div className="dg-card-title">Cookie preferences</div>
+            <p className="dg-card-description">
               Choose which cookies and analytics the app uses on this device.
             </p>
           </div>
@@ -56,10 +54,8 @@ export function DataPrivacyPanel() {
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-              Policies
-            </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+            <div className="dg-card-title">Policies</div>
+            <p className="dg-card-description">
               The legal documents that govern your use of DubGrid.
             </p>
           </div>

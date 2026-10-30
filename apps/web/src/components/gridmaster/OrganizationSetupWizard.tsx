@@ -879,14 +879,7 @@ export default function OrganizationSetupWizard({
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
-          <h2
-            style={{
-              margin: "0 0 8px",
-              fontSize: "var(--dg-fs-heading)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
+          <h2 className="dg-card-title" style={{ marginBottom: 8 }}>
             Organization Created
           </h2>
           <p
@@ -2073,14 +2066,7 @@ export default function OrganizationSetupWizard({
           marginBottom: 20,
         }}
       >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-heading)",
-            fontWeight: 700,
-            color: "var(--dg-color-text-primary)",
-          }}
-        >
+        <h2 className="dg-card-title">
           {currentStep === "decision" ? "Organization Created" : "Create Organization"}
         </h2>
         {currentStep !== "decision" && (

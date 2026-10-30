@@ -321,10 +321,7 @@ export function ProfilePage() {
                     // line up with the page's 1200px column instead.
                     className="flex scroll-mt-6 flex-col gap-3 [&_.dg-page-enter]:!max-w-none"
                   >
-                    <h2
-                      id={`profile-${id}-title`}
-                      className="m-0 text-[17px] font-semibold tracking-tight text-[var(--dg-color-text-primary)]"
-                    >
+                    <h2 id={`profile-${id}-title`} className="dg-section-heading">
                       {title}
                     </h2>
                     {id === "details" && (

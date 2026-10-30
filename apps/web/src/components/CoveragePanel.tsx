@@ -307,8 +307,7 @@ export default function CoveragePanel({
       >
         <div
           style={{
-            padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--dg-color-border)",
+            padding: isMobile ? "16px 16px 8px" : "20px 20px 12px",
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -338,30 +337,13 @@ export default function CoveragePanel({
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              Schedule Builder
-            </div>
+            <div className="dg-overlay-title">Schedule Builder</div>
             {subtitle ? (
-              <div
-                className="dg-tabular-nums"
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--dg-color-text-subtle)",
-                  marginTop: 2,
-                }}
-              >
-                {subtitle}
-              </div>
+              <div className="dg-overlay-subtitle dg-tabular-nums">{subtitle}</div>
             ) : null}
           </div>
           {!isMobile && (
-            <CloseButton size="md" onClick={close} aria-label="Close Schedule Builder" />
+            <CloseButton size="lg" onClick={close} aria-label="Close Schedule Builder" />
           )}
         </div>
 

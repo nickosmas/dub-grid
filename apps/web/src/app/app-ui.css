@@ -1017,14 +1017,16 @@
 }
 .dg-cc-detail-title {
   margin: 0;
-  font-size: var(--dg-fs-body-sm);
-  font-weight: 700;
+  font-size: var(--dg-type-card-title-size);
+  font-weight: var(--dg-type-card-title-weight);
+  line-height: var(--dg-type-card-title-line-height);
+  letter-spacing: var(--dg-type-card-title-letter-spacing);
   color: var(--dg-color-text-primary);
 }
 .dg-cc-detail-date {
-  margin-top: 2px;
-  font-size: var(--dg-fs-caption);
-  color: var(--dg-color-text-subtle);
+  margin-top: 4px;
+  font-size: var(--dg-fs-label);
+  color: var(--dg-color-text-muted);
 }
 .dg-cc-badge {
   flex-shrink: 0;
@@ -1844,33 +1846,97 @@ button.dg-cc-sg-main {
 /* Modal sub-elements */
 .dg-modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
-.dg-modal-title {
-  font-size: var(--dg-fs-title);
-  font-weight: 700;
+/* The title every popup and slide-over shares. */
+.dg-modal-title,
+.dg-overlay-title {
+  margin: 0;
+  font-size: var(--dg-type-overlay-title-size);
+  font-weight: var(--dg-type-overlay-title-weight);
+  line-height: var(--dg-type-overlay-title-line-height);
+  letter-spacing: var(--dg-type-overlay-title-letter-spacing);
   color: var(--dg-color-text-primary);
+  overflow-wrap: anywhere;
 }
+.dg-overlay-subtitle {
+  margin: 0;
+  font-size: var(--dg-fs-body-sm);
+  line-height: 1.45;
+  color: var(--dg-color-text-muted);
+}
+.dg-overlay-title + .dg-overlay-subtitle {
+  margin-top: 4px;
+}
+.dg-overlay-eyebrow {
+  margin-bottom: 4px;
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--dg-color-brand);
+}
+/* Level with a 40px icon or close button when the title is one line; a
+   subtitle under it starts the column at the top instead. */
 .dg-modal-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   min-width: 0;
+  min-height: 40px;
+}
+.dg-modal-heading.has-subtitle {
+  align-items: flex-start;
 }
 .dg-modal-titles {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .dg-modal-subtitle {
-  overflow: hidden;
+  font-size: var(--dg-fs-body-sm);
+  line-height: 1.45;
   color: var(--dg-color-text-muted);
-  font-size: var(--dg-fs-footnote);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+/* An alert dialog: the tile always sits left of the title, and the message
+   below starts at the tile's left edge, at every width. */
+.dg-modal--alert .dg-modal-header {
+  margin-bottom: 16px;
+}
+.dg-modal--alert .dg-modal-heading {
+  align-items: flex-start;
+  gap: 16px;
+}
+/* Centers a one-line title on the 40px tile. */
+.dg-modal--alert .dg-modal-titles {
+  padding-top: 7px;
+}
+/* The tinted tile an alert dialog leads with, toned by how serious it is. */
+.dg-modal-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--dg-radius-lg);
+  border: 1px solid var(--dg-color-brand-border);
+  background: var(--dg-color-brand-bg);
+  color: var(--dg-color-brand);
+}
+.dg-modal-icon[data-tone="warning"] {
+  border-color: var(--dg-color-warning-border);
+  background: var(--dg-color-warning-bg);
+  color: var(--dg-color-warning-text);
+}
+.dg-modal-icon[data-tone="danger"] {
+  border-color: var(--dg-color-danger-border);
+  background: var(--dg-color-danger-bg);
+  color: var(--dg-color-danger-text);
 }
 .dg-modal--auth-help {
   max-width: 360px;
@@ -1883,29 +1949,18 @@ button.dg-cc-sg-main {
   max-width: 520px;
   width: min(520px, calc(100vw - 32px));
 }
-.dg-activity-details-modal .dg-modal-header {
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--dg-color-border-light);
-}
-/* For a body that opens on a filled notice: 24px under a 16px title leaves
-   the banner floating, so the header holds the same 12px the banner keeps
-   inside its own edge. */
+
+/* For a body that opens on a filled notice: the usual 20px under the header
+   leaves the banner floating, so the header holds the same 12px the banner
+   keeps inside its own edge. */
 .dg-modal--tight-header .dg-modal-header {
   margin-bottom: 12px;
 }
 .dg-activity-details-heading {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-}
-.dg-activity-kind-icon[data-size="lg"] {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
 }
 .dg-activity-details-titles {
   display: flex;
@@ -1916,9 +1971,10 @@ button.dg-cc-sg-main {
 .dg-activity-details-headline {
   margin: 0;
   color: var(--dg-color-text-primary);
-  font-size: var(--dg-fs-heading);
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: var(--dg-type-overlay-title-size);
+  font-weight: var(--dg-type-overlay-title-weight);
+  line-height: var(--dg-type-overlay-title-line-height);
+  letter-spacing: var(--dg-type-overlay-title-letter-spacing);
   overflow-wrap: anywhere;
 }
 .dg-activity-details-meta {
@@ -3196,21 +3252,52 @@ button.dg-cc-sg-main {
   animation: none;
 }
 .dg-card-header {
-  padding: 14px var(--dg-card-padding-x);
+  padding: 16px var(--dg-card-padding-x);
   border-bottom: 1px solid var(--dg-color-border-light);
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+/* The title every card shares, in a header bar or at the top of its body. */
 .dg-card-title {
-  font-size: var(--dg-fs-label);
-  font-weight: 600;
+  margin: 0;
+  font-size: var(--dg-type-card-title-size);
+  font-weight: var(--dg-type-card-title-weight);
+  line-height: var(--dg-type-card-title-line-height);
+  letter-spacing: var(--dg-type-card-title-letter-spacing);
   color: var(--dg-color-text-primary);
 }
-.dg-card-subtitle {
-  font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-subtle);
-  margin-top: 1px;
+.dg-card-subtitle,
+.dg-card-description {
+  margin: 4px 0 0;
+  font-size: var(--dg-fs-label);
+  line-height: 1.45;
+  color: var(--dg-color-text-muted);
+}
+/* A header bar across the top of a card, ruled off from its list. */
+.dg-card-header-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+/* Plain words after a status card's name, so they read as part of it. */
+.dg-status-card-note {
+  font-size: var(--dg-fs-label);
+  font-weight: 500;
+  color: var(--dg-color-text-muted);
+  white-space: nowrap;
+}
+/* A heading between cards, one level above their titles. */
+.dg-section-heading {
+  margin: 0;
+  font-size: var(--dg-type-overlay-title-size);
+  font-weight: var(--dg-type-overlay-title-weight);
+  line-height: var(--dg-type-overlay-title-line-height);
+  letter-spacing: var(--dg-type-overlay-title-letter-spacing);
+  color: var(--dg-color-text-primary);
 }
 .dg-card-body {
   --dg-bleed-x: var(--dg-card-padding-x);

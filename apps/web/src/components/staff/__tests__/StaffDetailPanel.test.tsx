@@ -185,7 +185,7 @@ describe("StaffDetailPanel access controls", () => {
   it("says so plainly when the person has no login at all", () => {
     renderPanel({ orgRole: null });
 
-    expect(screen.getByText("No app access")).toBeTruthy();
+    expect(screen.getByText("· No app access")).toBeTruthy();
   });
 
   it("keeps access in the header, next to the name, not in the action row", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { Lock, UserX } from "lucide-react";
 import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
@@ -116,7 +117,12 @@ export function AccessSuspendedModal({
   onClose: () => void;
 }) {
   return (
-    <Modal title={ACCESS_SUSPENDED_TITLE} onClose={onClose} className="dg-modal--account-disabled">
+    <Modal
+      alert={{ icon: Lock, tone: "warning" }}
+      title={ACCESS_SUSPENDED_TITLE}
+      onClose={onClose}
+      className="dg-modal--account-disabled"
+    >
       <p className="dg-auth-modal-copy">{accessSuspendedBody(until)}</p>
       <Button
         type="button"
@@ -131,7 +137,12 @@ export function AccessSuspendedModal({
 
 export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="Account disabled" onClose={onClose} className="dg-modal--account-disabled">
+    <Modal
+      alert={{ icon: UserX, tone: "warning" }}
+      title="Account disabled"
+      onClose={onClose}
+      className="dg-modal--account-disabled"
+    >
       <p className="dg-auth-modal-copy">
         Your organization disabled this account. Contact your administrator if you think that's a
         mistake.

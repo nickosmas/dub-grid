@@ -19,7 +19,7 @@ export default function OrganizationChangeReviewModal({
   return (
     <ChangeReviewModal
       title="Save these changes?"
-      description="They apply to everyone in your organization."
+      description="They apply to your whole organization."
       changes={changes}
       saving={saving}
       confirmLabel="Save"

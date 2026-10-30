@@ -469,27 +469,10 @@ export default function DisplayMode({
           style={{
             padding: "16px 18px",
             borderBottom: "1px solid var(--dg-color-border-light)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
           }}
         >
-          <div
-            style={{
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            Choose a display mode
-          </div>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--dg-color-text-muted)",
-              lineHeight: 1.5,
-            }}
-          >
+          <div className="dg-card-title">Choose a display mode</div>
+          <div className="dg-card-description">
             Select how shifts appear in the schedule grid, monthly calendar, recurring-pattern
             editor, and shift previews in Settings.
           </div>
@@ -671,12 +654,10 @@ export default function DisplayMode({
         </div>
 
         <div
+          className="dg-card-title"
           style={{
             padding: "16px 18px 0",
             borderTop: "1px solid var(--dg-color-border-light)",
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 700,
-            color: "var(--dg-color-text-primary)",
           }}
         >
           What staff see after a publish

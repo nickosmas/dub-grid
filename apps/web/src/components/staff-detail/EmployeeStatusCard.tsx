@@ -12,6 +12,8 @@ interface EmployeeStatusCardProps {
   absenceTypes?: readonly AbsenceType[];
   /** Change status, when the viewer may change it. */
   action?: ReactNode;
+  /** A pill right after the status's name, such as No app access. */
+  badge?: ReactNode;
   /** Edit plan on the planned card, when the viewer may change it. */
   planAction?: ReactNode;
 }
@@ -19,11 +21,13 @@ interface EmployeeStatusCardProps {
 function CardText({
   eyebrow,
   title,
+  badge,
   detail,
   color,
 }: {
   eyebrow?: string;
   title: string;
+  badge?: ReactNode;
   detail: string;
   color: string;
 }) {
@@ -40,11 +44,14 @@ function CardText({
           {eyebrow}
         </span>
       ) : null}
-      <span
-        className="dg-tabular-nums"
-        style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color }}
-      >
-        {title}
+      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span
+          className="dg-tabular-nums"
+          style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color }}
+        >
+          {title}
+        </span>
+        {badge}
       </span>
       <span
         className="dg-tabular-nums"
@@ -65,6 +72,7 @@ export function EmployeeStatusCard({
   employee,
   absenceTypes = [],
   action,
+  badge,
   planAction,
 }: EmployeeStatusCardProps) {
   const absenceId =
@@ -102,6 +110,7 @@ export function EmployeeStatusCard({
         <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
         <CardText
           title={current.title}
+          badge={badge}
           detail={current.detail}
           color={active ? "var(--dg-color-text-primary)" : colors.text}
         />

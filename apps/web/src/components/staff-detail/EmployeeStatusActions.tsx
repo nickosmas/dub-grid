@@ -11,6 +11,7 @@ import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
 import { CalendarDays, CalendarX2, Ellipsis, Undo2 } from "lucide-react";
+import { STATUS_ACTION_ICONS, STATUS_CHANGE_ICON } from "@/components/staff/status-action-icons";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
@@ -846,6 +847,13 @@ export function EmployeeStatusActions({
   const dialog =
     open && !stepUpOpen ? (
       <ConfirmDialog
+        icon={
+          offboardsNow
+            ? STATUS_ACTION_ICONS.archive
+            : choice
+              ? STATUS_ACTION_ICONS[choice]
+              : STATUS_CHANGE_ICON
+        }
         isLoading={pending}
         // Wider than a plain confirm: the status cards carry a line of detail each.
         maxWidth={540}

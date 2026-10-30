@@ -86,7 +86,7 @@ describe("SessionList", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 
-    const confirmationDialog = screen.getByRole("dialog", { name: "Sign out this device?" });
+    const confirmationDialog = screen.getByRole("alertdialog", { name: "Sign out this device?" });
     expect(confirmationDialog).toBeInTheDocument();
     expect(mockSignOut).not.toHaveBeenCalled();
 

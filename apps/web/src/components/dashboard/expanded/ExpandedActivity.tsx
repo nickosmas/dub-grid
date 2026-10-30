@@ -4,6 +4,7 @@ import type { ActivityItem } from "@/lib/dashboard-stats";
 import { ActivityIcon } from "../ActivityIcon";
 import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
+
 import { EmptyState } from "@/components/EmptyState";
 
 const TYPE_FILTERS = [

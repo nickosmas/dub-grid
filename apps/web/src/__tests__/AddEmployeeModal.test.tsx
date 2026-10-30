@@ -295,12 +295,14 @@ describe("AddEmployeeModal", () => {
       await user.type(getFirstNameInputs()[0], "Alice");
       await user.click(screen.getByRole("button", { name: "Close modal" }));
 
-      expect(screen.getByRole("dialog", { name: /discard your changes/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("alertdialog", { name: /discard your changes/i }),
+      ).toBeInTheDocument();
       expect(onClose).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole("button", { name: /keep editing/i }));
       expect(
-        screen.queryByRole("dialog", { name: /discard your changes/i }),
+        screen.queryByRole("alertdialog", { name: /discard your changes/i }),
       ).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Close modal" }));

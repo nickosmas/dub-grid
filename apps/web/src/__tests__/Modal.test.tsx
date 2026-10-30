@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useState } from "react";
+import { Send } from "lucide-react";
 
 function renderModal(onClose = vi.fn(), title = "Test Modal") {
   return render(
@@ -125,6 +126,38 @@ describe("Modal — Close interactions", () => {
 
     expect(onRequestClose).toHaveBeenCalledOnce();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("Modal — Alert dialog", () => {
+  function renderAlert(onClose = vi.fn()) {
+    return render(
+      <Modal title="Publish 29 changes?" alert={{ icon: Send }} onClose={onClose}>
+        <p>Drafts from other editors are included.</p>
+      </Modal>,
+    );
+  }
+
+  it("is an alertdialog with its icon and no close button", () => {
+    renderAlert();
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog.querySelector(".dg-modal-icon svg")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Close modal" })).toBeNull();
+  });
+
+  it("ignores a click outside but still closes on Escape", async () => {
+    const onClose = vi.fn();
+    renderAlert(onClose);
+    await userEvent.click(screen.getByRole("presentation"));
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("presentation"), { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("draws no icon on a regular dialog", () => {
+    renderModal();
+    expect(screen.getByRole("dialog").querySelector(".dg-modal-icon")).toBeNull();
   });
 });
 

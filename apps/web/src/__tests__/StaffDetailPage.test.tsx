@@ -997,7 +997,7 @@ describe("StaffDetailPage", () => {
 
       render(<StaffDetailPage employeeId="emp-1" />);
       fireEvent.click(await screen.findByRole("button", { name: "Change status" }));
-      const dialog = screen.getByRole("dialog");
+      const dialog = screen.getByRole("alertdialog");
       fireEvent.click(within(dialog).getByRole("radio", { name: choice }));
       fireEvent.click(within(dialog).getByRole("button", { name: confirmLabel }));
 
