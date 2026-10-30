@@ -911,8 +911,7 @@ export default function ShiftRequestBoard({
         {/* Header */}
         <div
           style={{
-            padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--dg-color-border)",
+            padding: isMobile ? "16px 16px 8px" : "20px 20px 12px",
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -942,26 +941,10 @@ export default function ShiftRequestBoard({
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              Shift Requests
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-subtle)",
-                marginTop: 2,
-              }}
-            >
-              Pickups, swaps, and approvals
-            </div>
+            <div className="dg-overlay-title">Shift Requests</div>
+            <div className="dg-overlay-subtitle">Pickups, swaps, and approvals</div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close panel" />}
+          {!isMobile && <CloseButton size="lg" onClick={close} aria-label="Close panel" />}
         </div>
 
         {/* Tab bar */}

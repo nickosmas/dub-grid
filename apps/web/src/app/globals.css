@@ -177,6 +177,17 @@
   --dg-type-badge-line-height: 1.2;
   --dg-type-badge-letter-spacing: normal;
   --dg-type-badge-color: var(--dg-type-attention-secondary-color);
+  /* One title scale for every popup, slide-over and card (owner, 2026-10-29). */
+  --dg-type-overlay-title-size: 20px;
+  --dg-type-overlay-title-size-mobile: 18px;
+  --dg-type-overlay-title-weight: 600;
+  --dg-type-overlay-title-line-height: 1.3;
+  --dg-type-overlay-title-letter-spacing: -0.01em;
+  --dg-type-card-title-size: 17px;
+  --dg-type-card-title-size-mobile: 16px;
+  --dg-type-card-title-weight: 600;
+  --dg-type-card-title-line-height: 1.35;
+  --dg-type-card-title-letter-spacing: -0.01em;
   --dg-type-page-title-size-mobile: var(--dg-type-scale-page-size-mobile);
   --dg-type-section-title-size-mobile: var(--dg-type-scale-section-size-mobile);
   --dg-btn-radius: 6px;
@@ -1244,7 +1255,8 @@ input[type="color"]::-moz-color-swatch {
 .dg-close-btn--md,
 .dg-close-btn--lg {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--dg-color-border);
+  background: var(--dg-color-surface);
 }
 .dg-close-btn--md {
   width: 32px;
@@ -1258,7 +1270,7 @@ input[type="color"]::-moz-color-swatch {
 .dg-close-btn--lg:hover,
 .dg-close-btn--md:focus-visible,
 .dg-close-btn--lg:focus-visible {
-  border-color: var(--dg-color-border);
+  border-color: var(--dg-color-border-strong);
 }
 @media (max-width: 767px) {
   .dg-close-btn--xs,
@@ -1358,12 +1370,30 @@ table tbody > tr:last-child > th {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 20px 20px;
-  border-bottom: 1px solid var(--dg-color-border-light);
+  padding: 20px 20px 16px;
   position: sticky;
   top: 0;
   background: var(--dg-color-surface);
   z-index: 2;
+}
+/* The close button sits level with the avatar, as in every other slide-over. */
+.staff-detail-header__close {
+  position: absolute;
+  top: 22px;
+  right: 20px;
+}
+.staff-detail-header__profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding-right: 52px;
+}
+.staff-detail-header__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .staff-panel-action-footer,
 .staff-panel-editor-footer {
@@ -1953,6 +1983,8 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     --dg-btn-h: var(--dg-btn-h-lg);
     --dg-type-page-title-size: var(--dg-type-page-title-size-mobile);
     --dg-type-section-title-size: var(--dg-type-section-title-size-mobile);
+    --dg-type-overlay-title-size: var(--dg-type-overlay-title-size-mobile);
+    --dg-type-card-title-size: var(--dg-type-card-title-size-mobile);
     --dg-fs-page-title: var(--dg-fs-page-title-mobile);
     --dg-fs-section-title: var(--dg-fs-section-title-mobile);
     --dg-fs-card-title: var(--dg-fs-card-title-mobile);

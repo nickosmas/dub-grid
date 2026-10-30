@@ -2,6 +2,7 @@
 
 import { useId, useRef } from "react";
 import Modal from "@/components/Modal";
+
 import { StepUpForm } from "@/components/auth/StepUpForm";
 import type { StepUpMethod } from "@/features/account/client/step-up";
 

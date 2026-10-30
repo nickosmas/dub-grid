@@ -84,10 +84,10 @@ export default function DeleteAccountCard() {
         }}
       >
         <div>
-          <div className="text-[14px] font-semibold" style={{ color: "var(--dg-color-danger)" }}>
+          <div className="dg-card-title" style={{ color: "var(--dg-color-danger)" }}>
             Delete account
           </div>
-          <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+          <p className="dg-card-description">
             Permanently delete your account and leave every organization you belong to. If you're an
             organization's only Super Admin, make someone else a Super Admin first.
           </p>

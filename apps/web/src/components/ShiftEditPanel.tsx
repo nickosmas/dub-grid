@@ -64,6 +64,7 @@ import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { PersonAvatar } from "@/components/ui/person-avatar";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -461,6 +462,9 @@ export default function ShiftEditPanel({
   const isNameMode = shiftDisplayMode === "name";
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
+  const avatarPerson = employees.find((employee) => employee.id === modal.empId) ?? {
+    id: modal.empId,
+  };
   const assignableShiftDisplayMap = useMemo(
     () =>
       buildAssignableShiftDisplayMap({
@@ -4258,28 +4262,14 @@ export default function ShiftEditPanel({
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              padding: "16px 20px",
-              borderBottom: "1px solid var(--dg-color-border)",
+              gap: 14,
+              padding: "20px 20px 0",
             }}
           >
-            <div>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-title)",
-                  fontWeight: 700,
-                  color: "var(--dg-color-text-primary)",
-                }}
-              >
-                Shift requests
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--dg-color-text-secondary)",
-                  marginTop: 2,
-                }}
-              >
+            <PersonAvatar person={avatarPerson} name={modal.empName} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="dg-overlay-title">Shift requests</div>
+              <div className="dg-overlay-subtitle">
                 {modal.empName} &middot;{" "}
                 {modal.date.toLocaleDateString("en-US", {
                   weekday: "short",
@@ -4288,7 +4278,7 @@ export default function ShiftEditPanel({
                 })}
               </div>
             </div>
-            <CloseButton size="md" onClick={close} aria-label="Close" />
+            <CloseButton size="lg" onClick={close} aria-label="Close" />
           </div>
           <div
             style={{
@@ -4347,11 +4337,10 @@ export default function ShiftEditPanel({
         {/* Panel Header */}
         <div
           style={{
-            padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--dg-color-border)",
+            padding: isMobile ? "16px 16px 0" : "20px 24px 0",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 14,
             flexShrink: 0,
             background: "var(--dg-color-surface)",
           }}
@@ -4377,52 +4366,21 @@ export default function ShiftEditPanel({
               <ChevronLeft size={20} color="var(--dg-color-text-primary)" />
             </Button>
           )}
+          <PersonAvatar person={avatarPerson} name={modal.empName} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {correction && (
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-badge)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-brand)",
-                  marginBottom: 2,
-                }}
-              >
-                Correct this day
-              </div>
-            )}
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              {modal.empName}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-subtle)",
-                marginTop: 2,
-              }}
-            >
+            {correction && <div className="dg-overlay-eyebrow">Correct this day</div>}
+            <div className="dg-overlay-title">{modal.empName}</div>
+            <div className="dg-overlay-subtitle">
               {formatDate(modal.date)}
               {modal.empCertificationId != null && (
                 <>
                   {" · "}
-                  <span
-                    style={{
-                      color: "var(--dg-color-text-muted)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {getCertName(modal.empCertificationId, certifications)}
-                  </span>
+                  {getCertName(modal.empCertificationId, certifications)}
                 </>
               )}
             </div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close" />}
+          {!isMobile && <CloseButton size="lg" onClick={close} aria-label="Close" />}
         </div>
 
         {/* Scrollable content */}
@@ -5199,6 +5157,7 @@ export default function ShiftEditPanel({
 
       {pendingDelete && !(pendingDelete.type === "all" && (seriesId || runDateKeys)) && (
         <ConfirmDialog
+          icon={Trash2}
           title={`Remove ${
             isAbsence
               ? `the absence "${currentLabels[0]}"`

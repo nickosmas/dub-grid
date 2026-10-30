@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { NumberField } from "@/components/ui/number-field";
@@ -817,35 +818,10 @@ function JobSectionCard({
         overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--dg-color-border-light)",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 16,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: "var(--dg-fs-label)",
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
-            {header.title}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--dg-color-text-muted)",
-              lineHeight: 1.45,
-            }}
-          >
-            {header.description}
-          </div>
+      <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="dg-card-title">{header.title}</div>
+          <div className="dg-card-description">{header.description}</div>
         </div>
         {headerAction ? <div style={{ flexShrink: 0 }}>{headerAction}</div> : null}
       </div>
@@ -2575,6 +2551,7 @@ function JobRow({
             if (hasAny) {
               return (
                 <ConfirmDialog
+                  icon={Archive}
                   title={`Archive "${form.name}"?`}
                   message="It stays on past schedules but can't be picked for anything new."
                   confirmLabel="Archive"
@@ -2587,6 +2564,7 @@ function JobRow({
             }
             return (
               <ConfirmDialog
+                icon={Trash2}
                 title={`Delete "${form.name}"?`}
                 message={`Nothing uses ${form.name}, so it's deleted permanently.`}
                 confirmLabel="Delete"

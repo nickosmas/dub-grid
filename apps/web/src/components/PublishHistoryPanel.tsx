@@ -658,8 +658,7 @@ export default function PublishHistoryPanel({
         {/* Header */}
         <div
           style={{
-            padding: isMobile ? "12px 16px" : "16px 20px",
-            borderBottom: "1px solid var(--dg-color-border)",
+            padding: isMobile ? "16px 16px 8px" : "20px 20px 12px",
             display: "flex",
             alignItems: "center",
             gap: 12,
@@ -689,26 +688,10 @@ export default function PublishHistoryPanel({
             </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 700,
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              Publish History
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-subtle)",
-                marginTop: 2,
-              }}
-            >
-              {subtitle}
-            </div>
+            <div className="dg-overlay-title">Publish History</div>
+            <div className="dg-overlay-subtitle">{subtitle}</div>
           </div>
-          {!isMobile && <CloseButton size="md" onClick={close} aria-label="Close" />}
+          {!isMobile && <CloseButton size="lg" onClick={close} aria-label="Close" />}
         </div>
 
         <ProgressBar loading={loading} />

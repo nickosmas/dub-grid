@@ -1,6 +1,6 @@
 "use client";
 
-import { MonitorSmartphone } from "lucide-react";
+import { MonitorSmartphone, CalendarClock } from "lucide-react";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import Modal from "@/components/Modal";
@@ -62,6 +62,7 @@ export function ScheduleSessionWarning({
 export function ScheduleSessionEndedDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal
+      alert={{ icon: CalendarClock, tone: "warning" }}
       title="Schedule session ended"
       onClose={onClose}
       aria-describedby="schedule-session-ended-description"

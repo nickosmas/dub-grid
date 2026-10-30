@@ -670,10 +670,8 @@ export function ProfilePanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                Profile details
-              </div>
-              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              <div className="dg-card-title">Profile details</div>
+              <div className="dg-card-description">
                 Account and contact information. Changes stay editable on this page.
               </div>
             </div>
@@ -758,10 +756,8 @@ export function ProfilePanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                  Work details
-                </div>
-                <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+                <div className="dg-card-title">Work details</div>
+                <div className="dg-card-description">
                   Employment type, {(focusAreaLabel ?? "focus areas").toLowerCase()},{" "}
                   {(certificationLabel ?? "certification").toLowerCase()}, and{" "}
                   {(roleLabel ?? "roles").toLowerCase()} for this account.
@@ -822,10 +818,8 @@ export function ProfilePanel({
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-              Access
-            </div>
-            <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+            <div className="dg-card-title">Access</div>
+            <div className="dg-card-description">
               {isGridmaster
                 ? "Your platform role. Gridmasters administer every organization and hold no organization role of their own."
                 : "Your organization role and the permissions it carries."}
@@ -857,12 +851,8 @@ export function ProfilePanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                  Management departments
-                </div>
-                <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-                  Management department assignment.
-                </div>
+                <div className="dg-card-title">Management departments</div>
+                <div className="dg-card-description">Management department assignment.</div>
               </div>
               {canManageManagementAccess && employee && (
                 <Button
@@ -948,10 +938,8 @@ export function ProfilePanel({
         <SectionCard>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                Name change requests
-              </div>
-              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              <div className="dg-card-title">Name change requests</div>
+              <div className="dg-card-description">
                 Ask an admin to update your name. Email and phone are managed in Account details.
               </div>
             </div>
@@ -1058,13 +1046,10 @@ export function ProfilePanel({
             }}
           >
             <div>
-              <div
-                className="text-[14px] font-semibold"
-                style={{ color: "var(--dg-color-danger)" }}
-              >
+              <div className="dg-card-title" style={{ color: "var(--dg-color-danger)" }}>
                 Delete account
               </div>
-              <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              <p className="dg-card-description">
                 Request that an admin delete your account. This is irreversible.
               </p>
             </div>

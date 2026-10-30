@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -439,6 +439,7 @@ export default function GridmasterPersonView({
 
       {forceLogoutConfirm && !stepUp.dialog && (
         <ConfirmDialog
+          icon={LogOut}
           title="End every session for this person?"
           message="They need to sign in again."
           confirmLabel="Force logout"

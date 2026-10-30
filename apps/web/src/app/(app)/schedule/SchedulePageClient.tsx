@@ -67,7 +67,20 @@ import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingM
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { hint } from "@/components/ui/hint.types";
-import { CalendarCheck, CalendarRange, Trash2, Unplug, X } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarRange,
+  Trash2,
+  Unplug,
+  X,
+  CircleCheck,
+  CalendarPlus,
+  Replace,
+  Undo2,
+  Send,
+  Repeat,
+  Import,
+} from "lucide-react";
 
 const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), {
   ssr: false,
@@ -9213,6 +9226,7 @@ function SchedulerContent({
 
             {pendingApproval && (
               <ConfirmDialog
+                icon={CircleCheck}
                 title={pendingApproval.title}
                 message={pendingApproval.message}
                 summary={{ points: pendingApproval.points }}
@@ -9227,6 +9241,7 @@ function SchedulerContent({
             {/* Confirm dialog for context-menu shift removal */}
             {pendingClearShift && (
               <ConfirmDialog
+                icon={Trash2}
                 title={`Remove "${pendingClearShift.shiftLabel}" on ${formatDate(pendingClearShift.date)}?`}
                 confirmLabel="Remove"
                 variant="danger"
@@ -9241,6 +9256,7 @@ function SchedulerContent({
 
             {showBulkDeleteReview && (
               <ConfirmDialog
+                icon={Trash2}
                 title={`Remove ${bulkDeleteSelectedTargets.length} selected entr${
                   bulkDeleteSelectedTargets.length === 1 ? "y" : "ies"
                 }?`}
@@ -9409,6 +9425,7 @@ function SchedulerContent({
             )}
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
+                icon={CalendarPlus}
                 confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
@@ -9448,6 +9465,7 @@ function SchedulerContent({
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
+                icon={CalendarPlus}
                 title={`Claim ${
                   spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
                   pendingClaimShift.assignmentLabel
@@ -9541,6 +9559,7 @@ function SchedulerContent({
             {/* Confirm dialog for pasting over an existing shift */}
             {pendingPasteOver && (
               <ConfirmDialog
+                icon={Replace}
                 title={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
                 confirmLabel="Replace"
                 variant="warning"
@@ -9961,6 +9980,7 @@ function SchedulerContent({
 
           {showDiscardConfirm && (
             <ConfirmDialog
+              icon={Undo2}
               title={`Discard drafts for ${currentPublishWindow.label}?`}
               message={
                 <div
@@ -10038,6 +10058,7 @@ function SchedulerContent({
 
           {showPublishConfirm && (
             <ConfirmDialog
+              icon={Send}
               title={`Publish ${draftBreakdown.totalChanges} change${
                 draftBreakdown.totalChanges === 1 ? "" : "s"
               } for ${currentPublishWindow.label}?`}
@@ -10060,6 +10081,7 @@ function SchedulerContent({
 
           {showAutoFillConfirm && autoFillPreview && (
             <ConfirmDialog
+              icon={Repeat}
               title={`Fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} from recurring schedules?`}
               message={`This covers ${autoFillPreview.dateRange}. Shifts already on the schedule are not overwritten.`}
               confirmLabel="Fill"
@@ -10075,6 +10097,7 @@ function SchedulerContent({
 
           {showImportConfirm && importPreview && (
             <ConfirmDialog
+              icon={Import}
               title={`Import ${importPreview.breakdown.imported} shift${
                 importPreview.breakdown.imported === 1 ? "" : "s"
               } from ${importPreview.sourceRange}?`}

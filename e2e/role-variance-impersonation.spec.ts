@@ -91,7 +91,7 @@ async function startImpersonation(page: Page) {
   await content.getByPlaceholder(/Why are you impersonating/).fill(JUSTIFICATION);
   await content.getByRole("button", { name: `Impersonate ${QA_REGULAR_EMAIL}` }).click();
   await page
-    .getByRole("dialog")
+    .getByRole("alertdialog")
     .getByRole("button", { name: "Start impersonation", exact: true })
     .click();
 

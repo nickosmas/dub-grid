@@ -397,7 +397,7 @@ describe("Header sign out in sandbox mode", () => {
     await openSignOut();
 
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: /sign out/i })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: /sign out/i })).toBeInTheDocument();
     expect(screen.queryByText(/sign out and discard your sandbox/i)).not.toBeInTheDocument();
   });
 
@@ -406,7 +406,7 @@ describe("Header sign out in sandbox mode", () => {
     renderHeader(<Header />, { inSandbox: false });
 
     const user = await openSignOut();
-    const dialog = screen.getByRole("dialog", { name: /sign out/i });
+    const dialog = screen.getByRole("alertdialog", { name: /sign out/i });
     await user.click(within(dialog).getByRole("button", { name: /sign out/i }));
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
@@ -419,7 +419,7 @@ describe("Header sign out in sandbox mode", () => {
     renderHeader(<Header />, { inSandbox: false });
 
     const user = await openSignOut();
-    const dialog = screen.getByRole("dialog", { name: /sign out/i });
+    const dialog = screen.getByRole("alertdialog", { name: /sign out/i });
     await user.click(within(dialog).getByRole("button", { name: /sign out/i }));
 
     // Logout is a single sweep: signOutLocal tears down the session and clears
@@ -446,7 +446,9 @@ describe("Header sign out in sandbox mode", () => {
     renderHeader(<Header />, { inSandbox: true });
 
     const user = await openSignOut();
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Sign out" }));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out" }),
+    );
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
     // Sandbox is destroyed before the session is torn down.

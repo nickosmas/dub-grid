@@ -52,7 +52,7 @@ describe("PlatformBillingPolicyCard", () => {
 
     expect(await screen.findAllByText("14 days")).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Edit" }));
-    const dialog = await screen.findByRole("dialog", {
+    const dialog = await screen.findByRole("alertdialog", {
       name: "Edit the platform billing defaults?",
     });
     const grace = within(dialog).getByLabelText("Grace after the trial");
@@ -90,7 +90,9 @@ describe("OrganizationBillingPolicyCard", () => {
     wrap(<OrganizationBillingPolicyCard org={org} />);
 
     await user.click(screen.getByRole("button", { name: "Edit overrides" }));
-    const dialog = await screen.findByRole("dialog", { name: /^Override .*'s billing policy\?$/ });
+    const dialog = await screen.findByRole("alertdialog", {
+      name: /^Override .*'s billing policy\?$/,
+    });
     await user.click(
       within(dialog).getByRole("switch", { name: "Override Grace after the trial" }),
     );
