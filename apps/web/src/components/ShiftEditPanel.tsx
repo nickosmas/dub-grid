@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import { toDarkPillColors, darkenColor } from "@/lib/colors";
@@ -2161,31 +2162,25 @@ export default function ShiftEditPanel({
                   Only teammates with an absence on this date are shown.
                 </div>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  border: "1px solid var(--dg-color-border)",
-                  borderRadius: "var(--dg-radius-xl)",
-                  overflow: "hidden",
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                }}
-              >
-                {targetedPickupTargets.length === 0 ? (
-                  <div
-                    style={{
-                      padding: "18px 14px",
-                      textAlign: "center",
-                      color: "var(--dg-color-text-muted)",
-                      fontSize: "var(--dg-fs-body-sm)",
-                    }}
-                  >
-                    No absent teammates are available on this date.
-                  </div>
-                ) : (
-                  targetedPickupTargets.map((target, index) => {
+              {targetedPickupTargets.length === 0 ? (
+                <EmptyState
+                  size="compact"
+                  title="No absent teammates are available on this date."
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    border: "1px solid var(--dg-color-border)",
+                    borderRadius: "var(--dg-radius-xl)",
+                    overflow: "hidden",
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: "auto",
+                  }}
+                >
+                  {targetedPickupTargets.map((target, index) => {
                     const { employee } = target;
 
                     return (
@@ -2248,9 +2243,9 @@ export default function ShiftEditPanel({
                         </span>
                       </Button>
                     );
-                  })
-                )}
-              </div>
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2740,42 +2735,27 @@ export default function ShiftEditPanel({
               })}
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                border: "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-xl)",
-                overflow: "hidden",
-                background: "var(--dg-color-surface)",
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-              }}
-            >
-              {eligibleSwapEmployees.length === 0 ? (
-                <div
-                  style={{
-                    padding: "22px 16px",
-                    textAlign: "center",
-                    color: "var(--dg-color-text-muted)",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  No eligible employees on this date.
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      marginTop: 4,
-                      color: "var(--dg-color-text-label)",
-                    }}
-                  >
-                    Try another day.
-                  </div>
-                </div>
-              ) : (
-                eligibleSwapEmployees.map((employee, index) => {
+            {eligibleSwapEmployees.length === 0 ? (
+              <EmptyState
+                size="compact"
+                title="No eligible employees on this date."
+                description="Try another day."
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  border: "1px solid var(--dg-color-border)",
+                  borderRadius: "var(--dg-radius-xl)",
+                  overflow: "hidden",
+                  background: "var(--dg-color-surface)",
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                }}
+              >
+                {eligibleSwapEmployees.map((employee, index) => {
                   const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
                   const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
                   const targetSegmentOptions = getRequestSegmentOptions(targetSegments);
@@ -2861,9 +2841,9 @@ export default function ShiftEditPanel({
                       </Button>
                     );
                   });
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -4886,16 +4866,7 @@ export default function ShiftEditPanel({
 
               {/* Shift Picker Component */}
               {isAddingSecondShift && pickerAssignmentDefinitions.length === 0 ? (
-                <div
-                  style={{
-                    padding: "24px 16px",
-                    textAlign: "center",
-                    color: "var(--dg-color-text-subtle)",
-                    fontSize: "var(--dg-fs-label)",
-                  }}
-                >
-                  No other shifts to add.
-                </div>
+                <EmptyState size="compact" title="No other shifts to add." />
               ) : (
                 <div data-tour="shift-picker">
                   <ShiftPicker

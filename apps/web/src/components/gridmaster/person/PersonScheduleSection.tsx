@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchGridmasterStaffActivity } from "@/features/gridmaster/client";
 import type {
@@ -48,7 +49,7 @@ function Group({
     <div className="flex flex-col gap-2">
       <h5 className="dg-type-field-title">{title}</h5>
       {children.length === 0 ? (
-        <p className="text-[13px] text-[var(--dg-color-text-muted)]">{empty}</p>
+        <EmptyState size="inline" title={empty} />
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">{children}</ul>
       )}

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import type { GridmasterPersonRecord } from "@/features/gridmaster/person-record";
 import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from "./PersonField";
 import { formatActor, formatDay, formatMoment } from "./person-format";
@@ -41,9 +42,11 @@ export function PersonAccountCard({
   if (!account) {
     return (
       <PersonSection title="Account">
-        <p className="text-[13px] text-[var(--dg-color-text-secondary)]">
-          No account. This person has a staff record but has never signed in.
-        </p>
+        <EmptyState
+          size="inline"
+          title="No account."
+          description="This person has a staff record but has never signed in."
+        />
       </PersonSection>
     );
   }
@@ -127,9 +130,7 @@ export function PersonAccountCard({
 
       <PersonSubheading>Terms and consent</PersonSubheading>
       {record.termsAcceptances.length === 0 && record.cookieConsents.length === 0 ? (
-        <p className="text-[13px] text-[var(--dg-color-text-muted)]">
-          No terms acceptance or cookie choice recorded.
-        </p>
+        <EmptyState size="inline" title="No terms acceptance or cookie choice recorded." />
       ) : (
         <ul className="flex flex-col gap-2 text-[13px]">
           {terms.map((acceptance) => (

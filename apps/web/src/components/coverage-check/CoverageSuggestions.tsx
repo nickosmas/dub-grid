@@ -7,6 +7,7 @@ import type {
   CoverageSuggestionText,
 } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { formatCoverageNumber, formatLongDate } from "./coverage-check-text";
 
 export interface CoverageSuggestionView {
@@ -198,10 +199,11 @@ export function CoverageDayDetail({
           </ul>
         </div>
       ) : staffShort > 0 ? (
-        <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-          No fixes found for this day. Select a short cell to see why each qualified person
-          isn&apos;t suggested.
-        </p>
+        <EmptyState
+          size="inline"
+          title="No fixes found for this day."
+          description="Select a short cell to see why each qualified person isn't suggested."
+        />
       ) : null}
     </section>
   );

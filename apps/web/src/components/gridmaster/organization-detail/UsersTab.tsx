@@ -4,6 +4,7 @@ import { changedElsewhereMessage, REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubg
 import CustomSelect from "@/components/CustomSelect";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
 import { requireCredentialAssurance } from "@/features/account/client";
@@ -304,16 +305,8 @@ export function UsersTab({
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    style={{
-                      ...gmTdStyle,
-                      textAlign: "center",
-                      color: "var(--dg-color-text-muted)",
-                      padding: 32,
-                    }}
-                  >
-                    No users found
+                  <td colSpan={4} style={{ ...gmTdStyle, padding: 16 }}>
+                    <EmptyState size="compact" title="No users found" />
                   </td>
                 </tr>
               ) : (

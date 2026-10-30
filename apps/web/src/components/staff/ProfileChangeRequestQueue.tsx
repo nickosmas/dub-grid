@@ -170,9 +170,10 @@ function ProfileUpdateDetails({
 
   if (changeKeys.length === 0) {
     return (
-      <div className="rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg)] p-3 text-[13px] text-[var(--dg-color-text-muted)]">
-        No structured profile fields were included with this request.
-      </div>
+      <EmptyState
+        size="inline"
+        title="No structured profile fields were included with this request."
+      />
     );
   }
 

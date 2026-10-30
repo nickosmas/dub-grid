@@ -5,6 +5,7 @@ import { Search, UserRound } from "lucide-react";
 import { SUSPENDED_SCHEDULE_NOTE } from "@dubgrid/domain";
 import { StatusIcon } from "@/components/staff-detail/StatusMarkIcon";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
 import CustomSelect from "@/components/CustomSelect";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { Button } from "@/components/Button";
@@ -189,15 +190,21 @@ export function OpenShiftStaffingModal({
       ) : null}
 
       {candidates.length === 0 ? (
-        <div className="dg-open-shift-staffing-empty" role="status">
-          <UserRound aria-hidden="true" size={22} />
-          <strong>No eligible staff</strong>
-          <span>Nobody qualified is free that day.</span>
+        <div role="status">
+          <EmptyState
+            size="compact"
+            icon={<UserRound aria-hidden="true" size={22} />}
+            title="No eligible staff"
+            description="Nobody qualified is free that day."
+          />
         </div>
       ) : visibleCandidates.length === 0 ? (
-        <div className="dg-open-shift-staffing-empty" role="status">
-          <strong>No matching staff</strong>
-          <span>Try a different name.</span>
+        <div role="status">
+          <EmptyState
+            size="compact"
+            title="No matching staff"
+            description="Try a different name."
+          />
         </div>
       ) : (
         <div className="dg-open-shift-staffing-list" role="radiogroup" aria-label="Eligible staff">

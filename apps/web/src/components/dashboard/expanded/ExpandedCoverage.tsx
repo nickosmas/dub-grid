@@ -5,6 +5,7 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_COLORS = {
   green: { bg: "var(--dg-color-success-border)", text: "var(--dg-color-success-text)" },
@@ -58,10 +59,11 @@ export default function ExpandedCoverage({
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {isUnpublished ? (
-          <div style={emptyStyle}>
-            This period has not been published yet. Coverage details will appear after the first
-            publish.
-          </div>
+          <EmptyState
+            size="compact"
+            title="This period has not been published yet."
+            description="Coverage details will appear after the first publish."
+          />
         ) : (
           <>
             {isPartial && (
@@ -123,11 +125,14 @@ export default function ExpandedCoverage({
 
             <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
               {filtered.length === 0 ? (
-                <div style={emptyStyle}>
-                  {isPartial
-                    ? "No coverage data on published dates for this filter"
-                    : "No coverage data for this filter"}
-                </div>
+                <EmptyState
+                  size="compact"
+                  title={
+                    isPartial
+                      ? "No coverage data on published dates for this filter"
+                      : "No coverage data for this filter"
+                  }
+                />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                   {/* Coverage bars */}
@@ -311,11 +316,4 @@ const heatmapRowLabelStyle = {
   whiteSpace: "nowrap" as const,
   overflow: "hidden" as const,
   textOverflow: "ellipsis" as const,
-};
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--dg-color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
 };

@@ -6,6 +6,7 @@ import {
   fetchGridmasterOrgSeatHistory,
   type GridmasterSeatHistoryRow,
 } from "@/features/gridmaster/client";
+import { EmptyState } from "@/components/EmptyState";
 import { gmTableStyle, gmTdStyle, gmThStyle } from "@/components/gridmaster/table-styles";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionBodyStyle, sectionHeaderStyle, sectionStyle } from "@/lib/styles";
@@ -78,8 +79,12 @@ export function BillingHistoryCard() {
           {historyQuery.isError ? "We couldn't load the billing history." : "Loading"}
         </div>
       ) : report.months.length === 0 ? (
-        <div style={{ ...sectionBodyStyle, ...mutedStyle }}>
-          No history recorded yet. Seat changes and invoices are recorded from now on.
+        <div style={sectionBodyStyle}>
+          <EmptyState
+            size="compact"
+            title="No history recorded yet."
+            description="Seat changes and invoices are recorded from now on."
+          />
         </div>
       ) : (
         <table style={gmTableStyle}>
@@ -134,7 +139,9 @@ export function OrgSeatHistoryCard({ orgId }: { orgId: string }) {
           {seatsQuery.isError ? "We couldn't load the seat history." : "Loading"}
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ ...sectionBodyStyle, ...mutedStyle }}>No seat changes recorded yet.</div>
+        <div style={sectionBodyStyle}>
+          <EmptyState size="compact" title="No seat changes recorded yet." />
+        </div>
       ) : (
         <table style={gmTableStyle}>
           <thead>

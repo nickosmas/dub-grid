@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
@@ -454,16 +455,7 @@ export default function NotificationBell({
                 Loading
               </div>
             ) : notifications.length === 0 ? (
-              <div
-                style={{
-                  padding: 32,
-                  textAlign: "center",
-                  color: "var(--dg-color-text-muted)",
-                  fontSize: "var(--dg-fs-label)",
-                }}
-              >
-                No alerts
-              </div>
+              <EmptyState size="inline" title="No alerts" style={{ margin: 12 }} />
             ) : (
               notifications.map((n) => (
                 <BellRow

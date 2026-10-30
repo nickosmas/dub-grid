@@ -1305,9 +1305,6 @@ input[type="color"]::-moz-color-swatch {
   font-size: var(--dg-fs-footnote);
   font-weight: 600;
 }
-.dg-open-shift-staffing-empty strong {
-  color: var(--dg-color-text-primary);
-}
 .dg-open-shift-staffing-actions .dg-btn {
   width: 100%;
   min-width: 0;

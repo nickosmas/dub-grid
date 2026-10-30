@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
   GridmasterKnownDevice,
@@ -43,7 +44,7 @@ export function PersonSecurityCard({
         />
       </PersonFieldGrid>
       {twoFactor.factors.length === 0 ? (
-        <p className="text-[13px] text-[var(--dg-color-text-muted)]">No factors enrolled.</p>
+        <EmptyState size="inline" title="No factors enrolled." />
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">
           {twoFactor.factors.map((factor) => (
@@ -69,9 +70,11 @@ export function PersonSecurityCard({
 
       <PersonSubheading>Known devices</PersonSubheading>
       {knownDevices.length === 0 ? (
-        <p className="text-[13px] text-[var(--dg-color-text-muted)]">
-          No devices remembered. Their next sign-in anywhere sends a new-device alert.
-        </p>
+        <EmptyState
+          size="inline"
+          title="No devices remembered."
+          description="Their next sign-in anywhere sends a new-device alert."
+        />
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">
           {knownDevices.map((device) => (

@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import type {
   GridmasterPersonOrganization,
   GridmasterPersonRecord,
@@ -54,9 +55,11 @@ function MembershipFacts({
   const { membership, names, terminology } = organization;
   if (!membership) {
     return (
-      <p className="text-[13px] text-[var(--dg-color-text-muted)]">
-        No membership. They cannot sign in to this organization.
-      </p>
+      <EmptyState
+        size="inline"
+        title="No membership."
+        description="They cannot sign in to this organization."
+      />
     );
   }
   const granted = Object.entries(membership.adminPermissions ?? {})
@@ -218,7 +221,7 @@ function InvitationHistory({
   renderActions?: (invitation: Invitation) => ReactNode;
 }) {
   if (invitations.length === 0) {
-    return <p className="text-[13px] text-[var(--dg-color-text-muted)]">No invitations sent.</p>;
+    return <EmptyState size="inline" title="No invitations sent." />;
   }
   const nowMs = Date.now();
   return (
@@ -285,7 +288,7 @@ export function PersonOrganizationCard({
 
       <PersonSubheading>Staff record</PersonSubheading>
       {employees.length === 0 ? (
-        <p className="text-[13px] text-[var(--dg-color-text-muted)]">No staff record.</p>
+        <EmptyState size="inline" title="No staff record." />
       ) : (
         employees.map((employee) => (
           <div key={employee.id} className="flex flex-col gap-3">
