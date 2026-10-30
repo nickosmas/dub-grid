@@ -168,7 +168,7 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Discard your changes?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Discard your changes?" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(navigate).not.toHaveBeenCalled();
     // Opening the confirmation preserves the draft in the underlying panel.
@@ -195,9 +195,12 @@ describe("settings panels guard navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Jobs" }));
     await user.click(
-      within(screen.getByRole("dialog", { name: "Discard your changes?" })).getByRole("button", {
-        name: "Discard",
-      }),
+      within(screen.getByRole("alertdialog", { name: "Discard your changes?" })).getByRole(
+        "button",
+        {
+          name: "Discard",
+        },
+      ),
     );
 
     expect(navigate).toHaveBeenCalledTimes(1);

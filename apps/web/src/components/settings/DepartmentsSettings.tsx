@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
@@ -930,36 +931,10 @@ function DepartmentSection({
   return (
     <SectionCard noPadding>
       {/* Header: title, description, actions */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "16px 16px 14px",
-          borderBottom: "1px solid var(--dg-color-border-light)",
-        }}
-      >
-        <div>
-          <h3
-            style={{
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-              margin: 0,
-            }}
-          >
-            {title}
-          </h3>
-          <p
-            style={{
-              fontSize: "var(--dg-fs-label)",
-              color: "var(--dg-color-text-muted)",
-              margin: "4px 0 0",
-            }}
-          >
-            {description}
-          </p>
+      <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
+        <div style={{ minWidth: 0 }}>
+          <h3 className="dg-card-title">{title}</h3>
+          <p className="dg-card-description">{description}</p>
         </div>
         {showReadOnlyEditAction ? (
           <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
@@ -1267,6 +1242,7 @@ function DepartmentSection({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${deleteConfirm.dept.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
@@ -1281,6 +1257,7 @@ function DepartmentSection({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${deleteConfirm.dept.name}"?`}
               message={`Nothing uses ${deleteConfirm.dept.name || "this department"}, so it's deleted permanently and no history is lost.`}
               confirmLabel="Delete"
@@ -1323,6 +1300,7 @@ function DepartmentSection({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${faDeleteConfirm.fa.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
@@ -1337,6 +1315,7 @@ function DepartmentSection({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${faDeleteConfirm.fa.name}"?`}
               message={`Nothing uses ${faDeleteConfirm.fa.name || `this ${singularLabelNoun(focusAreaLabel)}`}, so it's deleted permanently.`}
               confirmLabel="Delete"

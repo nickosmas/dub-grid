@@ -120,9 +120,12 @@ describe("GridmasterAccountsView", () => {
     const buttons = await screen.findAllByRole("button", { name: "Force Logout" });
     fireEvent.click(buttons[1]);
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^End every session for / })).getByRole("button", {
-        name: "Force logout",
-      }),
+      within(screen.getByRole("alertdialog", { name: /^End every session for / })).getByRole(
+        "button",
+        {
+          name: "Force logout",
+        },
+      ),
     );
 
     await waitFor(() => expect(mockForceLogoutGridmasterUser).toHaveBeenCalledOnce());
@@ -137,12 +140,11 @@ describe("GridmasterAccountsView", () => {
     const buttons = await screen.findAllByRole("button", { name: "Reset Password" });
     fireEvent.click(buttons[buttons.length - 1]);
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Send a password reset email to / })).getByRole(
-        "button",
-        {
-          name: "Send reset email",
-        },
-      ),
+      within(
+        screen.getByRole("alertdialog", { name: /^Send a password reset email to / }),
+      ).getByRole("button", {
+        name: "Send reset email",
+      }),
     );
 
     await waitFor(() => expect(mockSendGridmasterPasswordReset).toHaveBeenCalledOnce());
@@ -167,7 +169,7 @@ describe("GridmasterAccountsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Promote" }));
     fireEvent.click(
       within(
-        screen.getByRole("dialog", { name: /^Promote .* to platform Gridmaster\?$/ }),
+        screen.getByRole("alertdialog", { name: /^Promote .* to platform Gridmaster\?$/ }),
       ).getByRole("button", {
         name: "Promote",
       }),
@@ -186,7 +188,7 @@ describe("GridmasterAccountsView", () => {
     await waitFor(() => expect(buttons[1]).toBeEnabled());
     fireEvent.click(buttons[1]);
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Demote Gridmaster" })).getByRole("button", {
+      within(screen.getByRole("alertdialog", { name: "Demote Gridmaster" })).getByRole("button", {
         name: "Demote",
       }),
     );
@@ -207,7 +209,7 @@ describe("GridmasterAccountsView", () => {
     await waitFor(() => expect(buttons[1]).toBeEnabled());
     fireEvent.click(buttons[1]);
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Deactivate / })).getByRole("button", {
+      within(screen.getByRole("alertdialog", { name: /^Deactivate / })).getByRole("button", {
         name: "Deactivate",
       }),
     );
@@ -227,7 +229,7 @@ describe("GridmasterAccountsView", () => {
 
     const buttons = await screen.findAllByRole("button", { name: "Reset Password" });
     fireEvent.click(buttons[buttons.length - 1]);
-    const dialog = screen.getByRole("dialog", { name: /^Send a password reset email to / });
+    const dialog = screen.getByRole("alertdialog", { name: /^Send a password reset email to / });
     fireEvent.click(within(dialog).getByRole("button", { name: "Send reset email" }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
@@ -235,7 +237,7 @@ describe("GridmasterAccountsView", () => {
       expect(within(dialog).getByRole("button", { name: "Send reset email" })).toBeEnabled(),
     );
     expect(
-      screen.getByRole("dialog", { name: /^Send a password reset email to / }),
+      screen.getByRole("alertdialog", { name: /^Send a password reset email to / }),
     ).toBeInTheDocument();
     expect(mockSendGridmasterPasswordReset).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();

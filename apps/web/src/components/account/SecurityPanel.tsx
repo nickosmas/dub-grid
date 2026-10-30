@@ -216,10 +216,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                Password
-              </div>
-              <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              <div className="dg-card-title">Password</div>
+              <p className="dg-card-description">
                 Choose a strong password: at least 10 characters with a letter and a number, plus an
                 uppercase letter or a symbol.
               </p>
@@ -335,10 +333,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-              Two-factor authentication
-            </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+            <div className="dg-card-title">Two-factor authentication</div>
+            <p className="dg-card-description">
               Add a second sign-in step using an authenticator app.
             </p>
           </div>
@@ -361,12 +357,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-              Sessions
-            </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
-              Sign out of devices you&apos;re not using.
-            </p>
+            <div className="dg-card-title">Sessions</div>
+            <p className="dg-card-description">Sign out of devices you&apos;re not using.</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -392,10 +384,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           </div>
           <div className="border-t border-[var(--dg-color-border-light)] pt-4">
             <div className="mb-3">
-              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                Devices
-              </div>
-              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
+              <div className="dg-card-title">Devices</div>
+              <div className="dg-card-description">
                 Where you&apos;re signed in, and when you last signed in.
               </div>
             </div>

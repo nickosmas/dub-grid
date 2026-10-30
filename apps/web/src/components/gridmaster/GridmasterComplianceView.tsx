@@ -12,7 +12,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
-import { sectionStyle } from "@/lib/styles";
+import { sectionHeaderStyle, sectionStyle } from "@/lib/styles";
 import { describeAuditEvent } from "@/lib/activity-log-utils";
 import { formatClientErrorMessage, formatDateTimeLabel } from "@/lib/client-facing";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -213,17 +213,7 @@ export default function GridmasterComplianceView({
 
           <div style={{ display: "grid", gap: 20 }}>
             <div style={sectionStyle}>
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--dg-color-border-light)",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-primary)",
-                }}
-              >
-                Data Retention
-              </div>
+              <div style={sectionHeaderStyle}>Data Retention</div>
               {compliance.orgRetention.length === 0 ? (
                 <div style={{ padding: 16 }}>
                   <EmptyState
@@ -281,17 +271,7 @@ export default function GridmasterComplianceView({
             </div>
 
             <div style={sectionStyle}>
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--dg-color-border-light)",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  color: "var(--dg-color-text-primary)",
-                }}
-              >
-                Recent Compliance Events
-              </div>
+              <div style={sectionHeaderStyle}>Recent Compliance Events</div>
               {compliance.gdprEvents.length === 0 &&
               compliance.accountDeletionEvents.length === 0 ? (
                 <div style={{ padding: 16 }}>

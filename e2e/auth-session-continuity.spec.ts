@@ -87,7 +87,7 @@ test("a Calm Haven sign-out propagates to another authenticated tab", async ({
 
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  const confirmation = page.getByRole("dialog", { name: "Sign out" });
+  const confirmation = page.getByRole("alertdialog", { name: "Sign out" });
   signingOut = true;
   await confirmation.getByRole("button", { name: "Sign out", exact: true }).click();
 

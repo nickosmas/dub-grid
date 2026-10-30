@@ -300,12 +300,11 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
-        "button",
-        {
-          name: "Force logout",
-        },
-      ),
+      within(
+        screen.getByRole("alertdialog", { name: "End every session for this person?" }),
+      ).getByRole("button", {
+        name: "Force logout",
+      }),
     );
 
     await waitFor(() =>
@@ -323,12 +322,11 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
-        "button",
-        {
-          name: "Force logout",
-        },
-      ),
+      within(
+        screen.getByRole("alertdialog", { name: "End every session for this person?" }),
+      ).getByRole("button", {
+        name: "Force logout",
+      }),
     );
 
     await waitFor(() => expect(fetchGridmasterPersonNotifications).toHaveBeenCalledTimes(2));
@@ -340,12 +338,11 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End every session for this person?" })).getByRole(
-        "button",
-        {
-          name: "Force logout",
-        },
-      ),
+      within(
+        screen.getByRole("alertdialog", { name: "End every session for this person?" }),
+      ).getByRole("button", {
+        name: "Force logout",
+      }),
     );
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
@@ -479,7 +476,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit name" }));
-    const dialog = screen.getByRole("dialog", { name: "Edit the name on this account?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Edit the name on this account?" });
     fireEvent.change(within(dialog).getByLabelText("First name"), {
       target: { value: " Augusta " },
     });
@@ -500,7 +497,9 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Change this account's sign-in email?",
+    });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "augusta@example.com" },
     });
@@ -525,7 +524,9 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Change this account's sign-in email?",
+    });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "grace@example.com" },
     });
@@ -537,7 +538,7 @@ describe("GridmasterPersonView", () => {
       ),
     );
     expect(
-      screen.getByRole("dialog", { name: "Change this account's sign-in email?" }),
+      screen.getByRole("alertdialog", { name: "Change this account's sign-in email?" }),
     ).toBeInTheDocument();
   });
 
@@ -546,7 +547,9 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Change sign-in email" }));
-    const dialog = screen.getByRole("dialog", { name: "Change this account's sign-in email?" });
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Change this account's sign-in email?",
+    });
     fireEvent.change(within(dialog).getByLabelText("New sign-in email"), {
       target: { value: "augusta@example.com" },
     });
@@ -708,7 +711,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "End session" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End this session?" })).getByRole("button", {
+      within(screen.getByRole("alertdialog", { name: "End this session?" })).getByRole("button", {
         name: "End session",
       }),
     );
@@ -733,7 +736,7 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "End session" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "End this session?" })).getByRole("button", {
+      within(screen.getByRole("alertdialog", { name: "End this session?" })).getByRole("button", {
         name: "End session",
       }),
     );
@@ -751,9 +754,12 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Clear sign-in lock" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Clear this sign-in lock?" })).getByRole("button", {
-        name: "Clear lock",
-      }),
+      within(screen.getByRole("alertdialog", { name: "Clear this sign-in lock?" })).getByRole(
+        "button",
+        {
+          name: "Clear lock",
+        },
+      ),
     );
     await waitFor(() =>
       expect(runGridmasterPersonSecurityAction).toHaveBeenCalledWith(
@@ -770,7 +776,7 @@ describe("GridmasterPersonView", () => {
     renderView(linkedRecord());
 
     fireEvent.click(await screen.findByRole("button", { name: "Reset two-factor" }));
-    const dialog = screen.getByRole("dialog", { name: "Reset this account's two-factor?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Reset this account's two-factor?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-factor" }));
     expect(toast.error).toHaveBeenCalledWith("Give a reason for the reset.");
     expect(resetGridmasterPersonTwoFactor).not.toHaveBeenCalled();
@@ -801,9 +807,12 @@ describe("GridmasterPersonView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Deactivate" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Deactivate this account?" })).getByRole("button", {
-        name: "Deactivate",
-      }),
+      within(screen.getByRole("alertdialog", { name: "Deactivate this account?" })).getByRole(
+        "button",
+        {
+          name: "Deactivate",
+        },
+      ),
     );
 
     await waitFor(() =>
@@ -818,7 +827,7 @@ describe("GridmasterPersonView", () => {
   describe("account and device actions (F-95)", () => {
     function confirmIn(dialogName: string | RegExp, button: string) {
       fireEvent.click(
-        within(screen.getByRole("dialog", { name: dialogName })).getByRole("button", {
+        within(screen.getByRole("alertdialog", { name: dialogName })).getByRole("button", {
           name: button,
         }),
       );
@@ -952,7 +961,7 @@ describe("GridmasterPersonView", () => {
 
       fireEvent.click(await screen.findByRole("button", { name: "Force logout" }));
       expect(
-        screen.getByRole("dialog", { name: "End every session for this person?" }),
+        screen.getByRole("alertdialog", { name: "End every session for this person?" }),
       ).toBeInTheDocument();
 
       stepUpState.dialog = <div role="dialog" aria-label="Confirm your identity" />;
@@ -963,13 +972,13 @@ describe("GridmasterPersonView", () => {
         screen.getAllByRole("dialog", { name: "Confirm your identity" }).length,
       ).toBeGreaterThan(0);
       expect(
-        screen.queryByRole("dialog", { name: "End every session for this person?" }),
+        screen.queryByRole("alertdialog", { name: "End every session for this person?" }),
       ).toBeNull();
 
       stepUpState.dialog = null;
       rerender();
       expect(
-        screen.getByRole("dialog", { name: "End every session for this person?" }),
+        screen.getByRole("alertdialog", { name: "End every session for this person?" }),
       ).toBeInTheDocument();
     });
   });

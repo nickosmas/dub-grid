@@ -837,7 +837,7 @@ describe("StaffView", () => {
       await user.click((await screen.findAllByRole("gridcell"))[0]);
       await user.click(screen.getByRole("button", { name: "pick-D" }));
       await user.click(screen.getByRole("button", { name: "Save" }));
-      const confirmDialog = await screen.findByRole("dialog", {
+      const confirmDialog = await screen.findByRole("alertdialog", {
         name: /^Save \d+ recurring schedule changes?\?$/,
       });
       await user.click(within(confirmDialog).getByRole("button", { name: "Save" }));

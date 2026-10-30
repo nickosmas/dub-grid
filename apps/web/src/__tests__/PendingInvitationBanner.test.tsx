@@ -85,7 +85,7 @@ describe("PendingInvitationBanner", () => {
 
     // The banner's trigger and the dialog's confirm are both "Revoke" now, so
     // scope to the dialog rather than matching whichever comes first.
-    const confirmDialog = await screen.findByRole("dialog", {
+    const confirmDialog = await screen.findByRole("alertdialog", {
       name: /^Revoke the invitation for /,
     });
     await user.click(within(confirmDialog).getByRole("button", { name: "Revoke" }));

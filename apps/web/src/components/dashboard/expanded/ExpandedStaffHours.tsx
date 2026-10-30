@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getEmployeeDisplayName, getInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
+
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 

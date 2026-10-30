@@ -609,7 +609,7 @@ export function OverviewTab({
           style={{
             ...sectionHeaderStyle,
             borderBottomColor: organization.suspendedAt ? "var(--dg-color-warning)" : undefined,
-            color: organization.suspendedAt ? "var(--dg-color-warning)" : undefined,
+            color: organization.suspendedAt ? "var(--dg-color-warning)" : sectionHeaderStyle.color,
           }}
         >
           Suspension

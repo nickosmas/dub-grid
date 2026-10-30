@@ -158,7 +158,7 @@ export function BillingCard({
           flexWrap: "wrap",
         }}
       >
-        <Icon size={16} aria-hidden="true" />
+        <Icon size={18} aria-hidden="true" />
         <span id={headingId} style={{ flex: 1, minWidth: 0 }}>
           {title}
         </span>

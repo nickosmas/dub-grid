@@ -74,7 +74,7 @@ test.describe("settings states", () => {
 
     // ConfirmDialog title: `Archive "<name>"?` (or `Delete "<name>"?` when
     // nothing references the type).
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("alertdialog");
     await expect(dialog).toBeVisible({ timeout: 10_000 });
     await expect(dialog).toContainText(/(Archive|Delete) ".+"\?/);
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();

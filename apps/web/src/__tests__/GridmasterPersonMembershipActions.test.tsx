@@ -102,7 +102,7 @@ describe("PersonMembershipActions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
     fireEvent.click(
       within(
-        screen.getByRole("dialog", { name: /^Change this person's access level in / }),
+        screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
       ).getByRole("button", {
         name: "Change access level",
       }),
@@ -133,7 +133,7 @@ describe("PersonMembershipActions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
     fireEvent.click(
       within(
-        screen.getByRole("dialog", { name: /^Change this person's access level in / }),
+        screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
       ).getByRole("button", {
         name: "Change access level",
       }),
@@ -143,7 +143,7 @@ describe("PersonMembershipActions", () => {
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("dialog", { name: /^Change this person's access level in / }),
+      screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
     ).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+      within(screen.getByRole("alertdialog", { name: /^Remove this person from / })).getByRole(
         "button",
         {
           name: "Remove",
@@ -211,7 +211,7 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+      within(screen.getByRole("alertdialog", { name: /^Remove this person from / })).getByRole(
         "button",
         {
           name: "Remove",
@@ -232,7 +232,7 @@ describe("PersonMembershipActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove from organization" }));
     fireEvent.click(
-      within(screen.getByRole("dialog", { name: /^Remove this person from / })).getByRole(
+      within(screen.getByRole("alertdialog", { name: /^Remove this person from / })).getByRole(
         "button",
         {
           name: "Remove",

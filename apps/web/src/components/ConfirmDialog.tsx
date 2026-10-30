@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
+import { Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -17,8 +18,18 @@ export interface ConfirmSummary {
   points: React.ReactNode[];
 }
 
+const VARIANT_ICONS: Record<NonNullable<ConfirmDialogProps["variant"]>, LucideIcon> = {
+  danger: OctagonAlert,
+  warning: TriangleAlert,
+  info: Info,
+};
+
+const VARIANT_TONES = { danger: "danger", warning: "warning", info: "brand" } as const;
+
 interface ConfirmDialogProps {
   title: string;
+  /** The tile beside the title; the variant's own icon when absent. */
+  icon?: LucideIcon;
   returnFocus?: React.RefObject<HTMLElement | null>;
   /** A short message under the title, and any fields the confirm needs. */
   message?: string | React.ReactNode;
@@ -58,6 +69,7 @@ interface ConfirmDialogProps {
 
 export default function ConfirmDialog({
   title,
+  icon,
   returnFocus,
   message,
   summary,
@@ -95,11 +107,10 @@ export default function ConfirmDialog({
     variant === "warning" ? { background: "var(--dg-color-warning)", border: "none" } : undefined;
 
   const descId = useId();
-  // Opening on Cancel, not the close button now in the corner: the safe
-  // choice is the one a stray Enter takes.
+  // Opening on Cancel: the safe choice is the one a stray Enter takes.
   const cancelRef = useRef<HTMLButtonElement>(null);
   const actionDisabled = confirmBusy || secondaryBusy;
-  const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
+  const cancelButtonStyle = wrapActions ? { minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
     ? {
         ...confirmStyle,
@@ -154,6 +165,7 @@ export default function ConfirmDialog({
   return (
     <Modal
       title={title}
+      alert={{ icon: icon ?? VARIANT_ICONS[variant], tone: VARIANT_TONES[variant] }}
       returnFocus={returnFocus}
       initialFocus={cancelRef}
       onClose={onCancel}

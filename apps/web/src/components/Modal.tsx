@@ -2,13 +2,26 @@
 
 import { useCallback, useRef, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, type LucideIcon } from "lucide-react";
 import React from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 
+export type ModalAlertTone = "brand" | "warning" | "danger";
+
+/**
+ * Makes the popup an alert dialog: it asks for a decision, so it leads with
+ * an icon tinted by how serious the decision is, and has no X. Its buttons
+ * and Escape are the only ways out, and clicking outside does nothing.
+ */
+export interface ModalAlert {
+  icon: LucideIcon;
+  tone?: ModalAlertTone;
+}
+
 interface ModalProps {
   title: string;
+  alert?: ModalAlert;
   /** A muted line under the title, such as who the dialog is about. */
   subtitle?: string;
   /** Richer header content shown in place of the title text; `title` still names the dialog. */
@@ -38,6 +51,7 @@ interface ModalProps {
 
 export default function Modal({
   title,
+  alert,
   subtitle,
   heading,
   onBack,
@@ -65,6 +79,10 @@ export default function Modal({
     };
   }, []);
 
+  const AlertIcon = alert?.icon;
+  const closeOnOverlay = !disableOverlayClose && !alert;
+  const closeButton = showCloseButton && !alert;
+
   // Animated close — ref guard prevents double-fire race condition
   const handleClose = useCallback(() => {
     if (closingRef.current) return;
@@ -86,10 +104,12 @@ export default function Modal({
       <Dialog.Portal>
         <div
           className={`dg-modal-overlay${closing ? " closing" : ""}${headerSafe ? " is-header-safe" : ""}`}
-          onClick={disableOverlayClose ? undefined : handleClose}
+          onClick={closeOnOverlay ? handleClose : undefined}
           role="presentation"
         >
           <Dialog.Popup
+            // Undefined would replace the popup's own "dialog" role.
+            {...(alert ? { role: "alertdialog" } : {})}
             aria-modal={headerSafe ? undefined : true}
             initialFocus={
               initialFocus
@@ -106,12 +126,12 @@ export default function Modal({
             finalFocus={returnFocus ?? true}
             aria-label={subtitle ? `${title}, ${subtitle}` : title}
             aria-describedby={ariaDescribedby}
-            className={`dg-modal${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
+            className={`dg-modal${alert ? " dg-modal--alert" : ""}${footer ? " dg-modal--with-footer" : ""}${className ? ` ${className}` : ""}`}
             style={style}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dg-modal-header">
-              <div className="dg-modal-heading">
+              <div className={`dg-modal-heading${subtitle ? " has-subtitle" : ""}`}>
                 {onBack ? (
                   <button
                     type="button"
@@ -122,6 +142,11 @@ export default function Modal({
                     <ChevronLeft size={20} strokeWidth={2.25} aria-hidden="true" />
                   </button>
                 ) : null}
+                {AlertIcon ? (
+                  <span className="dg-modal-icon" data-tone={alert?.tone ?? "brand"}>
+                    <AlertIcon size={20} strokeWidth={2} aria-hidden="true" />
+                  </span>
+                ) : null}
                 {heading ?? (
                   <div className="dg-modal-titles">
                     <span className="dg-modal-title">{title}</span>
@@ -129,7 +154,7 @@ export default function Modal({
                   </div>
                 )}
               </div>
-              {showCloseButton ? (
+              {closeButton ? (
                 <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
               ) : null}
             </div>

@@ -36,9 +36,7 @@ export function RequestsTab({ rows, loading, error, range, periodPhrase }: Reque
     <section aria-label="Requests" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3">
-          <h2 className="m-0 text-[17px] font-semibold tracking-tight text-[var(--dg-color-text-primary)]">
-            Requests
-          </h2>
+          <h2 className="dg-section-heading">Requests</h2>
           {loading || error ? null : (
             <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
               {inPeriod.length} {inPeriod.length === 1 ? "request" : "requests"} sent {periodPhrase}

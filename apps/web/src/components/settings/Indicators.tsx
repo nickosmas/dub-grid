@@ -14,6 +14,7 @@ import type { DependencyInfo } from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -433,6 +434,7 @@ function IndicatorRow({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${trimmedName || "schedule note"}"?`}
                 message="Notes already placed stay, but it can't be picked for anything new."
                 confirmLabel="Archive"
@@ -445,6 +447,7 @@ function IndicatorRow({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${trimmedName || "schedule note"}"?`}
               message={`Nothing uses ${trimmedName || "this schedule note"}, so it's deleted permanently.`}
               confirmLabel="Delete"
@@ -563,16 +566,8 @@ export default function Indicators({
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--dg-color-border-light)",
-            fontWeight: 700,
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--dg-color-text-secondary)",
-          }}
-        >
-          Indicators
+        <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
+          <div className="dg-card-title">Indicators</div>
         </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>

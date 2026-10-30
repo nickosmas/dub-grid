@@ -471,26 +471,19 @@ export function BulkImportModal({
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "16px 24px",
-            borderBottom: "1px solid var(--dg-color-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexShrink: 0,
-          }}
-        >
-          <span className="dg-modal-title">
-            {step === "upload" && "Import staff"}
-            {step === "preview" && `Preview (${rows.length} rows)`}
-            {step === "result" && "Import results"}
-          </span>
-          <CloseButton size="md" onClick={handleRequestClose} aria-label="Close import dialog" />
+        <div className="dg-modal-header" style={{ padding: "24px 24px 0", flexShrink: 0 }}>
+          <div className="dg-modal-heading">
+            <span className="dg-modal-title">
+              {step === "upload" && "Import staff"}
+              {step === "preview" && `Preview (${rows.length} rows)`}
+              {step === "result" && "Import results"}
+            </span>
+          </div>
+          <CloseButton size="lg" onClick={handleRequestClose} aria-label="Close import dialog" />
         </div>
 
         {/* Body */}
-        <div style={{ padding: 24, overflow: "auto", flex: 1 }}>
+        <div style={{ padding: "0 24px 24px", overflow: "auto", flex: 1 }}>
           {step === "upload" && (
             <div>
               <div

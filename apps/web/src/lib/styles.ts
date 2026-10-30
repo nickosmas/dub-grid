@@ -12,11 +12,13 @@ export const sectionStyle: CSSProperties = {
 
 /** Section header bar (bottom-bordered title row). */
 export const sectionHeaderStyle: CSSProperties = {
-  padding: "14px 20px",
+  padding: "16px 20px",
   borderBottom: "1px solid var(--dg-color-border-light)",
-  fontWeight: 700,
-  fontSize: "var(--dg-fs-body-sm)",
-  color: "var(--dg-color-text-secondary)",
+  fontSize: "var(--dg-type-card-title-size)",
+  fontWeight: "var(--dg-type-card-title-weight)",
+  letterSpacing: "var(--dg-type-card-title-letter-spacing)",
+  lineHeight: "var(--dg-type-card-title-line-height)",
+  color: "var(--dg-color-text-primary)",
 };
 
 /** Section body content area. */

@@ -473,22 +473,14 @@ export function ManagementStaffPanel({
         {/* Header */}
         <div className="staff-detail-header">
           <CloseButton
-            size="md"
-            className="self-end"
+            size="lg"
+            className="staff-detail-header__close"
             onClick={handleRequestClose}
             aria-label="Close"
           />
 
           {/* Profile card */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              width: "100%",
-              paddingTop: 4,
-            }}
-          >
+          <div className="staff-detail-header__profile">
             <div
               style={{
                 ...getAvatarTypography(44),
@@ -510,20 +502,7 @@ export function ManagementStaffPanel({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 22,
-                    lineHeight: "var(--dg-type-section-title-line-height)",
-                    color: "var(--dg-color-text-primary)",
-                    letterSpacing: "-0.01em",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {displayName}
-                </span>
+                <span className="dg-overlay-title staff-detail-header__name">{displayName}</span>
                 <AccessInsignia orgRole={person.orgRole} size="lg" />
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   {isOnSchedule && (
@@ -573,9 +552,9 @@ export function ManagementStaffPanel({
               </div>
               <div
                 style={{
-                  fontSize: "var(--dg-fs-footnote)",
+                  fontSize: "var(--dg-fs-body-sm)",
                   color: "var(--dg-color-text-muted)",
-                  marginTop: 2,
+                  marginTop: 4,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
