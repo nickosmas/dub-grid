@@ -49,7 +49,7 @@ export async function endOffboardedAccess(
     );
     return;
   }
-  await clearMembershipCaches(orgId, userId);
+  await clearMembershipCaches(orgId);
 }
 
 /**
@@ -76,15 +76,14 @@ export async function reopenRestoredAccess(
     );
     return;
   }
-  await clearMembershipCaches(orgId, userId);
+  await clearMembershipCaches(orgId);
 }
 
-async function clearMembershipCaches(orgId: string, userId: string): Promise<void> {
+async function clearMembershipCaches(orgId: string): Promise<void> {
   await cacheDel(
     CacheKey.orgUsers(orgId),
     CacheKey.orgDirectory(orgId),
     CacheKey.employees(orgId),
     CacheKey.allUsers(),
-    CacheKey.mwOrgVisible(userId, orgId),
   );
 }

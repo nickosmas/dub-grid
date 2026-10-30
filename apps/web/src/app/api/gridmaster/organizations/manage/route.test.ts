@@ -72,7 +72,6 @@ vi.mock("@/lib/cache", () => ({
   cacheDel: (...args: unknown[]) => cacheDel(...args),
   CacheKey: {
     orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
-    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
     organization: (orgId: string) => `dg:org:${orgId}:organization`,
   },
 }));
@@ -257,13 +256,9 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         details: expect.objectContaining({ stripeCanceled: true }),
       }),
     );
-    // Members keep passing the proxy for the cached access window and the
-    // slug lookup keeps resolving for a day unless both are dropped (F-95).
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-      "dg:org:slug:acme",
-    );
+    // The organization entry and the day-long slug lookup would otherwise keep
+    // a closed organization open (F-95).
+    expect(cacheDel).toHaveBeenCalledWith(`dg:org:${ORG_ID}:organization`, "dg:org:slug:acme");
   });
 
   it("archives without billing when the organization has no Stripe subscription", async () => {
@@ -275,17 +270,13 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(cancelSubscription).not.toHaveBeenCalled();
   });
 
-  it("suspending drops the org access and slug caches", async () => {
+  it("suspending drops the organization and slug caches", async () => {
     const response = await POST(
       makeRequest({ action: "suspendOrganization", orgId: ORG_ID, reason: "Unpaid invoices" }),
     );
 
     expect(response.status).toBe(200);
-    expect(cacheDel).toHaveBeenCalledWith(
-      `dg:mw:orgAccess:${ORG_ID}`,
-      `dg:org:${ORG_ID}:organization`,
-      "dg:org:slug:acme",
-    );
+    expect(cacheDel).toHaveBeenCalledWith(`dg:org:${ORG_ID}:organization`, "dg:org:slug:acme");
   });
 
   // A role grant can make anyone Super Admin of any organization (41d3, F-16).

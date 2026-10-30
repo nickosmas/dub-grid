@@ -106,8 +106,6 @@ vi.mock("@/lib/cache", () => ({
   CacheKey: {
     mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
-    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
-    mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
     mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
     platformBillingPolicy: () => `dg:platform:billingPolicy`,
   },
@@ -669,7 +667,6 @@ describe("middleware: route guards", () => {
     mockSessionWithClaims(claimsFor("member-1"));
     mockSupabaseFrom.mockImplementation(tableReturning({ id: "org-1" }));
     expect((await visit()) as { _type: string }).toMatchObject({ _type: "next" });
-    expect(mockCacheSet).toHaveBeenCalledWith("dg:mw:orgVisible:member-1:org-1", true, 30);
 
     // The organization's state is now memoized; the removed member's own read
     // as themselves finds no row.
@@ -679,11 +676,8 @@ describe("middleware: route guards", () => {
 
     expect((res as { _redirectUrl: string })._redirectUrl).toBe("http://acme.localhost:3000/login");
     expect(mockServiceFrom).toHaveBeenCalledTimes(2); // state and policy, first visit only
-    expect(mockCacheSet).not.toHaveBeenCalledWith(
-      "dg:mw:orgVisible:removed-1:org-1",
-      expect.anything(),
-      expect.anything(),
-    );
+    // Neither answer goes to Redis: the memo is the only cache.
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 
   it("reads visibility, organization state and the billing policy in parallel", async () => {
@@ -933,11 +927,6 @@ describe("middleware: route guards", () => {
 
     expect((restoredResponse as { _redirectUrl: string })._redirectUrl).toBe(
       "http://acme.localhost:3000/schedule",
-    );
-    expect(mockCacheSet).toHaveBeenCalledWith(
-      "dg:mw:orgAccess:org-1",
-      expect.objectContaining({ subscription_status: "active" }),
-      30,
     );
   });
 

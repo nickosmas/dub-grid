@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: serviceFrom }),
 }));
 
-// CacheKey and TTL stay real: refreshing the exact entry the proxy reads is the
+// CacheKey stays real: dropping the exact entry the bootstrap reads is the
 // property this recovery route depends on.
 vi.mock("@/lib/cache", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/cache")>();
@@ -27,7 +27,7 @@ vi.mock("@/lib/cache", async (importOriginal) => {
 
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 
-import { CacheKey, TTL } from "@/lib/cache";
+import { CacheKey } from "@/lib/cache";
 import { GET } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -124,14 +124,12 @@ describe("GET /api/organization/access-status", () => {
     expect(await GET(request())).toBe(unauthorized);
   });
 
-  it("reads current organization state and refreshes the proxy's cache entry", async () => {
-    const row = orgRow({ subscription_status: "active" });
-    respondWith(row);
+  it("reads current organization state", async () => {
+    respondWith(orgRow({ subscription_status: "active" }));
 
     await GET(request());
 
     expect(serviceFrom).toHaveBeenCalledWith("organizations");
-    expect(cacheSet).toHaveBeenCalledWith(CacheKey.mwOrgAccess(ORG_ID), row, TTL.MIDDLEWARE);
   });
 
   it("drops the cached organization row the bootstrap derives its billing lock from", async () => {

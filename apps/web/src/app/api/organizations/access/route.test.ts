@@ -198,7 +198,6 @@ describe("DELETE /api/organizations/access", () => {
     expect(membershipSelectEq2).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID);
     expect(membershipUpdateEq3).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID, UPDATED_AT);
     expect(revokeAllUserSessions).toHaveBeenCalledWith(TARGET_USER_ID);
-    expect(cacheDel).toHaveBeenCalledWith(`dg:mw:orgVisible:${TARGET_USER_ID}:${SANDBOX_ORG_ID}`);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,

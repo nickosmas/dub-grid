@@ -132,6 +132,7 @@
     "SUPABASE_ACCESS_TOKEN": { "declaration": "conditional", "exposure": "secret" },
     "SUPABASE_DB_PASSWORD": { "declaration": "conditional", "exposure": "secret" },
     "SUPABASE_DB_TRANSPORT": { "declaration": "optional", "exposure": "server-config" },
+    "SUPABASE_JWKS": { "declaration": "usage-only", "exposure": "provider-injected" },
     "SUPABASE_SECRET_KEY": { "declaration": "required", "exposure": "secret" },
     "TARGET_DB_URL": { "declaration": "conditional", "exposure": "secret" },
     "TURBO_TEAM": { "declaration": "optional", "exposure": "server-config" },

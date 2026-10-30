@@ -294,13 +294,13 @@ export async function getSubscription(subscriptionId: string): Promise<Stripe.Su
   return s.subscriptions.retrieve(subscriptionId);
 }
 
-// The proxy, the organization cache and the bootstrap each keep the billing
-// state for up to 30 seconds, and nothing else clears them when Stripe changes
-// it: a payment that unlocked the organization still sent people to billing
-// until those copies expired. Deleting the organization entry also drops the
-// bootstrap's copy.
+// The organization cache and the bootstrap each keep the billing state for up
+// to 30 seconds, and nothing else clears them when Stripe changes it: a payment
+// that unlocked the organization still sent people to billing until those
+// copies expired. Deleting the organization entry also drops the bootstrap's
+// copy. The proxy reads the database behind a 10-second memo.
 export async function invalidateOrganizationBillingCache(orgId: string): Promise<void> {
-  await cacheDel(CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId));
+  await cacheDel(CacheKey.organization(orgId));
 }
 
 export async function upsertStripeSubscriptionToDb(

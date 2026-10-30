@@ -44,10 +44,7 @@ const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
 async function expectBillingCacheCleared() {
   const { CacheKey } = await import("@/lib/cache");
-  expect(cacheDel).toHaveBeenCalledWith(
-    CacheKey.mwOrgAccess(ORG_ID),
-    CacheKey.organization(ORG_ID),
-  );
+  expect(cacheDel).toHaveBeenCalledWith(CacheKey.organization(ORG_ID));
 }
 const ORIGINAL_STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const ORIGINAL_STRIPE_PRICE_ID_MONTHLY = process.env.STRIPE_PRICE_ID_MONTHLY;
