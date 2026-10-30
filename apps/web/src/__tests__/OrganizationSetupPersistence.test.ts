@@ -124,7 +124,7 @@ describe("saveOrganizationSetupConfig", () => {
   });
 
   it("persists Full Names setup using fallback job labels without asking for a code", async () => {
-    const savedCount = await saveOrganizationSetupConfig({
+    const { savedCount } = await saveOrganizationSetupConfig({
       createdOrg: makeOrganization(),
       shiftDisplayMode: "name",
       departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],

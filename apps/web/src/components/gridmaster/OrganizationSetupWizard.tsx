@@ -1,12 +1,13 @@
 "use client";
 import { X } from "lucide-react";
 
-import { useId, useState, useCallback } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Organization, AssignableOrganizationRole } from "@/types";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { SectionNotice } from "@/components/ui/SectionNotice";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { withComposedOrganizationAddress } from "@/lib/organization-profile";
@@ -140,6 +141,15 @@ export default function OrganizationSetupWizard({
   // ── Step 5: Invitations ───────────────────────────────────────────────────
   const [invitationRows, setInvitationRows] = useState<InvitationRow[]>([]);
   const readyEmployeeCount = employeeRows.filter((r) => r.firstName.trim()).length;
+  // Filled when the setup step saves; staff can only go in a focus area it saved.
+  const [savedFocusAreaIds, setSavedFocusAreaIds] = useState<Map<string, number>>(new Map());
+  const staffFocusAreaOptions = useMemo(
+    () =>
+      focusAreas
+        .filter((focusArea) => savedFocusAreaIds.has(focusArea.id))
+        .map((focusArea) => ({ value: focusArea.id, label: focusArea.name.trim() })),
+    [focusAreas, savedFocusAreaIds],
+  );
   const selectedInvitationCount = invitationRows.filter((r) => r.selected).length;
 
   // ── Step 1 → Step 2 ──────────────────────────────────────────────────────
@@ -239,7 +249,7 @@ export default function OrganizationSetupWizard({
     if (!createdOrg) return;
     setSaving(true);
     try {
-      const savedCount = await saveOrganizationSetupConfig({
+      const { savedCount, focusAreaIds } = await saveOrganizationSetupConfig({
         createdOrg,
         shiftDisplayMode,
         departments,
@@ -250,6 +260,7 @@ export default function OrganizationSetupWizard({
         jobs,
       });
 
+      setSavedFocusAreaIds(focusAreaIds);
       if (savedCount > 0) {
         toast.success(`Saved ${savedCount} configuration items`);
       }
@@ -276,7 +287,11 @@ export default function OrganizationSetupWizard({
     if (!createdOrg) return;
     setSaving(true);
     try {
-      const created = await createOrganizationEmployees(createdOrg, employeeRows);
+      const created = await createOrganizationEmployees(
+        createdOrg,
+        employeeRows,
+        savedFocusAreaIds,
+      );
 
       // Build invitation rows for employees with emails
       const withEmail = created.filter((e) => e.email);
@@ -306,7 +321,7 @@ export default function OrganizationSetupWizard({
     } finally {
       setSaving(false);
     }
-  }, [createdOrg, employeeRows, onCreated]);
+  }, [createdOrg, employeeRows, onCreated, savedFocusAreaIds]);
 
   // ── Step 5: Send invitations ──────────────────────────────────────────────
 
@@ -1658,9 +1673,19 @@ export default function OrganizationSetupWizard({
                 color: "var(--dg-color-text-muted)",
               }}
             >
-              Add your staff members. At minimum, provide a first name. Email is needed if you want
-              to invite them in the next step.
+              Add your staff members. At minimum, provide a first name and a focus area. Email is
+              needed if you want to invite them in the next step.
             </p>
+            {staffFocusAreaOptions.length === 0 ? (
+              <div style={{ marginBottom: 16 }}>
+                <SectionNotice
+                  tone="warning"
+                  messages={[
+                    "Staff need a focus area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
+                  ]}
+                />
+              </div>
+            ) : null}
 
             <div
               style={{
@@ -1701,7 +1726,7 @@ export default function OrganizationSetupWizard({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr 1fr 32px",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 32px",
                 gap: 8,
                 marginBottom: 4,
               }}
@@ -1712,6 +1737,9 @@ export default function OrganizationSetupWizard({
               <span style={{ ...labelStyle, marginBottom: 0 }}>Last name</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Email</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Phone</span>
+              <span style={{ ...labelStyle, marginBottom: 0 }}>
+                Focus area <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+              </span>
               <span />
             </div>
 
@@ -1721,7 +1749,7 @@ export default function OrganizationSetupWizard({
                 key={row.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr 1fr 32px",
+                  gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 32px",
                   gap: 8,
                   marginBottom: 6,
                 }}
@@ -1751,6 +1779,13 @@ export default function OrganizationSetupWizard({
                   value={row.phone}
                   onChange={(e) => updateEmployeeRow(idx, { phone: e.target.value })}
                   placeholder="(555) 123-4567"
+                />
+                <CustomSelect
+                  value={row.focusAreaId ?? staffFocusAreaOptions[0]?.value ?? ""}
+                  options={staffFocusAreaOptions}
+                  onChange={(value) => updateEmployeeRow(idx, { focusAreaId: value })}
+                  ariaLabel={`Focus area for row ${idx + 1}`}
+                  disabled={staffFocusAreaOptions.length === 0}
                 />
                 <Button
                   type="button"
@@ -1794,7 +1829,7 @@ export default function OrganizationSetupWizard({
           <Button
             type="button"
             className="dg-btn dg-btn-primary"
-            disabled={saving || readyEmployeeCount === 0}
+            disabled={saving || readyEmployeeCount === 0 || staffFocusAreaOptions.length === 0}
             onClick={() => setSetupConfirmAction("create-employees")}
           >
             <ButtonLoading loading={saving}>

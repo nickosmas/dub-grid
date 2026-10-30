@@ -96,7 +96,11 @@ export async function saveOrganizationSetupConfig({
   orgRoles,
   shiftCategories,
   jobs,
-}: SaveOrganizationConfigInput): Promise<number> {
+}: SaveOrganizationConfigInput): Promise<{
+  savedCount: number;
+  /** Each saved focus area's setup row id, to its id in the organization. */
+  focusAreaIds: Map<string, number>;
+}> {
   let savedCount = 0;
   const departmentIdMap = new Map<string, number>();
   const focusAreaIdMap = new Map<string, number>();
@@ -347,15 +351,24 @@ export async function saveOrganizationSetupConfig({
   }
   savedCount += validJobs.length;
 
-  return savedCount;
+  return { savedCount, focusAreaIds: focusAreaIdMap };
 }
 
+/**
+ * Everyone needs a focus area to be on the schedule, so each person takes the
+ * one picked on their row, or the first saved when none was picked.
+ */
 export async function createOrganizationEmployees(
   createdOrg: Organization,
   employeeRows: EmployeeRow[],
+  focusAreaIds: Map<string, number>,
 ): Promise<CreatedEmployee[]> {
   const validRows = employeeRows.filter((row) => row.firstName.trim());
   if (validRows.length === 0) return [];
+  const firstFocusAreaId = focusAreaIds.values().next().value;
+  if (firstFocusAreaId === undefined) {
+    throw new Error("Add a focus area in the setup step before adding staff.");
+  }
 
   const { employees, failed } = await insertEmployees(
     validRows.map((row) => ({
@@ -366,7 +379,9 @@ export async function createOrganizationEmployees(
       phone: row.phone.trim(),
       certificationId: null,
       roleIds: [],
-      focusAreaIds: [],
+      focusAreaIds: [
+        (row.focusAreaId ? focusAreaIds.get(row.focusAreaId) : undefined) ?? firstFocusAreaId,
+      ],
       contactNotes: "",
       status: "active" as const,
       statusChangedAt: null,
