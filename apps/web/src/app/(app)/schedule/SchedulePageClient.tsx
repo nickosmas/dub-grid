@@ -223,6 +223,7 @@ import {
   correctShift,
   fetchCorrections,
   upsertShift,
+  upsertShiftBatch,
   upsertShiftTimes,
   type CellCorrection,
   type EchoedCells,
@@ -320,6 +321,19 @@ import {
   type ScheduleOperation,
 } from "./_lib/operations";
 import {
+  cellWriteBatchMessage,
+  chunk,
+  createConcurrencyLimit,
+  lastWritePerCell,
+  reconcileCellWrites,
+  SCHEDULE_UPSERT_BATCH_SIZE,
+  SCHEDULE_WRITE_BATCHES_IN_FLIGHT,
+  tallyCellWrites,
+  withoutUnsavedWrites,
+  type CellWriteBatchResult,
+  type CellWriteOutcome,
+} from "./_lib/shift-write-batch";
+import {
   PublishChangeSummary,
   publishSummaryPoints,
   type PublishCoverageChange,
@@ -395,6 +409,21 @@ type ShiftDeleteUpdate = {
   value: ShiftMap[string] | null;
   expectedVersion: number | undefined;
 };
+
+/** A cell write checked and drawn, ready to apply (see prepareShiftWrite). */
+type PreparedShiftWrite =
+  | { status: "invalid"; message: string | null; warning?: boolean }
+  | { status: "noop" }
+  | { status: "delete"; update: ShiftDeleteUpdate }
+  | {
+      status: "upsert";
+      key: string;
+      empId: string;
+      dateKey: string;
+      input: ScheduleCellInput;
+      value: ShiftMap[string];
+      expectedVersion: number | undefined;
+    };
 
 function getFirstCustomTimeSegment(time: string | null | undefined): string | null {
   if (!time) return null;
@@ -4316,14 +4345,9 @@ function SchedulerContent({
   // full window refetch per conflict is expensive. Share one in-flight refetch
   // between them: they all want the same fresh state.
   const conflictRefetchRef = useRef<Promise<void> | null>(null);
-  const handleShiftWriteConflict = useCallback(async () => {
+  const refetchAfterShiftWriteConflict = useCallback(async () => {
     const orgId = org?.id;
     if (!orgId) return;
-    toast.error("Someone else just changed this shift. Showing the latest version.");
-    // Peers may be holding the optimistic diff this tab broadcast before the
-    // write was refused; tell them to go back to the server.
-    broadcastDraftReconcile();
-
     if (conflictRefetchRef.current) {
       await conflictRefetchRef.current;
       return;
@@ -4350,7 +4374,16 @@ function SchedulerContent({
     })();
     conflictRefetchRef.current = refetch;
     await refetch;
-  }, [broadcastDraftReconcile, org?.id, canEditShifts, segmentCompatibility]);
+  }, [org?.id, canEditShifts, segmentCompatibility]);
+
+  const handleShiftWriteConflict = useCallback(async () => {
+    if (!org?.id) return;
+    toast.error("Someone else just changed this shift. Showing the latest version.");
+    // Peers may be holding the optimistic diff this tab broadcast before the
+    // write was refused; tell them to go back to the server.
+    broadcastDraftReconcile();
+    await refetchAfterShiftWriteConflict();
+  }, [broadcastDraftReconcile, org?.id, refetchAfterShiftWriteConflict]);
 
   /**
    * Serializes a write behind every write already pending on the cells it
@@ -4594,6 +4627,111 @@ function SchedulerContent({
     ],
   );
 
+  /**
+   * Checks one cell write and builds the value the grid shows for it, without
+   * applying anything. Shared by a single edit and a bulk change, so both
+   * refuse and draw a cell the same way.
+   */
+  const prepareShiftWrite = useCallback(
+    (empId: string, dateKey: string, entry: ScheduleCellInput | null): PreparedShiftWrite => {
+      const key = `${empId}_${dateKey}`;
+      // Read from ref to get the latest version, not the stale closure value
+      const existing = shiftsRef.current[key];
+      const existingVersion = existing?.version;
+      const isDelete =
+        !entry ||
+        entry.kind === "deleted" ||
+        (entry.kind === "worked" && entry.segments.length === 0 && entry.absenceTypeId == null);
+
+      if (isDelete) {
+        const deleteUpdate = buildShiftDeleteUpdate(empId, dateKey);
+        return deleteUpdate ? { status: "delete", update: deleteUpdate } : { status: "noop" };
+      }
+      const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
+      // Filter out any stale/archived shift code IDs
+      const validCodeIds = derivedCodeIds.filter((id) => assignmentLabelMapRef.current.has(id));
+      if (
+        entry.kind === "worked" &&
+        (derivedCodeIds.length === 0 || derivedCodeIds.length !== entry.segments.length)
+      ) {
+        return { status: "invalid", message: "That assignment is no longer available." };
+      }
+      if (validCodeIds.length < derivedCodeIds.length) {
+        return {
+          status: "invalid",
+          message: "Removed assignments that are no longer available.",
+          warning: true,
+        };
+      }
+      // A whole-day absence, or a worked cell's absence for the rest of the day.
+      if (entry.absenceTypeId != null && !absenceTypeMapRef.current.has(entry.absenceTypeId)) {
+        return { status: "invalid", message: "That absence type is no longer available." };
+      }
+      const ex = shiftsRef.current[key];
+      const normalizedEntry: ScheduleCellInput =
+        entry.kind === "worked"
+          ? {
+              ...entry,
+              customStartTime: entry.customStartTime ?? null,
+              customEndTime: entry.customEndTime ?? null,
+            }
+          : entry.kind === "absence"
+            ? {
+                ...entry,
+                segments: [],
+                customStartTime: null,
+                customEndTime: null,
+              }
+            : entry;
+      const provisional = buildScheduleCellEntryFromInput({
+        input: normalizedEntry,
+        published: getPublishedSnapshot(ex),
+        segmentCompatibility,
+        absenceTypeMap,
+        draftKind: null,
+        version: existingVersion != null ? existingVersion + 1 : undefined,
+        createdBy: ex?.createdBy ?? null,
+        updatedBy: currentUserRef.current?.id ?? null,
+        createdAt: ex?.createdAt ?? null,
+        updatedAt: ex?.updatedAt ?? null,
+      });
+      if (!provisional) {
+        return { status: "invalid", message: "We couldn't match that assignment." };
+      }
+      const dk = computeScheduleEntryDraftKind(provisional);
+      const upsertValue = buildScheduleCellEntryFromInput({
+        input: normalizedEntry,
+        published: getPublishedSnapshot(ex),
+        segmentCompatibility,
+        absenceTypeMap,
+        draftKind: dk,
+        version: existingVersion != null ? existingVersion + 1 : undefined,
+        createdBy: ex?.createdBy ?? null,
+        updatedBy: currentUserRef.current?.id ?? null,
+        createdAt: ex?.createdAt ?? null,
+        updatedAt: ex?.updatedAt ?? null,
+      });
+      if (!upsertValue) return { status: "invalid", message: null };
+      return {
+        status: "upsert",
+        key,
+        empId,
+        dateKey,
+        input: normalizedEntry,
+        value: upsertValue,
+        expectedVersion: existingVersion,
+      };
+    },
+    [
+      absenceTypeMap,
+      absenceTypeMapRef,
+      buildShiftDeleteUpdate,
+      getInputAssignmentDefinitionIds,
+      getPublishedSnapshot,
+      segmentCompatibility,
+    ],
+  );
+
   const setShift = useCallback(
     (
       empId: string,
@@ -4612,133 +4750,228 @@ function SchedulerContent({
       const dateKey = formatDateKey(date);
       const key = `${empId}_${dateKey}`;
       if (!guardActiveSession()) return false;
-      // Read from ref to get the latest version, not the stale closure value
-      const existing = shiftsRef.current[key];
-      const existingVersion = existing?.version;
-      const isDelete =
-        !entry ||
-        entry.kind === "deleted" ||
-        (entry.kind === "worked" && entry.segments.length === 0 && entry.absenceTypeId == null);
-
-      if (isDelete) {
-        const deleteUpdate = buildShiftDeleteUpdate(empId, dateKey);
-        if (!deleteUpdate) return false;
-        void applyShiftDeleteUpdates([deleteUpdate], {
+      const prepared = prepareShiftWrite(empId, dateKey, entry);
+      if (prepared.status === "noop") return false;
+      if (prepared.status === "invalid") {
+        if (prepared.message) {
+          if (prepared.warning) toast.warning(prepared.message);
+          else toast.error(prepared.message);
+        }
+        return false;
+      }
+      if (prepared.status === "delete") {
+        void applyShiftDeleteUpdates([prepared.update], {
           broadcast: true,
           failureMessage: "We couldn't delete that shift. Try again.",
         });
         return true;
-      } else {
-        const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
-        // Filter out any stale/archived shift code IDs
-        const validCodeIds = derivedCodeIds.filter((id) => assignmentLabelMapRef.current.has(id));
-        if (
-          entry.kind === "worked" &&
-          (derivedCodeIds.length === 0 || derivedCodeIds.length !== entry.segments.length)
-        ) {
-          toast.error("That assignment is no longer available.");
-          return false;
-        }
-        if (validCodeIds.length < derivedCodeIds.length) {
-          toast.warning("Removed assignments that are no longer available.");
-          return false;
-        }
-        // A whole-day absence, or a worked cell's absence for the rest of the day.
-        if (entry.absenceTypeId != null && !absenceTypeMapRef.current.has(entry.absenceTypeId)) {
-          toast.error("That absence type is no longer available.");
-          return false;
-        }
-        const ex = shiftsRef.current[key];
-        const normalizedEntry: ScheduleCellInput =
-          entry.kind === "worked"
-            ? {
-                ...entry,
-                customStartTime: entry.customStartTime ?? null,
-                customEndTime: entry.customEndTime ?? null,
-              }
-            : entry.kind === "absence"
-              ? {
-                  ...entry,
-                  segments: [],
-                  customStartTime: null,
-                  customEndTime: null,
-                }
-              : entry;
-        const provisional = buildScheduleCellEntryFromInput({
-          input: normalizedEntry,
-          published: getPublishedSnapshot(ex),
-          segmentCompatibility,
-          absenceTypeMap,
-          draftKind: null,
-          version: existingVersion != null ? existingVersion + 1 : undefined,
-          createdBy: ex?.createdBy ?? null,
-          updatedBy: currentUserRef.current?.id ?? null,
-          createdAt: ex?.createdAt ?? null,
-          updatedAt: ex?.updatedAt ?? null,
-        });
-        if (!provisional) {
-          toast.error("We couldn't match that assignment.");
-          return false;
-        }
-        const dk = computeScheduleEntryDraftKind(provisional);
-        const upsertValue = buildScheduleCellEntryFromInput({
-          input: normalizedEntry,
-          published: getPublishedSnapshot(ex),
-          segmentCompatibility,
-          absenceTypeMap,
-          draftKind: dk,
-          version: existingVersion != null ? existingVersion + 1 : undefined,
-          createdBy: ex?.createdBy ?? null,
-          updatedBy: currentUserRef.current?.id ?? null,
-          createdAt: ex?.createdAt ?? null,
-          updatedAt: ex?.updatedAt ?? null,
-        });
-        if (!upsertValue) return false;
-        setShifts((prev) => ({ ...prev, [key]: upsertValue }));
-        if (options.replacesShift) {
-          const remainingNotes = removeScheduleNotesForCell(notesRef.current, empId, dateKey);
-          setNotes(remainingNotes);
-          notesRef.current = remainingNotes;
-        }
-        void enqueueShiftWrite(key, async () => {
-          try {
-            await upsertShift(
-              empId,
-              dateKey,
-              normalizedEntry,
-              orgId,
-              existingVersion,
-              undefined,
-              options.replacesShift,
-            );
-          } catch (err) {
-            if (err instanceof OptimisticLockError) {
-              await handleShiftWriteConflict();
-            } else {
-              toast.error("We couldn't save that shift. Try again.");
-              broadcastDraftReconcile();
-              Sentry.captureException(err);
-            }
-          }
-        });
-        broadcastDraftChanged({ shifts: { [key]: upsertValue } });
-        return true;
       }
+      const { value: upsertValue, input: normalizedEntry, expectedVersion } = prepared;
+      setShifts((prev) => ({ ...prev, [key]: upsertValue }));
+      if (options.replacesShift) {
+        const remainingNotes = removeScheduleNotesForCell(notesRef.current, empId, dateKey);
+        setNotes(remainingNotes);
+        notesRef.current = remainingNotes;
+      }
+      void enqueueShiftWrite(key, async () => {
+        try {
+          await upsertShift(
+            empId,
+            dateKey,
+            normalizedEntry,
+            orgId,
+            expectedVersion,
+            undefined,
+            options.replacesShift,
+          );
+        } catch (err) {
+          if (err instanceof OptimisticLockError) {
+            await handleShiftWriteConflict();
+          } else {
+            toast.error("We couldn't save that shift. Try again.");
+            broadcastDraftReconcile();
+            Sentry.captureException(err);
+          }
+        }
+      });
+      broadcastDraftChanged({ shifts: { [key]: upsertValue } });
+      return true;
     },
     [
-      absenceTypeMapRef,
       org?.id,
       applyShiftDeleteUpdates,
-      buildShiftDeleteUpdate,
       broadcastDraftChanged,
       broadcastDraftReconcile,
       enqueueShiftWrite,
-      getInputAssignmentDefinitionIds,
-      getPublishedSnapshot,
       guardActiveSession,
       handleShiftWriteConflict,
-      segmentCompatibility,
-      absenceTypeMap,
+      prepareShiftWrite,
+    ],
+  );
+
+  /**
+   * Writes many cells as one change: applied to the grid at once, saved in
+   * batch requests, then settled from each cell's result, with one toast for
+   * whatever didn't save. Null, with nothing applied, when any write is
+   * refused before saving. Bulk changes use this; a single edit uses setShift.
+   */
+  const applyShiftWriteBatch = useCallback(
+    (
+      writes: readonly SuggestionWrite[],
+      options: { onProgress?: (settled: number, total: number) => void } = {},
+    ): Promise<CellWriteBatchResult> | null => {
+      const orgId = org?.id;
+      if (!orgId) {
+        console.error("Cannot modify shifts before org is loaded");
+        return null;
+      }
+      if (!guardActiveSession()) return null;
+
+      const upserts: Extract<PreparedShiftWrite, { status: "upsert" }>[] = [];
+      const deletes: ShiftDeleteUpdate[] = [];
+      for (const write of lastWritePerCell(writes)) {
+        const prepared = prepareShiftWrite(write.employeeId, write.dateKey, write.input);
+        if (prepared.status === "invalid") return null;
+        if (prepared.status === "upsert") upserts.push(prepared);
+        else if (prepared.status === "delete") deletes.push(prepared.update);
+      }
+      const total = upserts.length + deletes.length;
+      if (total === 0) return Promise.resolve(tallyCellWrites([]));
+
+      const optimistic = new Map<string, ShiftMap[string] | null>();
+      const previous = new Map<string, ShiftMap[string] | undefined>();
+      for (const write of [...upserts, ...deletes]) {
+        optimistic.set(write.key, write.value);
+        previous.set(write.key, shiftsRef.current[write.key]);
+      }
+      setShifts((prev) => {
+        const next = { ...prev };
+        for (const [key, value] of optimistic) {
+          if (value) next[key] = value;
+          else delete next[key];
+        }
+        return next;
+      });
+      if (deletes.length > 0) {
+        // The delete endpoint clears each cell's notes, so drop them here too.
+        setNotes((prev) => {
+          let next = prev;
+          for (const update of deletes) {
+            next = removeScheduleNotesForCell(next, update.empId, update.dateKey);
+          }
+          notesRef.current = next;
+          return next;
+        });
+      }
+      broadcastDraftChanged({ shifts: Object.fromEntries(optimistic) });
+
+      const echo = {
+        isScheduler: canEditShiftsRef.current,
+        assignmentLabelMap: assignmentLabelMapRef.current,
+        absenceTypeMap: absenceTypeMapRef.current,
+      };
+      const outcomes: CellWriteOutcome<ShiftMap[string]>[] = [];
+      const limit = createConcurrencyLimit(SCHEDULE_WRITE_BATCHES_IN_FLIGHT);
+      const report = (settled: CellWriteOutcome<ShiftMap[string]>[]) => {
+        outcomes.push(...settled);
+        options.onProgress?.(outcomes.length, total);
+      };
+      options.onProgress?.(0, total);
+
+      const upsertChunks = chunk(upserts, SCHEDULE_UPSERT_BATCH_SIZE).map((cells) =>
+        enqueueShiftWriteAcross(
+          cells.map((cell) => cell.key),
+          () =>
+            limit(async () => {
+              try {
+                const results = await upsertShiftBatch(
+                  orgId,
+                  cells.map((cell) => ({
+                    employeeId: cell.empId,
+                    date: cell.dateKey,
+                    input: cell.input,
+                    expectedVersion: cell.expectedVersion,
+                  })),
+                  echo,
+                );
+                const byKey = new Map(
+                  results.map((result) => [`${result.employeeId}_${result.date}`, result]),
+                );
+                report(
+                  cells.map((cell): CellWriteOutcome<ShiftMap[string]> => {
+                    const result = byKey.get(cell.key);
+                    if (!result || result.status === "error") {
+                      return { key: cell.key, status: "failed" };
+                    }
+                    return { key: cell.key, status: result.status, row: result.cell };
+                  }),
+                );
+              } catch (err) {
+                Sentry.captureException(err);
+                report(cells.map((cell) => ({ key: cell.key, status: "failed" as const })));
+              }
+            }),
+        ),
+      );
+      // A delete chunk commits or fails as a whole on the client's side of the
+      // wire, though the server may have finished part of it; a refetch after
+      // any failure puts the grid back on what the server holds.
+      let deleteFailed = false;
+      const deleteChunks = chunk(deletes, SCHEDULE_DELETE_BATCH_SIZE).map((cells) =>
+        enqueueShiftWriteAcross(
+          cells.map((cell) => cell.key),
+          () =>
+            limit(async () => {
+              try {
+                await deleteShiftBatch(
+                  orgId,
+                  cells.map((cell) => ({
+                    employeeId: cell.empId,
+                    date: cell.dateKey,
+                    expectedVersion: cell.expectedVersion,
+                  })),
+                );
+                report(cells.map((cell) => ({ key: cell.key, status: "saved" as const })));
+              } catch (err) {
+                deleteFailed = true;
+                const conflict = err instanceof OptimisticLockError;
+                if (!conflict) Sentry.captureException(err);
+                report(
+                  cells.map((cell) => ({
+                    key: cell.key,
+                    status: conflict ? ("conflict" as const) : ("failed" as const),
+                  })),
+                );
+              }
+            }),
+        ),
+      );
+
+      return Promise.all([...upsertChunks, ...deleteChunks]).then(async () => {
+        setShifts((prev) => {
+          const next = reconcileCellWrites(prev, outcomes, optimistic, previous);
+          shiftsRef.current = next;
+          return next;
+        });
+        const tally = tallyCellWrites(outcomes);
+        const message = cellWriteBatchMessage(tally);
+        if (message) toast.error(message);
+        if (tally.failed > 0 || tally.conflicts > 0) {
+          // Peers took the optimistic broadcast; tell them to go back to the server.
+          broadcastDraftReconcile();
+        }
+        if (tally.conflicts > 0 || deleteFailed) await refetchAfterShiftWriteConflict();
+        return tally;
+      });
+    },
+    [
+      org?.id,
+      broadcastDraftChanged,
+      broadcastDraftReconcile,
+      enqueueShiftWriteAcross,
+      guardActiveSession,
+      prepareShiftWrite,
+      refetchAfterShiftWriteConflict,
     ],
   );
 
@@ -7038,6 +7271,15 @@ function SchedulerContent({
     [assignments, scheduleEmployees, jobs, loadedShiftWindow, orgRoles, shiftCategories, shifts],
   );
 
+  const forgetUnsavedWrites = useCallback((appliedId: string, unsaved: ReadonlySet<string>) => {
+    if (unsaved.size === 0) return;
+    setAppliedSuggestions((current) =>
+      current.map((item) =>
+        item.id === appliedId ? { ...item, ...withoutUnsavedWrites(item, unsaved) } : item,
+      ),
+    );
+  }, []);
+
   const applyCoverageSuggestion = useCallback(
     (suggestion: CoverageSuggestion) => {
       const view = coverageSuggestions?.items.find((item) => item.suggestion.id === suggestion.id);
@@ -7068,24 +7310,24 @@ function SchedulerContent({
       }
       const { writes, before } = plan;
       setBusySuggestionId(suggestion.id);
-      const done: typeof before = [];
-      for (const [index, write] of writes.entries()) {
-        if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
-          // Put back what was already written so the draft is never left half applied.
-          for (const undo of done)
-            setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
-          setBusySuggestionId(null);
-          toast.error("That change couldn't be saved. Nothing was changed.");
-          return;
-        }
-        done.push(before[index]);
-      }
+      const saving = writes.length > 1 ? applyShiftWriteBatch(writes) : null;
+      const applied =
+        writes.length > 1
+          ? saving != null
+          : writes.every((write) =>
+              setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input),
+            );
       setBusySuggestionId(null);
+      if (!applied) {
+        toast.error("That change couldn't be saved. Nothing was changed.");
+        return;
+      }
       const text = appliedSuggestionText(view.text.title);
+      const appliedId = `${suggestion.id}@${Date.now()}`;
       setAppliedSuggestions((current) => [
         ...current,
         {
-          id: `${suggestion.id}@${Date.now()}`,
+          id: appliedId,
           text,
           final: false,
           before,
@@ -7094,12 +7336,20 @@ function SchedulerContent({
         },
       ]);
       toast.success(text);
+      void saving?.then((result) => forgetUnsavedWrites(appliedId, result.unsaved));
     },
-    [buildSuggestedAssignInput, coverageSuggestions, setShift, shifts],
+    [
+      applyShiftWriteBatch,
+      buildSuggestedAssignInput,
+      coverageSuggestions,
+      forgetUnsavedWrites,
+      setShift,
+      shifts,
+    ],
   );
 
-  // Writes a planned batch like single Applies, putting back what it wrote if
-  // any cell fails, and records one Applied entry whose Undo covers it all.
+  // Writes a planned batch as one bulk save, all or nothing on the grid until
+  // the server answers, and records one Applied entry whose Undo covers it all.
   const applyCoveragePlan = useCallback(
     (
       plan: CoverageSuggestion[],
@@ -7107,24 +7357,19 @@ function SchedulerContent({
       id: string,
       /** Written first, such as recurring schedule fills into empty cells. */
       fixedWrites: SuggestionWrite[] = [],
-    ): SuggestionWrite[] | null => {
+      onProgress?: (settled: number, total: number) => void,
+    ): { written: SuggestionWrite[]; saving: Promise<CellWriteBatchResult> } | null => {
       setBusySuggestionId(id);
       const before: SuggestionWrite[] = [];
       const written: SuggestionWrite[] = [];
-      const putBack = () => {
-        for (const undo of [...before].reverse()) {
-          setShift(undo.employeeId, parseLocalDateKey(undo.dateKey), undo.input);
-        }
+      const fail = () => {
         setBusySuggestionId(null);
         toast.error("Those changes couldn't be saved. Nothing was changed.");
+        return null;
       };
       for (const write of fixedWrites) {
         const entry = shiftsRef.current[`${write.employeeId}_${write.dateKey}`];
         const previous = entry?.isDelete ? null : scheduleCellSnapshotToInput(entry?.effective);
-        if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
-          putBack();
-          return null;
-        }
         before.push({ ...write, input: previous });
         written.push(write);
       }
@@ -7134,26 +7379,18 @@ function SchedulerContent({
           shiftsRef.current,
           buildSuggestedAssignInput,
         );
-        const failed =
-          !writes ||
-          writes.writes.some((write, index) => {
-            if (!setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input)) {
-              return true;
-            }
-            before.push(writes.before[index]);
-            written.push(write);
-            return false;
-          });
-        if (failed) {
-          putBack();
-          return null;
-        }
+        if (!writes) return fail();
+        before.push(...writes.before);
+        written.push(...writes.writes);
       }
+      const saving = applyShiftWriteBatch(written, { onProgress });
+      if (!saving) return fail();
       setBusySuggestionId(null);
+      const appliedId = `${id}@${Date.now()}`;
       setAppliedSuggestions((current) => [
         ...current,
         {
-          id: `${id}@${Date.now()}`,
+          id: appliedId,
           text,
           final: false,
           before,
@@ -7162,9 +7399,10 @@ function SchedulerContent({
         },
       ]);
       toast.success(text);
-      return written;
+      void saving.then((result) => forgetUnsavedWrites(appliedId, result.unsaved));
+      return { written, saving };
     },
-    [buildSuggestedAssignInput, setShift],
+    [applyShiftWriteBatch, buildSuggestedAssignInput, forgetUnsavedWrites],
   );
 
   const planOptions = useCallback(
@@ -7587,46 +7825,27 @@ function SchedulerContent({
     }
     const total = built.fixedWrites.length + built.preview.fixes.length;
     const changes = total === 1 ? "1 change" : `${total} changes`;
-    const written = applyCoveragePlan(
+    const applied = applyCoveragePlan(
       built.preview.fixes,
       `Auto-build: ${changes}`,
       "build",
       built.fixedWrites,
+      (saved, total) =>
+        setBuildApplying({
+          status: "applying",
+          preview: built.preview,
+          checking: null,
+          saved,
+          total,
+        }),
     );
-    if (!written) {
+    if (!applied) {
       setBuildApplying(null);
       return;
     }
-    // Each cell's save is queued; the report waits until every one has settled.
+    // The report waits until every batch has settled.
     setBusySuggestionId("build");
-    const saves = written.map(
-      (write) =>
-        pendingShiftWrites.current.get(`${write.employeeId}_${write.dateKey}`) ?? Promise.resolve(),
-    );
-    let saved = 0;
-    setBuildApplying({
-      status: "applying",
-      preview: built.preview,
-      checking: null,
-      saved,
-      total: saves.length,
-    });
-    await Promise.all(
-      saves.map((save) =>
-        save
-          .catch(() => {})
-          .then(() => {
-            saved += 1;
-            setBuildApplying({
-              status: "applying",
-              preview: built.preview,
-              checking: null,
-              saved,
-              total: saves.length,
-            });
-          }),
-      ),
-    );
+    await applied.saving;
     setBusySuggestionId(null);
     setBuildApplying(null);
     setBuildPreview(null);
@@ -7641,8 +7860,15 @@ function SchedulerContent({
       if (!entry || entry.final) return;
       // Only cells that still hold what was applied go back; a later edit stays.
       const { restore, kept } = planUndo(entry, shiftsRef.current);
-      for (const write of restore) {
-        setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+      if (restore.length > 1) {
+        if (!applyShiftWriteBatch(restore)) {
+          toast.error("That couldn't be undone. Nothing was changed.");
+          return;
+        }
+      } else {
+        for (const write of restore) {
+          setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+        }
       }
       setAppliedSuggestions((current) => current.filter((item) => item.id !== appliedId));
       if (appliedId.startsWith("build@")) setBuildReport(null);
@@ -7652,7 +7878,7 @@ function SchedulerContent({
           : `Undone, except ${kept === 1 ? "1 cell" : `${kept} cells`} changed since, which ${kept === 1 ? "keeps its" : "keep their"} change: ${entry.text}`,
       );
     },
-    [appliedSuggestions, setShift],
+    [appliedSuggestions, applyShiftWriteBatch, setShift],
   );
 
   const confirmSuggestedApproval = useCallback(async () => {
@@ -7803,8 +8029,15 @@ function SchedulerContent({
           label: "Undo",
           onClick: () => {
             const { restore, kept } = planUndo(applied, shiftsRef.current);
-            for (const write of restore) {
-              setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+            if (restore.length > 1) {
+              if (!applyShiftWriteBatch(restore)) {
+                toast.error("That couldn't be undone. Nothing was changed.");
+                return;
+              }
+            } else {
+              for (const write of restore) {
+                setShift(write.employeeId, parseLocalDateKey(write.dateKey), write.input);
+              }
             }
             if (kept > 0) {
               toast.info(
@@ -7815,7 +8048,7 @@ function SchedulerContent({
         },
       });
     },
-    [applyShiftDeleteUpdates, buildShiftDeleteUpdate, setShift],
+    [applyShiftDeleteUpdates, applyShiftWriteBatch, buildShiftDeleteUpdate, setShift],
   );
 
   const scheduleGridModel = useMemo(
