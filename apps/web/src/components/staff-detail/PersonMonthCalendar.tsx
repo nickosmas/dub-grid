@@ -165,7 +165,7 @@ export function PersonMonthCalendar({
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
-              aria-label="Previous month"
+              aria-label="Earlier month in these dates"
               disabled={!canStepBack}
               onClick={() => step(-1)}
             >
@@ -174,7 +174,7 @@ export function PersonMonthCalendar({
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
-              aria-label="Next month"
+              aria-label="Later month in these dates"
               disabled={!canStepForward}
               onClick={() => step(1)}
             >

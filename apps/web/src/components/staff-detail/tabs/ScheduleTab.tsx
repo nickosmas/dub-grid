@@ -302,6 +302,8 @@ function RecurringWeekCard({
     .filter((shift) => shift.effectiveUntil)
     .map((shift) => `${DAY_LABELS[shift.dayOfWeek]} until ${shift.effectiveUntil}`);
 
+  if (recurringShifts.length === 0 && preferences.length === 0) return null;
+
   return (
     <section className="dg-card" aria-label="Recurring schedule">
       <div className="dg-card-header">
@@ -316,9 +318,7 @@ function RecurringWeekCard({
         ) : null}
       </div>
       <div className="dg-card-body">
-        {recurringShifts.length === 0 ? (
-          <EmptyState size="inline" title="No recurring shifts yet" />
-        ) : (
+        {recurringShifts.length === 0 ? null : (
           <div className="dg-no-scrollbar overflow-x-auto">
             <div className="grid min-w-[700px] grid-cols-7 gap-2.5">
               {DAY_LABELS.map((day, dayOfWeek) => {
@@ -351,7 +351,9 @@ function RecurringWeekCard({
           </div>
         )}
         {preferences.length > 0 || until.length > 0 ? (
-          <p className="m-0 mt-3 text-[13px] text-[var(--dg-color-text-secondary)]">
+          <p
+            className={`m-0 text-[13px] text-[var(--dg-color-text-secondary)] ${recurringShifts.length > 0 ? "mt-3" : ""}`}
+          >
             {[...preferences, ...until].join(". ")}.
           </p>
         ) : null}

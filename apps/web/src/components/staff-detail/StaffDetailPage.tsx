@@ -182,12 +182,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const contentScrollerRef = useClipTrailingWhitespace();
   const {
     period,
-    setPreset: setPeriodPreset,
+    today: periodToday,
+    step: stepPeriod,
+    goToToday: goToPeriodToday,
     setCustomRange: setPeriodRange,
-  } = usePersonPeriod(org?.payPeriodStartDate);
+  } = usePersonPeriod();
   const periodRange = useMemo(
-    () => ({ ...period.range, phrase: formatPersonPeriodPhrase(period) }),
-    [period],
+    () => ({ ...period.range, phrase: formatPersonPeriodPhrase(period, periodToday) }),
+    [period, periodToday],
   );
 
   const orgId = perms.orgId ?? org?.id ?? null;
@@ -930,13 +932,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   });
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
-  // Overview's strip shows the current pay period when that's the period,
-  // and the current week otherwise.
-  const stripIsPayPeriod = period.preset === "pay-period" && !period.payPeriodUnset;
-  const stripRange = useMemo(
-    () => (stripIsPayPeriod ? period.range : resolvePeriodPreset("current-week", null)!),
-    [period.range, stripIsPayPeriod],
-  );
+  const stripRange = useMemo(() => resolvePeriodPreset("current-week", null)!, []);
   const upcomingShiftsQuery = useQuery<ShiftMap>({
     queryKey: orgId
       ? [
@@ -1442,8 +1438,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 </div>
                 <PersonPeriodControl
                   period={period}
-                  payPeriodStartDate={org?.payPeriodStartDate}
-                  onPresetChange={setPeriodPreset}
+                  today={periodToday}
+                  onStep={stepPeriod}
+                  onToday={goToPeriodToday}
                   onCustomRangeChange={setPeriodRange}
                 />
               </div>
@@ -1466,9 +1463,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         : null
                     }
                     nextDaysCopy={{
-                      title: stripIsPayPeriod ? "This pay period" : "This week",
+                      title: "This week",
                       periodLabel: formatCompactRangeLabel(stripRange),
-                      emptyTitle: `${employee.firstName} isn't scheduled ${stripIsPayPeriod ? "this pay period" : "this week"}`,
+                      emptyTitle: `${employee.firstName} isn't scheduled this week`,
                       emptyDescription: "Shifts show up here once they're on the schedule.",
                       editorView: true,
                     }}

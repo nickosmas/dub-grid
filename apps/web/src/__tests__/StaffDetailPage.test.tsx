@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
-import type { DirectoryPerson } from "@/types";
+import type { DirectoryPerson, RecurringShift } from "@/types";
 import {
   fetchEmployeeById,
   fetchEmployeeShifts,
@@ -22,6 +22,12 @@ import {
 } from "@/features/organization/client";
 import { fetchCorrections, fetchRecurringShifts } from "@/features/schedule/client";
 import { resolvePeriodPreset } from "@/lib/period-presets";
+import {
+  formatPersonPeriodLabel,
+  localIsoToday,
+  monthPeriod,
+  stepPersonPeriod,
+} from "@/lib/person-period";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -458,29 +464,37 @@ describe("StaffDetailPage", () => {
     );
   });
 
-  it("loads the Overview's shifts for the chosen period", async () => {
-    localStorage.setItem(
-      "dg-person-period",
-      JSON.stringify({
-        preset: "custom",
-        range: { startDate: "2026-09-01", endDate: "2026-10-15" },
-      }),
-    );
+  it("opens on the current month and steps the Overview's shifts a month at a time", async () => {
+    const month = monthPeriod(localIsoToday());
+    const previous = stepPersonPeriod(month, -1).range;
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByTestId("overview-range")).toHaveTextContent("2026-09-01..2026-10-15");
+    expect(await screen.findByTestId("overview-range")).toHaveTextContent(
+      `${month.range.startDate}..${month.range.endDate}`,
+    );
+    expect(screen.getByText(formatPersonPeriodLabel(month))).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    expect(await screen.findByTestId("overview-range")).toHaveTextContent(
+      `${previous.startDate}..${previous.endDate}`,
+    );
     await waitFor(() =>
       expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
         "emp-1",
         "org-1",
         expect.any(Map),
         expect.any(Map),
-        "2026-09-01",
-        "2026-10-15",
+        previous.startDate,
+        previous.endDate,
       ),
     );
-    expect(screen.getByRole("button", { name: "Period" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+    expect(await screen.findByTestId("overview-range")).toHaveTextContent(
+      `${month.range.startDate}..${month.range.endDate}`,
+    );
   });
 
   it("loads corrections for the Schedule tab only for someone who can edit shifts", async () => {
@@ -609,6 +623,29 @@ describe("StaffDetailPage", () => {
       orgId: "org-1",
     });
     mockSearchParams = new URLSearchParams("tab=schedule");
+    mockedFetchRecurringShifts.mockResolvedValue([
+      {
+        id: "recurring-1",
+        empId: "emp-1",
+        orgId: "org-1",
+        dayOfWeek: 1,
+        input: {
+          kind: "worked",
+          segments: [{ shiftId: 5, jobId: 9, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: true,
+        },
+        absenceTypeId: null,
+        shiftLabel: "D",
+        effectiveFrom: "2026-01-01",
+        effectiveUntil: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ] as RecurringShift[]);
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
@@ -617,6 +654,24 @@ describe("StaffDetailPage", () => {
       within(recurringSchedule).getByRole("link", { name: "Edit on Recurring Shifts" }),
     ).toBeVisible();
     expect(screen.getByRole("heading", { name: "Shifts and time off" })).toBeInTheDocument();
+  });
+
+  it("leaves out the recurring schedule when they have none", async () => {
+    mockUsePermissions.mockReturnValue({
+      canViewEmployeeDetails: true,
+      canViewRecurringShifts: true,
+      canManageEmployees: true,
+      isSuperAdmin: false,
+      isGridmaster: false,
+      isLoading: false,
+      orgId: "org-1",
+    });
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await screen.findByRole("heading", { name: "Shifts and time off" });
+    expect(screen.queryByRole("region", { name: "Recurring schedule" })).not.toBeInTheDocument();
   });
 
   it("keeps the editor in a popup and the status and invitation on the page", async () => {

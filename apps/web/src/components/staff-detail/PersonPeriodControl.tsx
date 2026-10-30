@@ -1,72 +1,77 @@
 "use client";
 
-import { useMemo } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import DateRangePicker from "@/components/ui/date-range-picker";
-import {
-  buildPeriodOptions,
-  isValidCustomRange,
-  MAX_CUSTOM_RANGE_DAYS,
-} from "@/lib/period-presets";
-import {
-  PERSON_PERIOD_PRESETS,
-  type PersonPeriod,
-  type PersonPeriodPreset,
-} from "@/lib/person-period";
-import type { PeriodRange } from "@/lib/period-presets";
+import { isValidCustomRange, MAX_CUSTOM_RANGE_DAYS, type PeriodRange } from "@/lib/period-presets";
+import { formatPersonPeriodLabel, isCurrentMonth, type PersonPeriod } from "@/lib/person-period";
 
 interface PersonPeriodControlProps {
   period: PersonPeriod;
-  payPeriodStartDate: string | null | undefined;
-  onPresetChange: (preset: PersonPeriodPreset) => void;
+  today: string;
+  onStep: (step: -1 | 1) => void;
+  onToday: () => void;
   onCustomRangeChange: (range: PeriodRange) => void;
 }
 
-/** The period the staff page's tabs follow, beside the tabs. */
+const EMPTY_RANGE = { from: "", to: "" };
+
+/** The month the staff page's tabs follow, beside the tabs, with Dates for any other span. */
 export function PersonPeriodControl({
   period,
-  payPeriodStartDate,
-  onPresetChange,
+  today,
+  onStep,
+  onToday,
   onCustomRangeChange,
 }: PersonPeriodControlProps) {
-  const isCustom = period.preset === "custom";
-  const options = useMemo(
-    () => buildPeriodOptions(PERSON_PERIOD_PRESETS, period.range, payPeriodStartDate, isCustom),
-    [isCustom, payPeriodStartDate, period.range],
-  );
-
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <CustomSelect
-        value={period.preset}
-        options={options}
-        ariaLabel="Period"
-        style={{ minWidth: 240 }}
-        onChange={(preset) => {
-          onPresetChange(preset);
-          if (preset === "pay-period" && !payPeriodStartDate) {
-            toast.info(
-              "Set a pay period start date in Settings > Schedule Rules to use this range.",
-            );
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Period">
+      {/* Before the arrows, so appearing never moves them under the pointer. */}
+      {!isCurrentMonth(period, today) && (
+        <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onToday}>
+          Today
+        </Button>
+      )}
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          className="dg-btn dg-btn-secondary dg-btn-icon"
+          aria-label="Previous month"
+          onClick={() => onStep(-1)}
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+        </Button>
+        <span
+          className="dg-tabular-nums min-w-[136px] px-1 text-center text-[14px] font-semibold text-[var(--dg-color-text-primary)]"
+          aria-live="polite"
+        >
+          {formatPersonPeriodLabel(period)}
+        </span>
+        <Button
+          type="button"
+          className="dg-btn dg-btn-secondary dg-btn-icon"
+          aria-label="Next month"
+          onClick={() => onStep(1)}
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden />
+        </Button>
+      </div>
+      {/* The trigger always reads "Dates": the arrows' label already names the picked span. */}
+      <DateRangePicker
+        label="Pick dates"
+        placeholder="Dates"
+        value={EMPTY_RANGE}
+        onChange={(next) => {
+          const range = { startDate: next.from, endDate: next.to };
+          if (!next.from || !next.to) return;
+          if (!isValidCustomRange(range)) {
+            toast.error(`Pick up to ${MAX_CUSTOM_RANGE_DAYS} days.`);
+            return;
           }
+          onCustomRangeChange(range);
         }}
       />
-      {isCustom && (
-        <DateRangePicker
-          label="Dates"
-          value={{ from: period.range.startDate, to: period.range.endDate }}
-          onChange={(next) => {
-            const range = { startDate: next.from, endDate: next.to };
-            if (!next.from || !next.to) return;
-            if (!isValidCustomRange(range)) {
-              toast.error(`Pick up to ${MAX_CUSTOM_RANGE_DAYS} days.`);
-              return;
-            }
-            onCustomRangeChange(range);
-          }}
-        />
-      )}
     </div>
   );
 }
