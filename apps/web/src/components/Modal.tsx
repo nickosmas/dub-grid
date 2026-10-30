@@ -2,13 +2,19 @@
 
 import { useCallback, useRef, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, type LucideIcon } from "lucide-react";
 import React from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 
+export type ModalIconTone = "brand" | "neutral" | "success" | "warning" | "danger";
+
 interface ModalProps {
   title: string;
+  /** The tile beside the title that says what the popup is about. */
+  icon?: LucideIcon;
+  /** Tints the icon tile; brand unless the popup warns or destroys. */
+  iconTone?: ModalIconTone;
   /** A muted line under the title, such as who the dialog is about. */
   subtitle?: string;
   /** Richer header content shown in place of the title text; `title` still names the dialog. */
@@ -38,6 +44,8 @@ interface ModalProps {
 
 export default function Modal({
   title,
+  icon: Icon,
+  iconTone = "brand",
   subtitle,
   heading,
   onBack,
@@ -111,7 +119,7 @@ export default function Modal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dg-modal-header">
-              <div className="dg-modal-heading">
+              <div className={`dg-modal-heading${subtitle ? " has-subtitle" : ""}`}>
                 {onBack ? (
                   <button
                     type="button"
@@ -121,6 +129,11 @@ export default function Modal({
                   >
                     <ChevronLeft size={20} strokeWidth={2.25} aria-hidden="true" />
                   </button>
+                ) : null}
+                {Icon && !heading ? (
+                  <span className="dg-modal-icon" data-tone={iconTone}>
+                    <Icon size={20} strokeWidth={2} aria-hidden="true" />
+                  </span>
                 ) : null}
                 {heading ?? (
                   <div className="dg-modal-titles">

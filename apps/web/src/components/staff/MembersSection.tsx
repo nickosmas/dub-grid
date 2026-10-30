@@ -28,6 +28,7 @@ import {
   SlidersHorizontal,
   Upload,
   User,
+  UserCog,
 } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
@@ -2269,6 +2270,7 @@ export function MembersSection({
           }}
           frame={(fields, actions) => (
             <Modal
+              icon={UserCog}
               title={
                 selectedEmployeeDirectoryPerson?.isManagementUser ||
                 selectedEmployeeHasPendingManagementInvite

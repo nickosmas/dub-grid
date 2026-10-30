@@ -169,7 +169,7 @@ export function RecurringScheduleCard({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-[var(--dg-color-text-muted)]" />
+            <CalendarClock className="h-[18px] w-[18px] text-[var(--dg-color-text-muted)]" />
             Recurring schedule
             <Badge
               variant="secondary"

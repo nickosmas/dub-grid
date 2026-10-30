@@ -88,7 +88,7 @@ export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: Wor
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title flex items-center gap-2">
-            <ChartPie className="h-4 w-4 text-[var(--dg-color-text-muted)]" aria-hidden />
+            <ChartPie className="h-[18px] w-[18px] text-[var(--dg-color-text-muted)]" aria-hidden />
             {title}
           </div>
           <div className="dg-card-subtitle">

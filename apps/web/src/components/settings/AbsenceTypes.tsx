@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Archive, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -493,6 +494,7 @@ function AbsenceTypeRow({
           if (hasAny) {
             return (
               <ConfirmDialog
+                icon={Archive}
                 title={`Archive "${form.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
@@ -505,6 +507,7 @@ function AbsenceTypeRow({
           }
           return (
             <ConfirmDialog
+              icon={Trash2}
               title={`Delete "${form.name}"?`}
               message={`Nothing uses ${form.name}, so it's deleted permanently.`}
               confirmLabel="Delete"
@@ -586,16 +589,8 @@ export default function AbsenceTypesSettings({
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--dg-color-border-light)",
-            fontWeight: 700,
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--dg-color-text-secondary)",
-          }}
-        >
-          Absence Types
+        <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
+          <div className="dg-card-title">Absence Types</div>
         </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>

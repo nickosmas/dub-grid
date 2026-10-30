@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import { Import } from "lucide-react";
 import {
   formatShortDate,
   getSkipReasonLabel,
@@ -41,7 +42,7 @@ export default function ImportResultsModal({
   }
 
   return (
-    <Modal title="Import results" onClose={onClose}>
+    <Modal icon={Import} title="Import results" onClose={onClose}>
       <p
         style={{
           margin: "0 0 16px",

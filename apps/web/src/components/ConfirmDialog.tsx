@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
+import { Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -17,8 +18,18 @@ export interface ConfirmSummary {
   points: React.ReactNode[];
 }
 
+const VARIANT_ICONS: Record<NonNullable<ConfirmDialogProps["variant"]>, LucideIcon> = {
+  danger: OctagonAlert,
+  warning: TriangleAlert,
+  info: Info,
+};
+
+const VARIANT_TONES = { danger: "danger", warning: "warning", info: "brand" } as const;
+
 interface ConfirmDialogProps {
   title: string;
+  /** The tile beside the title; the variant's own icon when absent. */
+  icon?: LucideIcon;
   returnFocus?: React.RefObject<HTMLElement | null>;
   /** A short message under the title, and any fields the confirm needs. */
   message?: string | React.ReactNode;
@@ -58,6 +69,7 @@ interface ConfirmDialogProps {
 
 export default function ConfirmDialog({
   title,
+  icon,
   returnFocus,
   message,
   summary,
@@ -154,6 +166,8 @@ export default function ConfirmDialog({
   return (
     <Modal
       title={title}
+      icon={icon ?? VARIANT_ICONS[variant]}
+      iconTone={VARIANT_TONES[variant]}
       returnFocus={returnFocus}
       initialFocus={cancelRef}
       onClose={onCancel}

@@ -4,6 +4,7 @@ import type { ActivityItem } from "@/lib/dashboard-stats";
 import { ActivityIcon } from "../ActivityIcon";
 import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
+import { History } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 
 const TYPE_FILTERS = [
@@ -27,7 +28,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
   );
 
   return (
-    <Modal title="Recent activity" onClose={onClose} style={modalStyle}>
+    <Modal icon={History} title="Recent activity" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Type filter tabs */}
         <div

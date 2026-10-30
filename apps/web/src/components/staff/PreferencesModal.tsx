@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import {
   formatScheduleTimeRange,
   type CoverageJobPreference,
@@ -183,6 +183,7 @@ export function PreferencesModal({
 
   return (
     <Modal
+      icon={SlidersHorizontal}
       title={
         step === "start" ? "Preferences" : step === "shifts" ? "Shift preference" : "Job preference"
       }

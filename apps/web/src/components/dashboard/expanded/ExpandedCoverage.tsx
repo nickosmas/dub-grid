@@ -4,6 +4,7 @@ import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
+import { ChartColumn } from "lucide-react";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -53,6 +54,7 @@ export default function ExpandedCoverage({
 
   return (
     <Modal
+      icon={ChartColumn}
       title={`Coverage by ${focusAreaLabel.toLowerCase()}`}
       onClose={onClose}
       style={modalStyle}

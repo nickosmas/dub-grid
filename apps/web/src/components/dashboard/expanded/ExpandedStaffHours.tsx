@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getEmployeeDisplayName, getInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
+import { Clock } from "lucide-react";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -82,7 +83,7 @@ export default function ExpandedStaffHours({
   const otCount = currentHours.filter((h) => h.isOvertime).length;
 
   return (
-    <Modal title="Staff hours" onClose={onClose} style={modalStyle}>
+    <Modal icon={Clock} title="Staff hours" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Controls row */}
         <div

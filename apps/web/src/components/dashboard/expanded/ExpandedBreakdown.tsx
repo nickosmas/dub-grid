@@ -2,6 +2,7 @@ import { useTheme } from "next-themes";
 import type { ShiftTypeBreakdown, FocusAreaBreakdown } from "@/lib/dashboard-stats";
 import DonutChart from "../DonutChart";
 import Modal from "@/components/Modal";
+import { ChartPie } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { toDarkPillColors } from "@/lib/colors";
 
@@ -12,7 +13,7 @@ interface ExpandedBreakdownProps {
 
 export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakdownProps) {
   return (
-    <Modal title="Shift breakdown" onClose={onClose} style={modalStyle}>
+    <Modal icon={ChartPie} title="Shift breakdown" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Summary */}
         <div

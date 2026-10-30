@@ -85,6 +85,7 @@ export default function PrintOptionsModal({
   return (
     <>
       <Modal
+        icon={Printer}
         title="Print schedule"
         onClose={onClose}
         onRequestClose={requestClose}

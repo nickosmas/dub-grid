@@ -155,22 +155,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
     return (
       <div style={sectionStyle}>
         <div style={{ padding: 24 }}>
-          <h3
-            style={{
-              margin: "0 0 6px",
-              fontSize: "var(--dg-fs-section-title)",
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            Billing summary unavailable
-          </h3>
-          <p
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-fs-label)",
-              color: "var(--dg-color-text-muted)",
-            }}
-          >
+          <h3 className="dg-card-title">Billing summary unavailable</h3>
+          <p className="dg-card-description">
             Refresh billing oversight to rebuild this organization&apos;s billing snapshot.
           </p>
         </div>
@@ -230,24 +216,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
         }}
       >
         <div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "var(--dg-fs-heading)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            Billing
-          </h2>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: "var(--dg-fs-label)",
-              color: "var(--dg-color-text-muted)",
-              fontWeight: 600,
-            }}
-          >
+          <h2 className="dg-card-title">Billing</h2>
+          <p className="dg-card-description">
             Manage this organization&apos;s Stripe status, trial timing, cancellation state, and
             billable app-user seat count.
           </p>

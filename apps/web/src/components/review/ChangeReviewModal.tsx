@@ -4,7 +4,7 @@ import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Banner } from "@/components/ui/Banner";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Save } from "lucide-react";
 
 export interface ReviewChange {
   key: string;
@@ -39,6 +39,7 @@ export default function ChangeReviewModal({
 
   return (
     <Modal
+      icon={Save}
       title={title}
       onClose={onCancel}
       style={{ maxWidth: 720, width: "100%" }}

@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
+import { ToggleRight } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { formatClientErrorMessage, formatClientLabel } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -325,6 +326,7 @@ export default function PlatformFeatureFlagsView() {
 
       {addModalOpen && (
         <Modal
+          icon={ToggleRight}
           title="Add Feature Control"
           onClose={closeAddModal}
           style={{ maxWidth: 480 }}

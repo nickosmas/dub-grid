@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import Modal from "@/components/Modal";
+import { Timer } from "lucide-react";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/components/AuthProvider";
 import { useLogout } from "@/hooks";
@@ -39,6 +40,7 @@ export default function InactivityGuard() {
 
   return (
     <Modal
+      icon={Timer}
       title="Still there?"
       onClose={handleStay}
       style={{ maxWidth: 400 }}
