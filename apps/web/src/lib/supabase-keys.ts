@@ -30,6 +30,14 @@ export function getSupabaseSecretKey(): string | undefined {
   return process.env.SUPABASE_SECRET_KEY;
 }
 
+/**
+ * Supabase's public signing keys as JSON, inlined at build time by
+ * next.config.ts. Unset when the build could not fetch them.
+ */
+export function getShippedSupabaseJwks(): string | undefined {
+  return process.env.SUPABASE_JWKS;
+}
+
 /** Throwing variants for call sites that cannot proceed without a key. */
 export function requireSupabaseUrl(): string {
   const url = getSupabaseUrl();

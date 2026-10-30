@@ -80,7 +80,6 @@ vi.mock("@/lib/cache", () => ({
     orgDirectory: (orgId: string) => `dg:org:${orgId}:orgDirectory`,
     employees: (orgId: string) => `dg:org:${orgId}:employees`,
     allUsers: () => "dg:gm:allUsers",
-    mwOrgVisible: (userId: string, orgId: string) => `dg:mw:orgVisible:${userId}:${orgId}`,
   },
   cacheThrough: (_key: string, _ttl: number, fetcher: () => unknown) => fetcher(),
   TTL: { MODERATE: 60 },
@@ -1044,7 +1043,6 @@ describe("POST /api/employees/status", () => {
       `dg:org:${ORG_ID}:orgDirectory`,
       `dg:org:${ORG_ID}:employees`,
       "dg:gm:allUsers",
-      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${ORG_ID}`,
     );
   });
 
@@ -1104,7 +1102,6 @@ describe("POST /api/employees/status", () => {
       `dg:org:${ORG_ID}:orgDirectory`,
       `dg:org:${ORG_ID}:employees`,
       "dg:gm:allUsers",
-      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${ORG_ID}`,
     );
   });
 
@@ -1168,7 +1165,6 @@ describe("POST /api/employees/status", () => {
       `dg:org:${SANDBOX_ORG_ID}:orgDirectory`,
       `dg:org:${SANDBOX_ORG_ID}:employees`,
       "dg:gm:allUsers",
-      `dg:mw:orgVisible:${EMPLOYEE_USER_ID}:${SANDBOX_ORG_ID}`,
     );
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
   });

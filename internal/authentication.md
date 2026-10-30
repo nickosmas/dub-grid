@@ -382,7 +382,12 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
    Supabase's JWKS (ES256), plus `exp`, `iss`, `aud`, `sub`, the authenticated role,
    `session_id`, and `iat`. Requiring the final two claims is load-bearing: without
    them the app cannot enforce either a session-specific revocation or the user's
-   revoke-all watermark. The keyset is module-cached and shared with `proxy.ts`.
+   revoke-all watermark. The keyset is module-cached. `proxy.ts` uses
+   `getProxyJwks` instead: the public keys `next.config.ts` fetched at build time,
+   asking Supabase only for a key added since. The proxy runs at the edge PoP, where
+   a fresh isolate's remote fetch cost about 735ms. A key revoked after a build stays
+   trusted by the proxy until the next deploy, so redeploy after revoking a signing
+   key; route handlers always verify against the live keyset.
    Tokens arrive either as an `Authorization: Bearer` header (mobile) or the Supabase
    SSR cookie (web); an explicit Bearer header wins and an invalid one never falls
    back to a cookie identity. The cookie path still goes through `getSession()`, which

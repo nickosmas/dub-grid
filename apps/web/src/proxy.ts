@@ -14,9 +14,9 @@ import { localSupabaseConnectSources } from "@/lib/local-supabase-csp";
 import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
-import { cacheGet, cacheSet, cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
-import { getSupabaseJwks, supabaseTokenClaimChecks } from "@/lib/auth/verify-token";
+import { getProxyJwks, supabaseTokenClaimChecks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
@@ -45,16 +45,17 @@ import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
 /**
  * Per-isolate memo in front of the org-access lookup below.
  *
- * `cacheGet` still costs a Redis GET on a hit, and this check runs on every
- * authenticated navigation — including each RSC request — so a user clicking
- * around paid a network round trip per page. Redis is not always nearby:
- * measured at 340-670ms from one development machine.
+ * This check runs on every authenticated navigation, including each RSC
+ * request, so a user clicking around would otherwise pay a database round trip
+ * per page. On a miss it reads the database directly. It used to try Redis
+ * first, but its 30s entries rarely outlived the gap between one person's hard
+ * loads, so a miss cost a Redis GET and then the query, in series, from the
+ * edge PoP (fix/login-speed, 2026-10-30).
  *
- * This is an access-revocation path, so the added staleness is stated plainly:
- * the org-access answer was already accepted as up to TTL.MIDDLEWARE (30s) old,
- * and this makes it at most 30s + MW_ORG_ACCESS_MEMO_MS. That sits inside the
- * window this check exists to cover in the first place — a pre-suspension JWT
- * remains usable for up to an hour, which is the whole reason for the check.
+ * This is an access-revocation path, so the staleness is stated plainly: an
+ * answer is at most MW_ORG_ACCESS_MEMO_MS old. That sits inside the window
+ * this check exists to cover in the first place: a pre-suspension JWT remains
+ * usable for up to an hour, which is the whole reason for the check.
  */
 const MW_ORG_ACCESS_MEMO_MS = 10_000;
 // Visibility is memoized per person, so the map is bounded by sweeping expired
@@ -119,14 +120,13 @@ function remember<T>(memo: Map<string, MemoEntry<T>>, key: string, value: T, now
 }
 
 /**
- * Memo, then Redis, then `load`. A null answer is never kept at either level:
- * for visibility it is one person's lost membership, and the next read must
- * ask again. `refresh` skips both caches and replaces them with a fresh read.
+ * Memo, then `load`. A null answer is never kept: for visibility it is one
+ * person's lost membership, and the next read must ask again. `refresh` skips
+ * the memo and replaces it with a fresh read.
  */
 async function readMemoized<T>(
   memo: Map<string, MemoEntry<T>>,
   memoKey: string,
-  cacheKey: string,
   load: () => Promise<T | null>,
   refresh: boolean,
 ): Promise<T | null> {
@@ -135,12 +135,8 @@ async function readMemoized<T>(
     const memoized = memo.get(memoKey);
     if (memoized && memoized.expiresAt > now) return memoized.value;
   }
-  let value = refresh ? null : await cacheGet<T>(cacheKey);
-  if (value === null) {
-    value = await load();
-    if (value === null) return null;
-    void cacheSet(cacheKey, value, TTL.MIDDLEWARE);
-  }
+  const value = await load();
+  if (value === null) return null;
   remember(memo, memoKey, value, now);
   return value;
 }
@@ -348,9 +344,11 @@ export async function proxy(req: NextRequest) {
     },
   });
 
+  const stopTotal = timer.start("mw_total");
+  // Untimed until now, yet it refreshes an access token within 90s of expiry.
   const {
     data: { session },
-  } = await supabase.auth.getSession();
+  } = await timer.time("mw_session", () => supabase.auth.getSession());
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
@@ -365,7 +363,7 @@ export async function proxy(req: NextRequest) {
   let claims: JWTClaims;
   let claimsVerified = false;
   try {
-    const jwks = getSupabaseJwks();
+    const jwks = getProxyJwks();
     const claimChecks = supabaseTokenClaimChecks();
     if (jwks && claimChecks) {
       const { payload } = await timer.time("jwt_verify", () =>
@@ -706,7 +704,6 @@ export async function proxy(req: NextRequest) {
             ? readMemoized(
                 mwOrgVisibleMemo,
                 `${userId}:${memberOrgId}`,
-                CacheKey.mwOrgVisible(userId, memberOrgId),
                 async () => {
                   const { data, error } = await supabase
                     .from("organizations")
@@ -724,7 +721,6 @@ export async function proxy(req: NextRequest) {
           readMemoized(
             mwOrgAccessMemo,
             orgId,
-            CacheKey.mwOrgAccess(orgId),
             async () => {
               const { data, error } = await platformPolicyClient()
                 .from("organizations")
@@ -763,9 +759,11 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      const billingAccess = await evaluateOrgBillingAccess(platformPolicyClient(), orgAccess, {
-        policy: billingPolicy,
-      });
+      const billingAccess = await timer.time("mw_billing", () =>
+        evaluateOrgBillingAccess(platformPolicyClient(), orgAccess, {
+          policy: billingPolicy,
+        }),
+      );
 
       const canRecoverBilling = getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
 
@@ -813,6 +811,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
+  stopTotal();
   timer.applyTo(res.headers);
   return res;
 }

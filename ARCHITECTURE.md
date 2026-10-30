@@ -108,7 +108,7 @@ Every organization gets a unique subdomain. The request proxy resolves the subdo
 
 Tenant isolation is enforced at three levels:
 
-1. **Request proxy** — Verifies the user's JWT `org_slug` matches the subdomain. Redirects on mismatch. Also performs a Redis-cached org-suspension check. Route Handlers re-verify independently (`lib/api-auth.ts`): local ES256 verification against Supabase's JWKS plus a Redis revocation check for ordinary requests; only sensitive actions (`requireLiveAuthenticatedSession`) and the mobile MFA-factor check go back to Supabase Auth.
+1. **Request proxy** — Verifies the user's JWT `org_slug` matches the subdomain. Redirects on mismatch. Also checks the organization's suspension, archive, membership and billing state against the database, behind a 10-second per-isolate memo, and verifies the JWT with keys shipped in the build. Route Handlers re-verify independently (`lib/api-auth.ts`): local ES256 verification against Supabase's JWKS plus a Redis revocation check for ordinary requests; only sensitive actions (`requireLiveAuthenticatedSession`) and the mobile MFA-factor check go back to Supabase Auth.
 2. **Application** — All data queries (server-side) include `org_id` from the authenticated session.
 3. **Database (RLS)** — Every table policy filters by `caller_org_id()`, extracted from the JWT. Even if application code is buggy, RLS prevents cross-tenant data access. **RLS is the real security boundary** — the request proxy is a fast first filter, not the sole gate.
 

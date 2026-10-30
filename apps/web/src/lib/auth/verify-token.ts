@@ -1,8 +1,8 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
-import type { JWTPayload } from "jose";
+import { createLocalJWKSet, createRemoteJWKSet, errors, jwtVerify } from "jose";
+import type { JSONWebKeySet, JWTPayload, JWTVerifyGetKey } from "jose";
 import type { NextRequest } from "next/server";
 import type { AuthenticationAssuranceClaims } from "@dubgrid/authz";
-import { getSupabaseUrl } from "@/lib/supabase-keys";
+import { getShippedSupabaseJwks, getSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
  * Local access-token verification, shared by middleware and API routes.
@@ -71,9 +71,54 @@ export function getSupabaseJwks(): ReturnType<typeof createRemoteJWKSet> | null 
   return cachedJwks;
 }
 
-/** Test seam: drops the memoized keyset so a test can install its own. */
+let cachedProxyJwks: JWTVerifyGetKey | null = null;
+
+/** The keyset next.config.ts fetched when the app was built, if it could. */
+function shippedJwks(): JSONWebKeySet | null {
+  const raw = getShippedSupabaseJwks();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as JSONWebKeySet;
+    return Array.isArray(parsed.keys) && parsed.keys.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The proxy's keyset: the keys shipped with the build, asking Supabase only
+ * for a key added since (rotation). The proxy runs at the edge PoP, where a
+ * fresh isolate's remote fetch cost about 735ms (2026-09-26).
+ *
+ * Only the proxy uses it. A key revoked after the build stays trusted here
+ * until the next deploy, so redeploy after revoking a signing key. The proxy's
+ * check only routes pages; route handlers verify with `getSupabaseJwks`.
+ */
+export function getProxyJwks(): JWTVerifyGetKey | null {
+  if (cachedProxyJwks) return cachedProxyJwks;
+  const remote = getSupabaseJwks();
+  if (!remote) return null;
+  const shipped = shippedJwks();
+  if (!shipped) {
+    cachedProxyJwks = remote;
+    return cachedProxyJwks;
+  }
+  const local = createLocalJWKSet(shipped);
+  cachedProxyJwks = async (protectedHeader, token) => {
+    try {
+      return await local(protectedHeader, token);
+    } catch (error) {
+      if (error instanceof errors.JWKSNoMatchingKey) return remote(protectedHeader, token);
+      throw error;
+    }
+  };
+  return cachedProxyJwks;
+}
+
+/** Test seam: drops the memoized keysets so a test can install its own. */
 export function resetSupabaseJwksCache(): void {
   cachedJwks = null;
+  cachedProxyJwks = null;
 }
 
 function supabaseIssuer(): string | null {
