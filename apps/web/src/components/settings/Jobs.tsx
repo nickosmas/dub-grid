@@ -542,18 +542,7 @@ function ChecklistPanel({
       </div>
 
       {items.length === 0 ? (
-        <div
-          style={{
-            padding: "12px 14px",
-            borderRadius: "var(--dg-radius-sm)",
-            border: "1px solid var(--dg-color-border-light)",
-            color: "var(--dg-color-text-muted)",
-            fontSize: "var(--dg-fs-label)",
-            background: "var(--dg-color-bg-secondary)",
-          }}
-        >
-          {emptyMessage}
-        </div>
+        <EmptyState size="inline" title={emptyMessage} />
       ) : (
         <div className="dg-checklist">
           <label className="dg-checkbox-row dg-checkbox-row--header">

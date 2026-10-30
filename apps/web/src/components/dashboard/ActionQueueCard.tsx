@@ -8,6 +8,7 @@ import {
   loadApprovalDraftWarning,
 } from "@/components/shift-requests/approval-draft-warning";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { formatCompactScheduleDate } from "@dubgrid/schedule-core";
 import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
@@ -419,50 +420,27 @@ export default function ActionQueueCard({
   const isHero = variant === "hero";
 
   if (items.length === 0) {
+    const icon = (
+      <svg
+        width={isHero ? 24 : 18}
+        height={isHero ? 24 : 18}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--dg-color-success-text)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 12l6 6L20 6" />
+      </svg>
+    );
+    if (isHero) {
+      return <EmptyState size="compact" icon={icon} title="Nothing to review" />;
+    }
     return (
-      <div className={isHero ? undefined : "dg-card"}>
-        <div
-          style={{
-            textAlign: "center",
-            padding: isHero ? "32px 18px" : "24px 18px",
-          }}
-        >
-          {/* Green checkmark */}
-          <div
-            style={{
-              width: isHero ? 48 : 36,
-              height: isHero ? 48 : 36,
-              borderRadius: "50%",
-              background: "var(--dg-color-success-bg)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 10,
-            }}
-          >
-            <svg
-              width={isHero ? 24 : 18}
-              height={isHero ? 24 : 18}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--dg-color-success-text)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M4 12l6 6L20 6" />
-            </svg>
-          </div>
-          <div
-            style={{
-              fontSize: isHero ? "var(--dg-fs-body)" : 12,
-              fontWeight: 600,
-              color: "var(--dg-color-text-primary)",
-              marginBottom: 2,
-            }}
-          >
-            Nothing to review
-          </div>
+      <div className="dg-card">
+        <div className="dg-card-body">
+          <EmptyState size="inline" icon={icon} title="Nothing to review" />
         </div>
       </div>
     );

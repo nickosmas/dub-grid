@@ -1,6 +1,7 @@
 "use client";
 
 import type { DraftBreakdown } from "@/lib/draft-utils";
+import { EmptyState } from "@/components/EmptyState";
 
 interface DraftReviewSummaryProps {
   title: string;
@@ -168,16 +169,11 @@ export default function DraftReviewSummary({
           ))}
         </dl>
       ) : (
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--dg-fs-footnote)",
-            lineHeight: 1.5,
-            color: "var(--dg-color-text-secondary)",
-          }}
-        >
-          {emptyMessage}
-        </p>
+        <EmptyState
+          size="inline"
+          title={emptyMessage}
+          style={description ? undefined : { marginTop: 10 }}
+        />
       )}
     </section>
   );

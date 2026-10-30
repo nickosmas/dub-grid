@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2d708494ecb7b05636f00fb713a55d16ac456809adcd5c56b26341e369d15941"
+      "evidenceFingerprint": "sha256:44dd887e650af2af1478b10e638db30d9e9aeb9139362c06146777e283ceb6d1"
     },
     {
       "id": "draft-publish",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9e60518103e8035da2d079fe0cb79ede5964ad7a85e0576c7b8df063906d4396"
+      "evidenceFingerprint": "sha256:4a730b9a4cd51a965159db04988645316243e3cdc40907fa7d57103d907d85b7"
     },
     {
       "id": "realtime",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:29db11fdf8bdbaf8305b12d81f48af7f3bc1776f3fa30f89de0e26dc96fa7329"
+      "evidenceFingerprint": "sha256:4f40d5f1fa43f1874713e4ac3d459038844e8976f924439748f9adcabc7106a7"
     },
     {
       "id": "dashboard",
@@ -683,7 +683,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e6ab580be8888f080ca3bc824865d74a3373bfdb998fbc26c1c9f7f0ee2b6197"
+      "evidenceFingerprint": "sha256:0187678741236575d5b8056859bfc36e3392d9f83914722e870616117d543cfa"
     },
     {
       "id": "roster",
@@ -789,11 +789,12 @@
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Schedule and Activity tabs; older tab links open the tab that holds them; who sees Usual week and Activity; period choices; Overview stats for the period, Next 7 days, Needs attention, What they work and remembered choice",
+            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Schedule tab: Usual week with preferences, then shifts and time off in the period grouped by week, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the All, Shifts and Time off filter, CSV export, and day off hidden unless shown",
-            "Activity tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, then the change log; the All, Requests and Changes filter and the waiting count"
+            "Schedule tab: recurring schedule with preferences, then shifts and time off grouped by week, or a month calendar with drafts outlined when the period is This month, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
+            "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, the filter dropdown and the waiting count",
+            "Activity tab: the change log for the period, filtered by kind from its dropdown"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
@@ -806,12 +807,12 @@
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/lib/schedule-rows.ts",
             "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/RequestsTab.tsx",
+            "apps/web/src/components/staff-detail/PersonMonthCalendar.tsx",
             "apps/web/src/components/dashboard/MyScheduleRow.tsx",
             "apps/web/src/lib/period-presets.ts",
-            "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
-            "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
             "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
             "apps/web/src/lib/shift-records.ts",
             "apps/web/src/lib/time-off.ts",
@@ -828,7 +829,6 @@
           ],
           "testFiles": [
             "apps/web/src/components/staff-detail/StaffDetailPage.test.tsx",
-            "apps/web/src/components/staff-detail/PersonRecordCard.test.tsx",
             "apps/web/src/__tests__/EditEmployeePanel.test.tsx",
             "apps/web/src/__tests__/ProfileChangeRequestQueue.test.tsx"
           ],
@@ -836,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c6d2413a468ec9e4dc2c1bdd31947424c90e601e1a0521109b55866a1ee9e5a7"
+      "evidenceFingerprint": "sha256:c023aefe8c0a2c44cec9cae1190aca03484033ae8dccd1bab205998c958ee09c"
     },
     {
       "id": "invitations",
@@ -1006,7 +1006,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:052b70ff3adbafcbd7fb4e95b2fb7391eca0ee9111ecf1b86357db25689836bc"
+      "evidenceFingerprint": "sha256:a42525cfc591dce5828f8a5038edccf1bf5c6825c33511dbed616116d3fcb7a1"
     },
     {
       "id": "terminology",
@@ -1055,7 +1055,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fa3eed39d96e009ab032c425c74d3b7f795ec2da5e01ca60357fd428a307702d"
+      "evidenceFingerprint": "sha256:b4864fd519cc3ff6df8706f1c6836bf5f467c173718b776da73ddaf2c57a4ca5"
     },
     {
       "id": "roles",
@@ -1371,7 +1371,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:f27474b5663777f808615666f4fe545c36b1fe436ac0fb8ffcaf792545020d26"
+      "evidenceFingerprint": "sha256:c5607e5cf7567fb808d61a5819c57cc1898d4bfddf04ade1a67e722d6af0b2fc"
     },
     {
       "id": "reports",
@@ -1453,10 +1453,10 @@
         {
           "id": "profile",
           "claims": [
-            "profile menu and sections",
+            "profile menu; header, status card, and Overview, Schedule and Account tabs; This week, What you work, About you; old section links; Account only without a staff record",
             "details: email and phone, identity confirmation and confirmation email; concurrent edit message",
             "direct name editing for people managers and Super Admins; name change requests otherwise",
-            "access and management departments cards",
+            "access and management departments in About you and Your details",
             "calendar subscription: create, replace, disable",
             "app profile tab rows and details behavior",
             "deletion: requests for most, direct for Super Admins with typed confirmation and sole Super Admin guard",
@@ -1466,8 +1466,11 @@
           "sourceFiles": [
             "apps/web/src/components/Header.tsx",
             "apps/web/src/components/profile/ProfilePage.tsx",
-            "apps/web/src/components/profile/profile-nav-config.tsx",
-            "apps/web/src/components/profile/SelfWorkProfile.tsx",
+            "apps/web/src/components/profile/profile-tabs.ts",
+            "apps/web/src/components/profile/ProfileHeader.tsx",
+            "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
+            "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
             "apps/web/src/components/account/ProfilePanel.tsx",
             "apps/web/src/components/account/DeleteAccountCard.tsx",
@@ -1481,6 +1484,7 @@
           ],
           "testFiles": [
             "apps/web/src/components/account/ProfilePanel.test.tsx",
+            "apps/web/src/components/profile/__tests__/profile-tabs.test.ts",
             "apps/web/src/components/profile/CalendarSubscriptionCard.test.tsx",
             "apps/web/src/app/api/auth/delete-account/route.test.ts",
             "apps/web/src/app/(app)/goodbye/__tests__/RunLogoutTeardown.test.tsx",
@@ -1493,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d44bd6eb5b826bb7b3e1ab764a7be1f8346a5e7381e4973335ba2fbdb2e887f7"
+      "evidenceFingerprint": "sha256:ccc41d1ca3abaada509a30ba11f69cadba2ece9b8b0f196a3bb28d9683e2504b"
     },
     {
       "id": "security-sessions",
@@ -1572,7 +1576,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:49efd956f2df94b5bcadb841459698667452d286e179204197947f369442f096"
+      "evidenceFingerprint": "sha256:d0a09b6ef0c82ed98b068ee472e86cc5f8ff63660e24c5a890a7eef352d70131"
     },
     {
       "id": "privacy-controls",
@@ -1635,7 +1639,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ccff0f17f6509885b6766cd35abda4babe85801663524452e8a5fb08d7583d9c"
+      "evidenceFingerprint": "sha256:58f7e004aff2628ced0be2b431bd5bb83ea3220a8ff69226d3934e4d81808212"
     },
     {
       "id": "schedule-rules-display",
@@ -1688,7 +1692,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8b1d782640bc031736eafe6702aa9aab98e96f3c5149e1648158285558c4fe08"
+      "evidenceFingerprint": "sha256:a866639338ebeecbbdc64e68708205e6d628b9b756110c1167bc9fbe1f1b7b96"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1741,7 +1745,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b1f6b08a6d097bf00c6dda8a7232228a62190991f5dcf06bd969467021193321"
+      "evidenceFingerprint": "sha256:c95fc603da030ac9a4e3a8a3da6b89bcbbc93570db455796ef7eed666089d63d"
     },
     {
       "id": "organization-activity-controls",
@@ -1849,7 +1853,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:98634c6d5b783998495e629bc328d2a8deed13a9d481989c3c6020ba42c277d0"
+      "evidenceFingerprint": "sha256:79bd5f4a729ea53690d35b8e304c4bcefcac4f02b84bb783517d5d23eb26f0b8"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1906,7 +1910,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ab49995bf745c854a8d1de4daa949db7b66cc454ac6f26e9530544e2613a628a"
+      "evidenceFingerprint": "sha256:e7dbe87990739462b6ad4f1819d6dd8bb3782531b0b7e73cbdaf323626e3b451"
     },
     {
       "id": "schedule-tools",
@@ -2009,7 +2013,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:0d6df9e7cb94c72cd08681dc41c1dbe848a4aa8be37f5e0f20dfb0a0be7ae2aa"
+      "evidenceFingerprint": "sha256:024692ae04013dcf1f3f9c1465483dd2b8fce8db046934d9759b5804252f584e"
     },
     {
       "id": "mobile-schedule",

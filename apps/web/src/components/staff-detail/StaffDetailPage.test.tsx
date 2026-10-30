@@ -70,7 +70,6 @@ vi.mock("./EmployeeStatusActions", () => ({
   EmployeeStatusActions: () => <div />,
   StatusCardActions: () => <div />,
 }));
-vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
 vi.mock("./tabs/StaffOverviewTab", () => ({
   StaffOverviewTab: ({ about }: { about: React.ReactNode }) => (
     <div data-testid="overview">{about}</div>

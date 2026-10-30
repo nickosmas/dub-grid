@@ -8,12 +8,19 @@ import { formatDateTimeLabel } from "@/lib/client-facing";
 import type { PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
 import type { AdminPermissions, Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
-import { ACCOUNT_LABELS } from "./PersonRecordCard";
 
 const ROLE_NAMES: Record<OrganizationRole, string> = {
   user: "User",
   admin: "Admin",
   super_admin: "Super Admin",
+};
+
+const ACCOUNT_LABELS: Record<PersonAccountState["kind"], string> = {
+  linked: "Linked account",
+  pending: "Invitation pending",
+  expired: "Invitation expired",
+  "not-invited": "Not invited",
+  "no-email": "No email",
 };
 
 const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });

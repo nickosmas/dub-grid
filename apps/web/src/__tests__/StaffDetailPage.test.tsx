@@ -21,7 +21,7 @@ import {
   revokeInvitation,
 } from "@/features/organization/client";
 import { fetchCorrections, fetchRecurringShifts } from "@/features/schedule/client";
-import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import { resolvePeriodPreset } from "@/lib/period-presets";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -153,17 +153,6 @@ vi.mock("@/components/staff-detail/tabs/StaffOverviewTab", () => ({
       <div>Overview content</div>
       <div data-testid="overview-range">{`${range.startDate}..${range.endDate}`}</div>
       {about}
-    </div>
-  ),
-}));
-
-vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
-  OverviewTab: ({ scheduleOverview }: { scheduleOverview?: ReactNode }) => (
-    <div>
-      <div>Overview content</div>
-      <div>Account summary</div>
-      <div>Employment summary</div>
-      {scheduleOverview}
     </div>
   ),
 }));
@@ -452,19 +441,19 @@ describe("StaffDetailPage", () => {
     expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
-  it("loads today and the next six days for the Next 7 days strip", async () => {
+  it("loads the current week for the Overview strip", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     await screen.findByText("Internal notes");
-    const today = getIsoDateInTimeZone(new Date(), "Pacific/Honolulu");
+    const week = resolvePeriodPreset("current-week", null)!;
     await waitFor(() =>
       expect(mockedFetchEmployeeShifts).toHaveBeenCalledWith(
         "emp-1",
         "org-1",
         expect.any(Map),
         expect.any(Map),
-        today,
-        addDaysToIsoDate(today, 6),
+        week.startDate,
+        week.endDate,
       ),
     );
   });
@@ -497,7 +486,7 @@ describe("StaffDetailPage", () => {
   it("loads corrections for the Schedule tab only for someone who can edit shifts", async () => {
     mockSearchParams = new URLSearchParams("tab=schedule");
     render(<StaffDetailPage employeeId="emp-1" />);
-    await screen.findByText("Shifts and time off");
+    await screen.findByRole("heading", { name: "Shifts and time off" });
     expect(vi.mocked(fetchCorrections)).not.toHaveBeenCalled();
 
     mockUsePermissions.mockReturnValue({
@@ -522,6 +511,7 @@ describe("StaffDetailPage", () => {
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
       "Overview",
       "Schedule",
+      "Requests",
       "Activity",
     ]);
     expect(tabs.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-pressed", "true");
@@ -566,7 +556,6 @@ describe("StaffDetailPage", () => {
     ["shifts", "/people/emp-1?tab=schedule"],
     ["timeoff", "/people/emp-1?tab=schedule"],
     ["recurring", "/people/emp-1?tab=schedule"],
-    ["requests", "/people/emp-1?tab=activity"],
     ["access", "/people/emp-1"],
   ])("sends an old ?tab=%s link to the tab that holds it now", async (tab, href) => {
     mockSearchParams = new URLSearchParams(`tab=${tab}`);
@@ -596,7 +585,27 @@ describe("StaffDetailPage", () => {
     expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
   });
 
-  it("shows their usual week and preferences on the Schedule tab when permitted", async () => {
+  it("shows the Schedule tab as a month calendar only for This month", async () => {
+    localStorage.setItem("dg-person-period", JSON.stringify({ preset: "this-month" }));
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByRole("region", { name: "Calendar" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Shifts and time off" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show" })).toBeNull();
+  });
+
+  it("keeps the list, without a calendar, for every other period", async () => {
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await screen.findByRole("heading", { name: "Shifts and time off" });
+    expect(screen.queryByRole("region", { name: "Calendar" })).toBeNull();
+  });
+
+  it("shows their recurring schedule on the Schedule tab when permitted", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,
       canViewRecurringShifts: true,
@@ -610,9 +619,11 @@ describe("StaffDetailPage", () => {
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    const usualWeek = await screen.findByRole("region", { name: "Usual week" });
-    expect(within(usualWeek).getByRole("link", { name: "Edit on Recurring Shifts" })).toBeVisible();
-    expect(screen.getByText("Shifts and time off")).toBeInTheDocument();
+    const recurringSchedule = await screen.findByRole("region", { name: "Recurring schedule" });
+    expect(
+      within(recurringSchedule).getByRole("link", { name: "Edit on Recurring Shifts" }),
+    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Shifts and time off" })).toBeInTheDocument();
   });
 
   it("keeps the editor in a popup and the status and invitation on the page", async () => {

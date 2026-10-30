@@ -527,12 +527,18 @@ the inline prototypes approved that day.
 A later fix the same day (fix/staff-page-three-tabs) folds the seven tabs
 into three: **Overview** (the period's numbers, Next 7 days in the
 dashboard's day strip, Needs attention, What they work, and About with Work,
-Access and one record line), **Schedule** (Usual week, then shifts and time
+Access and one record line), **Schedule** (Recurring schedule, then shifts and time
 off grouped by week) and **Activity** (requests and the change log). The left
 column is gone, contact sits under the name, lists are plain text with pills
 only for drafts, corrections and time off ahead or now, and the page runs up
 to 1200px (owner, 2026-10-29). Older `?tab=` links open the tab that holds
 them now.
+My profile follows the same day (fix/profile-three-tabs): the staff page's
+header and three tabs, **Overview** (the last 12 weeks, This week, What you
+work, About you), **Schedule** (Recurring schedule, the calendar subscription, shifts
+and time off) and **Account** (your details, sign-in and security, alerts, and
+data and privacy), replacing the settings sidebar. Old `?section=` links open
+Account at their heading.
 
 Item 55 is split:
 

@@ -2706,17 +2706,6 @@ button.dg-cc-sg-main {
   gap: 6px;
   margin-top: 16px;
 }
-.dg-open-shift-staffing-empty {
-  display: flex;
-  min-height: 150px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px;
-  color: var(--dg-color-text-muted);
-  text-align: center;
-}
 .dg-open-shift-staffing-actions {
   display: grid;
   width: 100%;

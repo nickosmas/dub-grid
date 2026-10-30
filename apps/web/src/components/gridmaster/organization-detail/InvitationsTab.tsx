@@ -5,6 +5,7 @@ import {
 } from "@/features/organization/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle } from "@/lib/styles";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -120,16 +121,8 @@ export function InvitationsTab({
             <tbody>
               {invitations.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      ...gmTdStyle,
-                      textAlign: "center",
-                      color: "var(--dg-color-text-muted)",
-                      padding: 32,
-                    }}
-                  >
-                    No invitations found
+                  <td colSpan={6} style={{ ...gmTdStyle, padding: 16 }}>
+                    <EmptyState size="compact" title="No invitations found" />
                   </td>
                 </tr>
               ) : (

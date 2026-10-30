@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import React, { useMemo, useState } from "react";
 import {
   ArrowLeftRight,
@@ -242,7 +243,7 @@ export function ActivityDetailsDialog({
           ) : details.length > 0 ? (
             <DetailRows items={details} />
           ) : (
-            <div className="dg-activity-details-empty">No additional details were recorded.</div>
+            <EmptyState size="inline" title="No additional details were recorded." />
           )}
         </section>
         {shiftChange && details.length > 0 ? (

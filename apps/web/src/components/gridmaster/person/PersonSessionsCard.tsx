@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
   GridmasterCalendarFeed,
@@ -42,7 +43,7 @@ function Row({
 
 function List({ empty, children }: { empty: string; children: ReactNode[] }) {
   if (children.length === 0) {
-    return <p className="text-[13px] text-[var(--dg-color-text-muted)]">{empty}</p>;
+    return <EmptyState size="inline" title={empty} />;
   }
   return (
     <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">{children}</ul>
