@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addDaysToIsoDate } from "@dubgrid/schedule-core";
@@ -20,14 +19,6 @@ interface PersonMonthCalendarProps {
   range: { startDate: string; endDate: string };
   today: string;
   lookups: ShiftRecordLookups;
-  /**
-   * Loads any month's shifts, so the calendar steps freely instead of staying
-   * inside the period. `key` scopes its cache.
-   */
-  loadMonth?: {
-    key: readonly unknown[];
-    load: (startDate: string, endDate: string) => Promise<ShiftMap>;
-  };
 }
 
 interface CalendarPill {
@@ -77,7 +68,6 @@ export function PersonMonthCalendar({
   range,
   today,
   lookups,
-  loadMonth,
 }: PersonMonthCalendarProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -85,8 +75,7 @@ export function PersonMonthCalendar({
   const todayMonth = today.slice(0, 7);
   const [picked, setPicked] = useState<{ range: typeof range; month: string } | null>(null);
   // A new period starts on the month holding today, or the period's last month.
-  const defaultMonth =
-    loadMonth || periodMonths.includes(todayMonth) ? todayMonth : periodMonths.at(-1);
+  const defaultMonth = periodMonths.includes(todayMonth) ? todayMonth : periodMonths.at(-1);
   const month = picked && picked.range === range ? picked.month : defaultMonth;
   const step = (delta: number) => {
     if (!month) return;
@@ -94,24 +83,12 @@ export function PersonMonthCalendar({
     const next = new Date(Date.UTC(year, monthNumber - 1 + delta, 1)).toISOString().slice(0, 7);
     setPicked({ range, month: next });
   };
-  const canStepBack = Boolean(month && (loadMonth || month > periodMonths[0]));
-  const canStepForward = Boolean(month && (loadMonth || month < (periodMonths.at(-1) ?? "")));
+  const canStepBack = Boolean(month && month > periodMonths[0]);
+  const canStepForward = Boolean(month && month < (periodMonths.at(-1) ?? ""));
   const weeks = useMemo(() => (month ? monthWeeks(month) : []), [month]);
-  const visibleRange =
-    loadMonth && weeks.length > 0 ? { startDate: weeks[0][0], endDate: weeks.at(-1)![6] } : range;
-  const monthQuery = useQuery({
-    queryKey: [
-      ...(loadMonth?.key ?? ["person-month"]),
-      visibleRange.startDate,
-      visibleRange.endDate,
-    ],
-    queryFn: () => loadMonth!.load(visibleRange.startDate, visibleRange.endDate),
-    enabled: Boolean(loadMonth && month),
-  });
-  const data = loadMonth ? monthQuery.data : shifts;
 
   const pillsFor = (day: string): CalendarPill[] => {
-    const entry = data?.[`${employeeId}_${day}`];
+    const entry = shifts?.[`${employeeId}_${day}`];
     if (!entry) return [];
     const draftBorder =
       entry.isDraft && entry.draftKind ? DRAFT_BORDER_COLORS[entry.draftKind] : null;
@@ -162,30 +139,31 @@ export function PersonMonthCalendar({
   return (
     <section className="dg-card" aria-label="Calendar">
       <div className="dg-card-header">
-        <div className="dg-card-title">Calendar</div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
-            aria-label="Previous month"
-            disabled={!canStepBack}
-            onClick={() => step(-1)}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden />
-          </Button>
-          <span className="dg-tabular-nums min-w-[120px] text-center text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-            {MONTH.format(new Date(`${month}-01T00:00:00Z`))}
-          </span>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
-            aria-label="Next month"
-            disabled={!canStepForward}
-            onClick={() => step(1)}
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </Button>
+        <div className="dg-card-title dg-tabular-nums">
+          {MONTH.format(new Date(`${month}-01T00:00:00Z`))}
         </div>
+        {periodMonths.length > 1 ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
+              aria-label="Previous month"
+              disabled={!canStepBack}
+              onClick={() => step(-1)}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-icon dg-btn-sm"
+              aria-label="Next month"
+              disabled={!canStepForward}
+              onClick={() => step(1)}
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="dg-card-body dg-no-scrollbar overflow-x-auto">
         <div
@@ -208,7 +186,7 @@ export function PersonMonthCalendar({
             <div key={week[0]} role="row" className="grid grid-cols-7 gap-1.5 pb-1.5">
               {week.map((day) => {
                 const inMonth = day.slice(0, 7) === month;
-                const inRange = day >= visibleRange.startDate && day <= visibleRange.endDate;
+                const inRange = day >= range.startDate && day <= range.endDate;
                 const pills = inMonth && inRange ? pillsFor(day) : [];
                 const isToday = day === today;
                 return (
@@ -240,7 +218,9 @@ export function PersonMonthCalendar({
                       >
                         <div
                           data-calendar-pill=""
-                          className="rounded-[var(--dg-radius-sm)] px-1.5 py-1 leading-[1.25]"
+                          // One size for every card, a name alone or a name and job,
+                          // so a month reads as an even grid.
+                          className="box-border flex h-10 flex-col justify-center rounded-[var(--dg-radius-sm)] px-1.5 leading-[1.25]"
                           style={{
                             background: pill.background,
                             border: pill.border,

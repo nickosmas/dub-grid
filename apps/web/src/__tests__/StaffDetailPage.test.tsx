@@ -585,6 +585,26 @@ describe("StaffDetailPage", () => {
     expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
   });
 
+  it("shows the Schedule tab as a month calendar only for This month", async () => {
+    localStorage.setItem("dg-person-period", JSON.stringify({ preset: "this-month" }));
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    expect(await screen.findByRole("region", { name: "Calendar" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Shifts and time off" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show" })).toBeNull();
+  });
+
+  it("keeps the list, without a calendar, for every other period", async () => {
+    mockSearchParams = new URLSearchParams("tab=schedule");
+
+    render(<StaffDetailPage employeeId="emp-1" />);
+
+    await screen.findByRole("heading", { name: "Shifts and time off" });
+    expect(screen.queryByRole("region", { name: "Calendar" })).toBeNull();
+  });
+
   it("shows their recurring schedule on the Schedule tab when permitted", async () => {
     mockUsePermissions.mockReturnValue({
       canViewEmployeeDetails: true,

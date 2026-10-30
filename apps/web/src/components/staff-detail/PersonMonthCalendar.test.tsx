@@ -1,14 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement } from "react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PersonMonthCalendar, monthWeeks, monthsInRange } from "./PersonMonthCalendar";
 import type { AssignmentDefinition, ShiftCategory, ShiftMap } from "@/types";
 
 vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
-
-const withQueries = (ui: ReactElement) =>
-  render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 
 describe("monthsInRange", () => {
   it("lists every month a range touches, across a year end", () => {
@@ -53,7 +48,7 @@ describe("PersonMonthCalendar", () => {
   } as unknown as ShiftMap;
 
   it("opens on today's month, spells out the shift, and steps between the period's months", () => {
-    withQueries(
+    render(
       <PersonMonthCalendar
         employeeId="emp"
         shifts={shifts}
@@ -68,6 +63,10 @@ describe("PersonMonthCalendar", () => {
     expect(within(day).getByText("Day Shift")).toBeInTheDocument();
     expect(within(day).getByText("Mentor")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous month" })).toBeDisabled();
+    // A card with a job and one without are the same size.
+    const cards = document.querySelectorAll("[data-calendar-pill]");
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) expect(card).toHaveClass("h-10");
 
     fireEvent.click(screen.getByRole("button", { name: "Next month" }));
     const november = screen.getByRole("grid", { name: "November 2026" });
@@ -77,25 +76,18 @@ describe("PersonMonthCalendar", () => {
     expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
   });
 
-  it("loads any month when given a loader, past the period's ends", async () => {
-    const load = vi.fn(async () => shifts);
-    withQueries(
+  it("shows one month with no arrows when the period is that month", () => {
+    render(
       <PersonMonthCalendar
         employeeId="emp"
-        shifts={undefined}
-        range={{ startDate: "2026-10-25", endDate: "2026-10-31" }}
+        shifts={shifts}
+        range={{ startDate: "2026-10-01", endDate: "2026-10-31" }}
         today="2026-10-29"
         lookups={lookups}
-        loadMonth={{ key: ["test"], load }}
       />,
     );
 
-    await waitFor(() => expect(load).toHaveBeenCalledWith("2026-09-27", "2026-10-31"));
-    expect(
-      await within(screen.getByRole("gridcell", { name: "2026-10-29" })).findByText("Day Shift"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Previous month" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
-    await waitFor(() => expect(load).toHaveBeenCalledWith("2026-11-01", "2026-12-05"));
+    expect(screen.getByRole("grid", { name: "October 2026" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next month" })).toBeNull();
   });
 });

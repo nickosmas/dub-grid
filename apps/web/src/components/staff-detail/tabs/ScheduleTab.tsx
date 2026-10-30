@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
@@ -45,8 +45,8 @@ interface ScheduleTabProps {
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;
-  /** Lets the calendar load any month; without it the calendar stays inside the period. */
-  loadMonth?: ComponentProps<typeof PersonMonthCalendar>["loadMonth"];
+  /** Shows the period as a month calendar instead of the list, for a month period. */
+  asCalendar?: boolean;
   /** Shown between the recurring schedule and the list, such as the calendar subscription. */
   afterRecurringSchedule?: ReactNode;
   /** Null when this viewer can't see recurring schedules. */
@@ -79,7 +79,7 @@ export function ScheduleTab({
   dayOffAbsenceTypeId,
   recurringSchedule,
   afterRecurringSchedule,
-  loadMonth,
+  asCalendar = false,
 }: ScheduleTabProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [includeDayOff, setIncludeDayOff] = useState(false);
@@ -130,14 +130,6 @@ export function ScheduleTab({
         <RecurringWeekCard employeeId={employee.id} {...recurringSchedule} />
       ) : null}
       {afterRecurringSchedule}
-      <PersonMonthCalendar
-        employeeId={employee.id}
-        shifts={shifts}
-        range={range}
-        today={today}
-        lookups={lookups}
-        loadMonth={loadMonth}
-      />
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -152,17 +144,19 @@ export function ScheduleTab({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CustomSelect<Filter>
-            ariaLabel="Show"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "all", label: "Shifts and time off" },
-              { value: "shift", label: "Shifts only" },
-              { value: "timeoff", label: "Time off only" },
-            ]}
-          />
-          {dayOffName && filter !== "shift" ? (
+          {asCalendar ? null : (
+            <CustomSelect<Filter>
+              ariaLabel="Show"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: "all", label: "Shifts and time off" },
+                { value: "shift", label: "Shifts only" },
+                { value: "timeoff", label: "Time off only" },
+              ]}
+            />
+          )}
+          {dayOffName && filter !== "shift" && !asCalendar ? (
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -185,6 +179,14 @@ export function ScheduleTab({
 
       {loading ? (
         <EmptyState size="compact" title="Loading their schedule" />
+      ) : asCalendar ? (
+        <PersonMonthCalendar
+          employeeId={employee.id}
+          shifts={shifts}
+          range={range}
+          today={today}
+          lookups={lookups}
+        />
       ) : weeks.length === 0 ? (
         <EmptyState size="compact" title={`Nothing ${periodPhrase}`} />
       ) : (

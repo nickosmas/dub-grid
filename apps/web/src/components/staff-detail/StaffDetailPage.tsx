@@ -1526,22 +1526,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     noteCounts={noteCountsByDate}
                     absenceTypes={absenceTypes}
                     dayOffAbsenceTypeId={dayOffAbsenceTypeId}
-                    loadMonth={
-                      orgId
-                        ? {
-                            key: [...queryKeys.shifts.all(orgId), "employee", employeeId, "month"],
-                            load: (startDate, endDate) =>
-                              fetchEmployeeShifts(
-                                employeeId,
-                                orgId,
-                                assignmentLabelMapRef.current,
-                                absenceTypeMapRef.current,
-                                startDate,
-                                endDate,
-                              ),
-                          }
-                        : undefined
-                    }
+                    asCalendar={period.preset === "this-month"}
                     recurringSchedule={
                       perms.canViewRecurringShifts && orgId && showScheduleDetails
                         ? {

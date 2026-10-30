@@ -10,9 +10,10 @@ Owner feedback on the three-tab staff page and profile, the same day.
 ### What changed
 
 - The weekly pattern is called **Recurring schedule** again, never "usual week".
-- **Schedule** has a month **Calendar**: each day's shifts and absences in the
-  schedule's colors, drafts outlined. On the staff page it loads any month; on
-  the profile it stays inside the last 12 weeks.
+- **Schedule** shows the month as a **Calendar** instead of the list when the
+  period is This month: each day's shifts and absences in the schedule's colors,
+  drafts outlined, every card the same size. Other periods, and the profile,
+  keep the list only.
 - **Requests** is its own tab again, with a filter dropdown and the waiting
   count. **Activity** is the change log only, with its own kind dropdown. No
   segmented filters: Schedule's filter is a dropdown too.

@@ -792,7 +792,7 @@
             "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Schedule tab: recurring schedule with preferences, a month calendar of the period with drafts outlined, then shifts and time off grouped by week, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
+            "Schedule tab: recurring schedule with preferences, then shifts and time off grouped by week, or a month calendar with drafts outlined when the period is This month, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
             "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, the filter dropdown and the waiting count",
             "Activity tab: the change log for the period, filtered by kind from its dropdown"
           ],
@@ -836,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9e26a00d15a646a1e153dac0de693c5d5aee9809b59eabc66afbeb7d0d77243d"
+      "evidenceFingerprint": "sha256:c023aefe8c0a2c44cec9cae1190aca03484033ae8dccd1bab205998c958ee09c"
     },
     {
       "id": "invitations",
@@ -1497,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bad24e9d3c9064629dc9608a4bb3a165caba308d3503263f64ca85f0b12237c5"
+      "evidenceFingerprint": "sha256:ccc41d1ca3abaada509a30ba11f69cadba2ece9b8b0f196a3bb28d9683e2504b"
     },
     {
       "id": "security-sessions",
