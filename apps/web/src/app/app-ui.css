@@ -1902,10 +1902,10 @@ button.dg-cc-sg-main {
   color: var(--dg-color-text-muted);
   overflow-wrap: anywhere;
 }
-/* An alert dialog: the tile on the left, then the title and the message in
-   one column beside it, with no X competing for the title's width. */
+/* An alert dialog: the tile always sits left of the title, and the message
+   below starts at the tile's left edge, at every width. */
 .dg-modal--alert .dg-modal-header {
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 .dg-modal--alert .dg-modal-heading {
   align-items: flex-start;
@@ -1914,21 +1914,6 @@ button.dg-cc-sg-main {
 /* Centers a one-line title on the 40px tile. */
 .dg-modal--alert .dg-modal-titles {
   padding-top: 7px;
-}
-.dg-modal--alert .dg-modal-scroll-region {
-  padding-left: 60px;
-}
-@media (max-width: 480px) {
-  .dg-modal--alert .dg-modal-heading {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .dg-modal--alert .dg-modal-titles {
-    padding-top: 0;
-  }
-  .dg-modal--alert .dg-modal-scroll-region {
-    padding-left: 4px;
-  }
 }
 /* The tinted tile an alert dialog leads with, toned by how serious it is. */
 .dg-modal-icon {
