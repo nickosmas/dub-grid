@@ -39,56 +39,52 @@ test.describe("profile states", () => {
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
 
     // ProfilePage.tsx renders the query's error message with a retry button
-    // instead of the settings shell.
+    // instead of the page.
     const tryAgain = page.getByRole("button", { name: "Try again" });
     await expect(tryAgain).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Temporary test failure")).toBeVisible();
-    await expect(page.getByText("Data & privacy")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit details" })).toHaveCount(0);
 
-    // Lift the failure; the button refetches and the shell renders.
+    // Lift the failure; the button refetches and the page renders.
     await page.unroute(SELF_PROFILE_GLOB);
     await tryAgain.click();
 
-    await expect(page.getByText("Data & privacy").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(tryAgain).toHaveCount(0);
   });
 
-  // ProfilePage.tsx mounts exactly one section panel, chosen from ?section=.
-  // "Lazy" here means the other panels are not in the DOM at all, so each
-  // case asserts its own marker present and every other marker absent.
-  const SECTION_MARKERS: Record<string, string> = {
-    profile: "First name",
-    security: "Password",
-    notifications: "Product updates",
-    "data-privacy": "Cookie preferences",
+  // Account holds what the sidebar's sections used to, under one heading each,
+  // and an old ?section= link opens Account at its heading.
+  const ACCOUNT_MARKERS: Record<string, string> = {
+    profile: "Your details",
+    security: "Sign-in and security",
+    notifications: "Alerts",
+    "data-privacy": "Data and privacy",
   };
 
-  test("mounts only the active section's panel", async ({ page }) => {
+  test("keeps every account section under Account, where old links land", async ({ page }) => {
     test.setTimeout(120_000);
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    for (const [section, marker] of Object.entries(SECTION_MARKERS)) {
+    for (const [section, heading] of Object.entries(ACCOUNT_MARKERS)) {
       await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile?section=${section}`);
-
-      await expect(page.getByText(marker, { exact: true }).first()).toBeVisible({
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({
         timeout: 15_000,
       });
-      for (const [other, otherMarker] of Object.entries(SECTION_MARKERS)) {
-        if (other === section) continue;
-        await expect(page.locator("main").getByText(otherMarker, { exact: true })).toHaveCount(0);
+      for (const other of Object.values(ACCOUNT_MARKERS)) {
+        await expect(page.getByRole("heading", { name: other, exact: true })).toHaveCount(1);
       }
     }
+    await expect(page.getByText("Product updates").first()).toBeVisible();
 
-    // The work overview only exists for viewers who are on the schedule.
-    await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile?section=overview`);
-    await expect(page.getByText("Data & privacy").first()).toBeVisible({ timeout: 15_000 });
-    const overviewNav = page.getByRole("link", { name: "Overview", exact: true });
-    if ((await overviewNav.count()) > 0) {
-      await expect(page.locator("main").getByText("First name", { exact: true })).toHaveCount(0);
-    } else {
-      // Unknown sections fall back to the default (profile) panel.
-      await expect(page.getByText("First name", { exact: true }).first()).toBeVisible();
-    }
+    // Overview and Schedule hold your own record; Account's sections are not mounted there.
+    await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
+    await expect(page.getByRole("button", { name: "Edit details" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("heading", { name: "Sign-in and security" })).toHaveCount(0);
   });
 });

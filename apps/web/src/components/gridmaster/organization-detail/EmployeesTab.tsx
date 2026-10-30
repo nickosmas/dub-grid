@@ -2,6 +2,7 @@ import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import { StatusDot } from "@/components/gridmaster/organization-detail/shared";
 import { sectionStyle } from "@/lib/styles";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { type Employee } from "@/types";
 import { useState } from "react";
@@ -114,16 +115,8 @@ export function EmployeesTab({
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      ...gmTdStyle,
-                      textAlign: "center",
-                      color: "var(--dg-color-text-muted)",
-                      padding: 32,
-                    }}
-                  >
-                    {EMPTY_STATUS_TEXT[showStatus]}
+                  <td colSpan={5} style={{ ...gmTdStyle, padding: 16 }}>
+                    <EmptyState size="compact" title={EMPTY_STATUS_TEXT[showStatus]} />
                   </td>
                 </tr>
               ) : (

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
+import { EmptyState } from "@/components/EmptyState";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import {
@@ -170,16 +171,7 @@ function DayPopover({
         {/* Employee breakdown */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 14px" }}>
           {focusAreaSections.length === 0 ? (
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                textAlign: "center",
-                padding: "8px 0",
-              }}
-            >
-              No shifts scheduled
-            </div>
+            <EmptyState size="inline" title="No shifts scheduled" />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {focusAreaSections.map((focusArea) => {

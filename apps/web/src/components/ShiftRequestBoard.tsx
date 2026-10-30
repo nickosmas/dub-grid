@@ -1099,7 +1099,7 @@ export default function ShiftRequestBoard({
                   </svg>
                 }
                 title={getEmptyMessage()}
-                style={{ padding: "40px 24px", border: "none", background: "transparent" }}
+                style={{ padding: "40px 24px" }}
               />
             )
           ) : queueGroups ? (

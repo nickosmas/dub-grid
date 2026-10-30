@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { ChartPie } from "lucide-react";
@@ -42,14 +43,18 @@ interface WorkMixCardProps {
   mix: WorkMixEntry[];
   /** "between Sep 1 and Oct 15", as the rest of the tab words the period. */
   periodPhrase: string;
+  /** "What they work", or "What you work" on your own profile. */
+  title?: string;
 }
 
 /** What someone worked in the period, by shift and job. */
-export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
+export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: WorkMixCardProps) {
   const { resolvedTheme } = useTheme();
   const [asTable, setAsTable] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const total = mix.reduce((sum, item) => sum + item.count, 0);
+  // Shift names repeat across focus areas, so name the area once they differ.
+  const showFocusArea = new Set(mix.map((item) => item.focusAreaName).filter(Boolean)).size > 1;
 
   // A pair keeps its color however the counts move: slots follow the pairs'
   // own order (shift, then job), never their rank.
@@ -84,7 +89,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
         <div>
           <div className="dg-card-title flex items-center gap-2">
             <ChartPie className="h-4 w-4 text-[var(--dg-color-text-muted)]" aria-hidden />
-            What they work
+            {title}
           </div>
           <div className="dg-card-subtitle">
             {total > 0
@@ -105,9 +110,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
 
       <div className="dg-card-body">
         {total === 0 ? (
-          <p className="py-6 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            No shifts {periodPhrase}.
-          </p>
+          <EmptyState size="inline" title={`No shifts ${periodPhrase}`} />
         ) : asTable ? (
           <table className="w-full text-[13px]">
             <thead>
@@ -124,6 +127,12 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
                   <td className="py-2 pr-2">
                     <div className="font-medium text-[var(--dg-color-text-primary)]">
                       {item.shiftName}
+                      {showFocusArea && item.focusAreaName ? (
+                        <span className="font-normal text-[var(--dg-color-text-muted)]">
+                          {" "}
+                          · {item.focusAreaName}
+                        </span>
+                      ) : null}
                     </div>
                     {item.time ? (
                       <div className="dg-tabular-nums text-[length:var(--dg-type-metadata-size)] text-[var(--dg-color-text-subtle)]">
@@ -147,7 +156,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
               width={SIZE}
               height={SIZE}
               role="img"
-              aria-label={`What they work ${periodPhrase}`}
+              aria-label={`${title} ${periodPhrase}`}
               className="shrink-0"
               onMouseLeave={() => setActive(null)}
             >
@@ -160,7 +169,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
                   onMouseEnter={() => setActive(item.key)}
                   className="transition-opacity duration-150"
                 >
-                  <title>{`${item.shiftName}${item.jobName ? ` as ${item.jobName}` : ""}: ${item.count} shifts, ${item.share}%`}</title>
+                  <title>{`${item.shiftName}${showFocusArea && item.focusAreaName ? ` in ${item.focusAreaName}` : ""}${item.jobName ? ` as ${item.jobName}` : ""}: ${item.count} shifts, ${item.share}%`}</title>
                 </path>
               ))}
               <text
@@ -199,6 +208,12 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
                   <span className="min-w-0">
                     <span className="block text-[13px] font-semibold text-[var(--dg-color-text-primary)]">
                       {item.shiftName}
+                      {showFocusArea && item.focusAreaName ? (
+                        <span className="font-normal text-[var(--dg-color-text-muted)]">
+                          {" "}
+                          · {item.focusAreaName}
+                        </span>
+                      ) : null}
                     </span>
                     {item.jobName ? (
                       <span className="block text-[13px] text-[var(--dg-color-text-muted)]">

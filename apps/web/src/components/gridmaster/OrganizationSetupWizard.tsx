@@ -5,6 +5,7 @@ import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Organization, AssignableOrganizationRole } from "@/types";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { SectionNotice } from "@/components/ui/SectionNotice";
@@ -1890,14 +1891,7 @@ export default function OrganizationSetupWizard({
             </div>
 
             {invitationRows.length === 0 ? (
-              <p
-                style={{
-                  color: "var(--dg-color-text-muted)",
-                  fontSize: "var(--dg-fs-label)",
-                }}
-              >
-                No employees with email addresses to invite.
-              </p>
+              <EmptyState size="compact" title="No employees with email addresses to invite." />
             ) : (
               <>
                 {/* Select all */}

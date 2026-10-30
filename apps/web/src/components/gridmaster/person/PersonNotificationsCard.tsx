@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/status-pill";
 import { fetchGridmasterPersonNotifications } from "@/features/gridmaster/client";
 import type { GridmasterPersonRecord } from "@/features/gridmaster/person-record";
@@ -87,7 +88,7 @@ export function PersonNotificationsCard({ record }: { record: GridmasterPersonRe
 
           <PersonSubheading>Recent notifications</PersonSubheading>
           {query.data.notifications.notifications.length === 0 ? (
-            <p className="text-[13px] text-[var(--dg-color-text-muted)]">No notifications.</p>
+            <EmptyState size="inline" title="No notifications." />
           ) : (
             <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">
               {query.data.notifications.notifications.map((notification) => (

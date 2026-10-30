@@ -973,7 +973,6 @@ function DepartmentSection({
         <EmptyState
           size="compact"
           title={emptyTitle}
-          style={{ border: "none", borderRadius: 0 }}
           action={
             canEdit ? (
               <Button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>

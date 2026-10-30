@@ -93,6 +93,7 @@ import { SpanTabs } from "@/components/ui/span-tabs";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { usePersonPeriod } from "@/hooks/usePersonPeriod";
 import { formatPersonPeriodPhrase } from "@/lib/person-period";
+import { formatCompactRangeLabel, resolvePeriodPreset } from "@/lib/period-presets";
 import { PersonPeriodControl } from "./PersonPeriodControl";
 import { StaffPageHeader } from "./StaffPageHeader";
 import { PersonPager } from "./PersonPager";
@@ -105,17 +106,19 @@ import { ScheduleTab } from "./tabs/ScheduleTab";
 import { buildPersonRequestRows } from "@/lib/person-requests";
 import { fetchPeopleProfileChangeRequests } from "@/features/account/client/api";
 import { ActivityTab } from "./tabs/ActivityTab";
+import { RequestsTab } from "./tabs/RequestsTab";
 import { getPersonAccountState } from "@/lib/person-account-state";
 
 interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "schedule" | "activity";
+export type StaffPageTab = "overview" | "schedule" | "requests" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
   schedule: "Schedule",
+  requests: "Requests",
   activity: "Activity",
 };
 
@@ -124,7 +127,6 @@ const LEGACY_TABS: Record<string, StaffPageTab> = {
   shifts: "schedule",
   timeoff: "schedule",
   recurring: "schedule",
-  requests: "activity",
   access: "overview",
 };
 
@@ -133,12 +135,14 @@ function tabForLegacySection(section: string): StaffPageTab {
   return section === "activity" ? "activity" : "overview";
 }
 
-const NEXT_DAYS = 7;
-
-/** Today and the six days after it, as the local dates the dashboard's strip reads. */
-function nextDayDates(today: string): Date[] {
-  const [year, month, day] = today.split("-").map(Number);
-  return Array.from({ length: NEXT_DAYS }, (_, index) => new Date(year, month - 1, day + index));
+/** Each day of a range, as the local dates the dashboard's strip reads. */
+function rangeDates(range: { startDate: string; endDate: string }): Date[] {
+  const dates: Date[] = [];
+  for (let day = range.startDate; day <= range.endDate; day = addDaysToIsoDate(day, 1)) {
+    const [year, month, date] = day.split("-").map(Number);
+    dates.push(new Date(year, month - 1, date));
+  }
+  return dates;
 }
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
@@ -877,7 +881,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => [
       "overview",
       "schedule",
-      ...(canViewActivity || canReviewRequests ? (["activity"] as const) : []),
+      ...(canReviewRequests ? (["requests"] as const) : []),
+      ...(canViewActivity ? (["activity"] as const) : []),
     ],
     [canReviewRequests, canViewActivity],
   );
@@ -924,10 +929,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   });
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
-  const upcomingEnd = useMemo(() => addDaysToIsoDate(today, NEXT_DAYS - 1), [today]);
+  // Overview's strip shows the current pay period when that's the period,
+  // and the current week otherwise.
+  const stripIsPayPeriod = period.preset === "pay-period" && !period.payPeriodUnset;
+  const stripRange = useMemo(
+    () => (stripIsPayPeriod ? period.range : resolvePeriodPreset("current-week", null)!),
+    [period.range, stripIsPayPeriod],
+  );
   const upcomingShiftsQuery = useQuery<ShiftMap>({
     queryKey: orgId
-      ? [...queryKeys.shifts.all(orgId), "employee", employeeId, today, upcomingEnd]
+      ? [
+          ...queryKeys.shifts.all(orgId),
+          "employee",
+          employeeId,
+          stripRange.startDate,
+          stripRange.endDate,
+        ]
       : ["shifts", "anon", "employee", employeeId, "upcoming"],
     queryFn: () =>
       fetchEmployeeShifts(
@@ -935,19 +952,19 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         orgId!,
         assignmentLabelMapRef.current,
         absenceTypeMapRef.current,
-        today,
-        upcomingEnd,
+        stripRange.startDate,
+        stripRange.endDate,
       ),
     enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
   });
-  const nextDates = useMemo(() => nextDayDates(today), [today]);
+  const stripDates = useMemo(() => rangeDates(stripRange), [stripRange]);
   const shiftRequestsQuery = useQuery({
     queryKey: orgId
       ? [...queryKeys.shiftRequests.all(orgId), "employee", employeeId]
       : ["shiftRequests", "anon", "employee", employeeId],
     queryFn: () => fetchShiftRequests(orgId!, assignmentLabelMapRef.current, { empId: employeeId }),
     enabled:
-      Boolean(orgId) && canReviewRequests && (activeTab === "activity" || activeTab === "overview"),
+      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "overview"),
   });
   const canSeeProfileRequests = Boolean(
     perms.isGridmaster || perms.isSuperAdmin || perms.canManageEmployees,
@@ -960,7 +977,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     enabled:
       Boolean(orgId) &&
       canSeeProfileRequests &&
-      (activeTab === "activity" || activeTab === "overview"),
+      (activeTab === "requests" || activeTab === "overview"),
   });
   const requestRows = useMemo(() => {
     if (!shiftRequestsQuery.data) return undefined;
@@ -1416,7 +1433,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     items={availableTabs.map((tab) => ({
                       value: tab,
                       label: TAB_LABELS[tab],
-                      count: tab === "activity" ? waitingRequests?.length : undefined,
+                      count: tab === "requests" ? waitingRequests?.length : undefined,
                     }))}
                     value={activeTab}
                     onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
@@ -1444,9 +1461,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     focusAreas={focusAreas}
                     nextDays={
                       showScheduleDetails && upcomingShiftsQuery.data
-                        ? { dates: nextDates, shifts: upcomingShiftsQuery.data }
+                        ? { dates: stripDates, shifts: upcomingShiftsQuery.data }
                         : null
                     }
+                    nextDaysCopy={{
+                      title: stripIsPayPeriod ? "This pay period" : "This week",
+                      periodLabel: formatCompactRangeLabel(stripRange),
+                      emptyTitle: `${employee.firstName} isn't scheduled ${stripIsPayPeriod ? "this pay period" : "this week"}`,
+                      emptyDescription: "Shifts show up here once they're on the schedule.",
+                      editorView: true,
+                    }}
                     waitingRequests={waitingRequests}
                     about={
                       <div className="flex flex-col gap-4">
@@ -1502,7 +1526,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     noteCounts={noteCountsByDate}
                     absenceTypes={absenceTypes}
                     dayOffAbsenceTypeId={dayOffAbsenceTypeId}
-                    usualWeek={
+                    asCalendar={period.preset === "this-month"}
+                    recurringSchedule={
                       perms.canViewRecurringShifts && orgId && showScheduleDetails
                         ? {
                             orgId,
@@ -1517,37 +1542,35 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     }
                   />
                 )}
+                {activeTab === "requests" && (
+                  <RequestsTab
+                    rows={requestRows}
+                    loading={shiftRequestsQuery.isPending}
+                    error={
+                      shiftRequestsQuery.error
+                        ? formatClientErrorMessage(
+                            shiftRequestsQuery.error,
+                            "We couldn't load their requests right now.",
+                          )
+                        : null
+                    }
+                    range={period.range}
+                    periodPhrase={periodRange.phrase}
+                  />
+                )}
                 {activeTab === "activity" && (
                   <ActivityTab
                     employee={employee}
-                    range={periodRange}
+                    entries={activityQuery.data ?? []}
                     timeZone={org?.timezone ?? null}
-                    requests={
-                      canReviewRequests
-                        ? {
-                            rows: requestRows,
-                            loading: shiftRequestsQuery.isPending,
-                            error: shiftRequestsQuery.error
-                              ? formatClientErrorMessage(
-                                  shiftRequestsQuery.error,
-                                  "We couldn't load their requests right now.",
-                                )
-                              : null,
-                          }
-                        : null
-                    }
-                    changes={
-                      canViewActivity
-                        ? {
-                            entries: activityQuery.data ?? [],
-                            loading: activityQuery.isPending,
-                            error: activityQuery.error
-                              ? formatClientErrorMessage(
-                                  activityQuery.error,
-                                  "We couldn't load activity right now.",
-                                )
-                              : null,
-                          }
+                    range={periodRange}
+                    loading={activityQuery.isPending}
+                    error={
+                      activityQuery.error
+                        ? formatClientErrorMessage(
+                            activityQuery.error,
+                            "We couldn't load activity right now.",
+                          )
                         : null
                     }
                   />

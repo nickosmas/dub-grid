@@ -10,6 +10,7 @@ const MIX: WorkMixEntry[] = [
     key: "10:100",
     shiftName: "Day Shift",
     jobName: "Day Shift Supervisor",
+    focusAreaName: "Skilled Nursing",
     time: "7:00 AM - 3:00 PM",
     count: 39,
     share: 83,
@@ -18,6 +19,7 @@ const MIX: WorkMixEntry[] = [
     key: "11:101",
     shiftName: "Evening Shift",
     jobName: "Charge Nurse",
+    focusAreaName: "Skilled Nursing",
     time: "3:00 PM - 11:00 PM",
     count: 8,
     share: 17,
@@ -25,6 +27,21 @@ const MIX: WorkMixEntry[] = [
 ];
 
 describe("WorkMixCard", () => {
+  it("names the focus area only once the shifts come from more than one", () => {
+    const { unmount } = render(<WorkMixCard mix={MIX} periodPhrase="in the last 12 weeks" />);
+    expect(screen.queryByText(/Skilled Nursing/)).toBeNull();
+    unmount();
+
+    render(
+      <WorkMixCard
+        mix={[MIX[0], { ...MIX[1], shiftName: "Day Shift", focusAreaName: "Sheltered Care" }]}
+        periodPhrase="in the last 12 weeks"
+      />,
+    );
+    expect(screen.getAllByText(/Skilled Nursing/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sheltered Care/).length).toBeGreaterThan(0);
+  });
+
   it("spells out each shift, job and time with its share", () => {
     render(<WorkMixCard mix={MIX} periodPhrase="in the last 12 weeks" />);
 
@@ -67,7 +84,7 @@ describe("WorkMixCard", () => {
   it("says so when there are no shifts in the period", () => {
     render(<WorkMixCard mix={[]} periodPhrase="this week" />);
 
-    expect(screen.getByText("No shifts this week.")).toBeInTheDocument();
+    expect(screen.getByText("No shifts this week")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show as table" })).not.toBeInTheDocument();
   });
 });

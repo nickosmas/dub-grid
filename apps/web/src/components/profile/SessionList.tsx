@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/EmptyState";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -328,22 +329,12 @@ export function SessionList({
     revokeMutation.mutate(session);
   }
 
-  const emptyStateBoxStyle = {
-    padding: "24px 16px",
-    textAlign: "center" as const,
-    color: "var(--dg-color-text-muted)",
-    fontSize: "var(--dg-fs-label)",
-    borderRadius: "var(--dg-radius-md)",
-    border: "1px solid var(--dg-color-border-light)",
-    background: "var(--dg-color-surface)",
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {stepUp.dialog}
-      {loading && <div style={emptyStateBoxStyle}>Loading sessions...</div>}
+      {loading && <EmptyState size="inline" title="Loading sessions..." />}
       {!loading && active.length === 0 && stale.length === 0 && (
-        <div style={emptyStateBoxStyle}>No active sessions</div>
+        <EmptyState size="inline" title="No active sessions" />
       )}
       {!loading && active.length > 0 && (
         <div

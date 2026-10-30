@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
 import { StatusPill } from "@/components/ui/status-pill";
-import { SpanTabs } from "@/components/ui/span-tabs";
+import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 import { describePreference, shiftLabel } from "@/components/staff/PreferencesModal";
 import { fetchJobPreferences, fetchShiftPreferences } from "@/features/schedule/client";
 import { DAY_LABELS } from "@/lib/constants";
@@ -27,6 +28,7 @@ import type {
   ShiftMap,
 } from "@/types";
 import { buildDayPills, type DayPill } from "../RecurringScheduleCard";
+import { PersonMonthCalendar } from "../PersonMonthCalendar";
 
 type Filter = "all" | "shift" | "timeoff";
 
@@ -43,9 +45,16 @@ interface ScheduleTabProps {
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;
+  /** Shows the period as a month calendar instead of the list, for a month period. */
+  asCalendar?: boolean;
+  /** Shown between the recurring schedule and the list, such as the calendar subscription. */
+  afterRecurringSchedule?: ReactNode;
   /** Null when this viewer can't see recurring schedules. */
-  usualWeek: {
-    orgId: string;
+  recurringSchedule: {
+    /** Loads their shift and job preferences; null leaves them out. */
+    orgId: string | null;
+    /** Where the pattern is changed; null when this viewer can't change it. */
+    editHref?: string | null;
     recurringShifts: RecurringShift[];
     assignments: AssignmentDefinition[];
     shiftCategories: ShiftCategory[];
@@ -55,7 +64,7 @@ interface ScheduleTabProps {
   } | null;
 }
 
-/** Their usual week, then every shift and time off in the period. */
+/** Their recurring schedule, then every shift and time off in the period. */
 export function ScheduleTab({
   employee,
   shifts,
@@ -68,7 +77,9 @@ export function ScheduleTab({
   noteCounts,
   absenceTypes,
   dayOffAbsenceTypeId,
-  usualWeek,
+  recurringSchedule,
+  afterRecurringSchedule,
+  asCalendar = false,
 }: ScheduleTabProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [includeDayOff, setIncludeDayOff] = useState(false);
@@ -115,7 +126,10 @@ export function ScheduleTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {usualWeek ? <UsualWeekCard employeeId={employee.id} {...usualWeek} /> : null}
+      {recurringSchedule ? (
+        <RecurringWeekCard employeeId={employee.id} {...recurringSchedule} />
+      ) : null}
+      {afterRecurringSchedule}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -130,17 +144,19 @@ export function ScheduleTab({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SpanTabs<Filter>
-            aria-label="Show"
-            items={[
-              { value: "all", label: "All" },
-              { value: "shift", label: "Shifts" },
-              { value: "timeoff", label: "Time off" },
-            ]}
-            value={filter}
-            onChange={setFilter}
-          />
-          {dayOffName && filter !== "shift" ? (
+          {asCalendar ? null : (
+            <CustomSelect<Filter>
+              ariaLabel="Show"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: "all", label: "Shifts and time off" },
+                { value: "shift", label: "Shifts only" },
+                { value: "timeoff", label: "Time off only" },
+              ]}
+            />
+          )}
+          {dayOffName && filter !== "shift" && !asCalendar ? (
             <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -161,17 +177,21 @@ export function ScheduleTab({
         </div>
       </div>
 
-      <section className="dg-card overflow-hidden" aria-label="Shifts and time off">
-        {loading ? (
-          <p className="m-0 px-5 py-8 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            Loading their schedule
-          </p>
-        ) : weeks.length === 0 ? (
-          <p className="m-0 px-5 py-8 text-center text-[13px] text-[var(--dg-color-text-muted)]">
-            Nothing {periodPhrase}.
-          </p>
-        ) : (
-          weeks.map((week, weekIndex) => (
+      {loading ? (
+        <EmptyState size="compact" title="Loading their schedule" />
+      ) : asCalendar ? (
+        <PersonMonthCalendar
+          employeeId={employee.id}
+          shifts={shifts}
+          range={range}
+          today={today}
+          lookups={lookups}
+        />
+      ) : weeks.length === 0 ? (
+        <EmptyState size="compact" title={`Nothing ${periodPhrase}`} />
+      ) : (
+        <section className="dg-card overflow-hidden" aria-label="Shifts and time off">
+          {weeks.map((week, weekIndex) => (
             <div key={week.weekStart}>
               <div
                 className={`bg-[var(--dg-color-bg-secondary)] px-5 pb-2 pt-3 text-[13px] font-semibold text-[var(--dg-color-text-secondary)] ${weekIndex > 0 ? "border-t border-[var(--dg-color-border)]" : ""}`}
@@ -208,15 +228,16 @@ export function ScheduleTab({
                 </div>
               ))}
             </div>
-          ))
-        )}
-      </section>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
 
-function UsualWeekCard({
+function RecurringWeekCard({
   orgId,
+  editHref = "/people?section=recurring-schedule",
   employeeId,
   recurringShifts,
   assignments,
@@ -224,7 +245,7 @@ function UsualWeekCard({
   jobs,
   focusAreas,
   absenceTypes,
-}: NonNullable<ScheduleTabProps["usualWeek"]> & { employeeId: string }) {
+}: NonNullable<ScheduleTabProps["recurringSchedule"]> & { employeeId: string }) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   const lookups = useMemo(
@@ -237,12 +258,14 @@ function UsualWeekCard({
     [absenceTypes, assignments, jobs, shiftCategories],
   );
   const shiftPreferenceQuery = useQuery({
-    queryKey: [...queryKeys.recurringShifts.preferences(orgId), employeeId],
-    queryFn: () => fetchShiftPreferences(orgId, employeeId),
+    queryKey: [...queryKeys.recurringShifts.preferences(orgId ?? "none"), employeeId],
+    queryFn: () => fetchShiftPreferences(orgId!, employeeId),
+    enabled: Boolean(orgId),
   });
   const jobPreferenceQuery = useQuery({
-    queryKey: [...queryKeys.recurringShifts.jobPreferences(orgId), employeeId],
-    queryFn: () => fetchJobPreferences(orgId, employeeId),
+    queryKey: [...queryKeys.recurringShifts.jobPreferences(orgId ?? "none"), employeeId],
+    queryFn: () => fetchJobPreferences(orgId!, employeeId),
+    enabled: Boolean(orgId),
   });
   const shiftName = useMemo(() => {
     const byId = new Map(shiftCategories.map((shift) => [shift.id, shift]));
@@ -270,21 +293,21 @@ function UsualWeekCard({
     .map((shift) => `${DAY_LABELS[shift.dayOfWeek]} until ${shift.effectiveUntil}`);
 
   return (
-    <section className="dg-card" aria-label="Usual week">
+    <section className="dg-card" aria-label="Recurring schedule">
       <div className="dg-card-header">
-        <div className="dg-card-title">Usual week</div>
-        <Link
-          href="/people?section=recurring-schedule"
-          className="text-[13px] font-semibold text-[var(--dg-color-link)] no-underline hover:underline"
-        >
-          Edit on Recurring Shifts
-        </Link>
+        <div className="dg-card-title">Recurring schedule</div>
+        {editHref ? (
+          <Link
+            href={editHref}
+            className="text-[13px] font-semibold text-[var(--dg-color-link)] no-underline hover:underline"
+          >
+            Edit on Recurring Shifts
+          </Link>
+        ) : null}
       </div>
       <div className="dg-card-body">
         {recurringShifts.length === 0 ? (
-          <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
-            No recurring shifts yet.
-          </p>
+          <EmptyState size="inline" title="No recurring shifts yet" />
         ) : (
           <div className="dg-no-scrollbar overflow-x-auto">
             <div className="grid min-w-[700px] grid-cols-7 gap-2.5">
@@ -327,7 +350,7 @@ function UsualWeekCard({
   );
 }
 
-/** The dashboard's Your schedule card, for a day of the usual week. */
+/** The dashboard's Your schedule card, for a day of the recurring schedule. */
 function WeekPill({ pill }: { pill: DayPill }) {
   return (
     <div
