@@ -2,6 +2,7 @@
 
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { MAX_EMPLOYEE_BATCH } from "../insert-limit";
 import {
   changedElsewhereMessage,
   parseFocusAreaShiftsQuestion,
@@ -221,6 +222,36 @@ export function insertEmployee(employee: Omit<Employee, "id">, orgId: string): P
     orgId,
     employee,
   }).then((data) => data.employee);
+}
+
+export interface InsertEmployeesResult {
+  /** Everyone added, in the order sent. */
+  employees: Employee[];
+  /** Rows that weren't added, by their position in the list sent. */
+  failed: Array<{ index: number; error: string }>;
+}
+
+/**
+ * Adds several people in one request (more only past the batch limit). The
+ * server places them after everyone else in seniority, in the order sent.
+ */
+export async function insertEmployees(
+  employees: Array<Omit<Employee, "id" | "seniority">>,
+  orgId: string,
+): Promise<InsertEmployeesResult> {
+  const result: InsertEmployeesResult = { employees: [], failed: [] };
+  for (let start = 0; start < employees.length; start += MAX_EMPLOYEE_BATCH) {
+    const body = await requestEmployeeAction<InsertEmployeesResult>({
+      action: "insertEmployees",
+      orgId,
+      employees: employees.slice(start, start + MAX_EMPLOYEE_BATCH),
+    });
+    result.employees.push(...body.employees);
+    result.failed.push(
+      ...body.failed.map((failure) => ({ ...failure, index: failure.index + start })),
+    );
+  }
+  return result;
 }
 
 /** The manager closed the question about their shifts, so nothing was saved. */

@@ -7,10 +7,11 @@ import {
 import {
   saveCertifications,
   saveDepartments,
+  saveFocusAreas,
+  saveJobDefinitions,
   saveOrganizationRoles,
-  upsertFocusArea,
-  upsertJobDefinition,
-  upsertShiftCategory,
+  saveShiftCategories,
+  type SettingsBatchItemResult,
 } from "@/features/settings/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { DEFAULT_PREDEFINED_COLOR_BG } from "@/lib/colors";
@@ -62,6 +63,17 @@ export async function createOrganizationSetup(
   superAdmin: SuperAdminSetupResult;
 }> {
   return createGridmasterOrganizationSetup(input, accessToken);
+}
+
+/** The saved items in order, or an error naming how many didn't save. */
+function requireAllSaved<T>(results: SettingsBatchItemResult<T>[], noun: string): T[] {
+  const saved = results.flatMap((result) => (result.ok ? [result.item] : []));
+  if (saved.length < results.length) {
+    throw new Error(
+      `We couldn't save ${results.length - saved.length} of ${results.length} ${noun}. Try again.`,
+    );
+  }
+  return saved;
 }
 
 type SaveOrganizationConfigInput = {
@@ -177,23 +189,28 @@ export async function saveOrganizationSetupConfig({
     savedCount += validDepartments.length;
   }
 
-  for (let index = 0; index < validFocusAreas.length; index += 1) {
-    const focusArea = validFocusAreas[index];
-    const departmentId =
-      (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ?? null;
-    const saved = await upsertFocusArea({
-      orgId: createdOrg.id,
-      departmentId,
-      name: normalizeLineText(focusArea.name, {
-        label: "Focus area name",
-        maxLength: 80,
-        required: true,
-        disallowUrl: true,
-      }),
-      color: null,
-      sortOrder: index,
+  if (validFocusAreas.length > 0) {
+    const { upserts } = await saveFocusAreas(
+      createdOrg.id,
+      validFocusAreas.map((focusArea, index) => ({
+        orgId: createdOrg.id,
+        departmentId:
+          (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ??
+          null,
+        name: normalizeLineText(focusArea.name, {
+          label: "Focus area name",
+          maxLength: 80,
+          required: true,
+          disallowUrl: true,
+        }),
+        color: null,
+        sortOrder: index,
+      })),
+      [],
+    );
+    requireAllSaved(upserts, "focus areas").forEach((saved, index) => {
+      focusAreaIdMap.set(validFocusAreas[index].id, saved.id);
     });
-    focusAreaIdMap.set(focusArea.id, saved.id);
   }
   savedCount += validFocusAreas.length;
 
@@ -249,76 +266,84 @@ export async function saveOrganizationSetupConfig({
     savedCount += validRoles.length;
   }
 
-  for (let index = 0; index < validCategories.length; index += 1) {
-    const category = validCategories[index];
-    const focusAreaId =
-      (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ?? null;
-    const saved = await upsertShiftCategory({
-      orgId: createdOrg.id,
-      name: normalizeLineText(category.name, {
-        label: "Shift name",
-        maxLength: 50,
-        required: true,
-        disallowUrl: true,
-      }),
-      abbr: category.name.trim().slice(0, 6).toUpperCase(),
-      startTime: category.startTime || null,
-      endTime: category.endTime || null,
-      sortOrder: index,
-      color: DEFAULT_PREDEFINED_COLOR_BG,
-      focusAreaId,
-      breakMinutes: null,
+  if (validCategories.length > 0) {
+    const results = await saveShiftCategories(
+      createdOrg.id,
+      validCategories.map((category, index) => ({
+        orgId: createdOrg.id,
+        name: normalizeLineText(category.name, {
+          label: "Shift name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        }),
+        abbr: category.name.trim().slice(0, 6).toUpperCase(),
+        startTime: category.startTime || null,
+        endTime: category.endTime || null,
+        sortOrder: index,
+        color: DEFAULT_PREDEFINED_COLOR_BG,
+        focusAreaId:
+          (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ?? null,
+        breakMinutes: null,
+      })),
+    );
+    requireAllSaved(results, "shifts").forEach((saved, index) => {
+      shiftCategoryIdMap.set(validCategories[index].id, saved.id);
     });
-    shiftCategoryIdMap.set(category.id, saved.id);
   }
   savedCount += validCategories.length;
 
-  for (let index = 0; index < validJobs.length; index += 1) {
-    const job = validJobs[index];
-    const departmentIds = job.departmentIds
-      .map((id) => departmentIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    const focusAreaIds = job.focusAreaIds
-      .map((id) => focusAreaIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    const applicableShiftIds = job.shiftCategoryIds
-      .map((id) => shiftCategoryIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    await upsertJobDefinition({
-      orgId: createdOrg.id,
-      name: normalizeLineText(job.name.trim() || job.label.trim(), {
-        label: "Job name",
-        maxLength: 50,
-        required: true,
-        disallowUrl: true,
-      }),
-      abbr: job.label.trim()
-        ? normalizeCode(job.label, {
-            label: "Job abbreviation",
-            maxLength: 6,
+  if (validJobs.length > 0) {
+    const results = await saveJobDefinitions(
+      createdOrg.id,
+      validJobs.map((job, index) => {
+        const departmentIds = job.departmentIds
+          .map((id) => departmentIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        const focusAreaIds = job.focusAreaIds
+          .map((id) => focusAreaIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        const applicableShiftIds = job.shiftCategoryIds
+          .map((id) => shiftCategoryIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        return {
+          orgId: createdOrg.id,
+          name: normalizeLineText(job.name.trim() || job.label.trim(), {
+            label: "Job name",
+            maxLength: 50,
             required: true,
-            uppercase: true,
-          })
-        : job.name.trim().slice(0, 4).toUpperCase(),
-      showOnGrid: true,
-      assignmentMode: "with_shift",
-      eligibilityMode: "and",
-      focusAreaIds,
-      departmentIds,
-      applicableShiftIds,
-      eligibleRoleIds: [],
-      requiredCertificationIds: [],
-      color: "",
-      border: "",
-      text: "",
-      shiftTimeOverrides: {},
-      shiftColorOverrides: {},
-      sortOrder: index,
-      defaultStartTime: null,
-      defaultEndTime: null,
-      defaultDurationHours: null,
-      defaultDurationMinutes: null,
-    });
+            disallowUrl: true,
+          }),
+          abbr: job.label.trim()
+            ? normalizeCode(job.label, {
+                label: "Job abbreviation",
+                maxLength: 6,
+                required: true,
+                uppercase: true,
+              })
+            : job.name.trim().slice(0, 4).toUpperCase(),
+          showOnGrid: true,
+          assignmentMode: "with_shift",
+          eligibilityMode: "and",
+          focusAreaIds,
+          departmentIds,
+          applicableShiftIds,
+          eligibleRoleIds: [],
+          requiredCertificationIds: [],
+          color: "",
+          border: "",
+          text: "",
+          shiftTimeOverrides: {},
+          shiftColorOverrides: {},
+          sortOrder: index,
+          defaultStartTime: null,
+          defaultEndTime: null,
+          defaultDurationHours: null,
+          defaultDurationMinutes: null,
+        };
+      }),
+    );
+    requireAllSaved(results, "jobs");
   }
   savedCount += validJobs.length;
 

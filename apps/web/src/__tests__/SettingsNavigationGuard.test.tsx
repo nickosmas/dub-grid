@@ -18,10 +18,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/features/settings/client", () => ({
-  saveCoverageRequirements: vi.fn(),
+  saveCoverageRequirementsBatch: vi.fn(),
   saveDepartments: vi.fn(),
-  upsertFocusArea: vi.fn(),
-  deleteFocusArea: vi.fn(),
+  saveFocusAreas: vi.fn(),
   checkDepartmentDependencies: vi.fn(),
   checkFocusAreaDependencies: vi.fn(),
 }));

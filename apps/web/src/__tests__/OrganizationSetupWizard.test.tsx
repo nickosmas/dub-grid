@@ -17,12 +17,12 @@ vi.mock("@/features/employees/client", () => ({
 }));
 
 vi.mock("@/features/settings/client", () => ({
-  upsertFocusArea: vi.fn(),
+  saveFocusAreas: vi.fn(),
   saveCertifications: vi.fn(),
   saveOrganizationRoles: vi.fn(),
   saveDepartments: vi.fn(),
-  upsertShiftCategory: vi.fn(),
-  upsertJobDefinition: vi.fn(),
+  saveShiftCategories: vi.fn(),
+  saveJobDefinitions: vi.fn(),
 }));
 
 vi.mock("@/features/organization/client", () => ({

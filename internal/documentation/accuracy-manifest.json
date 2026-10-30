@@ -1006,7 +1006,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6ac3e1cbbe1cce584f7aacafa1395e88692d95d96610bac7f587bcf7cd11f42f"
+      "evidenceFingerprint": "sha256:052b70ff3adbafcbd7fb4e95b2fb7391eca0ee9111ecf1b86357db25689836bc"
     },
     {
       "id": "terminology",
@@ -1055,7 +1055,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d3bf9a4b5196fc8d07778211fe31ccf10fbd0bf82d83fdc9102a2b101b3e0d88"
+      "evidenceFingerprint": "sha256:fa3eed39d96e009ab032c425c74d3b7f795ec2da5e01ca60357fd428a307702d"
     },
     {
       "id": "roles",
@@ -1849,7 +1849,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:10d7411b2bf81602f07c588f1243cb1e49aefe98d7bf1008908c915ac34887ad"
+      "evidenceFingerprint": "sha256:98634c6d5b783998495e629bc328d2a8deed13a9d481989c3c6020ba42c277d0"
     },
     {
       "id": "shifts-jobs-absences",
