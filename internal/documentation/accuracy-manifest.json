@@ -785,14 +785,14 @@
           "claims": [
             "person page needs view-details permission; one page with Back to People",
             "header contents: name, access star, status icon, roles, focus areas and employment, email and phone, Send invitation, Add to schedule or management, Edit details; previous and next person in the People list's order",
-            "status card under the header; Overview About: Work and Access cards, Edit opens the details or the access popup, account states, last active, and the record line",
+            "status card under the header; Overview About: Work, Access and Record cards; Edit details in the header edits the details, Change access and the management Edit sit on the Access card; account states, last active, and the Record card",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
             "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Schedule tab: recurring schedule with preferences, then shifts and time off grouped by week, or a month calendar with drafts outlined when the period is This month, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
+            "Schedule tab: recurring schedule with preferences, then shifts and time off as a month calendar first for every period (the period's days stand out, the rest of the month dimmed) or as a list grouped by week from Show as list, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
             "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, the filter dropdown and the waiting count",
             "Activity tab: the change log for the period, filtered by kind from its dropdown"
           ],
@@ -836,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c023aefe8c0a2c44cec9cae1190aca03484033ae8dccd1bab205998c958ee09c"
+      "evidenceFingerprint": "sha256:511a1e77c41168aca8bac769276b1ad078cd2193665ed9bd8e3cbb8671a36911"
     },
     {
       "id": "invitations",
@@ -1497,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ccc41d1ca3abaada509a30ba11f69cadba2ece9b8b0f196a3bb28d9683e2504b"
+      "evidenceFingerprint": "sha256:1ff85d39f1a10f00a8cf0c9c3dcd232395bb0603c734eb38d913bae69dd365c2"
     },
     {
       "id": "security-sessions",

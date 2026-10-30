@@ -21,7 +21,7 @@ import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
 import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard";
-import { AccessCard, RecordLine, WorkCard } from "@/components/staff-detail/PersonInfoCards";
+import { AccessCard, RecordCard, WorkCard } from "@/components/staff-detail/PersonInfoCards";
 import { StaffOverviewTab } from "@/components/staff-detail/tabs/StaffOverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
 import { CalendarSubscriptionCard } from "./CalendarSubscriptionCard";
@@ -261,7 +261,7 @@ export function ProfilePage() {
                 mixTitle="What you work"
                 about={
                   <div className="flex flex-col gap-4">
-                    <div className="grid items-start gap-4 lg:grid-cols-2">
+                    <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
                       <WorkCard
                         employee={employee}
                         focusAreas={focusAreas}
@@ -271,7 +271,6 @@ export function ProfilePage() {
                         certificationLabel={org?.certificationLabel}
                         roleLabel={org?.roleLabel}
                         showScheduleDetails={isOnSchedule}
-                        onEdit={() => openTab("account", "details")}
                       />
                       <AccessCard
                         orgRole={orgRole}
@@ -279,8 +278,8 @@ export function ProfilePage() {
                         managedDepartments={managed.length > 0 ? managed : null}
                         accountState={{ kind: "linked" }}
                       />
+                      <RecordCard employee={employee} />
                     </div>
-                    <RecordLine employee={employee} />
                   </div>
                 }
               />

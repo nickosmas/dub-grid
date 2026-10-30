@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
@@ -45,8 +45,8 @@ interface ScheduleTabProps {
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;
-  /** Shows the period as a month calendar instead of the list, for a month period. */
-  asCalendar?: boolean;
+  /** Lets the month grid load its whole month, not only the period's days. */
+  loadMonth?: ComponentProps<typeof PersonMonthCalendar>["loadMonth"];
   /** Shown between the recurring schedule and the list, such as the calendar subscription. */
   afterRecurringSchedule?: ReactNode;
   /** Null when this viewer can't see recurring schedules. */
@@ -79,8 +79,11 @@ export function ScheduleTab({
   dayOffAbsenceTypeId,
   recurringSchedule,
   afterRecurringSchedule,
-  asCalendar = false,
+  loadMonth,
 }: ScheduleTabProps) {
+  // The month grid comes first for every period; the list is a click away.
+  const [asList, setAsList] = useState(false);
+  const asCalendar = !asList;
   const [filter, setFilter] = useState<Filter>("all");
   const [includeDayOff, setIncludeDayOff] = useState(false);
   const absenceById = lookups.absenceById;
@@ -169,6 +172,14 @@ export function ScheduleTab({
           <Button
             type="button"
             className="dg-btn dg-btn-secondary dg-btn-sm"
+            aria-pressed={asList}
+            onClick={() => setAsList((value) => !value)}
+          >
+            {asList ? "Show as calendar" : "Show as list"}
+          </Button>
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary dg-btn-sm"
             onClick={exportCsv}
             disabled={records.length === 0}
           >
@@ -186,6 +197,7 @@ export function ScheduleTab({
           range={range}
           today={today}
           lookups={lookups}
+          loadMonth={loadMonth}
         />
       ) : weeks.length === 0 ? (
         <EmptyState size="compact" title={`Nothing ${periodPhrase}`} />

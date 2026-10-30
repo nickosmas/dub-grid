@@ -246,7 +246,7 @@ function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): Director
 }
 
 async function openDetailsEditor() {
-  fireEvent.click(await screen.findByRole("button", { name: "Edit work details" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Edit details" }));
   return screen.findByRole("dialog", { name: "Edit details" });
 }
 
@@ -585,24 +585,17 @@ describe("StaffDetailPage", () => {
     expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
   });
 
-  it("shows the Schedule tab as a month calendar only for This month", async () => {
-    localStorage.setItem("dg-person-period", JSON.stringify({ preset: "this-month" }));
+  it("opens the Schedule tab on the month grid for every period, with the list a click away", async () => {
     mockSearchParams = new URLSearchParams("tab=schedule");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByRole("region", { name: "Calendar" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Shifts and time off" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show" })).toBeNull();
-  });
 
-  it("keeps the list, without a calendar, for every other period", async () => {
-    mockSearchParams = new URLSearchParams("tab=schedule");
-
-    render(<StaffDetailPage employeeId="emp-1" />);
-
-    await screen.findByRole("heading", { name: "Shifts and time off" });
+    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
     expect(screen.queryByRole("region", { name: "Calendar" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show as calendar" })).toBeInTheDocument();
   });
 
   it("shows their recurring schedule on the Schedule tab when permitted", async () => {
@@ -814,9 +807,9 @@ describe("StaffDetailPage", () => {
     // Not a management user, so what they manage stays away entirely.
     expect(screen.queryByText("Manages")).not.toBeInTheDocument();
 
-    // The role and permissions open in a popup.
-    fireEvent.click(screen.getByRole("button", { name: "Edit access" }));
-    const dialog = await screen.findByRole("dialog", { name: "Edit access" });
+    // The role and permissions open in their own popup, apart from Edit details.
+    fireEvent.click(screen.getByRole("button", { name: "Change access" }));
+    const dialog = await screen.findByRole("dialog", { name: "Change access" });
     expect(within(dialog).getByText("Role")).toBeInTheDocument();
   });
 
@@ -982,7 +975,7 @@ describe("StaffDetailPage", () => {
     // canViewEmployeeDetails can be granted without canManageEmployees (a
     // per-person admin permission bit) — that viewer must see the read-only
     // summary, never the live editable form.
-    expect(screen.queryByRole("button", { name: "Edit work details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
     expect(screen.getByText("Focus Areas")).toBeInTheDocument();
   });

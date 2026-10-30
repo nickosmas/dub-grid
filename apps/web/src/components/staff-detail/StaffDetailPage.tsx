@@ -98,7 +98,7 @@ import { PersonPeriodControl } from "./PersonPeriodControl";
 import { StaffPageHeader } from "./StaffPageHeader";
 import { PersonPager } from "./PersonPager";
 import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
-import { AccessCard, RecordLine, WorkCard } from "./PersonInfoCards";
+import { AccessCard, RecordCard, WorkCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
@@ -1474,7 +1474,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     waitingRequests={waitingRequests}
                     about={
                       <div className="flex flex-col gap-4">
-                        <div className="grid items-start gap-4 lg:grid-cols-2">
+                        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
                           <WorkCard
                             employee={employee}
                             focusAreas={focusAreas}
@@ -1484,7 +1484,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             certificationLabel={org?.certificationLabel}
                             roleLabel={org?.roleLabel}
                             showScheduleDetails={showScheduleDetails}
-                            onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
                           />
                           <AccessCard
                             orgRole={effectiveOrgRole}
@@ -1507,8 +1506,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               canSendInvitation ? () => setShowInviteModal(true) : undefined
                             }
                           />
+                          <RecordCard employee={employee} />
                         </div>
-                        <RecordLine employee={employee} />
                       </div>
                     }
                   />
@@ -1526,7 +1525,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     noteCounts={noteCountsByDate}
                     absenceTypes={absenceTypes}
                     dayOffAbsenceTypeId={dayOffAbsenceTypeId}
-                    asCalendar={period.preset === "this-month"}
+                    loadMonth={
+                      orgId
+                        ? {
+                            key: [...queryKeys.shifts.all(orgId), "employee", employeeId, "month"],
+                            load: (startDate, endDate) =>
+                              fetchEmployeeShifts(
+                                employeeId,
+                                orgId,
+                                assignmentLabelMapRef.current,
+                                absenceTypeMapRef.current,
+                                startDate,
+                                endDate,
+                              ),
+                          }
+                        : undefined
+                    }
                     recurringSchedule={
                       perms.canViewRecurringShifts && orgId && showScheduleDetails
                         ? {
@@ -1639,7 +1653,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
       {isEditingAccess && employee && effectiveOrgRole && (
         <Modal
-          title="Edit access"
+          title="Change access"
           onClose={() => setIsEditingAccess(false)}
           className="dg-modal--tight-header"
           style={{ maxWidth: 520, width: "100%" }}
