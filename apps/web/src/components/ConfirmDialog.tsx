@@ -111,7 +111,7 @@ export default function ConfirmDialog({
   // choice is the one a stray Enter takes.
   const cancelRef = useRef<HTMLButtonElement>(null);
   const actionDisabled = confirmBusy || secondaryBusy;
-  const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
+  const cancelButtonStyle = wrapActions ? { minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
     ? {
         ...confirmStyle,
