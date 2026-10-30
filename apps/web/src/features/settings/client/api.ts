@@ -221,14 +221,56 @@ export async function fetchFocusAreas(
   return body.items;
 }
 
-export async function upsertFocusArea(
-  focusArea: Omit<FocusArea, "id"> & { id?: number },
-): Promise<FocusArea> {
-  const body = await postSettingsAction<{ item: FocusArea }>(
-    { action: "upsertFocusArea", focusArea },
-    "We couldn't save focus area. Try again.",
-  );
-  return body.item;
+/** One item of a batch save: saved, or the reason it wasn't. */
+export type SettingsBatchItemResult<T> = { ok: true; item: T } | { ok: false; error: string };
+
+/** The server accepts at most this many items per batch request. */
+export const SETTINGS_BATCH_LIMIT = 200;
+
+function chunkForBatch<T>(items: T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < items.length; start += SETTINGS_BATCH_LIMIT) {
+    chunks.push(items.slice(start, start + SETTINGS_BATCH_LIMIT));
+  }
+  return chunks;
+}
+
+export interface FocusAreaRemoval {
+  itemId: number;
+  /** Delete outright when nothing refers to it; otherwise it is archived. */
+  hard?: boolean;
+}
+
+export interface SaveFocusAreasResult {
+  /** In the order sent. */
+  upserts: SettingsBatchItemResult<FocusArea>[];
+  deletes: Array<{ itemId: number; ok: boolean }>;
+}
+
+/** Saves and removes focus areas in one request (more only past the batch limit). */
+export async function saveFocusAreas(
+  orgId: string,
+  upserts: Array<Omit<FocusArea, "id"> & { id?: number }>,
+  deletes: FocusAreaRemoval[],
+): Promise<SaveFocusAreasResult> {
+  const result: SaveFocusAreasResult = { upserts: [], deletes: [] };
+  // Past the limit, every removal still goes before any save, as in one request.
+  const requests: Array<{ upserts: typeof upserts; deletes: FocusAreaRemoval[] }> =
+    upserts.length <= SETTINGS_BATCH_LIMIT && deletes.length <= SETTINGS_BATCH_LIMIT
+      ? [{ upserts, deletes }]
+      : [
+          ...chunkForBatch(deletes).map((chunk) => ({ upserts: [], deletes: chunk })),
+          ...chunkForBatch(upserts).map((chunk) => ({ upserts: chunk, deletes: [] })),
+        ];
+  for (const request of requests) {
+    const body = await postSettingsAction<SaveFocusAreasResult>(
+      { action: "saveFocusAreas", orgId, ...request },
+      "We couldn't save focus areas. Try again.",
+    );
+    result.upserts.push(...body.upserts);
+    result.deletes.push(...body.deletes);
+  }
+  return result;
 }
 
 export function checkFocusAreaDependencies(
@@ -241,17 +283,6 @@ export function checkFocusAreaDependencies(
       itemId: String(focusAreaId),
     }),
     { errorMessage: "We couldn't check focus area dependencies. Try again." },
-  );
-}
-
-export function deleteFocusArea(
-  focusAreaId: number,
-  orgId: string,
-  hard = false,
-): Promise<{ success: true }> {
-  return postSettingsAction<{ success: true }>(
-    { action: "deleteFocusArea", orgId, itemId: focusAreaId, hard },
-    "We couldn't delete focus area. Try again.",
   );
 }
 
@@ -297,6 +328,22 @@ export async function upsertShiftCategory(
     "We couldn't save that shift. Try again.",
   );
   return body.item;
+}
+
+/** Saves several shifts in one request (more only past the batch limit). */
+export async function saveShiftCategories(
+  orgId: string,
+  items: Array<Omit<ShiftCategory, "id"> & { id?: number }>,
+): Promise<SettingsBatchItemResult<ShiftCategory>[]> {
+  const results: SettingsBatchItemResult<ShiftCategory>[] = [];
+  for (const chunk of chunkForBatch(items)) {
+    const body = await postSettingsAction<{ results: SettingsBatchItemResult<ShiftCategory>[] }>(
+      { action: "saveShiftCategories", orgId, items: chunk },
+      "We couldn't save those shifts. Try again.",
+    );
+    results.push(...body.results);
+  }
+  return results;
 }
 
 export function deleteShiftCategory(
@@ -351,6 +398,22 @@ export async function upsertJobDefinition(
   return body.item;
 }
 
+/** Saves several jobs in one request (more only past the batch limit). */
+export async function saveJobDefinitions(
+  orgId: string,
+  items: Array<Omit<JobDefinition, "id"> & { id?: number }>,
+): Promise<SettingsBatchItemResult<JobDefinition>[]> {
+  const results: SettingsBatchItemResult<JobDefinition>[] = [];
+  for (const chunk of chunkForBatch(items)) {
+    const body = await postSettingsAction<{ results: SettingsBatchItemResult<JobDefinition>[] }>(
+      { action: "saveJobDefinitions", orgId, items: chunk },
+      "We couldn't save those jobs. Try again.",
+    );
+    results.push(...body.results);
+  }
+  return results;
+}
+
 export function deleteJobDefinition(
   jobId: number,
   orgId: string,
@@ -377,25 +440,36 @@ export async function fetchCoverageRequirements(orgId: string): Promise<Coverage
   return body.items;
 }
 
-export async function saveCoverageRequirements(
+export interface CoverageRequirementsEntry {
+  focusAreaId: number;
+  jobId: number;
+  preferredShiftId: number | null;
+  requirements: { dayOfWeek: number | null; minStaff: number; maxStaff: number | null }[];
+}
+
+export interface SaveCoverageRequirementsResult {
+  /** Every coverage requirement in the organization after the save. */
+  items: CoverageRequirement[];
+  /** In the order sent. */
+  results: Array<{ ok: boolean }>;
+}
+
+/** Replaces the requirements of several job and shift options in one request. */
+export async function saveCoverageRequirementsBatch(
   orgId: string,
-  focusAreaId: number,
-  jobId: number,
-  preferredShiftId: number | null,
-  requirements: { dayOfWeek: number | null; minStaff: number; maxStaff: number | null }[],
-): Promise<CoverageRequirement[]> {
-  const body = await postSettingsAction<{ items: CoverageRequirement[] }>(
-    {
-      action: "saveCoverageRequirements",
-      orgId,
-      focusAreaId,
-      jobId,
-      preferredShiftId,
-      requirements,
-    },
-    "We couldn't save coverage requirements. Try again.",
-  );
-  return body.items;
+  entries: CoverageRequirementsEntry[],
+): Promise<SaveCoverageRequirementsResult> {
+  let items: CoverageRequirement[] = [];
+  const results: Array<{ ok: boolean }> = [];
+  for (const chunk of chunkForBatch(entries)) {
+    const body = await postSettingsAction<SaveCoverageRequirementsResult>(
+      { action: "saveCoverageRequirementsBatch", orgId, entries: chunk },
+      "We couldn't save coverage requirements. Try again.",
+    );
+    items = body.items;
+    results.push(...body.results);
+  }
+  return { items, results };
 }
 
 export async function fetchAbsenceTypes(

@@ -10,10 +10,12 @@ const people = [
 ] as Employee[];
 
 describe("useStaffReorder", () => {
-  it("stays in reorder mode until every moved row has saved", async () => {
-    const pending: Array<() => void> = [];
-    const onSave = vi.fn(() => new Promise<void>((resolve) => pending.push(resolve)));
-    const { result } = renderHook(() => useStaffReorder({ sorted: people, onSave }));
+  it("saves the whole new order in one call and leaves reorder mode once it's saved", async () => {
+    let finish: (saved: boolean) => void = () => {};
+    const onSaveOrder = vi.fn(
+      (_order: Employee[]) => new Promise<boolean>((resolve) => (finish = resolve)),
+    );
+    const { result } = renderHook(() => useStaffReorder({ sorted: people, onSaveOrder }));
 
     act(() => result.current.enterReorder());
     act(() => result.current.moveEmployee(0, 1));
@@ -22,20 +24,37 @@ describe("useStaffReorder", () => {
     act(() => {
       saving = result.current.saveOrder();
     });
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ id: "b", seniority: 1 }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ id: "a", seniority: 2 }));
+    expect(onSaveOrder).toHaveBeenCalledTimes(1);
+    expect(onSaveOrder.mock.calls[0][0].map((employee: Employee) => employee.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
     expect(result.current.isReordering).toBe(true);
 
     await act(async () => {
-      pending.forEach((resolve) => resolve());
+      finish(true);
       await saving;
     });
     expect(result.current.isReordering).toBe(false);
   });
 
+  it("stays in reorder mode with the new order when the save fails", async () => {
+    const onSaveOrder = vi.fn(async (_order: Employee[]) => false);
+    const { result } = renderHook(() => useStaffReorder({ sorted: people, onSaveOrder }));
+
+    act(() => result.current.enterReorder());
+    act(() => result.current.moveEmployee(0, 2));
+    await act(async () => {
+      await result.current.saveOrder();
+    });
+
+    expect(result.current.isReordering).toBe(true);
+    expect(result.current.displayList.map((employee) => employee.id)).toEqual(["b", "c", "a"]);
+  });
+
   it("discards a moved order in place, staying in reorder mode", () => {
-    const { result } = renderHook(() => useStaffReorder({ sorted: people, onSave: vi.fn() }));
+    const { result } = renderHook(() => useStaffReorder({ sorted: people, onSaveOrder: vi.fn() }));
 
     act(() => result.current.enterReorder());
     act(() => result.current.moveEmployee(0, 2));

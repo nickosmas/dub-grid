@@ -7,9 +7,8 @@ import { Button } from "@/components/Button";
 import {
   checkDepartmentDependencies,
   checkFocusAreaDependencies,
-  deleteFocusArea,
   saveDepartments,
-  upsertFocusArea,
+  saveFocusAreas,
 } from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -512,6 +511,13 @@ function DepartmentSection({
     setIsEditing(false);
   };
 
+  const focusAreaFailureMessage = (failed: number, total: number): string => {
+    const noun = pluralLabelNoun(focusAreaLabel);
+    return failed >= total
+      ? `${title} saved, but the ${noun} didn't update. Review and try again.`
+      : `${title} saved, but ${failed} of ${total} ${noun} didn't update. Review and try again.`;
+  };
+
   const lastSaveErrorRef = useRef<unknown>(null);
 
   const handleSave = async () => {
@@ -553,12 +559,12 @@ function DepartmentSection({
 
     setSaving(true);
     setError(null);
-    // Phase 1 (depts) and Phase 2 (focus areas, scheduled only) are not
-    // atomic: depts are one server action; FA upserts/deletes are individual
-    // HTTP calls. If phase 2 fails midway, the saved depts are still committed
-    // server-side, so we promote that state to local immediately so a retry
-    // doesn't re-send the dept save against now-stale `updatedAt` values.
+    // Phase 1 (depts) and Phase 2 (focus areas, scheduled only) are two
+    // requests and not atomic. If phase 2 fails, the saved depts are still
+    // committed server-side, so we promote that state to local immediately so
+    // a retry doesn't re-send the dept save against now-stale `updatedAt` values.
     let savedDepts: Department[] | null = null;
+    let focusAreaWrites = 0;
     try {
       // Phase 1: Save departments
       const otherDepts = allDepartments.filter((d) => d.type !== type || !!d.archivedAt);
@@ -569,6 +575,7 @@ function DepartmentSection({
         Array.from(pendingHardDeleteDeptIds),
       );
 
+      let failedFocusAreaWrites = 0;
       // Phase 2: Save focus areas (scheduled only)
       if (type === "scheduled") {
         // Build temp→real ID map for new departments
@@ -595,17 +602,10 @@ function DepartmentSection({
             !localFaIds.has(fa.id) &&
             !(fa.departmentId != null && pendingHardDeleteDeptIds.has(fa.departmentId)),
         );
-        // Parallel: distinct rows, one HTTP round trip each, no ordering between
-        // them. Deleting a handful of focus areas was a handful of serial calls.
-        await Promise.all(
-          deletedFAs.map((fa) => deleteFocusArea(fa.id, orgId, pendingHardDeleteFaIds.has(fa.id))),
-        );
 
-        // Upsert new and modified FAs
-        const savedFAsList: FocusArea[] = [];
         // Numbered in the order the departments now stand, so a focus area's
         // stored order matches the schedule and print everywhere it is read.
-        const cleanedFAs = orderFocusAreasByDepartment(
+        const plannedFAs = orderFocusAreasByDepartment(
           localFAs,
           cleaned.map((department, index) => ({
             id: department.id,
@@ -614,46 +614,70 @@ function DepartmentSection({
           })),
         )
           .filter((focusArea) => focusArea.name.trim())
-          .map((focusArea) => ({
-            ...focusArea,
-            name: normalizeLineText(focusArea.name, {
+          .map((fa, sortOrder) => {
+            const name = normalizeLineText(fa.name, {
               label: `${capitalizeFirst(singularLabelNoun(focusAreaLabel))} name`,
               maxLength: 80,
               required: true,
               disallowUrl: true,
-            }),
-          }));
-        for (let i = 0; i < cleanedFAs.length; i++) {
-          const fa = cleanedFAs[i];
-          const realDeptId =
-            fa.departmentId && fa.departmentId < 0
-              ? (tempToReal.get(fa.departmentId) ?? fa.departmentId)
-              : fa.departmentId;
-          const isNew = fa.id < 0;
-          const orig = propFAs.find((p) => p.id === fa.id);
-          const isModified =
-            !isNew &&
-            orig &&
-            (orig.name !== fa.name.trim() ||
-              orig.sortOrder !== i ||
-              orig.departmentId !== realDeptId);
-          if (isNew || isModified) {
-            const saved = await upsertFocusArea({
-              ...(isNew ? {} : { id: fa.id }),
-              orgId,
-              departmentId: realDeptId,
-              name: fa.name.trim(),
-              color: fa.color ?? null,
-              sortOrder: i,
-            });
-            savedFAsList.push(saved);
-          } else {
-            savedFAsList.push({
-              ...fa,
-              departmentId: realDeptId,
-            });
-          }
-        }
+            }).trim();
+            const departmentId =
+              fa.departmentId && fa.departmentId < 0
+                ? (tempToReal.get(fa.departmentId) ?? fa.departmentId)
+                : fa.departmentId;
+            const orig = fa.id < 0 ? undefined : propFAs.find((p) => p.id === fa.id);
+            const changed =
+              fa.id < 0 ||
+              (orig != null &&
+                (orig.name !== name ||
+                  orig.sortOrder !== sortOrder ||
+                  orig.departmentId !== departmentId));
+            return { fa, orig, changed, payload: { ...fa, name, departmentId, sortOrder } };
+          });
+        const toSave = plannedFAs.filter((planned) => planned.changed);
+        focusAreaWrites = toSave.length + deletedFAs.length;
+
+        const result =
+          focusAreaWrites > 0
+            ? await saveFocusAreas(
+                orgId,
+                toSave.map(({ fa, payload }) => ({
+                  ...(fa.id < 0 ? {} : { id: fa.id }),
+                  orgId,
+                  departmentId: payload.departmentId,
+                  name: payload.name,
+                  color: fa.color ?? null,
+                  sortOrder: payload.sortOrder,
+                })),
+                deletedFAs.map((fa) => ({
+                  itemId: fa.id,
+                  hard: pendingHardDeleteFaIds.has(fa.id),
+                })),
+              )
+            : { upserts: [], deletes: [] };
+
+        const savedByLocalId = new Map<number, FocusArea>();
+        toSave.forEach(({ fa }, index) => {
+          const outcome = result.upserts[index];
+          if (outcome?.ok) savedByLocalId.set(fa.id, outcome.item);
+        });
+        const removedIds = new Set(
+          result.deletes.filter((removal) => removal.ok).map((removal) => removal.itemId),
+        );
+        failedFocusAreaWrites =
+          toSave.length - savedByLocalId.size + (deletedFAs.length - removedIds.size);
+
+        // Only what the server kept: a focus area that failed stays as it was,
+        // and a new one that failed isn't shown as saved.
+        const savedFAsList: FocusArea[] = [
+          ...plannedFAs.flatMap(({ fa, orig, changed, payload }): FocusArea[] => {
+            if (!changed) return [{ ...fa, departmentId: payload.departmentId }];
+            const saved = savedByLocalId.get(fa.id);
+            if (saved) return [saved];
+            return orig ? [orig] : [];
+          }),
+          ...deletedFAs.filter((fa) => !removedIds.has(fa.id)),
+        ];
 
         // Merge saved FAs with unchanged FAs from other departments
         const otherFAs = allFocusAreas.filter(
@@ -662,9 +686,34 @@ function DepartmentSection({
             !tempToReal.has(fa.departmentId ?? -999),
         );
         onFocusAreasChange([...otherFAs, ...savedFAsList]);
+
+        if (failedFocusAreaWrites > 0 && !isWizardMode) {
+          // Keep the draft open for a retry, pointed at what now exists, so
+          // the retry doesn't add again what this save already added.
+          const realDepts = new Map(savedDepts.map((department) => [department.id, department]));
+          setLocalDepts((prev) =>
+            prev.map((department) => {
+              const realId = tempToReal.get(department.id);
+              return (realId != null && realDepts.get(realId)) || department;
+            }),
+          );
+          setLocalFAs((prev) =>
+            prev.map((fa) => {
+              const saved = savedByLocalId.get(fa.id);
+              if (saved) return saved;
+              const realDeptId = fa.departmentId != null ? tempToReal.get(fa.departmentId) : null;
+              return realDeptId != null ? { ...fa, departmentId: realDeptId } : fa;
+            }),
+          );
+        }
       }
 
       onDepartmentsChange(savedDepts);
+      if (failedFocusAreaWrites > 0) {
+        lastSaveErrorRef.current = new Error("Some focus areas did not save.");
+        toast.error(focusAreaFailureMessage(failedFocusAreaWrites, focusAreaWrites));
+        return;
+      }
       // Wizard mode keeps the editor open so saveAll can retry after a later
       // section fails, and so the user can keep adding/editing rows. The local
       // draft is resynced from props via a useEffect below.
@@ -681,9 +730,7 @@ function DepartmentSection({
       // and trigger a stale-updatedAt conflict.
       if (savedDepts) {
         onDepartmentsChange(savedDepts);
-        toast.error(
-          `${title} saved, but some ${pluralLabelNoun(focusAreaLabel)} didn't update. Review and try again.`,
-        );
+        toast.error(focusAreaFailureMessage(focusAreaWrites, focusAreaWrites));
       } else {
         toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
       }

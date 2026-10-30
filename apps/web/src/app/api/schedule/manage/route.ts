@@ -119,6 +119,23 @@ const cellEchoSchema = z.object({
   absenceTypeLabels: mapEntrySchema.optional(),
 });
 
+/** One cell of a save: the fields `upsertShift` takes, shared with `upsertShifts`. */
+const upsertShiftCellSchema = z.object({
+  employeeId: z.string().uuid(),
+  date: z.string().date(),
+  input: scheduleCellStateSchema,
+  expectedVersion: z.number().int().nonnegative().optional(),
+  /**
+   * Set when the write replaces the cell's shift wholesale rather than
+   * editing it, which a paste does. An ordinary edit keeps its indicators;
+   * a replacement cannot, because they described the shift being displaced.
+   */
+  clearNotes: z.boolean().optional(),
+});
+
+/** The most cells one `upsertShifts` request saves, as `deleteShifts` caps deletes. */
+const UPSERT_SHIFTS_MAX = 50;
+
 const requestActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchShifts"),
@@ -166,20 +183,16 @@ const requestActionSchema = z.discriminatedUnion("action", [
     reason: z.string().trim().max(CORRECTION_REASON_MAX_LENGTH).optional(),
     echo: cellEchoSchema.optional(),
   }),
-  z.object({
+  upsertShiftCellSchema.extend({
     action: z.literal("upsertShift"),
     orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
-    date: z.string().date(),
-    input: scheduleCellStateSchema,
-    expectedVersion: z.number().int().nonnegative().optional(),
     echo: cellEchoSchema.optional(),
-    /**
-     * Set when the write replaces the cell's shift wholesale rather than
-     * editing it, which a paste does. An ordinary edit keeps its indicators;
-     * a replacement cannot, because they described the shift being displaced.
-     */
-    clearNotes: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("upsertShifts"),
+    orgId: z.string().uuid(),
+    shifts: z.array(upsertShiftCellSchema).min(1).max(UPSERT_SHIFTS_MAX),
+    echo: cellEchoSchema,
   }),
   z.object({
     action: z.literal("importPreviousSchedule"),
@@ -972,6 +985,95 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
   return snapshots.some((snapshot) => snapshot.snapshot_kind === "published");
 }
 
+/**
+ * A database refusal of a cell's save that the person can act on, worded for
+ * them. Null for anything else, which stays a server fault.
+ */
+function cellWriteRefusal(error: unknown): {
+  error: string;
+  code: "PAST_DAY" | "ABSENCE_TIMES" | "SHIFT_OVERLAP";
+  status: 409 | 422;
+} | null {
+  if (isPastDayDraftRefusal(error)) {
+    return {
+      error: "This day has passed. Open it to correct it instead.",
+      code: "PAST_DAY",
+      status: 422,
+    };
+  }
+  if (isAbsenceTimesRefusal(error)) {
+    return {
+      error: "The absence has to cover some of the shift's time, apart from the time worked.",
+      code: "ABSENCE_TIMES",
+      status: 422,
+    };
+  }
+  if (isOverlapConflictError(error)) {
+    return {
+      error:
+        "These shift times overlap. Adjust the times, or turn off conflict prevention in Settings under Schedule Rules.",
+      code: "SHIFT_OVERLAP",
+      status: 409,
+    };
+  }
+  return null;
+}
+
+type ScheduleWriteAuth = Pick<
+  Extract<Awaited<ReturnType<typeof requireOrgPermissions>>, { serviceClient: unknown }>,
+  "userClient" | "serviceClient" | "actor"
+>;
+
+/**
+ * Saves one cell's draft: the before-read for the activity log, the versioned
+ * write, an optional note clear and one audit row. Shared by `upsertShift` and
+ * `upsertShifts` so a batch saves each cell exactly as a single save does.
+ */
+async function upsertShiftCell(
+  auth: ScheduleWriteAuth,
+  orgId: string,
+  cell: z.infer<typeof upsertShiftCellSchema>,
+): Promise<void> {
+  const before = await readCellStateForAudit(auth.serviceClient, orgId, cell.employeeId, cell.date);
+  await writeShiftSnapshot(auth.userClient, {
+    orgId,
+    employeeId: cell.employeeId,
+    date: cell.date,
+    state: cell.input,
+    expectedVersion: cell.expectedVersion,
+  });
+  if (cell.clearNotes) {
+    await clearScheduleNotesForCells(auth.serviceClient, orgId, auth.actor.id, [
+      { employeeId: cell.employeeId, date: cell.date },
+    ]);
+  }
+  logScheduleAudit(auth.serviceClient, {
+    orgId,
+    actorId: auth.actor.id,
+    actorEmail: auth.actor.email ?? null,
+    action: cell.expectedVersion !== undefined ? "shift.updated" : "shift.created",
+    resourceType: "shift",
+    resourceId: `${cell.employeeId}:${cell.date}`,
+    details: { input: cell.input, before },
+  });
+}
+
+/** How one cell of an `upsertShifts` batch failed, reported in place of failing the request. */
+function batchCellFailure(
+  error: unknown,
+  orgId: string,
+):
+  | { status: "conflict"; actualVersion?: number }
+  | { status: "error"; error: string; code?: string } {
+  if (error instanceof OptimisticLockConflictError) {
+    return { status: "conflict", actualVersion: error.actualVersion };
+  }
+  const refusal = cellWriteRefusal(error);
+  if (refusal) return { status: "error", error: refusal.error, code: refusal.code };
+  logger.error({ error, orgId }, "A schedule cell in a batch save failed");
+  return { status: "error", error: "We couldn't save this shift." };
+}
+
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
@@ -1374,39 +1476,58 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const before = await readCellStateForAudit(
-          auth.serviceClient,
-          data.orgId,
-          data.employeeId,
-          data.date,
-        );
-        await writeShiftSnapshot(auth.userClient, {
-          orgId: data.orgId,
-          employeeId: data.employeeId,
-          date: data.date,
-          state: data.input,
-          expectedVersion: data.expectedVersion,
-        });
-        if (data.clearNotes) {
-          await clearScheduleNotesForCells(auth.serviceClient, data.orgId, auth.actor.id, [
-            { employeeId: data.employeeId, date: data.date },
-          ]);
-        }
-        logScheduleAudit(auth.serviceClient, {
-          orgId: data.orgId,
-          actorId: auth.actor.id,
-          actorEmail: auth.actor.email ?? null,
-          action: data.expectedVersion !== undefined ? "shift.updated" : "shift.created",
-          resourceType: "shift",
-          resourceId: `${data.employeeId}:${data.date}`,
-          details: { input: data.input, before },
-        });
+        await upsertShiftCell(auth, data.orgId, data);
         return writeResponse(
           auth.serviceClient,
           data.orgId,
           [{ employeeId: data.employeeId, date: data.date }],
           data.echo,
         );
+      }
+
+      case "upsertShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor, gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        // Each cell stands alone: one refused cell must not undo the others,
+        // so every outcome is reported rather than the first failure thrown.
+        const outcomes = await Promise.all(
+          data.shifts.map(async (cell) => {
+            try {
+              await upsertShiftCell(auth, data.orgId, cell);
+              return { status: "saved" as const };
+            } catch (error) {
+              return batchCellFailure(error, data.orgId);
+            }
+          }),
+        );
+
+        // Saved cells come back as stored; a conflicted one as the server now holds it.
+        const readBack = data.shifts.filter((_cell, index) => outcomes[index]!.status !== "error");
+        let rows: Record<string, unknown | null> | null = null;
+        if (readBack.length > 0) {
+          try {
+            rows = await readEchoedCells(auth.serviceClient, data.orgId, readBack, data.echo);
+          } catch (error) {
+            logger.error({ error, orgId: data.orgId }, "Failed to read back saved schedule cells");
+          }
+        }
+
+        const results = data.shifts.map((cell, index) => {
+          const outcome = outcomes[index]!;
+          const where = { employeeId: cell.employeeId, date: cell.date };
+          if (outcome.status === "error" || !rows) return { ...where, ...outcome };
+          return { ...where, ...outcome, cell: rows[`${cell.employeeId}_${cell.date}`] ?? null };
+        });
+        return NextResponse.json({ success: true, results });
       }
 
       case "importPreviousSchedule": {
@@ -2509,31 +2630,11 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    if (isPastDayDraftRefusal(error)) {
+    const refusal = cellWriteRefusal(error);
+    if (refusal) {
       return NextResponse.json(
-        { error: "This day has passed. Open it to correct it instead.", code: "PAST_DAY" },
-        { status: 422 },
-      );
-    }
-
-    if (isAbsenceTimesRefusal(error)) {
-      return NextResponse.json(
-        {
-          error: "The absence has to cover some of the shift's time, apart from the time worked.",
-          code: "ABSENCE_TIMES",
-        },
-        { status: 422 },
-      );
-    }
-
-    if (isOverlapConflictError(error)) {
-      return NextResponse.json(
-        {
-          error:
-            "These shift times overlap. Adjust the times, or turn off conflict prevention in Settings under Schedule Rules.",
-          code: "SHIFT_OVERLAP",
-        },
-        { status: 409 },
+        { error: refusal.error, code: refusal.code },
+        { status: refusal.status },
       );
     }
 

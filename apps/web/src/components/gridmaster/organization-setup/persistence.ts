@@ -1,4 +1,4 @@
-import { insertEmployee } from "@/features/employees/client";
+import { insertEmployees } from "@/features/employees/client";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import {
   createOrganizationInvitation,
@@ -7,10 +7,11 @@ import {
 import {
   saveCertifications,
   saveDepartments,
+  saveFocusAreas,
+  saveJobDefinitions,
   saveOrganizationRoles,
-  upsertFocusArea,
-  upsertJobDefinition,
-  upsertShiftCategory,
+  saveShiftCategories,
+  type SettingsBatchItemResult,
 } from "@/features/settings/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { DEFAULT_PREDEFINED_COLOR_BG } from "@/lib/colors";
@@ -64,6 +65,17 @@ export async function createOrganizationSetup(
   return createGridmasterOrganizationSetup(input, accessToken);
 }
 
+/** The saved items in order, or an error naming how many didn't save. */
+function requireAllSaved<T>(results: SettingsBatchItemResult<T>[], noun: string): T[] {
+  const saved = results.flatMap((result) => (result.ok ? [result.item] : []));
+  if (saved.length < results.length) {
+    throw new Error(
+      `We couldn't save ${results.length - saved.length} of ${results.length} ${noun}. Try again.`,
+    );
+  }
+  return saved;
+}
+
 type SaveOrganizationConfigInput = {
   createdOrg: Organization;
   shiftDisplayMode: "code" | "name";
@@ -84,7 +96,11 @@ export async function saveOrganizationSetupConfig({
   orgRoles,
   shiftCategories,
   jobs,
-}: SaveOrganizationConfigInput): Promise<number> {
+}: SaveOrganizationConfigInput): Promise<{
+  savedCount: number;
+  /** Each saved focus area's setup row id, to its id in the organization. */
+  focusAreaIds: Map<string, number>;
+}> {
   let savedCount = 0;
   const departmentIdMap = new Map<string, number>();
   const focusAreaIdMap = new Map<string, number>();
@@ -177,23 +193,28 @@ export async function saveOrganizationSetupConfig({
     savedCount += validDepartments.length;
   }
 
-  for (let index = 0; index < validFocusAreas.length; index += 1) {
-    const focusArea = validFocusAreas[index];
-    const departmentId =
-      (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ?? null;
-    const saved = await upsertFocusArea({
-      orgId: createdOrg.id,
-      departmentId,
-      name: normalizeLineText(focusArea.name, {
-        label: "Focus area name",
-        maxLength: 80,
-        required: true,
-        disallowUrl: true,
-      }),
-      color: null,
-      sortOrder: index,
+  if (validFocusAreas.length > 0) {
+    const { upserts } = await saveFocusAreas(
+      createdOrg.id,
+      validFocusAreas.map((focusArea, index) => ({
+        orgId: createdOrg.id,
+        departmentId:
+          (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ??
+          null,
+        name: normalizeLineText(focusArea.name, {
+          label: "Focus area name",
+          maxLength: 80,
+          required: true,
+          disallowUrl: true,
+        }),
+        color: null,
+        sortOrder: index,
+      })),
+      [],
+    );
+    requireAllSaved(upserts, "focus areas").forEach((saved, index) => {
+      focusAreaIdMap.set(validFocusAreas[index].id, saved.id);
     });
-    focusAreaIdMap.set(focusArea.id, saved.id);
   }
   savedCount += validFocusAreas.length;
 
@@ -249,121 +270,141 @@ export async function saveOrganizationSetupConfig({
     savedCount += validRoles.length;
   }
 
-  for (let index = 0; index < validCategories.length; index += 1) {
-    const category = validCategories[index];
-    const focusAreaId =
-      (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ?? null;
-    const saved = await upsertShiftCategory({
-      orgId: createdOrg.id,
-      name: normalizeLineText(category.name, {
-        label: "Shift name",
-        maxLength: 50,
-        required: true,
-        disallowUrl: true,
-      }),
-      abbr: category.name.trim().slice(0, 6).toUpperCase(),
-      startTime: category.startTime || null,
-      endTime: category.endTime || null,
-      sortOrder: index,
-      color: DEFAULT_PREDEFINED_COLOR_BG,
-      focusAreaId,
-      breakMinutes: null,
+  if (validCategories.length > 0) {
+    const results = await saveShiftCategories(
+      createdOrg.id,
+      validCategories.map((category, index) => ({
+        orgId: createdOrg.id,
+        name: normalizeLineText(category.name, {
+          label: "Shift name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        }),
+        abbr: category.name.trim().slice(0, 6).toUpperCase(),
+        startTime: category.startTime || null,
+        endTime: category.endTime || null,
+        sortOrder: index,
+        color: DEFAULT_PREDEFINED_COLOR_BG,
+        focusAreaId:
+          (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ?? null,
+        breakMinutes: null,
+      })),
+    );
+    requireAllSaved(results, "shifts").forEach((saved, index) => {
+      shiftCategoryIdMap.set(validCategories[index].id, saved.id);
     });
-    shiftCategoryIdMap.set(category.id, saved.id);
   }
   savedCount += validCategories.length;
 
-  for (let index = 0; index < validJobs.length; index += 1) {
-    const job = validJobs[index];
-    const departmentIds = job.departmentIds
-      .map((id) => departmentIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    const focusAreaIds = job.focusAreaIds
-      .map((id) => focusAreaIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    const applicableShiftIds = job.shiftCategoryIds
-      .map((id) => shiftCategoryIdMap.get(id))
-      .filter((id): id is number => typeof id === "number");
-    await upsertJobDefinition({
-      orgId: createdOrg.id,
-      name: normalizeLineText(job.name.trim() || job.label.trim(), {
-        label: "Job name",
-        maxLength: 50,
-        required: true,
-        disallowUrl: true,
-      }),
-      abbr: job.label.trim()
-        ? normalizeCode(job.label, {
-            label: "Job abbreviation",
-            maxLength: 6,
+  if (validJobs.length > 0) {
+    const results = await saveJobDefinitions(
+      createdOrg.id,
+      validJobs.map((job, index) => {
+        const departmentIds = job.departmentIds
+          .map((id) => departmentIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        const focusAreaIds = job.focusAreaIds
+          .map((id) => focusAreaIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        const applicableShiftIds = job.shiftCategoryIds
+          .map((id) => shiftCategoryIdMap.get(id))
+          .filter((id): id is number => typeof id === "number");
+        return {
+          orgId: createdOrg.id,
+          name: normalizeLineText(job.name.trim() || job.label.trim(), {
+            label: "Job name",
+            maxLength: 50,
             required: true,
-            uppercase: true,
-          })
-        : job.name.trim().slice(0, 4).toUpperCase(),
-      showOnGrid: true,
-      assignmentMode: "with_shift",
-      eligibilityMode: "and",
-      focusAreaIds,
-      departmentIds,
-      applicableShiftIds,
-      eligibleRoleIds: [],
-      requiredCertificationIds: [],
-      color: "",
-      border: "",
-      text: "",
-      shiftTimeOverrides: {},
-      shiftColorOverrides: {},
-      sortOrder: index,
-      defaultStartTime: null,
-      defaultEndTime: null,
-      defaultDurationHours: null,
-      defaultDurationMinutes: null,
-    });
+            disallowUrl: true,
+          }),
+          abbr: job.label.trim()
+            ? normalizeCode(job.label, {
+                label: "Job abbreviation",
+                maxLength: 6,
+                required: true,
+                uppercase: true,
+              })
+            : job.name.trim().slice(0, 4).toUpperCase(),
+          showOnGrid: true,
+          assignmentMode: "with_shift",
+          eligibilityMode: "and",
+          focusAreaIds,
+          departmentIds,
+          applicableShiftIds,
+          eligibleRoleIds: [],
+          requiredCertificationIds: [],
+          color: "",
+          border: "",
+          text: "",
+          shiftTimeOverrides: {},
+          shiftColorOverrides: {},
+          sortOrder: index,
+          defaultStartTime: null,
+          defaultEndTime: null,
+          defaultDurationHours: null,
+          defaultDurationMinutes: null,
+        };
+      }),
+    );
+    requireAllSaved(results, "jobs");
   }
   savedCount += validJobs.length;
 
-  return savedCount;
+  return { savedCount, focusAreaIds: focusAreaIdMap };
 }
 
+/**
+ * Everyone needs a focus area to be on the schedule, so each person takes the
+ * one picked on their row, or the first saved when none was picked.
+ */
 export async function createOrganizationEmployees(
   createdOrg: Organization,
   employeeRows: EmployeeRow[],
+  focusAreaIds: Map<string, number>,
 ): Promise<CreatedEmployee[]> {
   const validRows = employeeRows.filter((row) => row.firstName.trim());
-  const created: CreatedEmployee[] = [];
-
-  for (const row of validRows) {
-    const employee = await insertEmployee(
-      {
-        firstName: row.firstName.trim(),
-        lastName: row.lastName.trim(),
-        employmentType: "full_time",
-        email: row.email.trim(),
-        phone: row.phone.trim(),
-        seniority: created.length + 1,
-        certificationId: null,
-        roleIds: [],
-        focusAreaIds: [],
-        contactNotes: "",
-        status: "active" as const,
-        statusChangedAt: null,
-        statusNote: "",
-        userId: null,
-        departmentIds: [],
-        deptAdminIds: [],
-        version: 0,
-      },
-      createdOrg.id,
-    );
-    created.push({
-      id: employee.id,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
-      email: employee.email,
-    });
+  if (validRows.length === 0) return [];
+  const firstFocusAreaId = focusAreaIds.values().next().value;
+  if (firstFocusAreaId === undefined) {
+    throw new Error("Add a focus area in the setup step before adding staff.");
   }
 
-  return created;
+  const { employees, failed } = await insertEmployees(
+    validRows.map((row) => ({
+      firstName: row.firstName.trim(),
+      lastName: row.lastName.trim(),
+      employmentType: "full_time" as const,
+      email: row.email.trim(),
+      phone: row.phone.trim(),
+      certificationId: null,
+      roleIds: [],
+      focusAreaIds: [
+        (row.focusAreaId ? focusAreaIds.get(row.focusAreaId) : undefined) ?? firstFocusAreaId,
+      ],
+      contactNotes: "",
+      status: "active" as const,
+      statusChangedAt: null,
+      statusNote: "",
+      userId: null,
+      departmentIds: [],
+      deptAdminIds: [],
+      version: 0,
+    })),
+    createdOrg.id,
+  );
+  if (failed.length > 0) {
+    throw new Error(
+      `We couldn't add ${failed.length} of ${validRows.length} people. ${failed[0].error}`,
+    );
+  }
+
+  return employees.map((employee): CreatedEmployee => ({
+    id: employee.id,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+  }));
 }
 
 export async function sendOrganizationInvitations(

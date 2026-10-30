@@ -58,6 +58,7 @@ function PeopleContent() {
     loading: empLoading,
     handleAddEmployee,
     handleSaveEmployee,
+    handleSaveSeniorityOrder,
     handleSaveEmployeeWithReinvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,
@@ -156,6 +157,7 @@ function PeopleContent() {
             certifications={certifications}
             roles={orgRoles}
             onSave={handleSaveEmployee}
+            onSaveOrder={handleSaveSeniorityOrder}
             onSaveWithReinvite={handleSaveEmployeeWithReinvite}
             onRemove={(empId, note, lastDay) =>
               runStatusChange((token) =>

@@ -13,9 +13,9 @@ import ShiftCategoriesSettings from "@/components/settings/ShiftCategories";
 import JobsSettings from "@/components/settings/Jobs";
 import AbsenceTypesSettings from "@/components/settings/AbsenceTypes";
 import {
-  saveCoverageRequirements,
+  saveCoverageRequirementsBatch,
   saveDepartments,
-  upsertFocusArea,
+  saveFocusAreas,
   upsertIndicatorType,
   upsertJobDefinition,
   upsertShiftCategory,
@@ -32,6 +32,7 @@ import {
   makeAssignmentDefinition,
 } from "./factories";
 import { DEFAULT_SHIFT_JOB_SYSTEM_KEY } from "@/lib/system-jobs";
+import { toast } from "sonner";
 import type {
   AbsenceType,
   Department,
@@ -61,9 +62,8 @@ vi.mock("@/features/settings/client", () => ({
   upsertIndicatorType: vi.fn(),
   deleteIndicatorType: vi.fn(),
   saveDepartments: vi.fn(),
-  saveCoverageRequirements: vi.fn(),
-  upsertFocusArea: vi.fn(),
-  deleteFocusArea: vi.fn(),
+  saveCoverageRequirementsBatch: vi.fn(),
+  saveFocusAreas: vi.fn(),
   checkDepartmentDependencies: vi.fn(),
   upsertAssignmentDefinition: vi.fn(),
   deleteAssignmentDefinition: vi.fn(),
@@ -720,7 +720,10 @@ describe("settings dirty save controls", () => {
       minStaff: 2,
     });
 
-    vi.mocked(saveCoverageRequirements).mockResolvedValue([requirement]);
+    vi.mocked(saveCoverageRequirementsBatch).mockResolvedValue({
+      items: [requirement],
+      results: [{ ok: true }],
+    });
 
     render(
       <CoverageRequirementsSettings
@@ -800,7 +803,10 @@ describe("settings dirty save controls", () => {
       dayOfWeek: null,
     });
 
-    vi.mocked(saveCoverageRequirements).mockResolvedValue([savedRequirement]);
+    vi.mocked(saveCoverageRequirementsBatch).mockResolvedValue({
+      items: [savedRequirement],
+      results: [{ ok: true }],
+    });
 
     render(
       <CoverageRequirementsSettings
@@ -831,8 +837,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 200, 10, [
-        { dayOfWeek: null, minStaff: 2, maxStaff: null },
+      expect(saveCoverageRequirementsBatch).toHaveBeenCalledWith("org-1", [
+        {
+          focusAreaId: 1,
+          jobId: 200,
+          preferredShiftId: 10,
+          requirements: [{ dayOfWeek: null, minStaff: 2, maxStaff: null }],
+        },
       ]);
     });
   });
@@ -872,7 +883,10 @@ describe("settings dirty save controls", () => {
       preferredShiftId: 10,
       minStaff: 1,
     });
-    vi.mocked(saveCoverageRequirements).mockResolvedValue([requirement]);
+    vi.mocked(saveCoverageRequirementsBatch).mockResolvedValue({
+      items: [requirement],
+      results: [{ ok: true }],
+    });
 
     render(
       <CoverageRequirementsSettings
@@ -903,8 +917,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 200, 10, [
-        { dayOfWeek: null, minStaff: 3, maxStaff: 3 },
+      expect(saveCoverageRequirementsBatch).toHaveBeenCalledWith("org-1", [
+        {
+          focusAreaId: 1,
+          jobId: 200,
+          preferredShiftId: 10,
+          requirements: [{ dayOfWeek: null, minStaff: 3, maxStaff: 3 }],
+        },
       ]);
     });
   });
@@ -1142,7 +1161,10 @@ describe("settings dirty save controls", () => {
       dayOfWeek: null,
     });
 
-    vi.mocked(saveCoverageRequirements).mockResolvedValue([savedRequirement]);
+    vi.mocked(saveCoverageRequirementsBatch).mockResolvedValue({
+      items: [savedRequirement],
+      results: [{ ok: true }],
+    });
 
     render(
       <CoverageRequirementsSettings
@@ -1172,8 +1194,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 203, 10, [
-        { dayOfWeek: null, minStaff: 4, maxStaff: null },
+      expect(saveCoverageRequirementsBatch).toHaveBeenCalledWith("org-1", [
+        {
+          focusAreaId: 1,
+          jobId: 203,
+          preferredShiftId: 10,
+          requirements: [{ dayOfWeek: null, minStaff: 4, maxStaff: null }],
+        },
       ]);
     });
   });
@@ -1584,6 +1611,71 @@ describe("settings dirty save controls", () => {
     expect(
       screen.getAllByDisplayValue(/North|South/).map((input) => input.getAttribute("value")),
     ).toEqual(["South", "North"]);
+  });
+
+  it("saves only the focus areas a reorder moved, in one request, and keeps what failed as it was", async () => {
+    const user = userEvent.setup();
+    const departments = [
+      makeDepartment({ id: 1, name: "North", abbr: "North", type: "scheduled", sortOrder: 0 }),
+      makeDepartment({ id: 2, name: "South", abbr: "South", type: "scheduled", sortOrder: 1 }),
+      makeDepartment({ id: 3, name: "East", abbr: "East", type: "scheduled", sortOrder: 2 }),
+    ];
+    const focusAreas = [
+      makeFocusArea({ id: 11, orgId: "org-1", departmentId: 1, name: "North", sortOrder: 0 }),
+      makeFocusArea({ id: 12, orgId: "org-1", departmentId: 2, name: "South", sortOrder: 1 }),
+      makeFocusArea({ id: 13, orgId: "org-1", departmentId: 3, name: "East", sortOrder: 2 }),
+    ];
+    const onFocusAreasChange = vi.fn();
+    vi.mocked(saveDepartments).mockResolvedValue([
+      departments[0],
+      { ...departments[2], sortOrder: 1 },
+      { ...departments[1], sortOrder: 2 },
+    ]);
+    vi.mocked(saveFocusAreas).mockResolvedValue({
+      upserts: [
+        { ok: true, item: { ...focusAreas[2], sortOrder: 1 } },
+        { ok: false, error: "We couldn't save that." },
+      ],
+      deletes: [],
+    });
+
+    render(
+      <DepartmentsSettings
+        departments={departments}
+        focusAreas={focusAreas}
+        orgId="org-1"
+        focusAreaLabel="Focus Areas"
+        departmentLabel="Departments"
+        canManageFocusAreas
+        onDepartmentsChange={vi.fn()}
+        onFocusAreasChange={onFocusAreasChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    screen.getByRole("button", { name: /reorder east/i }).focus();
+    await user.keyboard("{ArrowUp}");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(onFocusAreasChange).toHaveBeenCalled());
+    expect(saveFocusAreas).toHaveBeenCalledTimes(1);
+    expect(saveFocusAreas).toHaveBeenCalledWith(
+      "org-1",
+      [
+        expect.objectContaining({ id: 13, sortOrder: 1 }),
+        expect.objectContaining({ id: 12, sortOrder: 2 }),
+      ],
+      [],
+    );
+    expect(onFocusAreasChange).toHaveBeenCalledWith([
+      focusAreas[0],
+      expect.objectContaining({ id: 13, sortOrder: 1 }),
+      focusAreas[1],
+    ]);
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/saved, but 1 of 2 focus areas didn't update/),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("does not expose focus area color presets from the departments editor", async () => {

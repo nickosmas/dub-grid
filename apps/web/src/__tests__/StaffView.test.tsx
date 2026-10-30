@@ -384,6 +384,7 @@ const defaultProps = {
   certifications: defaultCertifications,
   roles: defaultRoles,
   onSave: vi.fn(),
+  onSaveOrder: vi.fn(),
   onRemove: vi.fn(),
   onDeactivate: vi.fn(),
   onActivate: vi.fn(),
@@ -1027,6 +1028,7 @@ describe("Property-based tests", () => {
             certifications={defaultCertifications}
             roles={defaultRoles}
             onSave={vi.fn()}
+            onSaveOrder={vi.fn()}
             onRemove={vi.fn()}
             onDeactivate={vi.fn()}
             onActivate={vi.fn()}
@@ -1084,6 +1086,7 @@ describe("Property-based tests", () => {
             certifications={defaultCertifications}
             roles={defaultRoles}
             onSave={vi.fn()}
+            onSaveOrder={vi.fn()}
             onRemove={vi.fn()}
             onDeactivate={vi.fn()}
             onActivate={vi.fn()}

@@ -7,6 +7,8 @@ import { makeEmployee } from "@/__tests__/factories";
 import type { Invitation } from "@/types";
 
 const mockFetchEmployees = vi.fn();
+const mockInsertEmployees = vi.fn();
+const mockSaveSeniorityOrder = vi.fn();
 const mockUpdateEmployee = vi.fn();
 const mockRemoveEmployee = vi.fn();
 const mockDeactivateEmployee = vi.fn();
@@ -40,7 +42,8 @@ vi.mock("@/features/employees/client", () => {
     EmployeeProfileConflictError: MockEmployeeProfileConflictError,
     EmployeeStatusConflictError: MockEmployeeStatusConflictError,
     fetchEmployees: (...args: unknown[]) => mockFetchEmployees(...args),
-    insertEmployee: vi.fn(),
+    insertEmployees: (...args: unknown[]) => mockInsertEmployees(...args),
+    saveSeniorityOrder: (...args: unknown[]) => mockSaveSeniorityOrder(...args),
     removeEmployee: (...args: unknown[]) => mockRemoveEmployee(...args),
     updateEmployee: (...args: unknown[]) => mockUpdateEmployee(...args),
   };
@@ -424,5 +427,103 @@ describe("useEmployees - handleBulkStatusChange (51h)", () => {
     await expect(
       act(() => result.current.handleBulkStatusChange("archive", ["emp-1"])),
     ).rejects.toThrow("step up");
+  });
+});
+
+describe("useEmployees — bulk saves", () => {
+  const people = [
+    makeEmployee({ id: "a", firstName: "Ana", seniority: 1, version: 2 }),
+    makeEmployee({ id: "b", firstName: "Ben", seniority: 2, version: 5 }),
+    makeEmployee({ id: "c", firstName: "Cal", seniority: 3, version: 1 }),
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchEmployees.mockResolvedValue(people);
+  });
+
+  it("saves a reorder in one call with only the people who moved, and one toast", async () => {
+    const result = await renderReady();
+    mockSaveSeniorityOrder.mockImplementation(async (_orgId, moves) =>
+      moves.map((move: { id: string; seniority: number; version: number }) => ({
+        ...people.find((person) => person.id === move.id),
+        seniority: move.seniority,
+        version: move.version + 1,
+      })),
+    );
+
+    let saved = false;
+    await act(async () => {
+      saved = await result.current.handleSaveSeniorityOrder([people[1], people[0], people[2]]);
+    });
+
+    expect(saved).toBe(true);
+    expect(mockSaveSeniorityOrder).toHaveBeenCalledTimes(1);
+    expect(mockSaveSeniorityOrder).toHaveBeenCalledWith("org-1", [
+      { id: "b", seniority: 1, version: 5 },
+      { id: "a", seniority: 2, version: 2 },
+    ]);
+    expect(mockToastSuccess).toHaveBeenCalledTimes(1);
+    expect(result.current.employees.find((person) => person.id === "b")?.seniority).toBe(1);
+  });
+
+  it("puts the whole order back with one error when the save is refused", async () => {
+    const result = await renderReady();
+    mockSaveSeniorityOrder.mockRejectedValue(
+      new Error("Someone else just changed the order. Refresh and try again."),
+    );
+
+    let saved = true;
+    await act(async () => {
+      saved = await result.current.handleSaveSeniorityOrder([people[2], people[1], people[0]]);
+    });
+
+    expect(saved).toBe(false);
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(result.current.employees.map((person) => [person.id, person.seniority])).toEqual([
+      ["a", 1],
+      ["b", 2],
+      ["c", 3],
+    ]);
+  });
+
+  it("adds several people in one call and reports the ones it couldn't add once", async () => {
+    const result = await renderReady();
+    const added = makeEmployee({ id: "d", firstName: "Dee", seniority: 4 });
+    mockInsertEmployees.mockResolvedValue({
+      employees: [added],
+      failed: [{ index: 1, error: "That email is already in use." }],
+    });
+
+    let returned: unknown;
+    await act(async () => {
+      returned = await result.current.handleAddEmployee([
+        { ...added, firstName: "Dee" },
+        { ...added, firstName: "Eve" },
+      ]);
+    });
+
+    expect(mockInsertEmployees).toHaveBeenCalledTimes(1);
+    expect(returned).toEqual([added]);
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Added 1 of 2 employees. That email is already in use.",
+    );
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("keeps the form open when nobody could be added", async () => {
+    const result = await renderReady();
+    mockInsertEmployees.mockResolvedValue({
+      employees: [],
+      failed: [{ index: 0, error: "That email is already in use." }],
+    });
+
+    let returned: unknown = "unset";
+    await act(async () => {
+      returned = await result.current.handleAddEmployee([people[0]]);
+    });
+
+    expect(returned).toBeUndefined();
+    expect(mockToastError).toHaveBeenCalledWith("That email is already in use.");
   });
 });

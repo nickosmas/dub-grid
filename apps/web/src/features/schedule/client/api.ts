@@ -666,6 +666,43 @@ export function upsertShift(
   });
 }
 
+export type UpsertShiftBatchItem = {
+  employeeId: string;
+  date: string;
+  input: ScheduleCellInput;
+  expectedVersion?: number;
+};
+
+/**
+ * How one cell of a batch save went. `cell` is the cell as the server now
+ * holds it (null when it has no content); absent when it couldn't be read back.
+ */
+export type UpsertShiftBatchResult =
+  | { employeeId: string; date: string; status: "saved"; cell?: ShiftMap[string] | null }
+  | {
+      employeeId: string;
+      date: string;
+      status: "conflict";
+      actualVersion?: number;
+      cell?: ShiftMap[string] | null;
+    }
+  | { employeeId: string; date: string; status: "error"; error: string; code?: string };
+
+/** Saves up to 50 cells in one request, each succeeding or failing on its own. */
+export async function upsertShiftBatch(
+  orgId: string,
+  shifts: UpsertShiftBatchItem[],
+  echo: CellEcho,
+): Promise<UpsertShiftBatchResult[]> {
+  const payload = await requestManageWithLockTyped<{ results?: UpsertShiftBatchResult[] }>({
+    action: "upsertShifts",
+    orgId,
+    shifts,
+    echo: serializeEcho(echo),
+  });
+  return payload.results ?? [];
+}
+
 /** A day's latest correction (53c), as the grid marks it. */
 export interface CellCorrection {
   empId: string;

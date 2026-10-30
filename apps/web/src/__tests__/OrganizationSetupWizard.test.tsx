@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
-import { insertEmployee } from "@/features/employees/client";
+import { insertEmployees } from "@/features/employees/client";
+import { saveDepartments, saveFocusAreas } from "@/features/settings/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { toast } from "sonner";
 import type { Organization } from "@/types";
@@ -13,16 +14,16 @@ vi.mock("@/features/gridmaster/client", () => ({
 }));
 
 vi.mock("@/features/employees/client", () => ({
-  insertEmployee: vi.fn(),
+  insertEmployees: vi.fn(),
 }));
 
 vi.mock("@/features/settings/client", () => ({
-  upsertFocusArea: vi.fn(),
+  saveFocusAreas: vi.fn(),
   saveCertifications: vi.fn(),
   saveOrganizationRoles: vi.fn(),
   saveDepartments: vi.fn(),
-  upsertShiftCategory: vi.fn(),
-  upsertJobDefinition: vi.fn(),
+  saveShiftCategories: vi.fn(),
+  saveJobDefinitions: vi.fn(),
 }));
 
 vi.mock("@/features/organization/client", () => ({
@@ -102,12 +103,23 @@ describe("OrganizationSetupWizard", () => {
       org: makeOrganization(),
       superAdmin: { kind: "assigned", displayName: "Jane Doe" },
     });
-    vi.mocked(insertEmployee).mockResolvedValue({
-      id: "emp-1",
-      firstName: "Jane",
-      lastName: "Doe",
-      email: "jane@example.com",
-    } as Awaited<ReturnType<typeof insertEmployee>>);
+    vi.mocked(insertEmployees).mockResolvedValue({
+      employees: [
+        {
+          id: "emp-1",
+          firstName: "Jane",
+          lastName: "Doe",
+          email: "jane@example.com",
+        },
+      ],
+      failed: [],
+    } as unknown as Awaited<ReturnType<typeof insertEmployees>>);
+    vi.mocked(saveDepartments).mockResolvedValue([{ id: 5 }] as unknown as Awaited<
+      ReturnType<typeof saveDepartments>
+    >);
+    vi.mocked(saveFocusAreas).mockResolvedValue({
+      upserts: [{ ok: true, item: { id: 11 } }],
+    } as unknown as Awaited<ReturnType<typeof saveFocusAreas>>);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -115,6 +127,67 @@ describe("OrganizationSetupWizard", () => {
       })),
     );
   });
+
+  async function createOrganization(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByPlaceholderText("Acme Healthcare"), "Acme Health");
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+    await user.type(screen.getByPlaceholderText("Jane"), "Jane");
+    await user.type(screen.getByPlaceholderText("Doe"), "Doe");
+    await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
+    await user.click(screen.getByRole("button", { name: /create organization/i }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
+    );
+    await user.click(await screen.findByRole("button", { name: /set up now/i }));
+  }
+
+  /** Saves setup with one scheduled department and one focus area in it. */
+  async function saveSetupWithFocusArea(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByPlaceholderText("e.g. Emergency"), "Nursing");
+    await user.type(screen.getByPlaceholderText("e.g. ER"), "NUR");
+    await user.type(screen.getByPlaceholderText("Focus Area name"), "East Wing");
+    await user.click(screen.getAllByRole("button", { name: /select scheduled department/i })[0]!);
+    await user.click(screen.getByRole("option", { name: "Nursing" }));
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^save configuration$/i }),
+    );
+  }
+
+  it("puts each person in a focus area saved in setup", async () => {
+    const user = userEvent.setup();
+    render(<OrganizationSetupWizard onCreated={vi.fn()} onCancel={vi.fn()} />);
+    await createOrganization(user);
+
+    await saveSetupWithFocusArea(user);
+
+    await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
+    expect(screen.getByRole("button", { name: /focus area for row 1/i })).toHaveTextContent(
+      "East Wing",
+    );
+    await user.click(screen.getByRole("button", { name: /^create 1 employee$/i }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^create employees$/i }),
+    );
+
+    await waitFor(() =>
+      expect(vi.mocked(insertEmployees)).toHaveBeenCalledWith(
+        [expect.objectContaining({ firstName: "Jane", focusAreaIds: [11] })],
+        expect.any(String),
+      ),
+    );
+  }, 15000);
+
+  it("explains that staff need a focus area when setup made none", async () => {
+    const user = userEvent.setup();
+    render(<OrganizationSetupWizard onCreated={vi.fn()} onCancel={vi.fn()} />);
+    await createOrganization(user);
+    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+    await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
+    expect(screen.getByText(/staff need a focus area to be on the schedule/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^create 1 employee$/i })).toBeDisabled();
+  }, 15000);
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -201,17 +274,8 @@ describe("OrganizationSetupWizard", () => {
       const onCreated = vi.fn();
       render(<OrganizationSetupWizard onCreated={onCreated} onCancel={vi.fn()} />);
 
-      await user.type(screen.getByPlaceholderText("Acme Healthcare"), "Acme Health");
-      await user.click(screen.getByRole("button", { name: /^next$/i }));
-      await user.type(screen.getByPlaceholderText("Jane"), "Jane");
-      await user.type(screen.getByPlaceholderText("Doe"), "Doe");
-      await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
-      await user.click(screen.getByRole("button", { name: /create organization/i }));
-      await user.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
-      );
-      await user.click(await screen.findByRole("button", { name: /set up now/i }));
-      await user.click(screen.getByRole("button", { name: /^skip$/i }));
+      await createOrganization(user);
+      await saveSetupWithFocusArea(user);
 
       await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
       await user.click(screen.getByRole("button", { name: /^create 1 employee$/i }));

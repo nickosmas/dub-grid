@@ -10,7 +10,7 @@ import type {
   ShiftCategory,
   ShiftDisplayMode,
 } from "@/types";
-import { saveCoverageRequirements } from "@/features/settings/client";
+import { saveCoverageRequirementsBatch } from "@/features/settings/client";
 import { Button } from "@/components/Button";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import {
@@ -642,12 +642,11 @@ function FocusAreaCoverageCard({
   sections: CoverageOptionSection[];
   requirements: CoverageRequirement[];
   canEdit: boolean;
-  onBatchSaved: (
-    focusAreaId: number,
-    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
-  ) => void;
+  onBatchSaved: (requirements: CoverageRequirement[]) => void;
 }) {
   const [saving, setSaving] = useState(false);
+  // Edits whose save failed, kept through the resync that the saved ones cause.
+  const [unsavedDrafts, setUnsavedDrafts] = useState<Record<string, CoverageDraft>>({});
 
   const initialDrafts = useMemo(() => {
     const map: Record<string, CoverageDraft> = {};
@@ -666,8 +665,9 @@ function FocusAreaCoverageCard({
   // Sync drafts to the saved baseline when it changes (after a save, or an
   // external update). Render-time adjustment per React guidance, not an effect.
   if (initialKey !== baselineKey) {
-    setDrafts(initialDrafts);
+    setDrafts({ ...initialDrafts, ...unsavedDrafts });
     setBaselineKey(initialKey);
+    setUnsavedDrafts({});
   }
 
   const isDirty = serializeDrafts(drafts) !== initialKey;
@@ -691,27 +691,43 @@ function FocusAreaCoverageCard({
         return serializeDraft(draftFor(option)) !== serializeDraft(initialDrafts[key]);
       });
 
-      const results = await Promise.all(
-        dirtyOptions.map(async (option) => {
+      if (dirtyOptions.length === 0) return;
+
+      const { items, results } = await saveCoverageRequirementsBatch(
+        orgId,
+        dirtyOptions.map((option) => {
           const draft = draftFor(option);
           const { maxStaff } = draft;
-          const rows = draft.everyDay
-            ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0, maxStaff }]
-            : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value, maxStaff }));
-          const saved = await saveCoverageRequirements(
-            orgId,
-            focusArea.id,
-            option.jobId,
-            option.shiftId ?? null,
-            rows,
-          );
-          return { option, saved };
+          return {
+            focusAreaId: focusArea.id,
+            jobId: option.jobId,
+            preferredShiftId: option.shiftId ?? null,
+            requirements: draft.everyDay
+              ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0, maxStaff }]
+              : draft.values.map((value, index) => ({
+                  dayOfWeek: index,
+                  minStaff: value,
+                  maxStaff,
+                })),
+          };
         }),
       );
 
-      onBatchSaved(focusArea.id, results);
+      const failedOptions = dirtyOptions.filter((_, index) => !results[index]?.ok);
+      setUnsavedDrafts(
+        Object.fromEntries(
+          failedOptions.map((option) => [requirementKey(focusArea.id, option), draftFor(option)]),
+        ),
+      );
+      onBatchSaved(items);
+      if (failedOptions.length > 0) {
+        toast.error(
+          `We couldn't save ${failedOptions.length} of ${dirtyOptions.length} coverage requirements. Try again.`,
+        );
+        return;
+      }
       toast.success(
-        results.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved",
+        dirtyOptions.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved",
       );
     } catch (error) {
       Sentry.captureException(error);
@@ -910,22 +926,8 @@ export default function CoverageRequirementsSettings({
     );
   }, [activeFocusAreas, coverageOptions]);
 
-  const handleBatchSaved = (
-    focusAreaId: number,
-    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
-  ) => {
-    if (results.length === 0) return;
-    let updated = coverageRequirements;
-    for (const { option } of results) {
-      updated = updated.filter(
-        (requirement) =>
-          !(
-            requirement.focusAreaId === focusAreaId && requirementMatchesOption(requirement, option)
-          ),
-      );
-    }
-    const added = results.flatMap((result) => result.saved);
-    onCoverageRequirementsChange([...updated, ...added]);
+  const handleBatchSaved = (requirements: CoverageRequirement[]) => {
+    onCoverageRequirementsChange(requirements);
   };
 
   if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {

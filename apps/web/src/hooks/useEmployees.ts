@@ -11,11 +11,12 @@ import {
   EmployeeStatusConflictError,
   FocusAreaShiftsCancelledError,
   fetchEmployees,
-  insertEmployee,
+  insertEmployees,
   removeEmployee,
   setEmployeePlannedChange,
   plannedChangeToast,
   setEmployeeReturnDate,
+  saveSeniorityOrder,
   updateEmployee,
   type BulkStatusOutcome,
   type PlannedChange,
@@ -53,6 +54,8 @@ export interface EmployeesData {
     dataList: Omit<Employee, "id" | "seniority">[],
   ) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<boolean>;
+  /** Saves a whole new seniority order at once; false when nothing changed. */
+  handleSaveSeniorityOrder: (order: Employee[]) => Promise<boolean>;
   /** Saves an employee whose email just changed while a pending invitation
    *  exists, then creates and sends a replacement invitation at the new
    *  address (reusing the old invitation's role/departments). */
@@ -199,33 +202,29 @@ export function useEmployees(
   const handleAddEmployee = useCallback(
     async (dataList: Omit<Employee, "id" | "seniority">[]) => {
       if (!orgId) return;
-      const added: Employee[] = [];
       try {
-        for (const data of dataList) {
-          const maxSen = Math.max(
-            ...allEmployeesRef.current.map((e) => e.seniority),
-            ...added.map((e) => e.seniority),
-            0,
-          );
-          const newEmp = await insertEmployee({ ...data, seniority: maxSen + 1 }, orgId);
-          added.push(newEmp);
+        // One request per hundred people; the server places them after
+        // everyone already in the organization, in the order given.
+        const { employees: added, failed } = await insertEmployees(dataList, orgId);
+        if (added.length === 0 && failed.length > 0) {
+          // Nothing was added, so keep the form open to fix and try again.
+          toast.error(failed[0].error);
+          return undefined;
         }
-        setAllLocal((prev) => [...prev, ...added]);
-        toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
-        invalidateEmployees();
+        if (added.length > 0) {
+          setAllLocal((prev) => [...prev, ...added]);
+          invalidateEmployees();
+        }
+        if (failed.length === 0) {
+          toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
+        } else {
+          toast.error(`Added ${added.length} of ${dataList.length} employees. ${failed[0].error}`);
+        }
         return added;
       } catch (err) {
         Sentry.captureException(err);
-        if (added.length === 0) {
-          toast.error(formatClientErrorMessage(err, "We couldn't add that person. Try again."));
-          return undefined;
-        }
-        // Rows are inserted one at a time, so some may already exist. Show
-        // them, and close the form rather than let a retry add them twice.
-        setAllLocal((prev) => [...prev, ...added]);
-        invalidateEmployees();
-        toast.error(`Added ${added.length} of ${dataList.length} employees. Add the rest again.`);
-        return added;
+        toast.error(formatClientErrorMessage(err, "We couldn't add that person. Try again."));
+        return undefined;
       }
     },
     [orgId, invalidateEmployees],
@@ -275,6 +274,45 @@ export function useEmployees(
         }
         if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save their details. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleSaveSeniorityOrder = useCallback(
+    async (order: Employee[]) => {
+      if (!orgId) return false;
+      const prevAll = allEmployeesRef.current;
+      const moves = order.flatMap((emp, index) =>
+        emp.seniority === index + 1
+          ? []
+          : [{ id: emp.id, seniority: index + 1, version: emp.version }],
+      );
+      if (moves.length === 0) return true;
+      const nextSeniority = new Map(moves.map((move) => [move.id, move.seniority]));
+      setAllLocal((prev) =>
+        prev.map((row) =>
+          nextSeniority.has(row.id) ? { ...row, seniority: nextSeniority.get(row.id)! } : row,
+        ),
+      );
+      try {
+        const saved = await saveSeniorityOrder(orgId, moves);
+        const savedById = new Map(saved.map((emp) => [emp.id, emp]));
+        setAllLocal((prev) => prev.map((row) => savedById.get(row.id) ?? row));
+        toast.success("Order saved");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        // The server saves all of it or none of it, so the whole list goes back.
+        setAllLocal(prevAll);
+        toast.error(
+          formatClientErrorMessage(
+            err,
+            "We couldn't save the new order, so nothing changed. Try again.",
+          ),
+        );
         Sentry.captureException(err);
         return false;
       }
@@ -712,6 +750,7 @@ export function useEmployees(
     loading,
     handleAddEmployee,
     handleSaveEmployee,
+    handleSaveSeniorityOrder,
     handleSaveEmployeeWithReinvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,

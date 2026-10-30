@@ -117,6 +117,7 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: vi.fn(),
 }));
 
+import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { POST } from "./route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -1978,5 +1979,183 @@ describe("POST /api/schedule/manage permission gates", () => {
         state: row.state,
       },
     });
+  });
+});
+
+describe("POST /api/schedule/manage upsertShifts", () => {
+  const orgId = "11111111-1111-4111-8111-111111111111";
+  const echo = { isScheduler: true, assignmentLabels: [], absenceTypeLabels: [[7, "Vacation"]] };
+  const absence = { kind: "absence", segments: [], absenceTypeId: 7 };
+  const employeeIds = [
+    "22222222-2222-4222-8222-222222222222",
+    "33333333-3333-4333-8333-333333333333",
+    "44444444-4444-4444-8444-444444444444",
+  ];
+
+  function cellRow(employeeId: string, version: number) {
+    return {
+      id: `cell-${employeeId}`,
+      emp_id: employeeId,
+      date: "2026-11-02",
+      org_id: orgId,
+      version,
+      series_id: null,
+      from_recurring: false,
+      created_by: null,
+      updated_by: null,
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+      snapshots: [
+        {
+          id: `snap-${employeeId}`,
+          cell_id: `cell-${employeeId}`,
+          org_id: orgId,
+          snapshot_kind: "draft",
+          state_kind: "absence",
+          absence_type_id: 7,
+          custom_start_time: null,
+          custom_end_time: null,
+          segments: [],
+        },
+      ],
+    };
+  }
+
+  /** Serves the read-back of saved cells, the version read of a conflict, and audit rows. */
+  function stubTables(rows: ReturnType<typeof cellRow>[], currentVersion = 9) {
+    const auditInsert = vi.fn(async (_row: Record<string, unknown>) => ({ error: null }));
+    serviceFrom.mockImplementation((table: string) => {
+      if (table === "audit_log") return { insert: auditInsert };
+      if (table !== "schedule_cells") throw new Error(`unexpected table ${table}`);
+      const query = {
+        select: () => query,
+        eq: () => query,
+        in: () => query,
+        maybeSingle: async () => ({ data: { version: currentVersion }, error: null }),
+        then: (resolve: (value: { data: unknown; error: null }) => unknown) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve),
+      };
+      return query;
+    });
+    return { auditInsert };
+  }
+
+  function batchRequest(shifts: unknown[]) {
+    return makeRequest({ action: "upsertShifts", orgId, echo, shifts });
+  }
+
+  const everyCell = employeeIds.map((employeeId) => ({
+    employeeId,
+    date: "2026-11-02",
+    input: absence,
+    expectedVersion: 2,
+  }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveEffectiveOrgId.mockImplementation((_req, _userId, requestedOrgId) =>
+      Promise.resolve(requestedOrgId),
+    );
+    requireOrgPermissions.mockImplementation(async (_req, requestedOrgId) => ({
+      // The write reads a conflicted cell's version through the caller's own client.
+      userClient: { rpc: userRpc, from: serviceFrom },
+      serviceClient: { from: serviceFrom, rpc: serviceRpc },
+      actor: { id: "actor-user" },
+      orgId: requestedOrgId,
+      permissions: { canEditShifts: true },
+    }));
+    serviceRpc.mockResolvedValue({ data: [], error: null });
+    userRpc.mockResolvedValue({ data: null, error: null });
+    vi.mocked(fetchAssignmentIdByPairMap).mockResolvedValue(new Map());
+  });
+
+  it("saves every cell after one permission check, with one audit row each", async () => {
+    const { auditInsert } = stubTables(employeeIds.map((id) => cellRow(id, 3)));
+
+    const response = await POST(batchRequest(everyCell));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(requireOrgPermissions).toHaveBeenCalledTimes(1);
+    expect(userRpc).toHaveBeenCalledTimes(3);
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({ p_emp_id: employeeIds[1], p_expected_version: 2 }),
+    );
+    expect(auditInsert).toHaveBeenCalledTimes(3);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "shift.updated",
+        resource_id: `${employeeIds[0]}:2026-11-02`,
+      }),
+    );
+    expect(body.results).toHaveLength(3);
+    body.results.forEach((result: unknown, index: number) => {
+      expect(result).toMatchObject({
+        employeeId: employeeIds[index],
+        date: "2026-11-02",
+        status: "saved",
+        cell: expect.objectContaining({ version: 3 }),
+      });
+    });
+  });
+
+  it("reports a conflicted and a refused cell without failing the others", async () => {
+    const { auditInsert } = stubTables(employeeIds.map((id) => cellRow(id, 9)));
+    userRpc.mockImplementation(async (_fn: string, args: Record<string, unknown>) => {
+      if (args.p_emp_id === employeeIds[1]) {
+        return { data: null, error: { message: "Optimistic lock failed" } };
+      }
+      if (args.p_emp_id === employeeIds[2]) {
+        return { data: null, error: { message: "Past days are corrected, not drafted" } };
+      }
+      return { data: null, error: null };
+    });
+
+    const response = await POST(batchRequest(everyCell));
+
+    expect(response.status).toBe(200);
+    const { results } = await response.json();
+    expect(results[0]).toMatchObject({ status: "saved", cell: expect.any(Object) });
+    expect(results[1]).toMatchObject({
+      status: "conflict",
+      actualVersion: 9,
+      cell: expect.objectContaining({ version: 9 }),
+    });
+    expect(results[2]).toEqual({
+      employeeId: employeeIds[2],
+      date: "2026-11-02",
+      status: "error",
+      error: "This day has passed. Open it to correct it instead.",
+      code: "PAST_DAY",
+    });
+    // Only the cell that saved is written to the activity log.
+    expect(auditInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses the whole batch when the caller can't edit shifts", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
+
+    const response = await POST(batchRequest(everyCell));
+
+    expect(response.status).toBe(403);
+    expect(userRpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses more than 50 cells, or none, before checking permissions", async () => {
+    const tooMany = Array.from({ length: 51 }, (_unused, index) => ({
+      employeeId: employeeIds[0],
+      date: `2026-11-${String((index % 28) + 1).padStart(2, "0")}`,
+      input: absence,
+    }));
+
+    for (const shifts of [tooMany, []]) {
+      const response = await POST(batchRequest(shifts));
+      expect(response.status).toBe(400);
+    }
+    expect(requireOrgPermissions).not.toHaveBeenCalled();
+    expect(userRpc).not.toHaveBeenCalled();
   });
 });

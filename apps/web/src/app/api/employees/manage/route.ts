@@ -66,6 +66,8 @@ import {
   fetchMobilePendingInvitationRowByEmployeeId,
 } from "@dubgrid/data-access";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { reorderSeniority } from "@/features/employees/server/reorder-seniority";
+import { insertEmployees, MAX_EMPLOYEE_BATCH } from "@/features/employees/server/insert-employees";
 import { enrichAuditRows } from "@/lib/audit/enrich";
 import {
   buildEmployeeActivityRows,
@@ -147,6 +149,11 @@ async function refuseInvalidFirstDay(
 
 const employeeCreateSchema = employeeSchema.omit({ id: true });
 
+const MAX_REORDER_ROWS = 2000;
+// Parallel writes per round; enough to save a large roster quickly without
+// opening hundreds of connections at once.
+const REORDER_WRITE_CHUNK = 25;
+
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchEmployees"),
@@ -165,6 +172,29 @@ const requestSchema = z.discriminatedUnion("action", [
     expectedVersion: z.number().int().nonnegative().optional(),
     /** What to do with their upcoming shifts in focus areas they come off (51i). */
     focusAreaShifts: z.enum(["clear", "keep"]).optional(),
+  }),
+  z.object({
+    action: z.literal("insertEmployees"),
+    orgId: z.string().uuid(),
+    employees: z
+      .array(employeeCreateSchema.omit({ seniority: true }))
+      .min(1)
+      .max(MAX_EMPLOYEE_BATCH),
+  }),
+  z.object({
+    action: z.literal("reorderSeniority"),
+    orgId: z.string().uuid(),
+    /** Only the people whose place changed, each at the version the manager saw. */
+    order: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          seniority: z.number().int(),
+          version: z.number().int().nonnegative(),
+        }),
+      )
+      .min(1)
+      .max(MAX_REORDER_ROWS),
   }),
   z.object({
     action: z.literal("fetchEmployeeById"),
@@ -691,6 +721,28 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      case "insertEmployees": {
+        const auth = await requireEmployeeSetupPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const outcome = await insertEmployees({
+          serviceClient: auth.serviceClient,
+          orgId: data.orgId,
+          actor: auth.actor,
+          employees: data.employees,
+          ip: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+        return "response" in outcome ? outcome.response : NextResponse.json(outcome);
+      }
+
       case "updateEmployee": {
         const auth = await requireEmployeeSetupPermissions(
           req,
@@ -917,12 +969,14 @@ export async function POST(req: NextRequest) {
               toStatus: nextEmployee.status,
             });
           }
-          if (changedProfileFields.length > 0) {
+          // Seniority is the order managers keep, so it never alerts the person.
+          const alertFields = changedProfileFields.filter((field) => field !== "seniority");
+          if (alertFields.length > 0) {
             void dispatchNotificationEvent(auth.actor.id, {
               action: "employee_profile_changed",
               orgId: data.orgId,
               empId: nextEmployee.id,
-              fields: changedProfileFields,
+              fields: alertFields,
             });
           }
 
@@ -1018,6 +1072,60 @@ export async function POST(req: NextRequest) {
             ? { focusAreaShiftsNotCleared: focusAreaShiftsResult.notCleared }
             : {}),
         });
+      }
+
+      case "reorderSeniority": {
+        const auth = await requireEmployeeSetupPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const result = await reorderSeniority(auth.serviceClient, data.orgId, data.order);
+        if (result.kind === "conflict") {
+          return NextResponse.json(
+            { error: changedElsewhereMessage("the order"), code: "EMPLOYEE_CONFLICT" },
+            { status: 409 },
+          );
+        }
+        if (result.kind === "missing") {
+          return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
+        }
+
+        // One row per person, as a single save writes; the activity log
+        // shows the run as one entry. A seniority change sends no alert: it
+        // is the order managers keep, not something about the person.
+        const { error: reorderAuditError } = await auth.serviceClient.from("audit_log").insert(
+          result.changed.map(({ before, after }) => ({
+            org_id: data.orgId,
+            actor_id: auth.actor.id,
+            actor_email: auth.actor.email ?? null,
+            action: "employee.updated",
+            resource_type: "employee",
+            resource_id: after.id,
+            details: {
+              firstName: after.firstName,
+              lastName: after.lastName,
+              changedFields: ["seniority"],
+              from: { seniority: before.seniority },
+              to: { seniority: after.seniority },
+            },
+            ip_address: getRequestIp(req),
+            user_agent: req.headers.get("user-agent"),
+          })),
+        );
+        if (reorderAuditError) {
+          logger.error(
+            { error: reorderAuditError, orgId: data.orgId },
+            "Seniority reorder audit log write failed",
+          );
+        }
+
+        return NextResponse.json({ employees: result.changed.map(({ after }) => after) });
       }
 
       case "fetchEmployeeById": {

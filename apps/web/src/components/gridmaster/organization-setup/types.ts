@@ -43,6 +43,8 @@ export interface EmployeeRow {
   lastName: string;
   email: string;
   phone: string;
+  /** The setup row id of their focus area; unset means the first one saved. */
+  focusAreaId?: string | null;
 }
 
 export interface CreatedEmployee {

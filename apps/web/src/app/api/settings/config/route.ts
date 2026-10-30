@@ -19,6 +19,7 @@ import { withoutHiddenStaff } from "@dubgrid/data-access";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import logger from "@/lib/logger";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
@@ -60,6 +61,9 @@ import {
   validateJob,
   validateAbsenceType,
   validateIndicatorType,
+  type FocusAreaInput,
+  type JobInput,
+  type ShiftCategoryInput,
 } from "./_lib/validation";
 import {
   getJobEligibilityMode,
@@ -102,6 +106,7 @@ type SettingsPermission =
   | "indicatorTypesManage";
 
 const POSTGREST_MUTATION_BATCH_SIZE = 50;
+const MAX_BATCH_ITEMS = 200;
 
 type SettingsServiceClient = ReturnType<typeof getServiceClient>;
 type ArchivableSettingsTable = "certifications" | "organization_roles" | "departments";
@@ -313,6 +318,13 @@ const coverageRequirementInputSchema = z
     { message: "The maximum can't be fewer than the minimum.", path: ["maxStaff"] },
   );
 
+const coverageEntrySchema = z.object({
+  focusAreaId: z.number().int(),
+  jobId: z.number().int(),
+  preferredShiftId: z.number().int().nullable(),
+  requirements: z.array(coverageRequirementInputSchema),
+});
+
 const postBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("saveCertifications"),
@@ -361,6 +373,16 @@ const postBodySchema = z.discriminatedUnion("action", [
     hard: z.boolean().optional(),
   }),
   z.object({
+    action: z.literal("saveFocusAreas"),
+    orgId: z.string().uuid(),
+    upserts: z
+      .array(focusAreaSchema.extend({ id: z.number().int().optional() }))
+      .max(MAX_BATCH_ITEMS),
+    deletes: z
+      .array(z.object({ itemId: z.number().int(), hard: z.boolean().optional() }))
+      .max(MAX_BATCH_ITEMS),
+  }),
+  z.object({
     action: z.literal("restoreFocusArea"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
@@ -368,6 +390,14 @@ const postBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("upsertShiftCategory"),
     shiftCategory: shiftCategorySchema.extend({ id: z.number().int().optional() }),
+  }),
+  z.object({
+    action: z.literal("saveShiftCategories"),
+    orgId: z.string().uuid(),
+    items: z
+      .array(shiftCategorySchema.extend({ id: z.number().int().optional() }))
+      .min(1)
+      .max(MAX_BATCH_ITEMS),
   }),
   z.object({
     action: z.literal("deleteShiftCategory"),
@@ -383,6 +413,14 @@ const postBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("upsertJobDefinition"),
     job: jobSchema.extend({ id: z.number().int().optional() }),
+  }),
+  z.object({
+    action: z.literal("saveJobDefinitions"),
+    orgId: z.string().uuid(),
+    items: z
+      .array(jobSchema.extend({ id: z.number().int().optional() }))
+      .min(1)
+      .max(MAX_BATCH_ITEMS),
   }),
   z.object({
     action: z.literal("deleteJobDefinition"),
@@ -402,6 +440,11 @@ const postBodySchema = z.discriminatedUnion("action", [
     jobId: z.number().int(),
     preferredShiftId: z.number().int().nullable(),
     requirements: z.array(coverageRequirementInputSchema),
+  }),
+  z.object({
+    action: z.literal("saveCoverageRequirementsBatch"),
+    orgId: z.string().uuid(),
+    entries: z.array(coverageEntrySchema).min(1).max(MAX_BATCH_ITEMS),
   }),
   z.object({
     action: z.literal("upsertAbsenceType"),
@@ -484,6 +527,375 @@ async function writeAudit(args: {
   } catch {
     // Best effort only. We do not fail config updates on audit write issues.
   }
+}
+
+/** One audit row per item, written in one insert. Best effort, like writeAudit. */
+async function writeAudits(
+  actor: User,
+  orgId: string,
+  entries: Array<{
+    action: AuditAction;
+    resourceType: AuditResourceType;
+    resourceId: string | null;
+    details?: Record<string, unknown>;
+  }>,
+) {
+  if (entries.length === 0) return;
+  try {
+    await getServiceClient()
+      .from("audit_log")
+      .insert(
+        entries.map((entry) => ({
+          org_id: orgId,
+          actor_id: actor.id,
+          actor_email: actor.email ?? null,
+          action: entry.action,
+          resource_type: entry.resourceType,
+          resource_id: entry.resourceId,
+          details: entry.details ?? {},
+        })),
+      );
+  } catch {
+    // Best effort only. We do not fail config updates on audit write issues.
+  }
+}
+
+const BATCH_WAVE_SIZE = 10;
+
+type BatchItemResult<T> = { ok: true; item: T } | { ok: false; error: string };
+
+/**
+ * One write per item, a few at a time: a failed item doesn't stop the rest,
+ * and a long list doesn't open hundreds of connections at once.
+ */
+async function settleInWaves<T, R>(
+  items: T[],
+  run: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  for (let start = 0; start < items.length; start += BATCH_WAVE_SIZE) {
+    results.push(
+      ...(await Promise.allSettled(items.slice(start, start + BATCH_WAVE_SIZE).map(run))),
+    );
+  }
+  return results;
+}
+
+function batchItemError(error: unknown, fallback: string): string {
+  return getShiftCategoryConflict(error)?.error ?? formatClientErrorMessage(error, fallback);
+}
+
+/** Every item failed, so the request failed: answer the way a single save would. */
+function allFailedResponse(errors: unknown[], fallback: string): NextResponse {
+  const first = errors[0];
+  const conflict = getShiftCategoryConflict(first);
+  if (conflict) return NextResponse.json(conflict, { status: 409 });
+  return apiErrorResponse(first, fallback);
+}
+
+async function saveFocusAreaRow(
+  serviceClient: SettingsServiceClient,
+  focusArea: FocusAreaInput,
+): Promise<FocusArea> {
+  const row = {
+    org_id: focusArea.orgId,
+    department_id: focusArea.departmentId ?? null,
+    name: focusArea.name,
+    color: normalizePresetBg(focusArea.color ?? undefined),
+    sort_order: focusArea.sortOrder,
+  };
+  if (focusArea.id) {
+    const { data, error } = await serviceClient
+      .from("focus_areas")
+      .update(row)
+      .eq("org_id", focusArea.orgId)
+      .eq("id", focusArea.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToFocusArea(data as Parameters<typeof rowToFocusArea>[0]);
+  }
+  const { data, error } = await serviceClient.from("focus_areas").insert(row).select().single();
+  if (error) throw error;
+  return rowToFocusArea(data as Parameters<typeof rowToFocusArea>[0]);
+}
+
+/** Deletes a focus area, or archives it when anything refers to it. Returns true when deleted. */
+async function removeFocusAreaRow(
+  serviceClient: SettingsServiceClient,
+  orgId: string,
+  focusAreaId: number,
+  hard: boolean | undefined,
+): Promise<boolean> {
+  const wantHard = hard === true && !(await focusAreaHasAnyReferencesForOrg(focusAreaId, orgId));
+
+  if (wantHard) {
+    const { error } = await serviceClient
+      .from("focus_areas")
+      .delete()
+      .eq("org_id", orgId)
+      .eq("id", focusAreaId);
+    if (error) throw error;
+    return true;
+  }
+
+  const now = new Date().toISOString();
+  const { error: categoryError } = await serviceClient
+    .from("shift_categories")
+    .update({ archived_at: now })
+    .eq("org_id", orgId)
+    .eq("focus_area_id", focusAreaId)
+    .is("archived_at", null);
+  if (categoryError) throw categoryError;
+
+  const { error: employeeError } = await serviceClient.rpc("remove_focus_area_from_employees", {
+    p_focus_area_id: focusAreaId,
+  });
+  if (employeeError) throw employeeError;
+
+  const { error } = await serviceClient
+    .from("focus_areas")
+    .update({ archived_at: now })
+    .eq("org_id", orgId)
+    .eq("id", focusAreaId);
+  if (error) throw error;
+  return false;
+}
+
+function focusAreaRemovalCacheKeys(orgId: string): string[] {
+  return [
+    CacheKey.focusAreas(orgId),
+    CacheKey.assignments(orgId),
+    CacheKey.assignments(orgId, true),
+    CacheKey.shiftCategories(orgId),
+    CacheKey.employees(orgId),
+    CacheKey.coverageReqs(orgId),
+  ];
+}
+
+async function saveShiftCategoryRow(
+  serviceClient: SettingsServiceClient,
+  shiftCategory: ShiftCategoryInput,
+): Promise<ShiftCategory> {
+  const row = {
+    org_id: shiftCategory.orgId,
+    name: shiftCategory.name,
+    abbr: shiftCategory.abbr ?? null,
+    start_time: shiftCategory.startTime ?? null,
+    end_time: shiftCategory.endTime ?? null,
+    color: normalizePresetBg(shiftCategory.color),
+    sort_order: shiftCategory.sortOrder,
+    focus_area_id: shiftCategory.focusAreaId ?? null,
+    break_minutes: shiftCategory.breakMinutes ?? null,
+  };
+  if (shiftCategory.id) {
+    const { data, error } = await serviceClient
+      .from("shift_categories")
+      .update(row)
+      .eq("org_id", shiftCategory.orgId)
+      .eq("id", shiftCategory.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToShiftCategory(data as Parameters<typeof rowToShiftCategory>[0]);
+  }
+  const { data, error } = await serviceClient
+    .from("shift_categories")
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToShiftCategory(data as Parameters<typeof rowToShiftCategory>[0]);
+}
+
+function shiftCategoryCacheKeys(orgId: string): string[] {
+  return [
+    CacheKey.shiftCategories(orgId),
+    CacheKey.assignments(orgId),
+    CacheKey.assignments(orgId, true),
+    CacheKey.jobs(orgId),
+    CacheKey.jobs(orgId, true),
+  ];
+}
+
+function jobCacheKeys(orgId: string): string[] {
+  return [
+    CacheKey.assignments(orgId),
+    CacheKey.assignments(orgId, true),
+    CacheKey.jobs(orgId),
+    CacheKey.jobs(orgId, true),
+  ];
+}
+
+async function saveJobRow(
+  serviceClient: SettingsServiceClient,
+  actor: User,
+  job: JobInput,
+): Promise<JobDefinition> {
+  const normalizedTiming = normalizeShiftlessJobTiming(job);
+  const isShiftlessJob = (job.assignmentMode ?? "with_shift") === "shiftless";
+  const storedStyle = isShiftlessJob
+    ? { color: job.color, border_color: job.border, text_color: job.text }
+    : {
+        color: DEFAULT_SCHEDULED_JOB_STYLE.color,
+        border_color: DEFAULT_SCHEDULED_JOB_STYLE.border,
+        text_color: DEFAULT_SCHEDULED_JOB_STYLE.text,
+      };
+
+  const row = {
+    org_id: job.orgId,
+    name: job.name,
+    abbr: job.abbr,
+    show_on_grid: job.showOnGrid,
+    assignment_mode: job.assignmentMode ?? "with_shift",
+    eligibility_mode: getJobEligibilityMode(job),
+    focus_area_ids: getStoredJobFocusAreaIds(job),
+    department_ids: getStoredJobDepartmentIds(job),
+    applicable_shift_ids: normalizePlacementIds(job.applicableShiftIds),
+    eligible_role_ids: job.eligibleRoleIds ?? [],
+    required_certification_ids: job.requiredCertificationIds ?? [],
+    color: storedStyle.color,
+    border_color: storedStyle.border_color,
+    text_color: storedStyle.text_color,
+    default_start_time: normalizedTiming.defaultStartTime,
+    default_end_time: normalizedTiming.defaultEndTime,
+    default_duration_hours: normalizedTiming.defaultDurationHours,
+    default_duration_minutes: normalizedTiming.defaultDurationMinutes,
+    sort_order: job.sortOrder,
+    system_key: job.systemKey ?? null,
+  };
+  const timeOverrides = normalizeShiftTimeOverrides(
+    job.shiftTimeOverrides as Record<string, JobShiftTimeOverride | undefined> | undefined,
+  );
+  const colorOverrides = normalizeShiftColorOverrides(job.shiftColorOverrides);
+
+  let savedRow;
+  if (job.id) {
+    const { data: updated, error } = await serviceClient
+      .from("jobs")
+      .update(row)
+      .eq("org_id", job.orgId)
+      .eq("id", job.id)
+      .select(JOB_COLS)
+      .single();
+    if (error) throw error;
+    savedRow = updated;
+  } else {
+    const { data: inserted, error } = await serviceClient
+      .from("jobs")
+      .insert(row)
+      .select(JOB_COLS)
+      .single();
+    if (error) throw error;
+    savedRow = inserted;
+  }
+
+  const { error: overridesError } = await serviceClient.rpc("set_job_shift_overrides", {
+    p_job_id: savedRow.id,
+    p_time_overrides: timeOverrides,
+    p_color_overrides: colorOverrides,
+    p_actor_id: actor.id,
+  });
+  if (overridesError) throw overridesError;
+  const { data: overrideRows, error: overrideRowsError } = await serviceClient
+    .from("job_shift_overrides")
+    .select("shift_id, start_time, end_time, color")
+    .eq("job_id", savedRow.id);
+  if (overrideRowsError) throw overrideRowsError;
+  savedRow.job_shift_overrides = overrideRows ?? [];
+  return rowToJobDefinition(savedRow as Parameters<typeof rowToJobDefinition>[0]);
+}
+
+type CoverageEntryInput = z.infer<typeof coverageEntrySchema>;
+
+/** Replaces one job and shift option's requirements in a focus area. Returns the rows written. */
+async function replaceCoverageRequirements(
+  serviceClient: SettingsServiceClient,
+  orgId: string,
+  entry: CoverageEntryInput,
+): Promise<number> {
+  let deleteQuery = serviceClient
+    .from("coverage_requirements")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("focus_area_id", entry.focusAreaId)
+    .eq("job_id", entry.jobId);
+  deleteQuery =
+    entry.preferredShiftId == null
+      ? deleteQuery.is("preferred_shift_id", null)
+      : deleteQuery.eq("preferred_shift_id", entry.preferredShiftId);
+  const { error: deleteError } = await deleteQuery;
+  if (deleteError) throw deleteError;
+
+  const rows = entry.requirements
+    .filter((requirement) => requirement.minStaff > 0)
+    .map((requirement) => ({
+      org_id: orgId,
+      focus_area_id: entry.focusAreaId,
+      job_id: entry.jobId,
+      preferred_shift_id: entry.preferredShiftId,
+      day_of_week: requirement.dayOfWeek,
+      min_staff: requirement.minStaff,
+      max_staff: requirement.maxStaff ?? null,
+    }));
+
+  if (rows.length > 0) {
+    const { error } = await serviceClient.from("coverage_requirements").insert(rows);
+    if (error) throw error;
+  }
+  return rows.length;
+}
+
+function coverageResourceId(entry: CoverageEntryInput): string {
+  return `${entry.focusAreaId}_${entry.jobId}_${entry.preferredShiftId ?? "null"}`;
+}
+
+/** Invalidates, audits each saved item and answers for a batch of upserts. */
+async function finishItemBatch<T extends { id: number }>(args: {
+  action: string;
+  orgId: string;
+  actor: User;
+  saves: PromiseSettledResult<T>[];
+  names: string[];
+  cacheKeys: string[];
+  audit: { action: AuditAction; resourceType: AuditResourceType };
+}): Promise<NextResponse> {
+  const { saves } = args;
+  const failures = saves.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
+  if (failures.length > 0) {
+    logger.error(
+      { action: args.action, orgId: args.orgId, failed: failures.length, error: failures[0] },
+      "Some settings items did not save",
+    );
+  }
+  if (failures.length < saves.length) {
+    await cacheDel(...args.cacheKeys);
+  }
+  await writeAudits(
+    args.actor,
+    args.orgId,
+    saves.flatMap((result, index) =>
+      result.status === "fulfilled"
+        ? [
+            {
+              ...args.audit,
+              resourceId: String(result.value.id),
+              details: { name: args.names[index] },
+            },
+          ]
+        : [],
+    ),
+  );
+  if (failures.length === saves.length) {
+    return allFailedResponse(failures, "We couldn't save your settings. Try again.");
+  }
+  return NextResponse.json({
+    results: saves.map((result): BatchItemResult<T> =>
+      result.status === "fulfilled"
+        ? { ok: true, item: result.value }
+        : { ok: false, error: batchItemError(result.reason, "We couldn't save that.") },
+    ),
+  });
 }
 
 async function authorize(req: NextRequest, orgId: string, permission: SettingsPermission) {
@@ -1554,15 +1966,19 @@ export async function POST(req: NextRequest) {
     saveDepartments: "departmentsManage",
     restoreDepartment: "departmentsManage",
     upsertFocusArea: "departmentsManage",
+    saveFocusAreas: "departmentsManage",
     deleteFocusArea: "departmentsManage",
     restoreFocusArea: "departmentsManage",
     upsertShiftCategory: "scheduleDefinitionsManage",
+    saveShiftCategories: "scheduleDefinitionsManage",
     deleteShiftCategory: "scheduleDefinitionsManage",
     restoreShiftCategory: "scheduleDefinitionsManage",
     upsertJobDefinition: "scheduleDefinitionsManage",
+    saveJobDefinitions: "scheduleDefinitionsManage",
     deleteJobDefinition: "scheduleDefinitionsManage",
     restoreJobDefinition: "scheduleDefinitionsManage",
     saveCoverageRequirements: "coverageManage",
+    saveCoverageRequirementsBatch: "coverageManage",
     upsertAbsenceType: "scheduleDefinitionsManage",
     deleteAbsenceType: "scheduleDefinitionsManage",
     restoreAbsenceType: "scheduleDefinitionsManage",
@@ -1600,6 +2016,15 @@ export async function POST(req: NextRequest) {
   }
   if ("indicatorType" in data && data.indicatorType) {
     (data.indicatorType as { orgId: string }).orgId = effectiveOrgId;
+  }
+  const batchItems =
+    data.action === "saveFocusAreas"
+      ? data.upserts
+      : data.action === "saveShiftCategories" || data.action === "saveJobDefinitions"
+        ? data.items
+        : [];
+  for (const item of batchItems) {
+    item.orgId = effectiveOrgId;
   }
 
   const { actor, serviceClient } = authorized;
@@ -1938,98 +2363,104 @@ export async function POST(req: NextRequest) {
         if ("response" in validatedFocusArea) {
           return validatedFocusArea.response;
         }
-        const row = {
-          org_id: validatedFocusArea.focusArea.orgId,
-          department_id: validatedFocusArea.focusArea.departmentId ?? null,
-          name: validatedFocusArea.focusArea.name,
-          color: normalizePresetBg(validatedFocusArea.focusArea.color ?? undefined),
-          sort_order: validatedFocusArea.focusArea.sortOrder,
-        };
-
-        let savedRow;
-        if (validatedFocusArea.focusArea.id) {
-          const { data: updated, error } = await serviceClient
-            .from("focus_areas")
-            .update(row)
-            .eq("id", validatedFocusArea.focusArea.id)
-            .select()
-            .single();
-          if (error) throw error;
-          savedRow = updated;
-        } else {
-          const { data: inserted, error } = await serviceClient
-            .from("focus_areas")
-            .insert(row)
-            .select()
-            .single();
-          if (error) throw error;
-          savedRow = inserted;
-        }
-
+        const item = await saveFocusAreaRow(serviceClient, validatedFocusArea.focusArea);
         await cacheDel(CacheKey.focusAreas(validatedFocusArea.focusArea.orgId));
         await writeAudit({
           actor,
           action: "focus_area.upserted",
           resourceType: "focus_area",
-          resourceId: String(savedRow.id),
+          resourceId: String(item.id),
           details: { name: validatedFocusArea.focusArea.name },
           orgId: validatedFocusArea.focusArea.orgId,
         });
-        return NextResponse.json({
-          item: rowToFocusArea(savedRow as Parameters<typeof rowToFocusArea>[0]),
-        });
+        return NextResponse.json({ item });
       }
       case "deleteFocusArea": {
-        const wantHard =
-          data.hard === true && !(await focusAreaHasAnyReferencesForOrg(data.itemId, data.orgId));
-
-        if (wantHard) {
-          const { error } = await serviceClient
-            .from("focus_areas")
-            .delete()
-            .eq("org_id", data.orgId)
-            .eq("id", data.itemId);
-          if (error) throw error;
-        } else {
-          const now = new Date().toISOString();
-          const { error: categoryError } = await serviceClient
-            .from("shift_categories")
-            .update({ archived_at: now })
-            .eq("org_id", data.orgId)
-            .eq("focus_area_id", data.itemId)
-            .is("archived_at", null);
-          if (categoryError) throw categoryError;
-
-          const { error: employeeError } = await serviceClient.rpc(
-            "remove_focus_area_from_employees",
-            { p_focus_area_id: data.itemId },
-          );
-          if (employeeError) throw employeeError;
-
-          const { error } = await serviceClient
-            .from("focus_areas")
-            .update({ archived_at: now })
-            .eq("org_id", data.orgId)
-            .eq("id", data.itemId);
-          if (error) throw error;
-        }
-
-        await cacheDel(
-          CacheKey.focusAreas(data.orgId),
-          CacheKey.assignments(data.orgId),
-          CacheKey.assignments(data.orgId, true),
-          CacheKey.shiftCategories(data.orgId),
-          CacheKey.employees(data.orgId),
-          CacheKey.coverageReqs(data.orgId),
-        );
+        const deleted = await removeFocusAreaRow(serviceClient, data.orgId, data.itemId, data.hard);
+        await cacheDel(...focusAreaRemovalCacheKeys(data.orgId));
         await writeAudit({
           actor,
-          action: wantHard ? "focus_area.deleted" : "focus_area.archived",
+          action: deleted ? "focus_area.deleted" : "focus_area.archived",
           resourceType: "focus_area",
           resourceId: String(data.itemId),
           orgId: data.orgId,
         });
         return NextResponse.json({ success: true });
+      }
+      case "saveFocusAreas": {
+        const upserts: FocusAreaInput[] = [];
+        for (const focusArea of data.upserts) {
+          const validated = validateFocusArea(focusArea);
+          if ("response" in validated) return validated.response;
+          upserts.push(validated.focusArea);
+        }
+
+        // Removals first, as the one-at-a-time saves did, so a new area can
+        // take the name of one removed in the same save.
+        const removals = await settleInWaves(data.deletes, (item) =>
+          removeFocusAreaRow(serviceClient, data.orgId, item.itemId, item.hard),
+        );
+        const saves = await settleInWaves(upserts, (focusArea) =>
+          saveFocusAreaRow(serviceClient, focusArea),
+        );
+
+        const failures = [...removals, ...saves].flatMap((result) =>
+          result.status === "rejected" ? [result.reason] : [],
+        );
+        if (failures.length > 0) {
+          logger.error(
+            { action: data.action, orgId: data.orgId, failed: failures.length, error: failures[0] },
+            "Some focus areas did not save",
+          );
+        }
+
+        if (removals.length > 0) {
+          await cacheDel(...focusAreaRemovalCacheKeys(data.orgId));
+        } else if (saves.length > 0) {
+          await cacheDel(CacheKey.focusAreas(data.orgId));
+        }
+        await writeAudits(actor, data.orgId, [
+          ...removals.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [
+                  {
+                    action: (result.value
+                      ? "focus_area.deleted"
+                      : "focus_area.archived") as AuditAction,
+                    resourceType: "focus_area" as const,
+                    resourceId: String(data.deletes[index].itemId),
+                  },
+                ]
+              : [],
+          ),
+          ...saves.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [
+                  {
+                    action: "focus_area.upserted" as const,
+                    resourceType: "focus_area" as const,
+                    resourceId: String(result.value.id),
+                    details: { name: upserts[index].name },
+                  },
+                ]
+              : [],
+          ),
+        ]);
+
+        if (failures.length > 0 && failures.length === removals.length + saves.length) {
+          return allFailedResponse(failures, "We couldn't save your settings. Try again.");
+        }
+        return NextResponse.json({
+          upserts: saves.map((result): BatchItemResult<FocusArea> =>
+            result.status === "fulfilled"
+              ? { ok: true, item: result.value }
+              : { ok: false, error: batchItemError(result.reason, "We couldn't save that.") },
+          ),
+          deletes: removals.map((result, index) => ({
+            itemId: data.deletes[index].itemId,
+            ok: result.status === "fulfilled",
+          })),
+        });
       }
       case "restoreFocusArea": {
         const { error } = await serviceClient
@@ -2053,55 +2484,39 @@ export async function POST(req: NextRequest) {
         if ("response" in validatedShiftCategory) {
           return validatedShiftCategory.response;
         }
-        const row = {
-          org_id: validatedShiftCategory.shiftCategory.orgId,
-          name: validatedShiftCategory.shiftCategory.name,
-          abbr: validatedShiftCategory.shiftCategory.abbr ?? null,
-          start_time: validatedShiftCategory.shiftCategory.startTime ?? null,
-          end_time: validatedShiftCategory.shiftCategory.endTime ?? null,
-          color: normalizePresetBg(validatedShiftCategory.shiftCategory.color),
-          sort_order: validatedShiftCategory.shiftCategory.sortOrder,
-          focus_area_id: validatedShiftCategory.shiftCategory.focusAreaId ?? null,
-          break_minutes: validatedShiftCategory.shiftCategory.breakMinutes ?? null,
-        };
-
-        let savedRow;
-        if (validatedShiftCategory.shiftCategory.id) {
-          const { data: updated, error } = await serviceClient
-            .from("shift_categories")
-            .update(row)
-            .eq("id", validatedShiftCategory.shiftCategory.id)
-            .select()
-            .single();
-          if (error) throw error;
-          savedRow = updated;
-        } else {
-          const { data: inserted, error } = await serviceClient
-            .from("shift_categories")
-            .insert(row)
-            .select()
-            .single();
-          if (error) throw error;
-          savedRow = inserted;
-        }
-
-        await cacheDel(CacheKey.shiftCategories(validatedShiftCategory.shiftCategory.orgId));
-        await cacheDel(
-          CacheKey.assignments(validatedShiftCategory.shiftCategory.orgId),
-          CacheKey.assignments(validatedShiftCategory.shiftCategory.orgId, true),
-          CacheKey.jobs(validatedShiftCategory.shiftCategory.orgId),
-          CacheKey.jobs(validatedShiftCategory.shiftCategory.orgId, true),
+        const item = await saveShiftCategoryRow(
+          serviceClient,
+          validatedShiftCategory.shiftCategory,
         );
+        await cacheDel(...shiftCategoryCacheKeys(validatedShiftCategory.shiftCategory.orgId));
         await writeAudit({
           actor,
           action: "shift_category.upserted",
           resourceType: "shift_category",
-          resourceId: String(savedRow.id),
+          resourceId: String(item.id),
           details: { name: validatedShiftCategory.shiftCategory.name },
           orgId: validatedShiftCategory.shiftCategory.orgId,
         });
-        return NextResponse.json({
-          item: rowToShiftCategory(savedRow as Parameters<typeof rowToShiftCategory>[0]),
+        return NextResponse.json({ item });
+      }
+      case "saveShiftCategories": {
+        const items: ShiftCategoryInput[] = [];
+        for (const shiftCategory of data.items) {
+          const validated = validateShiftCategory(shiftCategory);
+          if ("response" in validated) return validated.response;
+          items.push(validated.shiftCategory);
+        }
+        const saves = await settleInWaves(items, (shiftCategory) =>
+          saveShiftCategoryRow(serviceClient, shiftCategory),
+        );
+        return finishItemBatch({
+          action: data.action,
+          orgId: data.orgId,
+          actor,
+          saves,
+          names: items.map((item) => item.name),
+          cacheKeys: shiftCategoryCacheKeys(data.orgId),
+          audit: { action: "shift_category.upserted", resourceType: "shift_category" },
         });
       }
       case "deleteShiftCategory": {
@@ -2168,101 +2583,34 @@ export async function POST(req: NextRequest) {
         if ("response" in validatedJob) {
           return validatedJob.response;
         }
-        const focusAreaIds = getStoredJobFocusAreaIds(validatedJob.job);
-        const departmentIds = getStoredJobDepartmentIds(validatedJob.job);
-        const normalizedTiming = normalizeShiftlessJobTiming(validatedJob.job);
-        const isShiftlessJob = (validatedJob.job.assignmentMode ?? "with_shift") === "shiftless";
-        const storedStyle = isShiftlessJob
-          ? {
-              color: validatedJob.job.color,
-              border_color: validatedJob.job.border,
-              text_color: validatedJob.job.text,
-            }
-          : {
-              color: DEFAULT_SCHEDULED_JOB_STYLE.color,
-              border_color: DEFAULT_SCHEDULED_JOB_STYLE.border,
-              text_color: DEFAULT_SCHEDULED_JOB_STYLE.text,
-            };
-
-        const row = {
-          org_id: validatedJob.job.orgId,
-          name: validatedJob.job.name,
-          abbr: validatedJob.job.abbr,
-          show_on_grid: validatedJob.job.showOnGrid,
-          assignment_mode: validatedJob.job.assignmentMode ?? "with_shift",
-          eligibility_mode: getJobEligibilityMode(validatedJob.job),
-          focus_area_ids: focusAreaIds,
-          department_ids: departmentIds,
-          applicable_shift_ids: normalizePlacementIds(validatedJob.job.applicableShiftIds),
-          eligible_role_ids: validatedJob.job.eligibleRoleIds ?? [],
-          required_certification_ids: validatedJob.job.requiredCertificationIds ?? [],
-          color: storedStyle.color,
-          border_color: storedStyle.border_color,
-          text_color: storedStyle.text_color,
-          default_start_time: normalizedTiming.defaultStartTime,
-          default_end_time: normalizedTiming.defaultEndTime,
-          default_duration_hours: normalizedTiming.defaultDurationHours,
-          default_duration_minutes: normalizedTiming.defaultDurationMinutes,
-          sort_order: validatedJob.job.sortOrder,
-          system_key: validatedJob.job.systemKey ?? null,
-        };
-        const timeOverrides = normalizeShiftTimeOverrides(
-          validatedJob.job.shiftTimeOverrides as
-            Record<string, JobShiftTimeOverride | undefined> | undefined,
-        );
-        const colorOverrides = normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides);
-
-        let savedRow;
-        if (validatedJob.job.id) {
-          const { data: updated, error } = await serviceClient
-            .from("jobs")
-            .update(row)
-            .eq("org_id", validatedJob.job.orgId)
-            .eq("id", validatedJob.job.id)
-            .select(JOB_COLS)
-            .single();
-          if (error) throw error;
-          savedRow = updated;
-        } else {
-          const { data: inserted, error } = await serviceClient
-            .from("jobs")
-            .insert(row)
-            .select(JOB_COLS)
-            .single();
-          if (error) throw error;
-          savedRow = inserted;
-        }
-
-        const { error: overridesError } = await serviceClient.rpc("set_job_shift_overrides", {
-          p_job_id: savedRow.id,
-          p_time_overrides: timeOverrides,
-          p_color_overrides: colorOverrides,
-          p_actor_id: actor.id,
-        });
-        if (overridesError) throw overridesError;
-        const { data: overrideRows, error: overrideRowsError } = await serviceClient
-          .from("job_shift_overrides")
-          .select("shift_id, start_time, end_time, color")
-          .eq("job_id", savedRow.id);
-        if (overrideRowsError) throw overrideRowsError;
-        savedRow.job_shift_overrides = overrideRows ?? [];
-
-        await cacheDel(
-          CacheKey.assignments(validatedJob.job.orgId),
-          CacheKey.assignments(validatedJob.job.orgId, true),
-          CacheKey.jobs(validatedJob.job.orgId),
-          CacheKey.jobs(validatedJob.job.orgId, true),
-        );
+        const item = await saveJobRow(serviceClient, actor, validatedJob.job);
+        await cacheDel(...jobCacheKeys(validatedJob.job.orgId));
         await writeAudit({
           actor,
           action: "job.upserted",
           resourceType: "job",
-          resourceId: String(savedRow.id),
+          resourceId: String(item.id),
           details: { name: validatedJob.job.name },
           orgId: validatedJob.job.orgId,
         });
-        return NextResponse.json({
-          item: rowToJobDefinition(savedRow as Parameters<typeof rowToJobDefinition>[0]),
+        return NextResponse.json({ item });
+      }
+      case "saveJobDefinitions": {
+        const items: JobInput[] = [];
+        for (const job of data.items) {
+          const validated = validateJob(job);
+          if ("response" in validated) return validated.response;
+          items.push(validated.job);
+        }
+        const saves = await settleInWaves(items, (job) => saveJobRow(serviceClient, actor, job));
+        return finishItemBatch({
+          action: data.action,
+          orgId: data.orgId,
+          actor,
+          saves,
+          names: items.map((item) => item.name),
+          cacheKeys: jobCacheKeys(data.orgId),
+          audit: { action: "job.upserted", resourceType: "job" },
         });
       }
       case "deleteJobDefinition": {
@@ -2322,47 +2670,56 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "saveCoverageRequirements": {
-        let deleteQuery = serviceClient
-          .from("coverage_requirements")
-          .delete()
-          .eq("org_id", data.orgId)
-          .eq("focus_area_id", data.focusAreaId)
-          .eq("job_id", data.jobId);
-        deleteQuery =
-          data.preferredShiftId == null
-            ? deleteQuery.is("preferred_shift_id", null)
-            : deleteQuery.eq("preferred_shift_id", data.preferredShiftId);
-        const { error: deleteError } = await deleteQuery;
-        if (deleteError) throw deleteError;
-
-        const rows = data.requirements
-          .filter((requirement) => requirement.minStaff > 0)
-          .map((requirement) => ({
-            org_id: data.orgId,
-            focus_area_id: data.focusAreaId,
-            job_id: data.jobId,
-            preferred_shift_id: data.preferredShiftId,
-            day_of_week: requirement.dayOfWeek,
-            min_staff: requirement.minStaff,
-            max_staff: requirement.maxStaff ?? null,
-          }));
-
-        if (rows.length > 0) {
-          const { error } = await serviceClient.from("coverage_requirements").insert(rows);
-          if (error) throw error;
-        }
-
+        const count = await replaceCoverageRequirements(serviceClient, data.orgId, data);
         await cacheDel(CacheKey.coverageReqs(data.orgId));
         await writeAudit({
           actor,
           action: "coverage_requirements.saved",
           resourceType: "coverage_requirement",
-          resourceId: `${data.focusAreaId}_${data.jobId}_${data.preferredShiftId ?? "null"}`,
-          details: { count: rows.length },
+          resourceId: coverageResourceId(data),
+          details: { count },
           orgId: data.orgId,
         });
         return NextResponse.json({
           items: await fetchCoverageRequirementsForOrg(data.orgId),
+        });
+      }
+      case "saveCoverageRequirementsBatch": {
+        const saves = await settleInWaves(data.entries, (entry) =>
+          replaceCoverageRequirements(serviceClient, data.orgId, entry),
+        );
+        const failures = saves.flatMap((result) =>
+          result.status === "rejected" ? [result.reason] : [],
+        );
+        if (failures.length > 0) {
+          logger.error(
+            { action: data.action, orgId: data.orgId, failed: failures.length, error: failures[0] },
+            "Some coverage requirements did not save",
+          );
+        }
+        await cacheDel(CacheKey.coverageReqs(data.orgId));
+        await writeAudits(
+          actor,
+          data.orgId,
+          saves.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [
+                  {
+                    action: "coverage_requirements.saved" as const,
+                    resourceType: "coverage_requirement" as const,
+                    resourceId: coverageResourceId(data.entries[index]),
+                    details: { count: result.value },
+                  },
+                ]
+              : [],
+          ),
+        );
+        if (failures.length === saves.length) {
+          return allFailedResponse(failures, "We couldn't save your settings. Try again.");
+        }
+        return NextResponse.json({
+          items: await fetchCoverageRequirementsForOrg(data.orgId),
+          results: saves.map((result) => ({ ok: result.status === "fulfilled" })),
         });
       }
       case "upsertAbsenceType": {
