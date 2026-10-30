@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:300e60e60af2d588c060e334cea30415ddcf131b49d05c8063e79061a1c58e00"
+      "evidenceFingerprint": "sha256:8261ff4cdc2b437573d99fe49079be606a1c08e547cc602bd8e1d755c14f45b6"
     },
     {
       "id": "onboarding",
@@ -755,7 +755,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3749c4a4c1b7b32cab6239d1d48cc7e8cdf348efeb9d024e46171a45a1ec3b36"
+      "evidenceFingerprint": "sha256:a52af0d720b5ee1e9f5d8d2acad2e610a4f7e7a4cc548d583b29f21a03c3dce6"
     },
     {
       "id": "person-detail",
@@ -785,14 +785,14 @@
           "claims": [
             "person page needs view-details permission; one page with Back to People",
             "header contents: name, access star, status icon, roles, focus areas and employment, email and phone, Send invitation, Add to schedule or management, Edit details; previous and next person in the People list's order",
-            "status card under the header; Overview About: Work and Access cards, Edit opens the details or the access popup, account states, last active, and the record line",
+            "status card under the header; Overview About: Work, Access and Record cards; Edit details in the header edits the details, Change access and the management Edit sit on the Access card; account states, last active, and the Record card",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
             "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; period choices; Overview stats for the period, This week or This pay period, Needs attention, What they work with focus areas when they differ, and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Schedule tab: recurring schedule with preferences, then shifts and time off grouped by week, or a month calendar with drafts outlined when the period is This month, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
+            "Schedule tab: recurring schedule with preferences, then shifts and time off as a month calendar first for every period (the period's days stand out, the rest of the month dimmed) or as a list grouped by week from Show as list, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
             "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, the filter dropdown and the waiting count",
             "Activity tab: the change log for the period, filtered by kind from its dropdown"
           ],
@@ -836,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3097b933f8e5f2dc7c39a2f9c262ef2c324e29976da655842e455545e7ac82ba"
+      "evidenceFingerprint": "sha256:c7a5eb3dcfebc5eb0a98f13498ce3e9c5cbe74841eaeb6db02ca51c64ca4f7a7"
     },
     {
       "id": "invitations",
@@ -954,7 +954,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a4c181729886df874c33abdd7c4c910f91c3cf60398ed5fc2f3e7ce14a3114c7"
+      "evidenceFingerprint": "sha256:d14dea4eb72427774c8843fc637072b389216dc99d02fc34de293798439dcaa4"
     },
     {
       "id": "coverage",
@@ -1108,7 +1108,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5c93ed518dd55f675f25be6494e819f5013f6d745ac67f976cd4a24951c68f6b"
+      "evidenceFingerprint": "sha256:3db366a456ef57572fc2befbed08cfc14b72757c785a9f542121d46ea78dca91"
     },
     {
       "id": "admin-permissions",
@@ -1151,7 +1151,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ef9f4dc2b7bfdcb474b7001e0f1797ac4f44e51540af1b3f128b90bc6b9432a3"
+      "evidenceFingerprint": "sha256:6df2ce57cb3881697ea469bf46a2bb5805ba1e270711a2d937bb04b6cd2a1772"
     },
     {
       "id": "billing",
@@ -1221,7 +1221,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:f1e024f1ce116a7b0101789c76e00242862473aa52b1450e11f95d0a65687e2a"
+      "evidenceFingerprint": "sha256:f2672d4fceec15654a305720f4205eaba2b39a6e18fa6334bb7aeb6c0d08d309"
     },
     {
       "id": "mobile-navigation",
@@ -1497,7 +1497,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:334325452380b205bd80cb1ebcce886a016b82c0a51ee8b9acd1347e48875448"
+      "evidenceFingerprint": "sha256:f32d9361a552c83a01a1feac01ba8dec16ff568e747c9f90a891095f32064192"
     },
     {
       "id": "security-sessions",

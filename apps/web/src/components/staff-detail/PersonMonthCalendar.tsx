@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addDaysToIsoDate } from "@dubgrid/schedule-core";
@@ -19,6 +20,14 @@ interface PersonMonthCalendarProps {
   range: { startDate: string; endDate: string };
   today: string;
   lookups: ShiftRecordLookups;
+  /**
+   * Loads the whole month on screen, so days around the period show their
+   * shifts too. Without it only the period's days are filled.
+   */
+  loadMonth?: {
+    key: readonly unknown[];
+    load: (startDate: string, endDate: string) => Promise<ShiftMap>;
+  };
 }
 
 interface CalendarPill {
@@ -68,6 +77,7 @@ export function PersonMonthCalendar({
   range,
   today,
   lookups,
+  loadMonth,
 }: PersonMonthCalendarProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -86,9 +96,17 @@ export function PersonMonthCalendar({
   const canStepBack = Boolean(month && month > periodMonths[0]);
   const canStepForward = Boolean(month && month < (periodMonths.at(-1) ?? ""));
   const weeks = useMemo(() => (month ? monthWeeks(month) : []), [month]);
+  const gridStart = weeks[0]?.[0] ?? range.startDate;
+  const gridEnd = weeks.at(-1)?.[6] ?? range.endDate;
+  const monthQuery = useQuery({
+    queryKey: [...(loadMonth?.key ?? ["person-month"]), gridStart, gridEnd],
+    queryFn: () => loadMonth!.load(gridStart, gridEnd),
+    enabled: Boolean(loadMonth && month),
+  });
+  const data = loadMonth ? (monthQuery.data ?? shifts) : shifts;
 
   const pillsFor = (day: string): CalendarPill[] => {
-    const entry = shifts?.[`${employeeId}_${day}`];
+    const entry = data?.[`${employeeId}_${day}`];
     if (!entry) return [];
     const draftBorder =
       entry.isDraft && entry.draftKind ? DRAFT_BORDER_COLORS[entry.draftKind] : null;
@@ -187,7 +205,9 @@ export function PersonMonthCalendar({
               {week.map((day) => {
                 const inMonth = day.slice(0, 7) === month;
                 const inRange = day >= range.startDate && day <= range.endDate;
-                const pills = inMonth && inRange ? pillsFor(day) : [];
+                // The period's days are full strength; the rest of the month shows
+                // what it can, dimmed, so the period stands out in its month.
+                const pills = inMonth && (inRange || loadMonth) ? pillsFor(day) : [];
                 const isToday = day === today;
                 return (
                   <div

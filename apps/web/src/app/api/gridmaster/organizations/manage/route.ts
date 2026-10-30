@@ -97,12 +97,12 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-// The proxy caches org access and the login page caches the slug lookup
-// (including its suspended/archived state) for up to a day; without this,
-// members keep passing the gate after a suspension and the sign-in page keeps
-// treating a closed organization as open (F-95, F-87).
+// The organization cache and the login page's slug lookup (including its
+// suspended/archived state, kept for up to a day) would otherwise let members
+// keep passing the gate after a suspension and the sign-in page keep treating
+// a closed organization as open (F-95, F-87).
 async function invalidateOrganizationAccess(orgId: string, slug?: string | null): Promise<void> {
-  const keys = [CacheKey.mwOrgAccess(orgId), CacheKey.organization(orgId)];
+  const keys = [CacheKey.organization(orgId)];
   if (slug) keys.push(CacheKey.orgBySlug(slug));
   await cacheDel(...keys);
   // The oversight views share one facts load for a few seconds (F-89); a

@@ -21,7 +21,6 @@ import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { revokeAllUserSessions } from "@/lib/auth/revocation";
-import { cacheDel, CacheKey } from "@/lib/cache";
 import { offboardRemovedMember, requestInfo } from "@/features/employees/server/status-change";
 import {
   changedElsewhereMessage,
@@ -515,10 +514,6 @@ export async function DELETE(req: NextRequest) {
     // token that has already been issued. Revoke it before responding so the
     // former member cannot continue reading this organization with that token.
     await revokeAllUserSessions(userId);
-    // The proxy keeps a short-lived "still a member" answer per person; drop it
-    // so the next navigation asks the database. Other isolates' memos lapse in
-    // seconds.
-    await cacheDel(CacheKey.mwOrgVisible(userId, orgId));
 
     await offboardRemovedMember(
       {

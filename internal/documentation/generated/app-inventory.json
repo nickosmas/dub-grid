@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:0ab1941ee6bec527e6a96c12c979d3bf03ad38ea9635b50c08de38ed502626c6",
+  "sourceDigest": "sha256:b953a1dac3f8dba8daedb93ec6a316d1bed204f04ac051dc64062966a48f31ee",
   "webRoutes": [
     {
       "id": "web:/",
@@ -6965,6 +6965,22 @@
       "usages": [
         {
           "path": "scripts/lib/db-client.ts"
+        }
+      ],
+      "exampleFiles": []
+    },
+    {
+      "id": "env:SUPABASE_JWKS",
+      "name": "SUPABASE_JWKS",
+      "scopes": [
+        "web-server"
+      ],
+      "declaration": "usage-only",
+      "exposure": "provider-injected",
+      "declarations": [],
+      "usages": [
+        {
+          "path": "apps/web/src/lib/supabase-keys.ts"
         }
       ],
       "exampleFiles": []

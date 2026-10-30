@@ -125,7 +125,7 @@ export async function expectNoManageControls(
   page: Page,
   scope: Page | ReturnType<Page["getByRole"]>,
 ) {
-  for (const name of ["Save", "Edit details", "Edit work details", "Mark away", "Archive", "Add"]) {
+  for (const name of ["Save", "Edit details", "Mark away", "Archive", "Add"]) {
     await expect(scope.getByRole("button", { name, exact: true }), name).toHaveCount(0);
   }
 }

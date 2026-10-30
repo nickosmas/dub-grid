@@ -116,6 +116,8 @@ const composed = withBundleAnalyzer(withNextIntl(nextConfig));
 //
 // In production: dynamically require withSentryConfig so the import is only
 // evaluated during a production build, keeping dev completely clean.
+let finalConfig: NextConfig = composed;
+
 if (process.env.NODE_ENV === "production") {
   const { withSentryConfig } = require("@sentry/nextjs");
 
@@ -145,7 +147,7 @@ if (process.env.NODE_ENV === "production") {
     );
   }
 
-  module.exports = withSentryConfig(composed, {
+  finalConfig = withSentryConfig(composed, {
     org: sentryOrg,
     project: sentryProject,
     silent: !process.env.CI,
@@ -166,6 +168,28 @@ if (process.env.NODE_ENV === "production") {
       },
     },
   });
-} else {
-  module.exports = composed;
 }
+
+/**
+ * The proxy verifies tokens at the edge PoP, where fetching Supabase's public
+ * keys on a fresh isolate cost about 735ms (2026-09-26). Fetching them once
+ * here ships them with the build (`getProxyJwks` in lib/auth/verify-token.ts).
+ * Best effort: without them the proxy fetches at runtime, as it did before.
+ */
+async function withSupabaseJwks(config: NextConfig): Promise<NextConfig> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return config;
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return config;
+    const jwks: { keys?: unknown } = await response.json();
+    if (!Array.isArray(jwks.keys) || jwks.keys.length === 0) return config;
+    return { ...config, env: { ...config.env, SUPABASE_JWKS: JSON.stringify(jwks) } };
+  } catch {
+    return config;
+  }
+}
+
+module.exports = () => withSupabaseJwks(finalConfig);

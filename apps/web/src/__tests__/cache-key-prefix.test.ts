@@ -25,19 +25,19 @@ describe("cache key prefix", () => {
   it("namespaces reads and writes", async () => {
     mockGet.mockResolvedValue(null);
     mockMget.mockResolvedValue([null, null]);
-    const key = CacheKey.mwOrgAccess("org-1");
+    const key = CacheKey.organization("org-1");
 
     await cacheGet(key);
     await cacheGetMany([key, CacheKey.mwProfile("user-1")]);
     await cacheSet(key, { subscription_status: "canceled" }, 30);
 
-    expect(mockGet).toHaveBeenCalledWith("e2e-7-1-3:dg:mw:orgAccess:org-1");
+    expect(mockGet).toHaveBeenCalledWith("e2e-7-1-3:dg:org:org-1:organization");
     expect(mockMget).toHaveBeenCalledWith(
-      "e2e-7-1-3:dg:mw:orgAccess:org-1",
+      "e2e-7-1-3:dg:org:org-1:organization",
       "e2e-7-1-3:dg:mw:profile:user-1",
     );
     expect(mockSet).toHaveBeenCalledWith(
-      "e2e-7-1-3:dg:mw:orgAccess:org-1",
+      "e2e-7-1-3:dg:org:org-1:organization",
       { subscription_status: "canceled" },
       { ex: 30 },
     );

@@ -2,17 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { evaluateOrgBillingAccess, ORG_ACCESS_SELECT } from "@/lib/billing-policy";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { CacheKey, cacheDel, cacheSet, TTL } from "@/lib/cache";
+import { CacheKey, cacheDel } from "@/lib/cache";
 import * as Sentry from "@/lib/sentry";
 
 export const dynamic = "force-dynamic";
 
-// Same columns and cache key as the org-access read in proxy.ts. Unlike normal
-// navigation, this recovery check deliberately reads the source of truth and
-// replaces the cached answer before telling the browser to try the gate again.
+// Same columns as the org-access read in proxy.ts, which reads the database
+// behind a 10-second memo. This recovery check reads the source of truth too.
 // The organization row is also cached inside the bootstrap, whose billing lock
-// sends a super admin to billing recovery, so that copy is dropped too:
-// otherwise a cleared hold kept redirecting them for up to its TTL.
+// sends a super admin to billing recovery, so that copy is dropped: otherwise a
+// cleared hold kept redirecting them for up to its TTL.
 type OrgAccessRow = {
   suspended_at: string | null;
   archived_at: string | null;
@@ -75,10 +74,7 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
     if (error) throw error;
     org = (data as OrgAccessRow) ?? null;
-    await Promise.all([
-      cacheSet(CacheKey.mwOrgAccess(orgId), org, TTL.MIDDLEWARE),
-      cacheDel(CacheKey.organization(orgId)),
-    ]);
+    await cacheDel(CacheKey.organization(orgId));
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "organization-access-status" } });
     // A cache or database blip must never read as "your organization is open" —

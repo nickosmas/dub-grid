@@ -1,13 +1,7 @@
 import AuthProvider from "@/components/AuthProvider";
 import ConsentRecordSync from "@/components/ConsentRecordSync";
 import QueryProvider from "@/components/QueryProvider";
-import AppShell from "@/components/AppShell";
-import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
-import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
-import { TooltipProvider } from "@/components/ui/hint";
-import { TOOLTIP_DELAY_MS } from "@/lib/constants";
-import OnboardingGate from "@/components/onboarding/OnboardingGate";
-import { TwoFactorReenrollGate } from "@/components/auth/TwoFactorReenrollGate";
+import AppChrome from "@/components/AppChrome";
 import SignInPrefetch from "@/components/SignInPrefetch";
 import PostHogProvider from "@/components/PostHogProvider";
 import { preconnect, prefetchDNS } from "react-dom";
@@ -15,6 +9,8 @@ import { getClientFeatureFlags, isFeatureEnabled } from "@/lib/feature-flags";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { verifyAccessToken } from "@/lib/auth/verify-token";
+import logger from "@/lib/logger";
+import { Timer } from "@/lib/server-timing";
 import {
   getSupabaseUrl,
   requireSupabasePublishableKey,
@@ -57,8 +53,9 @@ function supabaseOrigin(): string | null {
 }
 
 // /api/feature-flags answers signed-in callers only, so the layout seeds the
-// same answer only for a request carrying a validly signed session.
-async function hasVerifiedSession(): Promise<boolean> {
+// same answer only for a request carrying a validly signed session. The id
+// also tells AuthProvider whose session was verified for this request.
+async function verifiedSessionUserId(): Promise<string | null> {
   const cookieStore = await cookies();
   const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
     cookies: {
@@ -73,7 +70,8 @@ async function hasVerifiedSession(): Promise<boolean> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session?.access_token ? (await verifyAccessToken(session.access_token)) !== null : false;
+  if (!session?.access_token) return null;
+  return (await verifyAccessToken(session.access_token))?.userId ?? null;
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -85,16 +83,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     preconnect(supabase, { crossOrigin: "anonymous" });
     prefetchDNS(supabase);
   }
-  const [posthogEnabled, signedIn] = await Promise.all([
-    isFeatureEnabled("posthog"),
-    hasVerifiedSession().catch(() => false),
+  // A Server Component cannot set response headers, so with PERF_TIMING=1
+  // its spans go to the log instead of Server-Timing.
+  const timer = new Timer();
+  const [posthogEnabled, verifiedUserId] = await Promise.all([
+    timer.time("layout_posthog_flag", () => isFeatureEnabled("posthog")),
+    timer.time("layout_session", () => verifiedSessionUserId().catch(() => null)),
   ]);
-  const initialFeatureFlags = signedIn
-    ? { flags: await getClientFeatureFlags(), readAt: Date.now() }
+  const initialFeatureFlags = verifiedUserId
+    ? {
+        flags: await timer.time("layout_client_flags", () => getClientFeatureFlags()),
+        readAt: Date.now(),
+      }
     : undefined;
+  const timing = timer.header();
+  if (timing) logger.info({ timing }, "app layout timing");
 
   return (
-    <AuthProvider>
+    <AuthProvider serverVerifiedUserId={verifiedUserId}>
       <ConsentRecordSync />
       <PostHogProvider enabled={posthogEnabled}>
         <QueryProvider initialFeatureFlags={initialFeatureFlags}>
@@ -107,19 +113,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               had downloaded and hydrated. The gate now owns a tight boundary
               around only the part that reads them. */}
           <SignInPrefetch />
-          <OnboardingGate>
-            <TwoFactorReenrollGate>
-              <MobileSubNavProvider>
-                <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                  {/* Wraps the whole shell so it sees every nav link,
-                    not just the ones inside a given page. */}
-                  <NavigationGuardProvider>
-                    <AppShell>{children}</AppShell>
-                  </NavigationGuardProvider>
-                </TooltipProvider>
-              </MobileSubNavProvider>
-            </TwoFactorReenrollGate>
-          </OnboardingGate>
+          <AppChrome>{children}</AppChrome>
         </QueryProvider>
       </PostHogProvider>
     </AuthProvider>

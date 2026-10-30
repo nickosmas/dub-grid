@@ -32,7 +32,7 @@ apps/web/
                                     #   shift-requests, push-tokens, session-presence)
         gridmaster/                 # Gridmaster-only API routes (+ platform-flags, audit-log)
       (app)/                        # Route group holding every authed and auth-flow page
-        layout.tsx                  # NavigationGuardProvider + AppShell
+        layout.tsx                  # Auth, query and PostHog providers; AppChrome adds the shell off the sign-in pages
         gridmaster/                 # /gridmaster portal (platform_role only)
         dashboard/ people/ schedule/ alerts/   # Main authed app routes
         settings/ reports/ profile/ account/   # More authed routes
@@ -72,7 +72,7 @@ apps/web/
                                     #   useOrgRealtimeInvalidation, useStepUpAction, ...)
     lib/                            # Server + client utilities
       api-auth.ts                   # requireAuthenticated* — local JWT verify, no getUser() call
-      auth/verify-token.ts          # JWKS keyset + local ES256 verification (shared with proxy)
+      auth/verify-token.ts          # JWKS keysets (live, and the proxy's build-shipped one) + local ES256 verification
       auth/revocation.ts            # Redis revocation markers — the other half of local verify
       auth/security-audit.ts        # Security-event audit writes (no secrets)
       auth/integrity-contract.ts    # Pinned auth-action redirect destinations
@@ -258,7 +258,7 @@ they compose, and a modal that wants both is fine:
   backdrop and the X button. Render `unsavedChangesDialog` as a sibling.
 - **A page-level editor guards navigation.** `useNavigationGuard(id, { isDirty })`
   registers with `NavigationGuardProvider` (mounted around `<AppShell>` in
-  `app/layout.tsx`), which asks before an in-app link click and before tab
+  `components/AppShellProviders.tsx`, absent on the sign-in pages), which asks before an in-app link click and before tab
   close/refresh. Never add a bare `beforeunload` — the provider owns it, and a
   second one prompts twice.
 

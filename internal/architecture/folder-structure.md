@@ -44,7 +44,7 @@ apps/web/
 │   │   │   ├── test-sandbox/ consent/ request-demo/ validate-domain/ health/
 │   │   │   └── shared/         # Helpers shared by several handlers
 │   │   ├── (app)/              # Route group: every authenticated and auth-flow page
-│   │   │   ├── layout.tsx      # AppShell, NavigationGuardProvider, gates
+│   │   │   ├── layout.tsx      # providers; AppChrome adds AppShell and the gates off sign-in pages
 │   │   │   ├── dashboard/      # /dashboard
 │   │   │   ├── schedule/       # /schedule (+ _components, _hooks, _lib)
 │   │   │   ├── people/         # /people + /people/[id]

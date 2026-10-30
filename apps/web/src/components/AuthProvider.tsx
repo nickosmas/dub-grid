@@ -47,11 +47,37 @@ async function trackSession(session: Session): Promise<void> {
   markSessionReported(session);
 }
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+/**
+ * The user to paint with before the auth server answers: the cookie session's
+ * own user, when the server verified that user's token for this same request
+ * and the token has not expired since.
+ */
+export function serverVouchedUser(
+  session: Session | null,
+  serverVerifiedUserId: string | null | undefined,
+  nowMs: number,
+): User | null {
+  if (!session?.access_token || !serverVerifiedUserId) return null;
+  if (session.user?.id !== serverVerifiedUserId) return null;
+  if (!session.expires_at || session.expires_at * 1000 <= nowMs) return null;
+  return session.user;
+}
+
+export default function AuthProvider({
+  children,
+  serverVerifiedUserId,
+}: {
+  children: React.ReactNode;
+  /** The user whose session token the server verified while rendering this page. */
+  serverVerifiedUserId?: string | null;
+}) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const authGenerationRef = useRef(0);
+  // Only the first mount's answer applies: it describes the hard load that
+  // rendered this provider, not any later navigation.
+  const initialServerVerifiedUserId = useRef(serverVerifiedUserId);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -98,10 +124,28 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         );
         const initialSession = await Promise.race([sessionPromise, timeoutPromise]);
 
+        // Every signed-in page used to wait here for getUser(), a round trip to
+        // the auth server, before showing anything. When the server already
+        // verified this token, paint now; the check below still runs, and a
+        // failed one signs out exactly as it did before.
+        const vouchedUser = serverVouchedUser(
+          initialSession,
+          initialServerVerifiedUserId.current,
+          Date.now(),
+        );
+        if (vouchedUser) commitAuthState(generation, initialSession, vouchedUser);
+
         const verifiedUser = initialSession?.access_token
           ? await getVerifiedBrowserAuthUser()
           : null;
-        if (!commitAuthState(generation, initialSession, verifiedUser)) return;
+        // Confirmed: keep the painted user rather than re-render every
+        // consumer with a new object for the same person.
+        const confirmsVouchedUser = vouchedUser !== null && verifiedUser?.id === vouchedUser.id;
+        if (confirmsVouchedUser) {
+          if (!isCurrentGeneration(generation)) return;
+        } else if (!commitAuthState(generation, initialSession, verifiedUser)) {
+          return;
+        }
 
         // Track a session restored from cookies, unless this tab reported it in
         // the last few minutes: every hard load used to post it again.
