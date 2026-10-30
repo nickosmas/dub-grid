@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useLayoutEffect, useRef } from "react";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,14 +21,27 @@ import {
   getAuditActorSecondaryLabel,
   getAuditTargetLabel,
   type ActivityDayGroup,
-  type ActivityRowDetails,
 } from "@/lib/activity-log-utils";
-import { ActivityKindIcon, ActivityKindLabel, type ActivityEntryLike } from "./ActivityLogParts";
+import {
+  isActivityGroup,
+  summarizeActivityGroup,
+  type ActivityGroup,
+  type ActivityListItem,
+} from "@/lib/audit/grouping";
+import {
+  ActivityKindIcon,
+  ActivityKindLabel,
+  ActivityRowDetailLines,
+  activityGroupTone,
+  formatActivityGroupTime,
+  type ActivityEntryLike,
+} from "./ActivityLogParts";
 
 export type ActivityTableEntry = ActivityEntryLike & { id: string | number };
 
 interface ActivityTableProps<T extends ActivityTableEntry> {
-  groups: ActivityDayGroup<T>[];
+  /** Days of entries; a run of the same change by one person arrives as one group. */
+  groups: ActivityDayGroup<ActivityListItem<T>>[];
   timeZone: string | null;
   /** Who or what the event acted on. Off on a person's own page, where it is always them. */
   showTarget?: boolean;
@@ -39,7 +52,7 @@ interface ActivityTableProps<T extends ActivityTableEntry> {
    * the day actually has, so prefer these when the caller knows them.
    */
   dayCounts?: Record<string, number>;
-  onSelect: (entry: T) => void;
+  onSelect: (item: ActivityListItem<T>) => void;
 }
 
 export function ActivityTable<T extends ActivityTableEntry>({
@@ -91,16 +104,27 @@ export function ActivityTable<T extends ActivityTableEntry>({
                   </div>
                 </th>
               </tr>
-              {group.entries.map((entry) => (
-                <ActivityRow
-                  key={entry.id}
-                  entry={entry}
-                  timeZone={timeZone}
-                  showTarget={showTarget}
-                  showOrganization={showOrganization}
-                  onSelect={onSelect}
-                />
-              ))}
+              {group.entries.map((item) =>
+                isActivityGroup(item) ? (
+                  <ActivityGroupRow
+                    key={item.id}
+                    group={item}
+                    timeZone={timeZone}
+                    showTarget={showTarget}
+                    showOrganization={showOrganization}
+                    onSelect={onSelect}
+                  />
+                ) : (
+                  <ActivityRow
+                    key={item.id}
+                    entry={item}
+                    timeZone={timeZone}
+                    showTarget={showTarget}
+                    showOrganization={showOrganization}
+                    onSelect={onSelect}
+                  />
+                ),
+              )}
             </React.Fragment>
           ))}
         </TableBody>
@@ -160,7 +184,7 @@ function ActivityRow<T extends ActivityTableEntry>({
   timeZone: string | null;
   showTarget: boolean;
   showOrganization: boolean;
-  onSelect: (entry: T) => void;
+  onSelect: (item: ActivityListItem<T>) => void;
 }) {
   const description = describeAction(entry);
   const rowDetails = formatActivityRowDetails(entry);
@@ -228,37 +252,86 @@ function ActivityRow<T extends ActivityTableEntry>({
   );
 }
 
-function ActivityRowDetailLines({ change, details }: ActivityRowDetails) {
+function ActivityGroupRow<T extends ActivityTableEntry>({
+  group,
+  timeZone,
+  showTarget,
+  showOrganization,
+  onSelect,
+}: {
+  group: ActivityGroup<T>;
+  timeZone: string | null;
+  showTarget: boolean;
+  showOrganization: boolean;
+  onSelect: (item: ActivityListItem<T>) => void;
+}) {
+  const summary = summarizeActivityGroup(group, describeAction);
+  const newest = group.members[0];
+  const actorLabel = getAuditActorLabel(newest);
+  const tone = activityGroupTone(group);
+
   return (
-    <>
-      {change && (
-        <div className="dg-activity-change">
-          {change.before === null ? (
-            <span className="dg-activity-change-new">New</span>
-          ) : (
-            <>
-              <span className="dg-activity-change-before">{change.before}</span>
-              <ArrowRight
-                className="dg-activity-change-arrow"
-                size={12}
-                strokeWidth={2.25}
-                aria-label="changed to"
-              />
-            </>
-          )}
-          <span>{change.after}</span>
+    <TableRow
+      className="dg-activity-row"
+      data-activity-group=""
+      tabIndex={0}
+      aria-label={`${summary.headline}, ${summary.counts.join(", ")}. Open details`}
+      onClick={() => onSelect(group)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect(group);
+      }}
+    >
+      <TableCell className="dg-activity-cell dg-activity-cell--when">
+        <MaybeHint content={formatActivityTimestamp(group.startedAt, timeZone)}>
+          <span className="dg-activity-time">{formatActivityGroupTime(group, timeZone)}</span>
+        </MaybeHint>
+      </TableCell>
+
+      <TableCell className="dg-activity-cell whitespace-normal">
+        <div className="dg-activity-main">
+          <ActivityKindIcon action={newest.action} tone={tone} />
+          <div className="min-w-0">
+            <ActivityKindLabel action={newest.action} tone={tone} />
+            <div className="dg-activity-description">{summary.headline}</div>
+            <div className="dg-activity-group-counts">
+              {summary.counts.map((count) => (
+                <span key={count} className="dg-activity-group-count">
+                  {count}
+                </span>
+              ))}
+            </div>
+            <div className="dg-activity-context md:hidden">
+              By {actorLabel}
+              {showTarget ? ` · Affected: ${summary.affected}` : ""}
+            </div>
+          </div>
         </div>
+      </TableCell>
+
+      <TableCell className="dg-activity-cell dg-activity-cell--identity hidden md:table-cell">
+        <ActivityIdentity primary={actorLabel} secondary={getAuditActorSecondaryLabel(newest)} />
+      </TableCell>
+
+      {showTarget && (
+        <TableCell className="dg-activity-cell dg-activity-cell--identity hidden md:table-cell">
+          <ActivityIdentity primary={summary.affected} />
+        </TableCell>
       )}
-      {details.length > 0 && (
-        <div className="dg-activity-detail-list">
-          {details.map((item) => (
-            <span className="dg-activity-detail" key={`${item.label}:${item.value}`}>
-              <span className="dg-activity-detail-key">{item.label}:</span> {item.value}
-            </span>
-          ))}
-        </div>
+
+      {showOrganization && (
+        <TableCell className="dg-activity-cell dg-activity-cell--identity hidden lg:table-cell">
+          <ActivityIdentity
+            primary={newest.orgName ?? (newest.orgId ? "Unknown organization" : "Platform-wide")}
+          />
+        </TableCell>
       )}
-    </>
+
+      <TableCell className="dg-activity-cell dg-activity-cell--chevron">
+        <ChevronRight size={14} strokeWidth={2.5} aria-hidden />
+      </TableCell>
+    </TableRow>
   );
 }
 

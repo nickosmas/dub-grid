@@ -4,17 +4,22 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { formatDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
-import { fetchAuditLogDayCounts, fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
+import {
+  fetchAuditLogDayCounts,
+  fetchGridmasterFullAuditLog,
+  fetchGroupedAuditLog,
+} from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { SearchClearButton, clearSearchOnEscape } from "@/components/ui/search-clear";
 import { Pagination } from "@/components/ui/pagination";
 import { queryKeys } from "@/lib/query-keys";
 import { countActors, groupByDay, summarizeCategories } from "@/lib/activity-log-utils";
+import { flattenActivityItems, type ActivityListItem } from "@/lib/audit/grouping";
 import { getAuditCategoryOptions, ORG_AUDIENCE_CATEGORIES } from "@/lib/audit/registry";
 import { formatActivityPeriodPhrase, shiftActivityPeriod } from "@/lib/activity-period";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityDetailsDialog, ActivityItemDialog } from "@/components/activity/ActivityLogParts";
 import { ActivityTable } from "@/components/activity/ActivityTable";
 import { ActivitySkeleton } from "@/components/activity/ActivitySkeleton";
 import { ActivityPeriodStats } from "@/components/activity/ActivityPeriodStats";
@@ -36,9 +41,13 @@ export default function ActivityLog({
   const period = useUrlActivityPeriod({ timeZone });
 
   const [page, setPage] = useState(0);
+  // Where each page starts in the raw log; a grouped run makes pages uneven.
+  const [pageOffsets, setPageOffsets] = useState<number[]>([0]);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ActivityListItem<FullAuditLogEntry> | null>(
+    null,
+  );
 
   const categoryOptions = useMemo(() => getAuditCategoryOptions(ORG_AUDIENCE_CATEGORIES), []);
   const categoryPrefixes = useMemo(
@@ -58,17 +67,19 @@ export default function ActivityLog({
   const activityQuery = useQuery({
     queryKey: queryKeys.org.auditLogRange(orgId, period.startAt, period.endAt, page, filterKey),
     queryFn: () =>
-      fetchGridmasterFullAuditLog({
+      fetchGroupedAuditLog({
         ...requestFilters,
         startDate: period.startAt,
         endDate: period.endAt,
         limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
+        offset: pageOffsets[page] ?? 0,
       }),
     placeholderData: keepPreviousData,
   });
 
-  const entries = useMemo(() => activityQuery.data ?? [], [activityQuery.data]);
+  const items = useMemo(() => activityQuery.data?.entries ?? [], [activityQuery.data]);
+  const nextOffset = activityQuery.data?.nextOffset ?? null;
+  const entries = useMemo(() => flattenActivityItems(items), [items]);
   const isEmpty = !activityQuery.isPending && entries.length === 0;
 
   // Only asked for when the period came back empty, so the reader gets a way
@@ -109,15 +120,25 @@ export default function ActivityLog({
   const periodCounts = search.length === 0 ? (countsQuery.data ?? null) : null;
 
   const groups = useMemo(
-    () => groupByDay(entries, { timeZone, todayDate: period.todayDate }),
-    [entries, timeZone, period.todayDate],
+    () => groupByDay(items, { timeZone, todayDate: period.todayDate }),
+    [items, timeZone, period.todayDate],
   );
   const categories = useMemo(() => summarizeCategories(entries), [entries]);
 
+  const restart = () => {
+    setPage(0);
+    setPageOffsets([0]);
+  };
+  const goToPage = (next: number) => {
+    if (next > page && nextOffset !== null) {
+      setPageOffsets((offsets) => [...offsets.slice(0, next), nextOffset]);
+    }
+    setPage(next);
+  };
   const resetPage = <T,>(apply: (value: T) => void) => {
     return (value: T) => {
       apply(value);
-      setPage(0);
+      restart();
     };
   };
   const clearSearch = () => resetPage(setSearchQuery)("");
@@ -134,7 +155,7 @@ export default function ActivityLog({
       label: `the latest activity, ${formatDate(dateKey, { month: "short", day: "numeric", year: "numeric" })}`,
       onJump: () => {
         period.jumpTo(dateKey);
-        setPage(0);
+        restart();
       },
     };
   }, [previousQuery.data, timeZone]);
@@ -151,15 +172,15 @@ export default function ActivityLog({
           onUnitChange={resetPage(period.setUnit)}
           onPrev={() => {
             period.goPrev();
-            setPage(0);
+            restart();
           }}
           onNext={() => {
             period.goNext();
-            setPage(0);
+            restart();
           }}
           onToday={() => {
             period.goToday();
-            setPage(0);
+            restart();
           }}
           onJumpToDate={resetPage(period.jumpTo)}
         />
@@ -177,7 +198,7 @@ export default function ActivityLog({
               value={searchQuery}
               onChange={(event) => {
                 setSearchQuery(event.target.value);
-                setPage(0);
+                restart();
               }}
               onKeyDown={clearSearchOnEscape(clearSearch)}
             />
@@ -210,7 +231,7 @@ export default function ActivityLog({
           onClearFilters={() => {
             setSearchQuery("");
             setCategoryFilter("all");
-            setPage(0);
+            restart();
           }}
           previousActivity={previousActivity}
         />
@@ -222,34 +243,32 @@ export default function ActivityLog({
             actorCount={countActors(entries)}
             categories={categories}
             periodPhrase={period.phrase}
-            truncated={!periodCounts && entries.length >= PAGE_SIZE}
-            pageSize={PAGE_SIZE}
+            truncated={!periodCounts && nextOffset !== null}
           />
 
           <ActivityTable
             groups={groups}
             timeZone={timeZone}
             dayCounts={periodCounts?.counts}
-            onSelect={(entry) => setSelectedEntry(entry as FullAuditLogEntry)}
+            onSelect={setSelectedItem}
           />
 
-          {(page > 0 || entries.length >= PAGE_SIZE) && (
+          {(page > 0 || nextOffset !== null) && (
             <Pagination
               className="mt-4"
               page={page + 1}
-              hasNext={entries.length >= PAGE_SIZE}
-              onPageChange={(next) => setPage(next - 1)}
-              summary={`Showing ${page * PAGE_SIZE + 1} to ${page * PAGE_SIZE + entries.length}`}
+              hasNext={nextOffset !== null}
+              onPageChange={(next) => goToPage(next - 1)}
             />
           )}
         </>
       )}
 
-      {selectedEntry ? (
-        <ActivityDetailsDialog
-          entry={selectedEntry}
+      {selectedItem ? (
+        <ActivityItemDialog
+          item={selectedItem}
           timeZone={timeZone}
-          onClose={() => setSelectedEntry(null)}
+          onClose={() => setSelectedItem(null)}
         />
       ) : null}
     </div>

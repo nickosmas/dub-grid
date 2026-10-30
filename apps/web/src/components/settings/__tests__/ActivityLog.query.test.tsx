@@ -15,10 +15,18 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParams,
 }));
 
-vi.mock("@/features/gridmaster/client", () => ({
-  fetchGridmasterFullAuditLog: vi.fn(),
-  fetchAuditLogDayCounts: vi.fn(),
-}));
+vi.mock("@/features/gridmaster/client", () => {
+  const fetchGridmasterFullAuditLog = vi.fn();
+  return {
+    fetchGridmasterFullAuditLog,
+    // The log pages through grouped entries; these rows never form a run.
+    fetchGroupedAuditLog: async (options: Parameters<typeof fetchGridmasterFullAuditLog>[0]) => ({
+      entries: (await fetchGridmasterFullAuditLog(options)) ?? [],
+      nextOffset: null,
+    }),
+    fetchAuditLogDayCounts: vi.fn(),
+  };
+});
 
 const mockedFetch = vi.mocked(fetchGridmasterFullAuditLog);
 const mockedCounts = vi.mocked(fetchAuditLogDayCounts);

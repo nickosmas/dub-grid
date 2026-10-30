@@ -2,9 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { fetchAuditLogDayCounts, fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
+import {
+  fetchAuditLogDayCounts,
+  fetchGridmasterFullAuditLog,
+  fetchGroupedAuditLog,
+} from "@/features/gridmaster/client";
 import { Pagination } from "@/components/ui/pagination";
 import { countActors, groupByDay, summarizeCategories } from "@/lib/activity-log-utils";
+import { flattenActivityItems, type ActivityListItem } from "@/lib/audit/grouping";
 import { formatActivityPeriodPhrase, shiftActivityPeriod } from "@/lib/activity-period";
 import {
   AUDIT_CATEGORY_OPTIONS,
@@ -15,7 +20,7 @@ import {
 import CustomSelect from "@/components/CustomSelect";
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { ActivityDetailsDialog } from "@/components/activity/ActivityLogParts";
+import { ActivityItemDialog } from "@/components/activity/ActivityLogParts";
 import { ActivityTable } from "@/components/activity/ActivityTable";
 import { ActivitySkeleton } from "@/components/activity/ActivitySkeleton";
 import { ActivityPeriodStats } from "@/components/activity/ActivityPeriodStats";
@@ -42,11 +47,15 @@ export default function AuditLogView({
   const period = useActivityPeriod({ timeZone });
 
   const [page, setPage] = useState(0);
+  // Where each page starts in the raw log; a grouped run makes pages uneven.
+  const [pageOffsets, setPageOffsets] = useState<number[]>([0]);
   const [actionFilter, setActionFilter] = useState(initialActionFilter);
   const [resourceType, setResourceType] = useState("");
   const [target, setTarget] = useState("");
   const [highRiskOnly, setHighRiskOnly] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ActivityListItem<FullAuditLogEntry> | null>(
+    null,
+  );
 
   // Scoped to one organization, platform rows cannot appear at all.
   const categoryOptions = useMemo(
@@ -79,18 +88,20 @@ export default function AuditLogView({
   const auditQuery = useQuery({
     queryKey: queryKeys.gridmaster.orgAudit(orgId ?? null, page, PAGE_SIZE, filterKey),
     queryFn: () =>
-      fetchGridmasterFullAuditLog({
+      fetchGroupedAuditLog({
         ...requestFilters,
         startDate: period.startAt,
         endDate: period.endAt,
         limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
+        offset: pageOffsets[page] ?? 0,
       }),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   });
 
-  const entries = useMemo(() => auditQuery.data ?? [], [auditQuery.data]);
+  const items = useMemo(() => auditQuery.data?.entries ?? [], [auditQuery.data]);
+  const nextOffset = auditQuery.data?.nextOffset ?? null;
+  const entries = useMemo(() => flattenActivityItems(items), [items]);
   const isEmpty = !auditQuery.isPending && entries.length === 0;
 
   const previousQuery = useQuery({
@@ -125,8 +136,8 @@ export default function AuditLogView({
   const periodCounts = countsEnabled ? (countsQuery.data ?? null) : null;
 
   const groups = useMemo(
-    () => groupByDay(entries, { timeZone, todayDate: period.todayDate }),
-    [entries, timeZone, period.todayDate],
+    () => groupByDay(items, { timeZone, todayDate: period.todayDate }),
+    [items, timeZone, period.todayDate],
   );
   const categories = useMemo(() => summarizeCategories(entries), [entries]);
 
@@ -134,15 +145,24 @@ export default function AuditLogView({
     ? formatClientErrorMessage(auditQuery.error, "We couldn't load the audit log right now.")
     : null;
 
+  const restart = () => {
+    setPage(0);
+    setPageOffsets([0]);
+  };
   const goTo = (move: () => void) => () => {
     move();
-    setPage(0);
+    restart();
   };
-
+  const goToPage = (next: number) => {
+    if (next > page && nextOffset !== null) {
+      setPageOffsets((offsets) => [...offsets.slice(0, next), nextOffset]);
+    }
+    setPage(next);
+  };
   const resetPage = <T,>(apply: (value: T) => void) => {
     return (value: T) => {
       apply(value);
-      setPage(0);
+      restart();
     };
   };
 
@@ -154,7 +174,7 @@ export default function AuditLogView({
       label: `the latest activity, ${dateKey}`,
       onJump: () => {
         period.jumpTo(dateKey);
-        setPage(0);
+        restart();
       },
     };
   }, [previousQuery.data]);
@@ -202,7 +222,7 @@ export default function AuditLogView({
             value={target}
             onChange={(event) => {
               setTarget(event.target.value);
-              setPage(0);
+              restart();
             }}
             placeholder="Search people or details"
             aria-label="Search people or details"
@@ -214,7 +234,7 @@ export default function AuditLogView({
               checked={highRiskOnly}
               onChange={(event) => {
                 setHighRiskOnly(event.target.checked);
-                setPage(0);
+                restart();
               }}
             />
             High risk
@@ -237,7 +257,7 @@ export default function AuditLogView({
             setResourceType("");
             setTarget("");
             setHighRiskOnly(false);
-            setPage(0);
+            restart();
           }}
           previousActivity={previousActivity}
         />
@@ -249,8 +269,7 @@ export default function AuditLogView({
             actorCount={countActors(entries)}
             categories={categories}
             periodPhrase={period.phrase}
-            truncated={!periodCounts && entries.length >= PAGE_SIZE}
-            pageSize={PAGE_SIZE}
+            truncated={!periodCounts && nextOffset !== null}
           />
 
           <ActivityTable
@@ -258,27 +277,26 @@ export default function AuditLogView({
             timeZone={timeZone}
             showOrganization={!orgId}
             dayCounts={periodCounts?.counts}
-            onSelect={setSelectedEntry}
+            onSelect={setSelectedItem}
           />
 
-          {(page > 0 || entries.length >= PAGE_SIZE) && (
+          {(page > 0 || nextOffset !== null) && (
             <Pagination
               className="mt-4"
               page={page + 1}
-              hasNext={entries.length >= PAGE_SIZE}
-              onPageChange={(next) => setPage(next - 1)}
-              summary={`Showing ${page * PAGE_SIZE + 1} to ${page * PAGE_SIZE + entries.length}`}
+              hasNext={nextOffset !== null}
+              onPageChange={(next) => goToPage(next - 1)}
             />
           )}
         </>
       )}
 
-      {selectedEntry ? (
-        <ActivityDetailsDialog
-          entry={selectedEntry}
+      {selectedItem ? (
+        <ActivityItemDialog
+          item={selectedItem}
           timeZone={timeZone}
           showOrganization
-          onClose={() => setSelectedEntry(null)}
+          onClose={() => setSelectedItem(null)}
         />
       ) : null}
     </>
