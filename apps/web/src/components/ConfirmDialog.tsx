@@ -107,8 +107,7 @@ export default function ConfirmDialog({
     variant === "warning" ? { background: "var(--dg-color-warning)", border: "none" } : undefined;
 
   const descId = useId();
-  // Opening on Cancel, not the close button now in the corner: the safe
-  // choice is the one a stray Enter takes.
+  // Opening on Cancel: the safe choice is the one a stray Enter takes.
   const cancelRef = useRef<HTMLButtonElement>(null);
   const actionDisabled = confirmBusy || secondaryBusy;
   const cancelButtonStyle = wrapActions ? { minWidth: 120 } : undefined;
@@ -166,8 +165,7 @@ export default function ConfirmDialog({
   return (
     <Modal
       title={title}
-      icon={icon ?? VARIANT_ICONS[variant]}
-      iconTone={VARIANT_TONES[variant]}
+      alert={{ icon: icon ?? VARIANT_ICONS[variant], tone: VARIANT_TONES[variant] }}
       returnFocus={returnFocus}
       initialFocus={cancelRef}
       onClose={onCancel}

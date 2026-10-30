@@ -695,7 +695,7 @@ describe("EditEmployeePanel", () => {
       await changeEmail(user);
       await user.click(screen.getByRole("button", { name: "Save" }));
 
-      const dialog = screen.getByRole("dialog", {
+      const dialog = screen.getByRole("alertdialog", {
         name: "Send a new invitation to new.address@example.com?",
       });
       expect(dialog).toHaveTextContent(

@@ -118,8 +118,7 @@ export function AccessSuspendedModal({
 }) {
   return (
     <Modal
-      icon={Lock}
-      iconTone="warning"
+      alert={{ icon: Lock, tone: "warning" }}
       title={ACCESS_SUSPENDED_TITLE}
       onClose={onClose}
       className="dg-modal--account-disabled"
@@ -139,8 +138,7 @@ export function AccessSuspendedModal({
 export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal
-      icon={UserX}
-      iconTone="warning"
+      alert={{ icon: UserX, tone: "warning" }}
       title="Account disabled"
       onClose={onClose}
       className="dg-modal--account-disabled"

@@ -565,8 +565,7 @@ export default function GridmasterAccountsView({
 
       {demoteTarget && !stepUp.dialog && (
         <Modal
-          icon={UserMinus}
-          iconTone="warning"
+          alert={{ icon: UserMinus, tone: "warning" }}
           title="Demote Gridmaster"
           onClose={() => setDemoteTarget(null)}
           style={{ maxWidth: 460 }}

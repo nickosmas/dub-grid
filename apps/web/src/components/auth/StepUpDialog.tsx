@@ -2,7 +2,7 @@
 
 import { useId, useRef } from "react";
 import Modal from "@/components/Modal";
-import { ShieldCheck } from "lucide-react";
+
 import { StepUpForm } from "@/components/auth/StepUpForm";
 import type { StepUpMethod } from "@/features/account/client/step-up";
 
@@ -30,7 +30,6 @@ export function StepUpDialog({ method, error, onConfirm, onCancel }: StepUpDialo
       }}
       frame={(fields, actions) => (
         <Modal
-          icon={ShieldCheck}
           title="Confirm your identity"
           onClose={onCancel}
           onRequestClose={() => {

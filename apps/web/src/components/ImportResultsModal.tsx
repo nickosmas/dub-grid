@@ -42,7 +42,7 @@ export default function ImportResultsModal({
   }
 
   return (
-    <Modal icon={Import} title="Import results" onClose={onClose}>
+    <Modal title="Import results" onClose={onClose}>
       <p
         style={{
           margin: "0 0 16px",

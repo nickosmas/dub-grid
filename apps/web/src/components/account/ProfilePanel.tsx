@@ -12,7 +12,7 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
-import { Check, Clock, Trash2, X, UserCog } from "lucide-react";
+import { Check, Clock, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
 import DeleteAccountCard from "@/components/account/DeleteAccountCard";
@@ -901,7 +901,6 @@ export function ProfilePanel({
           }}
           frame={(fields, actions) => (
             <Modal
-              icon={UserCog}
               title={showManagementAccess ? "Edit management access" : "Add to management"}
               onClose={closeManagementAccessEditor}
               onRequestClose={requestManagementAccessClose}

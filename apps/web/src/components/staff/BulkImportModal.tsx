@@ -473,9 +473,6 @@ export function BulkImportModal({
         {/* Header */}
         <div className="dg-modal-header" style={{ padding: "24px 24px 0", flexShrink: 0 }}>
           <div className="dg-modal-heading">
-            <span className="dg-modal-icon" data-tone="brand">
-              <ImportIcon size={20} strokeWidth={2} aria-hidden="true" />
-            </span>
             <span className="dg-modal-title">
               {step === "upload" && "Import staff"}
               {step === "preview" && `Preview (${rows.length} rows)`}

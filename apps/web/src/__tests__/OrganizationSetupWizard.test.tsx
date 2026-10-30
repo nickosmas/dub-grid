@@ -136,7 +136,9 @@ describe("OrganizationSetupWizard", () => {
     await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
     await user.click(screen.getByRole("button", { name: /create organization/i }));
     await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: /^create organization$/i,
+      }),
     );
     await user.click(await screen.findByRole("button", { name: /set up now/i }));
   }
@@ -150,7 +152,9 @@ describe("OrganizationSetupWizard", () => {
     await user.click(screen.getByRole("option", { name: "Nursing" }));
     await user.click(screen.getByRole("button", { name: /^next$/i }));
     await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: /^save configuration$/i }),
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: /^save configuration$/i,
+      }),
     );
   }
 
@@ -167,7 +171,7 @@ describe("OrganizationSetupWizard", () => {
     );
     await user.click(screen.getByRole("button", { name: /^create 1 employee$/i }));
     await user.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: /^create employees$/i }),
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: /^create employees$/i }),
     );
 
     await waitFor(() =>
@@ -233,7 +237,9 @@ describe("OrganizationSetupWizard", () => {
 
       await user.click(screen.getByRole("button", { name: /create organization/i }));
       await user.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
+        within(screen.getByRole("alertdialog")).getByRole("button", {
+          name: /^create organization$/i,
+        }),
       );
 
       expect(await screen.findByRole("button", { name: /set up now/i })).toBeInTheDocument();
@@ -280,7 +286,9 @@ describe("OrganizationSetupWizard", () => {
       await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
       await user.click(screen.getByRole("button", { name: /^create 1 employee$/i }));
       await user.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: /^create employees$/i }),
+        within(screen.getByRole("alertdialog")).getByRole("button", {
+          name: /^create employees$/i,
+        }),
       );
 
       // The invitation step's proof is stale: the dialog opens and is dismissed.
@@ -301,10 +309,12 @@ describe("OrganizationSetupWizard", () => {
         await screen.findByRole("button", { name: /^send 1 invitation & finish$/i }),
       );
       await user.click(
-        within(screen.getByRole("dialog")).getByRole("button", { name: /^send invitations$/i }),
+        within(screen.getByRole("alertdialog")).getByRole("button", {
+          name: /^send invitations$/i,
+        }),
       );
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
       expect(requireCredentialAssurance).toHaveBeenLastCalledWith("stale-token");
       expect(vi.mocked(createOrganizationInvitation)).not.toHaveBeenCalled();
       expect(onCreated).not.toHaveBeenCalled();

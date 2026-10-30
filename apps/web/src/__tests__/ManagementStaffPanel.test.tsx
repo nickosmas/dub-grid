@@ -221,13 +221,16 @@ describe("ManagementStaffPanel", () => {
     // through the confirm-before-closing flow.
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
-    expect(screen.getByRole("dialog", { name: /discard your changes/i })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: /discard your changes/i })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(
-      within(screen.getByRole("dialog", { name: /discard your changes/i })).getByRole("button", {
-        name: /^discard$/i,
-      }),
+      within(screen.getByRole("alertdialog", { name: /discard your changes/i })).getByRole(
+        "button",
+        {
+          name: /^discard$/i,
+        },
+      ),
     );
 
     await waitFor(() => {
@@ -282,7 +285,9 @@ describe("ManagementStaffPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Revoke invitation" }));
 
-      const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
+      const dialog = await screen.findByRole("alertdialog", {
+        name: /^Revoke the invitation for /,
+      });
       expect(onRevokeInvitation).not.toHaveBeenCalled();
       expect(screen.queryByText(/Revoke this invitation\?/)).not.toBeInTheDocument();
 
@@ -298,7 +303,9 @@ describe("ManagementStaffPanel", () => {
       const { onClose } = renderPanel(pending, undefined, null, { onRevokeInvitation });
 
       await user.click(screen.getByRole("button", { name: "Revoke invitation" }));
-      const dialog = await screen.findByRole("dialog", { name: /^Revoke the invitation for / });
+      const dialog = await screen.findByRole("alertdialog", {
+        name: /^Revoke the invitation for /,
+      });
       await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
       expect(onRevokeInvitation).not.toHaveBeenCalled();
@@ -312,7 +319,7 @@ describe("ManagementStaffPanel", () => {
       renderPanel(pending, undefined, null, { onResendInvitation });
 
       await user.click(screen.getByRole("button", { name: "Resend Invitation" }));
-      const dialog = await screen.findByRole("dialog", { name: /^Resend the invitation to / });
+      const dialog = await screen.findByRole("alertdialog", { name: /^Resend the invitation to / });
       expect(onResendInvitation).not.toHaveBeenCalled();
 
       await user.click(within(dialog).getByRole("button", { name: "Resend" }));

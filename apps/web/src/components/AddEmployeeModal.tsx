@@ -1,5 +1,5 @@
 "use client";
-import { X, UserPlus } from "lucide-react";
+import { X } from "lucide-react";
 
 import { useState, useCallback, useRef, useMemo, useId } from "react";
 import {
@@ -225,7 +225,6 @@ export default function AddEmployeeModal({
   return (
     <>
       <Modal
-        icon={UserPlus}
         title="Add staff members"
         onClose={onClose}
         onRequestClose={requestClose}

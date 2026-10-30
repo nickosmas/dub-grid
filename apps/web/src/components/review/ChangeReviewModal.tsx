@@ -39,7 +39,7 @@ export default function ChangeReviewModal({
 
   return (
     <Modal
-      icon={Save}
+      alert={{ icon: Save }}
       title={title}
       onClose={onCancel}
       style={{ maxWidth: 720, width: "100%" }}

@@ -40,7 +40,7 @@ export default function InactivityGuard() {
 
   return (
     <Modal
-      icon={Timer}
+      alert={{ icon: Timer }}
       title="Still there?"
       onClose={handleStay}
       style={{ maxWidth: 400 }}

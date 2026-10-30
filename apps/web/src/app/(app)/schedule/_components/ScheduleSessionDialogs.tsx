@@ -62,7 +62,7 @@ export function ScheduleSessionWarning({
 export function ScheduleSessionEndedDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal
-      icon={CalendarClock}
+      alert={{ icon: CalendarClock, tone: "warning" }}
       title="Schedule session ended"
       onClose={onClose}
       aria-describedby="schedule-session-ended-description"

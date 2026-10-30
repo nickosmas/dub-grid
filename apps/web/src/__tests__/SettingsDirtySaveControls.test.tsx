@@ -184,7 +184,7 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
 
-    const reviewDialog = await screen.findByRole("dialog", {
+    const reviewDialog = await screen.findByRole("alertdialog", {
       name: /save these changes/i,
     });
     await user.click(within(reviewDialog).getByRole("button", { name: /^save$/i }));
@@ -453,7 +453,7 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
     // The page's Save and the dialog's confirm are both "Save" now, so scope
     // the confirm to the dialog rather than matching whichever comes first.
-    const ruleDialog = await screen.findByRole("dialog", { name: /save schedule rule/i });
+    const ruleDialog = await screen.findByRole("alertdialog", { name: /save schedule rule/i });
     await user.click(within(ruleDialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
@@ -608,12 +608,14 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByText("Daily Readings"));
 
     expect(
-      await screen.findByRole("dialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Daily Readings")).toBeInTheDocument();
   });
 
@@ -1764,12 +1766,14 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
     expect(
-      await screen.findByRole("dialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Days Updated")).toBeInTheDocument();
   });
 
@@ -2118,12 +2122,14 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByText("Mentor Updated"));
 
     expect(
-      await screen.findByRole("dialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(screen.queryByRole("dialog", { name: /discard your changes/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Mentor Updated")).toBeInTheDocument();
   });
 

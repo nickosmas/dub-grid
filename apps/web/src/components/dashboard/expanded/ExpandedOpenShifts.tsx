@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
-import { CalendarPlus } from "lucide-react";
+
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -66,7 +66,7 @@ export default function ExpandedOpenShifts({
   const filteredSlotCount = filtered.reduce((total, shift) => total + shift.needed, 0);
 
   return (
-    <Modal icon={CalendarPlus} title="Open shifts" onClose={onClose} style={modalStyle}>
+    <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {isUnpublished ? (
           <EmptyState

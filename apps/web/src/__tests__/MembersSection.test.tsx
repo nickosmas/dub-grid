@@ -1337,7 +1337,7 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const { user } = await selectAll({ onBulkStatusChange });
 
     await user.click(screen.getByRole("button", { name: "Suspend (1)" }));
-    const dialog = await screen.findByRole("dialog", { name: "Suspend Jamie Rivera?" });
+    const dialog = await screen.findByRole("alertdialog", { name: "Suspend Jamie Rivera?" });
     const skipped = within(dialog).getByRole("region", { name: "Skipped" });
     expect(skipped).toHaveTextContent("Skipped (2)");
     expect(skipped).toHaveTextContent("Alex Chen");
@@ -1354,7 +1354,7 @@ describe("MembersSection - bulk status changes (51h)", () => {
   it("skips the manager's own row", async () => {
     await selectAll({ employees: [jamie, me] });
     await userEvent.setup().click(screen.getByRole("button", { name: "Offboard (1)" }));
-    const dialog = await screen.findByRole("dialog", { name: "Offboard Jamie Rivera?" });
+    const dialog = await screen.findByRole("alertdialog", { name: "Offboard Jamie Rivera?" });
     expect(dialog).toHaveTextContent("You can't change your own status.");
   });
 
@@ -1367,7 +1367,7 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const { user } = await selectAll({ onBulkStatusChange });
 
     await user.click(screen.getByRole("button", { name: "Mark away (3)" }));
-    const dialog = await screen.findByRole("dialog", { name: "Mark 3 people away?" });
+    const dialog = await screen.findByRole("alertdialog", { name: "Mark 3 people away?" });
     expect(within(dialog).getByText("Return date")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Reason (optional)"), " Unit closed ");
     await user.click(within(dialog).getByRole("button", { name: "Mark away" }));
@@ -1391,7 +1391,7 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const { user } = await selectAll({ onBulkStatusChange });
 
     await user.click(screen.getByRole("button", { name: "Offboard (3)" }));
-    const confirm = await screen.findByRole("dialog", { name: "Offboard 3 people?" });
+    const confirm = await screen.findByRole("alertdialog", { name: "Offboard 3 people?" });
     await user.click(within(confirm).getByRole("button", { name: "Offboard" }));
 
     const result = await screen.findByRole("dialog", { name: "2 people not changed" });
@@ -1412,10 +1412,10 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const onBulkStatusChange = vi.fn().mockResolvedValue(null);
     const { user } = await selectAll({ onBulkStatusChange });
     await user.click(screen.getByRole("button", { name: "Offboard (3)" }));
-    const dialog = await screen.findByRole("dialog", { name: "Offboard 3 people?" });
+    const dialog = await screen.findByRole("alertdialog", { name: "Offboard 3 people?" });
     await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
     await waitFor(() => expect(onBulkStatusChange).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("dialog", { name: "Offboard 3 people?" })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Offboard 3 people?" })).toBeInTheDocument();
   });
 
   it("hides the confirmation while the step-up prompt is open and keeps its reason", async () => {

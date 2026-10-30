@@ -12,7 +12,7 @@ import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBan
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
 import Modal from "@/components/Modal";
-import { KeyRound, UserCog, UserPen } from "lucide-react";
+
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
@@ -1584,7 +1584,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
       {isEditingDetails && employee && (
         <Modal
-          icon={UserPen}
           title="Edit details"
           onClose={closeDetailsEditor}
           onRequestClose={requestDetailsClose}
@@ -1641,7 +1640,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
       {isEditingAccess && employee && effectiveOrgRole && (
         <Modal
-          icon={KeyRound}
           title="Edit access"
           onClose={() => setIsEditingAccess(false)}
           className="dg-modal--tight-header"
@@ -1700,7 +1698,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           }}
           frame={(fields, actions) => (
             <Modal
-              icon={UserCog}
               title={
                 directoryPerson?.isManagementUser || hasPendingManagementInvite
                   ? "Edit management access"

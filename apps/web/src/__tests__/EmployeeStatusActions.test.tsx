@@ -106,7 +106,7 @@ async function openDialog(
   title = "Change Alice Smith's status?",
 ) {
   await user.click(screen.getByRole("button", { name: "Change status" }));
-  return screen.getByRole("dialog", { name: title });
+  return screen.getByRole("alertdialog", { name: title });
 }
 
 function choices(dialog: HTMLElement) {
@@ -769,7 +769,9 @@ describe("EmployeeStatusActions", () => {
     };
     const { unmount } = render(<EmployeeStatusActions {...base} label="Edit plan" focus="plan" />);
     await user.click(screen.getByRole("button", { name: "Edit plan" }));
-    let dialog = screen.getByRole("dialog", { name: "Change Alice Smith's planned time away?" });
+    let dialog = screen.getByRole("alertdialog", {
+      name: "Change Alice Smith's planned time away?",
+    });
     expect(within(dialog).getByRole("button", { name: "Starts" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     unmount();
@@ -805,7 +807,7 @@ describe("EmployeeStatusActions", () => {
     expect(cardButtons()).toEqual(["Reinstate", "More status changes"]);
     await user.click(screen.getByRole("button", { name: "Reinstate" }));
     // Its own confirmation: no list, a sentence saying what it does.
-    const dialog = screen.getByRole("dialog", { name: "Reinstate Alice Smith?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Reinstate Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(
       within(dialog).getByText("They'll be Active again and can sign in."),
@@ -835,7 +837,7 @@ describe("EmployeeStatusActions", () => {
       "Offboard",
     ]);
     await user.click(screen.getByRole("menuitem", { name: "Offboard" }));
-    const dialog = screen.getByRole("dialog", { name: "Offboard Alice Smith?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Offboard Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
     expect(onRemove).toHaveBeenCalledWith("emp-1", undefined);
@@ -863,7 +865,7 @@ describe("EmployeeStatusActions", () => {
       "Offboard",
     ]);
     await user.click(screen.getByRole("menuitem", { name: "Set end date" }));
-    const dialog = screen.getByRole("dialog", {
+    const dialog = screen.getByRole("alertdialog", {
       name: "Change when Alice Smith's suspension ends?",
     });
     expect(within(dialog).getByRole("button", { name: "Ends" })).toBeInTheDocument();
@@ -890,7 +892,7 @@ describe("EmployeeStatusActions", () => {
       "Offboard",
     ]);
     await user.click(screen.getByRole("menuitem", { name: "Edit time away" }));
-    const dialog = screen.getByRole("dialog", { name: "Change Alice Smith's time away?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Change Alice Smith's time away?" });
     expect(within(dialog).getByRole("button", { name: "Return date" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
   });
@@ -966,7 +968,7 @@ describe("EmployeeStatusActions", () => {
 
     expect(cardButtons()).toEqual(["Offboard"]);
     await user.click(screen.getByRole("button", { name: "Offboard" }));
-    const dialog = screen.getByRole("dialog", { name: "Offboard Alice Smith?" });
+    const dialog = screen.getByRole("alertdialog", { name: "Offboard Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Offboard" }));
     expect(onRemove).toHaveBeenCalledWith("emp-1", undefined);

@@ -1,7 +1,6 @@
 "use client";
 
 import Modal from "@/components/Modal";
-import { Hourglass } from "lucide-react";
 
 interface ScheduleOperationModalProps {
   title: string;
@@ -23,7 +22,6 @@ export default function ScheduleOperationModal({
 
   return (
     <Modal
-      icon={Hourglass}
       title={title}
       onClose={() => {}}
       onRequestClose={() => false}

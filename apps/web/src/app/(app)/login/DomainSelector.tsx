@@ -13,7 +13,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
-import { Globe } from "lucide-react";
+
 import { withThemeParam } from "@/lib/theme-preference";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
@@ -204,7 +204,6 @@ export default function DomainSelector() {
 
         {showHelp && (
           <Modal
-            icon={Globe}
             title="How to find your domain"
             onClose={() => setShowHelp(false)}
             className="dg-modal--auth-help"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, UserRound, CalendarPlus } from "lucide-react";
+import { Search, UserRound } from "lucide-react";
 import { SUSPENDED_SCHEDULE_NOTE } from "@dubgrid/domain";
 import { StatusIcon } from "@/components/staff-detail/StatusMarkIcon";
 import Modal from "@/components/Modal";
@@ -115,7 +115,6 @@ export function OpenShiftStaffingModal({
 
   return (
     <Modal
-      icon={CalendarPlus}
       title="Assign open shift"
       className="dg-open-shift-staffing-modal"
       onClose={onClose}

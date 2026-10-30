@@ -106,7 +106,6 @@ export default function TrialWelcomeModal() {
 
   return (
     <Modal
-      icon={CalendarClock}
       title="Your trial has started!"
       onClose={handleClose}
       disableOverlayClose

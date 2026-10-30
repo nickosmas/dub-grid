@@ -16,7 +16,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { Banner } from "@/components/ui/Banner";
-import { FlaskConical, UserCheck, Mail } from "lucide-react";
+import { FlaskConical, UserCheck } from "lucide-react";
 import {
   createOrganizationInvitation,
   checkUserExistsByEmail,
@@ -282,7 +282,6 @@ export default function InviteEmployeeModal({
   return (
     <>
       <Modal
-        icon={Mail}
         title={
           isManagementInvite ? "Invite to management" : `Invite ${getEmployeeDisplayName(employee)}`
         }

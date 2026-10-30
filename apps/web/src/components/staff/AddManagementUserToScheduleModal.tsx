@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
-import { CalendarPlus } from "lucide-react";
+
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -156,7 +156,6 @@ export function AddManagementUserToScheduleModal({
   return (
     <>
       <Modal
-        icon={CalendarPlus}
         title="Add to schedule"
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}

@@ -73,8 +73,6 @@ import {
   Trash2,
   Unplug,
   X,
-  Briefcase,
-  CalendarDays,
   CircleCheck,
   CalendarPlus,
   Replace,
@@ -9299,7 +9297,6 @@ function SchedulerContent({
             )}
             {coverageGapSelection && currentEmpId && (
               <Modal
-                icon={Briefcase}
                 title="Choose Assignment"
                 onClose={() => setCoverageGapSelection(null)}
                 style={{ maxWidth: 420 }}
@@ -9537,11 +9534,7 @@ function SchedulerContent({
             {/* Read-only info view for scheduler/admin viewers who see every
                 open shift but aren't personally eligible to claim this one. */}
             {openShiftDetails && (
-              <Modal
-                icon={CalendarDays}
-                title="Open Shift Details"
-                onClose={() => setOpenShiftDetails(null)}
-              >
+              <Modal title="Open Shift Details" onClose={() => setOpenShiftDetails(null)}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <div>
                     <strong>

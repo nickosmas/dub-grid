@@ -10,7 +10,7 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { STATUS_ACTION_ICONS } from "@/components/staff/status-action-icons";
 import Modal from "@/components/Modal";
-import { CircleAlert } from "lucide-react";
+
 import { Button } from "@/components/Button";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import { addDays, formatDateKey } from "@/lib/utils";
@@ -142,8 +142,6 @@ export function BulkStatusDialog({
   if (result) {
     return (
       <Modal
-        icon={CircleAlert}
-        iconTone="warning"
         title={`${countPeople(result.notChanged.length)} not changed`}
         onClose={onClose}
         footer={

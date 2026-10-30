@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
-import { KeyRound } from "lucide-react";
+
 import { Button } from "@/components/Button";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
@@ -562,7 +562,6 @@ export default function PermissionsEditor({
   return (
     <>
       <Modal
-        icon={KeyRound}
         title={title}
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
