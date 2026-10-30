@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
-import { insertEmployee } from "@/features/employees/client";
+import { insertEmployees } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
 import { toast } from "sonner";
 import type { Organization } from "@/types";
@@ -13,7 +13,7 @@ vi.mock("@/features/gridmaster/client", () => ({
 }));
 
 vi.mock("@/features/employees/client", () => ({
-  insertEmployee: vi.fn(),
+  insertEmployees: vi.fn(),
 }));
 
 vi.mock("@/features/settings/client", () => ({
@@ -102,12 +102,17 @@ describe("OrganizationSetupWizard", () => {
       org: makeOrganization(),
       superAdmin: { kind: "assigned", displayName: "Jane Doe" },
     });
-    vi.mocked(insertEmployee).mockResolvedValue({
-      id: "emp-1",
-      firstName: "Jane",
-      lastName: "Doe",
-      email: "jane@example.com",
-    } as Awaited<ReturnType<typeof insertEmployee>>);
+    vi.mocked(insertEmployees).mockResolvedValue({
+      employees: [
+        {
+          id: "emp-1",
+          firstName: "Jane",
+          lastName: "Doe",
+          email: "jane@example.com",
+        },
+      ],
+      failed: [],
+    } as unknown as Awaited<ReturnType<typeof insertEmployees>>);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({

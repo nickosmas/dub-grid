@@ -11,7 +11,7 @@ import {
   EmployeeStatusConflictError,
   FocusAreaShiftsCancelledError,
   fetchEmployees,
-  insertEmployee,
+  insertEmployees,
   removeEmployee,
   setEmployeePlannedChange,
   plannedChangeToast,
@@ -202,33 +202,29 @@ export function useEmployees(
   const handleAddEmployee = useCallback(
     async (dataList: Omit<Employee, "id" | "seniority">[]) => {
       if (!orgId) return;
-      const added: Employee[] = [];
       try {
-        for (const data of dataList) {
-          const maxSen = Math.max(
-            ...allEmployeesRef.current.map((e) => e.seniority),
-            ...added.map((e) => e.seniority),
-            0,
-          );
-          const newEmp = await insertEmployee({ ...data, seniority: maxSen + 1 }, orgId);
-          added.push(newEmp);
+        // One request per hundred people; the server places them after
+        // everyone already in the organization, in the order given.
+        const { employees: added, failed } = await insertEmployees(dataList, orgId);
+        if (added.length === 0 && failed.length > 0) {
+          // Nothing was added, so keep the form open to fix and try again.
+          toast.error(failed[0].error);
+          return undefined;
         }
-        setAllLocal((prev) => [...prev, ...added]);
-        toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
-        invalidateEmployees();
+        if (added.length > 0) {
+          setAllLocal((prev) => [...prev, ...added]);
+          invalidateEmployees();
+        }
+        if (failed.length === 0) {
+          toast.success(added.length === 1 ? "Employee added" : `${added.length} employees added`);
+        } else {
+          toast.error(`Added ${added.length} of ${dataList.length} employees. ${failed[0].error}`);
+        }
         return added;
       } catch (err) {
         Sentry.captureException(err);
-        if (added.length === 0) {
-          toast.error(formatClientErrorMessage(err, "We couldn't add that person. Try again."));
-          return undefined;
-        }
-        // Rows are inserted one at a time, so some may already exist. Show
-        // them, and close the form rather than let a retry add them twice.
-        setAllLocal((prev) => [...prev, ...added]);
-        invalidateEmployees();
-        toast.error(`Added ${added.length} of ${dataList.length} employees. Add the rest again.`);
-        return added;
+        toast.error(formatClientErrorMessage(err, "We couldn't add that person. Try again."));
+        return undefined;
       }
     },
     [orgId, invalidateEmployees],

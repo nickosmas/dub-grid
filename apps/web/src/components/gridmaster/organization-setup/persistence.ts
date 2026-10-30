@@ -1,4 +1,4 @@
-import { insertEmployee } from "@/features/employees/client";
+import { insertEmployees } from "@/features/employees/client";
 import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import {
   createOrganizationInvitation,
@@ -355,40 +355,41 @@ export async function createOrganizationEmployees(
   employeeRows: EmployeeRow[],
 ): Promise<CreatedEmployee[]> {
   const validRows = employeeRows.filter((row) => row.firstName.trim());
-  const created: CreatedEmployee[] = [];
+  if (validRows.length === 0) return [];
 
-  for (const row of validRows) {
-    const employee = await insertEmployee(
-      {
-        firstName: row.firstName.trim(),
-        lastName: row.lastName.trim(),
-        employmentType: "full_time",
-        email: row.email.trim(),
-        phone: row.phone.trim(),
-        seniority: created.length + 1,
-        certificationId: null,
-        roleIds: [],
-        focusAreaIds: [],
-        contactNotes: "",
-        status: "active" as const,
-        statusChangedAt: null,
-        statusNote: "",
-        userId: null,
-        departmentIds: [],
-        deptAdminIds: [],
-        version: 0,
-      },
-      createdOrg.id,
+  const { employees, failed } = await insertEmployees(
+    validRows.map((row) => ({
+      firstName: row.firstName.trim(),
+      lastName: row.lastName.trim(),
+      employmentType: "full_time" as const,
+      email: row.email.trim(),
+      phone: row.phone.trim(),
+      certificationId: null,
+      roleIds: [],
+      focusAreaIds: [],
+      contactNotes: "",
+      status: "active" as const,
+      statusChangedAt: null,
+      statusNote: "",
+      userId: null,
+      departmentIds: [],
+      deptAdminIds: [],
+      version: 0,
+    })),
+    createdOrg.id,
+  );
+  if (failed.length > 0) {
+    throw new Error(
+      `We couldn't add ${failed.length} of ${validRows.length} people. ${failed[0].error}`,
     );
-    created.push({
-      id: employee.id,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
-      email: employee.email,
-    });
   }
 
-  return created;
+  return employees.map((employee): CreatedEmployee => ({
+    id: employee.id,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+  }));
 }
 
 export async function sendOrganizationInvitations(

@@ -27,7 +27,15 @@ describe("lastWritePerCell", () => {
       {
         employeeId: "a",
         dateKey: "2026-11-02",
-        input: { kind: "absence" as const, segments: [], absenceTypeId: 7 },
+        input: {
+          kind: "absence" as const,
+          segments: [],
+          absenceTypeId: 7,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
       },
     ];
     expect(lastWritePerCell(writes)).toEqual([writes[1], writes[2]]);

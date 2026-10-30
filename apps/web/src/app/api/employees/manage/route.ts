@@ -67,6 +67,7 @@ import {
 } from "@dubgrid/data-access";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { reorderSeniority } from "@/features/employees/server/reorder-seniority";
+import { insertEmployees, MAX_EMPLOYEE_BATCH } from "@/features/employees/server/insert-employees";
 import { enrichAuditRows } from "@/lib/audit/enrich";
 import {
   buildEmployeeActivityRows,
@@ -171,6 +172,14 @@ const requestSchema = z.discriminatedUnion("action", [
     expectedVersion: z.number().int().nonnegative().optional(),
     /** What to do with their upcoming shifts in focus areas they come off (51i). */
     focusAreaShifts: z.enum(["clear", "keep"]).optional(),
+  }),
+  z.object({
+    action: z.literal("insertEmployees"),
+    orgId: z.string().uuid(),
+    employees: z
+      .array(employeeCreateSchema.omit({ seniority: true }))
+      .min(1)
+      .max(MAX_EMPLOYEE_BATCH),
   }),
   z.object({
     action: z.literal("reorderSeniority"),
@@ -710,6 +719,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           employee: rowToEmployee(insertedRow),
         });
+      }
+
+      case "insertEmployees": {
+        const auth = await requireEmployeeSetupPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const outcome = await insertEmployees({
+          serviceClient: auth.serviceClient,
+          orgId: data.orgId,
+          actor: auth.actor,
+          employees: data.employees,
+          ip: getRequestIp(req),
+          userAgent: req.headers.get("user-agent"),
+        });
+        return "response" in outcome ? outcome.response : NextResponse.json(outcome);
       }
 
       case "updateEmployee": {

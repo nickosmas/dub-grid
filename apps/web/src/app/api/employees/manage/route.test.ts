@@ -72,6 +72,12 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
+const insertEmployees = vi.fn();
+vi.mock("@/features/employees/server/insert-employees", () => ({
+  MAX_EMPLOYEE_BATCH: 100,
+  insertEmployees: (...args: unknown[]) => insertEmployees(...args),
+}));
+
 const reorderSeniority = vi.fn();
 vi.mock("@/features/employees/server/reorder-seniority", () => ({
   reorderSeniority: (...args: unknown[]) => reorderSeniority(...args),
@@ -1283,6 +1289,56 @@ describe("POST /api/employees/manage fetchEmployeeHasStarted", () => {
 
       expect((await POST(reorderRequest(order))).status).toBe(403);
       expect(reorderSeniority).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("insertEmployees", () => {
+    function insertRequest(employees: Array<Record<string, unknown>>) {
+      return new NextRequest("http://localhost/api/employees/manage", {
+        method: "POST",
+        body: JSON.stringify({ action: "insertEmployees", orgId: ORG_ID, employees }),
+      });
+    }
+    const person = {
+      firstName: "Mina",
+      lastName: "Diaz",
+      employmentType: "full_time",
+      status: "active",
+      statusChangedAt: null,
+      statusNote: "",
+      certificationId: null,
+      roleIds: [],
+      focusAreaIds: [3],
+      phone: "",
+      email: "mina@dubgrid.com",
+      contactNotes: "",
+      userId: null,
+      departmentIds: [],
+      deptAdminIds: [],
+      version: 0,
+    };
+
+    it("adds everyone in one request and answers with who was added and who wasn't", async () => {
+      mockAuth({ canManageEmployees: true });
+      const outcome = { employees: [makeEmployee()], failed: [{ index: 1, error: "In use." }] };
+      insertEmployees.mockResolvedValue(outcome);
+
+      const response = await POST(insertRequest([person, person]));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(outcome);
+      expect(insertEmployees).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId: ORG_ID, employees: [person, person] }),
+      );
+    });
+
+    it("needs the right to manage staff", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        response: new Response(null, { status: 403 }),
+      });
+
+      expect((await POST(insertRequest([person]))).status).toBe(403);
+      expect(insertEmployees).not.toHaveBeenCalled();
     });
   });
 });
