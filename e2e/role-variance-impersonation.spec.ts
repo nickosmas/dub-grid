@@ -187,7 +187,7 @@ test.describe("role variance: gridmaster impersonation", () => {
     await page.goto(`${QA_GRIDMASTER_ORIGIN}/profile`);
     await expect(page).toHaveURL(/\/profile/, { timeout: 20_000 });
     await expect(banner(page)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("link", { name: "Overview", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Overview", exact: true })).toHaveCount(0);
 
     // The banner ends the session directly (no confirmation; the "End
     // Impersonation" dialog belongs to the portal's Impersonation view) and

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
@@ -43,9 +43,14 @@ interface ScheduleTabProps {
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;
+  /** Shown between the usual week and the list, such as the calendar subscription. */
+  afterUsualWeek?: ReactNode;
   /** Null when this viewer can't see recurring schedules. */
   usualWeek: {
-    orgId: string;
+    /** Loads their shift and job preferences; null leaves them out. */
+    orgId: string | null;
+    /** Where the pattern is changed; null when this viewer can't change it. */
+    editHref?: string | null;
     recurringShifts: RecurringShift[];
     assignments: AssignmentDefinition[];
     shiftCategories: ShiftCategory[];
@@ -69,6 +74,7 @@ export function ScheduleTab({
   absenceTypes,
   dayOffAbsenceTypeId,
   usualWeek,
+  afterUsualWeek,
 }: ScheduleTabProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [includeDayOff, setIncludeDayOff] = useState(false);
@@ -116,6 +122,7 @@ export function ScheduleTab({
   return (
     <div className="flex flex-col gap-4">
       {usualWeek ? <UsualWeekCard employeeId={employee.id} {...usualWeek} /> : null}
+      {afterUsualWeek}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -217,6 +224,7 @@ export function ScheduleTab({
 
 function UsualWeekCard({
   orgId,
+  editHref = "/people?section=recurring-schedule",
   employeeId,
   recurringShifts,
   assignments,
@@ -237,12 +245,14 @@ function UsualWeekCard({
     [absenceTypes, assignments, jobs, shiftCategories],
   );
   const shiftPreferenceQuery = useQuery({
-    queryKey: [...queryKeys.recurringShifts.preferences(orgId), employeeId],
-    queryFn: () => fetchShiftPreferences(orgId, employeeId),
+    queryKey: [...queryKeys.recurringShifts.preferences(orgId ?? "none"), employeeId],
+    queryFn: () => fetchShiftPreferences(orgId!, employeeId),
+    enabled: Boolean(orgId),
   });
   const jobPreferenceQuery = useQuery({
-    queryKey: [...queryKeys.recurringShifts.jobPreferences(orgId), employeeId],
-    queryFn: () => fetchJobPreferences(orgId, employeeId),
+    queryKey: [...queryKeys.recurringShifts.jobPreferences(orgId ?? "none"), employeeId],
+    queryFn: () => fetchJobPreferences(orgId!, employeeId),
+    enabled: Boolean(orgId),
   });
   const shiftName = useMemo(() => {
     const byId = new Map(shiftCategories.map((shift) => [shift.id, shift]));
@@ -273,12 +283,14 @@ function UsualWeekCard({
     <section className="dg-card" aria-label="Usual week">
       <div className="dg-card-header">
         <div className="dg-card-title">Usual week</div>
-        <Link
-          href="/people?section=recurring-schedule"
-          className="text-[13px] font-semibold text-[var(--dg-color-link)] no-underline hover:underline"
-        >
-          Edit on Recurring Shifts
-        </Link>
+        {editHref ? (
+          <Link
+            href={editHref}
+            className="text-[13px] font-semibold text-[var(--dg-color-link)] no-underline hover:underline"
+          >
+            Edit on Recurring Shifts
+          </Link>
+        ) : null}
       </div>
       <div className="dg-card-body">
         {recurringShifts.length === 0 ? (

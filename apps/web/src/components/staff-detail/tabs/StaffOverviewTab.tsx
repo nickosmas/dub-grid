@@ -30,6 +30,17 @@ interface StaffOverviewTabProps {
   focusAreas: FocusArea[];
   /** Today and the six days after it, with their shifts; null for someone not on the schedule. */
   nextDays: { dates: Date[]; shifts: ShiftMap } | null;
+  /** The strip's wording, when it isn't someone else's next seven days. */
+  nextDaysCopy?: {
+    title: string;
+    periodLabel: string;
+    emptyTitle: string;
+    emptyDescription: string;
+  };
+  /** "About", or "About you" on your own profile. */
+  aboutTitle?: string;
+  /** "What they work", or "What you work" on your own profile. */
+  mixTitle?: string;
   /** Requests about them still awaiting approval; undefined when this viewer can't review them. */
   waitingRequests?: PersonRequestRow[];
   /** Work, Access and the record line. */
@@ -52,6 +63,9 @@ export function StaffOverviewTab({
   nextDays,
   waitingRequests,
   about,
+  nextDaysCopy,
+  aboutTitle = "About",
+  mixTitle,
 }: StaffOverviewTabProps) {
   const assignmentById = useMemo(() => new Map(assignments.map((a) => [a.id, a])), [assignments]);
   const absenceTypeById = useMemo(
@@ -119,13 +133,15 @@ export function StaffOverviewTab({
           shiftCategories={shiftCategories}
           focusAreas={focusAreas}
           periodDates={nextDays.dates}
-          periodLabel="Today and the next six days"
-          isScheduleEditor
-          copy={{
-            title: "Next 7 days",
-            emptyTitle: `${firstName} isn't scheduled in the next 7 days`,
-            emptyDescription: "Shifts show up here once they're on the schedule.",
-          }}
+          periodLabel={nextDaysCopy?.periodLabel ?? "Today and the next six days"}
+          isScheduleEditor={!nextDaysCopy}
+          copy={
+            nextDaysCopy ?? {
+              title: "Next 7 days",
+              emptyTitle: `${firstName} isn't scheduled in the next 7 days`,
+              emptyDescription: "Shifts show up here once they're on the schedule.",
+            }
+          }
         />
       ) : null}
 
@@ -170,12 +186,14 @@ export function StaffOverviewTab({
               </div>
             </section>
           ) : null}
-          {mix.length > 0 ? <WorkMixCard mix={mix} periodPhrase={periodPhrase} /> : null}
+          {mix.length > 0 ? (
+            <WorkMixCard mix={mix} periodPhrase={periodPhrase} title={mixTitle} />
+          ) : null}
         </div>
       ) : null}
 
       <h2 className="m-0 mt-6 text-[17px] font-semibold tracking-tight text-[var(--dg-color-text-primary)]">
-        About
+        {aboutTitle}
       </h2>
       {about}
     </div>

@@ -533,6 +533,12 @@ column is gone, contact sits under the name, lists are plain text with pills
 only for drafts, corrections and time off ahead or now, and the page runs up
 to 1200px (owner, 2026-10-29). Older `?tab=` links open the tab that holds
 them now.
+My profile follows the same day (fix/profile-three-tabs): the staff page's
+header and three tabs, **Overview** (the last 12 weeks, This week, What you
+work, About you), **Schedule** (Usual week, the calendar subscription, shifts
+and time off) and **Account** (your details, sign-in and security, alerts, and
+data and privacy), replacing the settings sidebar. Old `?section=` links open
+Account at their heading.
 
 Item 55 is split:
 

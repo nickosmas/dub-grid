@@ -808,10 +808,8 @@
             "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
             "apps/web/src/components/dashboard/MyScheduleRow.tsx",
             "apps/web/src/lib/period-presets.ts",
-            "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
-            "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
             "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
             "apps/web/src/lib/shift-records.ts",
             "apps/web/src/lib/time-off.ts",
@@ -828,7 +826,6 @@
           ],
           "testFiles": [
             "apps/web/src/components/staff-detail/StaffDetailPage.test.tsx",
-            "apps/web/src/components/staff-detail/PersonRecordCard.test.tsx",
             "apps/web/src/__tests__/EditEmployeePanel.test.tsx",
             "apps/web/src/__tests__/ProfileChangeRequestQueue.test.tsx"
           ],
@@ -836,7 +833,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c6d2413a468ec9e4dc2c1bdd31947424c90e601e1a0521109b55866a1ee9e5a7"
+      "evidenceFingerprint": "sha256:5243f83d51380736dd4e45461b083c965bf563294bccbbdb205fe32373905b03"
     },
     {
       "id": "invitations",
@@ -1453,10 +1450,10 @@
         {
           "id": "profile",
           "claims": [
-            "profile menu and sections",
+            "profile menu; header, status card, and Overview, Schedule and Account tabs; This week, What you work, About you; old section links; Account only without a staff record",
             "details: email and phone, identity confirmation and confirmation email; concurrent edit message",
             "direct name editing for people managers and Super Admins; name change requests otherwise",
-            "access and management departments cards",
+            "access and management departments in About you and Your details",
             "calendar subscription: create, replace, disable",
             "app profile tab rows and details behavior",
             "deletion: requests for most, direct for Super Admins with typed confirmation and sole Super Admin guard",
@@ -1466,8 +1463,11 @@
           "sourceFiles": [
             "apps/web/src/components/Header.tsx",
             "apps/web/src/components/profile/ProfilePage.tsx",
-            "apps/web/src/components/profile/profile-nav-config.tsx",
-            "apps/web/src/components/profile/SelfWorkProfile.tsx",
+            "apps/web/src/components/profile/profile-tabs.ts",
+            "apps/web/src/components/profile/ProfileHeader.tsx",
+            "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
+            "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
             "apps/web/src/components/account/ProfilePanel.tsx",
             "apps/web/src/components/account/DeleteAccountCard.tsx",
@@ -1481,6 +1481,7 @@
           ],
           "testFiles": [
             "apps/web/src/components/account/ProfilePanel.test.tsx",
+            "apps/web/src/components/profile/__tests__/profile-tabs.test.ts",
             "apps/web/src/components/profile/CalendarSubscriptionCard.test.tsx",
             "apps/web/src/app/api/auth/delete-account/route.test.ts",
             "apps/web/src/app/(app)/goodbye/__tests__/RunLogoutTeardown.test.tsx",
@@ -1493,7 +1494,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d44bd6eb5b826bb7b3e1ab764a7be1f8346a5e7381e4973335ba2fbdb2e887f7"
+      "evidenceFingerprint": "sha256:ab688af1af37f12a61b0fa72fbc28809e6193a92d5bb200915da6aae3cad536f"
     },
     {
       "id": "security-sessions",
@@ -1572,7 +1573,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:49efd956f2df94b5bcadb841459698667452d286e179204197947f369442f096"
+      "evidenceFingerprint": "sha256:210a3a683087ca976b0465798f82d063af1a75526ba31e2baeebfe2c25cc0216"
     },
     {
       "id": "privacy-controls",
@@ -1635,7 +1636,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ccff0f17f6509885b6766cd35abda4babe85801663524452e8a5fb08d7583d9c"
+      "evidenceFingerprint": "sha256:58f7e004aff2628ced0be2b431bd5bb83ea3220a8ff69226d3934e4d81808212"
     },
     {
       "id": "schedule-rules-display",

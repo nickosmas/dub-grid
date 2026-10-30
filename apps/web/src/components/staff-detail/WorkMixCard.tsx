@@ -42,10 +42,12 @@ interface WorkMixCardProps {
   mix: WorkMixEntry[];
   /** "between Sep 1 and Oct 15", as the rest of the tab words the period. */
   periodPhrase: string;
+  /** "What they work", or "What you work" on your own profile. */
+  title?: string;
 }
 
 /** What someone worked in the period, by shift and job. */
-export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
+export function WorkMixCard({ mix, periodPhrase, title = "What they work" }: WorkMixCardProps) {
   const { resolvedTheme } = useTheme();
   const [asTable, setAsTable] = useState(false);
   const [active, setActive] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
         <div>
           <div className="dg-card-title flex items-center gap-2">
             <ChartPie className="h-4 w-4 text-[var(--dg-color-text-muted)]" aria-hidden />
-            What they work
+            {title}
           </div>
           <div className="dg-card-subtitle">
             {total > 0
@@ -147,7 +149,7 @@ export function WorkMixCard({ mix, periodPhrase }: WorkMixCardProps) {
               width={SIZE}
               height={SIZE}
               role="img"
-              aria-label={`What they work ${periodPhrase}`}
+              aria-label={`${title} ${periodPhrase}`}
               className="shrink-0"
               onMouseLeave={() => setActive(null)}
             >

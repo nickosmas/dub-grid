@@ -157,17 +157,6 @@ vi.mock("@/components/staff-detail/tabs/StaffOverviewTab", () => ({
   ),
 }));
 
-vi.mock("@/components/staff-detail/tabs/OverviewTab", () => ({
-  OverviewTab: ({ scheduleOverview }: { scheduleOverview?: ReactNode }) => (
-    <div>
-      <div>Overview content</div>
-      <div>Account summary</div>
-      <div>Employment summary</div>
-      {scheduleOverview}
-    </div>
-  ),
-}));
-
 vi.mock("@/components/staff-detail/RecurringScheduleCard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/staff-detail/RecurringScheduleCard")>()),
   RecurringScheduleCard: () => <div>Recurring schedule card</div>,
