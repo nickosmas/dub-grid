@@ -3,10 +3,11 @@ import { Employee } from "@/types";
 
 interface UseStaffReorderOptions {
   sorted: Employee[];
-  onSave: (emp: Employee) => unknown;
+  /** Saves the whole new order in one go; false keeps the list open to retry. */
+  onSaveOrder: (order: Employee[]) => boolean | Promise<boolean>;
 }
 
-export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
+export function useStaffReorder({ sorted, onSaveOrder }: UseStaffReorderOptions) {
   const [isReordering, setIsReordering] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Employee[] | null>(null);
 
@@ -22,14 +23,10 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
 
   const saveOrder = useCallback(async () => {
     if (!pendingOrder) return;
-    await Promise.all(
-      pendingOrder.flatMap((emp, i) =>
-        emp.seniority === i + 1 ? [] : [onSave({ ...emp, seniority: i + 1 })],
-      ),
-    );
+    if (!(await onSaveOrder(pendingOrder))) return;
     setIsReordering(false);
     setPendingOrder(null);
-  }, [pendingOrder, onSave]);
+  }, [pendingOrder, onSaveOrder]);
 
   const discardReorder = useCallback(() => {
     setPendingOrder([...sorted]);

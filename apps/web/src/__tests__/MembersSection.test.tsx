@@ -265,6 +265,7 @@ const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementU
   certifications: [],
   roles: [],
   onSave: vi.fn(),
+  onSaveOrder: vi.fn(),
   onRemove: vi.fn(),
   onDeactivate: vi.fn(),
   onActivate: vi.fn(),

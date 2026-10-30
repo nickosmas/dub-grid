@@ -140,6 +140,8 @@ export interface MembersSectionProps {
   roles: NamedItem[];
   useCompactRoleCertificationLabels?: boolean;
   onSave: (emp: Employee) => boolean | Promise<boolean>;
+  /** Saves a new seniority order in one request. */
+  onSaveOrder: (order: Employee[]) => boolean | Promise<boolean>;
   /** Called instead of `onSave` when the admin confirms changing an
    *  on-schedule employee's email while a pending invitation exists — see
    *  EditEmployeePanel. */
@@ -204,6 +206,7 @@ export function MembersSection({
   roles,
   useCompactRoleCertificationLabels = false,
   onSave,
+  onSaveOrder,
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
@@ -462,7 +465,7 @@ export function MembersSection({
 
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection, selectOnly } =
     useStaffSelection();
-  const reorder = useStaffReorder({ sorted, onSave });
+  const reorder = useStaffReorder({ sorted, onSaveOrder });
   // A person's page steps through this list in this order (item 55b).
   useEffect(() => {
     if (orgId) savePeopleOrder(orgId, sorted.map(getEmployeeId));

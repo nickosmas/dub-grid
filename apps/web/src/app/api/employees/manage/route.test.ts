@@ -67,6 +67,16 @@ vi.mock("@dubgrid/data-access", async (importOriginal) => ({
     fetchMobilePendingInvitationRowByEmployeeId(...args),
 }));
 
+const dispatchNotificationEvent = vi.fn();
+vi.mock("@/features/notifications/server/events", () => ({
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+}));
+
+const reorderSeniority = vi.fn();
+vi.mock("@/features/employees/server/reorder-seniority", () => ({
+  reorderSeniority: (...args: unknown[]) => reorderSeniority(...args),
+}));
+
 vi.mock("@/lib/db/mappers", () => ({
   employeeToRow: vi.fn(),
   rowToEmployee: (...args: unknown[]) => rowToEmployee(...args),
@@ -395,6 +405,20 @@ describe("POST /api/employees/manage", () => {
   });
 
   describe("updateEmployee", () => {
+    it("never names seniority in the alert to the person", async () => {
+      mockAuth({ canManageEmployees: true });
+      rowToEmployee.mockReturnValue(makeEmployee({ seniority: 1, focusAreaIds: [3] }));
+
+      await POST(updateEmployeeRequest({ seniority: 7, focusAreaIds: [3] }));
+
+      const alertFields = dispatchNotificationEvent.mock.calls
+        .map(([, event]) => event as { action: string; fields?: string[] })
+        .filter((event) => event.action === "employee_profile_changed")
+        .flatMap((event) => event.fields ?? []);
+      expect(alertFields.length).toBeGreaterThan(0);
+      expect(alertFields).not.toContain("seniority");
+    });
+
     it("rejects clearing focus areas for an employee with no management access", async () => {
       mockAuth({ canManageEmployees: true });
       fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
@@ -1190,5 +1214,75 @@ describe("POST /api/employees/manage fetchEmployeeHasStarted", () => {
     const { response } = await ask([]);
 
     expect(await response.json()).toEqual({ started: false });
+  });
+
+  describe("reorderSeniority", () => {
+    const SECOND_ID = "1b2c3d4e-5f60-4718-8a9b-0c1d2e3f4a5b";
+
+    function reorderRequest(order: Array<Record<string, unknown>>) {
+      return new NextRequest("http://localhost/api/employees/manage", {
+        method: "POST",
+        body: JSON.stringify({ action: "reorderSeniority", orgId: ORG_ID, order }),
+      });
+    }
+
+    const order = [
+      { id: SECOND_ID, seniority: 1, version: 2 },
+      { id: EMPLOYEE_ID, seniority: 2, version: 4 },
+    ];
+
+    it("saves the order in one go, logging each person and alerting no one", async () => {
+      mockAuth({ canManageEmployees: true });
+      const before = makeEmployee({ seniority: 1, version: 4 });
+      const after = makeEmployee({ seniority: 2, version: 5 });
+      reorderSeniority.mockResolvedValue({ kind: "saved", changed: [{ before, after }] });
+
+      const response = await POST(reorderRequest(order));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ employees: [after] });
+      expect(reorderSeniority).toHaveBeenCalledWith(expect.anything(), ORG_ID, order);
+      expect(insertPayloads).toContainEqual([
+        expect.objectContaining({
+          action: "employee.updated",
+          resource_id: EMPLOYEE_ID,
+          details: expect.objectContaining({
+            changedFields: ["seniority"],
+            from: { seniority: 1 },
+            to: { seniority: 2 },
+          }),
+        }),
+      ]);
+      expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+    });
+
+    it("answers a stale order with the changed-elsewhere conflict", async () => {
+      mockAuth({ canManageEmployees: true });
+      reorderSeniority.mockResolvedValue({ kind: "conflict" });
+
+      const response = await POST(reorderRequest(order));
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error: "Someone else just changed the order. Refresh and try again.",
+        code: "EMPLOYEE_CONFLICT",
+      });
+    });
+
+    it("refuses people outside the organization", async () => {
+      mockAuth({ canManageEmployees: true });
+      reorderSeniority.mockResolvedValue({ kind: "missing" });
+
+      expect((await POST(reorderRequest(order))).status).toBe(400);
+    });
+
+    it("needs the right to manage staff", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        response: new Response(null, { status: 403 }),
+      });
+
+      expect((await POST(reorderRequest(order))).status).toBe(403);
+      expect(reorderSeniority).not.toHaveBeenCalled();
+    });
   });
 });

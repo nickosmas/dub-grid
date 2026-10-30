@@ -16,6 +16,7 @@ import {
   setEmployeePlannedChange,
   plannedChangeToast,
   setEmployeeReturnDate,
+  saveSeniorityOrder,
   updateEmployee,
   type BulkStatusOutcome,
   type PlannedChange,
@@ -53,6 +54,8 @@ export interface EmployeesData {
     dataList: Omit<Employee, "id" | "seniority">[],
   ) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<boolean>;
+  /** Saves a whole new seniority order at once; false when nothing changed. */
+  handleSaveSeniorityOrder: (order: Employee[]) => Promise<boolean>;
   /** Saves an employee whose email just changed while a pending invitation
    *  exists, then creates and sends a replacement invitation at the new
    *  address (reusing the old invitation's role/departments). */
@@ -275,6 +278,45 @@ export function useEmployees(
         }
         if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(formatClientErrorMessage(err, "We couldn't save their details. Try again."));
+        Sentry.captureException(err);
+        return false;
+      }
+    },
+    [orgId, invalidateEmployees],
+  );
+
+  const handleSaveSeniorityOrder = useCallback(
+    async (order: Employee[]) => {
+      if (!orgId) return false;
+      const prevAll = allEmployeesRef.current;
+      const moves = order.flatMap((emp, index) =>
+        emp.seniority === index + 1
+          ? []
+          : [{ id: emp.id, seniority: index + 1, version: emp.version }],
+      );
+      if (moves.length === 0) return true;
+      const nextSeniority = new Map(moves.map((move) => [move.id, move.seniority]));
+      setAllLocal((prev) =>
+        prev.map((row) =>
+          nextSeniority.has(row.id) ? { ...row, seniority: nextSeniority.get(row.id)! } : row,
+        ),
+      );
+      try {
+        const saved = await saveSeniorityOrder(orgId, moves);
+        const savedById = new Map(saved.map((emp) => [emp.id, emp]));
+        setAllLocal((prev) => prev.map((row) => savedById.get(row.id) ?? row));
+        toast.success("Order saved");
+        invalidateEmployees();
+        return true;
+      } catch (err) {
+        // The server saves all of it or none of it, so the whole list goes back.
+        setAllLocal(prevAll);
+        toast.error(
+          formatClientErrorMessage(
+            err,
+            "We couldn't save the new order, so nothing changed. Try again.",
+          ),
+        );
         Sentry.captureException(err);
         return false;
       }
@@ -712,6 +754,7 @@ export function useEmployees(
     loading,
     handleAddEmployee,
     handleSaveEmployee,
+    handleSaveSeniorityOrder,
     handleSaveEmployeeWithReinvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,

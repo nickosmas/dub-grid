@@ -132,6 +132,18 @@ async function requestEmployeeAction<T>(body: Record<string, unknown>): Promise<
   });
 }
 
+/** Saves a new seniority order in one request: all of it, or none of it. */
+export function saveSeniorityOrder(
+  orgId: string,
+  order: Array<{ id: string; seniority: number; version: number }>,
+): Promise<Employee[]> {
+  return requestEmployeeAction<{ employees: Employee[] }>({
+    action: "reorderSeniority",
+    orgId,
+    order,
+  }).then((data) => data.employees);
+}
+
 export async function updateEmployeeIdentity(
   input: UpdateEmployeeIdentityInput,
 ): Promise<{ success: true; employee: Employee }> {

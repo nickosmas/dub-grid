@@ -106,6 +106,7 @@ interface StaffViewProps {
   certifications: NamedItem[];
   roles: NamedItem[];
   onSave: (emp: Employee) => boolean | Promise<boolean>;
+  onSaveOrder: (order: Employee[]) => boolean | Promise<boolean>;
   /** Called instead of `onSave` when the admin confirms changing an
    *  on-schedule employee's email while a pending invitation exists — see
    *  EditEmployeePanel. */
@@ -176,6 +177,7 @@ export default function StaffView({
   certifications,
   roles,
   onSave,
+  onSaveOrder,
   onSaveWithReinvite,
   onRemove,
   onDeactivate,
@@ -375,6 +377,7 @@ export default function StaffView({
             roles={roles}
             useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
             onSave={onSave}
+            onSaveOrder={onSaveOrder}
             onSaveWithReinvite={onSaveWithReinvite}
             onRemove={onRemove}
             onDeactivate={onDeactivate}
