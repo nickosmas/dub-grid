@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bf6acdfd8fb7431b28fa6d3db325e2fdf3571d5b90af3f37302d60bbc017f725"
+      "evidenceFingerprint": "sha256:0caf47d513dbb89adf3d4587f696adbef0dbd212e18dbcedd7e3236847905593"
     },
     {
       "id": "realtime",
@@ -683,7 +683,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4169256d62501c5c18ed9727ea1f35d7871c39fe0aa00b0d8ca62b7dba636d1e"
+      "evidenceFingerprint": "sha256:e6ab580be8888f080ca3bc824865d74a3373bfdb998fbc26c1c9f7f0ee2b6197"
     },
     {
       "id": "roster",
@@ -784,17 +784,16 @@
           "id": "person",
           "claims": [
             "person page needs view-details permission; one page with Back to People",
-            "header contents: name, status icon, access star, employee number, No app access, Send invitation, Add to schedule or management; previous and next person in the People list's order",
-            "Contact, Work details and Record cards beside the tabs; Edit opens the details; Record account states",
+            "header contents: name, access star, status icon, roles, focus areas and employment, email and phone, Send invitation, Add to schedule or management, Edit details; previous and next person in the People list's order",
+            "status card under the header; Overview About: Work and Access cards, Edit opens the details or the access popup, account states, last active, and the record line",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
             "edit fields; focus area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Recurring, Access and Activity tabs; who sees Recurring and Activity; Overview and Activity period choices; Overview stats for the period, This week, What they work and remembered choice",
+            "Overview, Schedule and Activity tabs; older tab links open the tab that holds them; who sees Usual week and Activity; period choices; Overview stats for the period, Next 7 days, Needs attention, What they work and remembered choice",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
-            "Shifts tab: records in the period with state, what a draft replaces, correction reason, absence, notes, state filter and CSV export",
-            "Time off tab: absences and time away in the period, runs, part days, states, day off hidden unless shown; Next time off on Overview",
-            "Requests tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, for people who can review requests; Waiting on you on Overview"
+            "Schedule tab: Usual week with preferences, then shifts and time off in the period grouped by week, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the All, Shifts and Time off filter, CSV export, and day off hidden unless shown",
+            "Activity tab: pickups, swaps, call-offs and profile change requests sent in the period, state and who decided, Review for those waiting, then the change log; the All, Requests and Changes filter and the waiting count"
           ],
           "sourceFiles": [
             "apps/web/src/app/(app)/people/[id]/page.tsx",
@@ -804,19 +803,18 @@
             "apps/web/src/lib/people-order.ts",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
-            "apps/web/src/components/staff-detail/tabs/RecurringTab.tsx",
-            "apps/web/src/components/staff-detail/tabs/AccessTab.tsx",
+            "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
+            "apps/web/src/lib/schedule-rows.ts",
+            "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
+            "apps/web/src/components/dashboard/MyScheduleRow.tsx",
             "apps/web/src/lib/period-presets.ts",
             "apps/web/src/components/staff-detail/PersonRecordCard.tsx",
             "apps/web/src/components/staff-detail/RecurringScheduleCard.tsx",
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
             "apps/web/src/components/staff-detail/tabs/OverviewTab.tsx",
             "apps/web/src/components/staff-detail/tabs/StaffOverviewTab.tsx",
-            "apps/web/src/components/staff-detail/tabs/ShiftsTab.tsx",
             "apps/web/src/lib/shift-records.ts",
-            "apps/web/src/components/staff-detail/tabs/TimeOffTab.tsx",
             "apps/web/src/lib/time-off.ts",
-            "apps/web/src/components/staff-detail/tabs/RequestsTab.tsx",
             "apps/web/src/lib/person-requests.ts",
             "apps/web/src/components/staff-detail/WorkMixCard.tsx",
             "apps/web/src/lib/staff-detail-stats.ts",
@@ -838,7 +836,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0b90a4e2b2f5b7426bda2963b0db5e59709568c5a393a464c8e3e3d0345279a7"
+      "evidenceFingerprint": "sha256:1c41bba92f8ad6b0df9711242d984415d6160964854384c930cf86e5d35ac96f"
     },
     {
       "id": "invitations",

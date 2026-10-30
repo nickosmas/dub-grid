@@ -61,10 +61,6 @@ import {
   withKnownJoinedDate,
 } from "@/lib/staff-directory";
 import { isCurrentUsersEmployee } from "@/lib/profile-links";
-import {
-  getProfileOverviewCurrentWeekDateKeys,
-  getProfileOverviewDateRange,
-} from "@/features/account/shared/profile-schedule";
 import type {
   AdminPermissions,
   DirectoryPerson,
@@ -101,42 +97,48 @@ import { PersonPeriodControl } from "./PersonPeriodControl";
 import { StaffPageHeader } from "./StaffPageHeader";
 import { PersonPager } from "./PersonPager";
 import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
-import { ContactCard, WorkDetailsCard } from "./PersonInfoCards";
+import { AccessCard, RecordLine, WorkCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
-import { ShiftsTab } from "./tabs/ShiftsTab";
-import { TimeOffTab } from "./tabs/TimeOffTab";
-import { RequestsTab } from "./tabs/RequestsTab";
+import { ScheduleTab } from "./tabs/ScheduleTab";
 import { buildPersonRequestRows } from "@/lib/person-requests";
 import { fetchPeopleProfileChangeRequests } from "@/features/account/client/api";
-import { buildTimeOff, findNextTimeOff } from "@/lib/time-off";
 import { ActivityTab } from "./tabs/ActivityTab";
-import { AccessTab } from "./tabs/AccessTab";
-import { RecurringTab } from "./tabs/RecurringTab";
-import { PersonRecordCard } from "./PersonRecordCard";
 import { getPersonAccountState } from "@/lib/person-account-state";
 
 interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab =
-  "overview" | "shifts" | "timeoff" | "requests" | "recurring" | "access" | "activity";
+export type StaffPageTab = "overview" | "schedule" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
   overview: "Overview",
-  shifts: "Shifts",
-  timeoff: "Time off",
-  requests: "Requests",
-  recurring: "Recurring",
-  access: "Access",
+  schedule: "Schedule",
   activity: "Activity",
+};
+
+/** The tab that now holds what an older `?tab=` link opened. */
+const LEGACY_TABS: Record<string, StaffPageTab> = {
+  shifts: "schedule",
+  timeoff: "schedule",
+  recurring: "schedule",
+  requests: "activity",
+  access: "overview",
 };
 
 /** The tab an old `?section=` link meant, from before the page had tabs. */
 function tabForLegacySection(section: string): StaffPageTab {
   return section === "activity" ? "activity" : "overview";
+}
+
+const NEXT_DAYS = 7;
+
+/** Today and the six days after it, as the local dates the dashboard's strip reads. */
+function nextDayDates(today: string): Date[] {
+  const [year, month, day] = today.split("-").map(Number);
+  return Array.from({ length: NEXT_DAYS }, (_, index) => new Date(year, month - 1, day + index));
 }
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
@@ -160,7 +162,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   } = useOrganizationData();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [shifts, setShifts] = useState<ShiftMap>({});
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +170,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditingAccess, setIsEditingAccess] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
   const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
@@ -184,10 +186,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
 
   const orgId = perms.orgId ?? org?.id ?? null;
-  const overviewRange = useMemo(
-    () => getProfileOverviewDateRange(new Date(), org?.timezone),
-    [org?.timezone],
-  );
   const { directory } = useDirectory(orgId);
   // Your own record opens your profile, so the arrows step over it.
   const ownEmployeeId = useMemo(
@@ -302,29 +300,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         setEmployee(emp);
 
-        // Fetch the rest in parallel
-        const [empShifts, recShifts] = await Promise.all([
-          fetchEmployeeShifts(
-            employeeId,
-            orgId,
-            assignmentLabelMapRef.current,
-            absenceTypeMapRef.current,
-            overviewRange.startDate,
-            overviewRange.endDate,
-          ),
-          perms.canViewRecurringShifts
-            ? fetchRecurringShifts(
-                orgId,
-                employeeId,
-                assignmentLabelMapRef.current,
-                false,
-                absenceTypeMapRef.current,
-              )
-            : Promise.resolve([]),
-        ]);
+        const recShifts = perms.canViewRecurringShifts
+          ? await fetchRecurringShifts(
+              orgId,
+              employeeId,
+              assignmentLabelMapRef.current,
+              false,
+              absenceTypeMapRef.current,
+            )
+          : [];
 
         if (cancelled) return;
-        setShifts(empShifts);
         setRecurringShifts(recShifts);
       } catch (err: unknown) {
         if (!cancelled) {
@@ -357,8 +343,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     perms.isGridmaster,
     perms.isLoading,
     router,
-    overviewRange.endDate,
-    overviewRange.startDate,
   ]);
 
   useEffect(() => {
@@ -367,6 +351,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
     setIsEditingDetails(false);
+    setIsEditingAccess(false);
   }, [employeeId]);
 
   const refreshInvitations = useCallback(async () => {
@@ -891,17 +876,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const availableTabs = useMemo<StaffPageTab[]>(
     () => [
       "overview",
-      "shifts",
-      "timeoff",
-      ...(canReviewRequests ? (["requests"] as const) : []),
-      ...(perms.canViewRecurringShifts ? (["recurring"] as const) : []),
-      "access",
-      ...(canViewActivity ? (["activity"] as const) : []),
+      "schedule",
+      ...(canViewActivity || canReviewRequests ? (["activity"] as const) : []),
     ],
-    [canReviewRequests, canViewActivity, perms.canViewRecurringShifts],
+    [canReviewRequests, canViewActivity],
   );
   const legacySection = searchParams.get("section");
-  const requestedTab = searchParams.get("tab");
+  const rawTab = searchParams.get("tab");
+  const legacyTab = rawTab ? LEGACY_TABS[rawTab] : undefined;
+  const requestedTab = legacyTab ?? rawTab;
   const activeTab: StaffPageTab = availableTabs.includes(requestedTab as StaffPageTab)
     ? (requestedTab as StaffPageTab)
     : "overview";
@@ -912,7 +895,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   useEffect(() => {
     if (legacySection) router.replace(hrefForTab(tabForLegacySection(legacySection)));
-  }, [hrefForTab, legacySection, router]);
+    else if (legacyTab) router.replace(hrefForTab(activeTab));
+  }, [activeTab, hrefForTab, legacySection, legacyTab, router]);
 
   // The Overview counts the chosen period, loaded on its own so a long custom
   // range never rides on the page's first load.
@@ -936,14 +920,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         period.range.endDate,
       ),
     enabled:
-      Boolean(orgId) &&
-      Boolean(employee) &&
-      (activeTab === "overview" || activeTab === "shifts" || activeTab === "timeoff"),
+      Boolean(orgId) && Boolean(employee) && (activeTab === "overview" || activeTab === "schedule"),
   });
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
-  // Next time off looks past the chosen period, so it reads the next six months.
-  const upcomingEnd = useMemo(() => addDaysToIsoDate(today, 180), [today]);
+  const upcomingEnd = useMemo(() => addDaysToIsoDate(today, NEXT_DAYS - 1), [today]);
   const upcomingShiftsQuery = useQuery<ShiftMap>({
     queryKey: orgId
       ? [...queryKeys.shifts.all(orgId), "employee", employeeId, today, upcomingEnd]
@@ -959,30 +940,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       ),
     enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
   });
-  const absenceById = useMemo(
-    () => new Map(absenceTypes.map((absence) => [absence.id, absence])),
-    [absenceTypes],
-  );
-  const nextTimeOff = useMemo(() => {
-    if (!employee || !upcomingShiftsQuery.data) return undefined;
-    return findNextTimeOff(
-      buildTimeOff(
-        employee,
-        upcomingShiftsQuery.data,
-        { startDate: today, endDate: upcomingEnd },
-        today,
-        absenceById,
-        { dayOffAbsenceTypeId: dayOffAbsenceTypeId },
-      ),
-    );
-  }, [absenceById, employee, dayOffAbsenceTypeId, today, upcomingEnd, upcomingShiftsQuery.data]);
+  const nextDates = useMemo(() => nextDayDates(today), [today]);
   const shiftRequestsQuery = useQuery({
     queryKey: orgId
       ? [...queryKeys.shiftRequests.all(orgId), "employee", employeeId]
       : ["shiftRequests", "anon", "employee", employeeId],
     queryFn: () => fetchShiftRequests(orgId!, assignmentLabelMapRef.current, { empId: employeeId }),
     enabled:
-      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "overview"),
+      Boolean(orgId) && canReviewRequests && (activeTab === "activity" || activeTab === "overview"),
   });
   const canSeeProfileRequests = Boolean(
     perms.isGridmaster || perms.isSuperAdmin || perms.canManageEmployees,
@@ -995,7 +960,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     enabled:
       Boolean(orgId) &&
       canSeeProfileRequests &&
-      (activeTab === "requests" || activeTab === "overview"),
+      (activeTab === "activity" || activeTab === "overview"),
   });
   const requestRows = useMemo(() => {
     if (!shiftRequestsQuery.data) return undefined;
@@ -1030,7 +995,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         ]
       : ["shifts", "anon", "corrections"],
     queryFn: () => fetchCorrections(orgId!, period.range.startDate, period.range.endDate),
-    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeCorrections,
+    enabled: Boolean(orgId) && activeTab === "schedule" && canSeeCorrections,
   });
   const canSeeNotes = Boolean(perms.isGridmaster || perms.isSuperAdmin || perms.canViewSchedule);
   const notesQuery = useQuery({
@@ -1038,7 +1003,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       ? [...queryKeys.shifts.all(orgId), "notes", period.range.startDate, period.range.endDate]
       : ["shifts", "anon", "notes"],
     queryFn: () => fetchScheduleNotes(orgId!, period.range.startDate, period.range.endDate),
-    enabled: Boolean(orgId) && activeTab === "shifts" && canSeeNotes,
+    enabled: Boolean(orgId) && activeTab === "schedule" && canSeeNotes,
   });
   const correctionsByDate = useMemo(
     () =>
@@ -1068,10 +1033,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       absenceById: new Map(absenceTypes.map((absence) => [absence.id, absence])),
     }),
     [absenceTypes, assignmentById, categoryById, focusAreas, jobs],
-  );
-  const currentWeekDates = useMemo(
-    () => getProfileOverviewCurrentWeekDateKeys(overviewRange),
-    [overviewRange],
   );
 
   const closeDetailsEditor = useCallback(() => {
@@ -1305,10 +1266,31 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
     />
   ) : null;
+  const namesOf = (ids: number[], items: ReadonlyArray<{ id: number; name: string }>) =>
+    ids
+      .map((id) => items.find((item) => item.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+  const headerSummary =
+    employee && showScheduleDetails
+      ? [
+          namesOf(employee.roleIds, orgRoles).join(", "),
+          namesOf(employee.focusAreaIds, focusAreas).join(", "),
+          employee.employmentType === "part_time" ? "Part-time" : "Full-time",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
+  const waitingRequests = canReviewRequests ? requestRows?.filter((row) => row.waiting) : undefined;
+  const showsManagement =
+    (canManageManagementAccess || perms.canManageEmployees) &&
+    Boolean(directoryPerson?.isManagementUser || hasPendingManagementInvite);
+  const managedDepartments = showsManagement
+    ? namesOf(directoryPerson?.managementDepartmentIds ?? [], departments ?? [])
+    : null;
+
   const headerActions =
-    pager || canSendInvitation || canAddToManagement || canAddToSchedule ? (
+    canSendInvitation || canAddToManagement || canAddToSchedule || canEditDetails ? (
       <>
-        {pager}
         {canSendInvitation && (
           <Button
             type="button"
@@ -1334,6 +1316,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             onClick={() => setShowAddToScheduleModal(true)}
           >
             Add to schedule
+          </Button>
+        )}
+        {canEditDetails && (
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            onClick={() => setIsEditingDetails(true)}
+          >
+            Edit details
           </Button>
         )}
       </>
@@ -1378,214 +1369,190 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             <StaffPageHeader
               employee={employee}
               orgRole={effectiveOrgRole}
+              summary={headerSummary}
+              pager={pager}
               actions={headerActions}
             />
 
-            {/* Phones read the status first, then who they are, then the tabs; from
-                1024px the cards sit in a column beside both. */}
-            <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[auto_1fr]">
-              <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-1">
-                <EmployeeStatusCard
-                  employee={employee}
-                  absenceTypes={absenceTypes}
-                  action={
-                    perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
-                      ? statusActions(employee)
-                      : undefined
-                  }
-                  planAction={
-                    perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
-                      ? statusActions(employee, "Edit plan")
-                      : undefined
-                  }
-                />
+            <div className="flex min-w-0 flex-col gap-4">
+              <EmployeeStatusCard
+                employee={employee}
+                absenceTypes={absenceTypes}
+                action={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee)
+                    : undefined
+                }
+                planAction={
+                  perms.canManageEmployees && !isSelfAction(currentUser?.id, employee.userId)
+                    ? statusActions(employee, "Edit plan")
+                    : undefined
+                }
+              />
 
-                {perms.canManageEmployees && pendingInvite && (
-                  <PendingInvitationBanner
-                    pendingInvitation={pendingInvite}
-                    onReinvite={() => handleResendInvitation(pendingInvite.id)}
-                    onRevoke={handleRevokeInvitation}
-                  />
-                )}
-                {perms.canManageEmployees && !pendingInvite && expiredInvite && (
-                  <PendingInvitationBanner
-                    pendingInvitation={expiredInvite}
-                    onReinvite={() => handleResendInvitation(expiredInvite.id)}
-                    onRevoke={handleRevokeInvitation}
-                    expired
-                  />
-                )}
-              </div>
-
-              <aside
-                className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1"
-                aria-label="About them"
-              >
-                <ContactCard
-                  employee={employee}
-                  onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+              {perms.canManageEmployees && pendingInvite && (
+                <PendingInvitationBanner
+                  pendingInvitation={pendingInvite}
+                  onReinvite={() => handleResendInvitation(pendingInvite.id)}
+                  onRevoke={handleRevokeInvitation}
                 />
-                <WorkDetailsCard
-                  employee={employee}
-                  focusAreas={focusAreas}
-                  certifications={certifications}
-                  roles={orgRoles}
-                  focusAreaLabel={org?.focusAreaLabel}
-                  certificationLabel={org?.certificationLabel}
-                  roleLabel={org?.roleLabel}
-                  showScheduleDetails={showScheduleDetails}
-                  onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+              )}
+              {perms.canManageEmployees && !pendingInvite && expiredInvite && (
+                <PendingInvitationBanner
+                  pendingInvitation={expiredInvite}
+                  onReinvite={() => handleResendInvitation(expiredInvite.id)}
+                  onRevoke={handleRevokeInvitation}
+                  expired
                 />
-                {accountState && (
-                  <PersonRecordCard
-                    employee={employee}
-                    accountState={accountState}
-                    lastSignInAt={directoryPerson?.lastSignInAt}
-                  />
-                )}
-              </aside>
+              )}
+            </div>
 
-              <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-2">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="max-w-full overflow-x-auto">
-                    <SpanTabs<StaffPageTab>
-                      aria-label="Person sections"
-                      className="w-max"
-                      items={availableTabs.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
-                      value={activeTab}
-                      onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
-                    />
-                  </div>
-                  {(activeTab === "overview" ||
-                    activeTab === "shifts" ||
-                    activeTab === "timeoff" ||
-                    activeTab === "requests" ||
-                    activeTab === "activity") && (
-                    <PersonPeriodControl
-                      period={period}
-                      payPeriodStartDate={org?.payPeriodStartDate}
-                      onPresetChange={setPeriodPreset}
-                      onCustomRangeChange={setPeriodRange}
-                    />
-                  )}
+            <div className="flex min-w-0 flex-col gap-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="max-w-full overflow-x-auto">
+                  <SpanTabs<StaffPageTab>
+                    aria-label="Person sections"
+                    className="w-max"
+                    items={availableTabs.map((tab) => ({
+                      value: tab,
+                      label: TAB_LABELS[tab],
+                      count: tab === "activity" ? waitingRequests?.length : undefined,
+                    }))}
+                    value={activeTab}
+                    onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
+                  />
                 </div>
-
-                <section aria-label={TAB_LABELS[activeTab]}>
-                  {activeTab === "overview" && (
-                    <StaffOverviewTab
-                      employee={employee}
-                      periodShifts={periodShiftsQuery.data}
-                      currentWeekShifts={shifts}
-                      currentWeekDates={currentWeekDates}
-                      range={period.range}
-                      periodPhrase={periodRange.phrase}
-                      assignments={assignments}
-                      shiftCategories={shiftCategories}
-                      jobs={jobs}
-                      absenceTypes={absenceTypes}
-                      nextTimeOff={nextTimeOff}
-                      waitingRequests={
-                        canReviewRequests ? requestRows?.filter((row) => row.waiting) : undefined
-                      }
-                      onOpenRequests={() =>
-                        router.replace(hrefForTab("requests"), { scroll: false })
-                      }
-                      onOpenTimeOff={() => router.replace(hrefForTab("timeoff"), { scroll: false })}
-                    />
-                  )}
-                  {activeTab === "requests" && (
-                    <RequestsTab
-                      rows={requestRows}
-                      loading={shiftRequestsQuery.isPending}
-                      error={
-                        shiftRequestsQuery.error
-                          ? formatClientErrorMessage(
-                              shiftRequestsQuery.error,
-                              "We couldn't load their requests right now.",
-                            )
-                          : null
-                      }
-                      range={period.range}
-                      periodPhrase={periodRange.phrase}
-                    />
-                  )}
-                  {activeTab === "timeoff" && (
-                    <TimeOffTab
-                      person={employee}
-                      shifts={periodShiftsQuery.data}
-                      loading={periodShiftsQuery.isPending}
-                      range={period.range}
-                      today={today}
-                      periodPhrase={periodRange.phrase}
-                      absenceTypes={absenceTypes}
-                      dayOffAbsenceTypeId={dayOffAbsenceTypeId}
-                    />
-                  )}
-                  {activeTab === "shifts" && (
-                    <ShiftsTab
-                      employee={employee}
-                      shifts={periodShiftsQuery.data}
-                      loading={periodShiftsQuery.isPending}
-                      range={period.range}
-                      periodPhrase={periodRange.phrase}
-                      lookups={shiftRecordLookups}
-                      corrections={correctionsByDate}
-                      noteCounts={noteCountsByDate}
-                    />
-                  )}
-                  {activeTab === "recurring" && orgId && (
-                    <RecurringTab
-                      orgId={orgId}
-                      employeeId={employee.id}
-                      focusAreas={focusAreas}
-                      recurringShifts={recurringShifts}
-                      assignments={assignments}
-                      absenceTypes={absenceTypes}
-                      shiftCategories={shiftCategories}
-                      jobs={jobs}
-                    />
-                  )}
-                  {activeTab === "access" && (
-                    <AccessTab
-                      employee={employee}
-                      orgRole={effectiveOrgRole}
-                      directoryPerson={directoryPerson}
-                      pendingInvitation={pendingInvite}
-                      hasPendingManagementInvite={hasPendingManagementInvite}
-                      departments={departments ?? []}
-                      canManageManagementAccess={canManageManagementAccess}
-                      canManageEmployees={perms.canManageEmployees}
-                      isSelf={isSelfAction(currentUser?.id, employee.userId)}
-                      labels={{
-                        focusAreaLabel: org?.focusAreaLabel,
-                        certificationLabel: org?.certificationLabel,
-                        roleLabel: org?.roleLabel,
-                      }}
-                      onRoleChange={handleRoleChange}
-                      onPermissionsChange={handlePermissionsChange}
-                      onEditManagementAccess={() => setIsEditingManagementAccess(true)}
-                      onInvite={canSendInvitation ? () => setShowInviteModal(true) : undefined}
-                    />
-                  )}
-                  {activeTab === "activity" && (
-                    <ActivityTab
-                      employee={employee}
-                      entries={activityQuery.data ?? []}
-                      timeZone={org?.timezone ?? null}
-                      range={periodRange}
-                      loading={activityQuery.isPending}
-                      error={
-                        activityQuery.error
-                          ? formatClientErrorMessage(
-                              activityQuery.error,
-                              "We couldn't load activity right now.",
-                            )
-                          : null
-                      }
-                    />
-                  )}
-                </section>
+                <PersonPeriodControl
+                  period={period}
+                  payPeriodStartDate={org?.payPeriodStartDate}
+                  onPresetChange={setPeriodPreset}
+                  onCustomRangeChange={setPeriodRange}
+                />
               </div>
+
+              <section aria-label={TAB_LABELS[activeTab]}>
+                {activeTab === "overview" && (
+                  <StaffOverviewTab
+                    employee={employee}
+                    periodShifts={periodShiftsQuery.data}
+                    range={period.range}
+                    periodPhrase={periodRange.phrase}
+                    assignments={assignments}
+                    shiftCategories={shiftCategories}
+                    jobs={jobs}
+                    absenceTypes={absenceTypes}
+                    focusAreas={focusAreas}
+                    nextDays={
+                      showScheduleDetails && upcomingShiftsQuery.data
+                        ? { dates: nextDates, shifts: upcomingShiftsQuery.data }
+                        : null
+                    }
+                    waitingRequests={waitingRequests}
+                    about={
+                      <div className="flex flex-col gap-4">
+                        <div className="grid items-start gap-4 lg:grid-cols-2">
+                          <WorkCard
+                            employee={employee}
+                            focusAreas={focusAreas}
+                            certifications={certifications}
+                            roles={orgRoles}
+                            focusAreaLabel={org?.focusAreaLabel}
+                            certificationLabel={org?.certificationLabel}
+                            roleLabel={org?.roleLabel}
+                            showScheduleDetails={showScheduleDetails}
+                            onEdit={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+                          />
+                          <AccessCard
+                            orgRole={effectiveOrgRole}
+                            invited={Boolean(pendingInvite)}
+                            adminPermissions={directoryPerson?.adminPermissions}
+                            managedDepartments={managedDepartments}
+                            accountState={accountState}
+                            lastSignInAt={directoryPerson?.lastSignInAt}
+                            onEditAccess={
+                              canManageManagementAccess && effectiveOrgRole
+                                ? () => setIsEditingAccess(true)
+                                : undefined
+                            }
+                            onEditManagement={
+                              canManageManagementAccess && employee.status !== "removed"
+                                ? () => setIsEditingManagementAccess(true)
+                                : undefined
+                            }
+                            onInvite={
+                              canSendInvitation ? () => setShowInviteModal(true) : undefined
+                            }
+                          />
+                        </div>
+                        <RecordLine employee={employee} />
+                      </div>
+                    }
+                  />
+                )}
+                {activeTab === "schedule" && (
+                  <ScheduleTab
+                    employee={employee}
+                    shifts={periodShiftsQuery.data}
+                    loading={periodShiftsQuery.isPending}
+                    range={period.range}
+                    today={today}
+                    periodPhrase={periodRange.phrase}
+                    lookups={shiftRecordLookups}
+                    corrections={correctionsByDate}
+                    noteCounts={noteCountsByDate}
+                    absenceTypes={absenceTypes}
+                    dayOffAbsenceTypeId={dayOffAbsenceTypeId}
+                    usualWeek={
+                      perms.canViewRecurringShifts && orgId && showScheduleDetails
+                        ? {
+                            orgId,
+                            recurringShifts,
+                            assignments,
+                            shiftCategories,
+                            jobs,
+                            focusAreas,
+                            absenceTypes,
+                          }
+                        : null
+                    }
+                  />
+                )}
+                {activeTab === "activity" && (
+                  <ActivityTab
+                    employee={employee}
+                    range={periodRange}
+                    timeZone={org?.timezone ?? null}
+                    requests={
+                      canReviewRequests
+                        ? {
+                            rows: requestRows,
+                            loading: shiftRequestsQuery.isPending,
+                            error: shiftRequestsQuery.error
+                              ? formatClientErrorMessage(
+                                  shiftRequestsQuery.error,
+                                  "We couldn't load their requests right now.",
+                                )
+                              : null,
+                          }
+                        : null
+                    }
+                    changes={
+                      canViewActivity
+                        ? {
+                            entries: activityQuery.data ?? [],
+                            loading: activityQuery.isPending,
+                            error: activityQuery.error
+                              ? formatClientErrorMessage(
+                                  activityQuery.error,
+                                  "We couldn't load activity right now.",
+                                )
+                              : null,
+                          }
+                        : null
+                    }
+                  />
+                )}
+              </section>
             </div>
           </div>
         </div>
@@ -1646,6 +1613,44 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         </Modal>
       )}
       {detailsUnsavedChangesDialog}
+
+      {isEditingAccess && employee && effectiveOrgRole && (
+        <Modal
+          title="Edit access"
+          onClose={() => setIsEditingAccess(false)}
+          className="dg-modal--tight-header"
+          style={{ maxWidth: 520, width: "100%" }}
+          footer={
+            <EditorActionRow
+              primaryAction={
+                <Button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => setIsEditingAccess(false)}
+                >
+                  Done
+                </Button>
+              }
+            />
+          }
+        >
+          <div className="flex flex-col gap-6">
+            <MemberAccessControls
+              orgRole={effectiveOrgRole}
+              adminPermissions={directoryPerson?.adminPermissions}
+              onRoleChange={handleRoleChange}
+              onPermissionsChange={directoryPerson?.userId ? handlePermissionsChange : undefined}
+              isSelf={isSelfAction(currentUser?.id, employee.userId)}
+              labels={{
+                focusAreaLabel: org?.focusAreaLabel,
+                certificationLabel: org?.certificationLabel,
+                roleLabel: org?.roleLabel,
+              }}
+              pendingInvitationEmail={pendingInvite?.email}
+            />
+          </div>
+        </Modal>
+      )}
 
       {isEditingManagementAccess && orgId && org && employee && (
         <EmployeeManagementAccessEditor

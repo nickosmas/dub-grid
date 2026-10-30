@@ -72,10 +72,15 @@ vi.mock("./EmployeeStatusActions", () => ({
 }));
 vi.mock("./tabs/OverviewTab", () => ({ OverviewTab: () => <div data-testid="overview" /> }));
 vi.mock("./tabs/StaffOverviewTab", () => ({
-  StaffOverviewTab: () => <div data-testid="overview" />,
+  StaffOverviewTab: ({ about }: { about: React.ReactNode }) => (
+    <div data-testid="overview">{about}</div>
+  ),
 }));
 vi.mock("./tabs/ActivityTab", () => ({ ActivityTab: () => <div /> }));
-vi.mock("./RecurringScheduleCard", () => ({ RecurringScheduleCard: () => <div /> }));
+vi.mock("./RecurringScheduleCard", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./RecurringScheduleCard")>()),
+  RecurringScheduleCard: () => <div />,
+}));
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: ({ employee, onSave }: { employee: Employee; onSave: (employee: Employee) => void }) => (
     <button type="button" onClick={() => onSave({ ...employee, firstName: "Augusta" })}>
@@ -168,11 +173,11 @@ const employee = {
   statusNote: "",
 };
 
-const JOINED_DAY = new Date(employee.joinedAt).toLocaleDateString(undefined, {
-  year: "numeric",
+const JOINED_LINE = `joined ${new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
-});
+  year: "numeric",
+}).format(new Date(employee.joinedAt))}`;
 
 const findPage = () => screen.findByRole("heading", { level: 1, name: "Ada Lovelace" });
 
@@ -228,11 +233,10 @@ describe("StaffDetailPage", () => {
     expect(fetchEmployeeById).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the record card beside the tabs, joined date included", async () => {
+  it("shows the record in one line under About, joined date included", async () => {
     renderPage();
 
-    expect(await screen.findByText("Record")).toBeInTheDocument();
-    expect(screen.getByText("Date joined").nextElementSibling).toHaveTextContent(JOINED_DAY);
+    expect(await screen.findByTestId("person-record-line")).toHaveTextContent(JOINED_LINE);
     expect(screen.getByText("Account").nextElementSibling).toHaveTextContent("Linked account");
   });
 
@@ -250,7 +254,7 @@ describe("StaffDetailPage", () => {
 
     await waitFor(() => expect(updateEmployee).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByText("Date joined").nextElementSibling).toHaveTextContent(JOINED_DAY),
+      expect(screen.getByTestId("person-record-line")).toHaveTextContent(JOINED_LINE),
     );
   });
 
@@ -291,6 +295,7 @@ describe("StaffDetailPage", () => {
 
       const banner = await screen.findByTestId("invitation-banner");
       expect(banner).toHaveAttribute("data-expired", "true");
+      await screen.findByText("Account");
       expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
         "Invitation expired",
       );
@@ -306,6 +311,7 @@ describe("StaffDetailPage", () => {
 
       const banner = await screen.findByTestId("invitation-banner");
       expect(banner).toHaveAttribute("data-expired", "false");
+      await screen.findByText("Account");
       expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
         "Invitation pending",
       );
@@ -315,7 +321,8 @@ describe("StaffDetailPage", () => {
       vi.mocked(fetchEmployeeInvitations).mockResolvedValue([] as never);
       renderPage();
 
-      expect(await screen.findByRole("button", { name: "Send invitation" })).toBeInTheDocument();
+      // In the header and on the Access card.
+      expect(await screen.findAllByRole("button", { name: "Send invitation" })).toHaveLength(2);
       expect(screen.queryByTestId("invitation-banner")).not.toBeInTheDocument();
     });
   });
@@ -333,7 +340,6 @@ describe("StaffDetailPage", () => {
     };
 
     function renderWith(overrides: Record<string, unknown>) {
-      searchParams.set("tab", "access");
       vi.mocked(usePermissions).mockReturnValue({ ...permissions, ...overrides } as never);
       vi.mocked(useOrganizationData).mockReturnValue({
         ...organizationData(),
@@ -349,23 +355,25 @@ describe("StaffDetailPage", () => {
     it("shows a staff-managing Admin the departments, read-only", async () => {
       renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: true });
 
-      expect(await screen.findByText("Management departments")).toBeInTheDocument();
+      expect(await screen.findByText("Manages")).toBeInTheDocument();
       expect(screen.getByText("Nursing Office")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Edit access" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit management access" }),
+      ).not.toBeInTheDocument();
     });
 
     it("lets a Super Admin edit them", async () => {
       renderWith({});
 
-      expect(await screen.findByText("Management departments")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Edit access" })).toBeInTheDocument();
+      expect(await screen.findByText("Manages")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
     });
 
     it("hides them from a caller who does not manage employees", async () => {
       renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: false });
 
-      await screen.findByText("Record");
-      expect(screen.queryByText("Management departments")).not.toBeInTheDocument();
+      await screen.findByText("Access level");
+      expect(screen.queryByText("Manages")).not.toBeInTheDocument();
     });
   });
 });

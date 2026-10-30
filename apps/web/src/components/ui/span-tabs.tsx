@@ -6,6 +6,8 @@ import { Button } from "@/components/Button";
 export interface SpanTabItem<T extends string> {
   value: T;
   label: string;
+  /** Something waiting there, shown as a count after the label. */
+  count?: number;
 }
 
 /**
@@ -54,6 +56,14 @@ export function SpanTabs<T extends string>({
               className={`dg-span-tab${isActive ? " active" : ""}`}
             >
               {item.label}
+              {item.count ? (
+                <span
+                  aria-label={`${item.count} waiting`}
+                  className="dg-tabular-nums ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--dg-color-brand)] px-1.5 text-[length:var(--dg-type-badge-size)] font-semibold leading-none text-white"
+                >
+                  {item.count}
+                </span>
+              ) : null}
             </Button>
           </Fragment>
         );

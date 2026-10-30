@@ -173,12 +173,3 @@ export function buildTimeOff(
 
   return entries.sort((a, b) => b.startDate.localeCompare(a.startDate));
 }
-
-/** The first time off that starts after today, for the Overview. */
-export function findNextTimeOff(entries: readonly TimeOffEntry[]): TimeOffEntry | null {
-  return (
-    [...entries]
-      .filter((entry) => entry.state === "planned")
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ?? null
-  );
-}

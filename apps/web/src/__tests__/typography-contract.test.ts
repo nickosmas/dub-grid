@@ -194,7 +194,6 @@ const documentedUppercaseStyleCounts = {
   "components/settings/ShiftCategories.tsx": 1,
   "components/staff/ProfileChangeRequestQueue.tsx": 1,
   "components/staff-detail/RecurringScheduleCard.tsx": 1,
-  "components/staff-detail/tabs/StaffOverviewTab.tsx": 1,
 };
 
 // Alpha is reserved for text embedded in color-coded schedule cells and

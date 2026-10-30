@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeOff, findNextTimeOff, type TimeOffPerson } from "./time-off";
+import { buildTimeOff, type TimeOffPerson } from "./time-off";
 import type { AbsenceType, ShiftMap } from "@/types";
 
 const absences = new Map<number, AbsenceType>([
@@ -125,19 +125,5 @@ describe("buildTimeOff", () => {
       days: null,
       state: "planned",
     });
-  });
-});
-
-describe("findNextTimeOff", () => {
-  it("picks the earliest planned entry", () => {
-    const entries = buildTimeOff(
-      active,
-      { ...days("2026-12-22", 2, 1), ...days("2026-11-03", 1, 2), ...days("2026-10-02", 1, 2) },
-      RANGE,
-      TODAY,
-      absences,
-    );
-    expect(findNextTimeOff(entries)).toMatchObject({ name: "Sick", startDate: "2026-11-03" });
-    expect(findNextTimeOff([])).toBeNull();
   });
 });

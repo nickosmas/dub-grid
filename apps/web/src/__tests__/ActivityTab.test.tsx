@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ActivityTab } from "@/components/staff-detail/tabs/ActivityTab";
 import { makeEmployee } from "@/__tests__/factories";
 import type { EmployeeActivityEntry } from "@/types";
+import type { PersonRequestRow } from "@/lib/person-requests";
 
 function entry(
   overrides: Partial<EmployeeActivityEntry> & { id: string; action: string },
@@ -42,14 +43,43 @@ const INVITATION = entry({
   createdAt: "2026-01-02T10:00:00.000Z",
 });
 
-function renderTab(props: Partial<React.ComponentProps<typeof ActivityTab>> = {}) {
+const RANGE = { startDate: "2026-01-01", endDate: "2026-03-31", phrase: "this quarter" };
+
+const SWAP: PersonRequestRow = {
+  key: "shift-r1",
+  type: "Swap",
+  details: "Sat, Mar 7 · Day Shift",
+  secondary: "with Margaret Sullivan",
+  sentDate: "2026-02-20",
+  state: "Awaiting approval",
+  tone: "warning",
+  decidedBy: null,
+  waiting: true,
+  reviewHref: "/schedule?requests=approval",
+};
+const PICKUP: PersonRequestRow = {
+  ...SWAP,
+  key: "shift-r2",
+  type: "Pickup",
+  details: "Fri, Jan 9 · Night Shift",
+  secondary: null,
+  sentDate: "2026-01-05",
+  state: "Approved",
+  tone: "success",
+  decidedBy: "Nic Kosmas",
+  waiting: false,
+};
+
+type Props = React.ComponentProps<typeof ActivityTab>;
+
+function renderTab(props: Partial<Props> = {}) {
   return render(
     <ActivityTab
       employee={makeEmployee({ firstName: "Sam", lastName: "Rivera" })}
-      entries={[ROLE_CHANGE, INVITATION]}
-      loading={false}
-      error={null}
+      range={RANGE}
       timeZone="UTC"
+      requests={{ rows: [SWAP, PICKUP], loading: false, error: null }}
+      changes={{ entries: [ROLE_CHANGE, INVITATION], loading: false, error: null }}
       {...props}
     />,
   );
@@ -65,133 +95,77 @@ describe("ActivityTab", () => {
     vi.useRealTimers();
   });
 
-  it("renders the person's timeline in the shared activity table", () => {
+  it("lists their requests above the change log, with a way to review what's waiting", () => {
     renderTab();
 
-    const table = screen.getByRole("table");
-    for (const name of ["Time", "Activity", "By"]) {
-      expect(within(table).getByRole("columnheader", { name })).toBeInTheDocument();
-    }
-    // The target is always this person, so naming it in every row is noise.
-    expect(within(table).queryByRole("columnheader", { name: "Affected" })).toBeNull();
+    const requests = screen.getByRole("region", { name: "Requests" });
+    expect(within(requests).getByText("Swap · Sat, Mar 7 · Day Shift")).toBeInTheDocument();
+    expect(within(requests).getByText("Waiting on you")).toBeInTheDocument();
+    expect(within(requests).getByRole("link", { name: "Review" })).toHaveAttribute(
+      "href",
+      "/schedule?requests=approval",
+    );
+    expect(within(requests).getByText("Approved by Nic Kosmas")).toBeInTheDocument();
 
+    const changes = screen.getByRole("region", { name: "Changes" });
+    expect(within(changes).getByText("Changed Sam Rivera's role to Admin")).toBeInTheDocument();
+    expect(within(changes).getByText("Invited sam@example.com as User")).toBeInTheDocument();
+    // The page's period drives the log, so it has no navigator of its own.
+    expect(screen.queryByRole("button", { name: "Go to previous period" })).toBeNull();
+  });
+
+  it("shows one list at a time from the filter", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    await user.click(screen.getByRole("button", { name: "Requests" }));
+    expect(screen.getByRole("region", { name: "Requests" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Changes" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Changes" }));
+    expect(screen.queryByRole("region", { name: "Requests" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Changes" })).toBeInTheDocument();
+  });
+
+  it("drops the filter when the viewer can see only one list", () => {
+    renderTab({ requests: null });
+
+    expect(screen.queryByRole("button", { name: "All" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Requests" })).toBeNull();
     expect(screen.getByText("Changed Sam Rivera's role to Admin")).toBeInTheDocument();
-    expect(screen.getByText(/User → Admin/)).toBeInTheDocument();
-    expect(screen.getByText("Invited sam@example.com as User")).toBeInTheDocument();
-    expect(screen.getByText("Alex Admin")).toBeInTheDocument();
-    expect(screen.getByText("System")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Events: 2/)).toBeInTheDocument();
   });
 
-  it("opens the details dialog from a row, with no per-row button", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    const rows = screen.getAllByRole("row", { name: /Open details/ });
-    expect(rows).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "View details" })).toBeNull();
-
-    await user.click(rows[0]);
-    expect(screen.getByRole("dialog", { name: "Activity details" })).toBeInTheDocument();
-  });
-
-  it("opens on the month holding the latest event, not an empty current month", () => {
+  it("counts only requests sent in the period", () => {
     renderTab({
-      entries: [
-        entry({ id: "feb", action: "employee.updated", createdAt: "2026-02-10T10:00:00.000Z" }),
-        ROLE_CHANGE,
-        INVITATION,
-      ],
+      requests: {
+        rows: [SWAP, { ...PICKUP, sentDate: "2025-12-30" }],
+        loading: false,
+        error: null,
+      },
     });
 
-    // "Today" is March 1 in these tests, and March holds nothing.
-    expect(screen.getByText("February 2026")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Events: 1/)).toBeInTheDocument();
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(1);
-  });
-
-  it("steps through months with the period navigator", async () => {
-    const user = userEvent.setup();
-    renderTab({
-      entries: [
-        entry({ id: "feb", action: "employee.updated", createdAt: "2026-02-10T10:00:00.000Z" }),
-        ROLE_CHANGE,
-        INVITATION,
-      ],
-    });
-
-    await user.click(screen.getByRole("button", { name: "Go to previous period" }));
-
-    expect(screen.getByText("January 2026")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Events: 2/)).toBeInTheDocument();
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(2);
-  });
-
-  it("offers a way out of an empty period instead of a dead end", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    // January holds both entries, so December is empty.
-    await user.click(screen.getByRole("button", { name: "Go to previous period" }));
-    expect(screen.getByText("No activity in December 2025")).toBeInTheDocument();
-
-    const jump = screen.getByRole("button", { name: /Jump to the earliest activity/ });
-    await user.click(jump);
-
-    expect(screen.getByLabelText(/Events: 2/)).toBeInTheDocument();
-  });
-
-  it("switches the period length", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    await user.click(screen.getByRole("button", { name: "Day" }));
-
-    // The label and the day heading both name the day in Day view.
-    expect(screen.getAllByText("Saturday, January 3, 2026").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/Events: 1/)).toBeInTheDocument();
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(1);
-  });
-
-  it("groups a month's events by day", () => {
-    renderTab();
-
-    expect(screen.getByText("Saturday, January 3, 2026")).toBeInTheDocument();
-    expect(screen.getByText("Friday, January 2, 2026")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Days with activity: 2/)).toBeInTheDocument();
+    expect(screen.getByText("1 request sent this quarter")).toBeInTheDocument();
+    expect(screen.queryByText(/Pickup/)).toBeNull();
   });
 
   it("shows an empty state that names the person instead of a bare table", () => {
-    renderTab({ entries: [] });
+    renderTab({ changes: { entries: [], loading: false, error: null } });
 
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByText("No activity yet")).toBeInTheDocument();
     expect(screen.getByText(/Changes to Sam Rivera's profile/)).toBeInTheDocument();
   });
 
-  it("shows a skeleton while loading and the message when loading fails", () => {
-    const { rerender } = render(
-      <ActivityTab
-        employee={makeEmployee({ firstName: "Sam", lastName: "Rivera" })}
-        entries={[]}
-        loading
-        error={null}
-        timeZone="UTC"
-      />,
-    );
-    expect(screen.getByLabelText("Loading activity")).toBeInTheDocument();
-    expect(screen.queryByText("No activity yet")).not.toBeInTheDocument();
+  it("says when either list fails to load", () => {
+    renderTab({
+      requests: { rows: undefined, loading: false, error: "We couldn't load their requests." },
+      changes: { entries: [], loading: false, error: "We couldn't load activity right now." },
+    });
 
-    rerender(
-      <ActivityTab
-        employee={makeEmployee({ firstName: "Sam", lastName: "Rivera" })}
-        entries={[]}
-        loading={false}
-        error="We couldn't load activity right now."
-        timeZone="UTC"
-      />,
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent("We couldn't load activity right now.");
+    const alerts = screen.getAllByRole("alert").map((alert) => alert.textContent);
+    expect(alerts).toEqual([
+      "We couldn't load their requests.",
+      "We couldn't load activity right now.",
+    ]);
   });
 
   it("files an event under the organization's day, not the reader's", () => {
@@ -202,68 +176,15 @@ describe("ActivityTab", () => {
       createdAt: "2026-01-06T03:30:00.000Z",
     });
 
-    const { unmount } = render(
-      <ActivityTab
-        employee={makeEmployee()}
-        entries={[lateEntry]}
-        loading={false}
-        error={null}
-        timeZone="America/New_York"
-      />,
-    );
+    const { unmount } = renderTab({
+      requests: null,
+      timeZone: "America/New_York",
+      changes: { entries: [lateEntry], loading: false, error: null },
+    });
     expect(screen.getByText("Monday, January 5, 2026")).toBeInTheDocument();
     unmount();
 
-    render(
-      <ActivityTab
-        employee={makeEmployee()}
-        entries={[lateEntry]}
-        loading={false}
-        error={null}
-        timeZone="UTC"
-      />,
-    );
+    renderTab({ requests: null, changes: { entries: [lateEntry], loading: false, error: null } });
     expect(screen.getByText("Tuesday, January 6, 2026")).toBeInTheDocument();
-  });
-
-  it("filters the period by search text", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(2);
-
-    await user.type(screen.getByRole("textbox", { name: "Search activity" }), "invit");
-
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(1);
-    expect(screen.getByText("Invited sam@example.com as User")).toBeInTheDocument();
-  });
-
-  it("says when filters hide everything, and clears them", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    await user.type(screen.getByRole("textbox", { name: "Search activity" }), "nothing matches");
-
-    expect(screen.getByText("No matching activity")).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Clear filters" }));
-
-    expect(screen.getAllByRole("row", { name: /Open details/ })).toHaveLength(2);
-  });
-
-  it("offers only the categories a person's activity can contain", async () => {
-    const user = userEvent.setup();
-    renderTab();
-
-    await user.click(screen.getByRole("button", { name: "Filter by activity type" }));
-
-    const options = within(screen.getByRole("listbox")).getAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual([
-      "All activity",
-      "People",
-      "Access & roles",
-      "Invitations",
-    ]);
   });
 });

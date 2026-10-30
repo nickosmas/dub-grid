@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { DAY_LABELS } from "@/lib/constants";
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import {
   buildShiftJobPairKey,
@@ -21,10 +22,12 @@ import type {
   ShiftCategory,
 } from "@/types";
 
-type DayPill = {
+export type DayPill = {
   key: string;
   name: string;
   jobName: string | null;
+  /** "7:00 AM - 3:30 PM", when the pattern sets times. */
+  time: string | null;
   background: string;
   border: string;
   textColor: string;
@@ -46,7 +49,7 @@ function normalizeName(value: string): string {
  * column width here forcing "D · S" on a reader who came to check what they
  * actually work.
  */
-function buildDayPills(
+export function buildDayPills(
   recurringShift: RecurringShift,
   lookups: {
     assignmentByPair: Map<string, AssignmentDefinition>;
@@ -65,6 +68,7 @@ function buildDayPills(
         key: `${recurringShift.id}-absence`,
         name: absence?.name || absence?.label || recurringShift.shiftLabel,
         jobName: null,
+        time: null,
         background: resolved?.background ?? NEUTRAL_PILL.background,
         border: resolved?.border ?? NEUTRAL_PILL.border,
         textColor: resolved?.text ?? NEUTRAL_PILL.textColor,
@@ -79,6 +83,10 @@ function buildDayPills(
         key: `${recurringShift.id}-0`,
         name: recurringShift.presentation?.shiftName || recurringShift.shiftLabel,
         jobName: null,
+        time: formatScheduleTimeRange(
+          recurringShift.presentation?.startTime ?? null,
+          recurringShift.presentation?.endTime ?? null,
+        ),
         ...NEUTRAL_PILL,
       },
     ];
@@ -117,6 +125,7 @@ function buildDayPills(
       // A shiftless job resolves the same text into both lines; one of them is
       // enough.
       jobName: jobName && normalizeName(jobName) !== normalizeName(name) ? jobName : null,
+      time: formatScheduleTimeRange(segment.startTime ?? null, segment.endTime ?? null),
       background: resolved?.color ?? NEUTRAL_PILL.background,
       border: resolved?.border ?? NEUTRAL_PILL.border,
       textColor: resolved?.text ?? NEUTRAL_PILL.textColor,
