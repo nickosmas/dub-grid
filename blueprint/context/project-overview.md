@@ -539,6 +539,12 @@ work, About you), **Schedule** (Recurring schedule, the calendar subscription, s
 and time off) and **Account** (your details, sign-in and security, alerts, and
 data and privacy), replacing the settings sidebar. Old `?section=` links open
 Account at their heading.
+A fix on 2026-10-30 (fix/staff-period-month-stepper) replaces the period
+dropdown with a month stepper beside the tabs: arrows step a month, **Today**
+returns to the current month, and **Dates** picks any span up to a year. The
+page opens on the current month, no choice is remembered, and the Overview
+strip always shows this week. What they work moves into the numbers card as
+a bar and a row per shift and job, replacing the donut.
 
 Item 55 is split:
 

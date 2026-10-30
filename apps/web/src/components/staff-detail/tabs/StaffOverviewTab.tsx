@@ -14,7 +14,7 @@ import type {
   ShiftCategory,
   ShiftMap,
 } from "@/types";
-import { WorkMixCard } from "../WorkMixCard";
+import { WorkMixBreakdown } from "../WorkMixBreakdown";
 
 interface StaffOverviewTabProps {
   employee: Employee;
@@ -120,21 +120,28 @@ export function StaffOverviewTab({
       <section
         data-testid="overview-summary"
         aria-label={`${sentence(periodPhrase)} in numbers`}
-        className="dg-card grid grid-cols-3"
+        className="dg-card"
       >
-        {stats.map((stat, index) => (
-          <div
-            key={stat.label}
-            className={`min-w-0 px-5 py-4 ${index > 0 ? "border-l border-[var(--dg-color-border-light)]" : ""}`}
-          >
-            <div className="text-[13px] font-medium text-[var(--dg-color-text-secondary)]">
-              {stat.label}
+        <div className="grid grid-cols-3">
+          {stats.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`min-w-0 px-5 py-4 ${index > 0 ? "border-l border-[var(--dg-color-border-light)]" : ""}`}
+            >
+              <div className="text-[13px] font-medium text-[var(--dg-color-text-secondary)]">
+                {stat.label}
+              </div>
+              <div className="dg-tabular-nums mt-1 text-[28px] font-bold leading-[1.1] tracking-tight text-[var(--dg-color-text-primary)]">
+                {stat.value}
+              </div>
             </div>
-            <div className="dg-tabular-nums mt-1 text-[28px] font-bold leading-[1.1] tracking-tight text-[var(--dg-color-text-primary)]">
-              {stat.value}
-            </div>
+          ))}
+        </div>
+        {mix.length > 0 ? (
+          <div className="border-t border-[var(--dg-color-border-light)] px-5 py-4">
+            <WorkMixBreakdown mix={mix} periodPhrase={periodPhrase} title={mixTitle} />
           </div>
-        ))}
+        ) : null}
       </section>
 
       {nextDays ? (
@@ -159,51 +166,42 @@ export function StaffOverviewTab({
         />
       ) : null}
 
-      {waiting.length > 0 || mix.length > 0 ? (
-        <div
-          className={`grid items-start gap-4 ${waiting.length > 0 && mix.length > 0 ? "lg:grid-cols-2" : ""}`}
-        >
-          {waiting.length > 0 ? (
-            <section className="dg-card" aria-label="Needs attention">
-              <div className="dg-card-header">
-                <div className="dg-card-title flex items-center gap-2">
-                  Needs attention
-                  <span className="dg-tabular-nums inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--dg-color-brand)] px-1.5 text-[12px] font-semibold text-white">
-                    {waiting.length}
-                  </span>
-                </div>
-              </div>
-              <div className="dg-card-body flex flex-col">
-                {waiting.slice(0, 4).map((row, index) => (
-                  <div
-                    key={row.key}
-                    className={`flex items-center gap-3 py-2.5 ${index > 0 ? "border-t border-[var(--dg-color-border-light)]" : "pt-0"}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                        {row.type}
-                      </div>
-                      <div className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
-                        {[row.details, row.secondary].filter(Boolean).join(", ")}
-                      </div>
-                    </div>
-                    <Link href={row.reviewHref} className="dg-btn dg-btn-secondary dg-btn-sm">
-                      Review
-                    </Link>
+      {waiting.length > 0 ? (
+        <section className="dg-card" aria-label="Needs attention">
+          <div className="dg-card-header">
+            <div className="dg-card-title flex items-center gap-2">
+              Needs attention
+              <span className="dg-tabular-nums inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--dg-color-brand)] px-1.5 text-[12px] font-semibold text-white">
+                {waiting.length}
+              </span>
+            </div>
+          </div>
+          <div className="dg-card-body flex flex-col">
+            {waiting.slice(0, 4).map((row, index) => (
+              <div
+                key={row.key}
+                className={`flex items-center gap-3 py-2.5 ${index > 0 ? "border-t border-[var(--dg-color-border-light)]" : "pt-0"}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
+                    {row.type}
                   </div>
-                ))}
-                {waiting.length > 4 ? (
-                  <span className="pt-2 text-[13px] text-[var(--dg-color-text-subtle)]">
-                    and {waiting.length - 4} more in Activity
-                  </span>
-                ) : null}
+                  <div className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
+                    {[row.details, row.secondary].filter(Boolean).join(", ")}
+                  </div>
+                </div>
+                <Link href={row.reviewHref} className="dg-btn dg-btn-secondary dg-btn-sm">
+                  Review
+                </Link>
               </div>
-            </section>
-          ) : null}
-          {mix.length > 0 ? (
-            <WorkMixCard mix={mix} periodPhrase={periodPhrase} title={mixTitle} />
-          ) : null}
-        </div>
+            ))}
+            {waiting.length > 4 ? (
+              <span className="pt-2 text-[13px] text-[var(--dg-color-text-subtle)]">
+                and {waiting.length - 4} more in Activity
+              </span>
+            ) : null}
+          </div>
+        </section>
       ) : null}
 
       <h2 className="dg-section-heading" style={{ marginTop: 24 }}>

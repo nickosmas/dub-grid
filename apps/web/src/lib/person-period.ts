@@ -1,111 +1,77 @@
 import {
   formatCompactRangeLabel,
-  isValidCustomRange,
-  resolvePeriodPreset,
-  type PeriodPreset,
+  parseIsoDate,
+  toIsoDate,
   type PeriodRange,
 } from "./period-presets";
 
-export type PersonPeriodPreset = PeriodPreset;
-
-/** The period the staff page's tabs follow (item 55). */
+/**
+ * The dates the staff page's tabs follow: a calendar month stepped with the
+ * arrows, or any span picked under Dates.
+ */
 export interface PersonPeriod {
-  preset: PersonPeriodPreset;
+  kind: "month" | "custom";
   range: PeriodRange;
-  /** Pay period was chosen but the organization has no pay period start date. */
-  payPeriodUnset?: boolean;
 }
 
-/** What a viewer's browser keeps: a preset, and the dates only for Custom. */
-export interface StoredPersonPeriod {
-  preset: PersonPeriodPreset;
-  range?: PeriodRange;
+const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const MONTH_NAME = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
+
+/** The viewer's calendar day as an ISO date. */
+export function localIsoToday(now: Date = new Date()): string {
+  return toIsoDate(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
 }
 
-export const PERSON_PERIOD_PRESETS: readonly PersonPeriodPreset[] = [
-  "current-week",
-  "pay-period",
-  "this-month",
-  "last-12-weeks",
-  "custom",
-];
-
-export const PERSON_PERIOD_STORAGE_KEY = "dg-person-period";
-
-const DEFAULT_STORED: StoredPersonPeriod = { preset: "current-week" };
-
-function isPreset(value: unknown): value is PersonPeriodPreset {
-  return typeof value === "string" && (PERSON_PERIOD_PRESETS as readonly string[]).includes(value);
+function monthOf(isoDate: string, offset = 0): PeriodRange {
+  const date = parseIsoDate(isoDate) ?? new Date();
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + offset;
+  return {
+    startDate: toIsoDate(new Date(Date.UTC(year, month, 1))),
+    endDate: toIsoDate(new Date(Date.UTC(year, month + 1, 0))),
+  };
 }
 
-function isRange(value: unknown): value is PeriodRange {
-  if (!value || typeof value !== "object") return false;
-  const { startDate, endDate } = value as Record<string, unknown>;
-  return typeof startDate === "string" && typeof endDate === "string";
-}
-
-/** Anything missing, malformed, unknown or over the cap reads as Current week. */
-export function parseStoredPeriod(raw: string | null | undefined): StoredPersonPeriod {
-  if (!raw) return DEFAULT_STORED;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return DEFAULT_STORED;
-  }
-  if (!parsed || typeof parsed !== "object") return DEFAULT_STORED;
-  const { preset, range } = parsed as Record<string, unknown>;
-  if (!isPreset(preset)) return DEFAULT_STORED;
-  if (preset !== "custom") return { preset };
-  if (!isRange(range) || !isValidCustomRange(range)) return DEFAULT_STORED;
-  return { preset, range: { startDate: range.startDate, endDate: range.endDate } };
-}
-
-export function serializeStoredPeriod(stored: StoredPersonPeriod): string {
-  return JSON.stringify(
-    stored.preset === "custom" && stored.range
-      ? { preset: stored.preset, range: stored.range }
-      : { preset: stored.preset },
-  );
+export function monthPeriod(isoDate: string): PersonPeriod {
+  return { kind: "month", range: monthOf(isoDate) };
 }
 
 /**
- * Today's dates for a stored choice. An unset pay period keeps its preset (so
- * the control can say so) and covers the current week, as Reports does.
+ * The month before or after. From picked dates the arrows step out to whole
+ * months: back to the month they start in, forward to the month they end in.
  */
-export function resolvePersonPeriod(
-  stored: StoredPersonPeriod,
-  payPeriodStartDate: string | null | undefined,
-  now: Date = new Date(),
-): PersonPeriod {
-  const currentWeek = resolvePeriodPreset("current-week", null, now)!;
-  if (stored.preset === "custom") {
-    return stored.range
-      ? { preset: "custom", range: stored.range }
-      : { preset: "current-week", range: currentWeek };
+export function stepPersonPeriod(period: PersonPeriod, step: -1 | 1): PersonPeriod {
+  if (period.kind === "custom") {
+    return monthPeriod(step < 0 ? period.range.startDate : period.range.endDate);
   }
-  const range = resolvePeriodPreset(stored.preset, payPeriodStartDate, now);
-  if (range) return { preset: stored.preset, range };
-  return { preset: stored.preset, range: currentWeek, payPeriodUnset: true };
+  return { kind: "month", range: monthOf(period.range.startDate, step) };
+}
+
+export function isCurrentMonth(period: PersonPeriod, today: string): boolean {
+  return period.kind === "month" && period.range.startDate === monthOf(today).startDate;
+}
+
+/** "October 2026", or the picked dates. */
+export function formatPersonPeriodLabel(period: PersonPeriod): string {
+  if (period.kind === "custom") return formatCompactRangeLabel(period.range);
+  return MONTH_LABEL.format(parseIsoDate(period.range.startDate)!);
 }
 
 /**
- * The period as a sentence fragment for summaries: "No activity this pay
- * period", "3 events between Sep 1 and Oct 15".
+ * The period as a sentence fragment for summaries: "No shifts this month",
+ * "12 shifts in September", "3 events between Sep 1 and Oct 15".
  */
-export function formatPersonPeriodPhrase(period: PersonPeriod): string {
-  switch (period.preset) {
-    case "current-week":
-      return "this week";
-    case "pay-period":
-      return period.payPeriodUnset ? "this week" : "this pay period";
-    case "this-month":
-      return "this month";
-    case "last-12-weeks":
-      return "in the last 12 weeks";
-    case "custom": {
-      const [start, end] = formatCompactRangeLabel(period.range).split(" - ");
-      return `between ${start} and ${end}`;
-    }
+export function formatPersonPeriodPhrase(period: PersonPeriod, today: string): string {
+  if (period.kind === "custom") {
+    const [start, end] = formatCompactRangeLabel(period.range).split(" - ");
+    return `between ${start} and ${end}`;
   }
+  if (isCurrentMonth(period, today)) return "this month";
+  const start = parseIsoDate(period.range.startDate)!;
+  const sameYear = period.range.startDate.slice(0, 4) === today.slice(0, 4);
+  return `in ${(sameYear ? MONTH_NAME : MONTH_LABEL).format(start)}`;
 }
