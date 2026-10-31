@@ -14,6 +14,7 @@ import { Button } from "./Button";
 import { NumericBadge } from "./NumericBadge";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
+import { IS_ANDROID_LIST, IS_IOS_LIST, IS_NATIVE_LIST } from "../lib/native-list";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -106,7 +107,17 @@ export function SelectionSection({
 
   return (
     <View style={styles.section}>
-      {label ? <Text style={styles.sectionTitle}>{label}</Text> : null}
+      {label ? (
+        <Text
+          style={[
+            styles.sectionTitle,
+            IS_IOS_LIST && styles.sectionTitleIos,
+            IS_ANDROID_LIST && styles.sectionTitleAndroid,
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
       <View style={styles.selectionList}>
         {rows.map((child, index) => {
           if (!isSelectionRow(child)) return child;
@@ -117,8 +128,8 @@ export function SelectionSection({
             // row, which has lifted out of the group as its own card.
             showDivider:
               index < rows.length - 1 &&
-              !child.props.selected &&
-              !(isSelectionRow(next) && next.props.selected),
+              (IS_NATIVE_LIST ||
+                (!child.props.selected && !(isSelectionRow(next) && next.props.selected))),
           });
         })}
       </View>
@@ -156,7 +167,11 @@ export function SelectionRow({
         disabled={disabled}
         onPress={onPress}
         selected={selected}
-        style={[styles.selectionRow, selected && styles.selectionRowSelected]}
+        style={[
+          styles.selectionRow,
+          IS_NATIVE_LIST && styles.selectionRowNative,
+          selected && !IS_NATIVE_LIST && styles.selectionRowSelected,
+        ]}
       >
         <View style={styles.selectionRowCopy}>
           <Text style={[styles.selectionRowTitle, selected && styles.selectionRowTitleSelected]}>
@@ -164,7 +179,7 @@ export function SelectionRow({
           </Text>
           {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
         </View>
-        {selected ? <SelectionCheck /> : null}
+        {selected || IS_ANDROID_LIST ? <SelectionCheck selected={selected} /> : null}
       </PressableRow>
     </View>
   );
@@ -227,7 +242,7 @@ const createStyles = (mobileColors: MobileColors) =>
       // card inside a sheet is deliberately flat (see `flatInSheet`), so with
       // no shadow to draw it there was no edge at all in light mode. Dark is
       // unchanged: `cardBorder` already resolves to this token there.
-      borderColor: mobileColors.borderSubtle,
+      borderColor: IS_NATIVE_LIST ? "transparent" : mobileColors.borderSubtle,
       overflow: "hidden",
     },
     /** The full-bleed box a row occupies. Carries the divider and nothing else. */
@@ -254,6 +269,22 @@ const createStyles = (mobileColors: MobileColors) =>
       // vertical line it did when the rows were flush.
       paddingHorizontal: mobileSpace.lg - SELECTION_ROW_INSET,
       paddingVertical: mobileSpace.md,
+    },
+    // A native list's row spans the group; the chosen one carries only its mark.
+    selectionRowNative: {
+      borderRadius: 0,
+      margin: 0,
+      minHeight: 48,
+      paddingHorizontal: mobileSpace.lg,
+    },
+    sectionTitleIos: {
+      ...mobileText.meta,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    sectionTitleAndroid: {
+      ...mobileTextWeighted("meta", "semibold"),
+      color: mobileColors.brand,
     },
     selectionRowSelected: {
       // The same control fill the organization picker uses for its current row,

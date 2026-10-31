@@ -193,11 +193,11 @@ describe("mobileTabularText", () => {
 });
 
 describe("card border", () => {
-  it("is invisible in light mode and a hairline in dark", () => {
+  it("is invisible in both themes, since cards separate by fill", () => {
     // Transparent rather than absent, so the 1px keeps occupying layout and
     // nothing reflows when the theme flips.
     expect(mobileColors.cardBorder).toBe("transparent");
-    expect(darkMobileColors.cardBorder).not.toBe("transparent");
+    expect(darkMobileColors.cardBorder).toBe("transparent");
   });
 });
 
@@ -210,7 +210,7 @@ describe("mobile soft gradient", () => {
     expect(stops.at(-1)).toBe(mobileColors.background);
   });
 
-  it("leaves the other kinds to the shared tokens", () => {
+  it("ends the washes on the mobile page and card", () => {
     // `aurora` fades to fully transparent, so it needs no page-colour fixup.
     expect(mobileSoftGradientStops("aurora", false).at(-1)).toContain("0.00");
     expect(mobileSoftGradientStops("brandWash", true).at(-1)).toBe(darkMobileColors.background);

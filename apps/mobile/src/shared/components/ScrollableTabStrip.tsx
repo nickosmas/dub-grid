@@ -6,9 +6,7 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
-import { Text } from "./Text";
-import { NumericBadge } from "./NumericBadge";
-import { Pressable } from "./Pressable";
+import { ScrollableTabStripTab } from "./ScrollableTabStripTab";
 import { hapticSelection } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
@@ -162,34 +160,19 @@ export function ScrollableTabStrip({
         const isActive = tab.key === activeKey;
 
         return (
-          <Pressable
+          <ScrollableTabStripTab
             key={tab.key}
-            accessibilityLabel={tab.label}
-            accessibilityRole="tab"
-            // The badge is a sibling the explicit label hides from assistive
-            // tech; the value slot reads the count right after the name.
-            accessibilityValue={tab.count ? { text: String(tab.count) } : undefined}
-            accessibilityState={{ selected: isActive }}
-            android_ripple={{ color: mobileColors.rippleNeutral }}
-            // The pill is 36pt tall by design; pad the touch area out to the
-            // 44pt minimum without changing how it looks.
-            hitSlop={{ bottom: 4, top: 4 }}
+            count={tab.count}
+            isActive={isActive}
+            label={tab.label}
+            maxWidth={tabMaxWidth}
             onLayout={(event) => handleTabLayout(tab.key, event)}
             onPress={() => {
               if (tab.key === activeKey) return;
               hapticSelection();
               onSelect(tab.key);
             }}
-            style={[styles.tab, { maxWidth: tabMaxWidth }, isActive && styles.tabActive]}
-          >
-            <Text
-              fit="compact"
-              style={[styles.label, isActive ? styles.labelActive : styles.labelIdle]}
-            >
-              {tab.label}
-            </Text>
-            <NumericBadge count={tab.count ?? 0} tone={isActive ? "onAccent" : "neutral"} />
-          </Pressable>
+          />
         );
       })}
     </ScrollView>
@@ -252,37 +235,5 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.sm,
       paddingHorizontal: getScreenGutter(),
       paddingVertical: mobileSpace.xs,
-    },
-    tab: {
-      ...mobilePillOverflow.interactiveContainer,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.sm,
-      minHeight: mobileControl.sm,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-      borderRadius: mobileRadii.pill,
-      // Same hairline the shared SegmentedControl carries: the neutral fill
-      // alone sits at 1.22:1 on a white page, so the border is what actually
-      // draws an idle tab's edge.
-      borderWidth: 1,
-      borderColor: mobileColors.controlNeutralBorder,
-      backgroundColor: mobileColors.controlNeutralBg,
-    },
-    tabActive: {
-      backgroundColor: mobileColors.brand,
-      // The active tab keeps the same 1pt geometry, with the edge folded into
-      // its own fill, since a grey hairline on a brand pill reads as an outline.
-      borderColor: mobileColors.brand,
-    },
-    label: {
-      ...mobileText.bodyStrong,
-      ...mobilePillOverflow.interactiveText,
-    },
-    labelIdle: {
-      color: mobileColors.textSecondary,
-    },
-    labelActive: {
-      color: mobileColors.onBrandText,
     },
   });
