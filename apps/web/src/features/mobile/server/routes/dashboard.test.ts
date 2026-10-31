@@ -261,21 +261,49 @@ describe("mobile dashboard route", () => {
     expect((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)).toBe(6);
   });
 
-  it("fetches shift requests for a super_admin (for the pending-approvals metric) but omits them from actionQueue", async () => {
+  it("lists pending approvals in actionQueue for a super_admin", async () => {
     mockAuth({ role: "super_admin" });
     fetchMobileShiftRequests.mockResolvedValue([
       {
-        id: "req-1",
+        id: "8d3f4c1e-2b6a-4f0e-9c7d-1a2b3c4d5e6f",
+        orgId: "0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f",
         type: "pickup",
         status: "pending_approval",
+        requesterEmpId: "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d",
         requesterName: "Alex Rivera",
         // Far-future/never-expiring so resolveActiveShiftRequests's expiry
         // and "already started" checks don't filter this out regardless of
         // when the test actually runs.
         requesterShiftDate: "2099-01-01",
-        requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+        requesterState: {
+          kind: "worked",
+          segments: [{ shiftId: 1, jobId: 1, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        requesterPresentation: {
+          label: "D",
+          shiftName: "Day Shift",
+          focusAreaId: 1,
+          focusAreaName: "ICU",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          segments: [],
+        },
+        targetEmpId: null,
+        targetName: null,
+        targetShiftDate: null,
+        absenceTypeId: null,
+        parentRequestId: null,
+        adminUserId: null,
+        adminNote: null,
         expiresAt: "2099-01-02T00:00:00.000Z",
+        resolvedAt: null,
         createdAt: "2026-05-10T09:00:00.000Z",
+        updatedAt: "2026-05-10T09:00:00.000Z",
       },
     ]);
 
@@ -287,7 +315,8 @@ describe("mobile dashboard route", () => {
 
     expect(response.status).toBe(200);
     expect(fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
-    expect(payload.actionQueue).toEqual([]);
+    expect(payload.actionQueue).toHaveLength(1);
+    expect(payload.actionQueue[0].requesterName).toBe("Alex Rivera");
     expect(payload.metrics.pendingApprovalsCount).toBe(1);
   });
 

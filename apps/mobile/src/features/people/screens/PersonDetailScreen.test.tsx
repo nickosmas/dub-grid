@@ -1797,11 +1797,17 @@ describe("PersonDetailScreen", () => {
       pick(/^Away/);
       fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
 
+      // On a month's last day the calendar opens on the next month, the
+      // earliest day's, so today isn't drawn at all: not offered either way.
+      const today = screen.queryByRole("button", {
+        name: `Choose ${formatReturnDate(day(0), { weekday: true })}`,
+      });
+      if (today) expect(today).toBeDisabled();
       expect(
         screen.getByRole("button", {
-          name: `Choose ${formatReturnDate(day(0), { weekday: true })}`,
+          name: `Choose ${formatReturnDate(day(1), { weekday: true })}`,
         }),
-      ).toBeDisabled();
+      ).toBeEnabled();
     });
 
     it("archives with a reason", () => {

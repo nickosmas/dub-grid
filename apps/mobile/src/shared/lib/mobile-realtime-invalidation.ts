@@ -45,12 +45,12 @@ export function getMobileRealtimeInvalidationKeys(
   const shiftSwapOptions = ["mobile", "shift-swap-options"] as const;
   const notifications = mobileQueryKeys.notificationsPrefix(accessToken);
   const notificationFacets = mobileQueryKeys.notificationFacets(accessToken);
-  // Prefix-matches both useAdminDashboard's query key and MyScheduleCard's
-  // own dashboard query. AuthSessionProvider clears the cache at an account or
+  // Prefix-matches both useAdminDashboard's query key and the admin Home's
+  // own-schedule query (useMyScheduleQuery). AuthSessionProvider clears the cache at an account or
   // organization boundary, so this family prefix can only reach the current
   // identity's remaining entries.
   const dashboard = ["mobile", "dashboard"] as const;
-  const homeScheduleCard = ["mobile", "dashboard", "my-schedule"] as const;
+  const homeOwnSchedule = ["mobile", "dashboard", "my-schedule"] as const;
 
   switch (table) {
     case "organizations":
@@ -81,7 +81,7 @@ export function getMobileRealtimeInvalidationKeys(
     // its entries carry their indicators (42b). Only that card: indicators do not
     // change the admin dashboard's figures.
     case "schedule_notes":
-      return [schedule, homeScheduleCard];
+      return [schedule, homeOwnSchedule];
     case "profile_change_requests":
       return [profileChangeRequests, profileChangeRequestsOwn];
     case "notifications":

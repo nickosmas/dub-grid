@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { getScreenGutter } from "../../../../shared/components/screen-layout";
 import { getHeroTiming } from "../../../schedule/lib/scheduleScreenHelpers";
-import { MeHeroCard } from "../../../schedule/screens/ScheduleScreen";
+import { MeHeroCard } from "../../../schedule/components/MyScheduleSections";
 import { OnboardingPreviewStage } from "./OnboardingPreviewStage";
 import {
   PREVIEW_EMPLOYEE_ID,
@@ -14,7 +14,7 @@ import {
 
 /**
  * My schedule's hero card with today's shift on duty
- * (`schedule/screens/ScheduleScreen.tsx`), on its own: the tour's aurora
+ * (`schedule/components/MyScheduleSections.tsx`), on its own: the tour's aurora
  * backdrop is the one Home sits on, and the page's header stays behind.
  */
 export function UpcomingShiftPreview() {

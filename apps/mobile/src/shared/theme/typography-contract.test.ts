@@ -116,8 +116,6 @@ describe("mobile typography contract", () => {
   it("applies the shared tabular style to schedule and dashboard figures", () => {
     for (const filePath of [
       "src/features/dashboard/components/DashboardHeroCard.tsx",
-      "src/features/dashboard/components/DashboardHeader.tsx",
-      "src/features/dashboard/components/MyScheduleCard.tsx",
       "src/features/schedule/screens/scheduleScreenStyles.ts",
       "src/features/schedule/screens/shiftDetailScreenStyles.ts",
     ]) {
