@@ -61,6 +61,7 @@
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
 **Why it matters:** image-size 1.2.1 loops forever on a crafted ICNS, JXL or HEIF file (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq). Metro uses it only to measure the app's own image assets during a bundle, so the exposure is a stalled build on a developer machine or in CI, not the shipped app or the web server. The fixed 2.0.3 is a major that measures only a buffer, while Metro 0.83.3 passes a file path, so an override would break every image asset; `@expo/metro` 54.2.0 pins metro 0.83.3 exactly, and metro 0.83.8, which drops image-size, is not taken by SDK 54. Moving only the React Native copy to 0.83.8 would leave the alert open through Expo's copy.
 **Suggested fix:** Take the next Expo SDK (its `@expo/metro` moves to metro 0.84), then drop the image-size entry from `scripts/audit-check.mjs`. Until then the allowlist entry holds, review by 2026-11-01.
+**Update 2026-10-31 (fix/dependency-audit-gate):** the allowlist entry's review date moved from 2026-11-01 to 2026-12-01, since SDK 54 still has no path to metro 0.83.8.
 **Resolution:**
 
 ### F-124 [P3] open - No upstream path clears decode-uri-component 0.2.2 in the mobile app
@@ -69,6 +70,7 @@
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
 **Why it matters:** decode-uri-component 0.2.2 decodes malformed percent-encoded input exponentially (fixed in 0.5.0). It ships in the mobile app, where it parses the app's own deep links, so the only trigger is a crafted link opened on the user's own device, which stalls that app. query-string 7 `require()`s it as CommonJS, and 0.5.0 is ESM-only, so an override would break link parsing; even the newest expo-router (57.x) still depends on query-string ^7.1.3.
 **Suggested fix:** Revisit when expo-router and React Navigation move to query-string 9.5 or later (which depends on decode-uri-component ^0.5.0), normally with an Expo SDK upgrade. Medium severity, below the `deps:audit` gate, so no allowlist entry is needed.
+**Update 2026-10-31:** GHSA-qr28-fpjm-wq7f (quadratic replacement, high, <= 0.5.0) joined the earlier advisory, putting the chain above the gate. Both are allowlisted until 2026-12-01 for the same reason: the fixes are ESM-only and query-string 7 needs CommonJS.
 **Resolution:**
 
 ### F-125 [P3] open - Vitest's mocker advisory needs the Vitest 4 major
@@ -78,6 +80,7 @@
 **Why it matters:** `@vitest/mocker`'s redirect mock can read files outside the project (path traversal), fixed only in 4.1.11; every 3.x release is in range. Vitest runs only on developer machines and in CI over this repo's own tests, so the exposure is a crafted test or mock path in a change we review.
 **Suggested fix:** Upgrade `vitest` and `@vitest/coverage-v8` to 4.1.11 or later in one change across web, mobile and the packages, following Vitest's 4.0 migration notes, and run every workspace's suite. Medium severity, below the `deps:audit` gate.
 **Update 2026-10-13:** two critical tinypool advisories (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr, prototype-pollution gadgets reaching code execution through worker options) now put Vitest 3 above the gate. tinypool 2.1.2 fixes them and Vitest 3 cannot take it. All three are allowlisted in `scripts/audit-check.mjs` until 2026-11-15 (fix/dependency-audit); do the upgrade (Vitest 5.0.4 is current) before then rather than re-dating the entry.
+**Update 2026-10-31:** a fourth advisory, GHSA-qxg6-89mg-rqv8 (mock registration code injection, fixed in 4.1.12), joined the Vitest entry; its date stays 2026-11-15.
 **Resolution:**
 
 ### F-126 [P3] open - Faker's code-execution advisory waits on @snaplet/copycat
@@ -94,6 +97,7 @@
 **Found:** 2026-10-13 while clearing the `deps:audit` gate for release PR #131
 **Why it matters:** GHSA-vfj7-8cjw-p6xm (braces stack exhaustion on a nested brace pattern) has no fixed release, nor does GHSA-86w9-cpqp-85rv (node-forge accepting extra data in a PKCS#1 v1.5 signature). GHSA-hp3w-g68c-fv3c (sprintf-js) is fixed only in 1.1.4, outside argparse 1's range. Every copy is build, bundling or test tooling. The patterns and configs are our own, and the app does not use Expo code signing. So the exposure is a hostile change we review, or a crashed build, not the shipped app or the web server.
 **Suggested fix:** Take a braces or node-forge release when one ships. Otherwise take the Expo SDK upgrade (with F-123), which moves Metro and Jest. The allowlist entries hold until 2026-12-01.
+**Update 2026-10-31:** the braces and sprintf-js advisories no longer appear in `npm audit`, so their entries were removed. node-forge gained eleven advisories; its fix 1.4.1 (2026-10-27) is inside the freshness window, and the entry now says to take 1.4.2 after 2026-11-03 (review 2026-11-10).
 **Resolution:**
 
 ### F-128 [P3] open - The mobile session is stored in one SecureStore value over its 2,048-byte guidance
@@ -676,4 +680,12 @@
 - Fonts load at runtime rather than being embedded.
 
 **Suggested fix:** Defer presence until the splash lifts and persist its mark; overlap the org lookup and run the trial start in `after()`; allow submit while the org confirms; prefetch `/org/schedule` when the person can view it; embed the fonts through the `expo-font` plugin.
+**Resolution:**
+
+### F-189 [P2] open - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
+
+**File:** `package.json`, `apps/web/package.json`, `packages/contracts/package.json` (`zod` 3.24.4); 104 files import it in `apps/web/src` and `packages/contracts/src`; `scripts/audit-check.mjs` allowlist
+**Found:** 2026-10-31 while clearing the Dependency Audit gate (fix/dependency-audit-gate)
+**Why it matters:** GHSA-mrhx-c7xc-m3w5 (high): a huge array posted against a schema with a length or size constraint walks every element before the constraint fails, so request validation in the web routes and the mobile API can be pushed into memory exhaustion. Vercel caps a request body at 4.5 MB, which bounds what one request supplies. Fixed only in zod 4.6.6.
+**Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
 **Resolution:**
