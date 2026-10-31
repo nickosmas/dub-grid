@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import type { MobileScheduleRange } from "@dubgrid/contracts";
 import { formatScheduleDayLabel, formatScheduleRange } from "@dubgrid/schedule-core";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
-import { Pressable } from "../../../shared/components/Pressable";
+import { ChromeIconButton } from "../../../shared/components/ChromeIconButton";
 import { Text } from "../../../shared/components/Text";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { createStyles } from "../screens/scheduleScreenStyles";
@@ -24,28 +24,16 @@ export function IconControlButton({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      hitSlop={10}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.iconControlButton,
-        pressed && styles.iconControlButtonPressed,
-      ]}
-    >
+    <ChromeIconButton accessibilityLabel={accessibilityLabel} onPress={onPress}>
       <Ionicons
         color={mobileColors.textPrimary}
         name={iconName}
         size={iconSize}
         style={iconStyle}
       />
-    </Pressable>
+    </ChromeIconButton>
   );
 }
 
@@ -55,27 +43,22 @@ export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <Pressable
+    <ChromeIconButton
       accessibilityLabel="Open alerts"
-      accessibilityRole="button"
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      hitSlop={10}
+      badge={
+        <NumericBadge
+          count={unreadCount}
+          label={`${unreadCount} unread alerts`}
+          max={9}
+          size="sm"
+          style={styles.alertBadge}
+          tone="danger"
+        />
+      }
       onPress={() => router.push("/alerts")}
-      style={({ pressed }) => [
-        styles.iconControlButton,
-        pressed && styles.iconControlButtonPressed,
-      ]}
     >
       <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
-      <NumericBadge
-        count={unreadCount}
-        label={`${unreadCount} unread alerts`}
-        max={9}
-        size="sm"
-        style={styles.alertBadge}
-        tone="danger"
-      />
-    </Pressable>
+    </ChromeIconButton>
   );
 }
 

@@ -26,41 +26,32 @@ vi.mock("../features/notifications/hooks/usePushResponseHandler", () => ({
   usePushResponseHandler: vi.fn(),
 }));
 
+// Hidden tabs are left out of the native bar, so a probe per trigger shows
+// which tabs Android draws.
 vi.mock("expo-router", async () => {
   const React = await import("react");
-
-  const Tabs = ({ children }: { children: React.ReactNode }) =>
-    React.createElement("div", {}, children);
-
-  // Android hides a tab by passing `href: null` rather than omitting the
-  // screen, so the rendered probe has to surface the href.
-  Tabs.Screen = ({
-    name,
-    options,
-  }: {
-    name: string;
-    options?: { title?: string; href?: string | null };
-  }) =>
-    React.createElement(
-      "span",
-      { "data-testid": `tab-${name}` },
-      `${name}:${options?.title ?? name}:${options?.href === null ? "hidden" : "visible"}`,
-    );
-
   return {
     Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
-    Tabs,
   };
+});
+
+vi.mock("expo-router/unstable-native-tabs", async () => {
+  const React = await import("react");
+  const NativeTabs = ({ children }: { children: React.ReactNode }) =>
+    React.createElement("div", {}, children);
+  const Trigger = ({ name, children }: { name: string; children: React.ReactNode }) =>
+    React.createElement("span", { "data-testid": `tab-${name}` }, children);
+  NativeTabs.Trigger = Object.assign(Trigger, {
+    Label: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    Icon: () => null,
+  });
+  return { NativeTabs };
 });
 
 vi.mock("../shared/components/AppSplashScreen", async () => {
   const React = await import("react");
   return { AppSplashScreen: () => React.createElement("div", {}, "app-splash-screen") };
-});
-
-vi.mock("../shared/components/FloatingTabBar", async () => {
-  const React = await import("react");
-  return { FloatingTabBar: () => React.createElement("div", {}, "floating-tab-bar") };
 });
 
 vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
@@ -155,9 +146,9 @@ describe("TabsLayoutAndroid", () => {
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByTestId("tab-home")).toHaveTextContent("home:Home:visible");
-    expect(screen.getByTestId("tab-team")).toHaveTextContent("team:Schedule:visible");
-    expect(screen.getByTestId("tab-requests")).toHaveTextContent("requests:Requests:visible");
+    expect(screen.getByTestId("tab-home")).toHaveTextContent("Home");
+    expect(screen.getByTestId("tab-team")).toHaveTextContent("Schedule");
+    expect(screen.getByTestId("tab-requests")).toHaveTextContent("Requests");
   });
 
   it("redirects to login without a session", () => {
@@ -168,24 +159,24 @@ describe("TabsLayoutAndroid", () => {
     expect(screen.getByText("redirect:/(auth)/login")).toBeInTheDocument();
   });
 
-  it("renders the full tab set through the floating tab bar", () => {
+  it("renders the full tab set in the native bottom navigation", () => {
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByTestId("tab-home")).toHaveTextContent("home:Home:visible");
-    expect(screen.getByTestId("tab-team")).toHaveTextContent("team:Schedule:visible");
-    expect(screen.getByTestId("tab-requests")).toHaveTextContent("requests:Requests:visible");
-    expect(screen.getByTestId("tab-people")).toHaveTextContent("people:People:visible");
-    expect(screen.getByTestId("tab-profile")).toHaveTextContent("profile:Profile:visible");
+    expect(screen.getByTestId("tab-home")).toHaveTextContent("Home");
+    expect(screen.getByTestId("tab-team")).toHaveTextContent("Schedule");
+    expect(screen.getByTestId("tab-requests")).toHaveTextContent("Requests");
+    expect(screen.getByTestId("tab-people")).toHaveTextContent("People");
+    expect(screen.getByTestId("tab-profile")).toHaveTextContent("Profile");
   });
 
   // Android keeps the screen mounted and nulls its href, so a hidden tab must
   // still be registered — asserting on absence would pass for the wrong reason.
-  it("hides the Schedule tab with href: null rather than dropping the screen", () => {
+  it("leaves the Schedule tab out of the bar for someone who can't see it", () => {
     useBootstrap.mockReturnValue(bootstrap({ canViewSchedule: false }));
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByTestId("tab-team")).toHaveTextContent("team:Schedule:hidden");
+    expect(screen.queryByTestId("tab-team")).not.toBeInTheDocument();
   });
 
   it("hides the Home tab for a management-only regular user", () => {
@@ -195,7 +186,7 @@ describe("TabsLayoutAndroid", () => {
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByTestId("tab-home")).toHaveTextContent("home:Home:hidden");
+    expect(screen.queryByTestId("tab-home")).not.toBeInTheDocument();
   });
 
   it("hides Requests for a user who is neither scheduled nor an approver", () => {
@@ -205,7 +196,7 @@ describe("TabsLayoutAndroid", () => {
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByTestId("tab-requests")).toHaveTextContent("requests:Requests:hidden");
+    expect(screen.queryByTestId("tab-requests")).not.toBeInTheDocument();
   });
 
   it("shows the organization lock instead of tabs when bootstrap reports it unavailable", () => {

@@ -11,7 +11,6 @@ const illustrationSections = [
   ["Stop building schedules by hand", /Generate schedule fills next week/],
   ["Never get caught short-staffed", /open evening shift is filled/],
   ["No more swap texts and sticky notes", /Jordan accepts Sam's swap/],
-  ["No more “nobody told me”", /schedule for Tuesday changed/],
   ["Catch overtime before it happens", /nobody goes over 40/],
   ["The right people make the right changes", /billing stays with Super Admins/],
 ] as const;
@@ -27,6 +26,7 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
 
   await expect(page.getByRole("img", { name: heroSchedule })).toBeVisible();
+  await expect(page.getByRole("img", { name: "The app's Home in its Team view" })).toBeVisible();
 
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
@@ -51,10 +51,7 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
   }
   await expect(security.getByRole("button", { name: "Next" })).toHaveCount(0);
 
-  await expect(page.locator(".landing-cta")).toHaveCSS(
-    "background-image",
-    /linear-gradient\(140deg, rgb\(11, 45, 117\)/,
-  );
+  await expect(page.locator(".landing-cta")).toHaveCSS("background-color", "rgb(11, 45, 117)");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getFloatingTabBarClearance } from "./floating-tab-bar-layout";
 import { getFooterBottomPadding, getScreenBottomPadding, getScreenGutter } from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
@@ -27,22 +26,13 @@ describe("getScreenBottomPadding", () => {
     expect(getScreenBottomPadding("stack", -10)).toBe(24);
   });
 
-  // The floating bar is absolutely positioned, so nothing but this padding
-  // keeps a screen's last row out from behind it. The flat 72 it used to get
-  // was shorter than the bar's own footprint, which left the final control on
-  // a page tucked underneath with no scroll left to reveal it.
-  it("clears the whole floating tab bar on Android, with room to spare", () => {
+  // Android's bottom navigation is in the layout and keeps the system
+  // navigation inset for itself, so a tab screen needs breathing room only.
+  it("gives an Android tab screen breathing room above its bottom navigation", () => {
     platform.OS = "android";
 
-    for (const safeAreaBottom of [0, 8, 24, 48]) {
-      expect(getScreenBottomPadding("tabbed", safeAreaBottom)).toBeGreaterThan(
-        getFloatingTabBarClearance(safeAreaBottom),
-      );
-    }
-
-    // 8pt inset floor + 6pt gap + a 68pt bar + 16pt of breathing room.
-    expect(getScreenBottomPadding("tabbed", 0)).toBe(98);
-    expect(getScreenBottomPadding("tabbed", 24)).toBe(114);
+    expect(getScreenBottomPadding("tabbed", 0)).toBe(24);
+    expect(getScreenBottomPadding("tabbed", 24)).toBe(24);
   });
 
   it("leaves the stack and modal modes alone on Android", () => {
@@ -86,11 +76,11 @@ describe("getFooterBottomPadding", () => {
     expect(getFooterBottomPadding("stack", 0)).toBe(16);
   });
 
-  it("keeps Android floating-tab clearance unchanged", () => {
+  it("gives an Android tab footer breathing room above its bottom navigation", () => {
     platform.OS = "android";
 
-    expect(getFooterBottomPadding("tabbed", 0, true)).toBe(98);
-    expect(getFooterBottomPadding("tabbed", 24, true)).toBe(114);
+    expect(getFooterBottomPadding("tabbed", 0, true)).toBe(16);
+    expect(getFooterBottomPadding("tabbed", 24, true)).toBe(16);
     expect(getFooterBottomPadding("stack", 24, true)).toBe(40);
   });
 });

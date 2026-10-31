@@ -16,17 +16,19 @@
   border-radius: 12px;
   background: var(--dg-color-surface);
   color: var(--dg-color-text-primary);
-  box-shadow: 0 20px 50px rgba(7, 21, 53, 0.12);
+  box-shadow:
+    0 1px 2px rgba(7, 21, 53, 0.06),
+    0 20px 40px -16px rgba(7, 21, 53, 0.2);
   text-align: left;
 }
 .dark .landing-window {
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 20px 40px -16px rgba(0, 0, 0, 0.6);
 }
-.landing-window-wide {
-  max-width: 880px;
-}
+.landing-window-wide,
 .landing-window-medium {
-  max-width: 760px;
+  max-width: 1100px;
 }
 .landing-window-bar {
   display: flex;
@@ -1388,4 +1390,310 @@
   color: var(--dg-color-text-muted);
   font-size: 14px;
   font-weight: 500;
+}
+
+/* Hero: the schedule fills the width, and on a desktop a phone with Jordan's
+   alert overlaps its bottom-right corner. */
+.landing-hero-stage {
+  position: relative;
+}
+.landing-hero-phone {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .landing-hero-phone {
+    position: absolute;
+    z-index: 2;
+    right: 32px;
+    bottom: -96px;
+    display: block;
+  }
+  .landing-hero-phone .landing-phone-frame {
+    --landing-phone-scale: 0.6;
+  }
+}
+@media (min-width: 1400px) {
+  .landing-hero-phone {
+    right: -48px;
+  }
+}
+
+/* The swap and the alert share one row of three phones. */
+.landing-phones-trio {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 40px;
+}
+.landing-phones-trio > .landing-demo {
+  width: auto;
+  margin: 0;
+}
+.landing-phones-trio .landing-phones {
+  gap: 40px;
+}
+@media (min-width: 1024px) {
+  .landing-phones-trio .landing-phone-frame {
+    --landing-phone-scale: 0.72;
+  }
+}
+
+/* Desktop: the illustrations fill the wider sections, so their type grows. */
+@media (min-width: 1024px) {
+  .landing-toolbar {
+    padding: 16px 24px;
+    font-size: 17px;
+  }
+  .landing-btn {
+    height: 40px;
+    padding: 0 16px;
+    font-size: 15px;
+  }
+  .landing-btn-small {
+    height: 34px;
+    font-size: 14px;
+  }
+  .landing-grid {
+    grid-template-columns: minmax(170px, 1.3fr) repeat(5, minmax(0, 1fr));
+    font-size: 15px;
+  }
+  .landing-grid-cell {
+    min-height: 44px;
+    padding: 10px 6px;
+  }
+  .landing-grid-person {
+    font-size: 17px;
+  }
+  .landing-chip {
+    padding: 10px;
+    font-size: 15px;
+  }
+  .landing-preview-bar {
+    padding: 14px 24px;
+    font-size: 17px;
+  }
+  .landing-draft-slot {
+    padding: 14px 20px 4px;
+  }
+  .landing-draft-banner {
+    font-size: 16px;
+  }
+  .landing-hours-row,
+  .landing-hours-scale {
+    grid-template-columns: minmax(180px, auto) minmax(0, 1fr) 140px;
+    gap: 24px;
+    padding-right: 24px;
+    padding-left: 24px;
+    font-size: 17px;
+  }
+  .landing-hours-row {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+  .landing-hours-track {
+    height: 14px;
+  }
+  .landing-access {
+    font-size: 17px;
+  }
+  .landing-access > span,
+  .landing-access-row > span {
+    padding: 17px 24px;
+  }
+}
+
+/* The hero phone: the app's admin Home in its Team view, at native points
+   (the mobile app's own sizes: 34pt title, 17pt card titles, 15pt body). */
+.landing-home {
+  position: absolute;
+  inset: 0;
+  padding: 58px 16px 0;
+  background:
+    radial-gradient(120% 45% at 50% 0%, rgba(37, 99, 235, 0.22), transparent 70%),
+    var(--dg-color-bg-secondary);
+  font-size: 15px;
+}
+.landing-phone > .landing-statusbar {
+  position: relative;
+  z-index: 1;
+}
+.landing-home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.landing-home-day {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.landing-home-range {
+  color: var(--dg-color-text-muted);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.landing-home-icons {
+  display: flex;
+  gap: 8px;
+}
+.landing-home-icons > span {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: 50%;
+  background: var(--dg-color-surface);
+}
+.landing-home-bell i {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--dg-color-danger);
+  color: var(--dg-color-on-brand-text);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+.landing-home-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 18px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--dg-color-border-light);
+}
+.landing-home-switch span {
+  padding: 8px 0;
+  border-radius: 9px;
+  color: var(--dg-color-text-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+.landing-home-switch span[data-active] {
+  background: var(--dg-color-surface);
+  box-shadow: 0 1px 3px rgba(7, 21, 53, 0.12);
+  color: var(--dg-color-text-primary);
+}
+.landing-home-card {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--dg-color-border-light);
+  border-radius: 20px;
+  background: var(--dg-color-surface);
+}
+.landing-home-card-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.landing-home-card-title span {
+  color: var(--dg-color-brand);
+  font-size: 15px;
+  font-weight: 500;
+}
+.landing-home-figure {
+  color: var(--dg-color-text-muted);
+  font-size: 15px;
+}
+.landing-home-figure strong {
+  margin-right: 6px;
+  color: var(--dg-color-success);
+  font-size: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.landing-home-meter {
+  height: 8px;
+  margin: 8px 0 12px;
+  border-radius: 4px;
+  background: var(--dg-color-border-light);
+}
+.landing-home-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--dg-color-success);
+}
+.landing-home-area {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--dg-color-border-light);
+}
+.landing-home-area-count {
+  color: var(--dg-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.landing-home-area-count b {
+  margin-left: 8px;
+  color: var(--dg-color-warning-text);
+  font-weight: 600;
+}
+.landing-home-area-count b[data-full] {
+  color: var(--dg-color-success-text);
+}
+.landing-home-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dg-color-border-light);
+  color: var(--dg-color-text-muted);
+  font-size: 13px;
+}
+.landing-home-stats strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.landing-home-stats [data-tone="danger"] strong {
+  color: var(--dg-color-danger-text);
+}
+.landing-home-stats [data-tone="warning"] strong {
+  color: var(--dg-color-warning-text);
+}
+.landing-home-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+}
+.landing-home-row small,
+.landing-home-row-split small {
+  display: block;
+  color: var(--dg-color-text-muted);
+  font-size: 13px;
+}
+.landing-home-row small b {
+  color: var(--dg-color-success-text);
+  font-weight: 600;
+}
+.landing-home-row-split {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.landing-home-overtime {
+  color: var(--dg-color-danger-text);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: right;
+}
+.landing-home-overtime small {
+  font-weight: 400;
 }

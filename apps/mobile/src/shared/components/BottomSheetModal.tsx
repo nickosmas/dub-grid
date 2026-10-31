@@ -170,11 +170,14 @@ export function BottomSheetModal({
   // The sheet runs to the modal's bottom edge, so nothing lifts its content
   // clear of the system bars any more — that falls back to the content padding.
   const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
+  // Sticky actions sit just above the home indicator, as a system sheet's do;
+  // the content's extra padding left them floating a row too high.
+  const footerBottomPadding = Math.max(insets.bottom, mobileSpace.lg);
   const topGap = insets.top + SHEET_TOP_GAP;
   const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, topGap, bottomPadding, backdrop),
-    [mobileColors, isDark, topGap, bottomPadding, backdrop],
+    () => createStyles(mobileColors, isDark, topGap, bottomPadding, backdrop, footerBottomPadding),
+    [mobileColors, isDark, topGap, bottomPadding, backdrop, footerBottomPadding],
   );
   const keyboardStyle = useAnimatedStyle(() => ({
     marginBottom: -keyboardHeight.value - SHEET_OVERDRAG_LIMIT,
@@ -376,6 +379,7 @@ const createStyles = (
   topGap: number,
   bottomPadding: number,
   backdrop: "scrim" | "cover",
+  footerBottomPadding: number,
 ) =>
   StyleSheet.create({
     gestureRoot: {
@@ -503,7 +507,7 @@ const createStyles = (
       // The same step as the gap between the footer's own rows, so the divider
       // sits as far from the first button as the buttons sit from each other.
       paddingTop: mobileSpace.md,
-      paddingBottom: bottomPadding,
+      paddingBottom: footerBottomPadding,
     },
   });
 
