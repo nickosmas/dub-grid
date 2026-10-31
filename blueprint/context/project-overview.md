@@ -672,7 +672,7 @@ endpoints remain internal.
   `apps/mobile`, and 11 shared packages.
 - **Web** - Next.js 16 App Router, React 19, strict TypeScript, and Tailwind CSS
   v4.
-- **Mobile** - Expo SDK 54, Expo Router, and React Native.
+- **Mobile** - Expo SDK 57, Expo Router, and React Native.
 - **Backend** - Supabase Postgres, Auth, Realtime, and Row Level Security with no
   ORM.
 - **Data access** - direct Supabase clients on the server, TanStack Query v5 for

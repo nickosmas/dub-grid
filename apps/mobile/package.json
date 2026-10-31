@@ -3,13 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
-  "expo": {
-    "install": {
-      "exclude": [
-        "react-native-screens"
-      ]
-    }
-  },
   "scripts": {
     "prepare-shared-packages": "npm --prefix ../.. run build:packages",
     "ensure-local-env": "node ../../scripts/ensure-mobile-local-env.mjs",

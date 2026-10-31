@@ -66,7 +66,7 @@ What it unlocks:
       **Done when:** all three build, and the device build launches on the
       iPhone without the patch.
 
-- [ ] **4. Qualification.** On the iOS Simulator and the Android emulator,
+- [x] **4. Qualification.** On the iOS Simulator and the Android emulator,
       sign in as a staff member, an Admin and a Super Admin against the local
       stack and walk Home, Schedule, Requests, People, Profile, Alerts, a shift
       detail, a sheet, the week stepper and sign-out. Compare with the SDK 54
@@ -74,11 +74,25 @@ What it unlocks:
       **Done when:** every screen renders and responds as before, with no red
       box or console error the old build didn't have.
 
-- [ ] **5. Records.** Update or close F-123, F-124, F-127 and F-128 (SDK 57's
+- [x] **5. Records.** Update or close F-123, F-124, F-127 and F-128 (SDK 57's
       SecureStore size behavior), the dependency allowlist, the mobile notes that
       name SDK 54 (`apps/mobile/AGENTS.md`, `project-overview.md`'s tech stack),
       and the iOS device-build recipe.
       **Done when:** `npm run docs:check` passes.
+
+## Progress notes
+
+- **3:** iOS Release device, iOS Simulator (Release and Debug) and Android
+  Debug builds succeed. Expo 57's template doesn't adopt the scene life cycle,
+  so `apps/mobile/plugins/with-scene-lifecycle.js` does it at prebuild. The
+  device build links the iOS 27.2 SDK unpatched and installed on the iPhone;
+  whether it stays open there is not yet confirmed. Signing needs
+  `DEVELOPMENT_TEAM` on the xcodebuild line (a clean prebuild drops it);
+  Gradle needs `-Dorg.gradle.jvmargs=-Xmx4g` and a 3 GB Kotlin daemon.
+  SDK 57's iOS minimum is 16.4 (was 15.1).
+- **4:** iOS Simulator (iOS 26.5, Admin) and Android emulator (API 36,
+  Super Admin, then staff after sign-out): Home, Schedule, Requests, People,
+  Profile, shift detail and back twice; no JavaScript errors or warnings.
 
 ## Verify
 

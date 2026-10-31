@@ -222,7 +222,7 @@ runtime evidence.
 - **Web:** Next.js 16 (App Router only, no Pages Router, no catch-all
   routes), React 19, TypeScript strict, Tailwind CSS v4 (CSS-first
   `@theme` config)
-- **Mobile:** Expo SDK 54, Expo Router, React Native
+- **Mobile:** Expo SDK 57, Expo Router, React Native
 - **Backend:** Supabase - Postgres, Auth, Realtime, Row Level Security.
   No Prisma or any other ORM; direct `@supabase/supabase-js` /
   `@supabase/ssr` v0.9 clients plus `supabase/migrations`

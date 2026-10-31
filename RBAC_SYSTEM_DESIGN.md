@@ -9,7 +9,7 @@ Version 2.3 | Updated 2026-09-19 | Confidential
 
 > **Monorepo note:** DubGrid is an npm-workspaces + Turborepo monorepo. Two apps —
 > `@dubgrid/web` (Next.js 16 App Router, `apps/web`) and `@dubgrid/mobile`
-> (Expo SDK 54 / React Native, `apps/mobile`) — sit on top of 11 shared
+> (Expo SDK 57 / React Native, `apps/mobile`) — sit on top of 11 shared
 > `packages/*` libraries. All RBAC-relevant permission logic now lives in the
 > platform-neutral **`@dubgrid/authz`** package (`ROLE_LEVEL`, `ALL_PERMS` /
 > `READ_ONLY_PERMS`, `VIEW_IMPLICATIONS` / `applyViewImplications`,

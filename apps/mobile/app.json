@@ -16,6 +16,7 @@
       }
     },
     "plugins": [
+      "./plugins/with-scene-lifecycle",
       "expo-router",
       "expo-secure-store",
       [

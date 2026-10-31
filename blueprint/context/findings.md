@@ -55,14 +55,14 @@
 **Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
 **Resolution:**
 
-### F-123 [P3] open - Metro's image-size copies stay vulnerable until the Expo SDK upgrade
+### F-123 [P3] fixed - Metro's image-size copies stay vulnerable until the Expo SDK upgrade
 
 **File:** `package-lock.json` (`apps/mobile/node_modules/expo/node_modules/@expo/metro/node_modules/metro/node_modules/image-size`, and the copy under `react-native > @react-native/community-cli-plugin > metro`); Dependabot alerts 193, 194
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
 **Why it matters:** image-size 1.2.1 loops forever on a crafted ICNS, JXL or HEIF file (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq). Metro uses it only to measure the app's own image assets during a bundle, so the exposure is a stalled build on a developer machine or in CI, not the shipped app or the web server. The fixed 2.0.3 is a major that measures only a buffer, while Metro 0.83.3 passes a file path, so an override would break every image asset; `@expo/metro` 54.2.0 pins metro 0.83.3 exactly, and metro 0.83.8, which drops image-size, is not taken by SDK 54. Moving only the React Native copy to 0.83.8 would leave the alert open through Expo's copy.
 **Suggested fix:** Take the next Expo SDK (its `@expo/metro` moves to metro 0.84), then drop the image-size entry from `scripts/audit-check.mjs`. Until then the allowlist entry holds, review by 2026-11-01.
 **Update 2026-10-31 (fix/dependency-audit-gate):** the allowlist entry's review date moved from 2026-11-01 to 2026-12-01, since SDK 54 still has no path to metro 0.83.8.
-**Resolution:**
+**Resolution:** Fixed on feature/56a-expo-sdk-57 (2026-10-31): Expo SDK 57 moves Metro past image-size, so `npm audit` no longer reports it and its allowlist entry is removed from `scripts/audit-check.mjs`.
 
 ### F-124 [P3] open - No upstream path clears decode-uri-component 0.2.2 in the mobile app
 
@@ -71,6 +71,7 @@
 **Why it matters:** decode-uri-component 0.2.2 decodes malformed percent-encoded input exponentially (fixed in 0.5.0). It ships in the mobile app, where it parses the app's own deep links, so the only trigger is a crafted link opened on the user's own device, which stalls that app. query-string 7 `require()`s it as CommonJS, and 0.5.0 is ESM-only, so an override would break link parsing; even the newest expo-router (57.x) still depends on query-string ^7.1.3.
 **Suggested fix:** Revisit when expo-router and React Navigation move to query-string 9.5 or later (which depends on decode-uri-component ^0.5.0), normally with an Expo SDK upgrade. Medium severity, below the `deps:audit` gate, so no allowlist entry is needed.
 **Update 2026-10-31:** GHSA-qr28-fpjm-wq7f (quadratic replacement, high, <= 0.5.0) joined the earlier advisory, putting the chain above the gate. Both are allowlisted until 2026-12-01 for the same reason: the fixes are ESM-only and query-string 7 needs CommonJS.
+**Update 2026-10-31 (56a):** Expo SDK 57 still brings query-string 7.1.3 and decode-uri-component 0.2.2, so the allowlist entry stays.
 **Resolution:**
 
 ### F-125 [P3] open - Vitest's mocker advisory needs the Vitest 4 major
@@ -98,6 +99,7 @@
 **Why it matters:** GHSA-vfj7-8cjw-p6xm (braces stack exhaustion on a nested brace pattern) has no fixed release, nor does GHSA-86w9-cpqp-85rv (node-forge accepting extra data in a PKCS#1 v1.5 signature). GHSA-hp3w-g68c-fv3c (sprintf-js) is fixed only in 1.1.4, outside argparse 1's range. Every copy is build, bundling or test tooling. The patterns and configs are our own, and the app does not use Expo code signing. So the exposure is a hostile change we review, or a crashed build, not the shipped app or the web server.
 **Suggested fix:** Take a braces or node-forge release when one ships. Otherwise take the Expo SDK upgrade (with F-123), which moves Metro and Jest. The allowlist entries hold until 2026-12-01.
 **Update 2026-10-31:** the braces and sprintf-js advisories no longer appear in `npm audit`, so their entries were removed. node-forge gained eleven advisories; its fix 1.4.1 (2026-10-27) is inside the freshness window, and the entry now says to take 1.4.2 after 2026-11-03 (review 2026-11-10).
+**Update 2026-10-31 (56a):** Expo SDK 57's `@expo/cli` still depends on node-forge 1.4.0; the entry stands.
 **Resolution:**
 
 ### F-128 [P3] open - The mobile session is stored in one SecureStore value over its 2,048-byte guidance
@@ -106,6 +108,7 @@
 **Found:** 2026-10-22 during 40e4a's simulator and emulator qualification
 **Why it matters:** Every sign-in logs Expo's warning that the value "is larger than 2048 bytes and it may not be stored successfully", and that a future SDK may throw. Today it is stored and restored: a cold start kept the session on the iOS Simulator and the Android emulator. If an SDK upgrade starts rejecting it, every sign-in would fail to persist, and people would be signed out on each launch.
 **Suggested fix:** Store the session in chunks under the 2,048-byte guidance, or keep a key in SecureStore and the encrypted session in ordinary storage, with a migration that reads the old single value. Check before the next Expo SDK upgrade (with F-123).
+**Update 2026-10-31 (56a):** expo-secure-store 57 no longer checks the value's size, so the warning is gone and nothing throws; the session survived a reinstall on the iOS Simulator. The value is still over Apple's guidance, so the finding stays open for a decision.
 **Resolution:**
 
 ### F-129 [P2] fixed - Hard page loads wait on serial edge-to-Oregon round trips in the proxy
