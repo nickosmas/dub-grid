@@ -28,7 +28,10 @@ liquid glass"):
   Add person and turns into a filled blue circle with a white icon while any
   filter is on (no count badge); the filter sheet's Schedule | Management switch is the native
   `SegmentedSwitch` (no counts, which native segmented controls can't hold);
-  and a sheet's sticky buttons sit just above the home indicator.
+  a sheet's sticky buttons sit just above the home indicator; and every
+  search field is one design (`ScreenSearch`: the system field under the large
+  title on iOS, Material's docked search bar on Android), on People and
+  Alerts, replacing the in-page `SearchBar`.
 
 Dependencies: `expo-glass-effect` ~57.0.4 and `expo-symbols` ~57.0.3 (Material
 Symbols for Android tabs), both SDK 57 pins outside the freshness window.
@@ -63,6 +66,9 @@ Symbols for Android tabs), both SDK 57 pins outside the freshness window.
   after the header's first measurement, so Home's content stayed padded for
   the shorter header and the hero card sat under it. The switch now lays out
   at its final height (40dp on Android, 32pt on iOS) from the start.
+- Known: Alerts opened straight from a link on a cold launch draws its large
+  title over the search field; opened from the bell it lays out correctly.
+  Nothing in the app links to the Alerts list today. Left for 56d.
 - The emulator ran slowly enough that Android twice killed a cold Debug start
   as unresponsive while the bundle loaded over its flaky network; not an app
   fault (no crash in the crash buffer), and Wi-Fi off fixed the network.

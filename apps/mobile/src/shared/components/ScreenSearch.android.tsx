@@ -1,13 +1,13 @@
 import { StyleSheet } from "react-native";
 import { DockedSearchBar, Host, Text } from "@expo/ui/jetpack-compose";
 import { fillMaxWidth } from "@expo/ui/jetpack-compose/modifiers";
-import { useThemeMode } from "../../../shared/providers/ThemeModeProvider";
-import type { PeopleSearchFieldProps } from "./PeopleSearchField";
+import { useThemeMode } from "../providers/ThemeModeProvider";
+import type { ScreenSearchProps } from "./ScreenSearch";
 
-export type { PeopleSearchFieldProps } from "./PeopleSearchField";
+export type { ScreenSearchProps } from "./ScreenSearch";
 
-/** Material 3's docked search bar, above the People list. */
-export function PeopleSearchField({ placeholder, onSearchChange }: PeopleSearchFieldProps) {
+/** Material 3's docked search bar, at the top of a searchable screen. */
+export function ScreenSearch({ placeholder, onSearchChange }: ScreenSearchProps) {
   const { resolvedTheme } = useThemeMode();
 
   return (

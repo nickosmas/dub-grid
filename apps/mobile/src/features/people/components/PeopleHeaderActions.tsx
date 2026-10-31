@@ -6,21 +6,15 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
 
 /**
- * People's search, filter and add in the native navigation bar: bar buttons
- * (Liquid Glass on iOS 26, Material icon buttons on Android), Filter filled
- * blue while any filter is on, and on iOS the system search field under the
- * large title. Android's search field sits above the list instead
- * (`PeopleSearchField`), since its toolbar search collapses to an icon.
+ * People's add and filter in the native navigation bar: bar buttons (Liquid
+ * Glass on iOS 26, Material icon buttons on Android), with Filter filled blue
+ * while any filter is on. Search is `ScreenSearch`, as on every screen.
  */
 export function PeopleHeaderActions({
-  searchPlaceholder,
-  onSearchChange,
   activeFilterCount,
   onOpenFilters,
   onAddPerson,
 }: {
-  searchPlaceholder: string;
-  onSearchChange: (text: string) => void;
   activeFilterCount: number;
   onOpenFilters: () => void;
   /** Omitted for someone who can't add anyone. */
@@ -35,14 +29,6 @@ export function PeopleHeaderActions({
 
   return (
     <>
-      {Platform.OS === "ios" ? (
-        <Stack.SearchBar
-          hideWhenScrolling={false}
-          placeholder={searchPlaceholder}
-          onChangeText={(event) => onSearchChange(event.nativeEvent.text)}
-          onCancelButtonPress={() => onSearchChange("")}
-        />
-      ) : null}
       {/* Add person on the leading edge, Filter on the trailing one. Android
           draws its icons to images first, so a button waits for its image
           rather than render empty. */}

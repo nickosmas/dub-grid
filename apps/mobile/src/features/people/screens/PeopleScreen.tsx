@@ -74,7 +74,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { AddPersonKindSheet, type AddPersonKind } from "../components/AddPersonKindSheet";
 import { AddPersonSheet } from "../components/AddPersonSheet";
 import { PeopleHeaderActions } from "../components/PeopleHeaderActions";
-import { PeopleSearchField } from "../components/PeopleSearchField";
+import { ScreenSearch } from "../../../shared/components/ScreenSearch";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
@@ -930,12 +930,10 @@ export default function PeopleScreen() {
 
       <PeopleHeaderActions
         activeFilterCount={activeFilterCount}
-        searchPlaceholder={isManagementTab ? "Search management" : "Search people"}
         onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
         onOpenFilters={() => setIsFilterModalVisible(true)}
-        onSearchChange={setSearchValue}
       />
-      <PeopleSearchField
+      <ScreenSearch
         placeholder={isManagementTab ? "Search management" : "Search people"}
         onSearchChange={setSearchValue}
       />
