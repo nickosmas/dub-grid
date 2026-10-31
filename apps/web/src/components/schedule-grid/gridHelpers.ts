@@ -1,3 +1,4 @@
+import { correctionReasonLabel } from "@dubgrid/domain";
 import { DRAFT_BORDER_COLORS } from "@/lib/colors";
 import { deriveAssignmentDefinitionIdsFromAssignments } from "@/lib/shift-job-segments";
 import {
@@ -315,6 +316,23 @@ export function formatPublishedMetadata(args: {
     : `Published ${publishedAtFormatter(timeZone).format(publishedAt)}`;
   const summary = `${publishedDateTime}${publisherName ? ` by ${publisherName}` : ""}.`;
   return summary;
+}
+
+/** A corrected past day as editors read it (53c): when, by whom, and the reason on its own line. */
+export function formatCorrectionLabel(args: {
+  reason: string | null;
+  correctedAt?: string | null;
+  correctedBy?: string | null;
+  resolveName?: (userId: string) => string | null;
+  timeZone?: string | null;
+}): string {
+  const { reason, correctedAt, correctedBy, resolveName, timeZone } = args;
+  const at = correctedAt ? new Date(correctedAt) : null;
+  const when =
+    at && !Number.isNaN(at.getTime()) ? ` ${publishedAtFormatter(timeZone).format(at)}` : "";
+  const name = correctedBy && resolveName ? (resolveName(correctedBy) ?? "Unknown author") : null;
+  const summary = `Corrected${when}${name ? ` by ${name}` : ""}.`;
+  return reason ? `${summary}\nReason: ${correctionReasonLabel(reason)}` : summary;
 }
 
 const PUBLISHED_AT_FORMAT: Intl.DateTimeFormatOptions = {

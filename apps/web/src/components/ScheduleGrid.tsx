@@ -29,7 +29,7 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { correctionReasonLabel, formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
+import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { isNewShiftChange, isPastDateKey, type ShiftChange } from "@dubgrid/schedule-core";
 import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
@@ -98,6 +98,7 @@ import {
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   DRAFT_BORDER_COLORS,
+  FILLED_PILL_BORDER,
   getReadableTextOnSurface,
   resolveShiftPillColors,
   toDarkPillColors,
@@ -182,6 +183,7 @@ import {
   joinedCustomTimes,
   mentoredFlagsFromPublishState,
   timeRangesFromPublishState,
+  formatCorrectionLabel,
   SINGLE_SHIFT_PILL_RADIUS,
   SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
   GRID_CELL_HEIGHT,
@@ -722,6 +724,7 @@ function ShiftDetailHoverCard({
   changeDetails,
   changes = [],
   publicationLabel,
+  correctionLabel = null,
   children,
 }: {
   enabled: boolean;
@@ -736,6 +739,8 @@ function ShiftDetailHoverCard({
   /** The cell's changes as Before and After; replaces `changeDetails` when present. */
   changes?: Array<{ view: ShiftChange; draft: boolean }>;
   publicationLabel: string | null;
+  /** A corrected past day (53c): when, by whom and why. */
+  correctionLabel?: string | null;
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
   >;
@@ -933,6 +938,18 @@ function ShiftDetailHoverCard({
                       {publicationLabel}
                     </div>
                   ) : null}
+                  {correctionLabel ? (
+                    <div
+                      data-correction-detail
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                        whiteSpace: "pre-line",
+                      }}
+                    >
+                      {correctionLabel}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {!hasRichChanges &&
@@ -940,7 +957,8 @@ function ShiftDetailHoverCard({
                   requestLabel ||
                   status ||
                   changeDetails.length > 0 ||
-                  publicationLabel) && (
+                  publicationLabel ||
+                  correctionLabel) && (
                   <div
                     style={{
                       paddingTop: 10,
@@ -968,6 +986,11 @@ function ShiftDetailHoverCard({
                     ))}
                     {changeDetails.length === 0 && publicationLabel ? (
                       <div>{publicationLabel}</div>
+                    ) : null}
+                    {correctionLabel ? (
+                      <div data-correction-detail style={{ whiteSpace: "pre-line" }}>
+                        {correctionLabel}
+                      </div>
                     ) : null}
                   </div>
                 )}
@@ -2695,11 +2718,15 @@ const SectionBlock = memo(function SectionBlock({
                         // and nothing moves into or out of it.
                         const isPastDay = isPastDateKey(dateKey, todayKey);
                         const correction = isPastDay ? corrections?.get(cellKey) : undefined;
-                        const correctionHint = correction
-                          ? correction.reason
-                            ? `Corrected: ${correctionReasonLabel(correction.reason)}`
-                            : "Corrected"
-                          : undefined;
+                        const correctionLabel = correction
+                          ? formatCorrectionLabel({
+                              reason: correction.reason,
+                              correctedAt: correction.correctedAt,
+                              correctedBy: correction.correctedBy,
+                              resolveName: resolvePublisherName,
+                              timeZone: publicationTimeZone,
+                            })
+                          : null;
                         const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
                         // The row above paints its own bottom stroke inside its
                         // own box — the header cells and the open-shifts row both
@@ -2783,8 +2810,14 @@ const SectionBlock = memo(function SectionBlock({
                             data-absence-run-index={absenceRunDay?.runIndex}
                             data-away-run={awayRunDay?.position}
                             data-away-locked={isAwayLocked ? "true" : undefined}
-                            title={awayHint ?? correctionHint}
-                            aria-description={awayHint ?? correctionHint}
+                            // A pill's hover card already says it was corrected.
+                            title={
+                              awayHint ??
+                              (shiftLabel && showShiftDetailHoverCards
+                                ? undefined
+                                : (correctionLabel ?? undefined))
+                            }
+                            aria-description={awayHint ?? correctionLabel ?? undefined}
                             data-corrected={correction ? "true" : undefined}
                             data-bulk-mode={bulkDeleteMode ? "true" : undefined}
                             data-bulk-selectable={isBulkSelectable ? "true" : undefined}
@@ -3365,13 +3398,14 @@ const SectionBlock = memo(function SectionBlock({
                                             effectiveText,
                                             themeSurface,
                                           );
-                                      // Compute effective border: draft indicators use dashed border.
-                                      const absenceBorder = absenceStripes
-                                        ? `1px solid ${absenceStripes.border}`
+                                      // Only an unfilled (cross focus area) pill is outlined;
+                                      // draft indicators still use a dashed border.
+                                      const restingBorder = singleUsesShiftColor
+                                        ? FILLED_PILL_BORDER
                                         : `1px solid ${borderColor(singleForegroundColor)}`;
                                       const effectiveBorder = singleDraftBorderKind
-                                        ? getDraftBorder(singleDraftBorderKind, absenceBorder)
-                                        : absenceBorder;
+                                        ? getDraftBorder(singleDraftBorderKind, restingBorder)
+                                        : restingBorder;
                                       const singlePillBadge =
                                         (showsDraftBadge &&
                                         (draftBadge == null || draftBadge.text === "Changed")
@@ -3475,6 +3509,7 @@ const SectionBlock = memo(function SectionBlock({
                                             changeDetails={singleHoverChangeDetails}
                                             changes={hoverChanges}
                                             publicationLabel={publicationLabel}
+                                            correctionLabel={correctionLabel}
                                           >
                                             <div
                                               data-shift-pill="single"
@@ -3506,6 +3541,9 @@ const SectionBlock = memo(function SectionBlock({
                                                           absenceStripes.stripeB,
                                                         )
                                                       : effectiveColor,
+                                                // Stripes start under the transparent border, or
+                                                // they restart at the padding edge and draw a ring.
+                                                backgroundOrigin: "border-box",
                                                 opacity: draftKind === "deleted" ? 0.5 : 1,
                                                 border: runSegment ? undefined : effectiveBorder,
                                                 borderRadius: runSegment
@@ -3948,6 +3986,7 @@ const SectionBlock = memo(function SectionBlock({
                                           changeDetails={multiHoverChangeDetails}
                                           changes={hoverChanges}
                                           publicationLabel={publicationLabel}
+                                          correctionLabel={correctionLabel}
                                         >
                                           <div
                                             style={{
@@ -4056,12 +4095,15 @@ const SectionBlock = memo(function SectionBlock({
                                                   !!pillBadge ||
                                                   (li === 0 && !!(draftBadge || publishBadge));
                                                 const pillSeam = pillSeams[shiftOrder(li)];
+                                                const restingPillBorder = multiUsesShiftColor
+                                                  ? FILLED_PILL_BORDER
+                                                  : `1px solid ${borderColor(multiForegroundColor)}`;
                                                 const pillBorder = draftPillBorderKind
                                                   ? getDraftBorder(
                                                       draftPillBorderKind,
-                                                      `1px solid ${borderColor(multiForegroundColor)}`,
+                                                      restingPillBorder,
                                                     )
-                                                  : `1px solid ${borderColor(multiForegroundColor)}`;
+                                                  : restingPillBorder;
                                                 const pillTime =
                                                   customTimes?.perPill?.[li] ??
                                                   (li === 0 && !customTimes?.perPill
@@ -4424,8 +4466,9 @@ const SectionBlock = memo(function SectionBlock({
                                                     : "var(--dg-color-bg)";
                                                   const absenceFg =
                                                     stripes?.text ?? "var(--dg-color-text-primary)";
-                                                  const absenceBorder =
-                                                    stripes?.border ?? borderColor(absenceFg);
+                                                  const absenceBorder = stripes
+                                                    ? FILLED_PILL_BORDER
+                                                    : `1px solid ${borderColor(absenceFg)}`;
                                                   const absenceSeam = pillSeams[absenceOrder];
                                                   const lastShiftTime =
                                                     customTimes?.perPill?.[labels.length - 1] ??
@@ -4445,13 +4488,14 @@ const SectionBlock = memo(function SectionBlock({
                                                         order: absenceOrder,
                                                         flex: 1,
                                                         background: absenceBg,
+                                                        backgroundOrigin: "border-box",
                                                         ...seamBorders(
                                                           restOfDayDraftDiff?.borderKind
                                                             ? getDraftBorder(
                                                                 restOfDayDraftDiff.borderKind,
-                                                                `1px solid ${absenceBorder}`,
+                                                                absenceBorder,
                                                               )
-                                                            : `1px solid ${absenceBorder}`,
+                                                            : absenceBorder,
                                                           absenceSeam,
                                                         ),
                                                         ...gapBefore(
@@ -4783,6 +4827,7 @@ const SectionBlock = memo(function SectionBlock({
                                       changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
                                       publicationLabel={publicationLabel}
+                                      correctionLabel={correctionLabel}
                                     >
                                       {deletedPill}
                                     </ShiftDetailHoverCard>

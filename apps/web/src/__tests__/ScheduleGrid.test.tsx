@@ -8,7 +8,6 @@ import ScheduleGrid, {
 } from "@/components/ScheduleGrid";
 import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { getReadableTextOnSurface } from "@/lib/colors";
-import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
 import {
   MENTORED_CORNER_CLEARANCE,
   REQUEST_FOLD_CLEARANCE,
@@ -798,7 +797,7 @@ describe("ScheduleGrid", () => {
     expect(
       Number.parseFloat(pill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
-    expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
+    expect(pill?.style.borderColor).toBe("transparent");
     expect(badge?.style.top).toBe("0px");
     expect(badge?.style.transform).toBe("translateY(-50%)");
     expect(badge?.style.left).toBe("4px");
@@ -2552,11 +2551,45 @@ describe("ScheduleGrid", () => {
       );
       expect(cells[1].dataset.corrected).toBe("true");
       expect(cells[1].querySelector("[data-correction-mark]")).not.toBeNull();
-      expect(cells[1].getAttribute("title")).toBe("Corrected: Sent home sick at 10");
-      expect(cells[2].getAttribute("title")).toBe("Corrected");
+      expect(cells[1].getAttribute("aria-description")).toBe(
+        "Corrected.\nReason: Sent home sick at 10",
+      );
+      expect(cells[2].getAttribute("aria-description")).toBe("Corrected.");
       expect(cells[0].dataset.corrected).toBeUndefined();
       // A day from today on is never marked, whatever the map holds.
       expect(cells[4].dataset.corrected).toBeUndefined();
+    });
+
+    it("says in the hover card when, by whom and why", async () => {
+      observedWidth = 1600;
+      const corrected = formatDateKey(week1[1]);
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        resolvePublisherName: () => "Mina",
+        corrections: new Map([
+          [
+            `emp-1_${corrected}`,
+            {
+              reason: "Sent home sick at 10",
+              correctedBy: "user-1",
+              correctedAt: "2024-01-09T18:30:00.000Z",
+            },
+          ],
+        ]),
+      });
+
+      const cell = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (gridCell) => gridCell.dataset.empId === "emp-1",
+      )[1];
+      // The card says it, so the cell has no native tooltip on top.
+      expect(cell.getAttribute("title")).toBeNull();
+      fireEvent.mouseEnter(cell.querySelector('[data-shift-pill="single"]')!);
+      await waitFor(() => {
+        const detail = document.querySelector("[data-correction-detail]");
+        expect(detail?.textContent).toMatch(
+          /^Corrected .* by Mina\.\nReason: Sent home sick at 10$/,
+        );
+      });
     });
   });
 
@@ -3944,7 +3977,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Changed");
-    expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
+    expect(pill?.style.borderColor).toBe("transparent");
   });
 
   it("names the published shift an absence replaced", () => {
@@ -3993,7 +4026,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
 
-  it("stripes an absence pill in its own color and borders it even when the stored border is transparent", () => {
+  it("stripes an absence pill in its own color, unoutlined, with the stripes running under its border", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -4021,10 +4054,10 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
 
-    const stripes = resolveAbsenceStripes("#FDE68A", false);
     expect(pill?.textContent).toContain("VAC");
     expect(pill?.style.background).toContain("repeating-linear-gradient(135deg");
-    expect(pill?.style.borderColor).toBe(stripes.border.replace(/,/g, ", "));
+    expect(pill?.style.borderColor).toBe("transparent");
+    expect(pill?.style.backgroundOrigin).toBe("border-box");
   });
 
   it("keeps draft time-only changes compact and shows the time badge in-cell", () => {

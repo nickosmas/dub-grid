@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
-import { toDarkPillColors, darkenColor } from "@/lib/colors";
+import { FILLED_PILL_BORDER, toDarkPillColors, darkenColor } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { CORRECTION_REASON_MAX_LENGTH, indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
@@ -187,6 +187,8 @@ interface ShiftEditPanelProps {
   } | null;
   /** Why a past day opens read-only for this person (53b). */
   pastDayNotice?: string | null;
+  /** A corrected past day (53c): when, by whom and why. */
+  correctedLabel?: string | null;
   /** True when the underlying cell changed externally while the panel was open. */
   isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
@@ -359,6 +361,9 @@ const shiftEditCardHeaderRadius = "var(--dg-radius-md)";
 const shiftEditCardOuterRadius = `calc(${shiftEditCardHeaderRadius} + ${SHIFT_EDIT_CARD_INSET + SHIFT_EDIT_CARD_BORDER}px)`;
 const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
 
+// The panel's larger pills draw a 1.5px edge; a filled one keeps the width, unseen.
+const FILLED_PANEL_PILL_BORDER = "1.5px solid transparent";
+
 function getPanelDiffBorder(args: { diffKind: ShiftDiffBorderKind; fallback: string }): string {
   const { diffKind, fallback } = args;
   if (diffKind === "new") {
@@ -426,6 +431,7 @@ export default function ShiftEditPanel({
   onConfirmDraft,
   correction = null,
   pastDayNotice = null,
+  correctedLabel = null,
   isStale = false,
   focusAreas = [],
   certifications = [],
@@ -3110,9 +3116,10 @@ export default function ShiftEditPanel({
         <div
           style={{
             background: atResolved.background,
+            backgroundOrigin: "border-box",
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
-              fallback: `1.5px solid ${atResolved.border}`,
+              fallback: FILLED_PANEL_PILL_BORDER,
             }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
@@ -3187,7 +3194,7 @@ export default function ShiftEditPanel({
             background: s.color,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
-              fallback: `1.5px solid ${darkenColor(s.color, 0.25)}`,
+              fallback: FILLED_PANEL_PILL_BORDER,
             }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
@@ -3316,7 +3323,7 @@ export default function ShiftEditPanel({
                 data-shift-edit-card-header={i}
                 style={{
                   background: s.color,
-                  border: `1px solid ${darkenColor(s.color, 0.2)}`,
+                  border: FILLED_PILL_BORDER,
                   minHeight: 44,
                   padding: isNameMode ? "10px 12px" : "8px 12px",
                   display: "flex",
@@ -4392,6 +4399,20 @@ export default function ShiftEditPanel({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
+          {correctedLabel && (
+            <p
+              data-correction-notice
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                lineHeight: 1.45,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {correctedLabel}
+            </p>
+          )}
           {pastDayNotice && (
             <p
               data-past-day-notice

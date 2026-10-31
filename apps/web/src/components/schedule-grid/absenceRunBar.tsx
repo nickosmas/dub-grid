@@ -3,6 +3,7 @@ import { formatAbsenceRunLabel } from "@dubgrid/schedule-core";
 import type { CSSProperties } from "react";
 import { awayRunLabel } from "./awayRuns";
 import { gridFitLine } from "./gridFit";
+import { FILLED_PILL_BORDER } from "@/lib/colors";
 import { SINGLE_SHIFT_PILL_RADIUS } from "./gridHelpers";
 
 interface AbsenceRunBarProps {
@@ -41,7 +42,7 @@ export function AbsenceRunBar({
       style={{
         ...runBarFrame({ top, bottom, left, length, sideInset }),
         background: absenceStripeCss(stripes.stripeA, stripes.stripeB),
-        border: `1px solid ${stripes.border}`,
+        border: FILLED_PILL_BORDER,
         color: stripes.text,
       }}
     >
@@ -61,6 +62,9 @@ function runBarFrame({ top, bottom, left, length, sideInset }: RunBarFrame): CSS
     left,
     right: `calc(${-(length - 1)} * 100% + ${sideInset}px)`,
     borderRadius: SINGLE_SHIFT_PILL_RADIUS,
+    // Stripes start under the transparent border, or they restart at the
+    // padding edge and draw a ring.
+    backgroundOrigin: "border-box",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -103,7 +107,7 @@ export function AwayRunBar(
       style={{
         ...runBarFrame(props),
         background: "var(--dg-color-bg-secondary)",
-        border: "1px solid var(--dg-color-border)",
+        border: FILLED_PILL_BORDER,
         color: "var(--dg-color-text-secondary)",
       }}
     >
