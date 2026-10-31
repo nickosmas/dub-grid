@@ -1,48 +1,20 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 // Marketing pages render on the canonical apex. This explicit target keeps the
 // test independent of whichever origin authenticated-flow tests use.
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const apexURL = `http://${baseDomain}:${port}/`;
-// next/image resizes each large screenshot on its first request, and on a
-// loaded CI runner that has taken longer than the default 5s poll (four of six
-// requests still pending in a failed run). Production serves them from cache.
-const IMAGE_POLL = { timeout: 30_000 } as const;
-const IMAGE_FETCH = { timeout: 30_000 } as const;
-const LANDING_IMAGE_PATH = /^\/landing\/screenshots\/[a-z-]+\.png$/;
-const screenshotAlts = [
-  "Calm Haven's two-week staff schedule in DubGrid",
-  "Calm Haven's scheduling dashboard with coverage and shift summaries",
-  "Calm Haven's team directory in DubGrid",
+// Every picture on the page is drawn in code, the hero's schedule included.
+const heroSchedule = "A two-week staff schedule in DubGrid";
+const illustrationSections = [
+  ["Stop building schedules by hand", /Generate schedule fills next week/],
+  ["Never get caught short-staffed", /open evening shift is filled/],
+  ["No more swap texts and sticky notes", /Jordan accepts Sam's swap/],
+  ["No more “nobody told me”", /schedule for Tuesday changed/],
+  ["Catch overtime before it happens", /nobody goes over 40/],
+  ["The right people make the right changes", /billing stays with Super Admins/],
 ] as const;
-const mobileHomeAlt =
-  "The DubGrid mobile Home tab with this week's shifts and coverage for Calm Haven";
-
-test.beforeEach(async ({ page }) => {
-  await page.route("**/_next/image?**", async (route) => {
-    const source = new URL(route.request().url()).searchParams.get("url");
-    if (!source || !LANDING_IMAGE_PATH.test(source)) {
-      await route.continue();
-      return;
-    }
-
-    await route.fulfill({ path: `apps/web/public${source}` });
-  });
-});
-
-async function expectOptimizerImage(page: Page, request: APIRequestContext, alt: string) {
-  const image = page.getByAltText(alt);
-  const source = await image.evaluate((element) => {
-    if (!(element instanceof HTMLImageElement)) return null;
-    return element.currentSrc;
-  });
-
-  expect(source).toContain("/_next/image?");
-  const response = await request.get(source!, IMAGE_FETCH);
-  expect(response.status()).toBe(200);
-  expect(response.headers()["content-type"]).toMatch(/^image\//);
-}
 
 test("landing page renders the public DubGrid surface", async ({ page }) => {
   test.setTimeout(120_000);
@@ -53,38 +25,9 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
     page.getByRole("heading", { name: "Scheduling, done right. Ditch the spreadsheet." }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "See Features" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "See how it works" })).toBeVisible();
 
-  for (const alt of screenshotAlts) {
-    const screenshot = page.getByAltText(alt);
-    await screenshot.evaluate((image) => image.scrollIntoView({ block: "center" }));
-    await expect(screenshot).toBeVisible();
-    await expect
-      .poll(
-        () =>
-          screenshot.evaluate(
-            (image) =>
-              image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
-          ),
-        IMAGE_POLL,
-      )
-      .toBe(true);
-    await expect
-      .poll(
-        () =>
-          screenshot.evaluate((image) =>
-            image instanceof HTMLImageElement
-              ? new URL(image.currentSrc).searchParams.get("q")
-              : null,
-          ),
-        IMAGE_POLL,
-      )
-      .toBe("95");
-
-    await expectOptimizerImage(page, page.request, alt);
-  }
-
-  await expectOptimizerImage(page, page.request, mobileHomeAlt);
+  await expect(page.getByRole("img", { name: heroSchedule })).toBeVisible();
 
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(
@@ -92,8 +35,27 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
     "rgb(255, 255, 255)",
   );
 
-  await expect(page.locator(".landing-cta")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(page.locator(".landing-cta")).toHaveCSS("box-shadow", "none");
+  for (const [heading, illustration] of illustrationSections) {
+    const section = page.locator("section").filter({
+      has: page.getByRole("heading", { level: 2, name: heading }),
+    });
+    await section.scrollIntoViewIfNeeded();
+    await expect(section.getByRole("img", { name: illustration })).toBeVisible();
+  }
+
+  const security = page.locator("#security");
+  await security.scrollIntoViewIfNeeded();
+  // Wide enough for every card in one row, so there is nothing to page through.
+  await expect(security.getByRole("listitem")).toHaveCount(5);
+  for (const card of await security.getByRole("listitem").all()) {
+    await expect(card).toBeInViewport({ ratio: 1 });
+  }
+  await expect(security.getByRole("button", { name: "Next" })).toHaveCount(0);
+
+  await expect(page.locator(".landing-cta")).toHaveCSS(
+    "background-image",
+    /linear-gradient\(140deg, rgb\(11, 45, 117\)/,
+  );
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -103,7 +65,9 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
 test.describe("landing page at mobile width", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("keeps the hero controls and screenshot assets within the viewport", async ({ page }) => {
+  test("keeps the hero controls, screenshot and illustrations within the viewport", async ({
+    page,
+  }) => {
     await page.goto(apexURL);
 
     await expect(
@@ -111,9 +75,12 @@ test.describe("landing page at mobile width", () => {
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Theme:/ })).toBeVisible();
-    await expect(page.getByAltText(screenshotAlts[0])).toBeVisible();
+    await expect(page.getByRole("img", { name: heroSchedule })).toBeVisible();
+    for (const [heading] of illustrationSections) {
+      await expect(page.getByRole("heading", { level: 2, name: heading })).toBeVisible();
+    }
     await expect(
-      page.getByRole("heading", { name: "Security that stays out of your way" }),
+      page.getByRole("heading", { name: "Your team's information stays protected" }),
     ).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -134,25 +101,11 @@ test("landing header and hero stay readable in dark mode", async ({ page }) => {
   await expect(page.locator(".landing-hero h1")).toBeVisible();
   await expect(page.getByRole("button", { name: /Theme:/ })).toBeVisible();
 
-  for (const alt of screenshotAlts) {
-    const screenshot = page.getByAltText(alt);
-    await screenshot.evaluate((image) => image.scrollIntoView({ block: "center" }));
-    await expect
-      .poll(
-        () =>
-          screenshot.evaluate(
-            (image) =>
-              image instanceof HTMLImageElement &&
-              decodeURIComponent(image.currentSrc).includes("-dark"),
-          ),
-        IMAGE_POLL,
-      )
-      .toBe(true);
-
-    await expectOptimizerImage(page, page.request, alt);
-  }
-
-  await expectOptimizerImage(page, page.request, mobileHomeAlt);
+  await expect(page.getByRole("img", { name: heroSchedule })).toBeVisible();
+  await expect(page.locator('.hero-sched-chip[data-kind="day"]').first()).toHaveCSS(
+    "color",
+    "rgb(165, 243, 252)",
+  );
 
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS("border-top-width", "8px");
   await expect(page.locator(".landing-screenshot").first()).toHaveCSS(

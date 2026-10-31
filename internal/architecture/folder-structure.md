@@ -88,7 +88,7 @@ apps/web/
 │   │   ├── auth/               # AuthCard, EmailPasswordForm, StepUpDialog, TermsAcceptanceCard, ...
 │   │   ├── dashboard/          # DashboardView, role dashboards, cards, expanded/ detail views
 │   │   ├── gridmaster/         # Gridmaster portal views, organization-detail/, organization-setup/
-│   │   ├── landing/            # Landing page mockups and screenshots
+│   │   ├── landing/            # Landing page illustrations and the hero screenshot
 │   │   ├── onboarding/         # OnboardingGate, OnboardingWizard, WizardShell, steps/, SetupPendingScreen
 │   │   ├── organization/       # Location fields, timezone select, change review
 │   │   ├── profile/            # ProfilePage, MFASetup, MFAVerify, SessionList, CalendarSubscriptionCard

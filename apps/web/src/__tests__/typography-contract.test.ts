@@ -173,7 +173,7 @@ const documentedMicroTextCounts = {
 };
 
 const documentedHeavyWeightCounts = {
-  "app/page.tsx": 7,
+  "app/page.tsx": 3,
 };
 
 const documentedUppercaseStyleCounts = {
