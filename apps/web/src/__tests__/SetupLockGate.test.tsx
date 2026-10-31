@@ -343,7 +343,7 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     expect(await screen.findByText("Protected app")).toBeInTheDocument();
-    expect(screen.queryByText("Opening your organization")).not.toBeInTheDocument();
+    expect(screen.queryByText("Getting things ready")).not.toBeInTheDocument();
   });
 
   it("waits for matching bootstrap data before applying another org's admission state", async () => {
@@ -764,7 +764,7 @@ describe("OnboardingGate sign-in handoff", () => {
     mockPermissions.isLoading = false;
     rerenderGate();
     expect(screen.getByRole("main")).toBe(splash);
-    expect(splash).toHaveTextContent("Opening your organization");
+    expect(splash).toHaveTextContent("Getting things ready");
 
     orgReady();
     rerenderGate();

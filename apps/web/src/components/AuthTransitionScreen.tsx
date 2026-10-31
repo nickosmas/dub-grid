@@ -20,11 +20,11 @@ const PHASE_COPY: Record<TransitionPhase, { title: string; detail: string }> = {
     detail: "This usually takes a few seconds.",
   },
   workspace: {
-    title: "Opening your organization",
+    title: "Getting things ready",
     detail: "This usually takes a few seconds.",
   },
   onboarding: {
-    title: "Setting up your organization",
+    title: "Setting things up",
     detail: "This usually takes a few seconds.",
   },
 };
@@ -74,7 +74,7 @@ export default function AuthTransitionScreen({
   const detail = offline
     ? "You’re offline. We’ll continue when you’re connected again."
     : isSlow
-      ? "This is taking a little longer than usual. We’re still getting things ready."
+      ? "This is taking a little longer than usual. It’s still loading."
       : copy.detail;
 
   // Hidden rather than unrendered, so the screen keeps its accessible name and
