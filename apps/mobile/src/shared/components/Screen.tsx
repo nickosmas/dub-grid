@@ -21,7 +21,10 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import {
+  KeyboardAwareScrollView,
+  type KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
 import { Pressable } from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
@@ -212,13 +215,14 @@ export function Screen<T = never>({
     insets.bottom,
     nativeTabBarVisible,
   );
-  const internalScrollViewRef = useRef<ScrollView>(null);
+  const internalScrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   const internalListRef = useRef<FlatList<T>>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was
   // when the handle was created.
   const stickyHeaderHeightRef = useRef(0);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
+  const settleUnderHeaderRef = useRef(false);
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
@@ -284,6 +288,21 @@ export function Screen<T = never>({
       }) as unknown as ScreenScrollHandle,
     [isIosStickyHeader],
   );
+  // The first header measurement scrolls the content to sit just under it. It
+  // waits for the render that applies the new contentInset: React Native 0.86
+  // clamps a programmatic scroll to the current inset, so scrolling to
+  // -height before the inset lands is clamped to 0 and the page opens with
+  // its top hidden under the header.
+  useEffect(() => {
+    if (!settleUnderHeaderRef.current || stickyHeaderHeight === 0) return;
+    settleUnderHeaderRef.current = false;
+    const frame = requestAnimationFrame(() => {
+      internalListRef.current?.scrollToOffset({ offset: -stickyHeaderHeight, animated: false });
+      internalScrollViewRef.current?.scrollTo({ x: 0, y: -stickyHeaderHeight, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [stickyHeaderHeight]);
+
   useEffect(() => {
     if (scrollViewRef) {
       (scrollViewRef as MutableRefObject<ScreenScrollHandle | null>).current = scrollHandle;
@@ -464,11 +483,10 @@ export function Screen<T = never>({
               // mount, ahead of this native layout callback), the translation
               // above had nothing to subtract yet and was a no-op, leaving
               // content sitting under the header with no visible correction.
-              // Self-correct once, right here, the moment the real height is
-              // known, regardless of what any caller already tried.
+              // Self-correct once the real height is known and applied (the
+              // effect above), regardless of what any caller already tried.
               if (isIosStickyHeader && stickyHeaderHeight === 0) {
-                internalListRef.current?.scrollToOffset({ offset: -nextHeight, animated: false });
-                internalScrollViewRef.current?.scrollTo({ x: 0, y: -nextHeight, animated: false });
+                settleUnderHeaderRef.current = true;
               }
               stickyHeaderHeightRef.current = nextHeight;
               setStickyHeaderHeight(nextHeight);
@@ -630,7 +648,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // too would just be clipped by this view's own `overflow: "hidden"`.
     },
     overlayLayer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 20,
       elevation: 20,
     },

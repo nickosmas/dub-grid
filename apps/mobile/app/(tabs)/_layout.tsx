@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ParamListBase } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { ParamListBase } from "expo-router/react-navigation";
+import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { useNavigation, type ErrorBoundaryProps } from "expo-router";
-import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
+
+const { Icon, Label, VectorIcon } = NativeTabs.Trigger;
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
 import { NativeTabBarPresenceProvider } from "../../src/shared/navigation/NativeTabBarPresence";
@@ -71,13 +73,7 @@ export default function TabsLayout() {
       ? [
           <NativeTabs.Trigger key="team" name="team">
             <Label>Schedule</Label>
-            <Icon
-              androidSrc={{
-                default: <VectorIcon family={Ionicons} name="calendar-outline" />,
-                selected: <VectorIcon family={Ionicons} name="calendar" />,
-              }}
-              sf={{ default: "calendar", selected: "calendar" }}
-            />
+            <Icon sf={{ default: "calendar", selected: "calendar" }} />
           </NativeTabs.Trigger>,
         ]
       : []),
@@ -86,10 +82,6 @@ export default function TabsLayout() {
           <NativeTabs.Trigger key="requests" name="requests">
             <Label>Requests</Label>
             <Icon
-              androidSrc={{
-                default: <VectorIcon family={Ionicons} name="swap-horizontal-outline" />,
-                selected: <VectorIcon family={Ionicons} name="swap-horizontal" />,
-              }}
               sf={{
                 default: "arrow.left.arrow.right",
                 selected: "arrow.left.arrow.right.circle.fill",
@@ -100,21 +92,11 @@ export default function TabsLayout() {
       : []),
     <NativeTabs.Trigger key="people" name="people">
       <Label>People</Label>
-      <Icon
-        androidSrc={{
-          default: <VectorIcon family={Ionicons} name="people-outline" />,
-          selected: <VectorIcon family={Ionicons} name="people" />,
-        }}
-        sf={{ default: "person.2", selected: "person.2.fill" }}
-      />
+      <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
     </NativeTabs.Trigger>,
     <NativeTabs.Trigger key="profile" name="profile">
       <Label>Profile</Label>
       <Icon
-        androidSrc={{
-          default: <VectorIcon family={Ionicons} name="person-circle-outline" />,
-          selected: <VectorIcon family={Ionicons} name="person-circle" />,
-        }}
         sf={{
           default: "person.crop.circle",
           selected: "person.crop.circle.fill",

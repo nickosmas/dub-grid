@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigation, usePreventRemove } from "@react-navigation/native";
+import { useNavigation, usePreventRemove } from "expo-router/react-navigation";
 import type { UnsavedChangesGuard } from "./useUnsavedChangesGuard";
 
 type NavigationAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]["data"]["action"];

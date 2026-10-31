@@ -40,7 +40,7 @@ DubGrid is an **npm workspaces** monorepo orchestrated by **Turborepo** (Node 22
 | Workspace                  | Package                    | Description                                                                                           |
 | -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `apps/web`                 | `@dubgrid/web`             | Next.js 16 App Router web application                                                                 |
-| `apps/mobile`              | `@dubgrid/mobile`          | Expo SDK 54 / React Native mobile application (Expo Router)                                           |
+| `apps/mobile`              | `@dubgrid/mobile`          | Expo SDK 57 / React Native mobile application (Expo Router)                                           |
 | `packages/domain`          | `@dubgrid/domain`          | Platform-neutral domain types, enums, and pure logic (RBAC, billing, requests, self-action guards)    |
 | `packages/contracts`       | `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts                                              |
 | `packages/db-types`        | `@dubgrid/db-types`        | Database-row TypeScript types                                                                         |
@@ -77,7 +77,7 @@ All eleven packages are private `0.1.0`, ESM, and build via `tsc` to `dist/`. `a
 
 | Layer     | Technology                                                                             |
 | --------- | -------------------------------------------------------------------------------------- |
-| Framework | Expo SDK 54, React Native                                                              |
+| Framework | Expo SDK 57, React Native                                                              |
 | Routing   | Expo Router                                                                            |
 | Backend   | Talks only to `apps/web` `/api/mobile/v1/*` (base URL `EXPO_PUBLIC_API_BASE_URL`)      |
 | HTTP      | `@dubgrid/api-client` primitives — 15s timeout, bearer auth, Zod response parsing      |

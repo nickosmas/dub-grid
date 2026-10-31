@@ -35,21 +35,6 @@ import { execFileSync } from "node:child_process";
  */
 const ALLOWLIST = [
   {
-    ids: ["GHSA-w3rx-r6r6-pgpr", "GHSA-5p2g-fcmc-qvqq"],
-    package: "image-size",
-    reviewBy: "2026-12-01",
-    reason:
-      "Infinite loops in the ICNS/JXL/HEIF parsers, reachable only by parsing a malicious image. " +
-      "image-size is a build-time dependency of Metro, which bundles the mobile app's own asset " +
-      "files on a developer machine or in CI; it is not in the shipped app and not in the web " +
-      "server, so a denial of service there stops a build we control rather than anything a user " +
-      "or attacker can reach. The fix, 2.0.3, is a major version that Metro cannot take: image-size " +
-      "2 measures only a buffer, and Metro 0.83.3 passes it a file path, so an override would break " +
-      "every image asset. Expo SDK 54's @expo/metro 54.2.0 pins metro 0.83.3 exactly (metro 0.83.8 " +
-      "drops image-size, but SDK 54 does not take it). Re-dated on 2026-10-31 from 2026-11-01: " +
-      "still no SDK 54 path. Revisit with the Expo SDK upgrade (F-123).",
-  },
-  {
     ids: ["GHSA-qxc2-j82w-r537"],
     package: "@faker-js/faker",
     reviewBy: "2026-12-01",

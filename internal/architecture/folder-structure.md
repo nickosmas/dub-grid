@@ -6,7 +6,7 @@ DubGrid is an npm workspaces monorepo orchestrated by Turborepo. There are two a
 dub-grid/
 ├── apps/
 │   ├── web/          # @dubgrid/web — Next.js 16 / React 19 / Tailwind v4
-│   └── mobile/       # @dubgrid/mobile — Expo SDK 54 / React Native
+│   └── mobile/       # @dubgrid/mobile — Expo SDK 57 / React Native
 ├── packages/         # 11 platform-neutral shared workspaces
 ├── supabase/         # Supabase config, ordered migrations, seed SQL, compiled auth templates
 ├── e2e/              # Playwright specs and helpers (route states, role variance, auth qualification)

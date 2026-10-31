@@ -858,7 +858,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.md,
     },
     switchOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       alignItems: "center",
       justifyContent: "center",
       gap: mobileSpace.md,

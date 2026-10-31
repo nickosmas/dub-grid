@@ -43,7 +43,7 @@ DubGrid is an active, full-stack monorepo rather than a starter application. The
 | SSR            | @supabase/ssr v0.9                                                                                    |
 | State          | [TanStack React Query v5](https://tanstack.com/query)                                                 |
 | Drag & Drop    | @dnd-kit/core                                                                                         |
-| Mobile         | [Expo](https://expo.dev) SDK 54 + React Native (Expo Router)                                          |
+| Mobile         | [Expo](https://expo.dev) SDK 57 + React Native (Expo Router)                                          |
 | Email          | [Resend](https://resend.com)                                                                          |
 | Billing        | [Stripe](https://stripe.com) (subscriptions + webhooks)                                               |
 | Rate Limiting  | [@upstash/ratelimit](https://upstash.com) + Redis                                                     |
