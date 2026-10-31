@@ -275,9 +275,6 @@ export default function RootPage() {
             <Link href="/request-demo" className="landing-hero-primary dg-btn dg-btn-lg">
               Request Demo
             </Link>
-            <a href="#how-it-works" className="landing-hero-secondary dg-btn dg-btn-lg">
-              See how it works
-            </a>
           </div>
         </div>
       </section>

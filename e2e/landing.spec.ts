@@ -25,7 +25,6 @@ test("landing page renders the public DubGrid surface", async ({ page }) => {
     page.getByRole("heading", { name: "Scheduling, done right. Ditch the spreadsheet." }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "See how it works" })).toBeVisible();
 
   await expect(page.getByRole("img", { name: heroSchedule })).toBeVisible();
 
