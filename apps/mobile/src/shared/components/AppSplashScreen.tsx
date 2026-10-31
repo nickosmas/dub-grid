@@ -80,7 +80,7 @@ const createStyles = (mobileColors: MobileColors) =>
     // Whole screen, not the safe area: the launch image ignores insets, and a
     // centered box that also held the wordmark would push the mark up.
     center: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       alignItems: "center",
       justifyContent: "center",
     },

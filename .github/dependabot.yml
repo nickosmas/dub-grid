@@ -20,7 +20,7 @@ updates:
       semver-major-days: 14
     open-pull-requests-limit: 5
     ignore:
-      # Expo SDK 54 owns these versions. They move together at SDK-upgrade time
+      # The Expo SDK owns these versions. They move together at SDK-upgrade time
       # via `npx expo install --check`, never one at a time from a bot PR, and
       # react-native's 0.x line makes an SDK-breaking jump (0.81 -> 0.87) look
       # like a routine minor to Dependabot, which is how it reached the

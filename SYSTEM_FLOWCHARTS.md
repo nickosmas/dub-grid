@@ -1311,7 +1311,7 @@ flowchart TD
 flowchart TD
     subgraph Apps["apps/"]
         WEB["@dubgrid/web\nNext.js 16 App Router\nReact 19, Tailwind v4"]
-        MOBILE["@dubgrid/mobile\nExpo SDK 54 / React Native\nExpo Router"]
+        MOBILE["@dubgrid/mobile\nExpo SDK 57 / React Native\nExpo Router"]
     end
 
     subgraph Packages["packages/"]

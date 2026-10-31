@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     // Both, deliberately: iOS orders siblings by tree position and honours
     // zIndex, Android reorders them by elevation and ignores zIndex once any
     // sibling has one. The splash root paints an opaque background, which

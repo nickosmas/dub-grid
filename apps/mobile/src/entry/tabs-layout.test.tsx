@@ -64,8 +64,6 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
   const Trigger = ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", {}, children);
 
-  NativeTabs.Trigger = Trigger;
-
   const Label = ({ children }: { children: React.ReactNode }) =>
     React.createElement("span", {}, children);
 
@@ -76,7 +74,9 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
 
   const VectorIcon = (props: Record<string, unknown>) => React.createElement("div", props);
 
-  return { Icon, Label, NativeTabs, VectorIcon };
+  NativeTabs.Trigger = Object.assign(Trigger, { Icon, Label, VectorIcon });
+
+  return { NativeTabs };
 });
 
 vi.mock("../shared/components/AppSplashScreen", async () => {
@@ -225,7 +225,7 @@ describe("TabsLayout", () => {
     expect(nativeTabsLabelStyles.at(-1)).toEqual(nativeTabsLabelStyles.at(-2));
   });
 
-  it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
+  it("uses SF symbols for the native tabs, with Home drawn from its own icon", () => {
     render(<TabsLayout />);
 
     expect(triggerIconMock).toHaveBeenCalledTimes(5);
@@ -234,13 +234,9 @@ describe("TabsLayout", () => {
 
     expect(homeProps).toMatchObject({ src: expect.any(Object) });
     expect(homeProps).not.toHaveProperty("sf");
-    expect(homeProps).not.toHaveProperty("androidSrc");
 
     for (const props of restProps) {
-      expect(props).toMatchObject({
-        androidSrc: expect.any(Object),
-        sf: expect.any(Object),
-      });
+      expect(props).toMatchObject({ sf: expect.any(Object) });
       expect(props).not.toHaveProperty("src");
     }
   });

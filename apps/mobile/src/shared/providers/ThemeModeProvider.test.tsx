@@ -174,7 +174,7 @@ describe("ThemeModeProvider", () => {
     expect(setColorScheme).toHaveBeenCalledWith("dark");
   });
 
-  it("passes null to Appearance.setColorScheme when switching back to system", async () => {
+  it("passes unspecified to Appearance.setColorScheme when switching back to system", async () => {
     render(
       <ThemeModeProvider>
         <ThemeProbe />
@@ -189,6 +189,6 @@ describe("ThemeModeProvider", () => {
       fireEvent.click(screen.getByText("Set system"));
     });
 
-    expect(setColorScheme).toHaveBeenCalledWith(null);
+    expect(setColorScheme).toHaveBeenCalledWith("unspecified");
   });
 });

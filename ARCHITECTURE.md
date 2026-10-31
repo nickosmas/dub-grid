@@ -11,7 +11,7 @@ DubGrid is a **monorepo** — npm workspaces orchestrated by Turborepo — conta
 ```
 ┌──────────────────────────────┐      ┌──────────────────────────────┐
 │   apps/web  (browser)        │      │   apps/mobile (Expo / RN)    │
-│   Next.js 16 · React 19      │      │   Expo SDK 54 · Expo Router  │
+│   Next.js 16 · React 19      │      │   Expo SDK 57 · Expo Router  │
 │   Tailwind v4 · React Query  │      │   React Query · @dubgrid/    │
 │   @dnd-kit                   │      │   api-client + contracts     │
 └──────────────┬───────────────┘      └──────────────┬───────────────┘
@@ -57,7 +57,7 @@ DubGrid uses **npm workspaces** (`apps/*`, `packages/*`) orchestrated by **Turbo
 | Workspace | Package name      | Stack                                        | Path          |
 | --------- | ----------------- | -------------------------------------------- | ------------- |
 | Web       | `@dubgrid/web`    | Next.js 16 App Router, React 19, Tailwind v4 | `apps/web`    |
-| Mobile    | `@dubgrid/mobile` | Expo SDK 54, React Native, Expo Router       | `apps/mobile` |
+| Mobile    | `@dubgrid/mobile` | Expo SDK 57, React Native, Expo Router       | `apps/mobile` |
 
 ### Shared Packages
 
@@ -414,7 +414,7 @@ Tailwind v4 is the foundation, layered with shared style modules and `@dubgrid/d
 
 ## 7. Mobile App Architecture (`apps/mobile`)
 
-The mobile app is an **Expo SDK 54 / React Native** app using **Expo Router**. It is a thin client: all business logic and data access stay in the web app.
+The mobile app is an **Expo SDK 57 / React Native** app using **Expo Router**. It is a thin client: all business logic and data access stay in the web app.
 
 ### Routing
 
@@ -494,7 +494,7 @@ DubGrid uses Supabase Realtime for three purposes:
 
 ### Mobile (apps/mobile)
 
-- Built and distributed via Expo (bundle id / package `com.dubgrid.mobile`, scheme `dubgridmobile`). Configured against a deployed web app through `EXPO_PUBLIC_API_BASE_URL`. Push notifications delivered via Expo's push service. `react-native-screens` is pinned above Expo SDK 54's version for the iOS 26 native back button fix.
+- Built and distributed via Expo (bundle id / package `com.dubgrid.mobile`, scheme `dubgridmobile`). Configured against a deployed web app through `EXPO_PUBLIC_API_BASE_URL`. Push notifications delivered via Expo's push service. iOS builds adopt the UIScene life cycle through `apps/mobile/plugins/with-scene-lifecycle.js`, which UIKit requires for apps linked against the iOS 27 SDK.
 
 ### Third-Party Integrations
 

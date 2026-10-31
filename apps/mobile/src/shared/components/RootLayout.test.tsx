@@ -78,7 +78,7 @@ vi.mock("../../features/auth/components/TwoFactorReenrollGate", async () => {
   };
 });
 
-vi.mock("@react-navigation/native", async () => {
+vi.mock("expo-router/react-navigation", async () => {
   const React = await import("react");
 
   return {

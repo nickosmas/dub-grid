@@ -2,7 +2,7 @@
 
 Scope: `apps/mobile`, package `@dubgrid/mobile`.
 
-Expo SDK 54 with Expo Router. File-based routes in `apps/mobile/app`.
+Expo SDK 57 with Expo Router. File-based routes in `apps/mobile/app`.
 Feature code in `apps/mobile/src`.
 
 ## Verified Commands
@@ -414,9 +414,10 @@ Sheets have a grabber, 40pt top corners, and extend to the bottom edge.
   than the person, so it is a text-only `createHeaderTextAction` in the
   navigation bar, cleared while an inline editor's footer owns Save and
   Cancel. It rides in `headerRight`, which iOS 26 wraps in the same Liquid
-  Glass capsule as the back button; native-stack's `unstable_headerRightItems`
-  would be the textbook route but comes up as an empty capsule on the pinned
-  react-native-screens 4.17 (it sends `title`, screens 4.17 reads `label`).
+  Glass capsule as the back button. On SDK 54 native-stack's
+  `unstable_headerRightItems` came up as an empty capsule (react-native-screens
+  4.17 read `label` where it sent `title`); screens 4.26 on SDK 57 reads both,
+  so 56c may move bar actions to native bar button items.
   The management actions (invitation, schedule, management access, status)
   end the page in `ProfileActionStack`, full width one under the other, in
   web's staff-panel order: access first, status last. Keep the pair out of
@@ -680,10 +681,14 @@ withTiming(1, timing("emphasized", 200)) }))` throws `timing is not a function
   detail hides employment, account, and contact sections and the access pill for
   a viewer without employee-details permission, and the API redacts the fields.
   Who published a shift is withheld from a viewer who cannot open publish history.
-- `react-native-screens` is pinned to 4.17.x above Expo SDK 54's own pin for the
-  iOS 26 native back button (upstream #3294); it is excluded from `expo install
---check` on purpose and needs a dev-client rebuild. Never draw a JS back button
-  on iOS: the glass capsule double-wraps it.
+- `react-native-screens` follows Expo SDK 57's pin (4.26), which carries the
+  iOS 26 native back button fix (upstream #3294) that once needed a pin above
+  the SDK's. Never draw a JS back button on iOS: the glass capsule double-wraps
+  it.
+- iOS adopts the UIScene life cycle through `plugins/with-scene-lifecycle.js`
+  (Expo 57 ships `EXExpoAppSceneDelegate`, but its template doesn't use it).
+  UIKit refuses to launch an app linked against the iOS 27 SDK without it.
+  Prebuild fails loudly if the AppDelegate template it edits changes.
 - Use existing shared primitives before adding new components.
 - Avoid layout changes outside the requested screen or component.
 

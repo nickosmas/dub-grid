@@ -1,4 +1,4 @@
-import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
+import { ThemeProvider as NavigationThemeProvider } from "expo-router/react-navigation";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -223,7 +223,7 @@ function RootLayoutSurface({
           No `statusBarTranslucent` / `navigationBarTranslucent` /
           `preserveEdgeToEdge` here. They only apply when the library manages
           edge-to-edge itself; this app is already edge-to-edge through
-          react-native-edge-to-edge (the SDK 54 default), which owns the system
+          Expo's edge-to-edge default (since SDK 54), which owns the system
           bars, so the library ignores all three and warns on every launch if
           they are passed. The sheet's own `<Modal>` still needs its pair of
           translucency props — that is a different window and a different
