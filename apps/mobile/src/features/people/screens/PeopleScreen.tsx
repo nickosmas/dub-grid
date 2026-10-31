@@ -1,7 +1,7 @@
 import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -37,7 +37,7 @@ import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
-import { SegmentedControl } from "../../../shared/components/SegmentedControl";
+import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import {
   getAdminProfileChangeRequests,
   getManagementUsers,
@@ -74,6 +74,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { AddPersonKindSheet, type AddPersonKind } from "../components/AddPersonKindSheet";
 import { AddPersonSheet } from "../components/AddPersonSheet";
 import { PeopleHeaderActions } from "../components/PeopleHeaderActions";
+import { PeopleSearchField } from "../components/PeopleSearchField";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
@@ -672,6 +673,14 @@ export default function PeopleScreen() {
         data: rosterItems,
         keyExtractor: (item) => (item.kind === "management" ? `m-${item.user.id}` : item.person.id),
         renderItem: renderRosterItem,
+        // Under the search field the list starts close by; a People requests
+        // section above it keeps the full section gap.
+        headerGap:
+          canManageEmployees && profileRequests.length > 0
+            ? undefined
+            : Platform.OS === "android"
+              ? mobileSpace.md
+              : 0,
       }}
     >
       <FilterSheet
@@ -683,17 +692,15 @@ export default function PeopleScreen() {
         visible={isFilterModalVisible}
       >
         {canSeeManagementRoster ? (
-          <View style={styles.rosterTabs}>
-            <SegmentedControl
-              accessibilityLabel="Directory section"
-              onChange={setRosterTab}
-              options={[
-                { value: "schedule", label: "Schedule", count: visiblePeople.length },
-                { value: "management", label: "Management", count: managementUsers.length },
-              ]}
-              value={rosterTab}
-            />
-          </View>
+          <SegmentedSwitch
+            accessibilityLabel="Directory section"
+            options={[
+              { value: "schedule", label: "Schedule" },
+              { value: "management", label: "Management" },
+            ]}
+            value={rosterTab}
+            onChange={setRosterTab}
+          />
         ) : null}
         {isManagementTab ? (
           <>
@@ -926,6 +933,10 @@ export default function PeopleScreen() {
         searchPlaceholder={isManagementTab ? "Search management" : "Search people"}
         onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
         onOpenFilters={() => setIsFilterModalVisible(true)}
+        onSearchChange={setSearchValue}
+      />
+      <PeopleSearchField
+        placeholder={isManagementTab ? "Search management" : "Search people"}
         onSearchChange={setSearchValue}
       />
 
@@ -1251,12 +1262,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Air above a title that follows another section's card; the card's
       // own gap below the title stays at the section's `gap`.
       paddingTop: mobileSpace.sm,
-    },
-    rosterTabs: {
-      // The control sizes to its own labels, so it needs a start-aligned row
-      // rather than stretching across the gutter. The sheet body's own `gap`
-      // spaces it from the sections below.
-      alignItems: "flex-start",
     },
     // The clip sits on an inner view: iOS drops a view's own shadow when the
     // same view clips its children.
