@@ -1955,7 +1955,7 @@ describe("ScheduleScreen", () => {
   it("routes to the requests tab and claims an open shift from Home", () => {
     render(<HomeScheduleScreen />);
 
-    fireEvent.click(screen.getByText("See all"));
+    fireEvent.click(screen.getByRole("button", { name: "See all: Open shifts" }));
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/requests");
 
     // The posted pickup leads the carousel; the coverage gap follows it.
