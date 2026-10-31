@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
@@ -6,7 +6,7 @@ import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/c
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { SearchBar } from "../../../shared/components/SearchBar";
+import { ScreenSearch } from "../../../shared/components/ScreenSearch";
 import { Screen } from "../../../shared/components/Screen";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import {
@@ -68,6 +68,7 @@ const FILTERS = [
 type FilterKey = (typeof FILTERS)[number]["key"];
 
 const PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams> {
   switch (filter) {
@@ -98,6 +99,11 @@ export default function NotificationsScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Searched once typing pauses, not on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchInput]);
   const [busy, setBusy] = useState(false);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
 
@@ -378,13 +384,7 @@ export default function NotificationsScreen() {
       }}
     >
       <View style={styles.headerArea}>
-        <SearchBar
-          accessibilityLabel="Search alerts"
-          onChangeText={setSearchInput}
-          onDebouncedChange={(value) => setDebouncedSearch(value.trim())}
-          placeholder="Search title or message"
-          value={searchInput}
-        />
+        <ScreenSearch placeholder="Search title or message" onSearchChange={setSearchInput} />
 
         {/* Held back until the facets land: every tab carries a count, and
             painting the strip first made each badge pop in afterwards and shove

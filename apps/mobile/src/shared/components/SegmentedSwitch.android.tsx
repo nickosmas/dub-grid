@@ -56,5 +56,9 @@ export function SegmentedSwitch<Value extends string>({
 const styles = StyleSheet.create({
   host: {
     alignSelf: "stretch",
+    // Material's segmented buttons are 40dp. Laid out at that height from the start, a header holding it
+    // doesn't grow after its first measurement, which left the page under it
+    // padded for the shorter header.
+    minHeight: 40,
   },
 });

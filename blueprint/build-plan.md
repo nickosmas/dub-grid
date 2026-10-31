@@ -1260,13 +1260,19 @@
         with Claim only on cards the admin can work. Team holds Coverage,
         Pending approvals, Unpublished changes, Overtime watch and Recent
         activity. An admin who never works shifts sees Team alone.
-  - [ ] 56c. **Native top bars** - actions move into the navigation bar: on
+  - [x] 56c. **Native top bars** - actions move into the navigation bar: on
         iOS as Liquid Glass bar buttons (People's Add person and a Filter
         menu, the week stepper, Today and the bell on Home and Schedule, the
         Requests actions), with the native search bar on People; on Android a
         Material top app bar with icon actions, Add person as a floating
         action button, a Material search bar and filter chips, and Android's
         own bottom navigation in place of the floating tab bar.
+  - [ ] 56e. **Native sheets and dialogs** - every bottom sheet and popup
+        uses the platform's own: a native sheet with detents and the grabber
+        on iOS (Liquid Glass on iOS 26) and a Material bottom sheet on
+        Android; confirmations as the system alert on iOS and Material's
+        AlertDialog on Android, keeping each confirmation's wording (owner,
+        2026-10-31).
   - [ ] 56d. **Polish pass** - every screen reviewed on both platforms with
         before and after screenshots: platform icons, long-press menus on
         rows, haptics and ripples, native sheets, segmented controls, and

@@ -1,5 +1,4 @@
 import { StyleSheet } from "react-native";
-import { createIconControlStyle } from "../../../shared/components/icon-control-style";
 import {
   mobileOnAccent,
   mobilePillOverflow,
@@ -860,10 +859,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // The week chevrons and the alerts bell. Shared with the sheet close
     // button, which is the same chrome on a different surface.
-    iconControlButton: createIconControlStyle(mobileColors, isDark),
-    iconControlButtonPressed: {
-      transform: [{ scale: mobileMotion.press.iconOnlyScale }],
-    },
     // Ionicons draws its circular arrow clockwise; flipped, it points back.
     iconControlMirrored: {
       transform: [{ scaleX: -1 }],
