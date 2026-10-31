@@ -37,7 +37,7 @@ const ALLOWLIST = [
   {
     ids: ["GHSA-w3rx-r6r6-pgpr", "GHSA-5p2g-fcmc-qvqq"],
     package: "image-size",
-    reviewBy: "2026-11-01",
+    reviewBy: "2026-12-01",
     reason:
       "Infinite loops in the ICNS/JXL/HEIF parsers, reachable only by parsing a malicious image. " +
       "image-size is a build-time dependency of Metro, which bundles the mobile app's own asset " +
@@ -46,7 +46,8 @@ const ALLOWLIST = [
       "or attacker can reach. The fix, 2.0.3, is a major version that Metro cannot take: image-size " +
       "2 measures only a buffer, and Metro 0.83.3 passes it a file path, so an override would break " +
       "every image asset. Expo SDK 54's @expo/metro 54.2.0 pins metro 0.83.3 exactly (metro 0.83.8 " +
-      "drops image-size, but SDK 54 does not take it). Revisit with the Expo SDK upgrade (F-123).",
+      "drops image-size, but SDK 54 does not take it). Re-dated on 2026-10-31 from 2026-11-01: " +
+      "still no SDK 54 path. Revisit with the Expo SDK upgrade (F-123).",
   },
   {
     ids: ["GHSA-qxc2-j82w-r537"],
@@ -64,57 +65,104 @@ const ALLOWLIST = [
       "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
   },
   {
-    ids: ["GHSA-vfj7-8cjw-p6xm"],
-    package: "braces",
-    reviewBy: "2026-12-01",
-    reason:
-      "Stack exhaustion when expanding a deeply nested brace pattern. braces turns glob patterns " +
-      "into regexes for micromatch, and every copy here sits in build or developer tooling: Metro " +
-      "and Jest's transforms under expo and react-native (bundling the mobile app on a developer " +
-      "machine or in CI), eslint-config-next, the shadcn CLI, and chokidar under @snaplet/seed. " +
-      "The patterns come from our own config files, so the trigger is a hostile pattern in a change " +
-      "we review, and the worst case is a crashed build. Nothing ships it: it is not in the mobile " +
-      "bundle or the web server. No fix exists to take: 3.0.3 is the newest release and the " +
-      "advisory covers <= 3.0.3. Revisit when braces publishes a fix or the Expo SDK upgrade moves " +
-      "Metro and Jest off it (F-127).",
-  },
-  {
-    ids: ["GHSA-86w9-cpqp-85rv"],
+    ids: [
+      "GHSA-86w9-cpqp-85rv",
+      "GHSA-4642-5mcj-2rqw",
+      "GHSA-6wvx-3r32-xmcg",
+      "GHSA-525v-9gp9-w22h",
+      "GHSA-7wch-p9px-956x",
+      "GHSA-h6cr-wjv9-3cpp",
+      "GHSA-4487-j8r4-4g2f",
+      "GHSA-5cwg-6vw7-rj6p",
+      "GHSA-jc66-7q78-782g",
+      "GHSA-8hrf-8g6f-7xwp",
+      "GHSA-hqq3-7jhf-c5jx",
+      "GHSA-5x38-2vff-x55p",
+    ],
     package: "node-forge",
-    reviewBy: "2026-12-01",
+    reviewBy: "2026-11-10",
     reason:
-      "RSA PKCS#1 v1.5 signature verification accepts extra nested data. The only copy is under " +
+      "Twelve advisories in signature verification, PEM and PKCS#12 parsing, TLS record handling, " +
+      "certificate chains, AES-GCM and forge.http cookies. The only copy is node-forge 1.4.0 under " +
       "@expo/cli, which uses it through @expo/code-signing-certificates to sign and verify " +
       "expo-updates manifests. The mobile app does not configure code signing (no " +
-      "codeSigningCertificate in apps/mobile/app.json), so no signature is ever verified with it, " +
-      "and the CLI runs on developer machines and CI, not in the app. No fix exists: 1.4.0 is the " +
-      "newest release and the advisory covers <= 1.4.0. Revisit with the Expo SDK upgrade (F-127).",
+      "codeSigningCertificate in apps/mobile/app.json), the CLI makes no TLS connections or cookie " +
+      "requests with forge, and it runs on developer machines and in CI, not in the app. The fix, " +
+      "1.4.1, was published on 2026-10-27, inside the 7-day freshness window, so it cannot be " +
+      "taken yet. Point @expo/cli's node-forge entry at 1.4.2 once that release is a week old " +
+      "(2026-11-03) and delete this entry.",
   },
   {
-    ids: ["GHSA-hp3w-g68c-fv3c"],
-    package: "sprintf-js",
+    ids: ["GHSA-q3jh-wrc6-jgq8", "GHSA-8r9p-f939-6h3c", "GHSA-mrwp-f3q8-3g9p"],
+    package: "follow-redirects",
+    reviewBy: "2026-11-08",
+    reason:
+      "Credential headers can survive a cross-origin redirect. The only copy, follow-redirects " +
+      "1.16.0, sits under axios under posthog-node under @snaplet/seed, which sends the seed CLI's " +
+      "own telemetry from developer machines; no request it makes carries our credentials, and " +
+      "nothing in the web server or the mobile app uses it. The fix, 1.16.2, was published on " +
+      "2026-10-25, inside the 7-day freshness window. Raise the follow-redirects override to 1.16.2 " +
+      "after 2026-11-01 and delete this entry.",
+  },
+  {
+    ids: ["GHSA-vcc3-ghjq-m6fr", "GHSA-qr28-fpjm-wq7f"],
+    package: "decode-uri-component",
     reviewBy: "2026-12-01",
     reason:
-      "Denial of service through an unbounded precision specifier in a format string. The one copy " +
-      "is sprintf-js 1.0.3 under argparse 1, under js-yaml 3, under babel-plugin-istanbul inside " +
-      "react-native's babel-jest: coverage instrumentation that reads our own nyc config at build " +
-      "or test time. argparse 1 declares sprintf-js ~1.0.2, and the fixed 1.1.4 is outside that " +
-      "range, so an override would hand argparse an API it was not built against. Moderate on its " +
-      "own; it is listed because it shares react-native's chain with braces. Revisit with the Expo " +
-      "SDK upgrade (F-127).",
+      "Malformed percent-encoded input decodes in exponential or quadratic time. decode-uri-component " +
+      "0.2.2 ships in the mobile app under query-string 7, through expo-router and React " +
+      "Navigation, where it parses the app's own deep links: the trigger is a crafted link opened " +
+      "on the user's own device, and the worst case is a stalled app on that device. The fixes " +
+      "are 0.4.2 and 0.5.1, which are ESM-only, while query-string 7 requires it as CommonJS, so " +
+      "an override would break link parsing; even the newest expo-router (58) needs an Expo SDK " +
+      "upgrade to move query-string. Revisit with the Expo SDK upgrade (F-124).",
   },
   {
-    ids: ["GHSA-82fw-gwwq-j7x9", "GHSA-5gmw-xhrv-c9v3", "GHSA-85c8-ppgw-ccpr"],
+    ids: ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249", "GHSA-gcqx-w48m-w2h4"],
+    package: "glob, minimatch, deepmerge",
+    reviewBy: "2026-12-01",
+    reason:
+      "A glob AbortSignal cancellation bypass, a minimatch denial of service through brace " +
+      "amplification, and deepmerge prototype poisoning of the object it returns. Every copy runs " +
+      "at build or configuration time over our own files: Expo's config and prebuild tooling " +
+      "under expo-constants, expo-splash-screen and @expo/cli (reading app.json and plugins), the " +
+      "@snaplet/seed CLI, and the shadcn CLI. None is in the mobile bundle or the web server, and " +
+      "the inputs are patterns and config objects we write. The fixes are majors the callers do " +
+      "not accept (glob 14.0.2 and minimatch 11.0.1, both published 2026-10-27), and deepmerge " +
+      "has no fixed release. Revisit with the Expo SDK upgrade (F-127).",
+  },
+  {
+    ids: ["GHSA-mrhx-c7xc-m3w5"],
+    package: "zod",
+    reviewBy: "2026-12-01",
+    reason:
+      "Validating an oversized collection against a constrained schema can exhaust memory. zod " +
+      "3.24.4 validates request input in the web routes and @dubgrid/contracts, so this one does " +
+      "reach production: a huge array posted to a route walks every element before the length " +
+      "check fails. Vercel caps a function's request body at 4.5 MB, which bounds the input any " +
+      "one request can supply, and the other copies (4.5.4 under eslint-plugin-react-hooks, the " +
+      "shadcn MCP server and @snaplet/seed) are developer tooling. The fix is zod 4.6.6, a major " +
+      "upgrade across every schema in the repository (Dependabot #190, F-189). Do that upgrade " +
+      "rather than re-dating this entry.",
+  },
+  {
+    ids: [
+      "GHSA-82fw-gwwq-j7x9",
+      "GHSA-qxg6-89mg-rqv8",
+      "GHSA-5gmw-xhrv-c9v3",
+      "GHSA-85c8-ppgw-ccpr",
+    ],
     package: "vitest",
     reviewBy: "2026-11-15",
     reason:
-      "Path traversal in @vitest/mocker's redirect mock, and prototype-pollution gadgets that reach " +
-      "code execution through tinypool's worker options. Vitest and its tinypool run only on " +
-      "developer machines and in CI over this repository's own test files, so each needs a crafted " +
-      "test, mock path or polluted prototype in a change we review. The fixes are Vitest 4.1.11 " +
-      "(the mocker) and tinypool 2.1.2, which Vitest 3 cannot take, so all three wait on the Vitest " +
-      "major upgrade across web, mobile and the packages (F-125). The short review date reflects " +
-      "the critical rating: schedule that upgrade rather than re-dating this entry.",
+      "Path traversal and code injection through @vitest/mocker's mocks, and prototype-pollution " +
+      "gadgets that reach code execution through tinypool's worker options. Vitest and its " +
+      "tinypool run only on developer machines and in CI over this repository's own test files, " +
+      "so each needs a crafted test, mock path or polluted prototype in a change we review. The " +
+      "fixes are Vitest 4.1.12 (the mocker) and tinypool 2.1.2, which Vitest 3 cannot take, so " +
+      "all four wait on the Vitest major upgrade across web, mobile and the packages (F-125). The " +
+      "short review date reflects the critical rating: schedule that upgrade rather than " +
+      "re-dating this entry.",
   },
 ];
 
