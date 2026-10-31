@@ -17,16 +17,13 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 
 let MyHomeSections: (typeof import("./MyHomeSections"))["MyHomeSections"];
 let hasMyHomeContent: (typeof import("./MyHomeSections"))["hasMyHomeContent"];
-let splitPeriodIntoWeeks: (typeof import("./MyHomeSections"))["splitPeriodIntoWeeks"];
 let buildOpenShiftClaim: (typeof import("./MyHomeSections"))["buildOpenShiftClaim"];
 
 beforeAll(async () => {
-  ({ MyHomeSections, hasMyHomeContent, splitPeriodIntoWeeks, buildOpenShiftClaim } =
-    await import("./MyHomeSections"));
+  ({ MyHomeSections, hasMyHomeContent, buildOpenShiftClaim } = await import("./MyHomeSections"));
 });
 
 const WEEK = { startDate: "2026-04-12", endDate: "2026-04-18" };
-const TWO_WEEKS = { startDate: "2026-04-12", endDate: "2026-04-25" };
 
 function shift(date: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -166,6 +163,7 @@ describe("MyHomeSections", () => {
       <MyHomeSections
         data={makeData({ entries: [shift("2026-04-13"), shift("2026-04-18")] })}
         range={WEEK}
+        selectedDate="2026-04-16"
       />,
     );
 
@@ -181,6 +179,7 @@ describe("MyHomeSections", () => {
       <MyHomeSections
         data={makeData({ entries: [shift("2026-04-18")], requests: [swapAskedOfMe()] })}
         range={WEEK}
+        selectedDate="2026-04-16"
       />,
     );
 
@@ -193,29 +192,13 @@ describe("MyHomeSections", () => {
     });
   });
 
-  it("splits 2 Weeks into a section per week, each with its own hours", () => {
-    render(
-      <MyHomeSections
-        data={makeData({
-          entries: [shift("2026-04-13"), shift("2026-04-14"), shift("2026-04-21")],
-        })}
-        range={TWO_WEEKS}
-      />,
-    );
-
-    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
-    expect(screen.getByText("Apr 12 - Apr 18")).toBeInTheDocument();
-    expect(screen.getByText("Apr 19 - Apr 25")).toBeInTheDocument();
-    expect(screen.getByText("16h")).toBeInTheDocument();
-    expect(screen.getByText("8h")).toBeInTheDocument();
-  });
-
   it("opens a tapped shift's detail with this period's schedule already cached", () => {
     const scheduleResponse = { range: WEEK, entries: [shift("2026-04-18")] };
     render(
       <MyHomeSections
         data={makeData({ entries: scheduleResponse.entries, scheduleResponse })}
         range={WEEK}
+        selectedDate="2026-04-16"
       />,
     );
 
@@ -261,16 +244,6 @@ describe("hasMyHomeContent", () => {
       ),
     ).toBe(false);
     expect(hasMyHomeContent(makeData({ isOn: false, entries: [shift("2026-04-18")] }))).toBe(false);
-  });
-});
-
-describe("splitPeriodIntoWeeks", () => {
-  it("cuts a period into seven-day weeks from its first day", () => {
-    expect(splitPeriodIntoWeeks(WEEK)).toEqual([WEEK]);
-    expect(splitPeriodIntoWeeks(TWO_WEEKS)).toEqual([
-      { startDate: "2026-04-12", endDate: "2026-04-18" },
-      { startDate: "2026-04-19", endDate: "2026-04-25" },
-    ]);
   });
 });
 

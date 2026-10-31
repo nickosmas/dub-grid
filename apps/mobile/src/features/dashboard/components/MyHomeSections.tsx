@@ -3,12 +3,10 @@ import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import type { MobileScheduleEntry, MobileScheduleRange } from "@dubgrid/contracts";
 import {
-  addDaysToIsoDate,
   buildMeShiftRequestSections,
   buildScheduleWeekDays,
   buildUpcomingMeScheduleItems,
   buildWeeklyHoursSummary,
-  formatScheduleRange,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleEntryEndTime,
@@ -35,16 +33,6 @@ import { getMobileRequestActionKey } from "../../shift-requests/lib/request-acti
 import type { RequestActionBody } from "../../shift-requests/hooks/useShiftRequestActionFlow";
 import type { MyHomeSectionsData } from "../hooks/useMyHomeSections";
 import type { OpenShift, OpenShiftClaim } from "./OpenShiftsCard";
-
-/** The period in calendar weeks of seven days from its first day. */
-export function splitPeriodIntoWeeks(range: MobileScheduleRange): MobileScheduleRange[] {
-  const weeks: MobileScheduleRange[] = [];
-  for (let start = range.startDate; start <= range.endDate; start = addDaysToIsoDate(start, 7)) {
-    const end = addDaysToIsoDate(start, 6);
-    weeks.push({ startDate: start, endDate: end < range.endDate ? end : range.endDate });
-  }
-  return weeks;
-}
 
 /**
  * Whether the You group has anything to show for the period: a shift of
@@ -101,14 +89,17 @@ export function buildOpenShiftClaim(data: MyHomeSectionsData): OpenShiftClaim | 
 
 /**
  * The staff Home's personal sections on the admin Home: the shift now or
- * next, swaps asked of them, then every day of the period, a week at a time.
+ * next, swaps asked of them, then every day of the week.
  */
 export function MyHomeSections({
   data,
   range,
+  selectedDate,
 }: {
   data: MyHomeSectionsData;
   range: MobileScheduleRange;
+  /** The header stepper's day; the hero reads the week from it, as on the staff Home. */
+  selectedDate: string;
 }) {
   const now = useRealtimeNow();
   const { entries, linkedEmployeeId, timeZone } = data;
@@ -120,11 +111,11 @@ export function MyHomeSections({
       getFeaturedMeScheduleSegment({
         entries,
         rangeStartDate: range.startDate,
-        selectedDate: todayDate,
+        selectedDate,
         todayDate,
         currentTime,
       }),
-    [currentTime, entries, range.startDate, todayDate],
+    [currentTime, entries, range.startDate, selectedDate, todayDate],
   );
   const heroTiming = hero.item
     ? getHeroTiming(
@@ -150,25 +141,15 @@ export function MyHomeSections({
       }).coverRequests,
     [data.requests, linkedEmployeeId, now, timeZone],
   );
-  const weeks = useMemo(() => {
-    const periodWeeks = splitPeriodIntoWeeks(range);
-    return periodWeeks.map((week) => {
-      const weekEntries = entries.filter(
-        (entry) => entry.date >= week.startDate && entry.date <= week.endDate,
-      );
-      return {
-        key: week.startDate,
-        heading: periodWeeks.length > 1 ? formatScheduleRange(week, timeZone) : undefined,
-        weekDays: buildScheduleWeekDays(week, todayDate, timeZone, now),
-        items: buildUpcomingMeScheduleItems({
-          entries: weekEntries,
-          featuredItem: hero.item,
-          selectedDate: todayDate,
-        }),
-        summary: buildWeeklyHoursSummary(weekEntries, 40),
-      };
-    });
-  }, [entries, hero.item, now, range, timeZone, todayDate]);
+  const weekDays = useMemo(
+    () => buildScheduleWeekDays(range, selectedDate, timeZone, now),
+    [now, range, selectedDate, timeZone],
+  );
+  const upcomingItems = useMemo(
+    () => buildUpcomingMeScheduleItems({ entries, featuredItem: hero.item, selectedDate }),
+    [entries, hero.item, selectedDate],
+  );
+  const weeklyHours = useMemo(() => buildWeeklyHoursSummary(entries, 40), [entries]);
   const hasScheduledDay = entries.some((entry) => !isDeletedScheduleHistory(entry));
 
   const openShiftDetail = (entry: MobileScheduleEntry) => {
@@ -214,17 +195,13 @@ export function MyHomeSections({
           data.runRequestAction(requestId, { action: "respond", empId: linkedEmployeeId, accept });
         }}
       />
-      {weeks.map((week) => (
-        <UpcomingShiftsSection
-          key={week.key}
-          heading={week.heading}
-          items={week.items}
-          summary={week.summary}
-          todayDate={todayDate}
-          weekDays={week.weekDays}
-          onPressEntry={openShiftDetail}
-        />
-      ))}
+      <UpcomingShiftsSection
+        items={upcomingItems}
+        summary={weeklyHours}
+        todayDate={todayDate}
+        weekDays={weekDays}
+        onPressEntry={openShiftDetail}
+      />
     </View>
   );
 }

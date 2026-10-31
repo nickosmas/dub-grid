@@ -176,8 +176,6 @@ export function DashboardSkeleton({ showMySchedule = true }: { showMySchedule?: 
 
   return (
     <SkeletonGroup style={styles.page}>
-      {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
-      <SkeletonPill height={36} width={180} />
       {showMySchedule ? <ScheduleMeSkeleton inGroup rows={3} /> : null}
       <DashboardHeroSkeleton />
       <DashboardCardSkeleton rows={3} variant="text" />

@@ -40,7 +40,10 @@ Owner decisions (2026-10-30), from the inline prototype
 ("mobile_admin_home_merged_final_every_day"):
 
 - **One Home for Admins and Super Admins**, in this order:
-  - the greeting header and the Week / 2 Weeks toggle, unchanged;
+  - the staff Home's header, in place of the greeting and the Week / 2 Weeks
+    toggle (owner, 2026-10-30, after seeing the build): the day, its week, a
+    week stepper (previous, next, back to today) and the alerts bell. The
+    stepper moves the whole page, cards included, a week at a time;
   - the admin's own day, with no label over it (owner, 2026-10-30): the
     next-shift card, **Needs your response** (only when something waits),
     then **Your week**;
@@ -49,9 +52,8 @@ Owner decisions (2026-10-30), from the inline prototype
 - **Your week shows every day** of the period: a worked day spelled out
   (shift name, 12-hour times, job, focus area), an absence by its name, a day
   with nothing as **Unscheduled** (owner, 2026-10-30, as the staff Home says),
-  past days dimmed, today marked, and the hours beside the title. With
-  2 Weeks it runs both weeks, under one heading per week (`Oct 26 - Nov 1`),
-  each with its own hours. No shift codes anywhere.
+  past days dimmed, today marked, and the hours beside the title. No shift
+  codes anywhere.
 - **Open shifts offer Claim** (the staff Home's word for it, and the
   confirmation's) on a row the admin qualifies for and is free that day (the
   server's `canVolunteer`). It sends the same volunteer request
@@ -130,7 +132,7 @@ else links to the route (alerts open shift detail or the Schedule tab).
   mobile-api-core and web mobile-server tests touched by steps 3 and 4.
 - On the iOS Simulator, against a local stack, as an Admin on the schedule:
   Home shows You (next shift, a swap to answer, every day of the week with
-  Unscheduled days) then Your team; 2 Weeks shows two weeks with their hours;
+  Unscheduled days) then Your team; the header steps the page a week at a time;
   Accept on a swap works from Home; Claim on an eligible open shift puts them
   on the schedule. As a Super Admin:
   Pending approvals shows. As a management-only Admin: only the team cards.
@@ -156,10 +158,11 @@ date`, predates this fix and fails alone too: the test takes "today" in UTC
 - **iOS Simulator**, the QA Super Admin at Calm Haven against a local stack
   and this branch's web server and Metro: Home opens on today's card (an Off
   absence), then Your week with every day spelled out and 42.5h; a row opens
-  shift detail with Working with; 2 Weeks shows Oct 25 - Oct 31 and Nov 1 -
-  Nov 7 each with its hours and Unscheduled days; the team cards follow under
-  Your team, with Pending approvals shown to a Super Admin. The "You" label was
-  removed at the owner's word after seeing it.
+  shift detail with Working with; the team cards follow under Your team, with
+  Pending approvals shown to a Super Admin. After seeing it the owner had the
+  "You" label removed and the greeting and Week / 2 Weeks toggle replaced by
+  the staff Home's header with its week stepper (`WeekNavigatorHeader`, now
+  shared by both homes); the drill-in screens take the week as `weekOf`.
 - **Not seen on device:** Claim (Calm Haven has no staffing needs, so no gaps)
   and a swap to answer; both are covered by `MyHomeSections.test.tsx` and
   `OpenShiftsCard.test.tsx`. Not run: `npm run test:e2e`, Android.

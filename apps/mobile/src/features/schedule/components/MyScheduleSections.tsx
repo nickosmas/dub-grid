@@ -974,15 +974,12 @@ export function MeHeroCard({
 }
 
 export function UpcomingShiftsSection({
-  heading,
   items,
   onPressEntry,
   summary,
   todayDate,
   weekDays,
 }: {
-  /** Names one week of several, in place of "Your week"; its hours then drop "this week". */
-  heading?: string;
   items: Array<NonNullable<FeaturedMeScheduleSegment["item"]>>;
   onPressEntry: (entry: MobileScheduleEntry) => void;
   summary: WeeklyHoursSummary | null;
@@ -999,7 +996,7 @@ export function UpcomingShiftsSection({
 
   const hoursLabel =
     summary && summary.scheduledHours > 0
-      ? `${formatHoursValue(summary.scheduledHours)}h${heading ? "" : " this week"}`
+      ? `${formatHoursValue(summary.scheduledHours)}h this week`
       : null;
   const itemsByDate = new Map<string, Array<NonNullable<FeaturedMeScheduleSegment["item"]>>>();
   const deletedEntriesByDate = new Map<string, MobileScheduleEntry[]>();
@@ -1027,7 +1024,7 @@ export function UpcomingShiftsSection({
   return (
     <View style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>{heading ?? "Your week"}</Text>
+        <Text style={styles.upcomingSectionTitle}>Your week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
             <Text fit="compact" style={styles.upcomingHoursBadgeText}>

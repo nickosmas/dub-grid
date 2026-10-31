@@ -37,10 +37,10 @@ vi.mock("../hooks/useMyHomeSections", () => ({
   useMyHomeSections,
 }));
 
-const usePrefetchOtherDashboardPeriod = vi.fn();
+const usePrefetchAdjacentDashboardWeeks = vi.fn();
 
-vi.mock("../hooks/usePrefetchOtherDashboardPeriod", () => ({
-  usePrefetchOtherDashboardPeriod,
+vi.mock("../hooks/usePrefetchAdjacentDashboardWeeks", () => ({
+  usePrefetchAdjacentDashboardWeeks,
 }));
 
 // The sections have their own tests; here only whether and where they show,
@@ -468,7 +468,7 @@ describe("AdminHomeScreen", () => {
     expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
   });
 
-  it("warms the other period alongside the current one", () => {
+  it("warms the weeks either side of the one shown", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -483,9 +483,10 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
-    expect(usePrefetchOtherDashboardPeriod).toHaveBeenLastCalledWith(
+    const range = useAdminDashboard.mock.calls.at(-1)?.[1];
+    expect(usePrefetchAdjacentDashboardWeeks).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        periodMode: "week",
+        range,
         includeSchedule: true,
         ready: true,
         currentUpdatedAt: 1700,
@@ -493,7 +494,7 @@ describe("AdminHomeScreen", () => {
     );
   });
 
-  it("gives the You group the same period as the rest of the page", () => {
+  it("gives the You group the same week as the rest of the page", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -505,7 +506,7 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
-    fireEvent.click(screen.getByText("2 Weeks"));
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
 
     const dashboardRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
       startDate: string;
@@ -557,7 +558,7 @@ describe("AdminHomeScreen", () => {
     expect(screen.queryByTestId("period-loading")).not.toBeInTheDocument();
   });
 
-  it("renders the greeting header without the org name", () => {
+  it("steps the whole page a week at a time from the header, and Today comes back", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -570,57 +571,29 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByText(/Jordan/)).toBeInTheDocument();
-    // The org name left the header (it is on Profile); the header is a
-    // two-word greeting and the period, nothing more.
-    expect(screen.queryByText(/Acme Care/)).not.toBeInTheDocument();
+    const rangeNow = () =>
+      useAdminDashboard.mock.calls.at(-1)?.[1] as { startDate: string; endDate: string };
+    const thisWeek = rangeNow();
+    const days = (from: string, to: string) =>
+      (new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) /
+      (24 * 60 * 60 * 1000);
+    expect(new Date(`${thisWeek.startDate}T00:00:00Z`).getUTCDay()).toBe(0);
+    expect(days(thisWeek.startDate, thisWeek.endDate)).toBe(6);
+    expect(screen.getByText(/^Today, /)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(days(thisWeek.startDate, rangeNow().startDate)).toBe(7);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+    expect(days(thisWeek.startDate, rangeNow().startDate)).toBe(-7);
+
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+    expect(rangeNow()).toEqual(thisWeek);
   });
 
-  it("prefers the linked employee's name over auth user_metadata, which is often empty", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: {
-        effectiveRole: "admin",
-        // auth user_metadata firstName is unset, as commonly happens for
-        // invited accounts — the employees-table name must win instead.
-        user: { firstName: null, email: "alex@example.com" },
-        currentOrg: { name: "Acme Care", timezone: "America/Los_Angeles" },
-        linkedEmployee: { firstName: "Alex", focusAreaIds: [1], departmentIds: [] },
-      },
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-
-    render(<AdminHomeScreen />);
-
-    expect(screen.getByText(/Alex/)).toBeInTheDocument();
-  });
-
-  it("falls back to the email prefix when neither the employee nor auth metadata has a name", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: {
-        effectiveRole: "super_admin",
-        user: { firstName: null, email: "casey@example.com" },
-        currentOrg: { name: "Acme Care", timezone: "America/Los_Angeles" },
-        linkedEmployee: null,
-      },
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-
-    render(<AdminHomeScreen />);
-
-    expect(screen.getByText(/casey/)).toBeInTheDocument();
-  });
-
-  it("refetches with a 14-day range when the global period toggle switches to 2 weeks", () => {
+  it("opens a card's detail on the week shown", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -628,33 +601,21 @@ describe("AdminHomeScreen", () => {
     useAdminDashboard.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: EMPTY_DASHBOARD_DATA,
+      data: {
+        ...EMPTY_DASHBOARD_DATA,
+        metrics: { ...EMPTY_DASHBOARD_DATA.metrics, pendingApprovalsCount: 2 },
+      },
     });
 
     render(<AdminHomeScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    const range = useAdminDashboard.mock.calls.at(-1)?.[1] as { startDate: string };
+    fireEvent.click(screen.getByRole("button", { name: "2 pending approvals" }));
 
-    const initialRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
-      startDate: string;
-      endDate: string;
-    };
-    const initialSpanDays =
-      (new Date(`${initialRange.endDate}T00:00:00Z`).getTime() -
-        new Date(`${initialRange.startDate}T00:00:00Z`).getTime()) /
-      (24 * 60 * 60 * 1000);
-    expect(initialSpanDays).toBe(6);
-
-    // One global toggle, at the top of the screen, drives every card on the page.
-    fireEvent.click(screen.getByText("2 Weeks"));
-
-    const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
-      startDate: string;
-      endDate: string;
-    };
-    const latestSpanDays =
-      (new Date(`${latestRange.endDate}T00:00:00Z`).getTime() -
-        new Date(`${latestRange.startDate}T00:00:00Z`).getTime()) /
-      (24 * 60 * 60 * 1000);
-    expect(latestSpanDays).toBe(13);
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/home/pending-approvals",
+      params: { weekOf: range.startDate },
+    });
   });
 
   it("pull-to-refresh refetches the dashboard, bootstrap and You group and invalidates the shared dashboard cache prefix", async () => {

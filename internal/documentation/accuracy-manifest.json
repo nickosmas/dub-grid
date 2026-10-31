@@ -670,7 +670,8 @@
             "apps/mobile/app/(tabs)/home/index.tsx",
             "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
             "apps/mobile/src/features/dashboard/components/MyHomeSections.tsx",
-            "apps/mobile/src/features/dashboard/components/OpenShiftsCard.tsx"
+            "apps/mobile/src/features/dashboard/components/OpenShiftsCard.tsx",
+            "apps/mobile/src/features/schedule/components/WeekNavigatorHeader.tsx"
           ],
           "testFiles": [
             "apps/web/src/components/dashboard/__tests__/AdminDashboard.test.tsx",
@@ -685,7 +686,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:90dc0699c42413a91de162f5d4cbd35a45d8366613e4356b006da0b215664a97"
+      "evidenceFingerprint": "sha256:b2753eaf14839ee0e291fe19795f42039a8b437a45afda1d58f6ae32c2320d4a"
     },
     {
       "id": "roster",
@@ -1290,7 +1291,8 @@
             "packages/domain/src/employment-status.ts",
             "packages/client-errors/src/index.ts",
             "apps/mobile/src/features/notifications/lib/notification-categories.ts",
-            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx"
+            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx",
+            "apps/mobile/src/features/schedule/components/WeekNavigatorHeader.tsx"
           ],
           "testFiles": [
             "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx",
@@ -1308,7 +1310,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a194a12c9b30809e6edf04f278459137dd96eebb545400022dd9c04e170082ff"
+      "evidenceFingerprint": "sha256:c385470d9db138fa4d536898d3c746f6318a368af74f1731c139abe6a0c2bd9c"
     },
     {
       "id": "alerts",
@@ -2050,7 +2052,8 @@
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
             "apps/mobile/src/features/schedule/lib/schedule.ts",
             "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
-            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx"
+            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx",
+            "apps/mobile/src/features/schedule/components/WeekNavigatorHeader.tsx"
           ],
           "testFiles": [
             "apps/mobile/src/features/schedule/screens/ScheduleScreen.test.tsx",
@@ -2070,7 +2073,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d42b69695411e935fd8e6604995e8729da62d797644f3497a9ac445077627a22"
+      "evidenceFingerprint": "sha256:cd0c4b697b91b28765824fd0fac4d80b3d2a7cc65fd31e3f49ab4eecc8dcbcfc"
     },
     {
       "id": "integrations-exports",

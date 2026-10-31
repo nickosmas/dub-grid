@@ -61,7 +61,7 @@ export function useMyHomeSections({
   }, [canViewTeam, isOn, refetchRequests, refetchSchedule, refetchTeam]);
 
   useMobileShiftRequestsRealtime({
-    orgId: bootstrapQuery.data?.currentOrg.id ?? null,
+    orgId: bootstrapQuery.data?.currentOrg?.id ?? null,
     disabled: !isOn,
     onChange: () => {
       void refetchRequests();
@@ -94,7 +94,7 @@ export function useMyHomeSections({
     isLoading: isOn && (scheduleQuery.isLoading || requestsQuery.isLoading),
     isPlaceholderData: scheduleQuery.isPlaceholderData || requestsQuery.isPlaceholderData,
     linkedEmployeeId: linkedEmployee?.id ?? null,
-    timeZone: bootstrapQuery.data?.currentOrg.timezone ?? null,
+    timeZone: bootstrapQuery.data?.currentOrg?.timezone ?? null,
     entries: scheduleQuery.data?.entries ?? [],
     scheduleError: scheduleQuery.error,
     teamEntries: teamQuery.data?.entries ?? [],

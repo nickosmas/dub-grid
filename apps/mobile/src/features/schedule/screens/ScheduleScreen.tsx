@@ -1,7 +1,6 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   AppState,
   Animated,
@@ -9,8 +8,6 @@ import {
   useWindowDimensions,
   type AppStateStatus,
   type GestureResponderEvent,
-  type StyleProp,
-  type TextStyle,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
@@ -29,7 +26,6 @@ import Reanimated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
 import { PageWash } from "../../../shared/components/PageWash";
@@ -49,6 +45,11 @@ import {
   getInitials,
   getSegmentScheduleNotes,
 } from "../components/MyScheduleSections";
+import {
+  AlertsChromeButton,
+  IconControlButton,
+  WeekNavigatorHeader,
+} from "../components/WeekNavigatorHeader";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge } from "../components/SplitShift";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
@@ -83,7 +84,6 @@ import {
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
   formatScheduleDayLabel,
-  formatScheduleRange,
   formatScheduleTimeRange,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
@@ -581,14 +581,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
-  const selectedDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
   const teamHeaderDateLabel = formatTeamScheduleHeaderDateLabel(selectedDate, now, timeZone);
   const isSelectedToday = selectedDate === todayDate;
   // The Today control's arrow points the way today lies: back from a future
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
   // which reads as forward, so the backward one is that glyph mirrored.
   const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
-  const weekRangeLabel = formatScheduleRange(range, timeZone);
   const currentTimeValue = getCurrentTimeValue(now, timeZone);
   const visibleCalendarMonth = calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
@@ -1229,45 +1227,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     });
 
   const meStickyHeader = !isTeamScope ? (
-    <View style={styles.meWeekNavigator}>
-      <View style={styles.meWeekNavigatorCopy}>
-        {/* Both shrink rather than wrap or truncate: a header is one row,
-            and a date is bounded text that fits at the default size. */}
-        <Text fit="fixed" style={styles.meWeekNavigatorTitle}>
-          {selectedDateLabel}
-        </Text>
-        <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
-          {weekRangeLabel}
-        </Text>
-      </View>
-      <View style={styles.meWeekNavigatorActions}>
-        <View style={styles.meWeekRangeControlGroup}>
-          <IconControlButton
-            accessibilityLabel="Previous week"
-            iconName="chevron-back"
-            onPress={handlePreviousWeek}
-          />
-          <IconControlButton
-            accessibilityLabel="Next week"
-            iconName="chevron-forward"
-            onPress={handleNextWeek}
-          />
-        </View>
-        {/* Icon-only, like the chevrons beside it: with the word "Today" this
-            row held five controls and the date title was cut to "Sat, Sep…"
-            on any week but the current one. A circular arrow, "return to
-            today"; a calendar glyph read as a date picker. */}
-        {!isSelectedToday ? (
-          <IconControlButton
-            accessibilityLabel="Today"
-            iconName="refresh-outline"
-            iconStyle={todayIconStyle}
-            onPress={handleGoToToday}
-          />
-        ) : null}
-        <AlertsChromeButton unreadCount={unreadNotificationCount} />
-      </View>
-    </View>
+    <WeekNavigatorHeader
+      now={now}
+      range={range}
+      selectedDate={selectedDate}
+      timeZone={timeZone}
+      todayDate={todayDate}
+      unreadCount={unreadNotificationCount}
+      onNextWeek={handleNextWeek}
+      onPreviousWeek={handlePreviousWeek}
+      onToday={handleGoToToday}
+    />
   ) : undefined;
 
   function renderMonthWeeks(weeks: MobileScheduleMonthDay[][], isCenterMonth: boolean) {
@@ -1716,75 +1686,6 @@ function MonthDayCell({
           {day.dayLabel}
         </Text>
       </View>
-    </Pressable>
-  );
-}
-
-function IconControlButton({
-  accessibilityLabel,
-  iconName,
-  iconSize = 20,
-  iconStyle,
-  onPress,
-}: {
-  accessibilityLabel: string;
-  iconName: React.ComponentProps<typeof Ionicons>["name"];
-  iconSize?: number;
-  iconStyle?: StyleProp<TextStyle>;
-  onPress: () => void;
-}) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      hitSlop={10}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.iconControlButton,
-        pressed && styles.iconControlButtonPressed,
-      ]}
-    >
-      <Ionicons
-        color={mobileColors.textPrimary}
-        name={iconName}
-        size={iconSize}
-        style={iconStyle}
-      />
-    </Pressable>
-  );
-}
-
-function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <Pressable
-      accessibilityLabel="Open alerts"
-      accessibilityRole="button"
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      hitSlop={10}
-      onPress={() => router.push("/alerts")}
-      style={({ pressed }) => [
-        styles.iconControlButton,
-        pressed && styles.iconControlButtonPressed,
-      ]}
-    >
-      <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
-      <NumericBadge
-        count={unreadCount}
-        label={`${unreadCount} unread alerts`}
-        max={9}
-        size="sm"
-        style={styles.alertBadge}
-        tone="danger"
-      />
     </Pressable>
   );
 }
