@@ -386,45 +386,45 @@
 - Push `now` down to the rows that show relative time.
   **Resolution:** Re-examined 2026-10-30 (second /audit pass): confirmed at the cited lines, so moved to open. It missed the token refresh before bootstrap, fonts and the theme read gating bootstrap (F-183), Home content being a further wave after the splash, and the missing persisted cache (F-181).
 
-### F-154 [P2] open - After sign-in, the app shell's code downloads only once the dashboard has rendered on the server
+### F-154 [P2] fixed - After sign-in, the app shell's code downloads only once the dashboard has rendered on the server
 
 **File:** `apps/web/src/components/AppChrome.tsx:10`; `apps/web/src/components/dashboard/preloadDashboardView.ts:5`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** F-132's fix keeps `AppShellProviders` (AppShell, Header, the gates) off `/login`. After `router.replace`, `AppChrome` asks for that chunk only when the new pathname commits, which needs the `/dashboard` RSC response first. `preloadDashboardView()` runs on submit but warms only `DashboardView`. So every cold sign-in now has one extra chunk round trip and download (about the 54 KB gzip cut from `/login`) in series before the dashboard can paint.
 **Suggested fix:** Also `import("@/components/AppShellProviders")` inside `preloadDashboardView()`.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `preloadDashboardView()` also imports `AppShellProviders`; in the browser the shell chunk is requested 23ms after submit, beside the login POST.
 
-### F-155 [P2] open - After a password sign-in, the splash still waits on the browser's own `getUser` round trip
+### F-155 [P2] fixed - After a password sign-in, the splash still waits on the browser's own `getUser` round trip
 
 **File:** `apps/web/src/components/OrgLogin.tsx:424`; `apps/web/src/features/account/client/auth.ts:162`; `apps/web/src/components/RouteGuards.tsx:94`; `apps/web/src/components/onboarding/OnboardingGate.tsx:55`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** The login route already wrote the session cookies, but the user appears in `AuthProvider` only through the `SIGNED_IN` that `setSession` emits after a browser-to-Supabase `/auth/v1/user` call, which also holds the auth lock. F-131's fast path covers hard loads, not this soft navigation, so the round trip sits on the sign-in critical path whenever it is the slowest of the parallel calls.
 **Suggested fix:** Once `sessionCookieSet` is true, have `AuthProvider` read the cookie session (no network) and commit it as server-vouched, as F-131 does on a hard load; run `getUser` behind it.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the login route returns the whole signed-in user, and `syncBrowserSessionInBackground` announces the route's session to `AuthProvider` before `setSession`'s round trip; a refusal still signs out. Tested in `AuthProvider.test.tsx` and `auth.session-sync.test.ts`. Not measured on production.
 
-### F-156 [P2] open - A cold hard load of the dashboard takes three API waves; only sign-in is primed
+### F-156 [P2] fixed - A cold hard load of the dashboard takes three API waves; only sign-in is primed
 
 **File:** `apps/web/src/app/(app)/dashboard/DashboardPageContent.tsx:64, 119`; `apps/web/src/components/AppShell.tsx:60`; `apps/web/src/components/SignInPrefetch.tsx:119-126`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** Wave 1 is permissions, bootstrap and org context. Wave 2 is the employee roster, which waits for `perms.orgId` though `org_id` is in the session token, and `DashboardContent` mounts only once permissions load. Wave 3 is the dashboard data, because `DashboardView` mounts only after the roster, though `primeDashboardQueries` needs only bootstrap and permissions. `SignInPrefetch` primes all of this only while a sign-in handoff is pending, so a reopened tab or bookmark pays one avoidable API round trip (function time included) on every cold open. A Super Admin's header adds billing, then employees.
 **Suggested fix:** Run the sign-in priming on hard loads too, from the server-vouched session, and start the roster from the token's `org_id`.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `SignInPrefetch` primes once on a hard load from the vouched session, the roster with the dashboard only. In the browser a cold `/dashboard` now asks in two waves: permissions, bootstrap, org context, terms, billing and the roster together, then the dashboard's data when bootstrap answers.
 
-### F-157 [P2] open - The platform billing policy is still read Redis then database, after the org reads, on every page load and API call
+### F-157 [P2] fixed - The platform billing policy is still read Redis then database, after the org reads, on every page load and API call
 
 **File:** `apps/web/src/lib/billing-policy.ts:82-95` (`getPlatformBillingPolicy`, 10s memo then `cacheThrough`); `apps/web/src/proxy.ts:701-728`; `apps/web/src/app/api/shared/permissions.ts:457-477, 535, 545`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** F-129 dropped Redis for org visibility and access, but the billing-policy leg in the same `Promise.all` still does an edge-to-Upstash GET and, on a miss, a PostgREST query, one after the other, so after a minute idle it can still be the slowest leg of `mw_org_access`. In `requireOrgPermissions` it is worse: revocation (Redis), then three database reads in parallel, then the policy (Redis, then database), then "setup complete" (Redis), four serial waves before the handler starts, though the last two need only `orgId`. The proxy's missing-claims fallback (`proxy.ts:436-470`) also still uses `cacheThrough`.
 **Suggested fix:** Read the policy straight from the database with a 5-minute memo (it changes rarely), or return it with the org row in one RPC. In `requireOrgPermissions`, start the policy and setup reads inside the same `Promise.all` as the database wave and ignore the setup result for Gridmasters.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the platform policy is read from the database with a one-minute memo and one read in flight (no Redis), and `requireOrgPermissions` starts the policy and setup reads with its database wave. The proxy's missing-claims fallback still uses `cacheThrough`.
 
-### F-158 [P2] open - Route handlers and the app layout verify tokens against the remote key set
+### F-158 [P2] fixed - Route handlers and the app layout verify tokens against the remote key set
 
 **File:** `apps/web/src/lib/auth/verify-token.ts:164-170` (`verifyAccessToken` uses `getSupabaseJwks`, a `createRemoteJWKSet`); callers include `apps/web/src/app/(app)/layout.tsx:56-71` and every `/api` route
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** F-129's build-shipped keys (`getProxyJwks`) went into the proxy only. Each fresh function instance fetches the JWKS from Supabase Auth before its first verify, and each route can be its own function, so cold API calls and the layout's first byte pay that round trip. Size from pdx1 is unmeasured (about 735ms from the edge on 2026-09-26). The layout also awaits `layout_client_flags` after its `Promise.all` (`:93-95`) instead of inside it.
 **Suggested fix:** Verify with `getProxyJwks()` in `verifyAccessToken` (same remote fallback on an unknown `kid`), and move the flags read into the layout's `Promise.all`. Confirm the production build actually carries `SUPABASE_JWKS`: `next.config.ts:179-193` falls back to remote silently when the build's fetch fails.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `verifyAccessToken` uses the build-shipped keys (`getProxyJwks`), the runbook says to redeploy after revoking a key since routes now trust shipped keys too, the layout reads client flags alongside the session, and the build log says when keys could not be shipped (a failed build would break CI builds without Supabase).
 
 ### F-159 [P3] unverified - After about an hour idle, the proxy refreshes the token before it starts the org reads
 
@@ -474,13 +474,13 @@
 **Suggested fix:** Drop `reports.operationsAll` from the cell-table cases; keep it for `publish_history`, `employees` and `recurring_shifts`.
 **Resolution:**
 
-### F-165 [P2] open - The header loads the organization's whole roster on every page for one boolean
+### F-165 [P2] fixed - The header loads the organization's whole roster on every page for one boolean
 
 **File:** `apps/web/src/components/AppShell.tsx:60-63`; `apps/web/src/hooks/useEmployees.ts:130-135`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** `useEmployees` fetches every employee, archived included, only for `employees.length > 0` in the setup lock. It mounts on every app route, staff included, and keeps `employees.all` observed everywhere, so every employee, department, certification or role change refetches the full roster in every tab. It is also wave 2 of F-156.
 **Suggested fix:** Use `useEmployeeCount` (already keyed under `org.employeeCount`), or enable the roster only while onboarding is incomplete.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the header reads the bootstrap's `activeEmployeeCount`, as `SetupGuard` does; in the browser `/alerts` loads no roster.
 
 ### F-166 [P3] open - Opening Schedule refetches the directory in every other tab in the organization
 
@@ -613,39 +613,39 @@
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** With `jwt_expiry = 3600`, most cold opens start with an expired token. The splash holds through the refresh (GoTrue plus the access-token hook, then a SecureStore write of the over-2KB session), then `GET /bootstrap`, and only then starts the Home queries, so Home shows a skeleton for a further round trip. Nothing from the last session is shown meanwhile. This is the largest single cause of the slow cold open the owner reports. The size of the gain is unmeasured. P2 rather than P1: it is a missing optimization, not a defect, and must not block unrelated work at `/complete`.
 **Suggested fix:** Persist the bootstrap and Home query keys (`@tanstack/query-async-storage-persister` or MMKV), keyed by user and org and cleared on sign-out, and lift the splash on the restored bootstrap while the network refreshes behind it.
-**Resolution:**
+**Resolution:** Built and tested on its own branch `fix/mobile-persisted-cache` (2026-10-30): AsyncStorage persister, bootstrap and Home keys only, 24 hours, keyed to the app version, removed wherever the cache clears. Not merged: it adds packages, and the Dependency Audit check has failed on `main` since 2026-10-26 (24 unreviewed high advisories).
 
-### F-182 [P2] open - The mobile login response doesn't carry the bootstrap, so sign-in pays one more round trip and auth wave
+### F-182 [P2] fixed - The mobile login response doesn't carry the bootstrap, so sign-in pays one more round trip and auth wave
 
 **File:** `apps/web/src/features/mobile/server/routes/auth-login.ts:211`; `apps/mobile` `LoginScreen.tsx:266-295`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** The login handler already holds the user, memberships and organization, but the app then calls `/bootstrap` (a full mobile auth wave on the server), awaits it, then prefetches Home, then navigates. Three serial client round trips without MFA. About 300-800ms on cellular, unmeasured.
 **Suggested fix:** Return the bootstrap payload with the login response and seed the query cache, so the Home prefetch starts as soon as login returns.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the login handler builds the bootstrap with the new token (shared auth memo, bounded to 3s and well inside the login deadline) and sends it as an optional field; `LoginScreen` seeds it and starts Home's queries at once. Older builds ignore the field. Not measured on a device.
 
-### F-183 [P2] open - The bootstrap request can't start until fonts, the theme read and the first render finish
+### F-183 [P2] fixed - The bootstrap request can't start until fonts, the theme read and the first render finish
 
 **File:** `apps/mobile/app/_layout.tsx:49, 243-252`; `apps/mobile/src/shared/providers/ThemeModeProvider.tsx:61, 93`; `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:95, 223`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** The root renders nothing until five fonts load; `ThemeModeProvider` then reads SecureStore and returns null until it lands (500ms fallback); only then does `AuthSessionProvider` mount, call `getSession` and start bootstrap. `warmSupabaseSession()` already runs at module scope but nothing chains the bootstrap onto it. The 900ms minimum splash also counts only from the gate's mount (`StartupSplashGate.tsx:17`). Refines F-153.
 **Suggested fix:** At module scope, chain the warmed session into `queryClient.prefetchQuery(createBootstrapQueryOptions(token))` and start the theme read there too; count the minimum splash from launch.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `warmStartup()` at module load starts the bootstrap for the stored session and the theme read, and the minimum splash counts from launch. Not measured on a device.
 
-### F-184 [P2] open - Every mobile API call repeats serial auth work
+### F-184 [P2] fixed - Every mobile API call repeats serial auth work
 
 **File:** `apps/web/src/features/mobile/server/auth.ts:37` (feature flag awaited before verification); `apps/web/src/lib/auth/verify-token.ts:164` (remote JWKS, F-158); `packages/mobile-api-core/src/setup.ts` (`isMobileOrgSetupComplete`, 7 queries, no in-flight dedupe); `packages/mobile-api-core/src/auth.ts`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** Each request awaits the flag, then verifies, then runs about eight parallel reads including a GoTrue `getUser`, plus the 7 setup queries on a cold instance; the 3-5 calls a cold start fires concurrently each run them. Then the handler's own waves follow.
 **Suggested fix:** Start the flag lookup alongside verification, dedupe the setup check in flight, and memo the resolved auth context per token hash for a few seconds, as `isSessionRevoked` already does.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the `mobile_api` flag is read alongside auth, one resolution per token is shared for 5 seconds (refusals are not remembered), and concurrent setup checks share one read.
 
-### F-185 [P2] open - Mobile startup handlers run independent database reads in series
+### F-185 [P2] fixed - Mobile startup handlers run independent database reads in series
 
 **File:** `apps/web/src/features/mobile/server/data.ts:953-971` (`fetchMobileScheduleEntries`); `read.ts:466` and `packages/mobile-api-core/src/shift-requests.ts:330` (`fetchLinkedEmployeeForUser`); `apps/web/src/features/mobile/server/routes/dashboard.ts:79-116` (`hiddenUserIds()`)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** The comparison-rows query waits for six reference reads it doesn't use; the linked-employee read repeats a row auth already loaded; the hidden-people lookup (F-176's unindexed scan) gates every dashboard and shift-request fetcher. One to three extra database round trips on each of the calls Home needs.
 **Suggested fix:** Move the independent reads into `Promise.all`, widen the auth employee select and reuse it, and start the hidden-people lookup in the auth wave with a memo.
-**Resolution:**
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the comparison rows load with the reference reads, and the internal-account list is kept for 30 seconds per process. The linked-employee read stays serial: which requests a person sees depends on it.
 
 ### F-186 [P3] open - Mobile two-factor sign-in makes two or three redundant round trips
 
