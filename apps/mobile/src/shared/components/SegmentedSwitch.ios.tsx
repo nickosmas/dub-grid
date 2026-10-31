@@ -17,7 +17,7 @@ export function SegmentedSwitch<Value extends string>({
   const { resolvedTheme } = useThemeMode();
 
   return (
-    <Host matchContents={{ vertical: true }} style={[styles.host, style]}>
+    <Host matchContents={{ vertical: true }} ignoreSafeArea="all" style={[styles.host, style]}>
       <Picker
         label={accessibilityLabel}
         selection={value}
