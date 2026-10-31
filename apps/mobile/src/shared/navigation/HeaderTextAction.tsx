@@ -1,4 +1,4 @@
-import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
+import type { NativeStackNavigationOptions } from "expo-router/native-stack";
 import { useMemo } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import Animated from "react-native-reanimated";

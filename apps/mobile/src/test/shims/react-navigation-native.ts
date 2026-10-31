@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Test shim for `@react-navigation/native`.
+ * Test shim for `expo-router/react-navigation` (Expo Router's copy of React Navigation).
  *
  * The real `usePreventRemove` calls `useNavigation`, `useRoute` and
  * `usePreventRemoveContext`, all three of which throw "Couldn't find … context"

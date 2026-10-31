@@ -21,7 +21,10 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import {
+  KeyboardAwareScrollView,
+  type KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
 import { Pressable } from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
@@ -212,7 +215,7 @@ export function Screen<T = never>({
     insets.bottom,
     nativeTabBarVisible,
   );
-  const internalScrollViewRef = useRef<ScrollView>(null);
+  const internalScrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   const internalListRef = useRef<FlatList<T>>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
   // always read the *current* height at call time, not whatever it was
@@ -630,7 +633,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // too would just be clipped by this view's own `overflow: "hidden"`.
     },
     overlayLayer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 20,
       elevation: 20,
     },

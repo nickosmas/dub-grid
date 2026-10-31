@@ -77,7 +77,7 @@ export function ThemeModeProvider({ children }: PropsWithChildren) {
   const setPreference = useCallback((next: ThemePreference) => {
     setPreferenceState(next);
     saveThemePreference(next).catch(() => {});
-    Appearance.setColorScheme(next === "system" ? null : next);
+    Appearance.setColorScheme(next === "system" ? "unspecified" : next);
   }, []);
 
   const themeModeValue = useMemo<ThemeModeContextValue>(

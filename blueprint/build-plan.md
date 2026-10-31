@@ -1241,3 +1241,33 @@
   - [x] 55f. **Requests** - pickups, swaps, call-offs and profile change
         requests involving them in the period, with state and who decided.
         Overview gains a Waiting on you card.
+- [ ] 56. **Native iOS and Android** - the app feels built for each phone:
+      Liquid Glass and native controls on iOS, Material 3 Expressive on
+      Android, built from shared components with one version per platform so
+      screens don't fork. Android keeps DubGrid's brand colors (no wallpaper
+      colors). The admin Home gets a My schedule | Team switch. Every element
+      is polished to the standard of a top company's app. Owner decisions,
+      2026-10-31.
+  - [ ] 56a. **Expo SDK 57** - Expo 54 to 57 with the React Native, React
+        Native Screens and Expo Router it pins, so native bar buttons, menus
+        and segmented controls work as each platform intends and iOS device
+        builds no longer need the SDK patch. Every screen still works on the
+        iOS Simulator, the Android emulator and the iPhone.
+  - [ ] 56b. **Admin Home switch** - a native My schedule | Team switch at the
+        top of the admin Home, with no "Your team" label. My schedule reads
+        like the staff Home: next shift, Needs your response, Open shifts and
+        Your week. Open shifts is the staff Home's carousel showing every gap,
+        with Claim only on cards the admin can work. Team holds Coverage,
+        Pending approvals, Unpublished changes, Overtime watch and Recent
+        activity. An admin who never works shifts sees Team alone.
+  - [ ] 56c. **Native top bars** - actions move into the navigation bar: on
+        iOS as Liquid Glass bar buttons (People's Add person and a Filter
+        menu, the week stepper, Today and the bell on Home and Schedule, the
+        Requests actions), with the native search bar on People; on Android a
+        Material top app bar with icon actions, Add person as a floating
+        action button, a Material search bar and filter chips, and Android's
+        own bottom navigation in place of the floating tab bar.
+  - [ ] 56d. **Polish pass** - every screen reviewed on both platforms with
+        before and after screenshots: platform icons, long-press menus on
+        rows, haptics and ripples, native sheets, segmented controls, and
+        snackbars on Android.

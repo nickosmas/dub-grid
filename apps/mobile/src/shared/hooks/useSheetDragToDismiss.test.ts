@@ -80,7 +80,7 @@ function renderSheetDrag(
     // the assertion reads where the sheet actually settled.
     act(() => view.rerender(props));
     const [transform] = (
-      view.result.current.sheetStyle as { transform: Array<{ translateY: number }> }
+      view.result.current.sheetStyle as unknown as { transform: Array<{ translateY: number }> }
     ).transform;
     return transform.translateY;
   }
