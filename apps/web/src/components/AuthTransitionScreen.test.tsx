@@ -55,9 +55,7 @@ describe("AuthTransitionScreen", () => {
       markAuthTransition();
       const view = render(<AuthTransitionScreen onRetry={vi.fn()} phase="workspace" />);
 
-      expect(
-        screen.getByRole("heading", { name: "Opening your organization" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Getting things ready" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
 
       await act(async () => {
@@ -70,9 +68,7 @@ describe("AuthTransitionScreen", () => {
         await vi.advanceTimersByTimeAsync(15_000);
       });
       expect(
-        screen.getByText(
-          "This is taking a little longer than usual. We’re still getting things ready.",
-        ),
+        screen.getByText("This is taking a little longer than usual. It’s still loading."),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
       expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
