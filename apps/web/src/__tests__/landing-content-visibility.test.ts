@@ -8,6 +8,8 @@ describe("landing content visibility", () => {
   it("does not make marketing sections depend on scroll-observer delivery", () => {
     expect(landingPage).not.toContain("IntersectionObserver");
     expect(landingPage).not.toContain('"opacity-0 translate-y-8"');
-    expect(landingPage).toContain("className={`scroll-mt-14 ${className}`}");
+    // Sections render their content outright; only the illustrations'
+    // animation waits for them to scroll into view.
+    expect(landingPage).toContain("className={`scroll-mt-14 py-14");
   });
 });

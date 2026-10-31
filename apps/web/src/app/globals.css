@@ -812,30 +812,6 @@ button {
   position: relative;
   z-index: 1;
 }
-.landing-hero-screenshot-stage {
-  position: relative;
-}
-.landing-hero-phone {
-  display: none;
-}
-@media (min-width: 1280px) {
-  .landing-hero-phone {
-    position: absolute;
-    z-index: 0;
-    top: 120px;
-    display: block;
-    width: 278px;
-    transform: scale(0.9);
-  }
-  .landing-hero-phone-left {
-    right: calc(100% - 56px);
-    transform-origin: top right;
-  }
-  .landing-hero-phone-right {
-    left: calc(100% - 56px);
-    transform-origin: top left;
-  }
-}
 .landing-section-alt {
   background: #eff6ff;
 }
@@ -848,11 +824,38 @@ button {
 .dark .landing-cta-section {
   background: #050609;
 }
-.landing-feature-card {
-  background: #ffffff;
+/* The closing panel echoes the hero: the brand gradient with a faint grid,
+   the product's own motif, fading out from the middle. */
+.landing-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.2), transparent 60%),
+    linear-gradient(140deg, #0b2d75 0%, #1d4ed8 55%, #4a83ef 100%);
+  box-shadow: 0 30px 80px rgba(7, 21, 53, 0.22);
 }
-.dark .landing-feature-card {
-  background: #0a0e17;
+.dark .landing-cta {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.12), transparent 60%),
+    linear-gradient(140deg, #071535 0%, #0b2d75 50%, #1d3aa0 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.landing-cta::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-position: center;
+  background-size: 48px 48px;
+  content: "";
+  mask-image: radial-gradient(ellipse 70% 80% at 50% 50%, #000 20%, transparent 75%);
+  pointer-events: none;
 }
 .landing-mobile-menu {
   background: linear-gradient(180deg, #071535 0%, #173780 50%, #7686e5 100%);
@@ -894,85 +897,6 @@ button {
 }
 .dark .landing-screenshot-hero {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
-}
-/* A simulated iPhone: bezel, band highlight, and the screen's rounded corners. */
-.landing-phone {
-  box-sizing: border-box;
-  width: 278px;
-  padding: 8px;
-  border-radius: 44px;
-  background: #0a0a0c;
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
-    0 30px 80px rgba(15, 23, 42, 0.28),
-    0 6px 18px rgba(15, 23, 42, 0.14);
-}
-/* A near-black bezel disappears against the dark page, so it lightens there. */
-.dark .landing-phone {
-  background: #3f3f46;
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.16),
-    0 30px 80px rgba(0, 0, 0, 0.5),
-    0 6px 18px rgba(0, 0, 0, 0.3);
-}
-.landing-phone-screen {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 36px;
-}
-/* Desktop: three phones side by side. */
-.landing-phone-track {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 2rem;
-}
-.landing-phone-slot {
-  flex: 0 0 auto;
-  transition:
-    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 320ms ease;
-}
-/* Below the width that fits all three phones in a row (3 x 278px + gaps +
-   gutters), one horizontal snap scroller, the centred phone at full size;
-   otherwise tablets wrapped them two over one. The negative margin lets the
-   track bleed to the viewport edges past the section's gutter; the side
-   padding keeps the first and last phone centre-able. */
-@media (max-width: 959px) {
-  .landing-phone-track {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    margin: 0 -1.5rem;
-    padding: 24px calc(50vw - 120px) 40px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .landing-phone-track::-webkit-scrollbar {
-    display: none;
-  }
-  .landing-phone-slot {
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
-    transform: scale(0.84);
-    opacity: 0.55;
-  }
-  .landing-phone-slot[data-active="true"] {
-    transform: scale(1);
-    opacity: 1;
-  }
-  .landing-phone-slot .landing-phone {
-    width: 240px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .landing-phone-slot {
-    transition: none;
-  }
 }
 @media (max-width: 640px) {
   .landing-screenshot {
