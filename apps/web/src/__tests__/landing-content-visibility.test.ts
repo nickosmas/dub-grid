@@ -10,6 +10,6 @@ describe("landing content visibility", () => {
     expect(landingPage).not.toContain('"opacity-0 translate-y-8"');
     // Sections render their content outright; only the illustrations'
     // animation waits for them to scroll into view.
-    expect(landingPage).toContain("className={`scroll-mt-14 py-14");
+    expect(landingPage).toContain('className="landing-section scroll-mt-14');
   });
 });

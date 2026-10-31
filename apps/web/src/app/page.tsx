@@ -17,10 +17,10 @@ import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { HeroSchedulePreview } from "@/components/landing/HeroSchedulePreview";
+import { HeroHomePhone } from "@/components/landing/HeroHomePhone";
 import { AutoBuildDemo } from "@/components/landing/AutoBuildDemo";
 import { OpenShiftDemo } from "@/components/landing/OpenShiftDemo";
 import { SwapDemo } from "@/components/landing/SwapDemo";
-import { ScheduleAlertDemo } from "@/components/landing/ScheduleAlertDemo";
 import { OvertimeDemo } from "@/components/landing/OvertimeDemo";
 import { AccessDemo } from "@/components/landing/AccessDemo";
 import { SecurityCarousel } from "@/components/landing/SecurityCarousel";
@@ -40,28 +40,21 @@ function LandingSection({
   id,
   title,
   description,
-  alt = false,
-  wide = false,
   children,
 }: {
   id?: string;
   title: ReactNode;
   description: string;
-  alt?: boolean;
-  wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section
-      id={id}
-      className={`scroll-mt-14 py-14 sm:py-16 lg:py-20 ${alt ? "landing-section-alt" : ""}`}
-    >
-      <div className={`${wide ? "max-w-6xl" : "max-w-5xl"} mx-auto px-4 sm:px-6`}>
-        <div className="text-center mb-10">
+    <section id={id} className="landing-section scroll-mt-14 py-14 sm:py-20 lg:py-28">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="text-center mb-10 lg:mb-14">
           <h2 className="dg-font-brand-heading text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--dg-color-text-primary)]">
             {title}
           </h2>
-          <p className="mt-4 text-lg text-[var(--dg-color-text-muted)] max-w-xl mx-auto leading-relaxed">
+          <p className="mt-4 text-lg lg:text-xl text-[var(--dg-color-text-muted)] max-w-2xl mx-auto leading-relaxed">
             {description}
           </p>
         </div>
@@ -279,10 +272,17 @@ export default function RootPage() {
         </div>
       </section>
 
-      <section className="landing-hero-screenshot -mt-20 pb-4 sm:pb-8">
-        <div className="max-w-5xl mx-auto px-6">
+      <section className="landing-hero-screenshot -mt-20 pb-6 sm:pb-10 lg:pb-28">
+        <div className="landing-hero-stage max-w-[1248px] mx-auto px-6">
           <div className="landing-screenshot landing-screenshot-hero">
             <HeroSchedulePreview />
+          </div>
+          <div
+            className="landing-hero-phone"
+            role="img"
+            aria-label="The app's Home in its Team view"
+          >
+            <HeroHomePhone />
           </div>
         </div>
       </section>
@@ -296,7 +296,6 @@ export default function RootPage() {
       </LandingSection>
 
       <LandingSection
-        alt
         title="Never get caught short-staffed"
         description="Know which shifts need people before they start, and who can fill them."
       >
@@ -305,17 +304,11 @@ export default function RootPage() {
 
       <LandingSection
         title="No more swap texts and sticky notes"
-        description="Staff trade and give up shifts on their own. You just say yes or no."
+        description="Staff trade and give up shifts on their own. You just say yes or no, and whoever's shift changed hears about it."
       >
-        <SwapDemo />
-      </LandingSection>
-
-      <LandingSection
-        alt
-        title="No more “nobody told me”"
-        description="When shifts change, the people working them find out right away. Nobody else gets bothered."
-      >
-        <ScheduleAlertDemo />
+        <div className="landing-phones-trio">
+          <SwapDemo />
+        </div>
       </LandingSection>
 
       <LandingSection
@@ -326,7 +319,6 @@ export default function RootPage() {
       </LandingSection>
 
       <LandingSection
-        alt
         title="The right people make the right changes"
         description="Decide who can edit, publish and approve. Nobody changes what they shouldn't."
       >
@@ -335,7 +327,6 @@ export default function RootPage() {
 
       <LandingSection
         id="security"
-        wide
         title="Your team's information stays protected"
         description="Security that works quietly in the background."
       >
