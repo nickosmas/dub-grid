@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ShiftDiffDescriptorResult } from "@/lib/shift-diff-badges";
 import {
+  formatCorrectionLabel,
   formatPublishedMetadata,
   publishCellLevelBadge,
   publishedAtFormatter,
@@ -96,6 +97,36 @@ describe("formatPublishedMetadata", () => {
     expect(publishedAtFormatter("UTC")).toBe(publishedAtFormatter("UTC"));
     expect(publishedAtFormatter(undefined)).toBe(publishedAtFormatter(null));
     expect(publishedAtFormatter("UTC")).not.toBe(publishedAtFormatter("Asia/Kolkata"));
+  });
+});
+
+describe("formatCorrectionLabel", () => {
+  const correctedAt = "2026-10-30T22:12:00.000Z";
+
+  it("says when, by whom, and why", () => {
+    expect(
+      formatCorrectionLabel({
+        reason: "Left at 1 PM, not 3",
+        correctedAt,
+        correctedBy: "user-1",
+        resolveName: () => "Mina",
+        timeZone: "UTC",
+      }),
+    ).toBe("Corrected Oct 30, 2026, 10:12 PM UTC by Mina.\nReason: Left at 1 PM, not 3");
+  });
+
+  it("reads a reason key stored before reasons were typed", () => {
+    expect(formatCorrectionLabel({ reason: "called_off", correctedAt, timeZone: "UTC" })).toBe(
+      "Corrected Oct 30, 2026, 10:12 PM UTC.\nReason: Called off",
+    );
+  });
+
+  it("leaves out what it doesn't know", () => {
+    expect(formatCorrectionLabel({ reason: null })).toBe("Corrected.");
+    expect(
+      formatCorrectionLabel({ reason: null, correctedBy: "user-1", resolveName: () => null }),
+    ).toBe("Corrected by Unknown author.");
+    expect(formatCorrectionLabel({ reason: null, correctedAt: "not a date" })).toBe("Corrected.");
   });
 });
 

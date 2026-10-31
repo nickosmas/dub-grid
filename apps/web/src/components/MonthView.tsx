@@ -17,7 +17,7 @@ import {
   ShiftDisplayMode,
 } from "@/types";
 import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
-import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -226,7 +226,7 @@ function DayPopover({
                                   background: s.color,
                                   border: dk
                                     ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
-                                    : `1px solid ${borderColor(s.text)}`,
+                                    : FILLED_PILL_BORDER,
                                   borderRadius: "var(--dg-radius-xs)",
                                   padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
                                   fontSize: "var(--dg-fs-footnote)",

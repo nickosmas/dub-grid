@@ -33,6 +33,8 @@ import type {
 /** A corrected past day's latest correction (53c), with its typed reason if any. */
 export interface CorrectionMark {
   reason: string | null;
+  correctedBy?: string | null;
+  correctedAt?: string;
 }
 
 export interface ScheduleGridAccessors {

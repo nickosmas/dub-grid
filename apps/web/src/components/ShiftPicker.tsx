@@ -14,7 +14,7 @@ import {
 } from "@/types";
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
-import { borderColor, toDarkPillColors } from "@/lib/colors";
+import { FILLED_PILL_BORDER, toDarkPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
@@ -237,9 +237,12 @@ export default function ShiftPicker({
       padding: "8px 10px",
       borderRadius: "var(--dg-radius-lg)",
       background: disabled ? "var(--dg-color-bg)" : background,
+      backgroundOrigin: "border-box",
       border: disabled
         ? "1px dashed var(--dg-color-border-strong)"
-        : `1px solid ${isActive ? "var(--dg-color-primary)" : borderColor(text)}`,
+        : isActive
+          ? "1px solid var(--dg-color-primary)"
+          : FILLED_PILL_BORDER,
       // A second 1px ring outside the border reads as a 2px selection ring.
       boxShadow: isActive ? "0 0 0 1px var(--dg-color-primary)" : "none",
       color: disabled ? "var(--dg-color-text-subtle)" : text,

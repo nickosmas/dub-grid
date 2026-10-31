@@ -41,6 +41,7 @@ import {
 } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
+import { FILLED_PILL_BORDER } from "@/lib/colors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -596,8 +597,9 @@ export default function ShiftRequestBoard({
                 padding: "2px 8px",
                 borderRadius: "var(--dg-radius-sm)",
                 background: absenceTypeColors?.background || "var(--dg-color-surface-alt)",
+                backgroundOrigin: "border-box",
                 color: absenceTypeColors?.text || "var(--dg-color-text-primary)",
-                border: `1px solid ${absenceTypeColors?.border || "var(--dg-color-border)"}`,
+                border: absenceTypeColors ? FILLED_PILL_BORDER : "1px solid var(--dg-color-border)",
               }}
             >
               {absenceType.label}: {absenceType.name}

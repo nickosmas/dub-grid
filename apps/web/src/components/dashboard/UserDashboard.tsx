@@ -23,7 +23,7 @@ import {
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
@@ -2272,7 +2272,8 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
     <span
       style={{
         background: segment.backgroundColor,
-        border: `1px solid ${segment.borderColor}`,
+        backgroundOrigin: "border-box",
+        border: FILLED_PILL_BORDER,
         borderRadius: 7,
         color: segment.textColor,
         display: "inline-flex",

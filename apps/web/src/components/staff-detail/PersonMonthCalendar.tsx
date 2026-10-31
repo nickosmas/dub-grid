@@ -8,7 +8,7 @@ import { addDaysToIsoDate } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { DAY_LABELS } from "@/lib/constants";
-import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import type { ShiftRecordLookups } from "@/lib/shift-records";
 import type { AssignmentDefinition, ShiftMap } from "@/types";
@@ -131,7 +131,7 @@ export function PersonMonthCalendar({
           name,
           detail: job && job.trim().toLowerCase() !== name.trim().toLowerCase() ? job : null,
           background: colors.color,
-          border: draftBorder ? `2px dashed ${draftBorder}` : `1px solid ${colors.border}`,
+          border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
           text: colors.text,
         };
       });
@@ -146,7 +146,7 @@ export function PersonMonthCalendar({
         name: absence.name || absence.label,
         detail: null,
         background: fill.background,
-        border: draftBorder ? `2px dashed ${draftBorder}` : `1px solid ${fill.border}`,
+        border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
         text: fill.text,
       });
     }
