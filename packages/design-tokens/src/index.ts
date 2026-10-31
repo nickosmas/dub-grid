@@ -65,6 +65,13 @@ export {
   type AbsenceStripeColors,
 } from "./pill-colors";
 
+export {
+  resolveToastDuration,
+  TOAST_ACTION_MIN_DURATION_MS,
+  TOAST_DURATION_MS,
+  type ToastTimingTone,
+} from "./toast-timing";
+
 export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
 
 export {

@@ -258,6 +258,7 @@
   --dg-radius-md: 8px;
   --dg-radius-lg: 10px;
   --dg-radius-xl: 12px;
+  --dg-radius-2xl: 14px;
   --dg-tab-shell-radius: var(--dg-radius-md);
   --dg-tab-shell-pad: 2px;
   --dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));
@@ -275,14 +276,6 @@
   --dg-on-dark-control: rgba(255, 255, 255, 0.18);
   --dg-on-dark-control-hover: rgba(255, 255, 255, 0.35);
   --dg-on-dark-control-border: rgba(255, 255, 255, 0.28);
-  --dg-toast-success-bg: #16a34a;
-  --dg-toast-success-border: #166534;
-  --dg-toast-error-bg: #dc2626;
-  --dg-toast-error-border: #b91c1c;
-  --dg-toast-info-bg: #1d4ed8;
-  --dg-toast-info-border: #1e3a8a;
-  --dg-toast-warning-bg: #d97706;
-  --dg-toast-warning-border: #92400e;
 
   /* Light palette. `--dg-color-*` is the canonical web color namespace. */
   --dg-color-bg: #fcfcfc;
@@ -1439,91 +1432,111 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 /* ── Dashboard Card ─────────────────────────────────────── */
 /* ── Form Layout Helpers ───────────────────────────────── */
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
-/* Vibrant, full-color banner toasts — no shadows */
+/* A quiet neutral card for every type; only the icon carries the tone. The
+   icon, title, action and close share the title's first 20px line, and the
+   28px buttons overhang the padding by 4px so the card stays 52px tall. */
 [data-sonner-toaster] {
-  --width: min(calc(100vw - 48px), 720px) !important;
+  --width: min(400px, calc(100vw - 32px)) !important;
+  --border-radius: var(--dg-radius-2xl) !important;
+  /* Sonner sets its own system font stack; the product font is Inter. */
+  font-family: inherit !important;
 }
 [data-sonner-toast] {
-  box-shadow: none !important;
-  padding: 14px 48px 14px 20px !important;
+  background: var(--dg-color-surface) !important;
+  color: var(--dg-color-text-primary) !important;
+  border: 1px solid var(--dg-color-border) !important;
+  border-radius: var(--dg-radius-2xl) !important;
+  box-shadow: var(--shadow-menu) !important;
+  padding: 16px 8px 16px 16px !important;
   width: var(--width) !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
 }
-/* Toast type colors — vibrant solid backgrounds with white text */
-[data-sonner-toast][data-type="success"] {
-  background: var(--dg-toast-success-bg) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: 1px solid var(--dg-toast-success-border) !important;
+[data-sonner-toast] [data-icon] {
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
 }
-[data-sonner-toast][data-type="error"] {
-  background: var(--dg-toast-error-bg) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: 1px solid var(--dg-toast-error-border) !important;
+[data-sonner-toast] [data-icon] svg {
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
 }
-[data-sonner-toast][data-type="info"] {
-  background: var(--dg-toast-info-bg) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: 1px solid var(--dg-toast-info-border) !important;
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--dg-color-success-solid);
 }
-[data-sonner-toast][data-type="warning"] {
-  background: var(--dg-toast-warning-bg) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: 1px solid var(--dg-toast-warning-border) !important;
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--dg-color-danger);
+}
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--dg-color-warning-dark);
+}
+[data-sonner-toast][data-type="info"] [data-icon],
+[data-sonner-toast][data-type="loading"] [data-icon] {
+  color: var(--dg-color-info);
+}
+[data-sonner-toast] [data-content] {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px !important;
 }
 [data-sonner-toast] [data-title] {
-  color: inherit !important;
+  color: var(--dg-color-text-primary) !important;
   font-size: 14px !important;
+  line-height: 20px !important;
   font-weight: 600 !important;
 }
 [data-sonner-toast] [data-description] {
-  color: var(--dg-on-dark-description) !important;
+  color: var(--dg-color-text-muted) !important;
   font-size: 13px !important;
-  font-weight: 500 !important;
+  line-height: 18px !important;
+  font-weight: 400 !important;
 }
-/* Close button — white pill */
+[data-sonner-toast] [data-button],
 [data-sonner-toast] [data-close-button] {
-  position: absolute !important;
-  top: 50% !important;
-  right: 10px !important;
-  left: auto !important;
-  transform: translateY(-50%) !important;
-  background: var(--dg-on-dark-control) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: 1px solid var(--dg-on-dark-control-border) !important;
-  opacity: 1 !important;
-  padding: 0 !important;
-  border-radius: 50% !important;
-  transition: transform 150ms ease !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-sizing: border-box !important;
-  width: 28px !important;
+  order: 3;
+  flex-shrink: 0;
   height: 28px !important;
+  margin: -4px 0 !important;
+  border: none !important;
+  border-radius: var(--dg-radius-md) !important;
+  background: transparent !important;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease !important;
 }
-[data-sonner-toast] [data-close-button]:hover {
-  background: var(--dg-on-dark-control-hover) !important;
-  transform: translateY(-50%) scale(1.1) !important;
+[data-sonner-toast] [data-button] {
+  /* 2px from the close button rather than the card's 12px gap. */
+  margin-right: -10px !important;
+  padding: 0 8px !important;
+  color: var(--dg-color-brand) !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  font-weight: 600 !important;
+}
+[data-sonner-toast] [data-close-button] {
+  order: 4;
+  position: static !important;
+  transform: none !important;
+  width: 28px !important;
+  padding: 0 !important;
+  color: var(--dg-color-text-subtle) !important;
+  opacity: 1 !important;
 }
 [data-sonner-toast] [data-close-button] svg {
-  width: 14px !important;
-  height: 14px !important;
-  color: var(--dg-color-text-inverse) !important;
+  width: 20px !important;
+  height: 20px !important;
 }
-/* Action button — dark for universal contrast */
-[data-sonner-toast] [data-button] {
-  background: var(--dg-color-dark) !important;
-  color: var(--dg-color-text-inverse) !important;
-  border: none !important;
-  padding: 8px 16px !important;
-  border-radius: 8px !important;
-  font-weight: 700 !important;
-  font-size: 12px !important;
-  margin-left: auto !important;
-  transition: all 150ms ease !important;
+[data-sonner-toast] [data-button]:hover,
+[data-sonner-toast]:hover [data-close-button]:hover {
+  background: var(--dg-color-surface-hover) !important;
 }
-[data-sonner-toast] [data-button]:hover {
-  background: var(--dg-color-dark-elevated) !important;
-  transform: translateY(-1px);
+[data-sonner-toast]:hover [data-close-button]:hover {
+  color: var(--dg-color-text-primary) !important;
+}
+[data-sonner-toast] [data-button]:focus-visible,
+[data-sonner-toast] [data-close-button]:focus-visible {
+  box-shadow: 0 0 0 3px var(--dg-focus-ring) !important;
 }
 /* ── Loading Patterns ──────────────────────────────────── */
 @keyframes dg-shimmer {
