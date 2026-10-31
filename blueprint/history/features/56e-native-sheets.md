@@ -15,8 +15,12 @@ Every bottom sheet and popup uses the platform's own element (owner,
   iOS 26) and Material 3's ModalBottomSheet on Android. A sheet that fits its
   content is sized to it; a sheet that scrolls opens at full height, like a
   system form sheet, so the keyboard never pushes its title and actions off
-  the screen. The title row keeps a close button (`ChromeIconButton`), since a
-  sheet holding unsaved input answers its swipe with a discard question.
+  the screen. Its header follows each platform (owner, 2026-10-31: "make sure
+  sheet headers design is native", citing the HIG Sheets page and Material 3's
+  bottom sheets): on iOS a bar under the grabber with the close button as a
+  glass circle on the leading edge and the title centered at 17 points; on
+  Android the title left-aligned under the drag handle with no close button,
+  since a swipe, the scrim and Back close the sheet.
 - **Confirmations** that are only words are the system alert (UIKit's alert,
   Material's AlertDialog), with Cancel, an optional second action and the
   confirm action (destructive style for a danger confirmation), keeping each
