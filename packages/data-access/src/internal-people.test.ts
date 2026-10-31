@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   canSeeInternalPeople,
   withoutHiddenRequests,
   withoutHiddenStaffRows,
   fetchHiddenInternalUserIds,
+  resetInternalUserIdsMemo,
   withoutHiddenMembers,
   withoutHiddenStaff,
 } from "./internal-people";
@@ -38,6 +39,21 @@ describe("canSeeInternalPeople", () => {
 });
 
 describe("fetchHiddenInternalUserIds", () => {
+  beforeEach(() => resetInternalUserIdsMemo());
+
+  it("reads the list once for the requests that arrive within half a minute", async () => {
+    const { client, from } = profilesClient(["qa-1"]);
+    const viewer = { userId: "client", isGridmaster: false };
+
+    await Promise.all([
+      fetchHiddenInternalUserIds(client, viewer),
+      fetchHiddenInternalUserIds(client, viewer),
+    ]);
+    await fetchHiddenInternalUserIds(client, { userId: "qa-1", isGridmaster: false });
+
+    expect(from).toHaveBeenCalledTimes(1);
+  });
+
   it("hides every internal account from a client", async () => {
     const { client, query } = profilesClient(["qa-1", "qa-2"]);
     await expect(

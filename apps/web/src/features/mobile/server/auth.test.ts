@@ -161,8 +161,9 @@ function createServiceClient(input?: {
 }
 
 describe("mobile auth server boundaries", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    (await import("./auth")).resetMobileAuthMemoForTests();
     isSessionRevoked.mockResolvedValue(false);
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
       {
@@ -603,5 +604,38 @@ describe("mobile auth server boundaries", () => {
 
       expect("response" in result).toBe(false);
     });
+  });
+
+  it("resolves one token once for the requests a cold start sends together", async () => {
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+    const { requireMobileAuth } = await import("./auth");
+    const request = () =>
+      requireMobileAuth(
+        new Request("http://localhost/api/mobile/v1/bootstrap", {
+          headers: { authorization: "Bearer shared-token" },
+        }) as never,
+      );
+
+    const [first, second] = await Promise.all([request(), request()]);
+
+    expect("response" in first).toBe(false);
+    expect(second).toBe(first);
+    expect(verifyAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a refusal rather than remembering it", async () => {
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+    isSessionRevoked.mockResolvedValueOnce(true);
+    const { requireMobileAuth } = await import("./auth");
+    const request = () =>
+      requireMobileAuth(
+        new Request("http://localhost/api/mobile/v1/bootstrap", {
+          headers: { authorization: "Bearer refused-once" },
+        }) as never,
+      );
+
+    expect("response" in (await request())).toBe(true);
+    expect("response" in (await request())).toBe(false);
+    expect(verifyAccessToken).toHaveBeenCalledTimes(2);
   });
 });

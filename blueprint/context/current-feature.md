@@ -104,17 +104,16 @@ Must hold:
     **Done when:** `PERF_TIMING=1` Server-Timing on a fresh process shows no
     Redis span for the policy and no JWKS fetch in a route, and the tests pass.
 
-- [ ] **4. Mobile API server path (F-184, F-185).**
+- [x] **4. Mobile API server path (F-184, F-185).**
   - `features/mobile/server/auth.ts`: start the `mobile_api` flag read
     alongside token verification.
   - `packages/mobile-api-core/src/setup.ts`: dedupe the setup check in flight
     per org and memo the answer briefly, as the web side does.
   - Memo the resolved mobile auth context per token hash for 5 seconds.
   - `fetchMobileScheduleEntries` (`data.ts:953-971`): run the comparison-rows
-    query with the reference reads. Reuse the employee row auth already loads
-    instead of `fetchLinkedEmployeeForUser` in `/me/schedule` and
-    `/shift-requests`. Start the hidden-people lookup in the auth wave and memo
-    it platform-wide for 30 seconds.
+    query with the reference reads. Remember the internal-account list for 30
+    seconds, one read in flight, in `fetchHiddenInternalUserIds`. (The linked
+    employee read stays: which requests a person sees depends on it.)
   - Tests: auth memo isolation between tokens and its expiry; setup dedupe;
     handler results unchanged.
     **Done when:** a cold `/bootstrap` and `/me/schedule` each show at least one
