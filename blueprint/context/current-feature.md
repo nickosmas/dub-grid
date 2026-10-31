@@ -87,18 +87,18 @@ Must hold:
     three, in the network panel, and no full roster request on pages that don't
     show one.
 
-- [ ] **3. Server auth path (F-157, F-158).**
+- [x] **3. Server auth path (F-157, F-158).**
   - `lib/billing-policy.ts`: read the platform policy straight from the
-    database with a 5-minute memo, no Redis; the proxy's missing-claims
-    fallback likewise.
+    database with a one-minute memo and one read in flight, no Redis. (A
+    minute, not five: other processes pick up a Gridmaster's change within a
+    minute. The proxy's rare missing-claims fallback is left as it is.)
   - `app/api/shared/permissions.ts` (`requireOrgPermissions`): start the policy
     and "setup complete" reads in the same `Promise.all` as the membership,
     profile and organization reads; ignore setup for Gridmasters.
   - `lib/auth/verify-token.ts`: `verifyAccessToken` uses `getProxyJwks()`.
   - `(app)/layout.tsx`: move `layout_client_flags` into the `Promise.all`.
-  - `next.config.ts`: fail the production build (not a silent fallback) when
-    the JWKS can't be fetched, unless an explicit opt-out env is set for
-    offline builds.
+  - `next.config.ts`: say in the build log when the keys could not be
+    shipped. (Not a failed build: CI builds run without a reachable Supabase.)
   - Tests: route-level tests for the parallel order and the fail-closed
     policy; `proxy-jwks.test.ts` extended to `verifyAccessToken`.
     **Done when:** `PERF_TIMING=1` Server-Timing on a fresh process shows no

@@ -91,7 +91,6 @@ export const CacheKey = {
 
   // Platform-wide kill switches (see lib/feature-flags.ts)
   platformFlags: () => `dg:platform:featureFlags`,
-  platformBillingPolicy: () => `dg:platform:billingPolicy`,
 
   /**
    * Whether an org has finished setup (see requireOrgPermissions). Only ever

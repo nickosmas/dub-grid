@@ -10,7 +10,11 @@ import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
+import {
+  BILLING_ACCESS_SELECT,
+  evaluateOrgBillingAccess,
+  getPlatformBillingPolicy,
+} from "@/lib/billing-policy";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -454,6 +458,14 @@ export async function requireOrgPermissions(
   }
 
   const userClient = createRequestSupabaseClient(req);
+  // Started with the reads below rather than after them: each needs only the
+  // organization, and waiting added two serial round trips to every request.
+  // The setup answer is ignored for a Gridmaster and anyone refused first.
+  const platformPolicy = getPlatformBillingPolicy(serviceClient);
+  const setupCompleteAnswer = options?.allowDuringSetup
+    ? null
+    : isOrganizationSetupCompleteCached(serviceClient, orgId);
+  setupCompleteAnswer?.catch(() => {});
   const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
     serviceClient
       .from("organization_memberships")
@@ -532,7 +544,9 @@ export async function requireOrgPermissions(
     (membership?.admin_permissions as AdminPermissions | null) ?? null,
   );
 
-  const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization);
+  const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization, {
+    policy: await platformPolicy,
+  });
   if (billingAccess.isLocked && !options?.allowLockedOrganization && !permissions.isGridmaster) {
     return { response: lockedOrganizationResponse() };
   }
@@ -541,8 +555,8 @@ export async function requireOrgPermissions(
     return { response: forbiddenResponse(API_ERRORS.INSUFFICIENT_PERMISSION) };
   }
 
-  if (!options?.allowDuringSetup && !permissions.isGridmaster) {
-    const setupComplete = await isOrganizationSetupCompleteCached(serviceClient, orgId);
+  if (setupCompleteAnswer && !permissions.isGridmaster) {
+    const setupComplete = await setupCompleteAnswer;
     if (!setupComplete) {
       return { response: lockedOrganizationResponse() };
     }

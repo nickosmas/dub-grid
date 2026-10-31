@@ -10,7 +10,6 @@ import {
   type Organization,
   type ResolvedBillingPolicy,
 } from "@dubgrid/domain";
-import { cacheDel, cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import * as Sentry from "@/lib/sentry";
 
 type QueryClient = { from: (table: string) => any };
@@ -26,10 +25,14 @@ export const ORG_ACCESS_SELECT = `suspended_at, archived_at, subscription_status
 const PLATFORM_SELECT =
   "default_trial_days, trial_grace_days, trial_reminder_days, payment_grace_days, updated_at";
 
-// The proxy reads the policy on every request, so each process keeps it for a
-// few seconds before asking Redis again, as the proxy does for org access.
-const MEMO_MS = 10_000;
+// The proxy and every route read the policy on each request. It is one row a
+// Gridmaster changes rarely, so each process keeps it for a minute and reads
+// the database directly: a Redis layer in front cost a serial round trip, then
+// the database on a miss, on exactly the cold requests that are slowest. The
+// saving process forgets it at once; others take up to a minute.
+const MEMO_MS = 60_000;
 let memo: { policy: BillingPolicy; expiresAt: number } | null = null;
+let inFlight: Promise<BillingPolicy> | null = null;
 
 function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -53,17 +56,6 @@ function policyFromRow(row: Record<string, unknown> | null): BillingPolicy {
   };
 }
 
-function isPolicy(value: unknown): value is BillingPolicy {
-  if (!value || typeof value !== "object") return false;
-  const policy = value as Record<string, unknown>;
-  return (
-    isNumber(policy.trialDays) &&
-    isNumber(policy.trialGraceDays) &&
-    isNumber(policy.trialReminderDays) &&
-    isNumber(policy.paymentGraceDays)
-  );
-}
-
 async function readPlatformPolicy(client: QueryClient): Promise<BillingPolicy> {
   const { data, error } = await client
     .from("platform_billing_settings")
@@ -76,23 +68,24 @@ async function readPlatformPolicy(client: QueryClient): Promise<BillingPolicy> {
 
 /**
  * The platform's billing defaults. Fails closed to the built-in defaults: a
- * Redis or database blip must never silently lengthen or shorten a grace
- * period, and the fallback is not cached, so the next read retries.
+ * database blip must never silently lengthen or shorten a grace period, and
+ * the fallback is not kept, so the next read retries.
  */
 export async function getPlatformBillingPolicy(client: QueryClient): Promise<BillingPolicy> {
-  const now = Date.now();
-  if (memo && memo.expiresAt > now) return memo.policy;
-  try {
-    const cached = await cacheThrough(CacheKey.platformBillingPolicy(), TTL.MIDDLEWARE, () =>
-      readPlatformPolicy(client),
-    );
-    const policy = isPolicy(cached) ? cached : DEFAULT_BILLING_POLICY;
-    memo = { policy, expiresAt: now + MEMO_MS };
-    return policy;
-  } catch (error) {
-    Sentry.captureException(error, { extra: { context: "platform-billing-policy-read" } });
-    return DEFAULT_BILLING_POLICY;
-  }
+  if (memo && memo.expiresAt > Date.now()) return memo.policy;
+  inFlight ??= readPlatformPolicy(client)
+    .then((policy) => {
+      memo = { policy, expiresAt: Date.now() + MEMO_MS };
+      return policy;
+    })
+    .catch((error: unknown) => {
+      Sentry.captureException(error, { extra: { context: "platform-billing-policy-read" } });
+      return DEFAULT_BILLING_POLICY;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
 }
 
 /** An organization's effective policy, from its row's override columns. */
@@ -170,10 +163,10 @@ export async function evaluateOrganizationAccess(
 /** Call after a Gridmaster changes the platform defaults. */
 export async function invalidatePlatformBillingPolicyCache(): Promise<void> {
   memo = null;
-  await cacheDel(CacheKey.platformBillingPolicy());
 }
 
 /** Test seam: forgets the per-process memo. */
 export function resetBillingPolicyMemoForTests(): void {
   memo = null;
+  inFlight = null;
 }

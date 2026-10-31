@@ -107,7 +107,6 @@ vi.mock("@/lib/cache", () => ({
     mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
     mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
-    platformBillingPolicy: () => `dg:platform:billingPolicy`,
   },
   TTL: { MIDDLEWARE: 30 },
 }));
