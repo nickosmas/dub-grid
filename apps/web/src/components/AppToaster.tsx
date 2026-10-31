@@ -1,6 +1,8 @@
 "use client";
 
+import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from "lucide-react";
 import { Toaster, toast, type ExternalToast } from "sonner";
+import { withToastDuration } from "./toast-duration";
 
 type ToastMethod = "success" | "error" | "info" | "warning" | "message" | "loading";
 
@@ -33,7 +35,9 @@ if (typeof window !== "undefined" && !globalThis.__dubgridToastPatched) {
     const original = target[tone];
     if (typeof original !== "function") continue;
 
-    target[tone] = function patched(title, options) {
+    target[tone] = function patched(title, callerOptions) {
+      const options = withToastDuration(tone, callerOptions);
+
       // If the caller passed an explicit id, forward unchanged — they own dedupe.
       if (options?.id !== undefined) return original.call(this, title, options);
 
@@ -70,16 +74,23 @@ if (typeof window !== "undefined" && !globalThis.__dubgridToastPatched) {
   }
 }
 
+const ICONS = {
+  success: <CircleCheck strokeWidth={2} aria-hidden />,
+  error: <CircleAlert strokeWidth={2} aria-hidden />,
+  warning: <TriangleAlert strokeWidth={2} aria-hidden />,
+  info: <Info strokeWidth={2} aria-hidden />,
+  loading: <LoaderCircle strokeWidth={2} className="animate-spin" aria-hidden />,
+  close: <X strokeWidth={2} aria-hidden />,
+};
+
 export default function AppToaster() {
   return (
     <Toaster
-      position="top-center"
+      position="bottom-right"
+      visibleToasts={3}
       closeButton
-      duration={6000}
-      toastOptions={{
-        className:
-          "text-[15px] font-semibold rounded-[var(--dg-radius-lg)] w-[min(calc(100vw-48px),720px)] max-w-full",
-      }}
+      icons={ICONS}
+      toastOptions={{ className: "rounded-[var(--dg-radius-2xl)]" }}
     />
   );
 }
