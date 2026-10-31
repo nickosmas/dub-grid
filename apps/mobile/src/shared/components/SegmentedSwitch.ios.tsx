@@ -37,5 +37,9 @@ export function SegmentedSwitch<Value extends string>({
 const styles = StyleSheet.create({
   host: {
     alignSelf: "stretch",
+    // UIKit's segmented control is 32pt. Laid out at that height from the start, a header holding it
+    // doesn't grow after its first measurement, which left the page under it
+    // padded for the shorter header.
+    minHeight: 32,
   },
 });

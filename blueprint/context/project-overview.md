@@ -579,9 +579,13 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   (UIKit segmented control on iOS, Material 3 segmented buttons on Android,
   through `@expo/ui`), the staff Home's open shifts carousel showing every
   gap with Claim only where the admin can work it, and no "Your team" label.
-- **56c - Native top bars:** planned; Liquid Glass bar buttons and native
-  search on iOS, a Material top app bar, floating action button and bottom
-  navigation on Android.
+- **56c - Native top bars:** shipped; Liquid Glass header buttons on iOS
+  and Material tonal ones on Android, People's Add person and Filter (a blue
+  circle while filters are on) in the native navigation bar with the search field above the
+  list (the system one on iOS, Material's docked search bar on Android), and
+  Android's own Material bottom navigation in place of the floating tab bar.
+- **56e - Native sheets and dialogs:** planned; every sheet and popup uses
+  the platform's own.
 - **56d - Polish pass:** planned; every screen on both platforms.
 
 Android keeps DubGrid's brand colors rather than wallpaper colors.

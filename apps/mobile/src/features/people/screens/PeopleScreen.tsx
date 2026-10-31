@@ -1,9 +1,8 @@
 import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router } from "expo-router";
@@ -28,20 +27,17 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import {
-  FilterButton,
   FilterSheet,
   SelectionRow,
   SelectionSection,
 } from "../../../shared/components/FilterSheet";
-import { SearchBar } from "../../../shared/components/SearchBar";
-import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
-import { SegmentedControl } from "../../../shared/components/SegmentedControl";
+import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import {
   getAdminProfileChangeRequests,
   getManagementUsers,
@@ -66,7 +62,6 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileAvatarText,
   mobileElevation,
-  mobileMotion,
   mobileRadii,
   mobileTabularText,
   mobileText,
@@ -78,15 +73,14 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { AddPersonKindSheet, type AddPersonKind } from "../components/AddPersonKindSheet";
 import { AddPersonSheet } from "../components/AddPersonSheet";
+import { PeopleHeaderActions } from "../components/PeopleHeaderActions";
+import { ScreenSearch } from "../../../shared/components/ScreenSearch";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
-import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { StatusMarkIcon } from "../components/StatusMark";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const EMPLOYEE_STATUSES: readonly EmployeeStatus[] = ["active", "inactive", "removed"];
 
@@ -679,6 +673,14 @@ export default function PeopleScreen() {
         data: rosterItems,
         keyExtractor: (item) => (item.kind === "management" ? `m-${item.user.id}` : item.person.id),
         renderItem: renderRosterItem,
+        // Under the search field the list starts close by; a People requests
+        // section above it keeps the full section gap.
+        headerGap:
+          canManageEmployees && profileRequests.length > 0
+            ? undefined
+            : Platform.OS === "android"
+              ? mobileSpace.md
+              : 0,
       }}
     >
       <FilterSheet
@@ -690,17 +692,15 @@ export default function PeopleScreen() {
         visible={isFilterModalVisible}
       >
         {canSeeManagementRoster ? (
-          <View style={styles.rosterTabs}>
-            <SegmentedControl
-              accessibilityLabel="Directory section"
-              onChange={setRosterTab}
-              options={[
-                { value: "schedule", label: "Schedule", count: visiblePeople.length },
-                { value: "management", label: "Management", count: managementUsers.length },
-              ]}
-              value={rosterTab}
-            />
-          </View>
+          <SegmentedSwitch
+            accessibilityLabel="Directory section"
+            options={[
+              { value: "schedule", label: "Schedule" },
+              { value: "management", label: "Management" },
+            ]}
+            value={rosterTab}
+            onChange={setRosterTab}
+          />
         ) : null}
         {isManagementTab ? (
           <>
@@ -928,25 +928,15 @@ export default function PeopleScreen() {
         )}
       </FilterSheet>
 
-      <View style={styles.section}>
-        <View style={styles.searchBarRow}>
-          <SearchBar
-            accessibilityLabel="Search people"
-            onChangeText={setSearchValue}
-            placeholder={isManagementTab ? "Search management" : "Search people"}
-            value={searchValue}
-          />
-          <FilterButton
-            accessibilityLabel="Open people filters and sort"
-            activeCount={activeFilterCount}
-            expanded={isFilterModalVisible}
-            onPress={() => setIsFilterModalVisible(true)}
-          />
-          {canAddScheduled || canAddManagement ? (
-            <AddPersonButton accessibilityLabel="Add person" onPress={openAddPerson} />
-          ) : null}
-        </View>
-      </View>
+      <PeopleHeaderActions
+        activeFilterCount={activeFilterCount}
+        onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
+        onOpenFilters={() => setIsFilterModalVisible(true)}
+      />
+      <ScreenSearch
+        placeholder={isManagementTab ? "Search management" : "Search people"}
+        onSearchChange={setSearchValue}
+      />
 
       {canManageEmployees && profileRequests.length > 0 ? (
         <View style={styles.section}>
@@ -1132,43 +1122,6 @@ function countManagementUsersInDepartment(
   ).length;
 }
 
-/**
- * A circle rather than the shared `<Button iconOnly>`, which caps at 44 and
- * would sit two points shorter than the search field it lines up with.
- */
-function AddPersonButton({
-  accessibilityLabel,
-  onPress,
-}: {
-  accessibilityLabel: string;
-  onPress: () => unknown;
-}) {
-  // Latched like every other press handler, so this stays safe if it is ever
-  // pointed at something that files a request rather than opening a screen.
-  const action = useAsyncAction(onPress);
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
-    rippleBorderless: true,
-    rippleColor: mobileColors.rippleNeutral,
-    scale: mobileMotion.press.iconOnlyScale,
-  });
-
-  return (
-    <AnimatedPressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      android_ripple={androidRipple}
-      onPress={action.run}
-      {...pressHandlers}
-      style={[styles.addPersonButton, animatedStyle]}
-    >
-      <Ionicons color={mobileColors.controlSecondaryFg} name="person-add-outline" size={18} />
-    </AnimatedPressable>
-  );
-}
-
 const PERSON_ROW_INSET = mobileSpace.sm;
 
 function PersonRow({
@@ -1307,27 +1260,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Air above a title that follows another section's card; the card's
       // own gap below the title stays at the section's `gap`.
       paddingTop: mobileSpace.sm,
-    },
-    searchBarRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: mobileSpace.md,
-    },
-    rosterTabs: {
-      // The control sizes to its own labels, so it needs a start-aligned row
-      // rather than stretching across the gutter. The sheet body's own `gap`
-      // spaces it from the sections below.
-      alignItems: "flex-start",
-    },
-    addPersonButton: {
-      alignItems: "center",
-      backgroundColor: mobileColors.controlSecondaryBg,
-      // Circular: 46 square at the pill radius, matching the search field's
-      // height and the filter pill beside it.
-      borderRadius: mobileRadii.pill,
-      height: 46,
-      justifyContent: "center",
-      width: 46,
     },
     // The clip sits on an inner view: iOS drops a view's own shadow when the
     // same view clips its children.
