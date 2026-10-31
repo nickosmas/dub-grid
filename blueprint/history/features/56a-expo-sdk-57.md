@@ -95,6 +95,13 @@ What it unlocks:
   Super Admin, then staff after sign-out): Home, Schedule, Requests, People,
   Profile, shift detail and back twice; no JavaScript errors or warnings.
 
+- **Found on the iPhone:** Home opened scrolled by the header's height, the
+  hero card under it. React Native 0.86 clamps a programmatic scroll to the
+  current content inset, and `Screen` scrolled to `-height` in the same
+  `onLayout` that set the inset, so it landed at 0. The correction now runs
+  a frame after the inset applies (simulator: y=0, then y=-132 with a
+  132-point inset).
+
 ## Verify
 
 `npm run type-check`, `npm run lint`, `npm run test`, `npm run build`,

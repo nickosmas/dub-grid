@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 import { mobileSpacing } from "../theme/tokens";
@@ -615,7 +615,7 @@ describe("Screen", () => {
     expect(nativeScrollTo).toHaveBeenCalledWith({ y: -100, animated: true });
   });
 
-  it("self-corrects position the moment the sticky header's height is first measured, with no caller involved", () => {
+  it("self-corrects position once the sticky header's first height is applied, with no caller involved", async () => {
     // Regression for a race where a caller's scrollTo(y: 0) fires before the
     // header's onLayout has reported a height (e.g. on a warm cache, where
     // data — and so a caller's own "scroll to top" effect — can resolve in
@@ -623,14 +623,19 @@ describe("Screen", () => {
     // moment there's nothing yet to subtract, so the translated call is a
     // no-op, leaving content under the header with no visible correction.
     // Screen itself must self-correct once the real height becomes known,
-    // regardless of whether any caller already (ineffectively) tried.
+    // regardless of whether any caller already (ineffectively) tried. It
+    // waits a frame for the contentInset that height produces: React Native
+    // 0.86 clamps a scroll above the current inset, so scrolling first lands
+    // at 0.
     render(
       <Screen stickyHeader={<span>Header</span>}>
         <div>Body</div>
       </Screen>,
     );
 
-    expect(nativeScrollTo).toHaveBeenCalledWith({ x: 0, y: -100, animated: false });
+    await waitFor(() =>
+      expect(nativeScrollTo).toHaveBeenCalledWith({ x: 0, y: -100, animated: false }),
+    );
   });
 });
 
