@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { prefetchHomeQueries } from "../../features/auth/lib/prefetch-home";
+import { getStartupBeganAt } from "../../features/auth/lib/warm-startup";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
 import { useAppLockState } from "../providers/AppLockProvider";
@@ -65,9 +66,15 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setMinimumElapsed(true);
-    }, MIN_SPLASH_MS);
+    // Counted from launch: fonts and the theme read already spent part of it.
+    const beganAt = getStartupBeganAt();
+    const remaining = beganAt === null ? MIN_SPLASH_MS : MIN_SPLASH_MS - (Date.now() - beganAt);
+    const timeout = setTimeout(
+      () => {
+        setMinimumElapsed(true);
+      },
+      Math.max(0, remaining),
+    );
 
     return () => {
       clearTimeout(timeout);

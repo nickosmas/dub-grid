@@ -130,7 +130,7 @@ Must hold:
     **Done when:** a simulator sign-in makes no `/bootstrap` request, and Home
     queries start as soon as login returns.
 
-- [ ] **6. Mobile cold start overlaps (F-183).**
+- [x] **6. Mobile cold start overlaps (F-183).**
   - Chain the module-scope `warmSupabaseSession()` into
     `queryClient.prefetchQuery(createBootstrapQueryOptions(token))`, and start
     the theme read at module scope.
