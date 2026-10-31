@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
 import { Button } from "@/components/Button";
-import { DelayedReveal } from "@/components/DelayedReveal";
 import { useLogout } from "@/hooks/useLogout";
 import { getAuthTransitionStartedAt } from "@/lib/auth-transition";
+
+/**
+ * A normal sign-in finishes well inside this, so its handoff shows only the
+ * page background; the title and logo appear only for a wait worth explaining.
+ */
+export const AUTH_TRANSITION_REVEAL_AFTER_MS = 2_000;
 
 type TransitionPhase = "signing-in" | "workspace" | "onboarding";
 
@@ -35,23 +40,25 @@ export default function AuthTransitionScreen({
   retrying = false,
   offline = false,
   showActionsImmediately = false,
-  revealAfterMs = 0,
 }: {
   phase: TransitionPhase;
   onRetry?: () => Promise<void>;
   retrying?: boolean;
   offline?: boolean;
   showActionsImmediately?: boolean;
-  /**
-   * Shows only the background until this many ms have passed, for waits that
-   * are usually too short to need a loading screen.
-   */
-  revealAfterMs?: number;
 }) {
   const { signOut } = useLogout();
   const [startedAt] = useState(() => getAuthTransitionStartedAt() ?? Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.floor((Date.now() - startedAt) / 1_000),
+  );
+  // Counted from the start of the handoff, not this mount: each phase mounts
+  // its own screen, and restarting the delay per phase would still flash one.
+  // Failure screens show at once.
+  const [revealDelayMs] = useState(() =>
+    showActionsImmediately
+      ? 0
+      : Math.max(0, startedAt + AUTH_TRANSITION_REVEAL_AFTER_MS - Date.now()),
   );
   const copy = PHASE_COPY[phase];
   const isSlow = elapsedSeconds >= 15;
@@ -70,8 +77,18 @@ export default function AuthTransitionScreen({
       ? "This is taking a little longer than usual. We’re still getting things ready."
       : copy.detail;
 
+  // Hidden rather than unrendered, so the screen keeps its accessible name and
+  // a wait that ends just after the delay fades in instead of popping.
   const content = (
-    <div style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
+    <div
+      suppressHydrationWarning
+      style={{
+        width: "100%",
+        maxWidth: 440,
+        textAlign: "center",
+        animation: revealDelayMs > 0 ? `fade-in 200ms ease-out ${revealDelayMs}ms both` : undefined,
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
         {/* A long wait or a retry trades the calm pulse for a traced outline, so
             the screen visibly shows work still in progress. */}
@@ -134,13 +151,7 @@ export default function AuthTransitionScreen({
         fontFamily: "var(--font-sans)",
       }}
     >
-      {revealAfterMs > 0 ? (
-        <DelayedReveal afterMs={revealAfterMs} style={{ width: "100%", maxWidth: 440 }}>
-          {content}
-        </DelayedReveal>
-      ) : (
-        content
-      )}
+      {content}
     </main>
   );
 }

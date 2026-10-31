@@ -44,9 +44,9 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
   if (isComplete || (isLoading && hasCachedOrgData && hasEmployees)) return <>{children}</>;
   // Nothing cached and still loading: the bootstrap may be retrying a 5xx
   // for several seconds, and an empty shell reads as a hung page (F-68).
-  // Usually settles within the grace period, so the screen only shows for a
+  // Usually settles before the screen's reveal delay, so it only shows for a
   // real wait.
-  if (isLoading) return <AuthTransitionScreen phase="workspace" revealAfterMs={400} />;
+  if (isLoading) return <AuthTransitionScreen phase="workspace" />;
 
   // Regular user — show waiting message
   if (!perms.isSuperAdmin && !perms.canManageOrg) {
