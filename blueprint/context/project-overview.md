@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 207853f2a437c639728f641b87a8fc21005320b993c58f06e1d85624375556ce -->
+<!-- blueprint:source-hash bf97587af2a101eb988ebb2ec89b6e245c1f6d6cc7680adcf6109d997bf7e81a -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -584,8 +584,13 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   circle while filters are on) in the native navigation bar with the search field above the
   list (the system one on iOS, Material's docked search bar on Android), and
   Android's own Material bottom navigation in place of the floating tab bar.
-- **56e - Native sheets and dialogs:** planned; every sheet and popup uses
-  the platform's own.
+- **56e - Native sheets and dialogs:** shipped; every sheet is the
+  platform's own (SwiftUI's sheet with its grabber on iOS, Material's bottom
+  sheet on Android), fitted to its content or, when it scrolls, at full height
+  like a form sheet so the keyboard never hides its title or buttons; a
+  confirmation that is only words is the system alert, one with a choice of
+  its own a native sheet, each keeping its wording. The app lock keeps its
+  drawn cover.
 - **56d - Polish pass:** planned; every screen on both platforms.
 
 Android keeps DubGrid's brand colors rather than wallpaper colors.
