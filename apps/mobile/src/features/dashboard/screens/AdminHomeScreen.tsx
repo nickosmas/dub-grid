@@ -17,9 +17,7 @@ import {
   getScheduleRangeForDate,
 } from "@dubgrid/schedule-core";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
-import { Text } from "../../../shared/components/Text";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpacing, mobileText } from "../../../shared/theme/tokens";
+import { mobileSpace, mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useMyHomeSections } from "../hooks/useMyHomeSections";
 import { usePrefetchAdjacentDashboardWeeks } from "../hooks/usePrefetchAdjacentDashboardWeeks";
@@ -29,14 +27,21 @@ import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { CoverageWash } from "../components/CoverageWash";
 import { PeriodLoadingOverlay } from "../components/PeriodLoadingOverlay";
 import { ActionQueueCard } from "../components/ActionQueueCard";
-import {
-  MyHomeSections,
-  buildOpenShiftClaim,
-  hasMyHomeContent,
-} from "../components/MyHomeSections";
-import { OpenShiftsCard } from "../components/OpenShiftsCard";
+import { MyHomeSections } from "../components/MyHomeSections";
+import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { StaffHoursCard } from "../components/StaffHoursCard";
+
+type HomeView = "mine" | "team";
+
+const HOME_VIEW_OPTIONS = [
+  { value: "mine", label: "My schedule" },
+  { value: "team", label: "Team" },
+] as const satisfies ReadonlyArray<{ value: HomeView; label: string }>;
+
+// Kept for as long as the app runs, so leaving Home and coming back lands on
+// the view the admin last chose.
+let lastHomeView: HomeView = "mine";
 
 export function AdminHomeScreen() {
   const { accessToken } = useSessionState();
@@ -59,6 +64,15 @@ export function AdminHomeScreen() {
   // for management-only admins, who have no schedule of their own.
   const mine = useMyHomeSections({ accessToken, range, enabled: !managementOnly });
   const refetchMine = mine.refetch;
+  // Someone who works shifts switches between their own week and the team's;
+  // a management-only admin, or one with no staff profile, has only the team.
+  const hasOwnView = !managementOnly && (mine.isOn || bootstrapQuery.isLoading);
+  const [chosenView, setChosenView] = useState<HomeView>(lastHomeView);
+  const view: HomeView = hasOwnView ? chosenView : "team";
+  const chooseView = (next: HomeView) => {
+    lastHomeView = next;
+    setChosenView(next);
+  };
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
       dashboardQuery.refetch(),
@@ -96,17 +110,27 @@ export function AdminHomeScreen() {
   // height and fixed behind everything: status bar, sticky header and content.
   const { height: windowHeight } = useWindowDimensions();
   const header = (
-    <WeekNavigatorHeader
-      now={now}
-      range={range}
-      selectedDate={selectedDate}
-      timeZone={timeZone}
-      todayDate={todayDate}
-      unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
-      onNextWeek={() => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7))}
-      onPreviousWeek={() => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7))}
-      onToday={() => setSelectedDateOverride(null)}
-    />
+    <View style={styles.header}>
+      <WeekNavigatorHeader
+        now={now}
+        range={range}
+        selectedDate={selectedDate}
+        timeZone={timeZone}
+        todayDate={todayDate}
+        unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
+        onNextWeek={() => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7))}
+        onPreviousWeek={() => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7))}
+        onToday={() => setSelectedDateOverride(null)}
+      />
+      {hasOwnView ? (
+        <SegmentedSwitch
+          accessibilityLabel="Home view"
+          options={HOME_VIEW_OPTIONS}
+          value={view}
+          onChange={chooseView}
+        />
+      ) : null}
+    </View>
   );
 
   if (contentState.kind === "loading") {
@@ -117,7 +141,7 @@ export function AdminHomeScreen() {
         scrollEnabled={false}
         stickyHeader={header}
       >
-        {contentState.showSkeleton ? <DashboardSkeleton showMySchedule={!managementOnly} /> : null}
+        {contentState.showSkeleton ? <DashboardSkeleton view={view} /> : null}
       </Screen>
     );
   }
@@ -168,31 +192,13 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
-  // Decided only from this week's own data. An unpublished week has no shifts
-  // of yours to show, and while the stepper's next week is still loading, the
-  // previous week's shifts would show and then vanish.
-  const showMine =
-    hasMyHomeContent(mine) &&
-    data.metrics.coverageWindow !== "unpublished" &&
-    !mine.isPlaceholderData &&
-    !dashboardQuery.isPlaceholderData;
   const openExpanded = (pathname: `/(tabs)/home/${string}`) => () =>
     router.push({ pathname, params: { weekOf: range.startDate } });
 
   // Keyed so the stagger indexes the cards actually shown; a card that is
   // absent for this role does not leave a gap in the sequence. As on web, an
   // empty card stays and says so rather than dropping out of the page.
-  // The admin's own day leads when they have one, then the team they run.
-  const sections: Array<{ key: string; node: ReactNode }> = [
-    ...(showMine
-      ? [
-          {
-            key: "you",
-            node: <MyHomeSections data={mine} range={range} selectedDate={selectedDate} />,
-          },
-          { key: "team-label", node: <GroupLabel label="Your team" /> },
-        ]
-      : []),
+  const teamSections: Array<{ key: string; node: ReactNode }> = [
     {
       key: "coverage-summary",
       node: (
@@ -217,17 +223,6 @@ export function AdminHomeScreen() {
       ),
     },
     {
-      key: "open-shifts",
-      node: (
-        <OpenShiftsCard
-          coverageWindow={data.metrics.coverageWindow}
-          openShifts={data.openShifts}
-          claim={buildOpenShiftClaim(mine)}
-          onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
-        />
-      ),
-    },
-    {
       key: "staff-hours",
       node: (
         <StaffHoursCard
@@ -244,6 +239,15 @@ export function AdminHomeScreen() {
       ),
     },
   ];
+  const sections: Array<{ key: string; node: ReactNode }> =
+    view === "mine"
+      ? [
+          {
+            key: "mine",
+            node: <MyHomeSections data={mine} range={range} selectedDate={selectedDate} />,
+          },
+        ]
+      : teamSections;
 
   return (
     <Screen
@@ -257,24 +261,13 @@ export function AdminHomeScreen() {
     >
       <View style={styles.cards}>
         {sections.map((section, index) => (
-          <AnimatedListItem index={index} key={section.key}>
+          <AnimatedListItem index={index} key={`${view}-${section.key}`}>
             {section.node}
           </AnimatedListItem>
         ))}
       </View>
-      {/* Outside the You group: a claim from Open shifts confirms here too. */}
       {mine.confirmationModal}
     </Screen>
-  );
-}
-
-/** Marks where the admin's own day ends and the team's cards begin. */
-function GroupLabel({ label }: { label: string }) {
-  const mobileColors = useMobileColors();
-  return (
-    <Text accessibilityRole="header" style={[styles.groupLabel, { color: mobileColors.textMuted }]}>
-      {label}
-    </Text>
   );
 }
 
@@ -284,10 +277,7 @@ const styles = StyleSheet.create({
   cards: {
     gap: mobileSpacing.sectionGap,
   },
-  // The cards' gap already separates the label from what it names, so the
-  // label sits close to its group and the space above it does the dividing.
-  groupLabel: {
-    ...mobileText.label,
-    marginBottom: -mobileSpacing.sectionGap / 2,
+  header: {
+    gap: mobileSpace.md,
   },
 });

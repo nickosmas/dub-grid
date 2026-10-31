@@ -1253,7 +1253,7 @@
         and segmented controls work as each platform intends and iOS device
         builds no longer need the SDK patch. Every screen still works on the
         iOS Simulator, the Android emulator and the iPhone.
-  - [ ] 56b. **Admin Home switch** - a native My schedule | Team switch at the
+  - [x] 56b. **Admin Home switch** - a native My schedule | Team switch at the
         top of the admin Home, with no "Your team" label. My schedule reads
         like the staff Home: next shift, Needs your response, Open shifts and
         Your week. Open shifts is the staff Home's carousel showing every gap,
