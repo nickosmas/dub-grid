@@ -4,10 +4,7 @@ import { Text } from "../../../shared/components/Text";
 import type { MobileCoverageWindow, MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { Button } from "../../../shared/components/Button";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { DashboardCard } from "./DashboardCard";
-import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -19,27 +16,11 @@ import {
 import { formatUsDate, formatUsTime } from "../../../shared/lib/dates";
 import type { CountBadgeTone } from "./CountBadge";
 import { createToneTextColors } from "../lib/tone-text";
-import {
-  DASHBOARD_CARD_PREVIEW_LIMIT,
-  DashboardRowList,
-  hasMoreDashboardRows,
-} from "./DashboardRowList";
 
 export type OpenShiftUrgency = NonNullable<
   MobileDashboardResponse["openShifts"][number]["urgency"]
 >;
 export type OpenShift = MobileDashboardResponse["openShifts"][number];
-
-/**
- * Claiming from the card, for a viewer who can work some of these shifts.
- * `shiftFor` names the shift they can take for a row, or null.
- */
-export type OpenShiftClaim = {
-  shiftFor: (row: OpenShift) => OpenShift | null;
-  isClaiming: (shift: OpenShift) => boolean;
-  isBusy: boolean;
-  onClaim: (shift: OpenShift) => void;
-};
 
 // Same tone/label mapping as web's ExpandedOpenShifts.tsx: only "high" reads
 // as genuinely urgent, "medium"/"low" both just mean "still open".
@@ -53,12 +34,11 @@ export const URGENCY_BADGE: Record<OpenShiftUrgency, { label: string; tone: Coun
 // (apps/mobile/app/(tabs)/home/open-shifts.tsx). Lands on the Requests tab's
 // Available list, where an open shift can be claimed or offered; that screen
 // selects by tab, not by shift, so only the tab travels.
-export function OpenShiftRow({ shift, claim }: { shift: OpenShift; claim?: OpenShiftClaim }) {
+export function OpenShiftRow({ shift }: { shift: OpenShift }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const toneColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   const urgency = shift.urgency != null ? URGENCY_BADGE[shift.urgency] : null;
-  const claimable = claim?.shiftFor(shift) ?? null;
 
   return (
     <PressableRow
@@ -82,18 +62,7 @@ export function OpenShiftRow({ shift, claim }: { shift: OpenShift; claim?: OpenS
           {urgency?.tone === "danger" ? "urgent" : "needed"}
         </Text>
       </View>
-      {claimable && claim ? (
-        <Button
-          disabled={claim.isBusy}
-          label="Claim"
-          loading={claim.isClaiming(claimable)}
-          onPress={() => claim.onClaim(claimable)}
-          size="sm"
-          tone="secondary"
-        />
-      ) : (
-        <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
-      )}
+      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
   );
 }
@@ -117,42 +86,6 @@ export function getOpenShiftsEmptyCopy(coverageWindow: MobileCoverageWindow = "p
     };
   }
   return { title: "No open shifts right now" };
-}
-
-export function OpenShiftsCard({
-  openShifts,
-  coverageWindow,
-  claim,
-  onSeeAll,
-}: {
-  openShifts: MobileDashboardResponse["openShifts"];
-  coverageWindow?: MobileCoverageWindow;
-  claim?: OpenShiftClaim;
-  onSeeAll?: () => void;
-}) {
-  const emptyCopy = getOpenShiftsEmptyCopy(coverageWindow);
-  return (
-    <DashboardCard
-      title="Open shifts"
-      onOpen={hasMoreDashboardRows(openShifts.length) ? onSeeAll : undefined}
-    >
-      {openShifts.length > 0 ? (
-        <DashboardRowList
-          items={openShifts}
-          keyExtractor={(shift) => shift.id}
-          limit={DASHBOARD_CARD_PREVIEW_LIMIT}
-          renderItem={(shift) => <OpenShiftRow claim={claim} shift={shift} />}
-        />
-      ) : (
-        <EmptyStateCard
-          body={emptyCopy.body}
-          compact
-          iconName={coverageWindow === "unpublished" ? "calendar-outline" : "checkmark-circle"}
-          title={emptyCopy.title}
-        />
-      )}
-    </DashboardCard>
-  );
 }
 
 const createStyles = (mobileColors: MobileColors) =>

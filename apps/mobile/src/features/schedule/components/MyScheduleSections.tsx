@@ -1282,6 +1282,7 @@ export function OpenShiftsSection({
   onClaim,
   onVolunteer,
   onSeeAll,
+  showEveryGap = false,
 }: {
   requests: MobileShiftRequest[];
   openShifts: MobileOpenShift[];
@@ -1298,6 +1299,11 @@ export function OpenShiftsSection({
   onClaim: (requestId: string) => void;
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
+  /**
+   * A manager's view: every gap in their scope, with Claim only where they can
+   * work it. A card they can't take shows the shift alone, with no reason why.
+   */
+  showEveryGap?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -1330,10 +1336,20 @@ export function OpenShiftsSection({
         requests,
         now,
         timeZone,
+        showAll: showEveryGap,
         coverageGapVisibility: openShiftVisibility?.coverageGap,
         calloffVisibility: openShiftVisibility?.calloff,
       }),
-    [linkedEmployeeId, now, openShifts, requests, scheduleEntries, timeZone, openShiftVisibility],
+    [
+      linkedEmployeeId,
+      now,
+      openShifts,
+      requests,
+      scheduleEntries,
+      timeZone,
+      openShiftVisibility,
+      showEveryGap,
+    ],
   );
   const dateGroups = availableOpenShiftFeed.groups;
   const noteStackCardHeight = useCallback((date: string, height: number) => {
@@ -1466,6 +1482,14 @@ export function OpenShiftsSection({
         item.openShift.canVolunteer === false
           ? (item.openShift.volunteerBlockReason ?? "You can't volunteer for this shift right now.")
           : null;
+
+      if (showEveryGap && item.openShift.canVolunteer === false) {
+        return (
+          <View key={item.key} style={cardStyle}>
+            {cardSurface}
+          </View>
+        );
+      }
 
       return (
         <View key={item.key} style={cardStyle}>

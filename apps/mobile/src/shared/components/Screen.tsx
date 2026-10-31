@@ -223,6 +223,11 @@ export function Screen<T = never>({
   const stickyHeaderHeightRef = useRef(0);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const settleUnderHeaderRef = useRef(false);
+  const scrollYRef = useRef(0);
+  const handleScroll: ScreenScrollViewProps["onScroll"] = (event) => {
+    scrollYRef.current = event.nativeEvent?.contentOffset?.y ?? scrollYRef.current;
+    onScroll?.(event);
+  };
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
@@ -297,6 +302,8 @@ export function Screen<T = never>({
     if (!settleUnderHeaderRef.current || stickyHeaderHeight === 0) return;
     settleUnderHeaderRef.current = false;
     const frame = requestAnimationFrame(() => {
+      // A programmatic scroll reports no onScroll, so record where it lands.
+      scrollYRef.current = -stickyHeaderHeight;
       internalListRef.current?.scrollToOffset({ offset: -stickyHeaderHeight, animated: false });
       internalScrollViewRef.current?.scrollTo({ x: 0, y: -stickyHeaderHeight, animated: false });
     });
@@ -380,7 +387,7 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
-      onScroll={onScroll}
+      onScroll={handleScroll}
       refreshControl={refreshControl}
       scrollEventThrottle={scrollEventThrottle}
       showsVerticalScrollIndicator={false}
@@ -416,7 +423,7 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
-      onScroll={onScroll}
+      onScroll={handleScroll}
       // Mounted for the life of the screen once it can refresh, never only
       // while `scrollEnabled`. On iOS the control is the scroll view's first
       // child, so adding or removing it moves the content container to a
@@ -485,7 +492,11 @@ export function Screen<T = never>({
               // content sitting under the header with no visible correction.
               // Self-correct once the real height is known and applied (the
               // effect above), regardless of what any caller already tried.
-              if (isIosStickyHeader && stickyHeaderHeight === 0) {
+              // A header that grows later, as a native control inside it
+              // reports its size, settles the page again while it is still at
+              // the top.
+              const isAtTop = scrollYRef.current <= -stickyHeaderHeight + 1;
+              if (isIosStickyHeader && (stickyHeaderHeight === 0 || isAtTop)) {
                 settleUnderHeaderRef.current = true;
               }
               stickyHeaderHeightRef.current = nextHeight;

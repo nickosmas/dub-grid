@@ -29,7 +29,7 @@ type DashboardRowVariant =
   | "text"
   /** CoverageSectionRow: label row above a 6pt progress track. */
   | "meter"
-  /** OpenShiftsCard and StaffHoursCard: two lines, a figure with its label, a chevron. */
+  /** StaffHoursCard: two lines, a figure with its label, a chevron. */
   | "figure"
   /** ActivityFeedCard: a typed line over a description, nothing at the end. */
   | "feed";
@@ -163,25 +163,26 @@ function DashboardHeroSkeleton() {
 }
 
 /**
- * The admin dashboard's placeholder, card for card.
- *
- * The greeting header is included because the real screen renders it in the
- * sticky header slot; the old skeleton dropped it, so the header appeared to
- * fly in after the rest of the page.
+ * The admin Home's placeholder, card for card, for the view the switch is on:
+ * the admin's own week, or the team's cards.
  */
-export function DashboardSkeleton({ showMySchedule = true }: { showMySchedule?: boolean }) {
+export function DashboardSkeleton({ view }: { view: "mine" | "team" }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <SkeletonGroup style={styles.page}>
-      {showMySchedule ? <ScheduleMeSkeleton inGroup rows={3} /> : null}
-      <DashboardHeroSkeleton />
-      <DashboardCardSkeleton rows={3} variant="text" />
-      <DashboardCardSkeleton rows={3} variant="figure" />
-      <DashboardCardSkeleton rows={3} variant="figure" />
-      <DashboardCardSkeleton rows={3} variant="feed" />
+      {view === "mine" ? (
+        <ScheduleMeSkeleton inGroup rows={3} />
+      ) : (
+        <>
+          <DashboardHeroSkeleton />
+          <DashboardCardSkeleton rows={3} variant="text" />
+          <DashboardCardSkeleton rows={3} variant="figure" />
+          <DashboardCardSkeleton rows={3} variant="feed" />
+        </>
+      )}
     </SkeletonGroup>
   );
 }
