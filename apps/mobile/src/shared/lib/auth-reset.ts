@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { replaceAuthSession } from "../providers/AuthSessionProvider";
 import { disablePushToken, signOutMobileSessions } from "./api";
-import { queryClient } from "./query-client";
+import { clearQueryCache } from "./query-persistence";
 import { loadStoredPushDevice, saveStoredPushRegistration } from "./session";
 import { getSupabaseClient } from "./supabase";
 
@@ -109,7 +109,7 @@ export async function handleExpiredMobileSession(options?: {
       await settleWithin(revokeCurrentMobileSession());
     }
 
-    queryClient.clear();
+    clearQueryCache();
 
     if (!options?.skipSignOut) {
       try {

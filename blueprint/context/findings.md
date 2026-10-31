@@ -611,13 +611,13 @@
 **Suggested fix:** Skip the draft embed when `!canEditShifts`, use the cached config reads, and delete the unused key's invalidations.
 **Resolution:**
 
-### F-181 [P2] open - The mobile app keeps no data between launches, so every cold open waits on a token refresh and bootstrap before anything shows
+### F-181 [P2] fixed - The mobile app keeps no data between launches, so every cold open waits on a token refresh and bootstrap before anything shows
 
 **File:** `apps/mobile/src/shared/lib/query-client.ts:33-44` (no persister; none in `apps/mobile/package.json`); `apps/mobile/src/shared/components/StartupSplashGate.tsx:57-106`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** With `jwt_expiry = 3600`, most cold opens start with an expired token. The splash holds through the refresh (GoTrue plus the access-token hook, then a SecureStore write of the over-2KB session), then `GET /bootstrap`, and only then starts the Home queries, so Home shows a skeleton for a further round trip. Nothing from the last session is shown meanwhile. This is the largest single cause of the slow cold open the owner reports. The size of the gain is unmeasured. P2 rather than P1: it is a missing optimization, not a defect, and must not block unrelated work at `/complete`.
 **Suggested fix:** Persist the bootstrap and Home query keys (`@tanstack/query-async-storage-persister` or MMKV), keyed by user and org and cleared on sign-out, and lift the splash on the restored bootstrap while the network refreshes behind it.
-**Resolution:** Built and tested on its own branch `fix/mobile-persisted-cache` (2026-10-30): AsyncStorage persister, bootstrap and Home keys only, 24 hours, keyed to the app version, removed wherever the cache clears. Not merged: it adds packages, and the Dependency Audit check has failed on `main` since 2026-10-26 (24 unreviewed high advisories).
+**Resolution:** Fixed on fix/mobile-persisted-cache-v2 (2026-10-31), once the Dependency Audit gate was green (#234): `@react-native-async-storage/async-storage` 2.2.0 and the TanStack async-storage persister 5.101.4 (pinned to the installed React Query) keep the bootstrap and Home's queries for 24 hours, keyed to the app version, and remove them wherever the cache clears (sign-out, identity change, organization switch). Tested in `query-persistence.test.ts`. Needs a new development build before it shows on a device; not measured on one.
 
 ### F-182 [P2] fixed - The mobile login response doesn't carry the bootstrap, so sign-in pays one more round trip and auth wave
 
