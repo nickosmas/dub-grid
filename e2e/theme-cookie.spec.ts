@@ -6,22 +6,6 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const apexURL = `http://${baseDomain}:${port}/`;
-// Served from disk as landing.spec does: resizing the landing screenshots on a
-// loaded runner kept WebKit's load event waiting past the test timeout, and
-// held up the next spec's visit to the same page.
-const LANDING_IMAGE_PATH = /^\/landing\/screenshots\/[a-z-]+\.png$/;
-
-test.beforeEach(async ({ page }) => {
-  await page.route("**/_next/image?**", async (route) => {
-    const source = new URL(route.request().url()).searchParams.get("url");
-    if (!source || !LANDING_IMAGE_PATH.test(source)) {
-      await route.continue();
-      return;
-    }
-    await route.fulfill({ path: `apps/web/public${source}` });
-  });
-});
-
 /** The toggle's icon renders only after mount, so its effects (and any cookie write) have run. */
 async function waitForHydratedToggle(page: Page) {
   await expect(

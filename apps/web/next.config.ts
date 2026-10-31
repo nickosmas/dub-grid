@@ -75,8 +75,6 @@ const nextConfig: NextConfig = {
     turbopackFileSystemCacheForDev: false,
   },
   images: {
-    qualities: [75, 95],
-    localPatterns: [{ pathname: "/landing/screenshots/**" }],
     remotePatterns: [
       {
         protocol: "https",
