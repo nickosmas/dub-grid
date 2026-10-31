@@ -16,11 +16,9 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 }));
 
 let MyHomeSections: (typeof import("./MyHomeSections"))["MyHomeSections"];
-let hasMyHomeContent: (typeof import("./MyHomeSections"))["hasMyHomeContent"];
-let buildOpenShiftClaim: (typeof import("./MyHomeSections"))["buildOpenShiftClaim"];
 
 beforeAll(async () => {
-  ({ MyHomeSections, hasMyHomeContent, buildOpenShiftClaim } = await import("./MyHomeSections"));
+  ({ MyHomeSections } = await import("./MyHomeSections"));
 });
 
 const WEEK = { startDate: "2026-04-12", endDate: "2026-04-18" };
@@ -221,33 +219,7 @@ describe("MyHomeSections", () => {
   });
 });
 
-describe("hasMyHomeContent", () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-04-16T13:00:00.000Z"));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("is true for a shift in the period, or a swap waiting with none", () => {
-    expect(hasMyHomeContent(makeData({ entries: [shift("2026-04-18")] }))).toBe(true);
-    expect(hasMyHomeContent(makeData({ requests: [swapAskedOfMe()] }))).toBe(true);
-  });
-
-  it("is false with nothing of theirs, with only removed shifts, or when off", () => {
-    expect(hasMyHomeContent(makeData())).toBe(false);
-    expect(
-      hasMyHomeContent(
-        makeData({ entries: [shift("2026-04-18", { change: { kind: "deleted" } })] }),
-      ),
-    ).toBe(false);
-    expect(hasMyHomeContent(makeData({ isOn: false, entries: [shift("2026-04-18")] }))).toBe(false);
-  });
-});
-
-describe("buildOpenShiftClaim", () => {
+describe("MyHomeSections open shifts", () => {
   function gap(id: string, overrides: Record<string, unknown> = {}) {
     return {
       id,
@@ -257,22 +229,58 @@ describe("buildOpenShiftClaim", () => {
       needed: 1,
       urgency: null,
       state: { kind: "worked", segments: [{ shiftId: 1, jobId: 20, position: 0 }] },
-      presentation: { label: "Day Shift", segments: [] },
+      presentation: {
+        shiftName: "Day Shift",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
       canVolunteer: true,
       volunteerBlockReason: null,
       ...overrides,
     } as never;
   }
 
-  beforeEach(() => runRequestAction.mockReset());
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-04-16T13:00:00.000Z"));
+    runRequestAction.mockReset();
+  });
 
-  it("matches a row to the shift they can take on that day and focus area, and claims it", () => {
-    const theirs = gap("coverage_gap_2_7_2026-04-19");
-    const claim = buildOpenShiftClaim(makeData({ openShifts: [theirs] }))!;
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-    expect(claim.shiftFor(gap("coverage_gap_2_5_2026-04-19"))).toBe(theirs);
-    claim.onClaim(theirs);
-    expect(runRequestAction).toHaveBeenCalledWith("coverage_gap_2_7_2026-04-19", {
+  it("shows every gap, with Claim only on the one they can work", () => {
+    const theirs = gap("gap-mine");
+    render(
+      <MyHomeSections
+        data={makeData({
+          openShifts: [
+            theirs,
+            gap("gap-blocked", {
+              date: "2026-04-20",
+              canVolunteer: false,
+              volunteerBlockReason: "You already have a shift during that time.",
+            }),
+          ],
+        })}
+        range={WEEK}
+        selectedDate="2026-04-16"
+      />,
+    );
+
+    expect(screen.getByText("Open shifts")).toBeInTheDocument();
+    expect(screen.getAllByText("1 teammate needed")).toHaveLength(2);
+    expect(
+      screen.queryByText("You already have a shift during that time."),
+    ).not.toBeInTheDocument();
+
+    const claims = screen.getAllByRole("button", { name: "Claim" });
+    expect(claims).toHaveLength(1);
+    fireEvent.click(claims[0]!);
+
+    expect(runRequestAction).toHaveBeenCalledWith("gap-mine", {
       action: "volunteer_open_shift",
       empId: "emp-1",
       shiftDate: "2026-04-19",
@@ -281,27 +289,9 @@ describe("buildOpenShiftClaim", () => {
     });
   });
 
-  it("offers nothing on a row they are blocked from, such as a day they already work", () => {
-    const claim = buildOpenShiftClaim(
-      makeData({
-        openShifts: [
-          gap("a"),
-          gap("b", {
-            date: "2026-04-20",
-            canVolunteer: false,
-            volunteerBlockReason: "You already have a shift during that time.",
-          }),
-        ],
-      }),
-    )!;
+  it("leaves Open shifts out when nothing is open", () => {
+    render(<MyHomeSections data={makeData()} range={WEEK} selectedDate="2026-04-16" />);
 
-    expect(claim.shiftFor(gap("b", { date: "2026-04-20" }))).toBeNull();
-  });
-
-  it("is off for a management-only admin, or when nothing is claimable", () => {
-    expect(buildOpenShiftClaim(makeData({ isOn: false, openShifts: [gap("a")] }))).toBeUndefined();
-    expect(
-      buildOpenShiftClaim(makeData({ openShifts: [gap("a", { canVolunteer: false })] })),
-    ).toBeUndefined();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
   });
 });

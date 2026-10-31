@@ -19,6 +19,7 @@ import { queryClient } from "../../../shared/lib/query-client";
 import { mobileSpacing } from "../../../shared/theme/tokens";
 import {
   MeHeroCard,
+  OpenShiftsSection,
   ShiftCoverRequestsSection,
   UpcomingShiftsSection,
 } from "../../schedule/components/MyScheduleSections";
@@ -29,67 +30,12 @@ import {
   getSegmentEndTime,
   getSegmentStartTime,
 } from "../../schedule/lib/scheduleScreenHelpers";
-import { getMobileRequestActionKey } from "../../shift-requests/lib/request-action-feedback";
-import type { RequestActionBody } from "../../shift-requests/hooks/useShiftRequestActionFlow";
 import type { MyHomeSectionsData } from "../hooks/useMyHomeSections";
-import type { OpenShift, OpenShiftClaim } from "./OpenShiftsCard";
-
-/**
- * Whether the You group has anything to show for the period: a shift of
- * theirs, or a swap waiting on them. Removed shifts are history, not a day.
- */
-export function hasMyHomeContent(data: MyHomeSectionsData): boolean {
-  if (!data.isOn) return false;
-  if (data.scheduleError || data.entries.some((entry) => !isDeletedScheduleHistory(entry))) {
-    return true;
-  }
-  return (
-    buildMeShiftRequestSections({
-      linkedEmployeeId: data.linkedEmployeeId,
-      requests: data.requests,
-      timeZone: data.timeZone,
-    }).coverRequests.length > 0
-  );
-}
-
-function claimBody(shift: OpenShift, empId: string): RequestActionBody {
-  return {
-    action: "volunteer_open_shift",
-    empId,
-    shiftDate: shift.date,
-    focusAreaId: shift.focusAreaId,
-    state: shift.state,
-  };
-}
-
-/**
- * Claim on the team's Open shifts for someone who works shifts themselves.
- * The team's list keeps every gap; whether this person can take one comes
- * from their own open-shift feed, matched by focus area and day, so a gap with
- * several jobs offers the one they qualify for.
- */
-export function buildOpenShiftClaim(data: MyHomeSectionsData): OpenShiftClaim | undefined {
-  const empId = data.linkedEmployeeId;
-  if (!data.isOn || !empId) return undefined;
-
-  const claimable = data.openShifts.filter((shift) => shift.canVolunteer);
-  if (claimable.length === 0) return undefined;
-
-  return {
-    shiftFor: (row) =>
-      claimable.find((shift) => shift.id === row.id) ??
-      claimable.find((shift) => shift.focusAreaId === row.focusAreaId && shift.date === row.date) ??
-      null,
-    isClaiming: (shift) =>
-      data.pendingAction?.key === getMobileRequestActionKey(shift.id, claimBody(shift, empId)),
-    isBusy: data.pendingAction !== null,
-    onClaim: (shift) => data.runRequestAction(shift.id, claimBody(shift, empId)),
-  };
-}
 
 /**
  * The staff Home's personal sections on the admin Home: the shift now or
- * next, swaps asked of them, then every day of the week.
+ * next, swaps asked of them, every gap in the team with Claim where they can
+ * work it, then every day of the week.
  */
 export function MyHomeSections({
   data,
@@ -131,14 +77,14 @@ export function MyHomeSections({
     () => getMeHeroShiftmates(hero.item, data.teamEntries),
     [data.teamEntries, hero.item],
   );
-  const coverRequests = useMemo(
+  const { coverRequests, openShiftRequests } = useMemo(
     () =>
       buildMeShiftRequestSections({
         linkedEmployeeId,
         requests: data.requests,
         now,
         timeZone,
-      }).coverRequests,
+      }),
     [data.requests, linkedEmployeeId, now, timeZone],
   );
   const weekDays = useMemo(
@@ -193,6 +139,32 @@ export function MyHomeSections({
         onRespond={(requestId, accept) => {
           if (!linkedEmployeeId) return;
           data.runRequestAction(requestId, { action: "respond", empId: linkedEmployeeId, accept });
+        }}
+      />
+      <OpenShiftsSection
+        linkedEmployeeId={linkedEmployeeId}
+        now={now}
+        openShifts={data.openShifts}
+        pendingAction={data.pendingAction}
+        requests={openShiftRequests}
+        requestsError={data.requestsError}
+        scheduleEntries={entries}
+        showEveryGap
+        timeZone={timeZone}
+        onClaim={(requestId) => {
+          if (!linkedEmployeeId) return;
+          data.runRequestAction(requestId, { action: "claim", claimerEmpId: linkedEmployeeId });
+        }}
+        onSeeAll={() => router.push("/(tabs)/requests")}
+        onVolunteer={(openShift) => {
+          if (!linkedEmployeeId) return;
+          data.runRequestAction(openShift.id, {
+            action: "volunteer_open_shift",
+            empId: linkedEmployeeId,
+            shiftDate: openShift.date,
+            focusAreaId: openShift.focusAreaId,
+            state: openShift.state,
+          });
         }}
       />
       <UpcomingShiftsSection

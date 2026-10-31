@@ -44,7 +44,7 @@ vi.mock("../hooks/usePrefetchAdjacentDashboardWeeks", () => ({
 }));
 
 // The sections have their own tests; here only whether and where they show,
-// and for which period. `hasMyHomeContent` stays real: it decides the group.
+// and for which period.
 vi.mock("../components/MyHomeSections", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../components/MyHomeSections")>()),
   MyHomeSections: ({ range }: { range: { startDate: string; endDate: string } }) => (
@@ -169,6 +169,12 @@ function setMine(overrides: Record<string, unknown> = {}) {
   }));
 }
 
+// The chosen view outlives a render, as it does in the app, so each test
+// picks the one it needs.
+function showView(label: "My schedule" | "Team") {
+  fireEvent.click(screen.getByRole("button", { name: label }));
+}
+
 describe("AdminHomeScreen", () => {
   beforeEach(() => {
     useSessionState.mockReset();
@@ -234,7 +240,7 @@ describe("AdminHomeScreen", () => {
     expect(screen.getByText("Couldn't load dashboard")).toBeInTheDocument();
   });
 
-  it("shows the pending-approvals queue and personal schedule for an admin", () => {
+  it("opens on My schedule and switches to the team's cards", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -244,18 +250,27 @@ describe("AdminHomeScreen", () => {
       isError: false,
       data: EMPTY_DASHBOARD_DATA,
     });
-    setMine();
 
     render(<AdminHomeScreen />);
+    showView("My schedule");
 
-    // "Pending approvals" appears twice for an admin: the hero metric tile
-    // label, and the ActionQueueCard title — assert the card actually
-    // rendered its data (the queued requester), not just the ambiguous title.
+    expect(screen.getByText("my-home-sections")).toBeInTheDocument();
+    expect(screen.queryByText("Casey Lee")).not.toBeInTheDocument();
+
+    showView("Team");
+
+    // The ActionQueueCard's queued requester, not the hero's ambiguous label.
     expect(screen.getByText("Casey Lee")).toBeInTheDocument();
+    expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your team")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
+
+    showView("My schedule");
+
     expect(screen.getByText("my-home-sections")).toBeInTheDocument();
   });
 
-  it("keeps empty summary cards with their empty states, as on web", () => {
+  it("keeps empty team cards with their empty states, as on web", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -265,15 +280,12 @@ describe("AdminHomeScreen", () => {
       isError: false,
       data: { ...EMPTY_DASHBOARD_DATA, actionQueue: [] },
     });
-    setMine({ entries: [] });
 
     render(<AdminHomeScreen />);
+    showView("Team");
 
     expect(screen.queryByText("Casey Lee")).not.toBeInTheDocument();
-    expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
-    expect(screen.queryByText("No coverage to track yet")).not.toBeInTheDocument();
     expect(screen.getByText("No requests are waiting on you")).toBeInTheDocument();
-    expect(screen.getByText("No open shifts right now")).toBeInTheDocument();
     expect(screen.getByText(/No one is over \d+h this period/)).toBeInTheDocument();
     expect(screen.getByText("No recent activity")).toBeInTheDocument();
   });
@@ -297,6 +309,7 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
+    showView("Team");
 
     expect(screen.queryByText("Unpublished changes")).not.toBeInTheDocument();
     expect(screen.queryByText("1 new change")).not.toBeInTheDocument();
@@ -318,11 +331,12 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
+    showView("Team");
 
     expect(screen.getByText("Casey Lee")).toBeInTheDocument();
   });
 
-  it("hides the personal schedule card for a management-only admin", () => {
+  it("gives a management-only admin the team alone, with no switch", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [], departmentIds: [9] }),
@@ -335,10 +349,30 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
+    expect(screen.queryByRole("button", { name: "My schedule" })).not.toBeInTheDocument();
     expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
+    expect(screen.getByText("Casey Lee")).toBeInTheDocument();
   });
 
-  it("still shows the personal schedule card for a management admin who is also scheduled", () => {
+  it("gives the team alone to an admin with no staff profile", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    setMine({ isOn: false });
+
+    render(<AdminHomeScreen />);
+
+    expect(screen.queryByRole("button", { name: "Team" })).not.toBeInTheDocument();
+    expect(screen.getByText("Casey Lee")).toBeInTheDocument();
+  });
+
+  it("keeps My schedule for a management admin who is also scheduled", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [9] }),
@@ -350,11 +384,12 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
+    showView("My schedule");
 
     expect(screen.getByText("my-home-sections")).toBeInTheDocument();
   });
 
-  it("leads with the admin's own day, then the team's cards under Your team", () => {
+  it("keeps the chosen view when the week changes", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -365,77 +400,12 @@ describe("AdminHomeScreen", () => {
       data: EMPTY_DASHBOARD_DATA,
     });
 
-    const { container } = render(<AdminHomeScreen />);
-
-    const text = container.textContent ?? "";
-    const order = ["my-home-sections", "Your team", "Coverage", "Open shifts"].map((label) =>
-      text.indexOf(label),
-    );
-    expect(order.every((index) => index >= 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(screen.queryByText("You")).not.toBeInTheDocument();
-    expect(screen.getByText("Your team")).toBeInTheDocument();
-  });
-
-  it("drops the Your team label when there is no own day above it", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [], departmentIds: [9] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-
     render(<AdminHomeScreen />);
+    showView("Team");
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
 
-    expect(screen.queryByText("You")).not.toBeInTheDocument();
-    expect(screen.queryByText("Your team")).not.toBeInTheDocument();
-  });
-
-  it("hides the You group for an unpublished period", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        ...EMPTY_DASHBOARD_DATA,
-        metrics: {
-          ...EMPTY_DASHBOARD_DATA.metrics,
-          coveragePct: null,
-          coverageWindow: "unpublished",
-        },
-      },
-    });
-    setMine();
-
-    render(<AdminHomeScreen />);
-
-    expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
-  });
-
-  // Switching periods keeps the previous period's data on screen until the
-  // next one lands. Drawn from it, the You group would show and then vanish
-  // when the next period turns out to be unpublished.
-  it("does not draw the You group from the previous period while the next one loads", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-    setMine({ isPlaceholderData: true });
-
-    render(<AdminHomeScreen />);
-
-    expect(screen.queryByText("my-home-sections")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Team" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Casey Lee")).toBeInTheDocument();
   });
 
   it("warms the weeks either side of the one shown", () => {
@@ -476,6 +446,7 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
+    showView("My schedule");
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
 
     const dashboardRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
@@ -578,6 +549,7 @@ describe("AdminHomeScreen", () => {
     });
 
     render(<AdminHomeScreen />);
+    showView("Team");
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
     const range = useAdminDashboard.mock.calls.at(-1)?.[1] as { startDate: string };
     fireEvent.click(screen.getByRole("button", { name: "2 pending approvals" }));
