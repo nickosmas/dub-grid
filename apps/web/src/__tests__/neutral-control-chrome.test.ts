@@ -163,7 +163,7 @@ describe("shared chrome theming", () => {
     expect(sidebarPrimitive).toContain("rounded-[var(--dg-radius-lg)]");
     expect(tooltipPrimitive).toContain("rounded-[var(--tooltip-border-radius)]");
     expect(skeletonPrimitive).toContain("rounded-[var(--dg-radius-sm)]");
-    expect(appToaster).toContain("rounded-[var(--dg-radius-lg)]");
+    expect(appToaster).toContain("rounded-[var(--dg-radius-2xl)]");
   });
 
   it("fills editable fields one step off the card behind them", () => {
