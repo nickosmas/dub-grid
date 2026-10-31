@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, {
@@ -24,14 +25,18 @@ const SCROLLING_SNAP_POINTS = ["100%"];
 
 /**
  * The platform's own sheet: SwiftUI's sheet on iOS (the grabber, detents,
- * Liquid Glass on iOS 26) and Material 3's ModalBottomSheet on Android, sized
- * to its content and closed by a swipe down or the scrim. A gate that must
+ * Liquid Glass on iOS 26) and Material 3's ModalBottomSheet on Android,
+ * closed by a swipe down or the scrim. A gate that must
  * hide what is behind it (the app lock) keeps the drawn sheet, whose cover
  * backdrop a native sheet can't give.
  */
 export function BottomSheetModal(props: BottomSheetModalProps) {
   const mobileColors = useMobileColors();
   const { width: windowWidth } = useWindowDimensions();
+  // The native sheet reports every dismissal, including one the caller made by
+  // hiding it; only a dismissal while it should be showing is the person's.
+  const visibleRef = useRef(props.visible);
+  visibleRef.current = props.visible;
 
   if (props.presentationKind === "gate" || props.backdrop === "cover") {
     return <DrawnBottomSheetModal {...props} />;
@@ -55,7 +60,9 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
       enablePanDownToClose={!dismissDisabled}
       index={visible ? 0 : -1}
       snapPoints={scrollable ? SCROLLING_SNAP_POINTS : undefined}
-      onClose={onDismiss}
+      onClose={() => {
+        if (visibleRef.current) onDismiss();
+      }}
     >
       <InsideSheetContext.Provider value>
         {/* A sheet sized to its content lays React Native out without a set
