@@ -225,7 +225,7 @@ export function Screen<T = never>({
   const settleUnderHeaderRef = useRef(false);
   const scrollYRef = useRef(0);
   const handleScroll: ScreenScrollViewProps["onScroll"] = (event) => {
-    scrollYRef.current = event.nativeEvent.contentOffset.y;
+    scrollYRef.current = event.nativeEvent?.contentOffset?.y ?? scrollYRef.current;
     onScroll?.(event);
   };
   const overlay = renderOverlay?.({ stickyHeaderHeight });

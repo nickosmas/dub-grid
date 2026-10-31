@@ -575,8 +575,10 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   React Native Screens 4.26 and Expo Router 57, and the UIScene life cycle
   through a config plugin, so iOS device builds need no SDK patch. The iOS
   minimum is now 16.4.
-- **56b - Admin Home switch:** planned; My schedule | Team, one open shifts
-  carousel of every gap on My schedule, no "Your team" label.
+- **56b - Admin Home switch:** shipped; a native My schedule | Team switch
+  (UIKit segmented control on iOS, Material 3 segmented buttons on Android,
+  through `@expo/ui`), the staff Home's open shifts carousel showing every
+  gap with Claim only where the admin can work it, and no "Your team" label.
 - **56c - Native top bars:** planned; Liquid Glass bar buttons and native
   search on iOS, a Material top app bar, floating action button and bottom
   navigation on Android.
