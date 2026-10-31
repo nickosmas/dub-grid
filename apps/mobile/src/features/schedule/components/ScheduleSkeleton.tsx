@@ -35,7 +35,14 @@ import { SCHEDULE_DATE_TILE_MIN_HEIGHT, SCHEDULE_DATE_TILE_MIN_WIDTH } from "./S
  */
 const ME_HERO_SKELETON_HEIGHT = 116;
 
-export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
+/** `inGroup` when drawn inside another skeleton, which already owns the shimmer. */
+export function ScheduleMeSkeleton({
+  rows,
+  inGroup = false,
+}: {
+  rows?: number;
+  inGroup?: boolean;
+}) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   // The week's 132pt rows; reserved for the sticky header and the hero.
@@ -47,8 +54,10 @@ export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
   );
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
+  const Group = inGroup ? View : SkeletonGroup;
+
   return (
-    <SkeletonGroup style={scheduleStyles.mePage}>
+    <Group style={scheduleStyles.mePage}>
       {/* The hero is one rectangle. The real card is a brand gradient with
           white text on it, and a placeholder cannot paint either: drawn as
           lines on the grey fill it read as a broken card in light mode. The
@@ -79,7 +88,7 @@ export function ScheduleMeSkeleton({ rows }: { rows?: number }) {
           ))}
         </View>
       </View>
-    </SkeletonGroup>
+    </Group>
   );
 }
 

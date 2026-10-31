@@ -1,34 +1,35 @@
 import { useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { getIsoDateInTimeZone, getScheduleRangeForDate } from "@dubgrid/schedule-core";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
-import { getDashboardPeriodRange, type DashboardPeriodMode } from "../../../shared/lib/dates";
 import { useAdminDashboard } from "./useAdminDashboard";
 
-function toDashboardPeriodMode(value: string | string[] | undefined): DashboardPeriodMode {
-  return value === "2weeks" ? "2weeks" : "week";
+function toWeekOf(value: string | string[] | undefined): string | null {
+  const weekOf = Array.isArray(value) ? value[0] : value;
+  return weekOf && /^\d{4}-\d{2}-\d{2}$/.test(weekOf) ? weekOf : null;
 }
 
 /**
  * Shared data source for the full-page expanded dashboard routes
  * (coverage/open-shifts/staff-hours/activity/pending-approvals). Recomputes
- * the exact same range AdminHomeScreen used (periodMode passed as a route
- * param) so useAdminDashboard's query key matches and react-query serves it
- * straight from cache — no extra network round trip when navigating from an
- * already-warm Home tab, while still resolving on its own if opened cold
- * (e.g. a deep link).
+ * the exact same week AdminHomeScreen showed (its first day passed as the
+ * `weekOf` route param) so useAdminDashboard's query key matches and
+ * react-query serves it straight from cache — no extra network round trip when
+ * navigating from an already-warm Home tab, while still resolving on its own
+ * if opened cold (e.g. a deep link), on this week.
  */
 export function useExpandedDashboardQuery() {
-  const { periodMode: rawPeriodMode } = useLocalSearchParams<{ periodMode?: string }>();
-  const periodMode = toDashboardPeriodMode(rawPeriodMode);
+  const { weekOf: rawWeekOf } = useLocalSearchParams<{ weekOf?: string }>();
+  const weekOf = toWeekOf(rawWeekOf);
   const { accessToken } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  const payPeriodStartDate = bootstrapQuery.data?.currentOrg?.payPeriodStartDate ?? null;
+  const timeZone = bootstrapQuery.data?.currentOrg?.timezone ?? null;
   const range = useMemo(
-    () => getDashboardPeriodRange(periodMode, new Date(), payPeriodStartDate),
-    [periodMode, payPeriodStartDate],
+    () => getScheduleRangeForDate(weekOf ?? getIsoDateInTimeZone(new Date(), timeZone)),
+    [timeZone, weekOf],
   );
   const dashboardQuery = useAdminDashboard(accessToken, range);
 
-  return { dashboardQuery, bootstrapQuery, periodMode };
+  return { dashboardQuery, bootstrapQuery };
 }
