@@ -70,7 +70,11 @@ vi.mock("@/components/AuthProvider", () => ({
 
 vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
-  useOrganizationData: () => mockOrganizationData,
+  // The header reads the bootstrap's count; it tracks the roster these tests set.
+  useOrganizationData: () => ({
+    ...mockOrganizationData,
+    activeEmployeeCount: mockEmployeesData.employees.length,
+  }),
   useEmployees: () => mockEmployeesData,
   useLogout: () => ({ signOut: vi.fn(), signOutOthers: vi.fn() }),
 }));

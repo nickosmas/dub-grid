@@ -1,6 +1,12 @@
 "use client";
 
-import type { EmailOtpType, RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
+import type {
+  EmailOtpType,
+  RealtimeChannel,
+  Session,
+  SupabaseClient,
+  User,
+} from "@supabase/supabase-js";
 import {
   clearSupabaseBrowserAuthState,
   getBrowserSession,
@@ -152,18 +158,50 @@ export async function setBrowserSession(input: {
   }
 }
 
+type ServerVouchedSessionListener = (session: Session) => void;
+const serverVouchedSessionListeners = new Set<ServerVouchedSessionListener>();
+
+/** Hears each session the login route has just verified, ahead of the auth client. */
+export function subscribeToServerVouchedSessions(
+  listener: ServerVouchedSessionListener,
+): () => void {
+  serverVouchedSessionListeners.add(listener);
+  return () => {
+    serverVouchedSessionListeners.delete(listener);
+  };
+}
+
 /**
  * Brings the browser's auth client up to date with a session the login route
  * has already written to the auth cookies. Not awaited before navigating: the
- * cookies authenticate the next request, and ProtectedRoute holds the splash
- * until the auth client's SIGNED_IN lands. If the auth client refuses the
- * session, the browser signs out rather than keep cookies it will not use.
+ * cookies authenticate the next request. Given the user the route signed in,
+ * the session is announced at once, so the app paints without waiting for
+ * setSession's own round trip to the auth server. If the auth client refuses
+ * the session, the browser signs out rather than keep cookies it will not use,
+ * which also clears the announced session.
  */
-export function syncBrowserSessionInBackground(input: {
-  access_token: string;
-  refresh_token: string;
-}): Promise<void> {
-  return settleWithRequestTimeout(setBrowserSession(input)).catch(() =>
+export function syncBrowserSessionInBackground(
+  input: {
+    access_token: string;
+    refresh_token: string;
+    expires_in?: number;
+    token_type?: string;
+  },
+  user?: User,
+): Promise<void> {
+  if (user && input.expires_in) {
+    const session: Session = {
+      access_token: input.access_token,
+      refresh_token: input.refresh_token,
+      expires_in: input.expires_in,
+      expires_at: Math.floor(Date.now() / 1000) + input.expires_in,
+      token_type: "bearer",
+      user,
+    };
+    for (const listener of serverVouchedSessionListeners) listener(session);
+  }
+  const tokens = { access_token: input.access_token, refresh_token: input.refresh_token };
+  return settleWithRequestTimeout(setBrowserSession(tokens)).catch(() =>
     // A sign-out that stalls has still cleared the browser's state.
     signOutFromBrowser("local").catch(() => {}),
   );

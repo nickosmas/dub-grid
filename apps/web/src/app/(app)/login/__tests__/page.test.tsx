@@ -197,10 +197,15 @@ describe("OrgLogin submit states", () => {
       submitForm(container);
 
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard"));
-      expect(mockSyncSession).toHaveBeenCalledExactlyOnceWith({
-        access_token: sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
-        refresh_token: "refresh-token",
-      });
+      // With the signed-in user, so the app paints before the auth client's
+      // own check returns.
+      expect(mockSyncSession).toHaveBeenCalledExactlyOnceWith(
+        {
+          access_token: sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
+          refresh_token: "refresh-token",
+        },
+        expect.objectContaining({ id: "user-1" }),
+      );
       expect(mockSetSession).not.toHaveBeenCalled();
       // The login route cleared the sandbox cookie and tore the sandbox down.
       expect(mockExitSandbox).not.toHaveBeenCalled();

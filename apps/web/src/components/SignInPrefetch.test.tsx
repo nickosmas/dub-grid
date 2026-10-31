@@ -6,6 +6,8 @@ import { queryKeys } from "@/lib/query-keys";
 let mockSession: { access_token: string } | null = null;
 let mockTransitionPending = false;
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => ({ session: mockSession }) }));
+let mockPathname = "/dashboard";
+vi.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 vi.mock("@/lib/auth-transition", () => ({
   useAuthTransitionPending: () => mockTransitionPending,
 }));
@@ -132,6 +134,7 @@ describe("primeSignInQueries", () => {
     // Give the priming that follows those two answers its turn to run.
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(requestedPaths()).not.toContain("/api/schedule/manage");
+    expect(requestedPaths()).not.toContain("/api/employees/manage");
   });
 
   it("adds a Super Admin's billing to the same wave, not ahead of employees", () => {
@@ -164,6 +167,7 @@ describe("SignInPrefetch", () => {
   beforeEach(() => {
     mockSession = { access_token: token({ org_id: ORG_ID, org_role: "user" }) };
     mockTransitionPending = true;
+    mockPathname = "/dashboard";
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => json({}));
   });
@@ -194,8 +198,34 @@ describe("SignInPrefetch", () => {
     ).toBe(1);
   });
 
-  it("stays out of ordinary page loads", () => {
+  it("primes a cold page load once, from the session the server vouched for", async () => {
     mockTransitionPending = false;
+    const { rerender } = renderPrefetch();
+
+    await waitFor(() => expect(requestedPaths()).toContain("/api/employees/manage"));
+    const requests = vi.mocked(fetch).mock.calls.length;
+    mockSession = { access_token: token({ org_id: ORG_ID, org_role: "user", iat: 2 }) };
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <SignInPrefetch />
+      </QueryClientProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(vi.mocked(fetch).mock.calls.length).toBe(requests);
+  });
+
+  it("leaves the roster alone on a cold load of another page", async () => {
+    mockTransitionPending = false;
+    mockPathname = "/schedule";
+    renderPrefetch();
+
+    await waitFor(() => expect(requestedPaths()).toContain("/api/organization/bootstrap"));
+    expect(requestedPaths()).not.toContain("/api/employees/manage");
+  });
+
+  it("stays out of the sign-in pages", () => {
+    mockTransitionPending = false;
+    mockPathname = "/login";
     renderPrefetch();
     expect(fetch).not.toHaveBeenCalled();
   });

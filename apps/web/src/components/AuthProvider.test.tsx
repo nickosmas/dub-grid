@@ -5,6 +5,9 @@ import type { Session, User } from "@supabase/supabase-js";
 const getBrowserAuthSession = vi.fn();
 const getVerifiedBrowserAuthUser = vi.fn();
 const clearBrowserAuthState = vi.fn();
+type AuthChangeCallback = (event: string, session: Session | null) => void;
+const authChange: { current: AuthChangeCallback | null } = { current: null };
+const vouchSession: { current: ((session: Session) => void) | null } = { current: null };
 
 vi.mock("@/features/account/client", () => ({
   getBrowserAuthSession: () => getBrowserAuthSession(),
@@ -12,7 +15,16 @@ vi.mock("@/features/account/client", () => ({
   clearBrowserAuthState: () => clearBrowserAuthState(),
   isRecoverableBrowserAuthFailure: () => false,
   signOutFromBrowser: vi.fn(),
-  subscribeToBrowserAuthChanges: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),
+  subscribeToBrowserAuthChanges: (callback: AuthChangeCallback) => {
+    authChange.current = callback;
+    return { data: { subscription: { unsubscribe: vi.fn() } } };
+  },
+  subscribeToServerVouchedSessions: (listener: (session: Session) => void) => {
+    vouchSession.current = listener;
+    return () => {
+      vouchSession.current = null;
+    };
+  },
 }));
 vi.mock("@/features/account/client/session-registration", () => ({
   createSessionRegistration: () => vi.fn(async () => {}),
@@ -136,5 +148,36 @@ describe("AuthProvider", () => {
 
     await waitFor(() => expect(getVerifiedBrowserAuthUser).toHaveBeenCalled());
     expect(screen.getByText("loading")).toBeTruthy();
+  });
+
+  it("shows the user the login route vouched for without asking the auth server", async () => {
+    getBrowserAuthSession.mockResolvedValue(null);
+
+    render(
+      <AuthProvider serverVerifiedUserId={null}>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed out")).toBeTruthy();
+    act(() => vouchSession.current?.(sessionFor(user)));
+    expect(screen.getByText("user-1")).toBeTruthy();
+    expect(getVerifiedBrowserAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("signs out when the auth client then refuses the vouched session", async () => {
+    getBrowserAuthSession.mockResolvedValue(null);
+
+    render(
+      <AuthProvider serverVerifiedUserId={null}>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed out")).toBeTruthy();
+    act(() => vouchSession.current?.(sessionFor(user)));
+    expect(screen.getByText("user-1")).toBeTruthy();
+    act(() => authChange.current?.("SIGNED_OUT", null));
+    expect(screen.getByText("signed out")).toBeTruthy();
   });
 });
