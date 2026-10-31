@@ -61,23 +61,12 @@ describe("light mode control contrast", () => {
    * is strong enough to draw an edge. Drop the elevation and every card in light
    * mode becomes invisible, which is exactly the regression worth catching.
    */
-  it("gives light-mode cards a shadow, since their fill no longer separates them", () => {
-    expect(contrastRatio(mobileColors.surface, mobileColors.background)).toBe(1);
-    expect(mobileColors.cardBorder).toBe("transparent");
-
-    const shadow = mobileElevation("card", false);
-    expect(shadow.boxShadow, "a card with no shadow is invisible on a white page").toBeDefined();
-
-    const layers = shadow.boxShadow ?? [];
-    expect(
-      layers.length,
-      "one soft blur reads as a smudge; the edge needs a tight layer too",
-    ).toBeGreaterThanOrEqual(2);
-
-    const alphas = layers.map((layer) =>
-      Number(/rgba\([^)]*,\s*([\d.]+)\)/.exec(String(layer.color))?.[1] ?? 0),
+  it("separates light-mode cards from the grouped page by fill, with no shadow", () => {
+    expect(contrastRatio(mobileColors.surface, mobileColors.background)).toBeGreaterThanOrEqual(
+      PERCEIVABLE_FILL,
     );
-    expect(Math.max(...alphas)).toBeGreaterThanOrEqual(0.08);
+    expect(mobileColors.cardBorder).toBe("transparent");
+    expect(mobileElevation("card", false).boxShadow ?? []).toHaveLength(0);
   });
 
   /**

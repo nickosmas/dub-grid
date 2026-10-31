@@ -32,6 +32,22 @@ Every bottom sheet and popup uses the platform's own element (owner,
 - **People rows** mark an Admin or Super Admin with the star alone (blue or
   gold, named for screen readers), not a labeled pill, leaving the row's room
   for their status (owner, 2026-10-31).
+- **Sections** open from their title, as each platform draws it (owner,
+  2026-10-31): iOS follows the title with a chevron, Android puts an arrow at
+  the row's trailing edge (`SectionHeading`), in place of "See all".
+- **Section tags** (the Schedule focus areas, the Requests and Alerts tabs)
+  are Liquid Glass capsules on iOS 26, gray-tinted at rest and brand-tinted
+  while selected, and Material 3 filter chips on Android with a check mark,
+  each count in a small blue-tinted circle.
+- **Lists and cards** are the platforms' grouped lists (owner: surfaces "fully
+  native"): the page is iOS's grouped gray (#F2F2F7, black in dark mode under
+  #1C1C1E cards), cards are flat and separate by fill with no shadow or
+  border, rows are 52 points with separators inset to the text, row icons are
+  bare glyphs, section headers are small uppercase gray on iOS and small brand
+  titles on Android, a chosen row carries a bare checkmark on iOS and a radio
+  button or checkbox on Android with no filled row, and text fields are
+  borderless with a hairline on iOS and outlined on Android. A native sheet
+  takes the grouped gray, its groups white with no outline.
 - The web and the tests keep the drawn components: the native versions live in
   `.native.tsx` files, and Vitest resolves the base file.
 

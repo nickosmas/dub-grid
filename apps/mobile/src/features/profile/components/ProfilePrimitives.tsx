@@ -19,6 +19,9 @@ import {
 import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
+import { SelectionCheck } from "../../../shared/components/SelectionCheck";
+import { SelectionCheckbox } from "../../../shared/components/SelectionCheckbox";
+import { IS_ANDROID_LIST, IS_IOS_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
@@ -207,7 +210,17 @@ export function ProfileSection({
 
   return (
     <View style={[styles.section, style]}>
-      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
+      {title ? (
+        <Text
+          style={[
+            styles.sectionTitle,
+            IS_IOS_LIST && styles.sectionTitleIos,
+            IS_ANDROID_LIST && styles.sectionTitleAndroid,
+          ]}
+        >
+          {title}
+        </Text>
+      ) : null}
       {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       {children}
     </View>
@@ -273,7 +286,13 @@ export function ProfileInfoRow({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <View style={[styles.row, !isLast && styles.rowDivider]}>
+    <View
+      style={[
+        styles.row,
+        IS_NATIVE_LIST && styles.rowNative,
+        !isLast && !IS_NATIVE_LIST && styles.rowDivider,
+      ]}
+    >
       {iconName ? <ProfileIcon name={iconName} /> : null}
       <View style={styles.rowCopy}>
         <Text style={styles.rowLabel}>{label}</Text>
@@ -286,6 +305,9 @@ export function ProfileInfoRow({
           </Text>
         ) : null}
       </View>
+      {!isLast && IS_NATIVE_LIST ? (
+        <View style={[styles.insetDivider, iconName ? styles.insetDividerIcon : null]} />
+      ) : null}
     </View>
   );
 }
@@ -310,7 +332,12 @@ export function ProfileNavRow({
   return (
     <PressableRow
       onPress={onPress}
-      style={[styles.row, styles.navRow, !isLast && styles.rowDivider]}
+      style={[
+        styles.row,
+        styles.navRow,
+        IS_NATIVE_LIST && styles.rowNative,
+        !isLast && !IS_NATIVE_LIST && styles.rowDivider,
+      ]}
     >
       <ProfileIcon name={iconName} />
       <View style={styles.rowCopy}>
@@ -322,6 +349,9 @@ export function ProfileNavRow({
         ) : null}
       </View>
       <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      {!isLast && IS_NATIVE_LIST ? (
+        <View style={[styles.insetDivider, styles.insetDividerIcon]} />
+      ) : null}
     </PressableRow>
   );
 }
@@ -347,13 +377,24 @@ export function ProfileTextInput({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
+  const nativeInputStyle = IS_IOS_LIST
+    ? styles.inputIos
+    : IS_ANDROID_LIST
+      ? styles.inputAndroid
+      : null;
 
   return (
     <View style={[styles.field, containerStyle]}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {trailingAccessory ? (
         <View
-          style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
+          style={[
+            styles.inputShell,
+            nativeInputStyle,
+            focused &&
+              (IS_ANDROID_LIST ? styles.inputFocusedAndroid : !IS_IOS_LIST && styles.inputFocused),
+            error && styles.inputError,
+          ]}
         >
           <TextInput
             // The visible <Text> label isn't associated with the input on
@@ -366,6 +407,7 @@ export function ProfileTextInput({
             selectionColor={mobileColors.brand}
             style={[
               styles.input,
+              nativeInputStyle,
               styles.inputInShell,
               resolvedInputProps.multiline && styles.inputMultiline,
               textInputStyle,
@@ -384,8 +426,10 @@ export function ProfileTextInput({
           selectionColor={mobileColors.brand}
           style={[
             styles.input,
+            nativeInputStyle,
             resolvedInputProps.multiline && styles.inputMultiline,
-            focused && styles.inputFocused,
+            focused &&
+              (IS_ANDROID_LIST ? styles.inputFocusedAndroid : !IS_IOS_LIST && styles.inputFocused),
             error && styles.inputError,
             textInputStyle,
             inputStyle,
@@ -484,17 +528,27 @@ export function ProfileChoiceGroup<TId extends string | number>({
                     {item.name}
                   </Text>
                 )}
-                <View
-                  style={[
-                    styles.choiceMark,
-                    selection === "multiple" && !selected && styles.choiceMarkRing,
-                    selected && styles.choiceMarkSelected,
-                  ]}
-                >
-                  {selected ? (
-                    <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
-                  ) : null}
-                </View>
+                {IS_IOS_LIST ? (
+                  <SelectionCheck selected={selected} />
+                ) : IS_ANDROID_LIST ? (
+                  selection === "single" ? (
+                    <SelectionCheck selected={selected} />
+                  ) : (
+                    <SelectionCheckbox checked={selected} />
+                  )
+                ) : (
+                  <View
+                    style={[
+                      styles.choiceMark,
+                      selection === "multiple" && !selected && styles.choiceMarkRing,
+                      selected && styles.choiceMarkSelected,
+                    ]}
+                  >
+                    {selected ? (
+                      <Ionicons color={mobileColors.onBrandText} name="checkmark" size={14} />
+                    ) : null}
+                  </View>
+                )}
               </PressableRow>
             );
           })}
@@ -528,6 +582,15 @@ export function ProfileIcon({
         : tone === "success"
           ? mobileColors.successText
           : null;
+
+  if (IS_NATIVE_LIST) {
+    // A native list's row icon is the glyph alone, in the list's ink.
+    return (
+      <View style={styles.iconPlain}>
+        <Ionicons color={semanticColor ?? mobileColors.textSecondary} name={name} size={22} />
+      </View>
+    );
+  }
 
   return (
     <View
@@ -808,6 +871,18 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // own gap below the title stays at the section's `gap`.
       paddingTop: mobileSpace.sm,
     },
+    // iOS: a grouped list's header, small, uppercase and gray, over the rows'
+    // content.
+    sectionTitleIos: {
+      ...mobileText.meta,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    // Material 3: a list subheader, small and in the brand colour.
+    sectionTitleAndroid: {
+      ...mobileTextWeighted("meta", "semibold"),
+      color: mobileColors.brand,
+    },
     sectionDescription: {
       ...mobileText.body,
       color: mobileColors.textMuted,
@@ -824,7 +899,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       boxShadow: undefined,
       shadowOpacity: 0,
       elevation: 0,
-      borderColor: mobileColors.borderSubtle,
+      // A native sheet is the grouped gray, where the white card needs no edge.
+      borderColor: IS_NATIVE_LIST ? "transparent" : mobileColors.borderSubtle,
     },
     panel: {
       backgroundColor: mobileColors.surface,
@@ -862,6 +938,23 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     navRow: {
       minHeight: 70,
+    },
+    // A native list row: the platform's height, its separator drawn inset.
+    rowNative: {
+      minHeight: 52,
+      paddingVertical: mobileSpace.md,
+    },
+    insetDivider: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      left: 16,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    // Starts at the text, past the icon column (16 + 28 + 12).
+    insetDividerIcon: {
+      left: 56,
     },
     rowDivider: {
       borderBottomColor: mobileColors.borderSubtle,
@@ -933,6 +1026,27 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minHeight: 96,
       textAlignVertical: "top",
     },
+    // iOS: a form field is text on the group's own surface, with a hairline
+    // under it, not a box.
+    inputIos: {
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+      borderBottomColor: mobileColors.borderSubtle,
+      borderRadius: 0,
+      borderWidth: 0,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 0,
+    },
+    // Material 3's outlined text field.
+    inputAndroid: {
+      backgroundColor: "transparent",
+      borderColor: mobileColors.textMuted,
+      borderRadius: 4,
+    },
+    inputFocusedAndroid: {
+      borderColor: mobileColors.brand,
+      borderWidth: 2,
+    },
     inputFocused: {
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.brand,
@@ -990,6 +1104,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     choiceMarkSelected: {
       backgroundColor: mobileColors.brand,
+    },
+    iconPlain: {
+      alignItems: "center",
+      justifyContent: "center",
+      width: 28,
     },
     iconBadge: {
       alignItems: "center",

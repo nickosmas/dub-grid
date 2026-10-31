@@ -590,7 +590,10 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   like a form sheet so the keyboard never hides its title or buttons; a
   confirmation that is only words is the system alert, one with a choice of
   its own a native sheet, each keeping its wording. The app lock keeps its
-  drawn cover.
+  drawn cover. Headers follow each platform, People rows mark admins with the
+  star alone, sections open from their title, section tags are Liquid Glass
+  capsules or Material filter chips, and lists and cards are the platforms'
+  grouped lists on a grouped gray page.
 - **56d - Polish pass:** planned; every screen on both platforms.
 
 Android keeps DubGrid's brand colors rather than wallpaper colors.

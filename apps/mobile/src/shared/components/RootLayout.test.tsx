@@ -252,11 +252,11 @@ describe("RootLayout", () => {
     expect(screen.getByTestId("stack")).toBeInTheDocument();
     // The hide is an effect that can land after the shell under load.
     await waitFor(() => expect(splashScreen.hideAsync).toHaveBeenCalledTimes(1));
-    // The light page is plain white; the navigation theme has to follow it or
-    // the bar behind a screen transition flashes the old grey.
+    // The light page is the grouped gray; the navigation theme has to follow
+    // it or the bar behind a screen transition flashes the old page.
     expect(navigationThemeValues.at(-1)?.colors).toMatchObject({
-      background: "#FFFFFF",
-      card: "#FFFFFF",
+      background: "#F2F2F7",
+      card: "#F2F2F7",
     });
     expect(fontState.loadedMaps.at(-1)).toEqual({
       Inter_400Regular: "Inter_400Regular",

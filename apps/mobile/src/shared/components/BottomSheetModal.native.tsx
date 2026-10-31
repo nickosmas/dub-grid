@@ -65,7 +65,9 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
 
   return (
     <BottomSheet
-      backgroundStyle={{ backgroundColor: mobileColors.surface }}
+      // The grouped page colour, as a system sheet holding a list has: its
+      // groups and cards are white on it, with no outline.
+      backgroundStyle={{ backgroundColor: mobileColors.background }}
       enableDynamicSizing={!scrollable}
       enablePanDownToClose={!dismissDisabled}
       index={visible ? 0 : -1}
