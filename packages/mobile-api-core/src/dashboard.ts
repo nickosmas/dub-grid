@@ -599,8 +599,6 @@ export async function loadMobileDashboardPayload(
     throw new MobileApiAuthorizationError();
   }
 
-  const isAdmin = auth.effectiveRole === "admin";
-
   const [
     coverageSummary,
     shiftRequests,
@@ -617,10 +615,8 @@ export async function loadMobileDashboardPayload(
       endDate: range.endDate,
     }),
     // Both admin and super_admin can approve requests (canApproveShiftRequests
-    // is true for both by default), so the pending-approvals count on the
-    // hero summary reflects both — only the ActionQueueCard list itself
-    // stays admin-only on the client, matching web's AdminDashboard. This
-    // also doubles as the activity feed's "request" events (no employeeId
+    // is true for both by default), so both get the pending-approvals count
+    // and the queue itself on the app's Home. This also doubles as the activity feed's "request" events (no employeeId
     // set here, so the underlying query is unfiltered by status/type —
     // matches web's unfiltered shift-request fetch for its own feed).
     deps.fetchMobileShiftRequests(auth.serviceClient, {
@@ -753,6 +749,6 @@ export async function loadMobileDashboardPayload(
       assignmentById,
       assignmentIdByPair,
     ),
-    actionQueue: isAdmin ? pendingApprovalRequests : [],
+    actionQueue: pendingApprovalRequests,
   };
 }

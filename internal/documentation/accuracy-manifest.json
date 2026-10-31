@@ -637,7 +637,6 @@
         "mobile:screen:/(tabs)/home:all",
         "mobile:screen:/(tabs)/home/activity:all",
         "mobile:screen:/(tabs)/home/coverage:all",
-        "mobile:screen:/(tabs)/home/my-schedule:all",
         "mobile:screen:/(tabs)/home/open-shifts:all",
         "mobile:screen:/(tabs)/home/pending-approvals:all",
         "mobile:screen:/(tabs)/home/staff-hours:all"
@@ -669,7 +668,9 @@
             "apps/web/src/components/Header.tsx",
             "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.tsx",
             "apps/mobile/app/(tabs)/home/index.tsx",
-            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx"
+            "apps/mobile/src/features/auth/hooks/useTabsGate.tsx",
+            "apps/mobile/src/features/dashboard/components/MyHomeSections.tsx",
+            "apps/mobile/src/features/dashboard/components/OpenShiftsCard.tsx"
           ],
           "testFiles": [
             "apps/web/src/components/dashboard/__tests__/AdminDashboard.test.tsx",
@@ -677,13 +678,14 @@
             "apps/web/src/components/dashboard/__tests__/UserDashboard.test.tsx",
             "apps/web/src/__tests__/dashboard-hero-metrics.test.ts",
             "apps/mobile/src/features/dashboard/screens/AdminHomeScreen.test.tsx",
-            "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx"
+            "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx",
+            "apps/mobile/src/features/dashboard/components/MyHomeSections.test.tsx"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:652a9372197c2c275f47d2a3ea9d8759dfaec907825ed69402b4165bc4659fb9"
+      "evidenceFingerprint": "sha256:90dc0699c42413a91de162f5d4cbd35a45d8366613e4356b006da0b215664a97"
     },
     {
       "id": "roster",
@@ -1287,7 +1289,8 @@
             "apps/mobile/src/features/notifications/lib/openNotificationAction.ts",
             "packages/domain/src/employment-status.ts",
             "packages/client-errors/src/index.ts",
-            "apps/mobile/src/features/notifications/lib/notification-categories.ts"
+            "apps/mobile/src/features/notifications/lib/notification-categories.ts",
+            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx"
           ],
           "testFiles": [
             "apps/mobile/src/features/auth/hooks/useTabsGate.test.tsx",
@@ -1305,7 +1308,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7ad7fe34349548cd49bf94ed27d95c22043c23fb89c177d47367470cf7b3cced"
+      "evidenceFingerprint": "sha256:a194a12c9b30809e6edf04f278459137dd96eebb545400022dd9c04e170082ff"
     },
     {
       "id": "alerts",
@@ -2046,7 +2049,8 @@
             "apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx",
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx",
             "apps/mobile/src/features/schedule/lib/schedule.ts",
-            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx"
+            "apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx",
+            "apps/mobile/src/features/schedule/components/MyScheduleSections.tsx"
           ],
           "testFiles": [
             "apps/mobile/src/features/schedule/screens/ScheduleScreen.test.tsx",
@@ -2066,7 +2070,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:d1c1b262f7e7097778952459a3a9b66ea279ceae7d5b9a90ce7f4b771cfb1dc3"
+      "evidenceFingerprint": "sha256:d42b69695411e935fd8e6604995e8729da62d797644f3497a9ac445077627a22"
     },
     {
       "id": "integrations-exports",

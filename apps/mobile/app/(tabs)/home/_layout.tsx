@@ -28,7 +28,6 @@ export default function HomeLayout() {
         name="pending-approvals"
         options={createDetailStackOptions(mobileColors, "Pending approvals")}
       />
-      <Stack.Screen name="my-schedule" options={{ headerShown: false }} />
     </Stack>
   );
 }

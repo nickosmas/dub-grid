@@ -6,7 +6,6 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -17,9 +16,11 @@ import {
   getDashboardPeriodRange,
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
-import { mobileSpacing } from "../../../shared/theme/tokens";
+import { Text } from "../../../shared/components/Text";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileSpacing, mobileText } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
-import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
+import { useMyHomeSections } from "../hooks/useMyHomeSections";
 import { usePrefetchOtherDashboardPeriod } from "../hooks/usePrefetchOtherDashboardPeriod";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeaderSkeleton } from "../components/DashboardHeaderSkeleton";
@@ -30,7 +31,11 @@ import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodLoadingOverlay } from "../components/PeriodLoadingOverlay";
 import { PeriodToggle } from "../components/PeriodToggle";
 import { ActionQueueCard } from "../components/ActionQueueCard";
-import { MyScheduleCard } from "../components/MyScheduleCard";
+import {
+  MyHomeSections,
+  buildOpenShiftClaim,
+  hasMyHomeContent,
+} from "../components/MyHomeSections";
 import { OpenShiftsCard } from "../components/OpenShiftsCard";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { StaffHoursCard } from "../components/StaffHoursCard";
@@ -47,40 +52,31 @@ export function AdminHomeScreen() {
     [periodMode, payPeriodStartDate],
   );
   const dashboardQuery = useAdminDashboard(accessToken, range);
-  const role = bootstrapQuery.data?.effectiveRole;
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const managementOnly = isManagementOnly(
     linkedEmployee?.focusAreaIds ?? [],
     linkedEmployee?.departmentIds ?? [],
   );
-  // Shares its key with MyScheduleCard's own call, so this is one fetch, not
-  // two. Read here purely so the card's data gates the page's single skeleton
-  // instead of the card popping in after it. Skipped entirely for
-  // management-only users, who never see the card. The same period as the
-  // rest of the page: Week shows one week of shifts, 2 Weeks shows two.
-  const myScheduleQuery = useMyScheduleQuery(accessToken, { enabled: !managementOnly, range });
-  // Pull-to-refresh still reaches the card through the shared ["mobile",
-  // "dashboard"] key prefix — the same mechanism realtime invalidation uses.
+  // The admin's own day, for the same period as the rest of the page: Week
+  // shows one week, 2 Weeks shows two. Skipped for management-only admins,
+  // who have no schedule of their own.
+  const mine = useMyHomeSections({ accessToken, range, enabled: !managementOnly });
+  const refetchMine = mine.refetch;
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
       dashboardQuery.refetch(),
       bootstrapQuery.refetch(),
+      refetchMine(),
       queryClient.invalidateQueries({ queryKey: ["mobile", "dashboard"] }),
     ]),
   );
 
-  // "Resolved", not "succeeded": a failed schedule card should not take the
-  // whole dashboard to an error screen, it just renders empty. But it does
-  // have to finish before the skeleton comes down, or it lands afterwards and
-  // shifts every card below it.
-  const myScheduleResolved =
-    managementOnly || myScheduleQuery.data !== undefined || Boolean(myScheduleQuery.error);
   const contentState = useMobileContentState({
-    // Both halves of the first paint, so the page shows one skeleton once
-    // rather than clearing it and then filling a card in underneath.
+    // Every part of the first paint, so the page shows one skeleton once
+    // rather than clearing it and then filling the You group in underneath.
     hasData:
-      dashboardQuery.data !== undefined && bootstrapQuery.data !== undefined && myScheduleResolved,
-    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || myScheduleQuery.isLoading,
+      dashboardQuery.data !== undefined && bootstrapQuery.data !== undefined && mine.isResolved,
+    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || mine.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
   });
   // A period change keeps the previous period's cards on screen under a scrim
@@ -89,7 +85,7 @@ export function AdminHomeScreen() {
   // data is exactly that state, the other period still on screen while this
   // one loads; a background refetch of the period already shown, from a pull
   // or a realtime nudge, is not.
-  const isRefetching = dashboardQuery.isPlaceholderData || myScheduleQuery.isPlaceholderData;
+  const isRefetching = dashboardQuery.isPlaceholderData || mine.isPlaceholderData;
   // The other period is fetched alongside this one, so the toggle finds it in
   // cache and switches without the scrim.
   usePrefetchOtherDashboardPeriod({
@@ -112,15 +108,7 @@ export function AdminHomeScreen() {
         scrollEnabled={false}
         stickyHeader={contentState.showSkeleton ? <DashboardHeaderSkeleton /> : undefined}
       >
-        {contentState.showSkeleton ? (
-          <DashboardSkeleton
-            // Both default to shown: until bootstrap resolves the most common
-            // shape is the admin one, and guessing wrong costs one card of
-            // silhouette rather than a layout jump.
-            showActionQueue={role === undefined || role === "admin"}
-            showMySchedule={!managementOnly}
-          />
-        ) : null}
+        {contentState.showSkeleton ? <DashboardSkeleton showMySchedule={!managementOnly} /> : null}
       </Screen>
     );
   }
@@ -172,16 +160,13 @@ export function AdminHomeScreen() {
 
   const data = dashboardQuery.data;
   const draftSummary = data.metrics.draftSummary;
-  const hasPersonalSchedule =
-    Boolean(myScheduleQuery.error) || (myScheduleQuery.data?.entries.length ?? 0) > 0;
   // Decided only from this period's own data. An unpublished period has no
   // shifts of yours to show, and while the toggle's next period is still
   // loading, the previous period's shifts would show and then vanish.
-  const showMySchedule =
-    !managementOnly &&
-    hasPersonalSchedule &&
+  const showMine =
+    hasMyHomeContent(mine) &&
     data.metrics.coverageWindow !== "unpublished" &&
-    !myScheduleQuery.isPlaceholderData &&
+    !mine.isPlaceholderData &&
     !dashboardQuery.isPlaceholderData;
   // Prefer the linked employee record's name — it's always populated from the
   // employees table. auth user_metadata.first_name (user.firstName) is often
@@ -198,46 +183,12 @@ export function AdminHomeScreen() {
   // Keyed so the stagger indexes the cards actually shown; a card that is
   // absent for this role does not leave a gap in the sequence. As on web, an
   // empty card stays and says so rather than dropping out of the page.
-  // Your schedule leads when the person has one: the day ahead first, the
-  // organisation's coverage second.
+  // The admin's own day leads when they have one, then the team they run.
   const sections: Array<{ key: string; node: ReactNode }> = [
-    ...(showMySchedule
+    ...(showMine
       ? [
-          {
-            key: "my-schedule",
-            node: (
-              <MyScheduleCard
-                accessToken={accessToken}
-                range={range}
-                onExpand={() => router.push("/(tabs)/home/my-schedule")}
-                onOpenDay={({ date, entry }) => {
-                  if (!entry) {
-                    router.push({ pathname: "/(tabs)/home/my-schedule", params: { date } });
-                    return;
-                  }
-                  // The detail screen reads the same /me/schedule response
-                  // under the schedule key for this range; hand it the card's
-                  // copy so the shift is on screen before its own fetch.
-                  if (myScheduleQuery.data) {
-                    queryClient.setQueryData(
-                      mobileQueryKeys.schedule(accessToken, "mine", range),
-                      myScheduleQuery.data,
-                    );
-                  }
-                  router.push({
-                    pathname: "/shift/[employeeId]/[date]",
-                    params: {
-                      employeeId: entry.employeeId,
-                      date,
-                      rangeStart: range.startDate,
-                      rangeEnd: range.endDate,
-                      source: "mine",
-                    },
-                  });
-                }}
-              />
-            ),
-          },
+          { key: "you", node: <MyHomeSections data={mine} range={range} /> },
+          { key: "team-label", node: <GroupLabel label="Your team" /> },
         ]
       : []),
     {
@@ -262,25 +213,22 @@ export function AdminHomeScreen() {
           },
         ]
       : []),
-    ...(role === "admin"
-      ? [
-          {
-            key: "approvals",
-            node: (
-              <ActionQueueCard
-                requests={data.actionQueue}
-                onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
-              />
-            ),
-          },
-        ]
-      : []),
+    {
+      key: "approvals",
+      node: (
+        <ActionQueueCard
+          requests={data.actionQueue}
+          onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
+        />
+      ),
+    },
     {
       key: "open-shifts",
       node: (
         <OpenShiftsCard
           coverageWindow={data.metrics.coverageWindow}
           openShifts={data.openShifts}
+          claim={buildOpenShiftClaim(mine)}
           onSeeAll={openExpanded("/(tabs)/home/open-shifts")}
         />
       ),
@@ -326,7 +274,19 @@ export function AdminHomeScreen() {
           </AnimatedListItem>
         ))}
       </View>
+      {/* Outside the You group: a claim from Open shifts confirms here too. */}
+      {mine.confirmationModal}
     </Screen>
+  );
+}
+
+/** Marks where the admin's own day ends and the team's cards begin. */
+function GroupLabel({ label }: { label: string }) {
+  const mobileColors = useMobileColors();
+  return (
+    <Text accessibilityRole="header" style={[styles.groupLabel, { color: mobileColors.textMuted }]}>
+      {label}
+    </Text>
   );
 }
 
@@ -335,5 +295,11 @@ const styles = StyleSheet.create({
   // the coloured halos want air between them.
   cards: {
     gap: mobileSpacing.sectionGap,
+  },
+  // The cards' gap already separates the label from what it names, so the
+  // label sits close to its group and the space above it does the dividing.
+  groupLabel: {
+    ...mobileText.label,
+    marginBottom: -mobileSpacing.sectionGap / 2,
   },
 });

@@ -9,10 +9,10 @@ import {
   useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { ScheduleMeSkeleton } from "../../schedule/components/ScheduleSkeleton";
 import {
   mobileListRow,
   mobileRadii,
-  mobileRadius,
   mobileSpace,
   mobileSpacing,
   type MobileColors,
@@ -162,30 +162,6 @@ function DashboardHeroSkeleton() {
   );
 }
 
-/** The day strip under "Your schedule": pills straight on the page, no card. */
-function MyScheduleSkeleton() {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <View style={styles.cardGroup}>
-      <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="title" width="42%" style={styles.grow} />
-        <SkeletonLine variant="label" width={52} />
-      </View>
-      <View style={styles.dayStrip}>
-        {skeletonRows(3, (index) => (
-          <View key={`schedule-day-${index}`} style={styles.dayCard}>
-            <SkeletonLine variant="label" width="70%" />
-            <View style={styles.shiftPill} />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 /**
  * The admin dashboard's placeholder, card for card.
  *
@@ -193,13 +169,7 @@ function MyScheduleSkeleton() {
  * sticky header slot; the old skeleton dropped it, so the header appeared to
  * fly in after the rest of the page.
  */
-export function DashboardSkeleton({
-  showActionQueue = true,
-  showMySchedule = true,
-}: {
-  showActionQueue?: boolean;
-  showMySchedule?: boolean;
-}) {
+export function DashboardSkeleton({ showMySchedule = true }: { showMySchedule?: boolean }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -208,9 +178,9 @@ export function DashboardSkeleton({
     <SkeletonGroup style={styles.page}>
       {/* PeriodToggle is a SegmentedControl at size="sm" — 36pt, pill. */}
       <SkeletonPill height={36} width={180} />
-      {showMySchedule ? <MyScheduleSkeleton /> : null}
+      {showMySchedule ? <ScheduleMeSkeleton inGroup rows={3} /> : null}
       <DashboardHeroSkeleton />
-      {showActionQueue ? <DashboardCardSkeleton rows={3} variant="text" /> : null}
+      <DashboardCardSkeleton rows={3} variant="text" />
       <DashboardCardSkeleton rows={3} variant="figure" />
       <DashboardCardSkeleton rows={3} variant="figure" />
       <DashboardCardSkeleton rows={3} variant="feed" />
@@ -357,22 +327,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     feedRow: {
       gap: mobileListRow.titleGap,
       paddingVertical: mobileListRow.paddingVertical,
-    },
-    dayStrip: {
-      flexDirection: "row",
-      gap: mobileSpace.md,
-      overflow: "hidden",
-    },
-    // Borderless, matching MyScheduleCard's day cards.
-    dayCard: {
-      gap: 8,
-      minWidth: 124,
-    },
-    shiftPill: {
-      backgroundColor: mobileColors.skeletonBase,
-      borderRadius: mobileRadius.md,
-      minHeight: 71,
-      width: 124,
     },
     expandedPage: {
       gap: mobileSpace.md,

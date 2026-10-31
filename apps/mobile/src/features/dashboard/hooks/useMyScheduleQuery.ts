@@ -7,22 +7,14 @@ import {
 } from "../../../shared/lib/mobile-query-keys";
 
 /**
- * The signed-in user's own shifts for the dashboard's period, as shown by
- * `MyScheduleCard`. The range follows the period toggle, so Week shows one
- * week and 2 Weeks shows two; without one the API answers with its own
+ * The signed-in user's own shifts for the dashboard's period, read by the
+ * admin Home's You group. The range follows the period toggle, so Week shows
+ * one week and 2 Weeks shows two; without one the API answers with its own
  * forward-looking window.
  *
- * Extracted from the card so the dashboard can wait on it too. The card used
- * to own the query and render `null` while it loaded, which meant it appeared
- * *after* the page skeleton had already cleared and pushed everything below it
- * down. Folding this into the screen's content state makes it part of the one
- * skeleton the screen shows.
- *
- * Both callers use the same key, so React Query still issues a single fetch —
- * no prop drilling needed to share it.
- *
  * The `["mobile", "dashboard", ...]` prefix is load-bearing: manual
- * pull-to-refresh and realtime invalidation both target that prefix.
+ * pull-to-refresh, realtime invalidation and the other period's prefetch all
+ * target that prefix.
  */
 export function useMyScheduleQuery(
   accessToken: string | null,
