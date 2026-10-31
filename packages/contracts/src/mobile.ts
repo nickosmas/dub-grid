@@ -88,6 +88,12 @@ export const mobileAuthLoginResponseSchema = z.object({
     })
     .nullable()
     .optional(),
+  /**
+   * What `GET /bootstrap` would answer for this session, when the server could
+   * build it in time; absent with a second factor still to answer. Older
+   * builds ignore it and ask for the bootstrap themselves.
+   */
+  bootstrap: z.lazy(() => mobileBootstrapResponseSchema).optional(),
 });
 
 export const mobileOrganizationSummarySchema = z.object({

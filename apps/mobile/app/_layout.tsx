@@ -27,7 +27,7 @@ import { RouteErrorScreen } from "../src/shared/components/RouteErrorScreen";
 import { StartupSplashGate } from "../src/shared/components/StartupSplashGate";
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
-import { warmSupabaseSession } from "../src/shared/lib/supabase";
+import { warmStartup } from "../src/features/auth/lib/warm-startup";
 import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
 import { NetworkStateProvider } from "../src/shared/providers/NetworkStateProvider";
@@ -46,7 +46,7 @@ import { mobileTypography } from "../src/shared/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 markMobileAuthRuntimeStarted();
-warmSupabaseSession();
+warmStartup();
 
 /**
  * Expo Router renders this instead of crashing the app when a render throws.

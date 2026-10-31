@@ -86,13 +86,13 @@ function shippedJwks(): JSONWebKeySet | null {
 }
 
 /**
- * The proxy's keyset: the keys shipped with the build, asking Supabase only
- * for a key added since (rotation). The proxy runs at the edge PoP, where a
- * fresh isolate's remote fetch cost about 735ms (2026-09-26).
+ * The keys shipped with the build, asking Supabase only for a key added since
+ * (rotation). The proxy and every route handler verify with it: a fresh edge
+ * isolate's remote fetch cost about 735ms (2026-09-26), and each fresh function
+ * instance paid a fetch before its first verify.
  *
- * Only the proxy uses it. A key revoked after the build stays trusted here
- * until the next deploy, so redeploy after revoking a signing key. The proxy's
- * check only routes pages; route handlers verify with `getSupabaseJwks`.
+ * A key revoked after the build stays trusted until the next deploy, so
+ * redeploy after revoking a signing key (internal/secrets-rotation.md).
  */
 export function getProxyJwks(): JWTVerifyGetKey | null {
   if (cachedProxyJwks) return cachedProxyJwks;
@@ -162,7 +162,7 @@ export function extractBearerToken(req: NextRequest): string | null {
  * route handler acts on these claims, so an unverified payload is not usable.
  */
 export async function verifyAccessToken(token: string): Promise<VerifiedToken | null> {
-  const jwks = getSupabaseJwks();
+  const jwks = getProxyJwks();
   const claimChecks = supabaseTokenClaimChecks();
   if (!jwks || !claimChecks) return null;
 

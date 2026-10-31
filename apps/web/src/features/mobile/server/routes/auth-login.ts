@@ -24,6 +24,8 @@ import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
 import { sessionHashOf } from "@/lib/auth/sign-in-completion";
 import { endUserSession } from "@/lib/auth/revocation";
 import { verifyAccessToken } from "@/lib/auth/verify-token";
+import { resolveMobileAuthForToken } from "@/features/mobile/server";
+import { buildMobileBootstrap } from "./bootstrap";
 
 async function hashIdentifier(value: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -49,6 +51,34 @@ export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
  */
 function clientHasGoneAway(req: NextRequest, startedAt: number): boolean {
   return req.signal?.aborted === true || Date.now() - startedAt >= MOBILE_LOGIN_SERVER_DEADLINE_MS;
+}
+
+/**
+ * The app asks for the bootstrap the moment sign-in answers, so it is built
+ * here, with the token just minted, and sent with the session: one round trip
+ * and one auth pass fewer. Best effort and bounded well inside the deadline
+ * above; without it the app asks as it always has.
+ */
+const LOGIN_BOOTSTRAP_BUDGET_MS = 3_000;
+
+async function bootstrapForNewSession(accessToken: string, startedAt: number) {
+  const remaining = MOBILE_LOGIN_SERVER_DEADLINE_MS - 2_000 - (Date.now() - startedAt);
+  const budget = Math.min(LOGIN_BOOTSTRAP_BUDGET_MS, remaining);
+  if (budget <= 0) return undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const build = resolveMobileAuthForToken(accessToken).then((auth) =>
+    auth ? buildMobileBootstrap(auth) : undefined,
+  );
+  const outOfTime = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), budget);
+  });
+  try {
+    return await Promise.race([build, outOfTime]);
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Best effort: a login already too slow to use must not also fail on cleanup. */
@@ -164,6 +194,12 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       ),
     );
 
+    const bootstrap = payload.mfaRequired
+      ? undefined
+      : await timer.time("bootstrap", () =>
+          bootstrapForNewSession(payload.session.accessToken, startedAt),
+        );
+
     if (clientHasGoneAway(req, startedAt)) {
       const discarded = await discardSession(payload.session.accessToken);
       await writeSecurityAuditEvent({
@@ -208,7 +244,9 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       }),
     );
 
-    return json(mobileAuthLoginResponseSchema.parse(payload));
+    return json(
+      mobileAuthLoginResponseSchema.parse(bootstrap ? { ...payload, bootstrap } : payload),
+    );
   } catch (error) {
     await discardRefusedSession(sessionClient);
     if (error instanceof MobileApiRequestError) {

@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { vi } from "vitest";
+import { beforeEach, vi } from "vitest";
 
 // Supabase keys are read through `lib/supabase-keys`, whose `require*` helpers
 // throw on a missing key rather than passing `undefined` down into the client
@@ -78,3 +78,12 @@ vi.mock("@/lib/supabase", () => ({
     }),
   },
 }));
+
+// The internal-account list is remembered per process for half a minute, which
+// would carry one test's accounts into the next. Files that mock the package
+// without the seam skip it.
+beforeEach(async () => {
+  const dataAccess: { resetInternalUserIdsMemo?: () => void } =
+    await import("@dubgrid/data-access");
+  if ("resetInternalUserIdsMemo" in dataAccess) dataAccess.resetInternalUserIdsMemo?.();
+});

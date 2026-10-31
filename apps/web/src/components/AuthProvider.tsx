@@ -12,6 +12,7 @@ import {
   isRecoverableBrowserAuthFailure,
   signOutFromBrowser,
   subscribeToBrowserAuthChanges,
+  subscribeToServerVouchedSessions,
 } from "@/features/account/client";
 import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
 import {
@@ -214,6 +215,12 @@ export default function AuthProvider({
       })();
     });
 
+    // The login route just verified this user; setSession's SIGNED_IN follows
+    // once its own check returns, and a refusal signs out.
+    const stopHearingVouchedSessions = subscribeToServerVouchedSessions((vouched) => {
+      commitAuthState(++authGenerationRef.current, vouched, vouched.user);
+    });
+
     const stopListeningForBrowserSignOut = listenForBrowserSignOut(() => {
       const generation = ++authGenerationRef.current;
       clearBrowserAuthState();
@@ -224,6 +231,7 @@ export default function AuthProvider({
       isMounted = false;
       authGenerationRef.current += 1;
       subscription.unsubscribe();
+      stopHearingVouchedSessions();
       stopListeningForBrowserSignOut();
     };
   }, []);

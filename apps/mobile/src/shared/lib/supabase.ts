@@ -24,21 +24,6 @@ export function getSupabaseClient() {
   return supabaseClient;
 }
 
-/**
- * Starts reading (and, if it expired, refreshing) the stored session at
- * launch, so it overlaps font loading. `AuthSessionProvider` later asks for
- * the same session and gets this work's result instead of starting it.
- */
-export function warmSupabaseSession(): void {
-  try {
-    void getSupabaseClient()
-      .auth.getSession()
-      .catch(() => undefined);
-  } catch {
-    // Invalid configuration: the configuration screen reports it.
-  }
-}
-
 export function createEphemeralSupabaseClient() {
   const env = getMobileEnvConfig();
   return createClient(env.supabaseUrl, env.supabaseAnonKey, {

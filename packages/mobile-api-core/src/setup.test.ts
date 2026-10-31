@@ -72,6 +72,18 @@ describe("isMobileOrgSetupComplete memo", () => {
     expect(from).toHaveBeenCalledTimes(14);
   });
 
+  it("shares one read between checks that arrive together", async () => {
+    const { client, from } = buildServiceClient({ complete: false });
+
+    const answers = await Promise.all([
+      isMobileOrgSetupComplete(client, ORG_ID),
+      isMobileOrgSetupComplete(client, ORG_ID),
+    ]);
+
+    expect(answers).toEqual([false, false]);
+    expect(from).toHaveBeenCalledTimes(7);
+  });
+
   it("remembers each organization on its own", async () => {
     const { client, from } = buildServiceClient({ complete: true });
 

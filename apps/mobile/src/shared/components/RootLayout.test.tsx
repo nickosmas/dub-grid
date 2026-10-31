@@ -181,8 +181,11 @@ vi.mock("../navigation/top-level-stack", () => ({
   }),
 }));
 
-const warmSupabaseSession = vi.hoisted(() => vi.fn());
-vi.mock("../lib/supabase", () => ({ warmSupabaseSession }));
+const warmStartup = vi.hoisted(() => vi.fn());
+vi.mock("../../features/auth/lib/warm-startup", () => ({
+  warmStartup,
+  getStartupBeganAt: () => null,
+}));
 
 const validateMobileEnvSpy = vi.spyOn(envModule, "validateMobileEnv");
 let RootLayout: (typeof import("../../../app/_layout"))["default"];
@@ -200,9 +203,9 @@ describe("RootLayout", () => {
     splashScreen.hideAsync.mockClear();
   });
 
-  // Reading the stored session overlaps font loading instead of following it.
-  it("starts restoring the session when the layout module loads", () => {
-    expect(warmSupabaseSession).toHaveBeenCalledTimes(1);
+  // The session, bootstrap and theme reads overlap font loading instead of following it.
+  it("starts warming up when the layout module loads", () => {
+    expect(warmStartup).toHaveBeenCalledTimes(1);
   });
 
   it("shows the mobile setup screen when env validation fails", async () => {

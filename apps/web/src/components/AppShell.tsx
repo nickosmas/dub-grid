@@ -15,7 +15,7 @@ import {
   getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
-import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
+import { useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -52,16 +52,16 @@ function AppHeader() {
     org,
     setupStatus,
     entryGate,
+    activeEmployeeCount,
     loading: orgLoading,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
     enabled: shouldLoadOrgHeader,
   });
-  const { employees, loading: empLoading } = useEmployees(
-    shouldLoadOrgHeader ? (perms.orgId ?? org?.id ?? null) : null,
-  );
-  const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
-  const setupLoading = perms.isLoading || orgLoading || empLoading;
+  // The bootstrap's count, as SetupGuard reads it: loading the whole roster on
+  // every page for this one check kept it observed, and refetched, everywhere.
+  const isOrgSetupComplete = setupStatus.isComplete && activeEmployeeCount > 0;
+  const setupLoading = perms.isLoading || orgLoading;
   const billingLocked = billing?.billingAccess.isLocked === true;
   // The setup lock hides navigation for members OnboardingGate is holding
   // behind the wizard or the pending screen. It must release on the same

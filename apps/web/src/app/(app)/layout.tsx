@@ -86,16 +86,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // A Server Component cannot set response headers, so with PERF_TIMING=1
   // its spans go to the log instead of Server-Timing.
   const timer = new Timer();
-  const [posthogEnabled, verifiedUserId] = await Promise.all([
+  // The flags are read alongside the session check, not after it, and seeded
+  // only for a verified session; without a seed the client asks for them.
+  const [posthogEnabled, verifiedUserId, clientFlags] = await Promise.all([
     timer.time("layout_posthog_flag", () => isFeatureEnabled("posthog")),
     timer.time("layout_session", () => verifiedSessionUserId().catch(() => null)),
+    timer.time("layout_client_flags", () => getClientFeatureFlags().catch(() => null)),
   ]);
-  const initialFeatureFlags = verifiedUserId
-    ? {
-        flags: await timer.time("layout_client_flags", () => getClientFeatureFlags()),
-        readAt: Date.now(),
-      }
-    : undefined;
+  const initialFeatureFlags =
+    verifiedUserId && clientFlags ? { flags: clientFlags, readAt: Date.now() } : undefined;
   const timing = timer.header();
   if (timing) logger.info({ timing }, "app layout timing");
 

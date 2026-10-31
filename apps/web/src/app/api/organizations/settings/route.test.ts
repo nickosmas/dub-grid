@@ -53,9 +53,11 @@ vi.mock("@/lib/cache", () => ({
 // depend on it, so the built-in defaults stand in.
 vi.mock("@/lib/billing-policy", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/billing-policy")>();
-  const { evaluateBillingAccessWithPolicy } = await import("@dubgrid/domain");
+  const { DEFAULT_BILLING_POLICY, evaluateBillingAccessWithPolicy } =
+    await import("@dubgrid/domain");
   return {
     ...actual,
+    getPlatformBillingPolicy: async () => DEFAULT_BILLING_POLICY,
     evaluateOrgBillingAccess: async (_client: unknown, org: Record<string, string | null> | null) =>
       evaluateBillingAccessWithPolicy(
         {
