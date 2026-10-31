@@ -50,6 +50,7 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
+import { clearQueryCache } from "../../../shared/lib/query-persistence";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import {
@@ -236,7 +237,7 @@ export default function ProfileScreen() {
       // previous token and cache can no longer be offered as an interactive
       // recovery state. Tear them down immediately and return to sign-in.
       await queryClient.cancelQueries().catch(() => undefined);
-      queryClient.clear();
+      clearQueryCache();
       pushClientFriendlyErrorToast(pushToast, {
         error,
         fallbackMessage: "Sign in again to finish switching organizations.",
