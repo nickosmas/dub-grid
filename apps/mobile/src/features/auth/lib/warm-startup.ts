@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { queryClient } from "../../../shared/lib/query-client";
+import { startQueryPersistence } from "../../../shared/lib/query-persistence";
 import { preloadThemePreference } from "../../../shared/lib/theme-preference";
 import { createBootstrapQueryOptions } from "../hooks/useBootstrap";
 
@@ -12,6 +13,7 @@ export function getStartupBeganAt(): number | null {
 
 /**
  * Called once at module load, before fonts, the theme read and the first render.
+ * Restores the persisted queries too.
  * Bootstrap used to wait for all three, then for the session provider to mount
  * and read the session again. Now the stored session (refreshed if it expired)
  * starts the same bootstrap query the splash gate reads, under the same key.
@@ -19,6 +21,9 @@ export function getStartupBeganAt(): number | null {
 export function warmStartup(): void {
   startupBeganAt = Date.now();
   preloadThemePreference();
+  // The last session's bootstrap and Home, from the device, while the network
+  // answers; a fresher answer always wins over a restored one.
+  void startQueryPersistence();
   try {
     void getSupabaseClient()
       .auth.getSession()

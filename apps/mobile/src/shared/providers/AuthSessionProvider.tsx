@@ -18,6 +18,7 @@ import {
   type SessionPresenceMark,
 } from "../lib/session-presence-report";
 import { queryClient } from "../lib/query-client";
+import { clearQueryCache } from "../lib/query-persistence";
 import { getSupabaseClient } from "../lib/supabase";
 
 type AuthSessionContextValue = {
@@ -121,7 +122,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
         // A token that cannot be read will not become readable on retry, so
         // the stored copy goes too, or every launch would replay it.
         void queryClient.cancelQueries();
-        queryClient.clear();
+        clearQueryCache();
         committedIdentity = getMobileAuthIdentity(null);
         lastTrackedAccessTokenRef.current = null;
         void clearStoredSession();
@@ -131,7 +132,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
       if (crossesIdentityBoundary) {
         void queryClient.cancelQueries();
-        queryClient.clear();
+        clearQueryCache();
       }
       committedIdentity = nextIdentity;
 
