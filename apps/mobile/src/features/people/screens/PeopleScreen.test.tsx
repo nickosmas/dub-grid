@@ -39,11 +39,37 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   };
 });
 
-vi.mock("expo-router", () => ({
-  router: {
-    push: routerPush,
-  },
-}));
+// The native header's search field and bar buttons, as plain elements a test
+// can find by label and press.
+vi.mock("expo-router", async () => {
+  const React = await import("react");
+  type ButtonProps = { accessibilityLabel?: string; onPress?: () => void; children?: unknown };
+  const Toolbar = Object.assign(
+    ({ children }: { children?: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    {
+      Button: ({ accessibilityLabel, onPress }: ButtonProps) =>
+        React.createElement("button", { "aria-label": accessibilityLabel, onClick: onPress }),
+      Badge: () => null,
+    },
+  );
+  const SearchBar = ({
+    placeholder,
+    onChangeText,
+  }: {
+    placeholder?: string;
+    onChangeText?: (event: { nativeEvent: { text: string } }) => void;
+  }) =>
+    React.createElement("input", {
+      "aria-label": placeholder,
+      onChange: (event: { target: { value: string } }) =>
+        onChangeText?.({ nativeEvent: { text: event.target.value } }),
+    });
+  return {
+    router: { push: routerPush },
+    Stack: { Toolbar, SearchBar },
+  };
+});
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 

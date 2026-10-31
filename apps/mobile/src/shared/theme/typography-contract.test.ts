@@ -46,7 +46,6 @@ describe("mobile typography contract", () => {
     for (const filePath of [
       "src/features/auth/components/AuthField.tsx",
       "src/features/profile/components/ProfilePrimitives.tsx",
-      "src/shared/components/SearchBar.tsx",
     ]) {
       expect(readFileSync(path.resolve(mobileRoot, filePath), "utf8"), filePath).toContain(
         "mobileInputText",
@@ -58,7 +57,6 @@ describe("mobile typography contract", () => {
     for (const filePath of [
       "src/features/auth/components/AuthField.tsx",
       "src/features/profile/components/ProfilePrimitives.tsx",
-      "src/shared/components/SearchBar.tsx",
     ]) {
       expect(readFileSync(path.resolve(mobileRoot, filePath), "utf8"), filePath).toContain(
         "maxFontSizeMultiplier={MAX_FONT_SCALE}",
@@ -72,7 +70,6 @@ describe("mobile typography contract", () => {
     for (const filePath of [
       "src/features/auth/components/AuthField.tsx",
       "src/features/profile/components/ProfilePrimitives.tsx",
-      "src/shared/components/SearchBar.tsx",
     ]) {
       const source = readFileSync(path.resolve(mobileRoot, filePath), "utf8");
       const inputs = source.match(/<TextInput\b/g)?.length ?? 0;

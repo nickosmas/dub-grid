@@ -33,6 +33,8 @@ vi.mock("expo-router", () => ({
   router: {
     push,
   },
+  // The search field lives in the native header, which these tests don't draw.
+  Stack: { SearchBar: () => null },
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
