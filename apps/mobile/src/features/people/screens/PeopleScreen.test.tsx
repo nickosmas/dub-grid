@@ -327,10 +327,9 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    // The pill's glyph can't be asserted here: every icon subpath aliases to one
-    // shim, so this file's `vi.mock` of Ionicons nulls them all. See
-    // orgRoleBadges.test.ts for which glyph a tier gets.
-    expect(screen.getByText("Admin")).toBeInTheDocument();
+    // An admin is marked by the star alone, named for screen readers.
+    expect(screen.getByLabelText("Admin")).toBeInTheDocument();
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.queryByText("Details")).not.toBeInTheDocument();
 

@@ -29,6 +29,9 @@ Every bottom sheet and popup uses the platform's own element (owner,
   own (a choice to make before confirming) is a native sheet.
 - **The app lock** (a gate, or any sheet asking for a cover backdrop) keeps
   the drawn sheet, whose opaque cover a native sheet can't give.
+- **People rows** mark an Admin or Super Admin with the star alone (blue or
+  gold, named for screen readers), not a labeled pill, leaving the row's room
+  for their status (owner, 2026-10-31).
 - The web and the tests keep the drawn components: the native versions live in
   `.native.tsx` files, and Vitest resolves the base file.
 

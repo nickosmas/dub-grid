@@ -78,7 +78,8 @@ import { ScreenSearch } from "../../../shared/components/ScreenSearch";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
-import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
+import { AccessInsignia } from "../../../shared/components/AccessInsignia";
+import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
 import { StatusMarkIcon } from "../components/StatusMark";
 
@@ -1162,7 +1163,6 @@ function PersonRow({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
   const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
-  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const statusPill = staffStatus ? getMobileStatusPill(mobileColors, staffStatus) : null;
   // A change planned for later (51g) or a first day still ahead (51g4) leaves
   // them Active, and a planned return (51l) leaves them Offboarded, so it
@@ -1204,19 +1204,10 @@ function PersonRow({
             <Text numberOfLines={1} style={styles.personName}>
               {name}
             </Text>
+            {/* The star alone names an Admin or Super Admin, leaving the row's
+                room for their status (owner, 2026-10-31). */}
+            <AccessInsignia orgRole={orgRole} />
             {staffStatus ? <StatusMarkIcon person={staffStatus} /> : null}
-            {orgRoleBadge ? (
-              <View style={orgRoleBadge.containerStyle}>
-                <MaterialCommunityIcons
-                  color={orgRoleBadge.textStyle.color}
-                  name="star"
-                  size={13}
-                />
-                <Text fit="compact" style={orgRoleBadge.textStyle}>
-                  {orgRoleBadge.label}
-                </Text>
-              </View>
-            ) : null}
             {statusPill ? (
               <View style={statusPill.containerStyle}>
                 <Text fit="compact" style={statusPill.textStyle}>
