@@ -91,23 +91,7 @@ function getConfirmationIconColors(tone: ConfirmationTone, mobileColors: MobileC
 }
 
 /** A brief consequence decision. Editable tasks belong in a sheet or page. */
-export function ConfirmationModal({
-  visible,
-  title,
-  body,
-  children,
-  summary,
-  confirmLabel,
-  cancelLabel = "Cancel",
-  confirmTone = "primary",
-  iconName,
-  error,
-  loading,
-  onCancel,
-  onConfirm,
-  secondaryAction,
-  presentation = "modal",
-}: {
+export type ConfirmationModalProps = {
   visible: boolean;
   title: string;
   /** A short lead. Consequences go in `summary`. */
@@ -149,7 +133,25 @@ export function ConfirmationModal({
    * is up, so a nested Modal never appears.
    */
   presentation?: "modal" | "inline";
-}) {
+};
+
+export function ConfirmationModal({
+  visible,
+  title,
+  body,
+  children,
+  summary,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  confirmTone = "primary",
+  iconName,
+  error,
+  loading,
+  onCancel,
+  onConfirm,
+  secondaryAction,
+  presentation = "modal",
+}: ConfirmationModalProps) {
   const isDestructive = confirmTone === "danger";
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
