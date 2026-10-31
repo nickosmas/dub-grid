@@ -148,6 +148,13 @@ async function resolveMobileRequestAuth(
   }
 }
 
+/** The context for a token this server just minted, or null on any refusal. */
+export async function resolveMobileAuthForToken(
+  accessToken: string,
+): Promise<MobileAuthContext | null> {
+  return rememberedContext(accessToken, false).catch(() => null);
+}
+
 export function requireMobileAuth(
   req: NextRequest,
 ): Promise<MobileAuthContext | { response: NextResponse }> {

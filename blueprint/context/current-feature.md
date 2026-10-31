@@ -120,7 +120,7 @@ Must hold:
     fewer serial database wave in Server-Timing, and `npm run test:mobile` and
     the mobile route tests pass.
 
-- [ ] **5. Mobile sign-in carries the bootstrap (F-182).**
+- [x] **5. Mobile sign-in carries the bootstrap (F-182).**
   - `auth-login.ts` returns the bootstrap payload (optional field in
     `mobileAuthLoginResponseSchema`), built from what the handler already read.
   - `LoginScreen.tsx` seeds the bootstrap query from it and starts the Home

@@ -628,13 +628,17 @@ describe("LoginScreen", () => {
       return { promise, resolve };
     }
 
-    async function submitCredentials(setSession: ReturnType<typeof vi.fn>) {
+    async function submitCredentials(
+      setSession: ReturnType<typeof vi.fn>,
+      loginExtras: Record<string, unknown> = {},
+    ) {
       lookupOrganization.mockResolvedValue({
         organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
       });
       loginToOrganization.mockResolvedValue({
         organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
         session: { accessToken: "token-123", refreshToken: "refresh-123" },
+        ...loginExtras,
       });
       getSupabaseClient.mockReturnValue({ auth: { setSession } });
 
@@ -653,6 +657,22 @@ describe("LoginScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
       return view;
     }
+
+    it("uses the bootstrap sent with the sign-in instead of asking for it", async () => {
+      const sent = { currentOrg: { id: "org-1" }, effectiveRole: "user" };
+      const setSession = vi.fn().mockResolvedValue({ data: {}, error: null });
+
+      await submitCredentials(setSession, { bootstrap: sent });
+
+      await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
+      expect(getBootstrap).not.toHaveBeenCalled();
+      expect(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .some((query) => query.state.data === sent),
+      ).toBe(true);
+    });
 
     it("requests bootstrap before the session is stored and navigates once both settle", async () => {
       const session = deferred<{ error: null }>();
