@@ -163,6 +163,8 @@ date`, predates this fix and fails alone too: the test takes "today" in UTC
   "You" label removed and the greeting and Week / 2 Weeks toggle replaced by
   the staff Home's header with its week stepper (`WeekNavigatorHeader`, now
   shared by both homes); the drill-in screens take the week as `weekOf`.
+  The Unpublished changes card, which only counted drafts the app can't
+  publish, was removed at the owner's word too.
 - **Not seen on device:** Claim (Calm Haven has no staffing needs, so no gaps)
   and a swap to answer; both are covered by `MyHomeSections.test.tsx` and
   `OpenShiftsCard.test.tsx`. Not run: `npm run test:e2e`, Android.

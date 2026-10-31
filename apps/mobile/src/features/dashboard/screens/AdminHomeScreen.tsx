@@ -27,7 +27,6 @@ import { WeekNavigatorHeader } from "../../schedule/components/WeekNavigatorHead
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { CoverageWash } from "../components/CoverageWash";
-import { DraftSummaryCard } from "../components/DraftSummaryCard";
 import { PeriodLoadingOverlay } from "../components/PeriodLoadingOverlay";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import {
@@ -169,7 +168,6 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
-  const draftSummary = data.metrics.draftSummary;
   // Decided only from this week's own data. An unpublished week has no shifts
   // of yours to show, and while the stepper's next week is still loading, the
   // previous week's shifts would show and then vanish.
@@ -209,14 +207,6 @@ export function AdminHomeScreen() {
         />
       ),
     },
-    ...(draftSummary && draftSummary.total > 0
-      ? [
-          {
-            key: "drafts",
-            node: <DraftSummaryCard summary={draftSummary} />,
-          },
-        ]
-      : []),
     {
       key: "approvals",
       node: (

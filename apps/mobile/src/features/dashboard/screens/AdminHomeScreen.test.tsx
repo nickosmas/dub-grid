@@ -278,7 +278,8 @@ describe("AdminHomeScreen", () => {
     expect(screen.getByText("No recent activity")).toBeInTheDocument();
   });
 
-  it("shows unpublished draft changes only when the authorized summary is non-zero", () => {
+  // Drafts can only be published on the web, so Home never mentions them.
+  it("shows no Unpublished changes card, even with drafts waiting", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -297,39 +298,8 @@ describe("AdminHomeScreen", () => {
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByText("Unpublished changes")).toBeInTheDocument();
-    expect(screen.getByText("1 new change")).toBeInTheDocument();
-    expect(screen.getByText("1 deleted change")).toBeInTheDocument();
-  });
-
-  it("hides authorized zero and permission-redacted draft summaries", () => {
-    useBootstrap.mockReturnValue({
-      isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
-    });
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        ...EMPTY_DASHBOARD_DATA,
-        metrics: {
-          ...EMPTY_DASHBOARD_DATA.metrics,
-          draftSummary: { newCount: 0, modifiedCount: 0, deletedCount: 0, total: 0 },
-        },
-      },
-    });
-
-    const { rerender } = render(<AdminHomeScreen />);
     expect(screen.queryByText("Unpublished changes")).not.toBeInTheDocument();
-
-    useAdminDashboard.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: EMPTY_DASHBOARD_DATA,
-    });
-    rerender(<AdminHomeScreen />);
-
-    expect(screen.queryByText("Unpublished changes")).not.toBeInTheDocument();
+    expect(screen.queryByText("1 new change")).not.toBeInTheDocument();
   });
 
   it("shows the pending-approvals queue to a super_admin too", () => {
