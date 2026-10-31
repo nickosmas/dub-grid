@@ -1248,7 +1248,7 @@
       colors). The admin Home gets a My schedule | Team switch. Every element
       is polished to the standard of a top company's app. Owner decisions,
       2026-10-31.
-  - [ ] 56a. **Expo SDK 57** - Expo 54 to 57 with the React Native, React
+  - [x] 56a. **Expo SDK 57** - Expo 54 to 57 with the React Native, React
         Native Screens and Expo Router it pins, so native bar buttons, menus
         and segmented controls work as each platform intends and iOS device
         builds no longer need the SDK patch. Every screen still works on the

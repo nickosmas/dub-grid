@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 54 are
-shipped, and so is item 55. Item 40 is in progress.
+shipped, and so is item 55. Items 40 and 56 are in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,6 +90,7 @@ shipped, and so is item 55. Item 40 is in progress.
 | 53   | Shipped     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
 | 54   | Shipped     | People away or absent all period sit last in their section, under a group row that folds.                                       |
 | 55   | Shipped     | One staff page holds everything stored about a person, in tabs that follow one chosen period.                                   |
+| 56   | In progress | The app feels built for each phone: Liquid Glass on iOS, Material 3 on Android, and a My schedule \| Team switch on admin Home. |
 
 Item 40 is split:
 
@@ -567,6 +568,21 @@ Item 55 is split:
 - **55f - Requests:** shipped; pickups, swaps, call-offs and profile change
   requests involving them in the period, with state and who decided, and a
   Waiting on you card on Overview.
+
+Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
+
+- **56a - Expo SDK 57:** shipped; Expo 54 to 57 with React Native 0.86,
+  React Native Screens 4.26 and Expo Router 57, and the UIScene life cycle
+  through a config plugin, so iOS device builds need no SDK patch. The iOS
+  minimum is now 16.4.
+- **56b - Admin Home switch:** planned; My schedule | Team, one open shifts
+  carousel of every gap on My schedule, no "Your team" label.
+- **56c - Native top bars:** planned; Liquid Glass bar buttons and native
+  search on iOS, a Material top app bar, floating action button and bottom
+  navigation on Android.
+- **56d - Polish pass:** planned; every screen on both platforms.
+
+Android keeps DubGrid's brand colors rather than wallpaper colors.
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP
