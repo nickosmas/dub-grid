@@ -1,7 +1,6 @@
 import type { MobileBootstrapResponse } from "@dubgrid/contracts";
 import { getIsoDateInTimeZone, getScheduleRangeForDate } from "@dubgrid/schedule-core";
 import { getDashboard, getMySchedule, getShiftRequests } from "../../../shared/lib/api";
-import { getDashboardPeriodRange } from "../../../shared/lib/dates";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getAdminDashboardQueryKey } from "../../dashboard/hooks/useAdminDashboard";
@@ -26,12 +25,12 @@ export function prefetchHomeQueries(
     linkedEmployee?.departmentIds ?? [],
   );
 
+  // This week in the organization's time zone, as both homes open on it.
+  const range = getScheduleRangeForDate(
+    getIsoDateInTimeZone(new Date(), bootstrap.currentOrg.timezone),
+  );
+
   if (isAdminHomeRole(bootstrap.effectiveRole)) {
-    const range = getDashboardPeriodRange(
-      "week",
-      new Date(),
-      bootstrap.currentOrg.payPeriodStartDate ?? null,
-    );
     void queryClient.prefetchQuery({
       queryKey: getAdminDashboardQueryKey(accessToken, range),
       queryFn: ({ signal }) => getDashboard(accessToken, range, signal),
@@ -41,6 +40,10 @@ export function prefetchHomeQueries(
         queryKey: mobileQueryKeys.dashboardSchedule(accessToken, range),
         queryFn: ({ signal }) => getMySchedule(accessToken, range, signal),
       });
+      void queryClient.prefetchQuery({
+        queryKey: mobileQueryKeys.shiftRequests(accessToken, range),
+        queryFn: ({ signal }) => getShiftRequests(accessToken, range, signal),
+      });
     }
     return;
   }
@@ -48,9 +51,6 @@ export function prefetchHomeQueries(
   // Home sends these users to the team schedule instead.
   if (bootstrap.effectiveRole === "user" && managementOnly) return;
 
-  const range = getScheduleRangeForDate(
-    getIsoDateInTimeZone(new Date(), bootstrap.currentOrg.timezone),
-  );
   void queryClient.prefetchQuery({
     queryKey: mobileQueryKeys.schedule(accessToken, "mine", range),
     queryFn: ({ signal }) => getMySchedule(accessToken, range, signal),

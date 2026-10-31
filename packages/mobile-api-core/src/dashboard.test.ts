@@ -597,7 +597,7 @@ describe("loadMobileDashboardPayload", () => {
     );
   });
 
-  it("fetches pending approvals for both roles but only lists them in actionQueue for admin", async () => {
+  it("lists pending approvals in actionQueue for both admin and super_admin", async () => {
     const deps = makeDeps();
     const pendingRequest = {
       id: "req-1",
@@ -633,10 +633,8 @@ describe("loadMobileDashboardPayload", () => {
       serviceClient: {} as never,
     };
     const superAdminPayload = await loadMobileDashboardPayload(superAdminAuth, range, deps);
-    // super_admin still needs the count for the hero metric, even though the
-    // ActionQueueCard list itself stays admin-only.
     expect(deps.fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
-    expect(superAdminPayload.actionQueue).toEqual([]);
+    expect(superAdminPayload.actionQueue).toEqual([pendingRequest]);
     expect(superAdminPayload.metrics.pendingApprovalsCount).toBe(1);
   });
 

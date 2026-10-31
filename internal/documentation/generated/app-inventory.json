@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b953a1dac3f8dba8daedb93ec6a316d1bed204f04ac051dc64062966a48f31ee",
+  "sourceDigest": "sha256:265d13f161e8a1ee45531f89e97c4bade4634ab66d184938a72a933378841885",
   "webRoutes": [
     {
       "id": "web:/",
@@ -445,17 +445,6 @@
       "dynamicParameters": [],
       "source": {
         "path": "apps/mobile/app/(tabs)/home/coverage.tsx"
-      }
-    },
-    {
-      "id": "mobile:screen:/(tabs)/home/my-schedule:all",
-      "routerPath": "/(tabs)/home/my-schedule",
-      "urlPattern": "/home/my-schedule",
-      "kind": "screen",
-      "platform": "all",
-      "dynamicParameters": [],
-      "source": {
-        "path": "apps/mobile/app/(tabs)/home/my-schedule.tsx"
       }
     },
     {

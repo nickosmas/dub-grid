@@ -19,7 +19,6 @@ vi.mock("../hooks/useTabsGate", () => ({
   isAdminHomeRole: (role: string | undefined) => role === "admin" || role === "super_admin",
 }));
 
-import { getDashboardPeriodRange } from "../../../shared/lib/dates";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { getAdminDashboardQueryKey } from "../../dashboard/hooks/useAdminDashboard";
 import { prefetchHomeQueries } from "./prefetch-home";
@@ -48,13 +47,14 @@ describe("prefetchHomeQueries", () => {
     prefetchQuery.mockReset();
   });
 
-  it("warms an admin's dashboard and own schedule for this week", () => {
+  it("warms an admin's dashboard, own schedule and requests for this week in the org's time zone", () => {
     prefetchHomeQueries(TOKEN, bootstrapFor("admin"));
 
-    const range = getDashboardPeriodRange("week", new Date(), null);
+    const range = getScheduleRangeForDate(getIsoDateInTimeZone(new Date(), "America/New_York"));
     expect(prefetchedKeys()).toEqual([
       JSON.stringify(getAdminDashboardQueryKey(TOKEN, range)),
       JSON.stringify(mobileQueryKeys.dashboardSchedule(TOKEN, range)),
+      JSON.stringify(mobileQueryKeys.shiftRequests(TOKEN, range)),
     ]);
   });
 

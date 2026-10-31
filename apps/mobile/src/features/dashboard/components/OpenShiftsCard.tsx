@@ -4,6 +4,7 @@ import { Text } from "../../../shared/components/Text";
 import type { MobileCoverageWindow, MobileDashboardResponse } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
+import { Button } from "../../../shared/components/Button";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { DashboardCard } from "./DashboardCard";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -29,6 +30,17 @@ export type OpenShiftUrgency = NonNullable<
 >;
 export type OpenShift = MobileDashboardResponse["openShifts"][number];
 
+/**
+ * Claiming from the card, for a viewer who can work some of these shifts.
+ * `shiftFor` names the shift they can take for a row, or null.
+ */
+export type OpenShiftClaim = {
+  shiftFor: (row: OpenShift) => OpenShift | null;
+  isClaiming: (shift: OpenShift) => boolean;
+  isBusy: boolean;
+  onClaim: (shift: OpenShift) => void;
+};
+
 // Same tone/label mapping as web's ExpandedOpenShifts.tsx: only "high" reads
 // as genuinely urgent, "medium"/"low" both just mean "still open".
 export const URGENCY_BADGE: Record<OpenShiftUrgency, { label: string; tone: CountBadgeTone }> = {
@@ -41,11 +53,12 @@ export const URGENCY_BADGE: Record<OpenShiftUrgency, { label: string; tone: Coun
 // (apps/mobile/app/(tabs)/home/open-shifts.tsx). Lands on the Requests tab's
 // Available list, where an open shift can be claimed or offered; that screen
 // selects by tab, not by shift, so only the tab travels.
-export function OpenShiftRow({ shift }: { shift: OpenShift }) {
+export function OpenShiftRow({ shift, claim }: { shift: OpenShift; claim?: OpenShiftClaim }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const toneColor = useMemo(() => createToneTextColors(mobileColors), [mobileColors]);
   const urgency = shift.urgency != null ? URGENCY_BADGE[shift.urgency] : null;
+  const claimable = claim?.shiftFor(shift) ?? null;
 
   return (
     <PressableRow
@@ -69,7 +82,18 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
           {urgency?.tone === "danger" ? "urgent" : "needed"}
         </Text>
       </View>
-      <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+      {claimable && claim ? (
+        <Button
+          disabled={claim.isBusy}
+          label="Claim"
+          loading={claim.isClaiming(claimable)}
+          onPress={() => claim.onClaim(claimable)}
+          size="sm"
+          tone="secondary"
+        />
+      ) : (
+        <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
+      )}
     </PressableRow>
   );
 }
@@ -98,10 +122,12 @@ export function getOpenShiftsEmptyCopy(coverageWindow: MobileCoverageWindow = "p
 export function OpenShiftsCard({
   openShifts,
   coverageWindow,
+  claim,
   onSeeAll,
 }: {
   openShifts: MobileDashboardResponse["openShifts"];
   coverageWindow?: MobileCoverageWindow;
+  claim?: OpenShiftClaim;
   onSeeAll?: () => void;
 }) {
   const emptyCopy = getOpenShiftsEmptyCopy(coverageWindow);
@@ -115,7 +141,7 @@ export function OpenShiftsCard({
           items={openShifts}
           keyExtractor={(shift) => shift.id}
           limit={DASHBOARD_CARD_PREVIEW_LIMIT}
-          renderItem={(shift) => <OpenShiftRow shift={shift} />}
+          renderItem={(shift) => <OpenShiftRow claim={claim} shift={shift} />}
         />
       ) : (
         <EmptyStateCard
