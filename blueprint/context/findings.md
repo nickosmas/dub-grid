@@ -116,7 +116,7 @@
 - Read org visibility straight from the database rather than Redis then the database, or lengthen `mwOrgAccess`'s TTL (writers already invalidate it).
 - Consider pinning the proxy to pdx1, checking `x-vercel-id` on a deploy.
 - Measure first with `PERF_TIMING=1` and a `mw_session` span.
-  **Resolution:** Fixed on fix/login-speed (2026-10-30): the proxy verifies with keys shipped in the build (`getProxyJwks`, remote only for a key added since) and reads org visibility and state from the memo straight to the database, dropping the Redis layer and its writers. Local Server-Timing on a fresh process: `jwt_verify` 35 to 1.2ms, `mw_org_access` 472 to 128ms. Not done: overlapping the org reads with verification (nothing left to overlap) and pinning the proxy to pdx1 (would add a hop to static public pages).
+  **Resolution:** Fixed on fix/login-speed (2026-10-30): the proxy verifies with keys shipped in the build (`getProxyJwks`, remote only for a key added since) and reads org visibility and state from the memo straight to the database, dropping the Redis layer and its writers. Local Server-Timing on a fresh process: `jwt_verify` 35 to 1.2ms, `mw_org_access` 472 to 128ms. Not done: overlapping the org reads with verification (nothing left to overlap) and pinning the proxy to pdx1 (would add a hop to static public pages). Re-examined 2026-10-30 (second /audit pass): verification and org access hold, so it stays fixed. Not closed: the billing-policy leg of the same `Promise.all` still goes Redis then database (F-157), route handlers still verify against the remote key set (F-158), and the post-idle token refresh runs before the org reads (F-159).
 
 ### F-131 [P2] fixed - App pages paint nothing until the browser re-checks the session over the network
 
@@ -124,7 +124,7 @@
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** `ProtectedRoute` shows `BrandLoadingScreen` while `isLoading || !user`. `isLoading` clears only after `getBrowserAuthSession()` and then `supabase.auth.getUser()`, which is a round trip to Supabase Auth. Only then do permissions, bootstrap and the page's queries start. The server has already verified the token, so this is a client waterfall in front of every signed-in page, on top of downloading and hydrating 450-620 KB gzip of JS.
 **Suggested fix:** Seed `AuthProvider` with the user and claims the server verified, so `isLoading` starts false, and run `getUser()` in the background as revalidation. Next step: server-prefetch the org bootstrap into the QueryClient.
-**Resolution:** Fixed on fix/login-speed (2026-10-30): the `(app)` layout passes the user id its check verified, and `AuthProvider` paints with the cookie session's user when it matches and the token is unexpired, running `getUser()` behind it; a failed check signs out as before. Tested (`AuthProvider.test.tsx`), and seen in the browser: page queries start before `getUser`.
+**Resolution:** Fixed on fix/login-speed (2026-10-30): the `(app)` layout passes the user id its check verified, and `AuthProvider` paints with the cookie session's user when it matches and the token is unexpired, running `getUser()` behind it; a failed check signs out as before. Tested (`AuthProvider.test.tsx`), and seen in the browser: page queries start before `getUser`. Re-examined 2026-10-30 (second /audit pass): holds for hard loads. Not closed: the soft navigation after sign-in still waits on the browser `getUser` (F-155), two-factor sign-in repeats it (F-160), and the background `getUser` holds the auth lock (F-162).
 
 ### F-132 [P2] fixed - The sign-in pages load the whole signed-in app shell
 
@@ -132,7 +132,7 @@
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** `/login` (Speed Insights 73) inherits `force-dynamic`, the layout's session and flag reads, and AuthProvider, QueryProvider, PostHog, AppShell, Header and `app-ui.css`. A production build puts its first-load JS at about 470 KB gzip, more than `/dashboard`. PageSpeed (desktop, 2026-10-30) scored it 76, with 460ms Total Blocking Time and 221 KiB of unused JS, 141 KiB of it in one chunk. It also reports an unused Supabase preconnect and 43 KiB of render-blocking CSS; on mobile that CSS is 1.33s of LCP render delay against a 20ms TTFB.
 **Suggested fix:** Move the sign-in routes into a sibling group such as `(auth)` with a thin layout holding only what `OrgLogin` needs (AuthProvider, QueryClient, SignInPrefetch). Keep `app-ui.css` and AppShell out of it.
-**Resolution:** Fixed on fix/login-speed (2026-10-30), differently from the suggestion: the sign-in pages stay under `(app)` (they need its auth provider, query cache and `app-ui.css`), and `AppChrome` loads the shell through `next/dynamic` everywhere else. First-load JS gzip: `/login` 467 to 413 KB, `/accept-invite` 467 to 381 KB, `/forgot-password` 461 to 371 KB.
+**Resolution:** Fixed on fix/login-speed (2026-10-30), differently from the suggestion: the sign-in pages stay under `(app)` (they need its auth provider, query cache and `app-ui.css`), and `AppChrome` loads the shell through `next/dynamic` everywhere else. First-load JS gzip: `/login` 467 to 413 KB, `/accept-invite` 467 to 381 KB, `/forgot-password` 461 to 371 KB. Re-examined 2026-10-30 (second /audit pass): holds for `/login`'s own bundle. Not closed: the repair added a chunk download in series after sign-in (F-154), and `SignInPrefetch` still pulls app modules into `/login` (F-161).
 
 ### F-133 [P3] unverified - Every signed-in route renders in a function because the nonce CSP forbids prerendering
 
@@ -207,7 +207,7 @@
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** `/people/[id]` scores 74 and ships 538 KB gzip of first-load JS. Its data cost grows with the organization rather than the person.
 **Suggested fix:** `Promise.all` the two fetches. Filter corrections, notes and change requests by `emp_id` on the server. Use a Map for the directory.
-**Resolution:**
+**Resolution:** Re-examined 2026-10-30 (second /audit pass) after the staff page rework: shift requests are now filtered by `empId` (`StaffDetailPage.tsx:962`). Still open: the employee-then-recurring waterfall (`:295-318`), organization-wide corrections and notes filtered on the client (`:1002-1019`, `:1038-1056`), every profile change request (`:969-978`) and `directory.find` per row (`:984`). See also F-168.
 
 ### F-140 [P3] open - Code splitting gaps across signed-in routes
 
@@ -256,7 +256,7 @@
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** Likely a scan of the org's notifications on each dedupe. The crons in F-142 and the Stripe webhook call it per row, and the table only grows.
 **Suggested fix:** EXPLAIN it. Add a partial index on `(org_id, type)` or dedupe per recipient through the `user_id` index. Add retention for read, archived and email-tracking rows.
-**Resolution:**
+**Resolution:** Re-examined 2026-10-30 (second /audit pass): no notifications index leads with `org_id` (`001:1432-1436`), so the dedupe can only filter after reading across organizations; five overlapping `user_id` indexes also slow every insert. Still needs EXPLAIN.
 
 ### F-144 [P2] open - Creating or answering a shift request waits for every approver's alert to send
 
@@ -374,7 +374,7 @@
 - Make a batch draft-cells RPC, or load the cells when Approve opens.
   **Resolution:**
 
-### F-153 [P3] unverified - Mobile startup and list rendering costs
+### F-153 [P3] open - Mobile startup and list rendering costs
 
 **File:** `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:223` and `StartupSplashGate.tsx:76-104` (session, then bootstrap, then the Home prefetch); `apps/mobile/src/shared/components/Screen.tsx:335, 349` (inline `renderItem`, and a new separator component type each render); `ScheduleScreen.tsx:680` (a one-minute clock re-renders the screen)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
@@ -384,4 +384,296 @@
 - Start `/me/schedule` alongside bootstrap.
 - Use a stable `renderItem` and separator, and memo the rows.
 - Push `now` down to the rows that show relative time.
-  **Resolution:**
+  **Resolution:** Re-examined 2026-10-30 (second /audit pass): confirmed at the cited lines, so moved to open. It missed the token refresh before bootstrap, fonts and the theme read gating bootstrap (F-183), Home content being a further wave after the splash, and the missing persisted cache (F-181).
+
+### F-154 [P2] fixed - After sign-in, the app shell's code downloads only once the dashboard has rendered on the server
+
+**File:** `apps/web/src/components/AppChrome.tsx:10`; `apps/web/src/components/dashboard/preloadDashboardView.ts:5`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** F-132's fix keeps `AppShellProviders` (AppShell, Header, the gates) off `/login`. After `router.replace`, `AppChrome` asks for that chunk only when the new pathname commits, which needs the `/dashboard` RSC response first. `preloadDashboardView()` runs on submit but warms only `DashboardView`. So every cold sign-in now has one extra chunk round trip and download (about the 54 KB gzip cut from `/login`) in series before the dashboard can paint.
+**Suggested fix:** Also `import("@/components/AppShellProviders")` inside `preloadDashboardView()`.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `preloadDashboardView()` also imports `AppShellProviders`; in the browser the shell chunk is requested 23ms after submit, beside the login POST.
+
+### F-155 [P2] fixed - After a password sign-in, the splash still waits on the browser's own `getUser` round trip
+
+**File:** `apps/web/src/components/OrgLogin.tsx:424`; `apps/web/src/features/account/client/auth.ts:162`; `apps/web/src/components/RouteGuards.tsx:94`; `apps/web/src/components/onboarding/OnboardingGate.tsx:55`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The login route already wrote the session cookies, but the user appears in `AuthProvider` only through the `SIGNED_IN` that `setSession` emits after a browser-to-Supabase `/auth/v1/user` call, which also holds the auth lock. F-131's fast path covers hard loads, not this soft navigation, so the round trip sits on the sign-in critical path whenever it is the slowest of the parallel calls.
+**Suggested fix:** Once `sessionCookieSet` is true, have `AuthProvider` read the cookie session (no network) and commit it as server-vouched, as F-131 does on a hard load; run `getUser` behind it.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the login route returns the whole signed-in user, and `syncBrowserSessionInBackground` announces the route's session to `AuthProvider` before `setSession`'s round trip; a refusal still signs out. Tested in `AuthProvider.test.tsx` and `auth.session-sync.test.ts`. Not measured on production.
+
+### F-156 [P2] fixed - A cold hard load of the dashboard takes three API waves; only sign-in is primed
+
+**File:** `apps/web/src/app/(app)/dashboard/DashboardPageContent.tsx:64, 119`; `apps/web/src/components/AppShell.tsx:60`; `apps/web/src/components/SignInPrefetch.tsx:119-126`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Wave 1 is permissions, bootstrap and org context. Wave 2 is the employee roster, which waits for `perms.orgId` though `org_id` is in the session token, and `DashboardContent` mounts only once permissions load. Wave 3 is the dashboard data, because `DashboardView` mounts only after the roster, though `primeDashboardQueries` needs only bootstrap and permissions. `SignInPrefetch` primes all of this only while a sign-in handoff is pending, so a reopened tab or bookmark pays one avoidable API round trip (function time included) on every cold open. A Super Admin's header adds billing, then employees.
+**Suggested fix:** Run the sign-in priming on hard loads too, from the server-vouched session, and start the roster from the token's `org_id`.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `SignInPrefetch` primes once on a hard load from the vouched session, the roster with the dashboard only. In the browser a cold `/dashboard` now asks in two waves: permissions, bootstrap, org context, terms, billing and the roster together, then the dashboard's data when bootstrap answers.
+
+### F-157 [P2] fixed - The platform billing policy is still read Redis then database, after the org reads, on every page load and API call
+
+**File:** `apps/web/src/lib/billing-policy.ts:82-95` (`getPlatformBillingPolicy`, 10s memo then `cacheThrough`); `apps/web/src/proxy.ts:701-728`; `apps/web/src/app/api/shared/permissions.ts:457-477, 535, 545`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** F-129 dropped Redis for org visibility and access, but the billing-policy leg in the same `Promise.all` still does an edge-to-Upstash GET and, on a miss, a PostgREST query, one after the other, so after a minute idle it can still be the slowest leg of `mw_org_access`. In `requireOrgPermissions` it is worse: revocation (Redis), then three database reads in parallel, then the policy (Redis, then database), then "setup complete" (Redis), four serial waves before the handler starts, though the last two need only `orgId`. The proxy's missing-claims fallback (`proxy.ts:436-470`) also still uses `cacheThrough`.
+**Suggested fix:** Read the policy straight from the database with a 5-minute memo (it changes rarely), or return it with the org row in one RPC. In `requireOrgPermissions`, start the policy and setup reads inside the same `Promise.all` as the database wave and ignore the setup result for Gridmasters.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the platform policy is read from the database with a one-minute memo and one read in flight (no Redis), and `requireOrgPermissions` starts the policy and setup reads with its database wave. The proxy's missing-claims fallback still uses `cacheThrough`.
+
+### F-158 [P2] fixed - Route handlers and the app layout verify tokens against the remote key set
+
+**File:** `apps/web/src/lib/auth/verify-token.ts:164-170` (`verifyAccessToken` uses `getSupabaseJwks`, a `createRemoteJWKSet`); callers include `apps/web/src/app/(app)/layout.tsx:56-71` and every `/api` route
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** F-129's build-shipped keys (`getProxyJwks`) went into the proxy only. Each fresh function instance fetches the JWKS from Supabase Auth before its first verify, and each route can be its own function, so cold API calls and the layout's first byte pay that round trip. Size from pdx1 is unmeasured (about 735ms from the edge on 2026-09-26). The layout also awaits `layout_client_flags` after its `Promise.all` (`:93-95`) instead of inside it.
+**Suggested fix:** Verify with `getProxyJwks()` in `verifyAccessToken` (same remote fallback on an unknown `kid`), and move the flags read into the layout's `Promise.all`. Confirm the production build actually carries `SUPABASE_JWKS`: `next.config.ts:179-193` falls back to remote silently when the build's fetch fails.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `verifyAccessToken` uses the build-shipped keys (`getProxyJwks`), the runbook says to redeploy after revoking a key since routes now trust shipped keys too, the layout reads client flags alongside the session, and the build log says when keys could not be shipped (a failed build would break CI builds without Supabase).
+
+### F-159 [P3] unverified - After about an hour idle, the proxy refreshes the token before it starts the org reads
+
+**File:** `apps/web/src/proxy.ts:351` (`getSession`), then `:701`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** A token near expiry is refreshed (a Supabase Auth round trip plus the access-token hook) before any org read starts, so the first page after idle pays both in series. F-129's "nothing left to overlap" considered only verification. Size unmeasured.
+**Suggested fix:** Start the org and policy reads from `decodeJwt` of the cookie token alongside `getSession()`, and use them only if the verified `sub` and `org_id` match.
+**Resolution:**
+
+### F-160 [P3] open - A two-factor sign-in makes two or three redundant `getUser` round trips
+
+**File:** `apps/web/src/components/MFAVerify.tsx:104-108`; `apps/web/src/components/AuthProvider.tsx:197-202`; `apps/web/src/components/OrgLogin.tsx:433-450`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** After the code, `challengeAndVerify` has saved the session and emitted `MFA_CHALLENGE_VERIFIED`, but `AuthProvider` doesn't trust that event and calls `getUser` under the auth lock; `MFAVerify` then calls `setBrowserSession`, a second `getUser` queued behind it; `proceed()` waits on both. Before the form shows, the browser waits on `setSession`'s `getUser`, then `listFactors` calls `getUser` again.
+**Suggested fix:** Trust `MFA_CHALLENGE_VERIFIED` (its response carries the user), drop the extra `setBrowserSession` once E2E confirms the aal2 cookie, and return `factorId` from the login route.
+**Resolution:**
+
+### F-161 [P3] unverified - `SignInPrefetch` pulls dashboard, roster and billing modules into the `/login` bundle
+
+**File:** `apps/web/src/components/SignInPrefetch.tsx:9-16`, imported by `apps/web/src/app/(app)/layout.tsx` and `OrgLogin.tsx:12`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** It statically imports `dashboardQueries` (shift requests, shift-change formatting, schedule view), `useOrganizationData`, `useEmployees` (realtime-core, step-up) and the gridmaster and billing clients, all of which run only after a submit. Not in F-140; size unmeasured.
+**Suggested fix:** Move the priming into a module loaded with `import()` on submit.
+**Resolution:**
+
+### F-162 [P3] unverified - The background `getUser` on a hard load holds the auth lock that browser queries wait on
+
+**File:** `apps/web/src/components/AuthProvider.tsx:138`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** auth-js keeps its lock across the `getUser` network call, and every browser-direct query (schedule cells and notes in `lib/db/shifts.ts`, realtime `setAuth`) calls `getSession`, which queues behind it. Probably hidden behind the bootstrap wave; unmeasured.
+**Suggested fix:** Call `getUser(session.access_token)`, which skips the lock.
+**Resolution:**
+
+### F-163 [P2] open - One realtime event is invalidated once per table and re-broadcast to tabs that already received it
+
+**File:** `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:184-190` (`invalidateOrgRealtimeQueries`), `:226-229` (`onFlush`); `apps/web/src/lib/cache-broadcast.ts:39-43`; `packages/realtime-core/src/debounced-flusher.ts`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** A cell save touches `schedule_cells`, `schedule_cell_snapshots` and `schedule_cell_segments`, which map to the same keys, so each key is invalidated three times per flush with the default `cancelRefetch`, restarting fetches whose requests still go out. Every invalidation is also broadcast to other tabs, which got the same event on their own channel and invalidate again, so load grows with the square of open tabs. The 150ms fixed-window flusher fires about seven times a second through a paste or Auto-build Apply. `permissionsRealtime.ts:63-66` already uses `cancelRefetch: false`. The web side of F-150.
+**Suggested fix:** Collect the union of keys per flush and invalidate each once with `{ cancelRefetch: false }`; don't re-broadcast keys that came from realtime; make the flusher trailing with a 1-2s max wait.
+**Resolution:**
+
+### F-164 [P2] open - Draft edits regenerate the published-only operations report
+
+**File:** `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:138-145`; `apps/web/src/app/(app)/reports/ReportsPageContent.tsx:479-497`; `apps/web/src/features/reports/server/operations.ts:477, 942`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** `reports.operationsAll` is invalidated on every change to the three cell tables, though the report reads published data only. A manager with a long-range report open has it re-aggregated on the server on every peer's draft save, multiplied by F-163.
+**Suggested fix:** Drop `reports.operationsAll` from the cell-table cases; keep it for `publish_history`, `employees` and `recurring_shifts`.
+**Resolution:**
+
+### F-165 [P2] fixed - The header loads the organization's whole roster on every page for one boolean
+
+**File:** `apps/web/src/components/AppShell.tsx:60-63`; `apps/web/src/hooks/useEmployees.ts:130-135`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** `useEmployees` fetches every employee, archived included, only for `employees.length > 0` in the setup lock. It mounts on every app route, staff included, and keeps `employees.all` observed everywhere, so every employee, department, certification or role change refetches the full roster in every tab. It is also wave 2 of F-156.
+**Suggested fix:** Use `useEmployeeCount` (already keyed under `org.employeeCount`), or enable the roster only while onboarding is incomplete.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the header reads the bootstrap's `activeEmployeeCount`, as `SetupGuard` does; in the browser `/alerts` loads no roster.
+
+### F-166 [P3] open - Opening Schedule refetches the directory in every other tab in the organization
+
+**File:** `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:1656, 6518, 8975` (`updateScheduleLastViewed`); `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:134-135`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Writing `organization_memberships.schedule_last_viewed_at` makes the org channel invalidate `org.users` and `org.directory` everywhere that can see the row. `permissionsRealtime.ts:110-113` already ignores that column; the org channel doesn't.
+**Suggested fix:** Ignore membership updates that change only `schedule_last_viewed_at`, as the permissions path does.
+**Resolution:**
+
+### F-167 [P2] open - Bulk alert actions cause a request storm on the Alerts page
+
+**File:** `apps/web/src/hooks/useNotificationsRealtime.ts:47-57, 103-112`; `apps/web/src/app/(app)/alerts/AlertsInboxPage.tsx:322-335, 394-409`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Mark all read or a bulk archive updates N rows, so N realtime events arrive with no debounce. Per event the bell and the inbox each invalidate `notifications.all`, the inbox re-runs `refreshFacets()` per cached query, and `realtimeTick` re-runs the full search (the response is dropped, the request is not). Fifty events become roughly 50 searches and a few hundred count and facet requests.
+**Suggested fix:** Debounce the shared listener fan-out (about 300ms, trailing), invalidate once per subscription, and debounce `refreshFacets`.
+**Resolution:**
+
+### F-168 [P3] open - The staff page fetches the same month twice and keeps the person outside the query cache
+
+**File:** `apps/web/src/components/staff-detail/StaffDetailPage.tsx:285-349` (employee and recurring shifts in `useState`), `:911-933` and `:1526-1539`; `PersonMonthCalendar.tsx:101-106`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The Schedule tab loads the period's shifts and the month grid loads the padded month under its own key, the same data twice by default. The person and their recurring shifts sit in `useState`, so previous and next, and Back, repeat F-139's two-step waterfall each time, ignore the roster the People list just loaded, and get no realtime refresh.
+**Suggested fix:** Serve the grid month from the period's data when it falls inside it; move the person into `useQuery` with `placeholderData` from `employees.all`.
+**Resolution:**
+
+### F-169 [P2] unverified - Every in-app navigation waits on the proxy and a function render, Back included
+
+**File:** `apps/web/src/app/(app)/layout.tsx:47` (`force-dynamic`); `apps/web/next.config.ts:64-76` (no `experimental.staleTimes`); `apps/web/src/proxy.ts:824-826` (matcher includes RSC requests)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The page segments are client wrappers with no server data, yet each click, including Back to a visited page, goes edge proxy (verify, org memo, database) then a pdx1 render before the page swaps, with a bare `ProgressBar` meanwhile. Related to F-133 (hard loads); this is soft navigation. Latency unmeasured.
+**Suggested fix:** Set `experimental.staleTimes: { dynamic: 30 }` so visited segments are reused from the router cache; measure a click before and after.
+**Resolution:**
+
+### F-170 [P3] unverified - Schedule's presence and drafts channels rejoin on any organization row change
+
+**File:** `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:2489-2498, 2586-2593`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The effects depend on the whole `org` object, which is new after any `organizations` change (a settings save, a billing sync). Presence flickers and `draft_changed` messages sent during the rejoin are lost, since a refetch follows only an error. Also a 30s `now` tick in `useShiftRequests.ts:226` re-renders the whole Schedule page whenever a same-day request exists, on top of F-136's tick.
+**Suggested fix:** Depend on `org?.id`; keep the request tick inside the components that show relative time.
+**Resolution:**
+
+### F-171 [P2] open - Publish and discard read every cell in the period, snapshots and segments included, to count three numbers, and stop silently at 1,000 rows
+
+**File:** `apps/web/src/lib/server/schedule-draft-safety.ts:9-60`; called from `apps/web/src/app/api/shifts/publish/route.ts:88, 97` and `shifts/discard/route.ts:84`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The read is unpaged, so past PostgREST's `max_rows = 1000` (`supabase/config.toml:18`) the summary written to the audit log undercounts. The notes query loads published notes too. Discard with `scope: "all"` makes the dates optional (`discard/route.ts:26-27`), so it reads the organization's whole cell history. Publish's two pre-reads run one after the other, then the RPC scans the same range again (F-147).
+**Suggested fix:** For publish, count `schedule_publish_changes` by kind for the returned history id after the RPC. For discard, join only cells with a draft snapshot and require dates. Run the two reads with `Promise.all`.
+**Resolution:**
+
+### F-172 [P2] open - The shift-request list has no limit, no paging and no index for its sort or date filter
+
+**File:** `apps/web/src/app/api/schedule/requests/route.ts:303-378`; indexes in `supabase/migrations/001_schema.sql:1460-1466`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** `select('*')` with two employee embeds, ordered by `created_at`, no limit. The History tab (`ShiftRequestBoard.tsx:195`) and the staff page (`StaffDetailPage.tsx:962`) fetch the whole history, which grows with every request ever made and stops silently at 1,000 rows. The date filter ORs `requester_shift_date` and `target_shift_date`, neither indexed, and nothing indexes `(org_id, created_at)`.
+**Suggested fix:** Keyset paging with a limit, narrower columns, and an index on `shift_requests (org_id, created_at DESC)`.
+**Resolution:**
+
+### F-173 [P2] unverified - The staffed call-off trigger resolves every publish change before checking whether any pickup is waiting
+
+**File:** `supabase/migrations/099_away_until.sql:3811-3930` (`finalize_scheduler_staffed_calloffs`, AFTER INSERT on `schedule_publish_changes`); `082` `resolve_schedule_state_storage`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Each worked change runs `resolve_schedule_state_storage` twice (several job, shift and absence-type lookups) before scanning for open pickups that day, which usually returns none. A month publish for 150 people is about 3,000 runs. Out of lens and unchecked: `resolve_schedule_state_storage` raises on a since-archived job or shift, which could fail a whole publish.
+**Suggested fix:** Return early unless an open pickup with a parent exists for the org and date (`idx_shift_requests_org_open_pickups`). Check the archived-reference case separately.
+**Resolution:**
+
+### F-174 [P2] open - Leaving the grid locks the person's whole schedule history
+
+**File:** `supabase/migrations/100_away_absence.sql:170-212` (`clear_schedule_for_departed_employee`)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The loop selects every cell for the person with no lower date bound and `FOR UPDATE`, one row per day of tenure per status change, multiplied by bulk changes of up to 100 people. Past days need work only when they hold a draft. The in-progress fix (migration 113) copies this body and adds publish work to the same loop.
+**Suggested fix:** Add `AND (c.date >= v_today OR EXISTS (a draft snapshot))` before `FOR UPDATE`; fold it into 113 while that migration is unreleased.
+**Resolution:**
+
+### F-175 [P3] open - Bulk status changes run one person at a time with no time limit
+
+**File:** `apps/web/src/app/api/employees/status/bulk/route.ts:132`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Up to 100 people go through `applyStatusChange` in sequence, each several round trips plus F-174's trigger and the away-absence fill. No route sets `maxDuration`.
+**Suggested fix:** Bounded concurrency (keep Super Admin offboards serial for the last-Super-Admin check) and a `maxDuration`.
+**Resolution:**
+
+### F-176 [P2] open - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
+
+**File:** `packages/data-access/src/internal-people.ts:17-23`, then `:37-50`; for example `apps/web/src/app/api/schedule/manage/route.ts:1134`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** `profiles where is_internal = true` has no index, so it reads every user across every organization, serially before `fetchHiddenEmployeeIds`, on about 40 call sites. It grows with the platform, not the organization.
+**Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
+**Resolution:**
+
+### F-177 [P2] unverified - Schedule audit rows are fire-and-forget, like F-145's alerts
+
+**File:** `apps/web/src/app/api/schedule/manage/route.ts:57` (`logScheduleAudit`, 13 calls); `apps/web/src/app/api/schedule/recurring/route.ts:21` (4 calls)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** `void serviceClient.from("audit_log").insert(...)` after the response may be cut off on Vercel, dropping the activity log's Before and After. It also means F-145's suggested check (alerts against audit rows) can't confirm schedule actions.
+**Suggested fix:** Wrap in `after()`.
+**Resolution:**
+
+### F-178 [P3] open - Gridmaster oversight reads whole platform tables with unordered offset paging
+
+**File:** `apps/web/src/app/api/gridmaster/_lib/oversight.ts:220-301, 782-799`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Memberships, employees, invitations, every shift request and every session are read on each load, memoized per isolate. `selectAllPages` pages by offset with no ORDER BY, so rows can be skipped or repeated. The 30-day `schedule_cells` read is unpaged (stops at 1,000) with no `created_at` index.
+**Suggested fix:** Aggregate in SQL views or RPCs; if paging stays, order by id.
+**Resolution:**
+
+### F-179 [P3] unverified - Realtime publishes 29 tables, most with `REPLICA IDENTITY FULL`
+
+**File:** `supabase/migrations/001_schema.sql:1604-1632`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Includes `audit_log`, `user_sessions`, `notifications`, `profiles` and every schedule table. Each update or delete writes the full old row to the WAL, and Realtime re-checks access per subscriber, compounding F-141, F-150 and F-163. Also, the web org channel registers 24 bindings per tab and each tab opens three more per-user channels (`perms:m`, `perms:e`, `account-freshness`) that could be one.
+**Suggested fix:** Remove tables no client subscribes to from the publication, use default replica identity where old values aren't read, and merge the per-user channels.
+**Resolution:**
+
+### F-180 [P3] open - Smaller schedule read costs
+
+**File:** `apps/web/src/app/api/schedule/manage/route.ts:1140-1176`; `apps/web/src/lib/server/schedule-context.ts:20-37`; `CacheKey.employees` in `apps/web/src/lib/cache.ts`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:**
+
+- `fetchShifts` loads draft snapshots for viewers who can't edit, then redacts them.
+- `fetchAssignmentContext` makes three uncached queries on every schedule read and echoed save, though cached versions exist in `lib/db/config.ts`.
+- `CacheKey.employees` is invalidated in about 15 places and read nowhere.
+
+**Suggested fix:** Skip the draft embed when `!canEditShifts`, use the cached config reads, and delete the unused key's invalidations.
+**Resolution:**
+
+### F-181 [P2] open - The mobile app keeps no data between launches, so every cold open waits on a token refresh and bootstrap before anything shows
+
+**File:** `apps/mobile/src/shared/lib/query-client.ts:33-44` (no persister; none in `apps/mobile/package.json`); `apps/mobile/src/shared/components/StartupSplashGate.tsx:57-106`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** With `jwt_expiry = 3600`, most cold opens start with an expired token. The splash holds through the refresh (GoTrue plus the access-token hook, then a SecureStore write of the over-2KB session), then `GET /bootstrap`, and only then starts the Home queries, so Home shows a skeleton for a further round trip. Nothing from the last session is shown meanwhile. This is the largest single cause of the slow cold open the owner reports. The size of the gain is unmeasured. P2 rather than P1: it is a missing optimization, not a defect, and must not block unrelated work at `/complete`.
+**Suggested fix:** Persist the bootstrap and Home query keys (`@tanstack/query-async-storage-persister` or MMKV), keyed by user and org and cleared on sign-out, and lift the splash on the restored bootstrap while the network refreshes behind it.
+**Resolution:** Built and tested on its own branch `fix/mobile-persisted-cache` (2026-10-30): AsyncStorage persister, bootstrap and Home keys only, 24 hours, keyed to the app version, removed wherever the cache clears. Not merged: it adds packages, and the Dependency Audit check has failed on `main` since 2026-10-26 (24 unreviewed high advisories).
+
+### F-182 [P2] fixed - The mobile login response doesn't carry the bootstrap, so sign-in pays one more round trip and auth wave
+
+**File:** `apps/web/src/features/mobile/server/routes/auth-login.ts:211`; `apps/mobile` `LoginScreen.tsx:266-295`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The login handler already holds the user, memberships and organization, but the app then calls `/bootstrap` (a full mobile auth wave on the server), awaits it, then prefetches Home, then navigates. Three serial client round trips without MFA. About 300-800ms on cellular, unmeasured.
+**Suggested fix:** Return the bootstrap payload with the login response and seed the query cache, so the Home prefetch starts as soon as login returns.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the login handler builds the bootstrap with the new token (shared auth memo, bounded to 3s and well inside the login deadline) and sends it as an optional field; `LoginScreen` seeds it and starts Home's queries at once. Older builds ignore the field. Not measured on a device.
+
+### F-183 [P2] fixed - The bootstrap request can't start until fonts, the theme read and the first render finish
+
+**File:** `apps/mobile/app/_layout.tsx:49, 243-252`; `apps/mobile/src/shared/providers/ThemeModeProvider.tsx:61, 93`; `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:95, 223`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The root renders nothing until five fonts load; `ThemeModeProvider` then reads SecureStore and returns null until it lands (500ms fallback); only then does `AuthSessionProvider` mount, call `getSession` and start bootstrap. `warmSupabaseSession()` already runs at module scope but nothing chains the bootstrap onto it. The 900ms minimum splash also counts only from the gate's mount (`StartupSplashGate.tsx:17`). Refines F-153.
+**Suggested fix:** At module scope, chain the warmed session into `queryClient.prefetchQuery(createBootstrapQueryOptions(token))` and start the theme read there too; count the minimum splash from launch.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): `warmStartup()` at module load starts the bootstrap for the stored session and the theme read, and the minimum splash counts from launch. Not measured on a device.
+
+### F-184 [P2] fixed - Every mobile API call repeats serial auth work
+
+**File:** `apps/web/src/features/mobile/server/auth.ts:37` (feature flag awaited before verification); `apps/web/src/lib/auth/verify-token.ts:164` (remote JWKS, F-158); `packages/mobile-api-core/src/setup.ts` (`isMobileOrgSetupComplete`, 7 queries, no in-flight dedupe); `packages/mobile-api-core/src/auth.ts`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** Each request awaits the flag, then verifies, then runs about eight parallel reads including a GoTrue `getUser`, plus the 7 setup queries on a cold instance; the 3-5 calls a cold start fires concurrently each run them. Then the handler's own waves follow.
+**Suggested fix:** Start the flag lookup alongside verification, dedupe the setup check in flight, and memo the resolved auth context per token hash for a few seconds, as `isSessionRevoked` already does.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the `mobile_api` flag is read alongside auth, one resolution per token is shared for 5 seconds (refusals are not remembered), and concurrent setup checks share one read.
+
+### F-185 [P2] fixed - Mobile startup handlers run independent database reads in series
+
+**File:** `apps/web/src/features/mobile/server/data.ts:953-971` (`fetchMobileScheduleEntries`); `read.ts:466` and `packages/mobile-api-core/src/shift-requests.ts:330` (`fetchLinkedEmployeeForUser`); `apps/web/src/features/mobile/server/routes/dashboard.ts:79-116` (`hiddenUserIds()`)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** The comparison-rows query waits for six reference reads it doesn't use; the linked-employee read repeats a row auth already loaded; the hidden-people lookup (F-176's unindexed scan) gates every dashboard and shift-request fetcher. One to three extra database round trips on each of the calls Home needs.
+**Suggested fix:** Move the independent reads into `Promise.all`, widen the auth employee select and reuse it, and start the hidden-people lookup in the auth wave with a memo.
+**Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the comparison rows load with the reference reads, and the internal-account list is kept for 30 seconds per process. The linked-employee read stays serial: which requests a person sees depends on it.
+
+### F-186 [P3] open - Mobile two-factor sign-in makes two or three redundant round trips
+
+**File:** `apps/mobile/src/shared/lib/api.ts:781-801` (`verifyMobileTotpFactor`)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** An ephemeral `setSession` (a `getUser`), challenge, verify, then a refresh, then the main client's `setSession` calls `getUser` again: seven serial client round trips for a two-factor sign-in.
+**Suggested fix:** Send challenge and verify with the bearer token directly; drop the refresh if the verified token already carries the hook claims (check this first).
+**Resolution:**
+
+### F-187 [P3] unverified - The mobile session is re-read from SecureStore on every `getSession`, including each realtime heartbeat
+
+**File:** `apps/mobile/src/shared/lib/local-storage.ts:32`; `apps/mobile/src/shared/lib/supabase.ts:28-31`
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:** auth-js re-reads storage on each `getSession`: about five reads of the over-2KB value at launch (initialize, warm, provider, auto-refresh, realtime connect), then one per 25s heartbeat. The comment claiming the work is shared is inaccurate. Cost on the Android keystore unmeasured. Related to F-128.
+**Suggested fix:** An in-memory read-through cache in `local-storage.ts`, written through on set and remove.
+**Resolution:**
+
+### F-188 [P3] open - Smaller mobile startup and sign-in costs
+
+**File:** `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:141-159` and `apps/web/src/features/mobile/server/routes/session-presence.ts:70-115`; `apps/web/src/features/mobile/server/routes/auth-login.ts` (org lookup, `start_trial_for_org`); `apps/mobile` `LoginScreen.tsx:163-188, 341`; `apps/mobile` `prefetch-home.ts:51-61`; `apps/mobile/app.json` (`expo-font` with no `fonts` list)
+**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
+**Why it matters:**
+
+- Session presence posts on every launch beside bootstrap (its mark is in memory only), with four serial server steps.
+- The login handler looks up the org after the rate limit instead of alongside it, and awaits `start_trial_for_org` on every Super Admin login.
+- Sign in stays disabled until the remembered-org lookup answers, so an autofilled submit waits on a cold function.
+- Staff shiftmates (`/org/schedule`) aren't prefetched, so they pop in after Home.
+- Fonts load at runtime rather than being embedded.
+
+**Suggested fix:** Defer presence until the splash lifts and persist its mark; overlap the org lookup and run the trial start in `after()`; allow submit while the org confirms; prefetch `/org/schedule` when the person can view it; embed the fonts through the `expo-font` plugin.
+**Resolution:**

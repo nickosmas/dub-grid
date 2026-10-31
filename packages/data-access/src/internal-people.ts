@@ -22,13 +22,36 @@ export async function fetchInternalUserIds(
   return ((data ?? []) as Array<{ id: string }>).map((row) => row.id);
 }
 
+// The list is platform-wide and changes when an account is marked internal,
+// which is rare, while most schedule and people reads ask for it first. Each
+// process keeps it for half a minute, sharing one read in flight.
+const INTERNAL_IDS_MEMO_MS = 30_000;
+let internalIdsMemo: { ids: Promise<string[]>; expiresAt: number } | null = null;
+
+/** Test seam: forgets the remembered list. */
+export function resetInternalUserIdsMemo(): void {
+  internalIdsMemo = null;
+}
+
+function rememberedInternalUserIds(client: Pick<SupabaseClient, "from">): Promise<string[]> {
+  const now = Date.now();
+  if (internalIdsMemo && internalIdsMemo.expiresAt > now) return internalIdsMemo.ids;
+  const ids = fetchInternalUserIds(client);
+  const entry = { ids, expiresAt: now + INTERNAL_IDS_MEMO_MS };
+  internalIdsMemo = entry;
+  ids.catch(() => {
+    if (internalIdsMemo === entry) internalIdsMemo = null;
+  });
+  return ids;
+}
+
 /** The user ids to leave out of what `viewer` is shown; empty when they may see everyone. */
 export async function fetchHiddenInternalUserIds(
   client: SupabaseClient,
   viewer: InternalPeopleViewer,
 ): Promise<string[]> {
   if (viewer.isGridmaster) return [];
-  const ids = await fetchInternalUserIds(client);
+  const ids = await rememberedInternalUserIds(client);
   const isInternal = ids.includes(viewer.userId);
   return canSeeInternalPeople({ isGridmaster: false, isInternal }) ? [] : ids;
 }

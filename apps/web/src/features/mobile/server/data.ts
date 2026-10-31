@@ -957,6 +957,7 @@ export async function fetchMobileScheduleEntries(
     jobNameMap,
     publishHistory,
     shiftChangeResolvers,
+    data,
   ] = await Promise.all([
     fetchAssignmentDetailsMap(serviceClient, input.orgId),
     fetchAbsenceLabelMap(serviceClient, input.orgId),
@@ -967,8 +968,8 @@ export async function fetchMobileScheduleEntries(
       endDate: input.endDate,
     }),
     fetchShiftChangeResolvers(serviceClient, input.orgId),
+    fetchMobileScheduleComparisonRowsData(serviceClient, input),
   ]);
-  const data = await fetchMobileScheduleComparisonRowsData(serviceClient, input);
   const missingDeletedChanges = getMissingDeletedPublishedChanges(publishHistory, data, input);
   const missingDeletedEmployees = await fetchMobileEmployeeRowsByIds(
     serviceClient,

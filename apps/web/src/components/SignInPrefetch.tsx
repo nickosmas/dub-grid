@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { extractJwtClaims } from "@dubgrid/authz";
 import { useAuth } from "@/components/AuthProvider";
+import { isSignInRoute } from "@/components/onboarding/public-routes";
 import { primeDashboardQueries } from "@/components/dashboard/dashboardQueries";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import { gridmasterDashboardQueryOptions } from "@/features/gridmaster/queries";
@@ -48,9 +49,10 @@ function bootstrapQueryOptions() {
  * organization data resolve, the header holds a Super Admin's employees behind
  * billing, and the dashboard holds its own data behind employees.
  *
- * Employees are asked for alongside billing even though the header waits: a
- * locked organization answers with an error nothing here displays, and its
- * members are sent to billing recovery before any screen reads the list.
+ * Employees are asked for only with the dashboard, the first screen that
+ * reads the list; a locked organization answers with an error nothing here
+ * displays, and its members are sent to billing recovery before any screen
+ * reads it.
  */
 export function primeSignInQueries(
   queryClient: QueryClient,
@@ -70,11 +72,13 @@ export function primeSignInQueries(
   void queryClient.prefetchQuery(bootstrapQueryOptions());
   void queryClient.prefetchQuery(orgContextQueryOptions());
   void queryClient.prefetchQuery(termsAcceptanceQueryOptions(target.userId));
-  void queryClient.prefetchQuery(employeesQueryOptions(target.orgId));
   if (target.isSuperAdmin) {
     void queryClient.prefetchQuery(organizationBillingQueryOptions(target.orgId));
   }
-  if (dashboard) void primeDefaultDashboard(queryClient, target);
+  if (dashboard) {
+    void queryClient.prefetchQuery(employeesQueryOptions(target.orgId));
+    void primeDefaultDashboard(queryClient, target);
+  }
 }
 
 /**
@@ -119,10 +123,32 @@ function primeGridmasterPortal(queryClient: QueryClient): void {
 export default function SignInPrefetch() {
   const pending = useAuthTransitionPending();
   const { session } = useAuth();
-  const accessToken = pending ? (session?.access_token ?? null) : null;
+  const sessionToken = session?.access_token ?? null;
+  const accessToken = pending ? sessionToken : null;
+  usePrimeHardLoad(pending, sessionToken);
   return accessToken && signInTarget(accessToken) ? (
     <HoldSignInQueries accessToken={accessToken} />
   ) : null;
+}
+
+/**
+ * A page opened cold (a reopened tab, a bookmark) primes the same queries once,
+ * from the session the server vouched for, so the dashboard's data no longer
+ * waits for the roster, and the roster for permissions, before it is asked for.
+ */
+function usePrimeHardLoad(pending: boolean, accessToken: string | null) {
+  const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const primed = useRef(false);
+  useEffect(() => {
+    if (primed.current || !accessToken) return;
+    primed.current = true;
+    // A sign-in primes through HoldSignInQueries instead.
+    if (pending || isSignInRoute(pathname) || !signInTarget(accessToken)) return;
+    primeSignInQueries(queryClient, accessToken, {
+      dashboard: pathname === POST_LOGIN_DESTINATION,
+    });
+  }, [queryClient, pathname, pending, accessToken]);
 }
 
 function HoldSignInQueries({ accessToken }: { accessToken: string }) {

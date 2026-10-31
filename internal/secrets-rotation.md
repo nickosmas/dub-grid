@@ -61,10 +61,10 @@ at runtime:
 
 > Note: `SUPABASE_JWT_SECRET` is **not** used. JWT verification uses the JWKS
 > endpoint (ES256 asymmetric keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
-> The build also ships that keyset to the request proxy (`next.config.ts`,
-> `getProxyJwks`), so **redeploy after revoking a signing key**: until then the
-> proxy keeps accepting the revoked key for page navigation. Route handlers verify
-> against the live keyset and are unaffected. A newly added key needs no redeploy.
+> The build also ships that keyset to the request proxy and every route handler
+> (`next.config.ts`, `getProxyJwks`), so **redeploy after revoking a signing
+> key**: until then the proxy and the API keep accepting tokens signed with the
+> revoked key. A newly added key needs no redeploy.
 
 ---
 

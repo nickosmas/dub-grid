@@ -171,24 +171,30 @@ if (process.env.NODE_ENV === "production") {
 }
 
 /**
- * The proxy verifies tokens at the edge PoP, where fetching Supabase's public
- * keys on a fresh isolate cost about 735ms (2026-09-26). Fetching them once
- * here ships them with the build (`getProxyJwks` in lib/auth/verify-token.ts).
- * Best effort: without them the proxy fetches at runtime, as it did before.
+ * The proxy and route handlers verify tokens, and fetching Supabase's public
+ * keys on a fresh isolate or instance cost about 735ms at the edge
+ * (2026-09-26). Fetching them once here ships them with the build
+ * (`getProxyJwks` in lib/auth/verify-token.ts). Best effort, since CI builds
+ * run without a reachable Supabase: without them every fresh instance fetches
+ * at runtime, so the build log says so.
  */
 async function withSupabaseJwks(config: NextConfig): Promise<NextConfig> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) return config;
+  const skip = (reason: string) => {
+    console.warn(`Supabase signing keys not shipped with this build (${reason}).`);
+    return config;
+  };
   try {
     const response = await fetch(`${supabaseUrl}/auth/v1/.well-known/jwks.json`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) return config;
+    if (!response.ok) return skip(`status ${response.status}`);
     const jwks: { keys?: unknown } = await response.json();
-    if (!Array.isArray(jwks.keys) || jwks.keys.length === 0) return config;
+    if (!Array.isArray(jwks.keys) || jwks.keys.length === 0) return skip("no keys");
     return { ...config, env: { ...config.env, SUPABASE_JWKS: JSON.stringify(jwks) } };
-  } catch {
-    return config;
+  } catch (error) {
+    return skip(error instanceof Error ? error.message : "fetch failed");
   }
 }
 

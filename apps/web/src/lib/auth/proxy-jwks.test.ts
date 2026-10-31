@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { exportJWK, generateKeyPair, jwtVerify, SignJWT } from "jose";
-import { getProxyJwks, resetSupabaseJwksCache } from "./verify-token";
+import { getProxyJwks, resetSupabaseJwksCache, verifyAccessToken } from "./verify-token";
 
 const SUPABASE_URL = "https://project.supabase.co";
 
@@ -72,5 +72,28 @@ describe("getProxyJwks", () => {
     await jwtVerify(await remote.sign(), getProxyJwks()!);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("is what route handlers verify with, so a fresh instance asks Supabase for nothing", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
+    const jwk = { ...(await exportJWK(publicKey)), kid: "shipped", alg: "ES256", use: "sig" };
+    vi.stubEnv("SUPABASE_JWKS", JSON.stringify({ keys: [jwk] }));
+    const token = await new SignJWT({
+      sub: "user-1",
+      role: "authenticated",
+      session_id: "session-1",
+    })
+      .setProtectedHeader({ alg: "ES256", kid: "shipped" })
+      .setIssuer(`${SUPABASE_URL}/auth/v1`)
+      .setAudience("authenticated")
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+
+    await expect(verifyAccessToken(token)).resolves.toMatchObject({
+      userId: "user-1",
+      sessionId: "session-1",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

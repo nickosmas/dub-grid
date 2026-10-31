@@ -20,6 +20,7 @@ vi.mock("@/features/account/client", () => ({
   isRecoverableBrowserAuthFailure: () => false,
   signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
   subscribeToBrowserAuthChanges: (...args: unknown[]) => mockOnAuthStateChange(...args),
+  subscribeToServerVouchedSessions: () => () => {},
 }));
 
 vi.mock("next/navigation", () => ({

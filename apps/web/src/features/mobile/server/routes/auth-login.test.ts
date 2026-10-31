@@ -46,6 +46,51 @@ vi.mock("@/lib/auth/verify-token", () => ({
   verifyAccessToken,
 }));
 
+const resolveMobileAuthForToken = vi.fn(async (_token: string): Promise<unknown> => null);
+const buildMobileBootstrap = vi.fn();
+vi.mock("@/features/mobile/server", () => ({
+  resolveMobileAuthForToken: (token: string) => resolveMobileAuthForToken(token),
+}));
+vi.mock("./bootstrap", () => ({
+  buildMobileBootstrap: (auth: unknown) => buildMobileBootstrap(auth),
+}));
+
+async function bootstrapFixture() {
+  const { mobileBootstrapResponseSchema, mobilePermissionsSchema } =
+    await import("@dubgrid/contracts");
+  return mobileBootstrapResponseSchema.parse({
+    user: {
+      id: "11111111-1111-4111-8111-111111111111",
+      email: "m@dubgrid.com",
+      firstName: "Morgan",
+      lastName: "Lee",
+    },
+    currentOrg: {
+      id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      name: "DubGrid Health",
+      slug: "dubgrid-health",
+      timezone: "America/Los_Angeles",
+      shiftDisplayMode: "code",
+      labels: {
+        focusArea: "Focus Areas",
+        certification: "Certifications",
+        role: "Roles",
+        department: "Departments",
+      },
+      featureFlags: {},
+    },
+    memberships: [],
+    effectiveRole: "admin",
+    permissions: Object.fromEntries(
+      Object.keys(mobilePermissionsSchema.shape).map((key) => [key, false]),
+    ),
+    linkedEmployee: null,
+    absenceTypes: [],
+    focusAreas: [],
+    unreadNotificationCount: 0,
+  });
+}
+
 const DEFAULT_ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
 /** Some other organization this user also belongs to. */
 const OTHER_ORG_ID = "6f1d0a52-6a9c-4a3a-9c2f-2f5a1f0b8e44";
@@ -819,6 +864,58 @@ describe("mobile auth login route", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
       error: "We couldn't find that organization. Check the domain and try again.",
+    });
+  });
+
+  describe("the bootstrap sent with a sign-in", () => {
+    function signIn() {
+      checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+      getServiceClient.mockReturnValue(createServiceClientMock());
+      createClient.mockReturnValue(createSessionClientMock());
+      return import("./auth-login").then(({ POST }) =>
+        POST(
+          new Request("http://localhost/api/mobile/v1/auth/login", {
+            method: "POST",
+            body: JSON.stringify({
+              orgSlug: "dubgrid-health",
+              email: "manager@dubgrid.com",
+              password: "super-secret",
+            }),
+          }) as never,
+        ),
+      );
+    }
+
+    it("carries what GET /bootstrap would answer for the new session", async () => {
+      const bootstrap = await bootstrapFixture();
+      resolveMobileAuthForToken.mockResolvedValueOnce({ auth: "context" });
+      buildMobileBootstrap.mockResolvedValueOnce(bootstrap);
+
+      const response = await signIn();
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).bootstrap).toEqual(bootstrap);
+      expect(buildMobileBootstrap).toHaveBeenCalledWith({ auth: "context" });
+    });
+
+    it("signs in without it when the new session cannot be resolved", async () => {
+      resolveMobileAuthForToken.mockResolvedValueOnce(null);
+
+      const response = await signIn();
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).bootstrap).toBeUndefined();
+      expect(buildMobileBootstrap).not.toHaveBeenCalled();
+    });
+
+    it("signs in without it when building it fails", async () => {
+      resolveMobileAuthForToken.mockResolvedValueOnce({ auth: "context" });
+      buildMobileBootstrap.mockRejectedValueOnce(new Error("bootstrap read failed"));
+
+      const response = await signIn();
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).bootstrap).toBeUndefined();
     });
   });
 });

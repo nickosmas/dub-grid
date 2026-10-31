@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getPlatformBillingPolicy } from "@/lib/billing-policy";
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -30,10 +31,84 @@ import { createMobileUserClient } from "./client";
 
 export type MobileAuthContext = ResolvedMobileAuthContext<Organization>;
 
+/**
+ * A cold start fires several requests with one token at once, and each used to
+ * resolve the same context: verification, the Auth `getUser`, and seven reads.
+ * One resolution serves them all for a few seconds, the same window the
+ * revocation check already allows itself, and only for that exact token.
+ */
+const AUTH_MEMO_MS = 5_000;
+const AUTH_MEMO_MAX = 500;
+const authMemo = new Map<string, { expiresAt: number; context: Promise<MobileAuthContext> }>();
+
+/** Test seam: forgets every remembered context. */
+export function resetMobileAuthMemoForTests(): void {
+  authMemo.clear();
+}
+
+function rememberedContext(
+  accessToken: string,
+  allowAal1ForStepUp: boolean,
+): Promise<MobileAuthContext> {
+  const now = Date.now();
+  const key = `${allowAal1ForStepUp ? 1 : 0}:${createHash("sha256").update(accessToken).digest("base64url")}`;
+  const remembered = authMemo.get(key);
+  if (remembered && remembered.expiresAt > now) return remembered.context;
+  if (authMemo.size >= AUTH_MEMO_MAX) {
+    for (const [staleKey, entry] of authMemo) {
+      if (entry.expiresAt <= now) authMemo.delete(staleKey);
+    }
+    if (authMemo.size >= AUTH_MEMO_MAX) authMemo.clear();
+  }
+  const context = resolveTokenContext(accessToken, allowAal1ForStepUp);
+  authMemo.set(key, { expiresAt: now + AUTH_MEMO_MS, context });
+  // A refusal or an outage is answered once and asked again next time.
+  context.catch(() => {
+    if (authMemo.get(key)?.context === context) authMemo.delete(key);
+  });
+  return context;
+}
+
+function resolveTokenContext(
+  accessToken: string,
+  allowAal1ForStepUp: boolean,
+): Promise<MobileAuthContext> {
+  return resolveMobileAuthContext({
+    accessToken,
+    serviceClient: getServiceClient(),
+    createUserClient: createMobileUserClient,
+    fetchMemberships: fetchMobileOrganizationMembershipRows,
+    fetchOrganization: fetchMobileOrganizationRowById,
+    fetchPlatformRole: fetchMobileProfilePlatformRole,
+    mapOrganization: rowToOrganization,
+    // Claims come from local JWKS verification instead of a second call to
+    // Supabase Auth (`getClaims`), and revocation is checked explicitly
+    // because a locally verified token can't tell that it was signed out.
+    verifyToken: async (accessToken) => {
+      const verified = await verifyAccessToken(accessToken);
+      if (!verified) return null;
+      return {
+        userId: verified.userId,
+        sessionId: verified.sessionId,
+        issuedAtMs: verified.issuedAtMs,
+        claims: verified.claims as MobileAuthClaims,
+      };
+    },
+    isRevoked: (token) => isSessionRevoked(token),
+    loadPlatformBillingPolicy: () => getPlatformBillingPolicy(getServiceClient()),
+    allowAal1ForStepUp,
+  });
+}
+
 async function resolveMobileRequestAuth(
   req: NextRequest,
   allowAal1ForStepUp: boolean,
 ): Promise<MobileAuthContext | { response: NextResponse }> {
+  const accessToken = extractMobileBearerToken(req.headers.get("authorization"));
+  // Started together: the flag no longer holds up verification.
+  const context = accessToken ? rememberedContext(accessToken, allowAal1ForStepUp) : null;
+  context?.catch(() => {});
+
   if (!(await isFeatureEnabled("mobile_api"))) {
     return {
       response: NextResponse.json(
@@ -43,8 +118,7 @@ async function resolveMobileRequestAuth(
     };
   }
 
-  const accessToken = extractMobileBearerToken(req.headers.get("authorization"));
-  if (!accessToken) {
+  if (!context) {
     return {
       response: NextResponse.json(
         { error: "Your session expired. Sign in again to continue." },
@@ -54,31 +128,7 @@ async function resolveMobileRequestAuth(
   }
 
   try {
-    return await resolveMobileAuthContext({
-      accessToken,
-      serviceClient: getServiceClient(),
-      createUserClient: createMobileUserClient,
-      fetchMemberships: fetchMobileOrganizationMembershipRows,
-      fetchOrganization: fetchMobileOrganizationRowById,
-      fetchPlatformRole: fetchMobileProfilePlatformRole,
-      mapOrganization: rowToOrganization,
-      // Claims come from local JWKS verification instead of a second call to
-      // Supabase Auth (`getClaims`), and revocation is checked explicitly
-      // because a locally verified token can't tell that it was signed out.
-      verifyToken: async (accessToken) => {
-        const verified = await verifyAccessToken(accessToken);
-        if (!verified) return null;
-        return {
-          userId: verified.userId,
-          sessionId: verified.sessionId,
-          issuedAtMs: verified.issuedAtMs,
-          claims: verified.claims as MobileAuthClaims,
-        };
-      },
-      isRevoked: (token) => isSessionRevoked(token),
-      loadPlatformBillingPolicy: () => getPlatformBillingPolicy(getServiceClient()),
-      allowAal1ForStepUp,
-    });
+    return await context;
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       return {
@@ -96,6 +146,13 @@ async function resolveMobileRequestAuth(
       ),
     };
   }
+}
+
+/** The context for a token this server just minted, or null on any refusal. */
+export async function resolveMobileAuthForToken(
+  accessToken: string,
+): Promise<MobileAuthContext | null> {
+  return rememberedContext(accessToken, false).catch(() => null);
 }
 
 export function requireMobileAuth(

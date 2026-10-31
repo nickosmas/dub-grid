@@ -421,7 +421,7 @@ export default function OrgLogin({
           navigateToDashboard(result.destination, true);
           return;
         }
-        void syncBrowserSessionInBackground(result.session);
+        void syncBrowserSessionInBackground(result.session, result.user);
         primeSignInQueries(queryClient, result.session.access_token, {
           dashboard: result.destination === POST_LOGIN_DESTINATION,
         });

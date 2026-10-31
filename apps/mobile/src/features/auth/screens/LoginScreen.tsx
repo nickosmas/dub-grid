@@ -263,12 +263,23 @@ export default function LoginScreen() {
       // tab gate's locked/error handling. Sent whatever the online flag says:
       // it can read offline after the device sleeps, and a paused warm-up
       // never settles, where the request's own timeout always does.
-      const bootstrapWarmed = queryClient.prefetchQuery({
-        queryKey: bootstrapQueryKey,
-        queryFn: () => getBootstrap(session.accessToken),
-        retry: false,
-        networkMode: "always",
-      });
+      //
+      // The server sends the bootstrap with the sign-in when it can, so there is
+      // nothing to warm and Home's queries start at once. Not after a second
+      // factor: that session is a new one the sent bootstrap does not describe.
+      const sentBootstrap = session === response.session ? response.bootstrap : undefined;
+      if (sentBootstrap) {
+        queryClient.setQueryData(bootstrapQueryKey, sentBootstrap);
+        prefetchHomeQueries(session.accessToken, sentBootstrap);
+      }
+      const bootstrapWarmed = sentBootstrap
+        ? Promise.resolve()
+        : queryClient.prefetchQuery({
+            queryKey: bootstrapQueryKey,
+            queryFn: () => getBootstrap(session.accessToken),
+            retry: false,
+            networkMode: "always",
+          });
       // After the warm-up starts, so the device write does not delay it.
       await saveLastOrg(response.organization);
 
@@ -291,7 +302,9 @@ export default function LoginScreen() {
       }
 
       await bootstrapWarmed;
-      prefetchHomeQueries(session.accessToken, queryClient.getQueryData(bootstrapQueryKey));
+      if (!sentBootstrap) {
+        prefetchHomeQueries(session.accessToken, queryClient.getQueryData(bootstrapQueryKey));
+      }
       router.replace(postLoginDestination);
       handedOff = true;
       requestAnimationFrame(() => {

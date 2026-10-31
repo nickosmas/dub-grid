@@ -1,24 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cacheStore = new Map<string, unknown>();
-const cacheDel = vi.fn(async (key: string) => {
-  cacheStore.delete(key);
-});
 const captureException = vi.fn();
-
-vi.mock("@/lib/cache", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/cache")>();
-  return {
-    ...actual,
-    cacheThrough: async <T>(key: string, _ttl: number, fetcher: () => Promise<T>) => {
-      if (cacheStore.has(key)) return cacheStore.get(key) as T;
-      const value = await fetcher();
-      cacheStore.set(key, value);
-      return value;
-    },
-    cacheDel: (key: string) => cacheDel(key),
-  };
-});
 
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
@@ -47,7 +29,6 @@ const platformRow = {
 };
 
 beforeEach(() => {
-  cacheStore.clear();
   vi.clearAllMocks();
   resetBillingPolicyMemoForTests();
   vi.useRealTimers();
@@ -70,7 +51,7 @@ describe("getPlatformBillingPolicy", () => {
     expect(client.maybeSingle).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to the built-in defaults on a read error, without caching them", async () => {
+  it("falls back to the built-in defaults on a read error, and asks again next time", async () => {
     const failing = clientReturning({ data: null, error: { message: "down" } });
 
     await expect(getPlatformBillingPolicy(failing)).resolves.toMatchObject({
@@ -78,7 +59,20 @@ describe("getPlatformBillingPolicy", () => {
       trialGraceDays: 3,
     });
     expect(captureException).toHaveBeenCalled();
-    expect(cacheStore.size).toBe(0);
+    await getPlatformBillingPolicy(failing);
+    expect(failing.maybeSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares one read between requests that arrive together", async () => {
+    const client = clientReturning({ data: platformRow, error: null });
+
+    const [first, second] = await Promise.all([
+      getPlatformBillingPolicy(client),
+      getPlatformBillingPolicy(client),
+    ]);
+
+    expect(second).toBe(first);
+    expect(client.maybeSingle).toHaveBeenCalledTimes(1);
   });
 
   it("asks again once the memo expires and after an invalidation", async () => {
@@ -86,8 +80,11 @@ describe("getPlatformBillingPolicy", () => {
     const client = clientReturning({ data: platformRow, error: null });
     await getPlatformBillingPolicy(client);
 
-    vi.setSystemTime(Date.now() + 11_000);
-    cacheStore.clear();
+    vi.setSystemTime(Date.now() + 59_000);
+    await getPlatformBillingPolicy(client);
+    expect(client.maybeSingle).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(Date.now() + 2_000);
     await getPlatformBillingPolicy(client);
     expect(client.maybeSingle).toHaveBeenCalledTimes(2);
 

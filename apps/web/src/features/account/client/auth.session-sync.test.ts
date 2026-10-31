@@ -25,7 +25,8 @@ vi.mock("@/lib/auth-boundary-broadcast", () => ({
   broadcastBrowserSignOut: mocks.broadcast,
 }));
 
-import { syncBrowserSessionInBackground } from "./auth";
+import type { User } from "@supabase/supabase-js";
+import { subscribeToServerVouchedSessions, syncBrowserSessionInBackground } from "./auth";
 
 const SESSION = { access_token: "access", refresh_token: "refresh" };
 
@@ -74,5 +75,39 @@ describe("syncBrowserSessionInBackground", () => {
 
     await expect(sync).resolves.toBeUndefined();
     expect(mocks.clear).toHaveBeenCalledOnce();
+  });
+
+  it("announces the session with the signed-in user before the auth client answers", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+    let answer!: (value: { data: object; error: null }) => void;
+    mocks.setSession.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    const heard = vi.fn();
+    const stop = subscribeToServerVouchedSessions(heard);
+    const user = { id: "user-1" } as User;
+
+    const sync = syncBrowserSessionInBackground({ ...SESSION, expires_in: 3600 }, user);
+
+    expect(heard).toHaveBeenCalledExactlyOnceWith({
+      ...SESSION,
+      expires_in: 3600,
+      expires_at: 1_800_003_600,
+      token_type: "bearer",
+      user,
+    });
+    expect(mocks.setSession).toHaveBeenCalledExactlyOnceWith(SESSION);
+    answer({ data: {}, error: null });
+    await sync;
+    stop();
+  });
+
+  it("announces nothing without the signed-in user", async () => {
+    mocks.setSession.mockResolvedValue({ data: {}, error: null });
+    const heard = vi.fn();
+    const stop = subscribeToServerVouchedSessions(heard);
+
+    await syncBrowserSessionInBackground({ ...SESSION, expires_in: 3600 });
+
+    expect(heard).not.toHaveBeenCalled();
+    stop();
   });
 });

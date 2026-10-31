@@ -20,10 +20,14 @@ function getSetupQueryError(results: SetupQueryResult[]): unknown {
  */
 const SETUP_COMPLETE_MEMO_TTL_MS = 60_000;
 const setupCompleteMemo = new Map<string, number>();
+// The requests a cold start sends together share one read rather than each
+// running all seven queries before the memo is filled.
+const setupReadsInFlight = new Map<string, Promise<boolean>>();
 
 /** Test seam: clears the in-process setup-complete memo between cases. */
 export function resetMobileOrgSetupCompleteMemo(): void {
   setupCompleteMemo.clear();
+  setupReadsInFlight.clear();
 }
 
 export async function isMobileOrgSetupComplete(
@@ -35,13 +39,22 @@ export async function isMobileOrgSetupComplete(
     return true;
   }
 
-  const complete = await readMobileOrgSetupComplete(serviceClient, orgId);
-  if (complete) {
-    setupCompleteMemo.set(orgId, Date.now() + SETUP_COMPLETE_MEMO_TTL_MS);
-  } else {
-    setupCompleteMemo.delete(orgId);
-  }
-  return complete;
+  const inFlight = setupReadsInFlight.get(orgId);
+  if (inFlight) return inFlight;
+  const read = readMobileOrgSetupComplete(serviceClient, orgId)
+    .then((complete) => {
+      if (complete) {
+        setupCompleteMemo.set(orgId, Date.now() + SETUP_COMPLETE_MEMO_TTL_MS);
+      } else {
+        setupCompleteMemo.delete(orgId);
+      }
+      return complete;
+    })
+    .finally(() => {
+      setupReadsInFlight.delete(orgId);
+    });
+  setupReadsInFlight.set(orgId, read);
+  return read;
 }
 
 async function readMobileOrgSetupComplete(

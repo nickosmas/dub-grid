@@ -614,15 +614,12 @@ export async function POST(req: NextRequest) {
 
   // The tokens still go to the client, which brings its auth client up to date
   // with them; when the cookies are already set it does so without holding up
-  // the navigation.
+  // the navigation. The whole user goes too, so the client can paint as this
+  // user before its auth client has re-read them from the auth server.
   const res = NextResponse.json({
     success: true,
     session,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      email_confirmed_at: data.user.email_confirmed_at,
-    },
+    user: data.user,
     mfa_required: mfaRequired,
     destination,
     didSwitchOrg,
