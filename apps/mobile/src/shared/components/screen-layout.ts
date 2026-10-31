@@ -1,6 +1,5 @@
 import { Platform } from "react-native";
 import { mobileSpacing } from "../theme/tokens";
-import { getFloatingTabBarClearance } from "./floating-tab-bar-layout";
 
 /**
  * The horizontal gutter every screen's content sits on.
@@ -13,8 +12,8 @@ import { getFloatingTabBarClearance } from "./floating-tab-bar-layout";
  *
  * Anything that has to agree with this gutter reads it from here: `Screen`'s
  * content padding, `ScrollableTabStrip`'s bleed (which cancels it with a
- * negative margin and re-adds it inside), and `FloatingTabBar`'s inset. A
- * literal 16 in any of them silently breaks the alignment on iOS.
+ * negative margin and re-adds it inside). A literal 16 in either silently
+ * breaks the alignment on iOS.
  *
  * A function, not a constant, because `Platform` is mocked per test with a lazy
  * getter — reading it at module scope throws before the mock is initialized.
@@ -37,8 +36,12 @@ const SCREEN_BOTTOM_PADDING = {
   modal: 16,
 } as const;
 
-/** Breathing room between a screen's last row and the floating bar above it. */
-const FLOATING_TAB_BAR_BREATHING_ROOM = 16;
+/**
+ * Room between a screen's last row and Android's bottom navigation. The bar
+ * is in the layout, below the screen, and keeps the system navigation inset
+ * for itself, so this is breathing room and nothing else.
+ */
+const ANDROID_TAB_BAR_BREATHING_ROOM = 24;
 
 export const DEFAULT_SCREEN_BOTTOM_PADDING_MODE: ScreenBottomPaddingMode = "stack";
 
@@ -48,15 +51,8 @@ export function getScreenBottomPadding(
 ): number {
   const safeArea = Math.max(safeAreaBottom, 0);
 
-  // Android's tab bar is `FloatingTabBar` — absolutely positioned, taking no
-  // layout height, with content scrolling under it. Measure its real footprint
-  // instead of restating a constant that has to be kept in step with it by
-  // hand: the flat 72 was already shorter than the bar itself, so a screen
-  // whose last element sat flush against the end of its content (Profile's
-  // "Switch organization", the save row on the settings screens) stayed tucked
-  // behind the bar with nothing left to scroll.
   if (mode === "tabbed" && Platform.OS === "android") {
-    return getFloatingTabBarClearance(safeArea) + FLOATING_TAB_BAR_BREATHING_ROOM;
+    return ANDROID_TAB_BAR_BREATHING_ROOM;
   }
 
   return safeArea + SCREEN_BOTTOM_PADDING[mode];
@@ -89,7 +85,7 @@ export function getFooterBottomPadding(
   const safeArea = Math.max(safeAreaBottom, 0);
 
   if (mode === "tabbed" && Platform.OS === "android") {
-    return getFloatingTabBarClearance(safeArea) + FLOATING_TAB_BAR_BREATHING_ROOM;
+    return FOOTER_BOTTOM_BREATHING_ROOM;
   }
 
   if (Platform.OS === "ios" && nativeTabBarVisible) {
