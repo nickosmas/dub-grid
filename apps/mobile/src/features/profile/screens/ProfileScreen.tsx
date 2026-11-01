@@ -630,6 +630,7 @@ export default function ProfileScreen() {
           </ProfileSection>
 
           <BottomSheetModal
+            expandable
             header={<SheetHeader title="Switch organization" />}
             scrollable
             visible={isSwitchModalVisible}
@@ -729,20 +730,17 @@ function OrganizationOptionRow({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const name = membership.name ?? "Organization";
-  // The role label the rest of the app uses, not the raw `admin`/`user` enum,
-  // and the app's own separator rather than a hyphen — which was ambiguous
-  // against slugs that are themselves hyphenated ("dubgrid-health - admin").
-  const meta = [membership.slug ?? "organization", getOrgRoleLabel(membership.orgRole)]
-    .filter(Boolean)
-    .join(" · ");
+  // Your access there, in the role label the rest of the app uses; the
+  // organization's address adds nothing to choosing it (owner, 2026-11-01).
+  const meta = getOrgRoleLabel(membership.orgRole);
 
   const body = (
     <>
-      {/* Every row keeps the building glyph and the selected one tints its
-          tile brand, so the icon column stays scannable. Swapping the glyph
-          itself for a bare checkmark left the current row as the only one
-          without an organization icon. */}
-      <ProfileIcon name="business-outline" tone={membership.isCurrent ? "brand" : undefined} />
+      {/* A native list names each organization alone, as a system picker
+          does (owner, 2026-11-01); the drawn list keeps its building tile. */}
+      {IS_NATIVE_LIST ? null : (
+        <ProfileIcon name="business-outline" tone={membership.isCurrent ? "brand" : undefined} />
+      )}
       <View style={styles.orgOptionCopy}>
         <Text
           numberOfLines={1}
@@ -750,9 +748,11 @@ function OrganizationOptionRow({
         >
           {name}
         </Text>
-        <Text numberOfLines={1} style={styles.orgOptionMeta}>
-          {meta}
-        </Text>
+        {meta ? (
+          <Text numberOfLines={1} style={styles.orgOptionMeta}>
+            {meta}
+          </Text>
+        ) : null}
       </View>
       {/* The row's own accessibilityLabel already says "current organization",
           so the mark is decorative here. */}
@@ -769,7 +769,11 @@ function OrganizationOptionRow({
   if (membership.isCurrent) {
     return (
       <View
-        style={[styles.orgOptionSlot, IS_NATIVE_LIST && showDivider && styles.orgOptionDivider]}
+        style={[
+          styles.orgOptionSlot,
+          IS_NATIVE_LIST && styles.orgOptionSlotNative,
+          IS_NATIVE_LIST && showDivider && styles.orgOptionDivider,
+        ]}
       >
         <View
           accessibilityLabel={`${name}, current organization`}
@@ -790,7 +794,13 @@ function OrganizationOptionRow({
   // Android ripple the same rounded shape the selected row has, instead of a
   // square band spanning the whole group.
   return (
-    <View style={[styles.orgOptionSlot, showDivider && styles.orgOptionDivider]}>
+    <View
+      style={[
+        styles.orgOptionSlot,
+        IS_NATIVE_LIST && styles.orgOptionSlotNative,
+        showDivider && styles.orgOptionDivider,
+      ]}
+    >
       <PressableRow
         accessibilityLabel={name}
         style={[styles.orgOptionRow, IS_NATIVE_LIST && styles.orgOptionNative]}
@@ -833,10 +843,16 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 12,
     },
     // A native list's row spans the group; the current one carries only its mark.
+    // The row starts at the text, so its separator does too, as a grouped
+    // list's does.
     orgOptionNative: {
       borderRadius: 0,
       margin: 0,
-      paddingHorizontal: mobileSpace.lg,
+      paddingLeft: 0,
+      paddingRight: mobileSpace.lg,
+    },
+    orgOptionSlotNative: {
+      marginLeft: mobileSpace.lg,
     },
     orgOptionCurrent: {
       // A control fill, not `surfaceSecondary`: these rows sit on `surface`

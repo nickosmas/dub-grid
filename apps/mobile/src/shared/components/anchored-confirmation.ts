@@ -4,6 +4,8 @@ export type AnchoredConfirmationRequest = {
   title: string;
   body?: string;
   confirmLabel: string;
+  /** The way back out, such as Keep editing; the popover shows it as a button. */
+  cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
 };

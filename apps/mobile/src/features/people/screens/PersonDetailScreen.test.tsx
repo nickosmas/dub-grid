@@ -967,8 +967,9 @@ describe("PersonDetailScreen", () => {
     fireEvent.click(screen.getByText("Edit"));
 
     expect(screen.getByText("Basic info")).toBeInTheDocument();
-    expect(screen.getByText("Staffing")).toBeInTheDocument();
-    expect(screen.getByText("Assignments")).toBeInTheDocument();
+    // One title per group: Employment, not Staffing over Employment.
+    expect(screen.getByText("Employment")).toBeInTheDocument();
+    expect(screen.queryByText("Staffing")).not.toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
     // Two icon buttons, and the X carries web's tri-state: nothing typed yet,
     // so it is Cancel. It becomes Discard once there is something to throw
@@ -1405,15 +1406,15 @@ describe("PersonDetailScreen", () => {
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ copyAction: "archive" });
     });
 
-    it("says where they stand and lists only where they can go", () => {
+    it("leaves where they stand to the page and lists only where they can go", () => {
       renderWithStatusMutation();
 
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
 
       expect(screen.getByText("Change Mina Diaz's status?")).toBeInTheDocument();
-      // The page's card and the sheet's both say it.
-      expect(screen.getAllByText("Can sign in and be scheduled.")).toHaveLength(2);
-      expect(screen.getByText("Change to")).toBeInTheDocument();
+      // Only the page's card says it; the sheet starts at the choices.
+      expect(screen.getAllByText("Can sign in and be scheduled.")).toHaveLength(1);
+      expect(screen.queryByText("Change to")).not.toBeInTheDocument();
       expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(
         [
           "Away. Can sign in but isn't scheduled.",
@@ -1509,12 +1510,8 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
       pick(/^Away/);
       fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      // Picking a day closes its calendar.
       choose(day(1));
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: `Starts, ${formatReturnDate(day(1), { weekday: true })}`,
-        }),
-      );
       fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
       choose(day(2));
       expect(
