@@ -25,16 +25,17 @@ export default function TabsLayoutAndroid() {
       badgeBackgroundColor={mobileColors.danger}
       iconColor={{ default: mobileColors.textSubtle, selected: mobileColors.brand }}
       indicatorColor={mobileColors.brandSoft}
+      // Material 3's label: 12sp medium, the same weight selected or not.
       labelStyle={{
         default: {
           color: mobileColors.textSubtle,
-          fontFamily: mobileTypography.fontFamily.semibold,
-          fontSize: mobileText.badge.fontSize,
+          fontFamily: mobileTypography.fontFamily.medium,
+          fontSize: mobileText.caption.fontSize,
         },
         selected: {
           color: mobileColors.brand,
-          fontFamily: mobileTypography.fontFamily.bold,
-          fontSize: mobileText.badge.fontSize,
+          fontFamily: mobileTypography.fontFamily.medium,
+          fontSize: mobileText.caption.fontSize,
         },
       }}
       labelVisibilityMode="labeled"

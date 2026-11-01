@@ -4,13 +4,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import {
-  mobileElevation,
-  mobileRadii,
-  mobileText,
-  type MobileColors,
-  mobileSpace,
-} from "../theme/tokens";
+import { mobileRadii, mobileText, type MobileColors, mobileSpace } from "../theme/tokens";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenBottomPadding } from "./screen-layout";
 
@@ -47,6 +41,12 @@ function getIssueMessage(key: string, message: string): string {
   }
 }
 
+const SETUP_STEPS = [
+  "1. Local backend: `npm run use:mobile:local`",
+  "2. Hosted backend: `npm run use:mobile:remote`",
+  "3. Restart Expo and re-open the app",
+];
+
 export function ConfigurationScreen({
   validation,
 }: {
@@ -75,26 +75,35 @@ export function ConfigurationScreen({
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>Mobile app setup</Text>
+        <View style={styles.intro}>
           <Text style={styles.title}>Mobile configuration needs attention</Text>
           <Text style={styles.body}>
             This Expo build does not have a phone-safe backend configuration yet. For a real phone,
             pick one of these:
           </Text>
-          <Text style={styles.step}>1. Local backend: `npm run use:mobile:local`</Text>
-          <Text style={styles.step}>2. Hosted backend: `npm run use:mobile:remote`</Text>
-          <Text style={styles.step}>3. Restart Expo and re-open the app</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>What needs fixing</Text>
-          {validation.issues.map((issue) => (
-            <View key={`${issue.key}-${issue.message}`} style={styles.issue}>
-              <Text style={styles.issueKey}>{getIssueTitle(issue.key)}</Text>
-              <Text style={styles.issueMessage}>{getIssueMessage(issue.key, issue.message)}</Text>
-            </View>
+          {SETUP_STEPS.map((step, index) => (
+            <Text key={step} style={[styles.row, styles.step, index > 0 && styles.rowDivider]}>
+              {step}
+            </Text>
           ))}
+        </View>
+
+        <View style={styles.group}>
+          <Text style={styles.groupTitle}>What needs fixing</Text>
+          <View style={styles.card}>
+            {validation.issues.map((issue, index) => (
+              <View
+                key={`${issue.key}-${issue.message}`}
+                style={[styles.row, index > 0 && styles.rowDivider]}
+              >
+                <Text style={styles.issueKey}>{getIssueTitle(issue.key)}</Text>
+                <Text style={styles.issueMessage}>{getIssueMessage(issue.key, issue.message)}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -112,24 +121,36 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       padding: 20,
       paddingBottom: 20,
-      gap: 16,
+      gap: 24,
     },
+    intro: {
+      gap: mobileSpace.sm,
+    },
+    group: {
+      gap: mobileSpace.sm,
+    },
+    // A grouped list's card: flat in light mode, a hairline in dark.
     card: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      padding: mobileSpace.lg,
-      gap: 12,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      ...mobileElevation("card", isDark),
+      overflow: "hidden",
+      ...(isDark
+        ? { borderWidth: StyleSheet.hairlineWidth, borderColor: mobileColors.borderSubtle }
+        : null),
     },
-    eyebrow: {
-      ...mobileText.label,
-      color: mobileColors.brand,
-      textTransform: "uppercase",
+    row: {
+      gap: 4,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.md,
+    },
+    rowDivider: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+      marginLeft: mobileSpace.lg,
+      paddingLeft: 0,
     },
     title: {
-      ...mobileText.display,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
     body: {
@@ -140,15 +161,10 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.bodyStrong,
       color: mobileColors.brand,
     },
-    sectionTitle: {
-      ...mobileText.sectionTitle,
+    groupTitle: {
+      ...mobileText.cardTitle,
       color: mobileColors.textPrimary,
-    },
-    issue: {
-      gap: 4,
-      paddingTop: 8,
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
+      paddingHorizontal: mobileSpace.lg,
     },
     issueKey: {
       ...mobileText.bodyStrong,

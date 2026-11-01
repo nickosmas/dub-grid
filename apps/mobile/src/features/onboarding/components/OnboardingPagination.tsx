@@ -1,15 +1,12 @@
 import { StyleSheet, View } from "react-native";
-import Animated, {
-  interpolate,
-  interpolateColor,
-  useAnimatedStyle,
-  type SharedValue,
-} from "react-native-reanimated";
+import Animated, { interpolate, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
+// UIPageControl's geometry: round dots of one size, the current one at full
+// strength and the rest faded, in the label colour rather than a tint.
 const DOT_SIZE = 8;
-const DOT_GAP = 8;
-const ACTIVE_DOT_WIDTH = 24;
+const DOT_GAP = 9;
+const IDLE_DOT_OPACITY = 0.3;
 
 export function OnboardingPagination({
   count,
@@ -44,17 +41,14 @@ function Dot({
     const distance = Math.abs(progress - index);
     const proximity = Math.min(distance, 1);
 
-    const width = interpolate(proximity, [0, 1], [ACTIVE_DOT_WIDTH, DOT_SIZE]);
-    const backgroundColor = interpolateColor(
-      proximity,
-      [0, 1],
-      [mobileColors.brand, mobileColors.borderSubtle],
-    );
+    return { opacity: interpolate(proximity, [0, 1], [1, IDLE_DOT_OPACITY]) };
+  }, [index, pageWidth]);
 
-    return { width, backgroundColor };
-  }, [index, pageWidth, mobileColors]);
-
-  return <Animated.View style={[styles.dot, animatedStyle]} />;
+  return (
+    <Animated.View
+      style={[styles.dot, { backgroundColor: mobileColors.textPrimary }, animatedStyle]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

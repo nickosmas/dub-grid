@@ -8,23 +8,10 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
-import { toastToneTokens } from "@dubgrid/design-tokens";
-import { StyleSheet, View, type GestureResponderEvent } from "react-native";
-import { Text } from "../components/Text";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ToastSurface } from "../components/ToastSurface";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { useNetworkRecovery } from "./NetworkRecoveryProvider";
-import { useMobileColors } from "./ThemeModeProvider";
-import {
-  mobileOnAccent,
-  mobileRadii,
-  mobileText,
-  mobileTextWeighted,
-  type MobileColors,
-  mobileSpace,
-} from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -41,78 +28,15 @@ type ToastDescriptor = ToastInput & {
 };
 
 const DEFAULT_TOAST_DURATION_MS = 4500;
-const TOAST_MESSAGE_COLOR = mobileOnAccent.secondary;
-const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
-const TOAST_HOST_GUTTER = 20;
-
-const createToastTone = (mobileColors: MobileColors) =>
-  ({
-    error: {
-      backgroundColor: toastToneTokens.error.background,
-      borderColor: toastToneTokens.error.border,
-      iconColor: mobileColors.textInverse,
-      iconName: "alert-circle" as const,
-    },
-    success: {
-      backgroundColor: toastToneTokens.success.background,
-      borderColor: toastToneTokens.success.border,
-      iconColor: mobileColors.textInverse,
-      iconName: "checkmark-circle" as const,
-    },
-    info: {
-      backgroundColor: toastToneTokens.info.background,
-      borderColor: toastToneTokens.info.border,
-      iconColor: mobileColors.textInverse,
-      iconName: "information-circle" as const,
-    },
-    warning: {
-      backgroundColor: toastToneTokens.warning.background,
-      borderColor: toastToneTokens.warning.border,
-      iconColor: mobileColors.textInverse,
-      iconName: "warning" as const,
-    },
-  }) as const;
 
 const ToastContext = createContext<{
   pushToast: (toast: ToastInput) => void;
 } | null>(null);
 
-function getTouchEventY(event: GestureResponderEvent): number | null {
-  const nativeEvent = event.nativeEvent;
-  const webNativeEvent = nativeEvent as typeof nativeEvent & {
-    changedTouches?: Array<{ pageY?: number }>;
-    touches?: Array<{ pageY?: number }>;
-  };
-
-  if (typeof nativeEvent.pageY === "number") {
-    return nativeEvent.pageY;
-  }
-
-  const changedTouchY = webNativeEvent.changedTouches?.[0]?.pageY;
-  if (typeof changedTouchY === "number") {
-    return changedTouchY;
-  }
-
-  const touchY = webNativeEvent.touches?.[0]?.pageY;
-  if (typeof touchY === "number") {
-    return touchY;
-  }
-
-  return null;
-}
-
 export function ToastProvider({ children }: PropsWithChildren) {
-  const mobileColors = useMobileColors();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => createStyles(mobileColors, insets.left, insets.right),
-    [mobileColors, insets.left, insets.right],
-  );
-  const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const { isOffline } = useNetworkStatus();
   const { isNetworkRecoveryActive } = useNetworkRecovery();
   const idRef = useRef(0);
-  const swipeStartYRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
   const [activeToast, setActiveToast] = useState<ToastDescriptor | null>(null);
   const [isOfflineBannerDismissed, setIsOfflineBannerDismissed] = useState(false);
@@ -202,7 +126,6 @@ export function ToastProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    swipeStartYRef.current = null;
     setActiveToast(null);
     setQueue([]);
     setIsOfflineBannerDismissed(false);
@@ -220,58 +143,6 @@ export function ToastProvider({ children }: PropsWithChildren) {
     };
   }, [isOffline, isOfflineBannerDismissed]);
 
-  function handleToastTouchStart(event: GestureResponderEvent) {
-    swipeStartYRef.current = getTouchEventY(event);
-  }
-
-  function handleToastTouchCancel() {
-    swipeStartYRef.current = null;
-  }
-
-  function handleToastTouchEnd(event: GestureResponderEvent) {
-    const startY = swipeStartYRef.current;
-    swipeStartYRef.current = null;
-
-    if (startY == null || !activeToast) {
-      return;
-    }
-
-    const endY = getTouchEventY(event);
-    if (endY == null) {
-      return;
-    }
-
-    if (endY - startY <= -TOAST_SWIPE_DISMISS_THRESHOLD) {
-      dismissToast(activeToast.id);
-    }
-  }
-
-  function handleOfflineBannerTouchStart(event: GestureResponderEvent) {
-    swipeStartYRef.current = getTouchEventY(event);
-  }
-
-  function handleOfflineBannerTouchCancel() {
-    swipeStartYRef.current = null;
-  }
-
-  function handleOfflineBannerTouchEnd(event: GestureResponderEvent) {
-    const startY = swipeStartYRef.current;
-    swipeStartYRef.current = null;
-
-    if (startY == null) {
-      return;
-    }
-
-    const endY = getTouchEventY(event);
-    if (endY == null) {
-      return;
-    }
-
-    if (endY - startY <= -TOAST_SWIPE_DISMISS_THRESHOLD) {
-      setIsOfflineBannerDismissed(true);
-    }
-  }
-
   const value = useMemo(
     () => ({
       pushToast,
@@ -279,65 +150,28 @@ export function ToastProvider({ children }: PropsWithChildren) {
     [pushToast],
   );
 
-  const palette = activeToast ? toastTone[activeToast.tone] : null;
-  const offlinePalette = toastTone.error;
-
   return (
     <ToastContext.Provider value={value}>
       {children}
       {isOffline && !isNetworkRecoveryActive && !isOfflineBannerDismissed ? (
-        <View pointerEvents="box-none" style={styles.host}>
-          <View
-            testID="offline-toast"
-            onTouchCancel={handleOfflineBannerTouchCancel}
-            onTouchEnd={handleOfflineBannerTouchEnd}
-            onTouchStart={handleOfflineBannerTouchStart}
-            style={[
-              styles.toast,
-              {
-                marginTop: insets.top + 12,
-                backgroundColor: offlinePalette.backgroundColor,
-                borderColor: offlinePalette.borderColor,
-              },
-            ]}
-          >
-            <View style={styles.toastMain}>
-              <Ionicons color={offlinePalette.iconColor} name={offlinePalette.iconName} size={20} />
-              <View style={styles.toastCopy}>
-                <Text style={styles.toastTitle}>{NETWORK_ERROR_TITLE}</Text>
-                <Text style={styles.toastMessage}>{NETWORK_ERROR_MESSAGE}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        <ToastSurface
+          isOfflineNotice
+          message={NETWORK_ERROR_MESSAGE}
+          onDismiss={() => setIsOfflineBannerDismissed(true)}
+          testID="offline-toast"
+          title={NETWORK_ERROR_TITLE}
+          tone="error"
+        />
       ) : null}
-      {activeToast && palette ? (
-        <View pointerEvents="box-none" style={styles.host}>
-          <View
-            testID="toast-notification"
-            onTouchCancel={handleToastTouchCancel}
-            onTouchEnd={handleToastTouchEnd}
-            onTouchStart={handleToastTouchStart}
-            style={[
-              styles.toast,
-              {
-                marginTop: insets.top + 12,
-                backgroundColor: palette.backgroundColor,
-                borderColor: palette.borderColor,
-              },
-            ]}
-          >
-            <View style={styles.toastMain}>
-              <Ionicons color={palette.iconColor} name={palette.iconName} size={20} />
-              <View style={styles.toastCopy}>
-                {activeToast.title ? (
-                  <Text style={styles.toastTitle}>{activeToast.title}</Text>
-                ) : null}
-                <Text style={styles.toastMessage}>{activeToast.message}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+      {activeToast ? (
+        <ToastSurface
+          key={activeToast.id}
+          message={activeToast.message}
+          onDismiss={() => dismissToast(activeToast.id)}
+          testID="toast-notification"
+          title={activeToast.title}
+          tone={activeToast.tone}
+        />
       ) : null}
     </ToastContext.Provider>
   );
@@ -352,51 +186,3 @@ export function useToast() {
 
   return context;
 }
-
-const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight: number) =>
-  StyleSheet.create({
-    host: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      alignItems: "center",
-      // The side insets matter in landscape on a notched device, where a fixed
-      // gutter runs the toast under the sensor housing.
-      paddingLeft: TOAST_HOST_GUTTER + insetLeft,
-      paddingRight: TOAST_HOST_GUTTER + insetRight,
-      zIndex: 100,
-      elevation: 100,
-    },
-    toast: {
-      width: "100%",
-      maxWidth: 520,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      paddingVertical: mobileSpace.md,
-      paddingLeft: 20,
-      paddingRight: 20,
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    toastMain: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 12,
-    },
-    toastCopy: {
-      flex: 1,
-      gap: mobileSpace.xs,
-    },
-    toastTitle: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textInverse,
-    },
-    toastMessage: {
-      ...mobileTextWeighted("meta", "medium"),
-      color: TOAST_MESSAGE_COLOR,
-    },
-  });

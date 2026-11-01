@@ -1,18 +1,11 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { useEffect, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, View } from "react-native";
-import { Text } from "../../../shared/components/Text";
-import { Button } from "../../../shared/components/Button";
+import { ContentUnavailable } from "../../../shared/components/ContentUnavailable";
 import { useNetworkRecovery } from "../../../shared/providers/NetworkRecoveryProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import {
-  mobileRadii,
-  mobileText,
-  type MobileColors,
-  mobileSpace,
-} from "../../../shared/theme/tokens";
+import { type MobileColors } from "../../../shared/theme/tokens";
 
 /**
  * Recovery surface for a signed-in session whose required bootstrap data could
@@ -41,22 +34,17 @@ export function NetworkConnectionRecoveryScreen({
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
-        <View style={styles.iconFrame}>
-          <Ionicons color={colors.brand} name="cloud-offline-outline" size={28} />
-        </View>
-        <Text style={styles.title}>{NETWORK_ERROR_TITLE}</Text>
-        <Text style={styles.body}>{NETWORK_ERROR_MESSAGE}</Text>
-        <View style={styles.actions}>
-          <Button label="Try again" loading={isRetrying} onPress={onRetry} />
-          {onSignInAgain ? (
-            <Button
-              disabled={isRetrying}
-              label="Sign in again"
-              onPress={onSignInAgain}
-              tone="link"
-            />
-          ) : null}
-        </View>
+        <ContentUnavailable
+          body={NETWORK_ERROR_MESSAGE}
+          iconName="cloud-offline-outline"
+          primaryAction={{ label: "Try again", loading: isRetrying, onPress: onRetry }}
+          secondaryAction={
+            onSignInAgain
+              ? { label: "Sign in again", disabled: isRetrying, onPress: onSignInAgain }
+              : undefined
+          }
+          title={NETWORK_ERROR_TITLE}
+        />
       </View>
     </SafeAreaView>
   );
@@ -71,21 +59,4 @@ const createStyles = (colors: MobileColors) =>
       justifyContent: "center",
       paddingHorizontal: 32,
     },
-    iconFrame: {
-      alignItems: "center",
-      backgroundColor: colors.brandSoft,
-      borderRadius: mobileRadii.pill,
-      height: 56,
-      justifyContent: "center",
-      marginBottom: 16,
-      width: 56,
-    },
-    title: { ...mobileText.sectionTitle, color: colors.textPrimary, textAlign: "center" },
-    body: {
-      ...mobileText.body,
-      color: colors.textSubtle,
-      marginTop: 12,
-      textAlign: "center",
-    },
-    actions: { gap: 12, marginTop: mobileSpace["3xl"], width: "100%" },
   });
