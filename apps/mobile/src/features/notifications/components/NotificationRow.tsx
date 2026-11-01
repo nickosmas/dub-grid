@@ -8,7 +8,6 @@ import ReanimatedSwipeable, {
 import Animated, {
   Extrapolation,
   interpolate,
-  interpolateColor,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -98,12 +97,10 @@ export function NotificationRow({
     }
   };
 
-  // Unread is the dot and the weight, as in Mail; the row keeps the page's fill.
-  const restingFill = mobileColors.background;
-  const revealedFill = mobileColors.surfaceSecondary;
+  // Unread is the dot and the weight, as in Mail. Swiped, the row keeps the
+  // page's fill and only rounds its corners against the white track.
   const cardStyle = useAnimatedStyle(() => ({
     borderRadius: interpolate(reveal.value, [0, 1], [0, mobileRadii.card], Extrapolation.CLAMP),
-    backgroundColor: interpolateColor(reveal.value, [0, 1], [restingFill, revealedFill]),
   }));
 
   return (
@@ -266,6 +263,7 @@ const createStyles = (mobileColors: MobileColors) =>
     // row keeps the gutter as its own padding so its text lines up with the
     // page. The card's radius clips the press highlight underneath.
     card: {
+      backgroundColor: mobileColors.background,
       overflow: "hidden",
     },
     row: {
