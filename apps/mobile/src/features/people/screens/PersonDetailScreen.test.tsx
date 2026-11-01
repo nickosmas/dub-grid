@@ -49,6 +49,28 @@ vi.mock("expo-router", () => ({
     push: routerPush,
   },
   Stack: {
+    Toolbar: Object.assign(
+      ({ children }: { children?: ReactNode }) => (
+        <div data-testid="navigation-bar">{children}</div>
+      ),
+      {
+        Button: (props: {
+          children?: ReactNode;
+          accessibilityLabel?: string;
+          disabled?: boolean;
+          onPress?: () => void;
+        }) => (
+          <button
+            aria-label={props.accessibilityLabel}
+            disabled={props.disabled}
+            onClick={props.onPress}
+            type="button"
+          >
+            {props.children}
+          </button>
+        ),
+      },
+    ),
     // The bar's trailing slot rendered in place, so a test can press the
     // header's "Edit" the way it presses anything else on the page.
     Screen: (props: { options?: StackScreenOptions }) => {
@@ -2050,8 +2072,8 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(bar.getByRole("button", { name: "Edit" }));
 
       // Editing, the bar holds Cancel and Save in Edit's place.
-      expect(bar.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
-      expect(bar.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();

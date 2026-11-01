@@ -28,6 +28,28 @@ vi.mock("expo-router", () => ({
     back: routerBack,
   },
   Stack: {
+    Toolbar: Object.assign(
+      ({ children }: { children?: ReactNode }) => (
+        <div data-testid="navigation-bar">{children}</div>
+      ),
+      {
+        Button: (props: {
+          children?: ReactNode;
+          accessibilityLabel?: string;
+          disabled?: boolean;
+          onPress?: () => void;
+        }) => (
+          <button
+            aria-label={props.accessibilityLabel}
+            disabled={props.disabled}
+            onClick={props.onPress}
+            type="button"
+          >
+            {props.children}
+          </button>
+        ),
+      },
+    ),
     // The bar's edit actions rendered in place, so a test presses Save and
     // Discard where the phones show them.
     Screen: (props: {

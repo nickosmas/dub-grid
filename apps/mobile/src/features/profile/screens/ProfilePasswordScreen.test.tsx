@@ -24,6 +24,28 @@ vi.mock("react-native", async () => createReactNativeModule(await import("react"
 
 vi.mock("expo-router", () => ({
   Stack: {
+    Toolbar: Object.assign(
+      ({ children }: { children?: ReactNode }) => (
+        <div data-testid="navigation-bar">{children}</div>
+      ),
+      {
+        Button: (props: {
+          children?: ReactNode;
+          accessibilityLabel?: string;
+          disabled?: boolean;
+          onPress?: () => void;
+        }) => (
+          <button
+            aria-label={props.accessibilityLabel}
+            disabled={props.disabled}
+            onClick={props.onPress}
+            type="button"
+          >
+            {props.children}
+          </button>
+        ),
+      },
+    ),
     // The bar's action rendered in place, so a test presses it where the
     // phones show it.
     Screen: (props: { options?: { headerRight?: () => ReactNode } }) => (

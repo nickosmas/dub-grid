@@ -257,6 +257,7 @@ type SheetHeaderProps = ComponentProps<typeof DrawnSheetHeader>;
 
 const HAS_LIQUID_GLASS = IS_IOS && isLiquidGlassAvailable();
 const SUBTITLE_IN_BAR_MAX = 32;
+const DISABLED_GLASS_TINT = "rgba(120, 120, 128, 0.36)";
 const BAR_LABEL_MAX = 10;
 
 /**
@@ -396,12 +397,16 @@ function BarAction({
   const [running, setRunning] = useState(false);
   const busy = Boolean(action.loading) || running;
   const disabled = Boolean(action.disabled) || busy;
+  // Disabled, the capsule is gray glass with a white label, as the system
+  // draws a prominent bar item it can't press (owner, 2026-10-31).
   const tint =
     kind === "secondary"
       ? undefined
-      : action.tone === "danger"
-        ? mobileColors.danger
-        : mobileColors.brand;
+      : disabled && !busy
+        ? DISABLED_GLASS_TINT
+        : action.tone === "danger"
+          ? mobileColors.danger
+          : mobileColors.brand;
 
   const press = () => {
     if (disabled) return;
@@ -466,7 +471,6 @@ function BarAction({
       disabled={disabled}
       hitSlop={8}
       onPress={press}
-      style={disabled && !busy ? styles.actionDisabled : null}
     >
       {HAS_LIQUID_GLASS ? (
         <GlassView
@@ -535,9 +539,6 @@ const styles = StyleSheet.create({
   },
   iosActionLabel: {
     ...mobileTextWeighted("body", "semibold"),
-  },
-  actionDisabled: {
-    opacity: 0.45,
   },
   materialHeader: {
     flexDirection: "row",

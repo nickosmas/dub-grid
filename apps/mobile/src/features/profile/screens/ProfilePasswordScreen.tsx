@@ -1,4 +1,3 @@
-import { Stack } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
   PASSWORD_MISMATCH_MESSAGE,
@@ -19,7 +18,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
-import { createHeaderEditActions } from "../../../shared/navigation/HeaderTextAction";
+import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   getProfile,
@@ -379,16 +378,14 @@ export default function ProfilePasswordScreen() {
       scrollEnabled={contentState.kind !== "loading"}
     >
       {IS_NATIVE_LIST && contentState.kind !== "loading" && contentState.kind !== "error" ? (
-        <Stack.Screen
-          options={createHeaderEditActions({
-            save: {
-              label: passwordChanged ? "Finish" : "Update",
-              accessibilityLabel: passwordChanged ? "Finish signing out" : "Update password",
-              disabled: (!passwordChanged && !passwordLooksReady) || passwordSaving,
-              loading: passwordSaving,
-              onPress: requestPasswordChange,
-            },
-          })}
+        <EditBarActions
+          save={{
+            label: passwordChanged ? "Finish" : "Update",
+            accessibilityLabel: passwordChanged ? "Finish signing out" : "Update password",
+            disabled: (!passwordChanged && !passwordLooksReady) || passwordSaving,
+            loading: passwordSaving,
+            onPress: requestPasswordChange,
+          }}
         />
       ) : null}
       {contentState.kind === "loading" ? (

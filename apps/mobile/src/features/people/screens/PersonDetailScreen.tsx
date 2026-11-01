@@ -57,10 +57,8 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import {
-  createHeaderEditActions,
-  createHeaderTextAction,
-} from "../../../shared/navigation/HeaderTextAction";
+import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   changeMobilePersonOrgRole,
@@ -1457,37 +1455,35 @@ export default function PersonDetailScreen() {
           // it is the one action about the page rather than about the person.
           // While editing, the phones put Save and Cancel in the bar too; the
           // web build keeps them in the footer.
-          ...(editing && IS_NATIVE_LIST
-            ? createHeaderEditActions({
-                save: {
-                  label: "Save",
-                  accessibilityLabel: "Save changes",
-                  disabled: updateMutation.isPending || !hasChanges || hasEditValidationErrors,
-                  loading: updateMutation.isPending,
-                  onPress: handleSave,
-                },
-                discard: {
-                  label: getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges }),
-                  onPress: hasChanges ? guard.discard : guard.requestClose,
-                },
-              })
-            : { headerLeft: undefined, headerBackVisible: true }),
-          ...(editing && IS_NATIVE_LIST
-            ? {}
-            : createHeaderTextAction(
-                canEdit && !editing
-                  ? {
-                      label: "Edit",
-                      accessibilityHint: "Opens the staff details editor",
-                      onPress: () => {
-                        setEditing(true);
-                        setDraft(makeDraft(person));
-                      },
-                    }
-                  : null,
-              )),
+          ...createHeaderTextAction(
+            canEdit && !editing
+              ? {
+                  label: "Edit",
+                  accessibilityHint: "Opens the staff details editor",
+                  onPress: () => {
+                    setEditing(true);
+                    setDraft(makeDraft(person));
+                  },
+                }
+              : null,
+          ),
         }}
       />
+      {editing && IS_NATIVE_LIST ? (
+        <EditBarActions
+          discard={{
+            label: getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges }),
+            onPress: hasChanges ? guard.discard : guard.requestClose,
+          }}
+          save={{
+            label: "Save",
+            accessibilityLabel: "Save changes",
+            disabled: updateMutation.isPending || !hasChanges || hasEditValidationErrors,
+            loading: updateMutation.isPending,
+            onPress: handleSave,
+          }}
+        />
+      ) : null}
       <AccountLinkChallengeModal
         challenge={accountLinkChallenge}
         error={invitationError}
