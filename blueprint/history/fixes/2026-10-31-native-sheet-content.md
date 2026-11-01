@@ -30,11 +30,11 @@ schedule drop their Staffing and Assignments titles, so each group (such as
 Employment, Certifications or Wings) has one title.
 
 **iOS fields.** A panel holding fields is a grouped form: a white card with
-one row per field, the name on the leading edge and the value on the trailing
-edge, and separators only between rows. A placeholder that repeats the name
-is dropped, and an optional field says "Optional". A multi-line field is a
-text area under its section title. A field with no panel gets its own card,
-and the invite sheet's fields share one.
+one row per field and separators only between rows. Each field's name is its
+placeholder, left-aligned as in Contacts, so it is said once and gives way to
+what is typed (owner, same day). A multi-line field is a text area under its
+section title. A field with no panel gets its own card, and the invite
+sheet's fields share one.
 
 **iOS dates.** Every date field (Starts, Return date, Last day, First day,
 Ends) is a row like Calendar's: the date sits in a gray capsule that turns

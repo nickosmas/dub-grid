@@ -271,8 +271,6 @@ export function ProfilePanel({
 /** Set by a panel of fields, whose card and separators the rows sit in. */
 const FormRowContext = createContext(false);
 
-const OPTIONAL_SUFFIX = /\s*\(optional\)$/i;
-
 export function ProfileList({
   children,
   variant = "framed",
@@ -411,24 +409,12 @@ export function ProfileTextInput({
   const nativeInputStyle = IS_ANDROID_LIST ? styles.inputAndroid : null;
 
   if (IS_IOS_LIST) {
-    // A grouped-form row (owner, 2026-10-31): the field's name once, on the
-    // leading edge, and what was typed on the trailing edge, the way
-    // Settings lays out a form. A placeholder that only repeats the name is
-    // dropped; an optional field says so there instead. A multi-line field
-    // is a text area under its section's title, named by its placeholder.
-    const name = label.replace(OPTIONAL_SUFFIX, "");
-    const placeholder = resolvedInputProps.placeholder;
-    const repeatsName =
-      placeholder != null &&
-      placeholder.replace(OPTIONAL_SUFFIX, "").trim().toLowerCase() === name.toLowerCase();
+    // A grouped-form row as Contacts draws one (owner, 2026-10-31): the
+    // field's name is its placeholder, left-aligned, so it is said once and
+    // gives way to what is typed. A multi-line field keeps a placeholder of
+    // its own when it has one.
     const multiline = Boolean(resolvedInputProps.multiline);
-    const shownPlaceholder = multiline
-      ? (placeholder ?? name)
-      : placeholder && !repeatsName
-        ? placeholder
-        : OPTIONAL_SUFFIX.test(label)
-          ? "Optional"
-          : undefined;
+    const shownPlaceholder = multiline ? (resolvedInputProps.placeholder ?? label) : label;
     const input = (
       <TextInput
         accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
@@ -453,9 +439,6 @@ export function ProfileTextInput({
             input
           ) : (
             <View style={styles.iosFieldRow}>
-              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.iosFieldLabel}>
-                {name}
-              </Text>
               {input}
               {trailingAccessory ? (
                 <View style={styles.inputAccessory}>{trailingAccessory}</View>
@@ -1133,12 +1116,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minHeight: 52,
       paddingHorizontal: 16,
     },
-    iosFieldLabel: {
-      ...mobileText.body,
-      color: mobileColors.textPrimary,
-      flexShrink: 0,
-      maxWidth: "50%",
-    },
     iosFieldInput: {
       ...mobileInputText("regular"),
       fontSize: mobileText.body.fontSize,
@@ -1148,7 +1125,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
       paddingVertical: mobileSpace.md,
-      textAlign: "right",
     },
     iosFieldMultiline: {
       lineHeight: mobileText.body.lineHeight,
