@@ -702,5 +702,5 @@ export function createNativeStackMock(React: typeof import("react")) {
       Badge: () => null,
     },
   );
-  return { Toolbar, SearchBar: () => null };
+  return { Toolbar, SearchBar: () => null, Screen: () => null };
 }

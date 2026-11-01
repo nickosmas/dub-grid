@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
+import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
 import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
@@ -395,6 +396,7 @@ export default function NotificationsScreen() {
         )}
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
+        <HeaderLeadingTitle title="Alerts" />
         {unreadCount > 0 ? (
           <MarkAllReadBarAction disabled={busy} onPress={() => setConfirmingMarkAllRead(true)} />
         ) : null}

@@ -141,8 +141,9 @@ function RootLayoutContent({
                                   gets the same native back as every drill-in. */}
                                 <Stack.Screen
                                   name="alerts/index"
-                                  // An inline title: with a large one, iOS 26 drew the
-                                  // stacked search field over the title on a cold push.
+                                  // Not a large title: iOS 26 drew the stacked search field
+                                  // over it on a cold push. The screen sets its title on the
+                                  // leading edge instead (HeaderLeadingTitle).
                                   options={createDetailStackOptions(mobileColors, "Alerts")}
                                 />
                                 <Stack.Screen
