@@ -27,7 +27,7 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
-import { PREDEFINED_COLORS, TRANSPARENT_BORDER } from "@/lib/colors";
+import { FILLED_PILL_BORDER, PREDEFINED_COLORS, TRANSPARENT_BORDER } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
@@ -285,7 +285,7 @@ function AbsenceTypeRow({
                 overflow: "hidden",
                 padding: "3px 8px",
                 background: badge.background,
-                border: `1px solid ${badge.border}`,
+                border: FILLED_PILL_BORDER,
                 color: badge.text,
                 borderRadius: "var(--dg-radius-md)",
                 fontSize: "var(--dg-fs-caption)",

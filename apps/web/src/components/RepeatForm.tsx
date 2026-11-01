@@ -12,6 +12,7 @@ import {
 import { ChevronDown, ChevronLeft, ChevronRight, Repeat, Replace } from "lucide-react";
 import { useTheme } from "next-themes";
 import { absenceStripeFill } from "@/lib/absence-stripes";
+import { FILLED_PILL_BORDER } from "@/lib/colors";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
 import {
@@ -402,7 +403,6 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const previewBackground =
     absenceFill?.background ?? assignment?.color ?? "var(--dg-color-bg-secondary)";
   const previewText = absenceFill?.text ?? assignment?.text ?? "var(--dg-color-text-secondary)";
-  const previewBorder = absenceFill?.border ?? assignment?.border ?? "var(--dg-color-border)";
 
   function toggleDay(day: number) {
     setDaysOfWeek((prev) =>
@@ -556,7 +556,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             style={{
               background: previewBackground,
               color: previewText,
-              border: `1px solid ${previewBorder}`,
+              border: FILLED_PILL_BORDER,
               borderRadius: "var(--dg-radius-md)",
               padding: previewDisplayParts.secondaryLabel ? "6px 12px 7px" : "6px 12px",
               display: "inline-flex",

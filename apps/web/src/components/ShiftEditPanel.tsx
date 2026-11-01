@@ -3141,7 +3141,6 @@ export default function ShiftEditPanel({
         <div
           style={{
             background: atResolved.background,
-            backgroundOrigin: "border-box",
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
               fallback: FILLED_PANEL_PILL_BORDER,
