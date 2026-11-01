@@ -30,13 +30,11 @@ export type DayPill = {
   /** "7:00 AM - 3:30 PM", when the pattern sets times. */
   time: string | null;
   background: string;
-  border: string;
   textColor: string;
 };
 
 const NEUTRAL_PILL = {
   background: "var(--dg-color-bg-secondary)",
-  border: "var(--dg-color-border)",
   textColor: "var(--dg-color-text-primary)",
 };
 
@@ -71,7 +69,6 @@ export function buildDayPills(
         jobName: null,
         time: null,
         background: resolved?.background ?? NEUTRAL_PILL.background,
-        border: resolved?.border ?? NEUTRAL_PILL.border,
         textColor: resolved?.text ?? NEUTRAL_PILL.textColor,
       },
     ];
@@ -128,7 +125,6 @@ export function buildDayPills(
       jobName: jobName && normalizeName(jobName) !== normalizeName(name) ? jobName : null,
       time: formatScheduleTimeRange(segment.startTime ?? null, segment.endTime ?? null),
       background: resolved?.color ?? NEUTRAL_PILL.background,
-      border: resolved?.border ?? NEUTRAL_PILL.border,
       textColor: resolved?.text ?? NEUTRAL_PILL.textColor,
     };
   });
@@ -212,10 +208,9 @@ export function RecurringScheduleCard({
                         {pills.map((pill) => (
                           <div
                             key={pill.key}
-                            className="flex flex-1 flex-col justify-center rounded-[var(--dg-radius-sm)] border px-1.5 py-1.5 leading-tight [overflow-wrap:anywhere]"
+                            className="flex flex-1 flex-col justify-center rounded-[var(--dg-radius-sm)] border border-transparent px-1.5 py-1.5 leading-tight [overflow-wrap:anywhere]"
                             style={{
                               background: pill.background,
-                              borderColor: pill.border,
                               color: pill.textColor,
                             }}
                           >

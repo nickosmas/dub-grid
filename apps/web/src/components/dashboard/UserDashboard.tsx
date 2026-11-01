@@ -2272,7 +2272,6 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
     <span
       style={{
         background: segment.backgroundColor,
-        backgroundOrigin: "border-box",
         border: FILLED_PILL_BORDER,
         borderRadius: 7,
         color: segment.textColor,

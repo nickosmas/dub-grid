@@ -3541,9 +3541,6 @@ const SectionBlock = memo(function SectionBlock({
                                                           absenceStripes.stripeB,
                                                         )
                                                       : effectiveColor,
-                                                // Stripes start under the transparent border, or
-                                                // they restart at the padding edge and draw a ring.
-                                                backgroundOrigin: "border-box",
                                                 opacity: draftKind === "deleted" ? 0.5 : 1,
                                                 border: runSegment ? undefined : effectiveBorder,
                                                 borderRadius: runSegment
@@ -4488,7 +4485,6 @@ const SectionBlock = memo(function SectionBlock({
                                                         order: absenceOrder,
                                                         flex: 1,
                                                         background: absenceBg,
-                                                        backgroundOrigin: "border-box",
                                                         ...seamBorders(
                                                           restOfDayDraftDiff?.borderKind
                                                             ? getDraftBorder(

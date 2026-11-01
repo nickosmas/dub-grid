@@ -237,7 +237,6 @@ export default function ShiftPicker({
       padding: "8px 10px",
       borderRadius: "var(--dg-radius-lg)",
       background: disabled ? "var(--dg-color-bg)" : background,
-      backgroundOrigin: "border-box",
       border: disabled
         ? "1px dashed var(--dg-color-border-strong)"
         : isActive

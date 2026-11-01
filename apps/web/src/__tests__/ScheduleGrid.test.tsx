@@ -2349,7 +2349,11 @@ describe("ScheduleGrid", () => {
         expect(pill.textContent).toBe("");
         expect(pill.style.background).toBe("transparent");
       }
-      expect(cells[0].querySelector("[data-absence-run-bar]")).not.toBeNull();
+      const runBar = cells[0].querySelector("[data-absence-run-bar]") as HTMLElement;
+      expect(runBar).not.toBeNull();
+      // Stripes run under the transparent border rather than drawing a ring.
+      expect(runBar.style.borderColor).toBe("transparent");
+      expect(runBar.style.backgroundOrigin).toBe("border-box");
       expect(cells[1].querySelector("[data-absence-run-bar]")).toBeNull();
       // The day after the run keeps its divider.
       expect(alexCells()[5].dataset.leadingDivider).toBe("light");

@@ -11,7 +11,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
 import { useTheme } from "next-themes";
-import { borderColor, resolveShiftPillColors } from "@/lib/colors";
+import { FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Switch } from "@/components/ui/switch";
 import { changedElsewhereMessage } from "@dubgrid/domain";
@@ -125,7 +125,7 @@ function DisplayModePreviewPill({
       data-shift-pill="single"
       style={{
         background: resolved.color,
-        border: `1px solid ${borderColor(resolved.text)}`,
+        border: FILLED_PILL_BORDER,
         borderRadius: "var(--dg-radius-md)",
         color: resolved.text,
         display: "flex",
