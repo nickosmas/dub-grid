@@ -932,13 +932,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.brand,
       borderColor: mobileColors.brand,
     },
+    // Today is the brand colour, not red (owner, 2026-11-01): a soft tint on
+    // its own, filled once it is also the selected day.
     dateHighlightTodaySelected: {
-      backgroundColor: mobileColors.danger,
-      borderColor: mobileColors.danger,
+      backgroundColor: mobileColors.brand,
+      borderColor: mobileColors.brand,
     },
     dateHighlightToday: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
+      backgroundColor: mobileColors.controlSecondaryBg,
+      borderColor: mobileColors.controlSecondaryBg,
     },
     dateHighlightOutsideMonth: {
       opacity: 0.4,
@@ -952,7 +954,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textInverse,
     },
     dateHighlightTextToday: {
-      color: mobileColors.danger,
+      color: mobileColors.brand,
     },
     dateHighlightTextTodaySelected: {
       color: mobileColors.textInverse,

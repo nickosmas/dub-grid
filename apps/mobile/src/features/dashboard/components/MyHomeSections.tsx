@@ -167,13 +167,17 @@ export function MyHomeSections({
           });
         }}
       />
-      <UpcomingShiftsSection
-        items={upcomingItems}
-        summary={weeklyHours}
-        todayDate={todayDate}
-        weekDays={weekDays}
-        onPressEntry={openShiftDetail}
-      />
+      {/* A week with nothing in it is the empty state above alone, not that
+          and seven Unscheduled days, as the Schedule tab already does. */}
+      {hasScheduledDay ? (
+        <UpcomingShiftsSection
+          items={upcomingItems}
+          summary={weeklyHours}
+          todayDate={todayDate}
+          weekDays={weekDays}
+          onPressEntry={openShiftDetail}
+        />
+      ) : null}
     </View>
   );
 }

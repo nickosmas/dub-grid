@@ -8,7 +8,11 @@ import { useIosToolbarImage, useToolbarIcon } from "./useToolbarIcon";
 const IS_IOS = Platform.OS === "ios";
 
 /** The words `useUnsavedChangesGuard` asks with, for an editor's X. */
-export const DISCARD_CONFIRM = { title: "Discard unsaved changes?", label: "Discard" };
+export const DISCARD_CONFIRM = {
+  title: "Discard unsaved changes?",
+  label: "Discard",
+  keepLabel: "Keep editing",
+};
 
 type EditBarAction = {
   label: string;
@@ -20,7 +24,7 @@ type EditBarAction = {
    * Ask before acting: on iOS the X opens the question as a menu from itself,
    * with the action in red, as the system's editors do.
    */
-  confirm?: { title: string; label: string };
+  confirm?: { title: string; label: string; keepLabel: string };
 };
 
 /**
@@ -67,6 +71,11 @@ export function EditBarActions({
             >
               <Stack.Toolbar.MenuAction destructive onPress={discard.onPress}>
                 {discard.confirm.label}
+              </Stack.Toolbar.MenuAction>
+              {/* Changing your mind is an answer on screen too (owner,
+                  2026-11-01). */}
+              <Stack.Toolbar.MenuAction onPress={() => undefined}>
+                {discard.confirm.keepLabel}
               </Stack.Toolbar.MenuAction>
             </Stack.Toolbar.Menu>
           ) : (

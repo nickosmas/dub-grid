@@ -1051,7 +1051,7 @@ export function UpcomingShiftsSection({
                 <ScheduleDateTile
                   date={group.date}
                   isToday={isToday}
-                  todayDotTestID={`upcoming-today-date-dot-${group.date}`}
+                  todayTestID={`upcoming-today-date-${group.date}`}
                 />
               </View>
 

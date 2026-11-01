@@ -110,6 +110,11 @@ export type BottomSheetModalProps = {
   backdrop?: "scrim" | "cover";
   dismissDisabled?: boolean;
   scrollable?: boolean;
+  /**
+   * A list that can drag up to fill the screen even when it fits, such as
+   * Switch organization (native sheets only).
+   */
+  expandable?: boolean;
   accessibilityLabel?: string;
   /** Set "alert" for a blocking sheet the user must answer before continuing. */
   accessibilityRole?: "alert";

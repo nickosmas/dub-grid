@@ -396,7 +396,7 @@ export function AddPersonSheet({
             </ProfilePanel>
           </ProfileSection>
 
-          <ProfileSection title="Staffing">
+          <ProfileSection>
             <ProfileChoiceGroup
               items={[
                 { id: 0, name: "Full-time" },
@@ -431,7 +431,7 @@ export function AddPersonSheet({
             />
           </ProfileSection>
 
-          <ProfileSection title="Assignments">
+          <ProfileSection>
             <ProfileChoiceGroup
               error={fieldErrors.focusAreaIds}
               items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}

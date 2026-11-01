@@ -18,7 +18,11 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
-import { ProfileChoiceGroup, ProfileTextInput } from "../../profile/components/ProfilePrimitives";
+import {
+  ProfileChoiceGroup,
+  ProfilePanel,
+  ProfileTextInput,
+} from "../../profile/components/ProfilePrimitives";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { mobileSpace } from "../../../shared/theme/tokens";
@@ -181,42 +185,44 @@ export function ManagementUserInviteSheet({
         </AppText>
       ) : (
         <View style={styles.body}>
-          <ProfileTextInput
-            autoCapitalize="words"
-            editable={!isPending}
-            error={showErrors ? firstNameError : null}
-            label="First name"
-            onChangeText={(firstName) => setDraft((current) => ({ ...current, firstName }))}
-            value={draft.firstName}
-          />
-          <ProfileTextInput
-            autoCapitalize="words"
-            editable={!isPending}
-            error={showErrors ? lastNameError : null}
-            label="Last name"
-            onChangeText={(lastName) => setDraft((current) => ({ ...current, lastName }))}
-            value={draft.lastName}
-          />
-          <ProfileTextInput
-            autoCapitalize="none"
-            editable={!isPending}
-            error={showErrors ? emailError : null}
-            keyboardType="email-address"
-            autoComplete="email"
-            autoCorrect={false}
-            label="Email"
-            onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
-            value={draft.email}
-          />
-          <ProfileTextInput
-            editable={!isPending}
-            error={showErrors ? phoneError : null}
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            label="Phone (optional)"
-            onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
-            value={draft.phone}
-          />
+          <ProfilePanel>
+            <ProfileTextInput
+              autoCapitalize="words"
+              editable={!isPending}
+              error={showErrors ? firstNameError : null}
+              label="First name"
+              onChangeText={(firstName) => setDraft((current) => ({ ...current, firstName }))}
+              value={draft.firstName}
+            />
+            <ProfileTextInput
+              autoCapitalize="words"
+              editable={!isPending}
+              error={showErrors ? lastNameError : null}
+              label="Last name"
+              onChangeText={(lastName) => setDraft((current) => ({ ...current, lastName }))}
+              value={draft.lastName}
+            />
+            <ProfileTextInput
+              autoCapitalize="none"
+              editable={!isPending}
+              error={showErrors ? emailError : null}
+              keyboardType="email-address"
+              autoComplete="email"
+              autoCorrect={false}
+              label="Email"
+              onChangeText={(email) => setDraft((current) => ({ ...current, email }))}
+              value={draft.email}
+            />
+            <ProfileTextInput
+              editable={!isPending}
+              error={showErrors ? phoneError : null}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              label="Phone (optional)"
+              onChangeText={(phone) => setDraft((current) => ({ ...current, phone }))}
+              value={draft.phone}
+            />
+          </ProfilePanel>
 
           <OrgRoleChoice
             canGrantSuperAdmin={canGrantSuperAdmin}

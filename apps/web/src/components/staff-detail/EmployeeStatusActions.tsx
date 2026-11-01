@@ -10,12 +10,11 @@ import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
-import { CalendarDays, CalendarX2, Ellipsis, Undo2 } from "lucide-react";
+import { CalendarX2, Ellipsis, Undo2 } from "lucide-react";
 import { STATUS_ACTION_ICONS, STATUS_CHANGE_ICON } from "@/components/staff/status-action-icons";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
-  describeStatusCard,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
   plannedReturn,
@@ -23,9 +22,8 @@ import {
   statusChoices,
   suggestedStatusChoice,
   type StatusAction,
-  type StatusCardCopy,
 } from "@dubgrid/domain";
-import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusIconCircle } from "./StatusMarkIcon";
+import { STATUS_KIND_ICONS, StatusIconCircle } from "./StatusMarkIcon";
 
 export interface EmployeeStatusActionsProps {
   employee: Employee;
@@ -310,12 +308,6 @@ const NOTE_PLACEHOLDERS: Partial<Record<StatusAction, string>> = {
   archive: "Reason (optional) - e.g. Left the company",
 };
 
-const LABEL_STYLE = {
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 600,
-  color: "var(--dg-color-text-secondary)",
-} as const;
-
 /** Cancels a planned change, or takes the cancel back, inside the plan's dialog. */
 function PlanCancelToggle({
   cancelling,
@@ -338,78 +330,6 @@ function PlanCancelToggle({
       <Icon size={14} aria-hidden />
       {cancelling ? keepLabel : cancelLabel}
     </Button>
-  );
-}
-
-/** Where they stand, above the Change status list: the profile's status card, without its tint. */
-function CurrentStatusCard({ card }: { card: StatusCardCopy }) {
-  const { current, planned } = card;
-  const titleColor =
-    current.kind === "active"
-      ? "var(--dg-color-text-primary)"
-      : STATUS_TONE_COLORS[current.tone].text;
-  return (
-    <div role="status" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "10px 12px",
-          borderRadius: "var(--dg-radius-lg)",
-          border: "1px solid var(--dg-color-border)",
-          background: "var(--dg-color-surface)",
-        }}
-      >
-        <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} size={30} />
-        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-          <span
-            className="dg-tabular-nums"
-            style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: titleColor }}
-          >
-            {current.title}
-          </span>
-          <span
-            className="dg-tabular-nums"
-            style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
-          >
-            {current.detail}
-          </span>
-        </span>
-      </div>
-      {planned ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "8px 12px",
-            borderRadius: "var(--dg-radius-lg)",
-            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
-          }}
-        >
-          <StatusIconCircle icon={CalendarDays} tone="warning" size={26} />
-          <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <span
-              className="dg-tabular-nums"
-              style={{
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-                color: STATUS_TONE_COLORS.warning.text,
-              }}
-            >
-              {`Planned: ${planned.title}`}
-            </span>
-            <span
-              className="dg-tabular-nums"
-              style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-secondary)" }}
-            >
-              {planned.detail}
-            </span>
-          </span>
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -553,11 +473,6 @@ export function EmployeeStatusActions({
   const lastDayChanged = !!plannedLeave && !cancellingPlan && !!lastDay && lastDay !== plannedLeave;
   // Clearing a planned last day offboards them today instead.
   const offboardsNow = !!plannedLeave && !cancellingPlan && !lastDay && focus !== "status";
-  const statusCard = describeStatusCard(employee, {
-    absenceName: isAway
-      ? absenceTypes.find((absenceType) => absenceType.id === employee.awayAbsenceTypeId)?.name
-      : plannedAbsenceName,
-  });
   const datedFields = (
     <>
       <ReturnDateField value={returnDate} minDate={returnMinDate} onChange={setReturnDate} />
@@ -843,6 +758,13 @@ export function EmployeeStatusActions({
   );
   const ordinary = choice === "markActive" || choice === "reinstate" || choice === "restore";
   const showList = !onlyChoice && focus !== "plan";
+  const hasDetailsAboveLine =
+    !choice &&
+    ((isAway && !!onSetReturnDate) ||
+      (isSuspended && !!onSetSuspendedUntil) ||
+      (!!onSetPlannedChange &&
+        focus !== "status" &&
+        (hasSuspensionPlan || !!returnDay || !!plannedLeave || hasPlan)));
 
   const dialog =
     open && !stepUpOpen ? (
@@ -875,7 +797,9 @@ export function EmployeeStatusActions({
         }
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {showList ? (
+            {/* Where they stand is on the page behind the dialog, so it starts
+                at what can change (owner, 2026-10-31). */}
+            {showList && hasDetailsAboveLine ? (
               <div
                 style={{
                   display: "flex",
@@ -885,18 +809,15 @@ export function EmployeeStatusActions({
                   borderBottom: "1px solid var(--dg-color-border)",
                 }}
               >
-                <CurrentStatusCard card={statusCard} />
                 {detailsAboveLine}
               </div>
             ) : (
-              // A confirmation names its change in the title, so it skips where they stand.
               detailsAboveLine
             )}
             {onlyChoice ? (
               <span style={{ color: "var(--dg-color-text-primary)" }}>{onlyChoice.outcome}</span>
             ) : !showList ? null : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={LABEL_STYLE}>Change to</span>
                 <RadioCardList
                   label="Change to"
                   options={choices.map((option) => ({

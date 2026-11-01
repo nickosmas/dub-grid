@@ -575,7 +575,7 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Your week")).toBeInTheDocument();
     expect(screen.getByText("24h this week")).toBeInTheDocument();
-    expect(screen.getByTestId("upcoming-today-date-dot-2026-04-16")).toBeInTheDocument();
+    expect(screen.getByTestId("upcoming-today-date-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
     expect(screen.getByText("FRI")).toBeInTheDocument();
     expect(screen.getAllByText("17").length).toBeGreaterThan(0);
