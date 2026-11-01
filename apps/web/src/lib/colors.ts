@@ -322,8 +322,8 @@ export function normalizePresetBg(bgHex: string | null | undefined): string {
 
 /**
  * A filled pill needs no outline. The border stays, transparent, so a filled
- * pill keeps the same size as an outlined one; stripes behind it need
- * `background-origin: border-box` or they restart at the padding edge.
+ * pill keeps the same size as an outlined one. Stripes run under it because
+ * `absenceStripeCss` puts `border-box` in the shorthand.
  */
 export const FILLED_PILL_BORDER = "1px solid transparent";
 

@@ -22,11 +22,13 @@ import {
 } from "react-native";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import BottomSheet, {
   BottomSheetScrollView,
   BottomSheetView,
 } from "@expo/ui/community/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { barActionIsCheckmark } from "../lib/bar-action";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, mobileTextWeighted } from "../theme/tokens";
 import { ActionButtons } from "./ActionButtons";
@@ -35,6 +37,11 @@ import { Button } from "./Button";
 import { Pressable } from "./Pressable";
 import { ChromeIconButton } from "./ChromeIconButton";
 import { ICON_CONTROL_SIZE } from "./icon-control-style";
+import { AnchoredConfirmation } from "./AnchoredConfirmation";
+import {
+  AnchoredConfirmationContext,
+  type AnchoredConfirmationRequest,
+} from "./anchored-confirmation";
 import {
   BottomSheetModal as DrawnBottomSheetModal,
   InsideSheetContext,
@@ -47,10 +54,16 @@ export * from "./BottomSheetModalDrawn";
 
 /**
  * A sheet is only as tall as its content (owner, 2026-10-31); a long one
- * scrolls within this share of the screen, which keeps its title clear of the
- * grabber.
+ * opens at this share of the screen and drags up to fill it, as the system's
+ * own sheets do (owner, same day).
  */
 const SCROLL_BODY_MAX_SHARE = 0.62;
+/** The space `@expo/ui` puts between the grabber and a detent sheet's content. */
+const IOS_GRABBER_SPACE = 16;
+/** How much of the screen a sheet that scrolls opens at, before it's dragged up. */
+const RESIZABLE_OPEN_SHARE = 0.7;
+
+type SheetSizes = { header: number; content: number; footer: number };
 /**
  * Room the title row, the footer and the sheet's own insets take, so a body
  * sized to the space above the keyboard leaves the whole sheet in view. The
@@ -87,9 +100,11 @@ type SheetClose = {
   primary?: ButtonProps;
   /** A second action that isn't a cancel, such as Clear all. */
   secondary?: ButtonProps;
+  /** A discard confirmation opening from the close button (iOS). */
+  confirmation: AnchoredConfirmationRequest | null;
 };
 
-const CANCEL_LABELS = new Set(["Cancel", "Close", "Not now", "Back", "Keep editing"]);
+const CANCEL_LABELS = new Set(["Cancel", "Close", "Dismiss", "Not now", "Back", "Keep editing"]);
 
 type LiftedActions = {
   rest: ReactNode;
@@ -166,6 +181,13 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
   // hiding it; only a dismissal while it should be showing is the person's.
   const visibleRef = useRef(props.visible);
   visibleRef.current = props.visible;
+  const [sizes, setSizes] = useState<SheetSizes>({ header: 0, content: 0, footer: 0 });
+  const measure = (part: keyof SheetSizes, value: number) => {
+    const rounded = Math.ceil(value);
+    setSizes((current) => (current[part] === rounded ? current : { ...current, [part]: rounded }));
+  };
+  const androidResizableRef = useRef<boolean | null>(null);
+  const [confirmation, setConfirmation] = useState<AnchoredConfirmationRequest | null>(null);
 
   if (props.presentationKind === "gate" || props.backdrop === "cover") {
     return <DrawnBottomSheetModal {...props} />;
@@ -184,18 +206,48 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
 
   const lifted = liftSheetActions(footer);
   const barFooter = lifted.primary ? lifted.rest : footer;
+  // A detent's height stops at the home indicator, and the system adds the
+  // inset below it, which a list with nothing under it already pads for.
+  const naturalHeight =
+    sizes.content > 0
+      ? IOS_GRABBER_SPACE +
+        sizes.header +
+        sizes.content +
+        (barFooter ? sizes.footer : -2 * bottomInset) +
+        mobileSpace.sm
+      : 0;
+  const openHeight = Math.round(windowHeight * RESIZABLE_OPEN_SHARE);
+  const overflows = naturalHeight > openHeight;
+  // Android's sheet has one partly open state and full screen, and changing
+  // how it is sized remounts its content, so the choice holds while it shows.
+  if (!visible) androidResizableRef.current = null;
+  else if (androidResizableRef.current === null) androidResizableRef.current = overflows;
+  // A sheet that scrolls opens at its content's height, or at most most of
+  // the screen, and a long one drags up to fill it. iOS sizes it by detents
+  // throughout, so a height change while it shows just moves the detent.
+  const resizable = scrollable && (IS_IOS || androidResizableRef.current === true);
+  const snapPoints = !resizable
+    ? undefined
+    : !IS_IOS
+      ? ["50%", "100%"]
+      : naturalHeight === 0
+        ? [openHeight]
+        : overflows
+          ? [openHeight, "100%"]
+          : [naturalHeight];
 
   return (
     <BottomSheet
       // The grouped page colour, as a system sheet holding a list has: its
       // groups and cards are white on it, with no outline.
       backgroundStyle={{ backgroundColor: mobileColors.background }}
-      enableDynamicSizing
+      enableDynamicSizing={!resizable}
       enablePanDownToClose={!dismissDisabled}
       index={visible ? 0 : -1}
       onClose={() => {
         if (visibleRef.current) onDismiss();
       }}
+      snapPoints={snapPoints}
     >
       <InsideSheetContext.Provider value>
         <SheetCloseContext.Provider
@@ -205,41 +257,54 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             label: props.accessibilityLabel ?? "Close",
             primary: lifted.primary,
             secondary: lifted.secondary,
+            confirmation,
           }}
         >
-          {/* A sheet sized to its content lays React Native out without a set
+          <AnchoredConfirmationContext.Provider
+            value={IS_IOS && !lifted.secondary ? setConfirmation : null}
+          >
+            {/* A sheet sized to its content lays React Native out without a set
             width, so text in a row never wraps. The app is phone-only, where
             a sheet is as wide as the screen. */}
-          <BottomSheetView style={[styles.sheet, { width: windowWidth }]}>
-            {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
-            {scrollable ? (
-              <BottomSheetScrollView
-                automaticallyAdjustKeyboardInsets
-                contentContainerStyle={[
-                  styles.body,
-                  !barFooter && { paddingBottom: bottomInset + mobileSpace.lg },
-                ]}
-                keyboardShouldPersistTaps="handled"
-                // With nothing below it, the list runs on under the home
-                // indicator, as a system sheet's does, rather than stopping
-                // on a hard line above the system's bottom inset.
-                style={[
-                  { maxHeight: scrollBodyMaxHeight },
-                  !barFooter && { marginBottom: -bottomInset },
-                ]}
-              >
-                {children}
-              </BottomSheetScrollView>
-            ) : (
-              <View style={styles.body}>{children}</View>
-            )}
-            {barFooter ? (
-              <View style={[styles.footer, { borderTopColor: mobileColors.borderSubtle }]}>
-                {barFooter}
+            <BottomSheetView
+              style={[styles.sheet, { width: windowWidth }, resizable && styles.sheetFill]}
+            >
+              <View onLayout={(event) => measure("header", event.nativeEvent.layout.height)}>
+                {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
               </View>
-            ) : null}
-            {overlay}
-          </BottomSheetView>
+              {scrollable ? (
+                <BottomSheetScrollView
+                  automaticallyAdjustKeyboardInsets
+                  contentContainerStyle={[
+                    styles.body,
+                    !barFooter && { paddingBottom: bottomInset + mobileSpace.lg },
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  onContentSizeChange={(_width, height) => measure("content", height)}
+                  // With nothing below it, the list runs on under the home
+                  // indicator, as a system sheet's does, rather than stopping
+                  // on a hard line above the system's bottom inset.
+                  style={[
+                    resizable ? styles.scrollFill : { maxHeight: scrollBodyMaxHeight },
+                    !barFooter && { marginBottom: -bottomInset },
+                  ]}
+                >
+                  {children}
+                </BottomSheetScrollView>
+              ) : (
+                <View style={styles.body}>{children}</View>
+              )}
+              {barFooter ? (
+                <View
+                  onLayout={(event) => measure("footer", event.nativeEvent.layout.height)}
+                  style={[styles.footer, { borderTopColor: mobileColors.borderSubtle }]}
+                >
+                  {barFooter}
+                </View>
+              ) : null}
+              {overlay}
+            </BottomSheetView>
+          </AnchoredConfirmationContext.Provider>
         </SheetCloseContext.Provider>
       </InsideSheetContext.Provider>
     </BottomSheet>
@@ -323,16 +388,18 @@ function IosSheetBar({ title, subtitle }: { title?: string; subtitle?: string })
             {close?.secondary ? (
               <BarAction action={close.secondary} kind="secondary" />
             ) : close ? (
-              <ChromeIconButton
-                accessibilityLabel={close.label}
-                onPress={close.disabled ? () => undefined : close.onClose}
-              >
-                <Ionicons
-                  color={close.disabled ? mobileColors.textSubtle : mobileColors.textPrimary}
-                  name="close"
-                  size={22}
-                />
-              </ChromeIconButton>
+              <AnchoredConfirmation request={close.confirmation}>
+                <ChromeIconButton
+                  accessibilityLabel={close.label}
+                  onPress={close.disabled ? () => undefined : close.onClose}
+                >
+                  <Ionicons
+                    color={close.disabled ? mobileColors.textSubtle : mobileColors.textPrimary}
+                    name="close"
+                    size={22}
+                  />
+                </ChromeIconButton>
+              </AnchoredConfirmation>
             ) : null}
           </View>
         </View>
@@ -372,9 +439,13 @@ function IosSheetBar({ title, subtitle }: { title?: string; subtitle?: string })
 }
 
 /**
- * A footer action moved into the bar: a glass capsule on iOS (tinted for the
- * primary, plain glass for a second action) and a Material text button on
- * Android. It spins while the press's promise runs, as `Button` does.
+ * A footer action moved into the bar. A commit that only saves is a
+ * checkmark, as the close button is an X (owner, 2026-10-31): a tinted glass
+ * circle on iOS and a Material icon button on Android, its words left to
+ * screen readers. One with an outcome of its own (Send, Approve, Mark away)
+ * or a destructive one keeps its words, as does a second action such as
+ * Clear all: a glass capsule on iOS, a text button on Android. It spins while
+ * the press's promise runs, as `Button` does.
  */
 function BarAction({
   action,
@@ -401,6 +472,9 @@ function BarAction({
           ? mobileColors.danger
           : mobileColors.brand;
 
+  const asCheckmark =
+    kind === "primary" && action.tone !== "danger" && barActionIsCheckmark(action.label);
+
   const press = () => {
     if (disabled) return;
     const result = action.onPress(undefined as never);
@@ -420,10 +494,16 @@ function BarAction({
         disabled={disabled}
         hitSlop={8}
         onPress={press}
-        style={styles.materialAction}
+        style={asCheckmark ? styles.materialIconAction : styles.materialAction}
       >
         {busy ? (
           <ActivityIndicator color={mobileColors.brand} size="small" />
+        ) : asCheckmark ? (
+          <MaterialIcons
+            color={disabled ? mobileColors.textSubtle : mobileColors.brand}
+            name="check"
+            size={24}
+          />
         ) : (
           <AppText
             numberOfLines={1}
@@ -450,11 +530,14 @@ function BarAction({
   const labelColor = tint ? mobileColors.onBrandText : mobileColors.textPrimary;
   const content = busy ? (
     <ActivityIndicator color={labelColor} size="small" />
+  ) : asCheckmark ? (
+    <Ionicons color={labelColor} name="checkmark" size={22} />
   ) : (
     <AppText numberOfLines={1} style={[styles.iosActionLabel, { color: labelColor }]}>
       {label}
     </AppText>
   );
+  const shape = asCheckmark ? styles.iosIconAction : styles.iosAction;
 
   return (
     <Pressable
@@ -466,18 +549,11 @@ function BarAction({
       onPress={press}
     >
       {HAS_LIQUID_GLASS ? (
-        <GlassView
-          glassEffectStyle="regular"
-          isInteractive
-          style={styles.iosAction}
-          tintColor={tint}
-        >
+        <GlassView glassEffectStyle="regular" isInteractive style={shape} tintColor={tint}>
           {content}
         </GlassView>
       ) : (
-        <View
-          style={[styles.iosAction, { backgroundColor: tint ?? mobileColors.controlNeutralBg }]}
-        >
+        <View style={[shape, { backgroundColor: tint ?? mobileColors.controlNeutralBg }]}>
           {content}
         </View>
       )}
@@ -492,6 +568,14 @@ const styles = StyleSheet.create({
   sheet: {
     paddingTop: IS_IOS ? 0 : mobileSpace.xs,
     paddingBottom: mobileSpace.sm,
+  },
+  // Sized by a detent, the sheet is a set height and its list takes what the
+  // title and footer leave.
+  sheetFill: {
+    flex: 1,
+  },
+  scrollFill: {
+    flex: 1,
   },
   // Equal leading and trailing columns keep the title on the sheet's centre
   // line whatever the two sides hold.
@@ -530,6 +614,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // The same circle as the close button opposite it.
+  iosIconAction: {
+    width: ICON_CONTROL_SIZE,
+    height: ICON_CONTROL_SIZE,
+    borderRadius: ICON_CONTROL_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   iosActionLabel: {
     ...mobileTextWeighted("body", "semibold"),
   },
@@ -547,6 +639,12 @@ const styles = StyleSheet.create({
   materialAction: {
     minHeight: ICON_CONTROL_SIZE,
     paddingHorizontal: mobileSpace.md,
+    justifyContent: "center",
+  },
+  materialIconAction: {
+    width: ICON_CONTROL_SIZE,
+    height: ICON_CONTROL_SIZE,
+    alignItems: "center",
     justifyContent: "center",
   },
   materialActionLabel: {

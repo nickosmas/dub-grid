@@ -62,9 +62,6 @@ function runBarFrame({ top, bottom, left, length, sideInset }: RunBarFrame): CSS
     left,
     right: `calc(${-(length - 1)} * 100% + ${sideInset}px)`,
     borderRadius: SINGLE_SHIFT_PILL_RADIUS,
-    // Stripes start under the transparent border, or they restart at the
-    // padding edge and draw a ring.
-    backgroundOrigin: "border-box",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
