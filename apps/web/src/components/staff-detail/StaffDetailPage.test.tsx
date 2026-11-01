@@ -316,8 +316,8 @@ describe("StaffDetailPage", () => {
       const card = await screen.findByRole("region", { name: "Invitation" });
       expect(within(card).getByText("Not invited yet")).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Invite" })).toBeInTheDocument();
-      // The Access card keeps its own; the header no longer has one.
-      expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(1);
+      // The invite card is the one place to invite from.
+      expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
     });
 
     it("leaves the invite card off for someone offboarded", async () => {

@@ -1489,9 +1489,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                                 ? () => setIsEditingManagementAccess(true)
                                 : undefined
                             }
-                            onInvite={
-                              canSendInvitation ? () => setShowInviteModal(true) : undefined
-                            }
                           />
                           <RecordCard employee={employee} />
                         </div>

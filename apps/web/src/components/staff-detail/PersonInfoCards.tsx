@@ -129,7 +129,6 @@ interface AccessCardProps {
   lastSignInAt?: string | null;
   onEditAccess?: () => void;
   onEditManagement?: () => void;
-  onInvite?: () => void;
 }
 
 export function AccessCard({
@@ -141,7 +140,6 @@ export function AccessCard({
   lastSignInAt,
   onEditAccess,
   onEditManagement,
-  onInvite,
 }: AccessCardProps) {
   // Without a role, where their invitation stands says why, in the invite card's words.
   const access = orgRole ? (
@@ -156,11 +154,8 @@ export function AccessCard({
     <Missing>None</Missing>
   );
   const permissionValues = adminPermissions ? Object.values(adminPermissions) : [];
-  const action = onInvite ? (
-    <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onInvite}>
-      Send invitation
-    </Button>
-  ) : onEditAccess ? (
+  // Inviting lives on the invite card beside the status, not here.
+  const action = onEditAccess ? (
     <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onEditAccess}>
       Change access
     </Button>

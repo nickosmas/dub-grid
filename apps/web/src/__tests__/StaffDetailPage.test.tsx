@@ -879,8 +879,8 @@ describe("StaffDetailPage", () => {
     // On the invite card and as the Access card's access level.
     expect(screen.getAllByText("Not invited yet")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
-    // Only the Access card's; the header no longer offers one.
-    expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(1);
+    // The invite card is the one place to invite from.
+    expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
   });
 
   it("leaves the role out of the management card, which now covers departments only", async () => {

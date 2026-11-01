@@ -22,6 +22,7 @@ interface EmployeeStatusCardProps {
 }
 
 const LATER_GRID = "grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3";
+const ROW_GRID = "grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-3";
 
 function CardText({
   eyebrow,
@@ -157,14 +158,14 @@ export function EmployeeStatusCard({
     </>
   );
 
+  // The status, anything planned and the companion share one row when they fit,
+  // and wrap to the next row when they don't.
   if (companion) {
     return (
-      <div data-slot="employee-status-card" className="flex flex-col gap-3">
-        <div className="grid gap-3 md:grid-cols-2">
-          {statusSection}
-          {companion}
-        </div>
-        {starts || planned ? <div className={LATER_GRID}>{laterCards}</div> : null}
+      <div data-slot="employee-status-card" className={ROW_GRID}>
+        {statusSection}
+        {laterCards}
+        {companion}
       </div>
     );
   }
