@@ -565,7 +565,7 @@ describe("Screen", () => {
     expect(screen.getByText("Overlay 100")).toBeInTheDocument();
   });
 
-  it("uses a native content inset/offset instead of padding to clear the sticky header on iOS, so pull-to-refresh isn't hidden behind it", () => {
+  it("uses a native content inset instead of padding to clear the sticky header on iOS, so pull-to-refresh isn't hidden behind it", () => {
     render(
       <Screen refreshing={false} onRefresh={() => undefined} stickyHeader={<span>Header</span>}>
         <div>Body</div>
@@ -578,7 +578,7 @@ describe("Screen", () => {
     );
 
     // The mocked header's onLayout reports height: 100 (see the View mock
-    // above) — that value should drive a native inset/offset, not a JS
+    // above) — that value should drive a native inset, not a JS
     // paddingTop, since paddingTop doesn't move the ScrollView's own frame
     // origin that the RefreshControl's pull reveal is anchored to.
     expect(JSON.parse(scrollView.getAttribute("data-content-inset") ?? "null")).toEqual({
@@ -587,10 +587,10 @@ describe("Screen", () => {
       bottom: 0,
       right: 0,
     });
-    expect(JSON.parse(scrollView.getAttribute("data-content-offset") ?? "null")).toEqual({
-      x: 0,
-      y: -100,
-    });
+    // No contentOffset prop: applied before the inset, it reads to UIKit as a
+    // pull past the refresh threshold, and the page opened refreshing. The
+    // settle effect scrolls the content under the header instead.
+    expect(JSON.parse(scrollView.getAttribute("data-content-offset") ?? "null")).toBeNull();
     expect(contentStyle.paddingTop).toBe(0);
   });
 
