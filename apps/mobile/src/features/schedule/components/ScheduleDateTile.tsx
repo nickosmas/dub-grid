@@ -20,7 +20,8 @@ export const SCHEDULE_DATE_TILE_MIN_HEIGHT = 68;
 
 /**
  * The calendar tile that fronts a day: weekday over day number in a framed
- * box, with a dot when the day is today. Home's Your Week rows and the
+ * box, filled with the brand colour when the day is today (owner, 2026-11-01:
+ * no red dot for today). Home's Your Week rows and the
  * Requests feed's date rail draw the same tile, so a date reads the same
  * wherever a list is grouped by day. Fixed text: the tile is chrome and holds
  * its shape at any OS text size.
@@ -29,28 +30,29 @@ export function ScheduleDateTile({
   date,
   isToday = false,
   accessibilityLabel,
-  todayDotTestID,
+  todayTestID,
 }: {
   date: string;
   isToday?: boolean;
   accessibilityLabel?: string;
-  todayDotTestID?: string;
+  todayTestID?: string;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const parts = getCompactScheduleDateParts(date);
 
   return (
-    <View accessibilityLabel={accessibilityLabel} style={styles.tile}>
-      <Text fit="fixed" style={styles.weekday}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.tile, isToday && styles.tileToday]}
+      testID={isToday ? todayTestID : undefined}
+    >
+      <Text fit="fixed" style={[styles.weekday, isToday && styles.textToday]}>
         {parts.weekdayLabel}
       </Text>
-      <Text fit="fixed" style={styles.day}>
+      <Text fit="fixed" style={[styles.day, isToday && styles.textToday]}>
         {parts.dayLabel}
       </Text>
-      {isToday ? (
-        <View pointerEvents="none" style={styles.todayDot} testID={todayDotTestID} />
-      ) : null}
     </View>
   );
 }
@@ -77,11 +79,11 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
-    todayDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 999,
-      backgroundColor: mobileColors.danger,
-      marginTop: 1,
+    tileToday: {
+      backgroundColor: mobileColors.brand,
+      borderColor: mobileColors.brand,
+    },
+    textToday: {
+      color: mobileColors.onBrandText,
     },
   });

@@ -74,6 +74,15 @@ away"), and the editor's discard menu adds Keep editing (owner, same day).
 there, without the building icon or its address. The sheet opens at its
 content's height and drags up to full screen (`expandable`).
 
+**An empty week on Home.** Home drew Your Week's seven days even when none
+had a shift, so "Nothing scheduled this week" sat over seven Unscheduled rows
+(owner, 2026-11-01). It now shows the empty state alone, as the Schedule tab
+already did. A removed shift is history, not a scheduled day.
+
+**Today.** The date tile's red dot and the Schedule calendar's red today mark
+are gone (owner, same day). Today's tile is filled with the brand colour, and
+the calendar marks today in the brand colour.
+
 ## Verify
 
 - **iOS Simulator, person editor:** one header per group and form rows.
