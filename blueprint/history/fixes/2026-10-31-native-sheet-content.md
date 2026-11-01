@@ -58,6 +58,22 @@ as the group's footer. A popover was tried and set aside at the owner's call
 - The Reason placeholder reads "Optional, e.g. Family leave".
 - The People doc says the card already shows where they stand.
 
+**Cancelling a plan.** The Cancel and Keep toggle was a mode: it renamed
+itself, hid the plan's fields, and left the decision to the checkmark (owner,
+2026-11-01: "rethink from first principles"). Planned time away, a last day, a
+planned suspension and a planned return now end with a destructive row, full
+width in its own group, as Calendar's Delete Event is. It asks once, from the
+row on iOS (the system alert on Android), says what the cancel changes, and
+then cancels and closes the sheet. The checkmark only saves date edits.
+
+**A way back out.** Every confirmation anchored to its control shows a plain
+Keep button beside the destructive one ("Keep editing", "Keep planned time
+away"), and the editor's discard menu adds Keep editing (owner, same day).
+
+**Switch organization.** Each row is the organization's name and your access
+there, without the building icon or its address. The sheet opens at its
+content's height and drags up to full screen (`expandable`).
+
 ## Verify
 
 - **iOS Simulator, person editor:** one header per group and form rows.
