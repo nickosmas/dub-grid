@@ -109,6 +109,9 @@ export function NotificationRow({
   return (
     <ReanimatedSwipeable
       ref={swipeable}
+      // White under the row, as Mail draws it: hidden while the row rests
+      // over it, then the strip the rounded row and its buttons sit on.
+      containerStyle={styles.swipeTrack}
       friction={2}
       onSwipeableClose={handleClose}
       onSwipeableWillOpen={handleWillOpen}
@@ -324,8 +327,11 @@ const createStyles = (mobileColors: MobileColors) =>
     noteLabel: {
       color: mobileColors.textMuted,
     },
-    // The actions sit on the page showing through behind the card, one round
-    // button per slot with its label underneath, as iOS Mail lays them out.
+    swipeTrack: {
+      backgroundColor: mobileColors.surface,
+    },
+    // The actions sit on the white track behind the card, one round button
+    // per slot with its label underneath, as iOS Mail lays them out.
     actions: {
       flexDirection: "row",
       alignItems: "center",
