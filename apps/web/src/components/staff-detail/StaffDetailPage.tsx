@@ -8,7 +8,6 @@ import * as Sentry from "@/lib/sentry";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
-import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
 import Modal from "@/components/Modal";
@@ -102,6 +101,7 @@ import { findNeighbors, readPeopleOrder } from "@/lib/people-order";
 import { AccessCard, RecordCard, WorkCard } from "./PersonInfoCards";
 import { EmployeeStatusActions, StatusCardActions } from "./EmployeeStatusActions";
 import { EmployeeStatusCard } from "./EmployeeStatusCard";
+import { InvitationCard } from "./InvitationCard";
 import { StaffOverviewTab } from "./tabs/StaffOverviewTab";
 import { ScheduleTab } from "./tabs/ScheduleTab";
 import { buildPersonRequestRows } from "@/lib/person-requests";
@@ -1303,17 +1303,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     : null;
 
   const headerActions =
-    canSendInvitation || canAddToManagement || canAddToSchedule || canEditDetails ? (
+    canAddToManagement || canAddToSchedule || canEditDetails ? (
       <>
-        {canSendInvitation && (
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary"
-            onClick={() => setShowInviteModal(true)}
-          >
-            Send invitation
-          </Button>
-        )}
         {canAddToManagement && (
           <Button
             type="button"
@@ -1402,23 +1393,21 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     ? statusActions(employee, "Edit plan")
                     : undefined
                 }
+                companion={
+                  perms.canManageEmployees &&
+                  accountState &&
+                  accountState.kind !== "linked" &&
+                  employee.status !== "removed" ? (
+                    <InvitationCard
+                      state={accountState}
+                      onInvite={canSendInvitation ? () => setShowInviteModal(true) : undefined}
+                      onEditDetails={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+                      onResend={handleResendInvitation}
+                      onRevoke={handleRevokeInvitation}
+                    />
+                  ) : undefined
+                }
               />
-
-              {perms.canManageEmployees && pendingInvite && (
-                <PendingInvitationBanner
-                  pendingInvitation={pendingInvite}
-                  onReinvite={() => handleResendInvitation(pendingInvite.id)}
-                  onRevoke={handleRevokeInvitation}
-                />
-              )}
-              {perms.canManageEmployees && !pendingInvite && expiredInvite && (
-                <PendingInvitationBanner
-                  pendingInvitation={expiredInvite}
-                  onReinvite={() => handleResendInvitation(expiredInvite.id)}
-                  onRevoke={handleRevokeInvitation}
-                  expired
-                />
-              )}
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
@@ -1499,9 +1488,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               canManageManagementAccess && employee.status !== "removed"
                                 ? () => setIsEditingManagementAccess(true)
                                 : undefined
-                            }
-                            onInvite={
-                              canSendInvitation ? () => setShowInviteModal(true) : undefined
                             }
                           />
                           <RecordCard employee={employee} />

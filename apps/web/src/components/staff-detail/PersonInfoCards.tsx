@@ -5,7 +5,7 @@ import { describePlannedChangeInFull, formatFirstDay, plannedReturn } from "@dub
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateTimeLabel } from "@/lib/client-facing";
-import type { PersonAccountState } from "@/lib/person-account-state";
+import { describeInvitationCard, type PersonAccountState } from "@/lib/person-account-state";
 import { formatRelativeTime } from "@/lib/utils";
 import type { AdminPermissions, Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 
@@ -129,7 +129,6 @@ interface AccessCardProps {
   lastSignInAt?: string | null;
   onEditAccess?: () => void;
   onEditManagement?: () => void;
-  onInvite?: () => void;
 }
 
 export function AccessCard({
@@ -141,19 +140,22 @@ export function AccessCard({
   lastSignInAt,
   onEditAccess,
   onEditManagement,
-  onInvite,
 }: AccessCardProps) {
-  const access = orgRole
-    ? invited
-      ? `${ROLE_NAMES[orgRole]}, once they accept`
-      : ROLE_NAMES[orgRole]
-    : "No app access";
+  // Without a role, where their invitation stands says why, in the invite card's words.
+  const access = orgRole ? (
+    invited ? (
+      `${ROLE_NAMES[orgRole]}, once they accept`
+    ) : (
+      ROLE_NAMES[orgRole]
+    )
+  ) : accountState && accountState.kind !== "linked" ? (
+    describeInvitationCard(accountState).title
+  ) : (
+    <Missing>None</Missing>
+  );
   const permissionValues = adminPermissions ? Object.values(adminPermissions) : [];
-  const action = onInvite ? (
-    <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onInvite}>
-      Send invitation
-    </Button>
-  ) : onEditAccess ? (
+  // Inviting lives on the invite card beside the status, not here.
+  const action = onEditAccess ? (
     <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onEditAccess}>
       Change access
     </Button>

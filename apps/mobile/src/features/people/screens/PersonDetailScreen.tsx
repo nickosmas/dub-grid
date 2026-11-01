@@ -3,6 +3,7 @@ import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox"
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   describeStatusAction,
+  formatReturnDate,
   PLANNED_START_MAX_DAYS,
   plannedLastDay,
   plannedReturn,
@@ -136,9 +137,10 @@ import { SectionNotice } from "../components/SectionNotice";
 import {
   STATUS_KIND_ICONS,
   STATUS_KIND_TONES,
-  StatusCards,
+  StaffStatusCard,
   StatusIconCircle,
   StatusMarkIcon,
+  type StatusCardLine,
   type StatusSheetOpening,
 } from "../components/StatusMark";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
@@ -209,6 +211,11 @@ function formatDate(value: string | null): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+/** An invitation's day, as "Oct 30". */
+function formatInviteDay(value: string): string {
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function makeDraft(person: MobilePerson): EditDraft {
@@ -335,6 +342,8 @@ export default function PersonDetailScreen() {
   const [statusOpening, setStatusOpening] = useState<StatusSheetOpening>({});
   // The choice the sheet opened with (Reinstate, Restore): picked for them, not an edit.
   const [openedChoice, setOpenedChoice] = useState<StatusAction | null>(null);
+  // Edit time away or Set end date, picked from the list rather than a status.
+  const [detailsPicked, setDetailsPicked] = useState(false);
   const [returnDate, setReturnDate] = useState<string | null>(null);
   /** The first day away; null means today, and a later day plans it (51g1). */
   const [startDate, setStartDate] = useState<string | null>(null);
@@ -719,11 +728,13 @@ export default function PersonDetailScreen() {
   const plannedSuspension =
     person?.status === "active" && person.plannedStatus === "suspended" && !!person.plannedFrom;
   const plannedReturnDay = person?.status === "removed" ? plannedReturn(person) : null;
+  // Picking a row is one tap to redo, so only what was typed or chosen after
+  // it counts; a newly picked change starts its dates clear.
+  const pickedFresh = statusChoice !== null && statusChoice !== openedChoice;
   const statusGuard = useUnsavedChangesGuard({
     isDirty:
       confirmAction === "status" &&
-      (statusChoice !== openedChoice ||
-        Boolean(inactiveNote.trim()) ||
+      (Boolean(inactiveNote.trim()) ||
         returnDate !==
           (person?.status === "inactive"
             ? (person.awayUntil ?? null)
@@ -737,13 +748,19 @@ export default function PersonDetailScreen() {
               ? (person.plannedAbsenceTypeId ?? null)
               : null) ||
         startDate !==
-          (plannedAway || plannedSuspension ? (person?.plannedFrom ?? null) : plannedReturnDay) ||
+          (pickedFresh
+            ? null
+            : plannedAway || plannedSuspension
+              ? (person?.plannedFrom ?? null)
+              : plannedReturnDay) ||
         suspensionEnd !==
-          (person?.suspendedAt
-            ? (person.suspendedUntil ?? null)
-            : plannedSuspension
-              ? (person.plannedUntil ?? null)
-              : null) ||
+          (pickedFresh
+            ? null
+            : person?.suspendedAt
+              ? (person.suspendedUntil ?? null)
+              : plannedSuspension
+                ? (person.plannedUntil ?? null)
+                : null) ||
         lastDay !== (person?.status === "active" ? plannedLastDay(person) : null)),
     disabled: statusMutation.isPending,
     onClose: closeStatusConfirmation,
@@ -972,27 +989,49 @@ export default function PersonDetailScreen() {
     !isSelf &&
     person.status !== "removed" &&
     (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
-  // Only the two states someone might act on get a banner. A person who
-  // already has an account needs no announcement that they do, and the body
-  // line naming the next move is for the managers who can make it. A viewer
-  // without employee details never sees one: the API redacts `userId` and
-  // the invitation for them, so every colleague would read "No app access".
-  const invitationBanner = !canViewEmployeeDetails
-    ? null
-    : person.userId
+  // Where their invitation stands, for someone who can't sign in yet. A
+  // viewer without employee details gets no line: the API redacts `userId`
+  // and the invitation for them, so every colleague would read as not invited.
+  // The links are the foot's old invite buttons, for the managers who had them.
+  const invitation = person.pendingInvitation;
+  const invitationExpired = invitation ? Date.parse(invitation.expiresAt) <= Date.now() : false;
+  const canSendInvite = canManageEmployees && Boolean(person.email);
+  const invitationLine: StatusCardLine | null =
+    !canViewEmployeeDetails || person.userId || person.status === "removed"
       ? null
-      : person.pendingInvitation
+      : invitation
         ? {
-            title: "Invitation pending",
-            body: person.pendingInvitation.email
-              ? `Sent to ${person.pendingInvitation.email}.`
+            key: "invitation",
+            icon: invitationExpired ? "alert-circle" : "time-outline",
+            tone: invitationExpired ? "warning" : undefined,
+            text: invitationExpired
+              ? `Invite expired ${formatInviteDay(invitation.expiresAt)}`
+              : invitation.updatedAt
+                ? `Invited ${formatInviteDay(invitation.updatedAt)}, hasn't joined`
+                : "Invited, hasn't joined",
+            link: canSendInvite
+              ? {
+                  label: "Resend",
+                  accessibilityLabel: "Resend invite",
+                  disabled: invitationMutation.isPending,
+                  // An expired invite is no longer pending to the server, so a
+                  // fresh one goes out in its place.
+                  onPress: () =>
+                    setInvitationConfirmAction(invitationExpired ? "create" : "resend"),
+                }
               : undefined,
-            tone: "warning" as const,
           }
         : {
-            title: "No app access",
-            body: canManageEmployees ? "Send an invitation to give app access." : undefined,
-            tone: "info" as const,
+            key: "invitation",
+            icon: "mail-outline",
+            text: "Not invited yet",
+            link: canSendInvite
+              ? {
+                  label: "Send invite",
+                  disabled: invitationMutation.isPending,
+                  onPress: () => setInvitationConfirmAction("create"),
+                }
+              : undefined,
           };
   // A manager reads "None" as a gap to fill; a colleague reads it as noise.
   // The rows that can be empty drop out for viewers without details, and the
@@ -1045,25 +1084,29 @@ export default function PersonDetailScreen() {
     const choice: StatusAction =
       override ??
       statusChoice ??
-      (returnDay
-        ? restoresNow
-          ? "restore"
-          : "setPlannedChange"
-        : plannedLeave
-          ? offboardsNow
-            ? "archive"
+      (detailsPicked
+        ? isSuspended
+          ? "setSuspendedUntil"
+          : "setReturnDate"
+        : returnDay
+          ? restoresNow
+            ? "restore"
             : "setPlannedChange"
-          : hasSuspensionPlan
-            ? suspendsNow
-              ? "suspend"
+          : plannedLeave
+            ? offboardsNow
+              ? "archive"
               : "setPlannedChange"
-            : isSuspended
-              ? "setSuspendedUntil"
-              : startsNow
-                ? "markAway"
-                : hasPlan
-                  ? "setPlannedChange"
-                  : "setReturnDate");
+            : hasSuspensionPlan
+              ? suspendsNow
+                ? "suspend"
+                : "setPlannedChange"
+              : isSuspended
+                ? "setSuspendedUntil"
+                : startsNow
+                  ? "markAway"
+                  : hasPlan
+                    ? "setPlannedChange"
+                    : "setReturnDate");
     // A suspension's dates (51g3) travel as a start date and a return date.
     if (
       choice === "suspend" ||
@@ -1130,6 +1173,7 @@ export default function PersonDetailScreen() {
       )?.action ?? null;
     setStatusChoice(picked);
     setOpenedChoice(picked);
+    setDetailsPicked(false);
     setInactiveNote("");
     setReturnDate(
       away ? (person.awayUntil ?? null) : hasPlan ? (person.plannedUntil ?? null) : null,
@@ -1158,6 +1202,7 @@ export default function PersonDetailScreen() {
   function closeStatusConfirmation() {
     setConfirmAction(null);
     setStatusChoice(null);
+    setDetailsPicked(false);
     setConfirmationError(null);
     // The note is typed inside this modal and never survives it, so clearing it
     // here stops the next status change opening with the last one's reason.
@@ -1250,12 +1295,81 @@ export default function PersonDetailScreen() {
       returnDate !== (person.plannedUntil ?? null) ||
       chosenAbsenceTypeId !== (person.plannedAbsenceTypeId ?? null));
   const showChoices = !onlyChoice && statusOpening.focus !== "plan";
+  // A return date is the first day back, so the organization's tomorrow at the
+  // earliest, or the day after a planned Away's start.
+  const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
+  // A plan's dates and a return or end date open on their own (Edit plan); in
+  // the list they show under the row that picks them.
   const hasStatusTopFields =
     !statusChoice &&
-    (isAway ||
-      isSuspended ||
-      (statusOpening.focus !== "status" &&
-        (hasSuspensionPlan || !!returnDay || !!plannedLeave || hasPlan)));
+    statusOpening.focus !== "status" &&
+    (isAway || isSuspended || hasSuspensionPlan || !!returnDay || !!plannedLeave || hasPlan);
+  // Edit time away or Set end date sits in the list after the change most
+  // people want next, as the card's menu put it beside that button.
+  const detailsItem =
+    isAway || isSuspended
+      ? {
+          id: "details" as const,
+          name: isAway
+            ? describeStatusAction("setReturnDate", "", {
+                currentReturnDate: person.awayUntil ?? null,
+                returnDate: person.awayUntil ?? null,
+              }).label
+            : describeStatusAction("setSuspendedUntil", "", {
+                currentReturnDate: person.suspendedUntil ?? null,
+                returnDate: person.suspendedUntil ?? null,
+              }).label,
+          detail: isAway
+            ? person.awayUntil
+              ? `Back ${formatReturnDate(person.awayUntil, { weekday: true })}.`
+              : "No return date."
+            : person.suspendedUntil
+              ? `Until ${formatReturnDate(person.suspendedUntil, { weekday: true })}.`
+              : "No end date.",
+          disabled: false,
+          leading: (
+            <StatusIconCircle name="calendar" size={30} tone={isAway ? "warning" : "danger"} />
+          ),
+        }
+      : null;
+  const choiceItems = choices.map((choice) => ({
+    id: choice.action as StatusAction | "details",
+    name: choice.label,
+    detail: choice.unavailableReason ?? choice.detail,
+    disabled: !choice.available,
+    leading: (
+      <StatusIconCircle
+        name={STATUS_KIND_ICONS[choice.kind]}
+        size={30}
+        tone={STATUS_KIND_TONES[choice.kind]}
+      />
+    ),
+  }));
+  const listItems = detailsItem
+    ? [...choiceItems.slice(0, 1), detailsItem, ...choiceItems.slice(1)]
+    : choiceItems;
+  const awayDetailFields = (
+    <>
+      <ReturnDateField
+        disabled={statusMutation.isPending}
+        minDate={firstReturnDate}
+        onChange={setReturnDate}
+        value={returnDate}
+      />
+      {awayAbsenceChoices}
+    </>
+  );
+  const suspensionEndField = (
+    <ReturnDateField
+      disabled={statusMutation.isPending}
+      emptyLabel="No end date"
+      hint={SUSPENSION_END_HINT}
+      label="Ends"
+      minDate={firstReturnDate}
+      onChange={setSuspensionEnd}
+      value={suspensionEnd}
+    />
+  );
   const plannedAbsence = absenceTypes.find(
     (absenceType) => absenceType.id === person.plannedAbsenceTypeId,
   );
@@ -1344,9 +1458,6 @@ export default function PersonDetailScreen() {
                             absenceName: chosenAbsenceName,
                           })
                         : null;
-  // A return date is the first day back, so the organization's tomorrow at the
-  // earliest, or the day after a planned Away's start.
-  const firstReturnDate = addDaysToIsoDate(laterStart ?? orgToday, 1);
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? `Send an invitation to ${person.email}?`
@@ -1540,27 +1651,15 @@ export default function PersonDetailScreen() {
         </ProfileQuickActions>
       ) : null}
 
-      {/* Where they stand, in the Change status sheet's words, under the
-          contact pair: the sheet opens from here rather than the page foot. */}
+      {/* Where they stand, under the contact pair: one row that opens Change
+          staff status, then a line for a plan and for their invitation. */}
       {!editing && canViewEmployeeDetails ? (
-        <StatusCards
+        <StaffStatusCard
           absenceTypes={absenceTypes}
           disabled={statusMutation.isPending}
-          canOffboard={reach.canOffboard}
+          lines={invitationLine ? [invitationLine] : []}
           onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
           person={person}
-        />
-      ) : null}
-
-      {/* Where the app account stands, one line under the actions rather than a
-          chip competing with the name. Someone with an account needs no banner:
-          the states worth surfacing are the two a manager can act on. */}
-      {!editing && invitationBanner ? (
-        <StatusBanner
-          body={invitationBanner.body}
-          bordered={false}
-          title={invitationBanner.title}
-          tone={invitationBanner.tone}
         />
       ) : null}
 
@@ -1756,32 +1855,21 @@ export default function PersonDetailScreen() {
           {canManageEmployees ? (
             <ProfileActionGroup
               actions={[
-                ...(!person.userId && person.status !== "removed" && person.email
-                  ? person.pendingInvitation
-                    ? [
-                        {
-                          key: "resend",
-                          label: "Resend invite",
-                          loading: invitationMutation.isPending,
-                          onPress: () => setInvitationConfirmAction("resend"),
-                          buttonTone: "neutral" as const,
-                        },
-                        {
-                          key: "revoke",
-                          disabled: invitationMutation.isPending,
-                          label: "Revoke invite",
-                          onPress: () => setInvitationConfirmAction("revoke"),
-                          tone: "danger" as const,
-                        },
-                      ]
-                    : [
-                        {
-                          key: "send",
-                          label: "Send invitation",
-                          loading: invitationMutation.isPending,
-                          onPress: () => setInvitationConfirmAction("create"),
-                        },
-                      ]
+                // Sending and resending live on the status card's invitation line.
+                ...(!person.userId &&
+                person.status !== "removed" &&
+                person.email &&
+                person.pendingInvitation &&
+                !invitationExpired
+                  ? [
+                      {
+                        key: "revoke",
+                        disabled: invitationMutation.isPending,
+                        label: "Revoke invite",
+                        onPress: () => setInvitationConfirmAction("revoke"),
+                        tone: "danger" as const,
+                      },
+                    ]
                   : []),
                 // Only offered to someone who isn't on the grid at all. Anyone
                 // with focus areas changes them in the edit panel, where
@@ -1852,7 +1940,7 @@ export default function PersonDetailScreen() {
           <SheetHeader
             title={
               statusCopy?.title ??
-              (statusOpening.focus === "plan"
+              (statusOpening.focus === "plan" || detailsPicked
                 ? isAway
                   ? `Change ${getFullName(person)}'s time away?`
                   : isSuspended
@@ -1864,7 +1952,7 @@ export default function PersonDetailScreen() {
                         : plannedLeave
                           ? `Change ${getFullName(person)}'s last day?`
                           : `Change ${getFullName(person)}'s planned time away?`
-                : `Change ${getFullName(person)}'s status?`)
+                : "Change staff status")
             }
           />
         }
@@ -1897,10 +1985,7 @@ export default function PersonDetailScreen() {
                   label={
                     statusChoice || startsNow || offboardsNow || suspendsNow || restoresNow
                       ? (statusCopy?.label ?? "")
-                      : isAway ||
-                          isSuspended ||
-                          ((hasPlan || plannedLeave || hasSuspensionPlan || returnDay) &&
-                            statusOpening.focus !== "status")
+                      : detailsPicked || hasStatusTopFields
                         ? "Save changes"
                         : "Change status"
                   }
@@ -1935,28 +2020,8 @@ export default function PersonDetailScreen() {
           <View
             style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}
           >
-            {isAway && !statusChoice ? (
-              <>
-                <ReturnDateField
-                  disabled={statusMutation.isPending}
-                  minDate={firstReturnDate}
-                  onChange={setReturnDate}
-                  value={returnDate}
-                />
-                {awayAbsenceChoices}
-              </>
-            ) : null}
-            {isSuspended && !statusChoice ? (
-              <ReturnDateField
-                disabled={statusMutation.isPending}
-                emptyLabel="No end date"
-                hint={SUSPENSION_END_HINT}
-                label="Ends"
-                minDate={firstReturnDate}
-                onChange={setSuspensionEnd}
-                value={suspensionEnd}
-              />
-            ) : null}
+            {isAway && !statusChoice ? awayDetailFields : null}
+            {isSuspended && !statusChoice ? suspensionEndField : null}
             {hasSuspensionPlan && !statusChoice && statusOpening.focus !== "status" ? (
               <>
                 {startField}
@@ -2052,22 +2117,23 @@ export default function PersonDetailScreen() {
           <Text style={styles.statusMessage}>{onlyChoice.outcome}</Text>
         ) : !showChoices ? null : (
           <ProfileChoiceGroup
-            items={choices.map((choice) => ({
-              id: choice.action,
-              name: choice.label,
-              detail: choice.unavailableReason ?? choice.detail,
-              disabled: !choice.available,
-              leading: (
-                <StatusIconCircle
-                  name={STATUS_KIND_ICONS[choice.kind]}
-                  size={30}
-                  tone={STATUS_KIND_TONES[choice.kind]}
-                />
-              ),
-            }))}
+            items={listItems}
             selection="single"
-            selectedIds={statusChoice ? [statusChoice] : []}
+            selectedIds={statusChoice ? [statusChoice] : detailsPicked ? ["details"] : []}
             onToggle={(id) => {
+              if (id === "details") {
+                // Their current dates, as Edit time away or Set end date opens with.
+                setStatusChoice(null);
+                setDetailsPicked(true);
+                if (isAway) {
+                  setReturnDate(person.awayUntil ?? null);
+                  setAwayAbsenceTypeId(person.awayAbsenceTypeId ?? null);
+                } else {
+                  setSuspensionEnd(person.suspendedUntil ?? null);
+                }
+                return;
+              }
+              setDetailsPicked(false);
               setStatusChoice(id);
               // A plan's dates fill these for Edit plan; a new choice starts clear.
               setStartDate(null);
@@ -2075,6 +2141,8 @@ export default function PersonDetailScreen() {
             }}
           />
         )}
+        {showChoices && detailsPicked && isAway ? awayDetailFields : null}
+        {showChoices && detailsPicked && isSuspended ? suspensionEndField : null}
         {statusChoice === "markAway" || statusChoice === "archive" ? (
           <ProfileTextInput
             editable={!statusMutation.isPending}

@@ -1,12 +1,15 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useMemo, type ComponentProps } from "react";
 import { StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
-  describeStatusAction,
+  describeReturn,
   describeStatusCard,
-  availableStatusChoices,
+  EMPLOYMENT_STATUS_LABELS,
+  formatReturnDate,
+  plannedLastDay,
+  plannedReturn,
   statusMark,
-  suggestedStatusChoice,
+  SUSPENDED_LABEL,
   type CurrentStatusState,
   type StatusAction,
   type StatusChoiceKind,
@@ -15,13 +18,13 @@ import {
   type StatusTone,
 } from "@dubgrid/domain";
 import { formatLocalDateKey } from "@dubgrid/schedule-core";
-import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
-import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Text } from "../../../shared/components/Text";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { ProfileList } from "../../profile/components/ProfilePrimitives";
 import {
-  mobileRadii,
+  mobileListRow,
   mobileSpace,
   mobileTabularText,
   mobileText,
@@ -132,288 +135,223 @@ export function StatusIconCircle({
   );
 }
 
-/** How Change status opens: one change on its own, or the list without one already offered. */
+/** How Change status opens: one change on its own, the list, or a plan's dates alone. */
 export interface StatusSheetOpening {
   only?: StatusAction;
   exclude?: StatusAction;
-  /** A planned away's dates alone (Edit plan), or the list alone (Change status). */
+  /** A plan's dates alone (Edit plan), or the list of changes (the status row). */
   focus?: "plan" | "status";
 }
 
-interface StatusCardsProps {
+/** A line under the status row: a fact with an optional link that acts on it. */
+export interface StatusCardLine {
+  key: string;
+  icon: IconName;
+  text: string;
+  tone?: StatusTone;
+  link?: {
+    label: string;
+    accessibilityLabel?: string;
+    disabled?: boolean;
+    onPress: () => void | Promise<unknown>;
+  };
+}
+
+/**
+ * A planned change in one line: "Away from Mon, Nov 10 to Fri, Nov 20",
+ * "Last day Sun, Nov 8", "Suspended from Mon, Nov 10" or "Returns Mon, Nov 10".
+ */
+export function describePlannedLine(person: StatusState): string | null {
+  if (person.status === "removed" || person.archivedAt) {
+    const returnDay = plannedReturn(person);
+    return returnDay ? describeReturn(returnDay, { weekday: true }) : null;
+  }
+  if (person.status !== "active") return null;
+  const lastDay = plannedLastDay(person);
+  if (lastDay) return `Last day ${formatReturnDate(lastDay, { weekday: true })}`;
+  if (!person.plannedFrom) return null;
+  const until = person.plannedUntil
+    ? ` to ${formatReturnDate(person.plannedUntil, { weekday: true })}`
+    : "";
+  const from = formatReturnDate(person.plannedFrom, { weekday: true });
+  if (person.plannedStatus === "suspended") return `${SUSPENDED_LABEL} from ${from}${until}`;
+  if (person.plannedStatus === "away") {
+    return `${EMPLOYMENT_STATUS_LABELS.inactive} from ${from}${until}`;
+  }
+  return null;
+}
+
+interface StaffStatusCardProps {
   person: CurrentStatusState & {
+    firstDay?: string | null;
     awayAbsenceTypeId?: number | null;
     plannedAbsenceTypeId?: number | null;
   };
   absenceTypes: readonly { id: number; name?: string | null; label: string }[];
-  /** Opens Change status; left off for someone who can't change it. */
+  /** Opens Change staff status; left off for someone who can't change it. */
   onChangeStatus?: (opening: StatusSheetOpening) => void;
-  /** False when this manager may not offboard or restore them (51k). */
-  canOffboard?: boolean;
+  /** Lines after the planned change, such as where their invitation stands. */
+  lines?: readonly StatusCardLine[];
   disabled?: boolean;
-  /**
-   * Tinted like their pill on the profile; the sheet draws it plain, since the
-   * choices below carry the colour there.
-   */
-  plain?: boolean;
 }
 
 /**
- * Where someone stands, in the Change status dialog's words, with a dashed
- * second card for an Away planned for later.
+ * Where someone stands, as one row that opens Change staff status, with a
+ * line under it for each thing that applies: a first day or planned change,
+ * then the lines the page adds.
  */
-export function StatusCards({
+export function StaffStatusCard({
   person,
   absenceTypes,
   onChangeStatus,
-  canOffboard = true,
+  lines = [],
   disabled = false,
-  plain = false,
-}: StatusCardsProps) {
+}: StaffStatusCardProps) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const handoff = useModalHandoff();
   const absenceId =
     person.status === "inactive" ? person.awayAbsenceTypeId : person.plannedAbsenceTypeId;
   const absence = absenceTypes.find((absenceType) => absenceType.id === absenceId);
-  const { current, planned, starts } = describeStatusCard(person, {
+  const { current, starts } = describeStatusCard(person, {
     absenceName: absence ? (absence.name ?? absence.label) : null,
     today: formatLocalDateKey(new Date()),
   });
-  const quiet = plain || current.kind === "active";
   const colors = statusToneColors(mobileColors, current.tone);
-  const warning = statusToneColors(mobileColors, "warning");
-  // The change most people want next gets its own button (Reinstate, Mark
-  // active, Restore); a menu names each other change that can be made now,
-  // and for someone Away their return date. Every one opens a confirmation
-  // for that change alone. Someone Active gets Change status, or a button
-  // named for the one change left, or none when nothing can change now.
-  const suggested = plain ? null : suggestedStatusChoice(person, { canOffboard });
-  const available = availableStatusChoices(person, { canOffboard });
-  const away = person.status === "inactive" && !person.archivedAt;
-  const suspended = person.status === "active" && !person.archivedAt && Boolean(person.suspendedAt);
-  const moreItems: { key: string; label: string; opening: StatusSheetOpening }[] = suggested
-    ? [
-        ...(suspended
-          ? [
-              {
-                key: "details",
-                label: describeStatusAction("setSuspendedUntil", "", {
-                  currentReturnDate: person.suspendedUntil ?? null,
-                  returnDate: person.suspendedUntil ?? null,
-                }).label,
-                opening: { focus: "plan" as const },
-              },
-            ]
-          : []),
-        ...(away
-          ? [
-              {
-                key: "details",
-                label: describeStatusAction("setReturnDate", "", {
-                  currentReturnDate: person.awayUntil ?? null,
-                  returnDate: person.awayUntil ?? null,
-                }).label,
-                opening: { focus: "plan" as const },
-              },
-            ]
-          : []),
-        ...available
-          .filter((choice) => choice.action !== suggested.action)
-          .map((choice) => ({
-            key: choice.action,
-            label: describeStatusAction(choice.action, "").label,
-            opening: { only: choice.action },
-          })),
-      ]
-    : [];
-  const actions = !onChangeStatus ? null : suggested ? (
-    <View style={styles.actions}>
-      <View style={styles.action}>
-        <Button
-          disabled={disabled}
-          label={describeStatusAction(suggested.action, "").label}
-          onPress={() => onChangeStatus({ only: suggested.action })}
-          tone="secondary"
-        />
+  const plannedText = describePlannedLine(person);
+  const allLines: StatusCardLine[] = [
+    ...(starts ? [{ key: "starts", icon: "calendar-outline" as const, text: starts.title }] : []),
+    ...(plannedText
+      ? [
+          {
+            key: "planned",
+            icon: "calendar-outline" as const,
+            text: plannedText,
+            link: onChangeStatus
+              ? {
+                  label: "Edit plan",
+                  disabled,
+                  onPress: () => onChangeStatus({ focus: "plan" }),
+                }
+              : undefined,
+          },
+        ]
+      : []),
+    ...lines,
+  ];
+  const rowContent = (
+    <>
+      <StatusIconCircle name={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
+      <View style={styles.copy}>
+        <Text
+          style={[
+            styles.title,
+            { color: current.kind === "active" ? mobileColors.textPrimary : colors.text },
+          ]}
+        >
+          {current.title}
+        </Text>
+        <Text style={styles.detail}>{current.detail}</Text>
       </View>
-      {moreItems.length > 0 ? (
-        <Button
-          accessibilityLabel="More status changes"
-          disabled={disabled}
-          expanded={moreOpen}
-          icon="ellipsis-horizontal"
-          iconOnly
-          onPress={() => setMoreOpen(true)}
-          tone="secondary"
-        />
-      ) : null}
-    </View>
-  ) : available.length === 0 ? null : available.length === 1 ? (
-    <Button
-      disabled={disabled}
-      label={describeStatusAction(available[0].action, "").label}
-      onPress={() => onChangeStatus({ only: available[0].action })}
-      tone="secondary"
-    />
-  ) : (
-    <Button
-      disabled={disabled}
-      label="Change status"
-      onPress={() => onChangeStatus({ focus: "status" })}
-      tone="secondary"
-    />
+    </>
   );
+  const label = `Status: ${current.title}. ${current.detail}`;
 
   return (
-    <View style={styles.stack}>
-      <View
-        accessibilityLabel={`Status: ${current.title}. ${current.detail}`}
-        accessibilityRole="summary"
-        style={[
-          styles.card,
-          quiet
-            ? { backgroundColor: mobileColors.surface, borderColor: mobileColors.borderSubtle }
-            : { backgroundColor: colors.bg, borderColor: colors.border },
-        ]}
-        testID="status-card"
-      >
-        <View style={styles.row}>
-          <StatusIconCircle name={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
-          <View style={styles.copy}>
-            <Text
-              style={[
-                styles.title,
-                { color: current.kind === "active" ? mobileColors.textPrimary : colors.text },
-              ]}
-            >
-              {current.title}
-            </Text>
-            <Text style={styles.detail}>{current.detail}</Text>
+    <View testID="status-card">
+      <ProfileList>
+        {onChangeStatus ? (
+          <PressableRow
+            accessibilityLabel={label}
+            accessibilityRole="button"
+            disabled={disabled}
+            onPress={() => onChangeStatus({ focus: "status" })}
+            style={styles.row}
+          >
+            {rowContent}
+            <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+          </PressableRow>
+        ) : (
+          <View accessibilityLabel={label} accessibilityRole="summary" style={styles.row}>
+            {rowContent}
           </View>
-        </View>
-        {actions}
-      </View>
-      {starts ? (
-        <View
-          accessibilityLabel={`First day: ${starts.title}. ${starts.detail}`}
-          accessibilityRole="summary"
-          style={[
-            styles.card,
-            styles.dashed,
-            { backgroundColor: mobileColors.surface, borderColor: warning.border },
-          ]}
-          testID="starts-card"
-        >
-          <View style={styles.row}>
-            <StatusIconCircle name="calendar" tone="warning" />
-            <View style={styles.copy}>
-              <Text style={styles.eyebrow}>First day</Text>
-              <Text style={[styles.title, { color: warning.text }]}>{starts.title}</Text>
-              <Text style={styles.detail}>{starts.detail}</Text>
-            </View>
-          </View>
-        </View>
-      ) : null}
-      {planned ? (
-        <View
-          accessibilityLabel={`Planned: ${planned.title}. ${planned.detail}`}
-          accessibilityRole="summary"
-          style={[
-            styles.card,
-            styles.dashed,
-            { backgroundColor: mobileColors.surface, borderColor: warning.border },
-          ]}
-          testID="planned-card"
-        >
-          <View style={styles.row}>
-            <StatusIconCircle name="calendar" tone="warning" />
-            <View style={styles.copy}>
-              <Text style={styles.eyebrow}>Planned</Text>
-              <Text style={[styles.title, { color: warning.text }]}>{planned.title}</Text>
-              <Text style={styles.detail}>{planned.detail}</Text>
-            </View>
-          </View>
-          {onChangeStatus && !plain ? (
-            <Button
-              disabled={disabled}
-              label="Edit plan"
-              onPress={() => onChangeStatus({ focus: "plan" })}
-              tone="secondary"
+        )}
+        {allLines.map((line) => (
+          <View key={line.key} style={styles.line} testID={`status-line-${line.key}`}>
+            <View style={styles.lineDivider} />
+            <Ionicons
+              color={
+                line.tone
+                  ? statusToneColors(mobileColors, line.tone).text
+                  : mobileColors.textSecondary
+              }
+              name={line.icon}
+              size={16}
             />
-          ) : null}
-        </View>
-      ) : null}
-      {onChangeStatus && moreItems.length > 0 ? (
-        <BottomSheetModal
-          debugName="More status changes"
-          header={<SheetHeader title="More status changes" />}
-          onDismiss={() => setMoreOpen(false)}
-          visible={moreOpen}
-        >
-          <View style={styles.stack}>
-            {moreItems.map((item) => (
+            <Text style={styles.lineText}>{line.text}</Text>
+            {line.link ? (
               <Button
-                key={item.key}
-                label={item.label}
-                onPress={() => {
-                  setMoreOpen(false);
-                  // The status sheet waits for this one to finish leaving.
-                  handoff(() => onChangeStatus(item.opening));
-                }}
-                tone="secondary"
+                accessibilityLabel={line.link.accessibilityLabel}
+                disabled={line.link.disabled}
+                fullWidth={false}
+                label={line.link.label}
+                onPress={line.link.onPress}
+                size="sm"
+                tone="link"
               />
-            ))}
+            ) : null}
           </View>
-        </BottomSheetModal>
-      ) : null}
+        ))}
+      </ProfileList>
     </View>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    stack: {
-      gap: mobileSpace.sm,
-    },
-    card: {
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      gap: mobileSpace.md,
-      padding: mobileSpace.md,
-    },
-    actions: {
-      flexDirection: "row",
-      gap: mobileSpace.sm,
-    },
-    action: {
-      flex: 1,
-    },
-    dashed: {
-      borderStyle: "dashed",
-    },
     row: {
       alignItems: "center",
       flexDirection: "row",
       gap: mobileSpace.md,
+      minHeight: mobileListRow.minHeight,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.md,
     },
     copy: {
       flex: 1,
       gap: mobileSpace.xs,
       minWidth: 0,
     },
-    eyebrow: {
-      ...mobileTextWeighted("caption", "semibold"),
-      color: mobileColors.textSecondary,
-    },
     title: {
-      ...mobileTextWeighted("body", "semibold"),
+      ...mobileTextWeighted("rowTitle", "semibold"),
       ...mobileTabularText,
     },
     detail: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: mobileColors.textSecondary,
+    },
+    line: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.sm,
+      minHeight: mobileListRow.minHeight,
+      paddingLeft: mobileSpace.lg,
+      paddingRight: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
+    },
+    lineDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      height: StyleSheet.hairlineWidth,
+      left: mobileSpace.lg,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    lineText: {
+      ...mobileText.meta,
+      ...mobileTabularText,
+      color: mobileColors.textSecondary,
+      flex: 1,
+      minWidth: 0,
     },
   });

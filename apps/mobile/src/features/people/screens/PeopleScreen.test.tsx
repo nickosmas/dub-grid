@@ -819,7 +819,7 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("Owen Lee")).not.toBeInTheDocument();
     expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^(Away|Offboarded)$/)).not.toBeInTheDocument();
-    expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not invited yet")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
   });
 
@@ -1170,7 +1170,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("No app access"));
+    fireEvent.click(screen.getByText("Not invited yet"));
 
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
     expect(screen.getByText("June Patel")).toBeInTheDocument();

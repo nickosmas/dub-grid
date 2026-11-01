@@ -91,7 +91,7 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
   return <Icon aria-hidden="true" size={size} strokeWidth={2.4} />;
 }
 
-/** An icon in a tinted circle, for the status card and the Change status dialog. */
+/** An icon in a tinted circle, for the status card and the Change staff status dialog. */
 export function StatusIconCircle({
   icon: Icon,
   tone,
