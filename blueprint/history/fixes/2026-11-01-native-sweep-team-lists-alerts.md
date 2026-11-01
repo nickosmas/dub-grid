@@ -33,8 +33,10 @@ the iOS Simulator found the following:
   as the group's caption.
 - Mobile activity rows take the shift's name from its segment before the code.
 - **Alerts:**
-  - An inline title, which fixed the overlap; a declared search bar and an
-    unlocked scroll did not.
+  - No large title, which fixed the overlap; a declared search bar, an
+    unlocked scroll and a search bar attached after the push did not. The
+    title sits on the leading edge beside back (`HeaderLeadingTitle`), at the
+    owner's request, since iOS centers a pushed screen's inline title.
   - Mark all read is a bar action: words on iOS, Material's done-all icon on
     Android.
   - Unread is the dot and the weight only.
