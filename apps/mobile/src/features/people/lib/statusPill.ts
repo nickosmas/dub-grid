@@ -58,7 +58,7 @@ export function getMobileStatusPill(
       paddingVertical: 4,
     },
     textStyle: {
-      ...mobileTextWeighted("caption", "bold"),
+      ...mobileTextWeighted("meta", "bold"),
       ...mobileTabularText,
       ...mobilePillOverflow.displayText,
       color: tone.text,

@@ -21,6 +21,7 @@ export function ChromeIconButton({
   onPress,
   children,
   badge,
+  disabled = false,
 }: ChromeIconButtonProps) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -34,6 +35,8 @@ export function ChromeIconButton({
       <Pressable
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
+        accessibilityState={disabled ? { disabled } : undefined}
+        disabled={disabled}
         hitSlop={10}
         onPress={onPress}
         style={styles.frame}

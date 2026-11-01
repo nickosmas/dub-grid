@@ -51,9 +51,7 @@ const createStyles = (mobileColors: MobileColors, tone: "danger" | "warning") =>
     notice: {
       alignItems: "center",
       backgroundColor: tone === "warning" ? mobileColors.warningSoft : mobileColors.dangerSoft,
-      borderColor: tone === "warning" ? mobileColors.warningBorder : mobileColors.dangerBorder,
       borderRadius: mobileRadii.control,
-      borderWidth: 1,
       flexDirection: "row",
       gap: mobileSpace.sm,
       paddingHorizontal: mobileSpace.md,

@@ -6,13 +6,13 @@ import { BottomSheetModal, SheetHeader } from "../../../shared/components/Bottom
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileRadii,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
-import { ProfileIcon } from "./ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { ProfileIcon, ProfileList } from "./ProfilePrimitives";
 
 export type SignOutScope = "others" | "global";
 
@@ -37,16 +37,13 @@ export function SignOutScopeSheet({
   onDismiss: () => void;
   onSelect: (scope: SignOutScope) => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
   return (
     <BottomSheetModal
       header={<SheetHeader title="Sign out devices" />}
       visible={visible}
       onDismiss={onDismiss}
     >
-      <View style={styles.options}>
+      <ProfileList>
         <ScopeOption
           description={
             hasOtherSessions
@@ -66,7 +63,7 @@ export function SignOutScopeSheet({
           tone="danger"
           onPress={() => onSelect("global")}
         />
-      </View>
+      </ProfileList>
     </BottomSheetModal>
   );
 }
@@ -95,9 +92,10 @@ function ScopeOption({
     <PressableRow
       accessibilityLabel={label}
       disabled={disabled}
-      style={[styles.option, divider && styles.optionDivider]}
+      style={[styles.option, divider && !IS_NATIVE_LIST && styles.optionDivider]}
       onPress={onPress}
     >
+      {divider && IS_NATIVE_LIST ? <View style={styles.insetDivider} /> : null}
       <ProfileIcon name={iconName} tone={tone} />
       <View style={styles.optionCopy}>
         <Text style={[styles.optionLabel, tone === "danger" && styles.optionLabelDanger]}>
@@ -111,17 +109,14 @@ function ScopeOption({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    options: {
-      backgroundColor: mobileColors.surface,
-      // A hairline, not `cardBorder`. Cards on the page are drawn by their
-      // shadow, which is why `cardBorder` is transparent in light mode - but a
-      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
-      // no shadow to draw it there was no edge at all in light mode. Dark is
-      // unchanged: `cardBorder` already resolves to this token there.
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      overflow: "hidden",
+    // Inset to the text, past the icon column (16 + 28 + 12).
+    insetDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 56,
+      position: "absolute",
+      right: 0,
     },
     option: {
       alignItems: "center",

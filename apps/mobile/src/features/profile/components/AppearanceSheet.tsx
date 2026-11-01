@@ -9,6 +9,8 @@ import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeMo
 import type { ThemePreference } from "../../../shared/lib/theme-preference";
 import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { ProfileChoiceGroup, ProfileIcon } from "./ProfilePrimitives";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -69,20 +71,38 @@ export function AppearanceSheet({
       onDismiss={onDismiss}
       visible={visible}
     >
-      <View style={sheetStyles.options}>
-        {APPEARANCE_OPTIONS.map((option) => (
-          <AppearanceOption
-            key={option.id}
-            icon={option.icon}
-            label={option.label}
-            selected={preference === option.id}
-            onPress={() => {
-              setPreference(option.id);
-              onDismiss();
-            }}
-          />
-        ))}
-      </View>
+      {IS_NATIVE_LIST ? (
+        // A pick-one list with a bare checkmark on the chosen row, as
+        // Settings' own Appearance choices are.
+        <ProfileChoiceGroup
+          items={APPEARANCE_OPTIONS.map((option) => ({
+            id: option.id,
+            name: option.label,
+            leading: <ProfileIcon name={option.icon} />,
+          }))}
+          selectedIds={[preference]}
+          selection="single"
+          onToggle={(id) => {
+            setPreference(id);
+            onDismiss();
+          }}
+        />
+      ) : (
+        <View style={sheetStyles.options}>
+          {APPEARANCE_OPTIONS.map((option) => (
+            <AppearanceOption
+              key={option.id}
+              icon={option.icon}
+              label={option.label}
+              selected={preference === option.id}
+              onPress={() => {
+                setPreference(option.id);
+                onDismiss();
+              }}
+            />
+          ))}
+        </View>
+      )}
     </BottomSheetModal>
   );
 }

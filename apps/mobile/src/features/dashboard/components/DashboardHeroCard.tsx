@@ -248,7 +248,7 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTabularText,
     },
     statLabel: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
       textAlign: "center",
     },

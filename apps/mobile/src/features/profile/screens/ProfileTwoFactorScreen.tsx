@@ -37,11 +37,13 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   ProfileInfoRow,
   ProfileList,
+  ProfileListAction,
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 
 const MOBILE_TOTP_FRIENDLY_NAME = "Mobile App Authenticator";
@@ -353,23 +355,39 @@ export default function ProfileTwoFactorScreen() {
           title="Refresh status"
           description="We couldn't confirm your last change. Check your two-factor status before trying again."
         >
-          <ActionButtons
-            primaryAction={
-              <Button
+          {IS_NATIVE_LIST ? (
+            <ProfileList>
+              <ProfileListAction
                 label="Refresh status"
                 loading={mfaLoading}
-                disabled={mfaLoading}
                 onPress={retryStatus}
               />
-            }
-          >
-            <Button
-              label="Cancel"
-              tone="neutral"
-              disabled={mfaLoading}
-              onPress={resetMfaEnrollment}
-            />
-          </ActionButtons>
+              <ProfileListAction
+                disabled={mfaLoading}
+                isLast
+                label="Cancel"
+                onPress={resetMfaEnrollment}
+              />
+            </ProfileList>
+          ) : (
+            <ActionButtons
+              primaryAction={
+                <Button
+                  label="Refresh status"
+                  loading={mfaLoading}
+                  disabled={mfaLoading}
+                  onPress={retryStatus}
+                />
+              }
+            >
+              <Button
+                label="Cancel"
+                tone="neutral"
+                disabled={mfaLoading}
+                onPress={resetMfaEnrollment}
+              />
+            </ActionButtons>
+          )}
         </ProfileSection>
       ) : isEnrolling ? (
         <ProfileSection
@@ -378,7 +396,7 @@ export default function ProfileTwoFactorScreen() {
         >
           <ProfilePanel>
             {mfaSecret ? (
-              <View style={styles.mfaSecretRow}>
+              <View style={IS_NATIVE_LIST ? null : styles.mfaSecretRow}>
                 <Text selectable style={styles.mfaSecretText}>
                   {mfaSecret}
                 </Text>
@@ -396,24 +414,41 @@ export default function ProfileTwoFactorScreen() {
               onChangeText={(text) => setMfaVerifyCode(text.replace(/\D/g, "").slice(0, 6))}
             />
           </ProfilePanel>
-          <ActionButtons
-            primaryAction={
-              <Button
-                disabled={mfaLoading || mfaVerifyCode.length !== 6}
+          {IS_NATIVE_LIST ? (
+            <ProfileList>
+              <ProfileListAction
+                disabled={mfaVerifyCode.length !== 6}
                 label="Verify & enable"
                 loading={mfaLoading}
                 onPress={() => verifyMfaEnrollment()}
               />
-            }
-            style={styles.actionsStack}
-          >
-            <Button
-              disabled={mfaLoading}
-              label="Cancel"
-              onPress={cancelMfaEnrollment}
-              tone="neutral"
-            />
-          </ActionButtons>
+              <ProfileListAction
+                disabled={mfaLoading}
+                isLast
+                label="Cancel"
+                onPress={cancelMfaEnrollment}
+              />
+            </ProfileList>
+          ) : (
+            <ActionButtons
+              primaryAction={
+                <Button
+                  disabled={mfaLoading || mfaVerifyCode.length !== 6}
+                  label="Verify & enable"
+                  loading={mfaLoading}
+                  onPress={() => verifyMfaEnrollment()}
+                />
+              }
+              style={styles.actionsStack}
+            >
+              <Button
+                disabled={mfaLoading}
+                label="Cancel"
+                onPress={cancelMfaEnrollment}
+                tone="neutral"
+              />
+            </ActionButtons>
+          )}
         </ProfileSection>
       ) : (
         <ProfileSection description="An authenticator app generates a short code that the app asks for alongside your password, so a stolen password isn't enough to sign in.">
@@ -425,7 +460,28 @@ export default function ProfileTwoFactorScreen() {
               value={needsReconciliation ? "Needs refresh" : mfaEnabled ? "Enabled" : "Not enabled"}
             />
           </ProfileList>
-          {needsReconciliation ? (
+          {IS_NATIVE_LIST ? (
+            <ProfileList>
+              {needsReconciliation ? (
+                <ProfileListAction isLast label="Refresh status" onPress={retryStatus} />
+              ) : mfaEnabled ? (
+                <ProfileListAction
+                  disabled={mfaLoading}
+                  isLast
+                  label="Turn off two-factor"
+                  onPress={() => setIsConfirmingDisable(true)}
+                  tone="danger"
+                />
+              ) : (
+                <ProfileListAction
+                  isLast
+                  label="Set up two-factor"
+                  loading={mfaLoading}
+                  onPress={startMfaEnrollment}
+                />
+              )}
+            </ProfileList>
+          ) : needsReconciliation ? (
             <Button label="Refresh status" onPress={retryStatus} tone="neutral" />
           ) : mfaEnabled ? (
             <Button

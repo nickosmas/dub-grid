@@ -17,7 +17,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
-import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { IS_IOS_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
@@ -81,7 +81,17 @@ function PasswordStrengthHints({ password }: { password: string }) {
       <View style={styles.passwordHintList}>
         {hints.map((hint) => (
           <View key={hint.id} style={styles.passwordHintRow}>
-            <View style={[styles.passwordHintDot, hint.met && styles.passwordHintDotMet]} />
+            {IS_NATIVE_LIST ? (
+              // The system's own mark for a rule met, as the passwords
+              // Settings suggests list theirs.
+              <Ionicons
+                color={hint.met ? mobileColors.successText : mobileColors.textSubtle}
+                name={hint.met ? "checkmark-circle" : "ellipse-outline"}
+                size={17}
+              />
+            ) : (
+              <View style={[styles.passwordHintDot, hint.met && styles.passwordHintDotMet]} />
+            )}
             <Text style={[styles.passwordHintText, hint.met && styles.passwordHintTextMet]}>
               {hint.label}
             </Text>
@@ -92,6 +102,10 @@ function PasswordStrengthHints({ password }: { password: string }) {
   );
 }
 
+/**
+ * Off iOS only: there a secure field is the system's own, with no reveal, as
+ * Settings' password fields are; Material's password field keeps its eye.
+ */
 function PasswordVisibilityToggle({
   isVisible,
   label,
@@ -416,11 +430,13 @@ export default function ProfilePasswordScreen() {
               placeholder="Current password"
               secureTextEntry={!visiblePasswordFields.currentPassword}
               trailingAccessory={
-                <PasswordVisibilityToggle
-                  isVisible={visiblePasswordFields.currentPassword}
-                  label="current password"
-                  onPress={() => togglePasswordVisibility("currentPassword")}
-                />
+                IS_IOS_LIST ? undefined : (
+                  <PasswordVisibilityToggle
+                    isVisible={visiblePasswordFields.currentPassword}
+                    label="current password"
+                    onPress={() => togglePasswordVisibility("currentPassword")}
+                  />
+                )
               }
               editable={!passwordChanged}
               value={currentPassword}
@@ -451,11 +467,13 @@ export default function ProfilePasswordScreen() {
               placeholder="New password"
               secureTextEntry={!visiblePasswordFields.newPassword}
               trailingAccessory={
-                <PasswordVisibilityToggle
-                  isVisible={visiblePasswordFields.newPassword}
-                  label="new password"
-                  onPress={() => togglePasswordVisibility("newPassword")}
-                />
+                IS_IOS_LIST ? undefined : (
+                  <PasswordVisibilityToggle
+                    isVisible={visiblePasswordFields.newPassword}
+                    label="new password"
+                    onPress={() => togglePasswordVisibility("newPassword")}
+                  />
+                )
               }
               editable={!passwordChanged}
               value={newPassword}
@@ -475,11 +493,13 @@ export default function ProfilePasswordScreen() {
               placeholder="Confirm new password"
               secureTextEntry={!visiblePasswordFields.confirmPassword}
               trailingAccessory={
-                <PasswordVisibilityToggle
-                  isVisible={visiblePasswordFields.confirmPassword}
-                  label="confirm password"
-                  onPress={() => togglePasswordVisibility("confirmPassword")}
-                />
+                IS_IOS_LIST ? undefined : (
+                  <PasswordVisibilityToggle
+                    isVisible={visiblePasswordFields.confirmPassword}
+                    label="confirm password"
+                    onPress={() => togglePasswordVisibility("confirmPassword")}
+                  />
+                )
               }
               editable={!passwordChanged}
               value={confirmPassword}
@@ -539,11 +559,11 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "space-between",
     },
     passwordStrengthTitle: {
-      ...mobileTextWeighted("caption", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
     },
     passwordStrengthLevel: {
-      ...mobileTextWeighted("caption", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
     },
     passwordStrengthLevelShort: {
       color: mobileColors.dangerText,

@@ -560,6 +560,19 @@ export default function LoginScreen() {
             />
 
             {error ? <InlineError message={error} /> : null}
+            {showOrgHelp ? (
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperText}>
+                Your organization&apos;s domain is the address you use for DubGrid, such as{" "}
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg{orgSuffix}
+                </Text>
+                . Enter the first part,{" "}
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
+                  yourorg
+                </Text>
+                .
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.actions}>
@@ -594,20 +607,6 @@ export default function LoginScreen() {
                 {slowSubmission
                   ? "This is taking longer than usual. We’re still checking your organization."
                   : "Checking your organization"}
-              </Text>
-            ) : null}
-
-            {showOrgHelp ? (
-              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperText}>
-                Your organization&apos;s domain is the address you use for DubGrid, such as{" "}
-                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
-                  yourorg{orgSuffix}
-                </Text>
-                . Enter the first part,{" "}
-                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.helperStrong}>
-                  yourorg
-                </Text>
-                .
               </Text>
             ) : null}
           </View>
@@ -819,10 +818,11 @@ const createStyles = (mobileColors: MobileColors) =>
     actions: {
       gap: 16,
     },
+    // A footer under the field, as iOS sets a grouped field's explanation.
     helperText: {
       ...mobileText.meta,
       color: mobileColors.textMuted,
-      textAlign: "center",
+      paddingHorizontal: mobileSpace.lg,
     },
     helperStrong: {
       ...mobileTextWeighted("meta", "bold"),

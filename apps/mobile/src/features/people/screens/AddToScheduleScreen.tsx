@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
@@ -14,6 +14,8 @@ import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesG
 import { updateMobilePerson } from "../../../shared/lib/api";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import {
@@ -52,6 +54,8 @@ export default function AddToScheduleScreen() {
   const [draft, setDraft] = useState<ScheduleDraft | null>(null);
   const [baselineSource, setBaselineSource] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set by the bar's X once its own menu has asked, so leaving doesn't ask again.
+  const [leaving, setLeaving] = useState(false);
 
   // Seeded during render, keyed on the person, so the first painted frame shows
   // their current assignments and a background refetch can't wipe a selection.
@@ -114,11 +118,15 @@ export default function AddToScheduleScreen() {
 
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
-    disabled: mutation.isPending || mutation.isSuccess,
+    disabled: mutation.isPending || mutation.isSuccess || leaving,
     title: "Discard these assignments?",
     body: "They won't be added to the schedule.",
   });
   useNavigationDiscardGuard(guard);
+
+  useEffect(() => {
+    if (leaving) router.back();
+  }, [leaving]);
 
   if (contentState.kind === "loading") {
     return (
@@ -252,15 +260,34 @@ export default function AddToScheduleScreen() {
 
           {error ? <InlineError message={error} /> : null}
 
-          <View style={{ gap: mobileSpace.sm }}>
-            <Button
-              disabled={!canSubmit}
-              label="Add to schedule"
-              loading={mutation.isPending}
-              onPress={() => mutation.mutate(draft)}
-              tone="primary"
+          {/* On the phones Add sits in the navigation bar, keeping its word
+              since it does more than save; the web build keeps the button. */}
+          {IS_NATIVE_LIST ? (
+            <EditBarActions
+              discard={
+                hasUnsavedChanges
+                  ? { label: "Discard", onPress: () => setLeaving(true), confirm: DISCARD_CONFIRM }
+                  : null
+              }
+              save={{
+                label: "Add",
+                accessibilityLabel: "Add to schedule",
+                disabled: !canSubmit,
+                loading: mutation.isPending,
+                onPress: () => mutation.mutate(draft),
+              }}
             />
-          </View>
+          ) : (
+            <View style={{ gap: mobileSpace.sm }}>
+              <Button
+                disabled={!canSubmit}
+                label="Add to schedule"
+                loading={mutation.isPending}
+                onPress={() => mutation.mutate(draft)}
+                tone="primary"
+              />
+            </View>
+          )}
         </>
       )}
 

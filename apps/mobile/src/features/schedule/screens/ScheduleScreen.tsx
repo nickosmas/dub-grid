@@ -29,6 +29,7 @@ import Reanimated, {
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
 import { PageWash } from "../../../shared/components/PageWash";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   ScrollableTabStrip,
   ScrollableTabStripSkeleton,
@@ -1403,15 +1404,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  const homeWash = isTeamScope ? undefined : (
-    <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
-  );
+  // On the web build the staff home sits on the brand aurora, the login
+  // page's wash. On device every page is the plain grouped gray, the team
+  // schedule always so.
+  const homeWash =
+    isTeamScope || IS_NATIVE_LIST ? undefined : (
+      <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
+    );
 
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      // The staff home sits on the brand aurora, the login page's wash, and
-      // keeps it whatever the schedule says; the team schedule stays plain.
       pageBackground={homeWash}
       stickyHeaderBackground={homeWash}
       refreshing={manualRefresh.isRefreshing}
@@ -1575,7 +1578,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
               return (
                 <View key={group.key} style={styles.shiftGroupBlock}>
-                  {index > 0 ? <View style={styles.shiftGroupDivider} /> : null}
+                  {/* Grouped lists part their groups with space alone. */}
+                  {index > 0 && !IS_NATIVE_LIST ? <View style={styles.shiftGroupDivider} /> : null}
                   <View
                     style={[
                       styles.shiftGroupHeader,
@@ -1761,7 +1765,8 @@ function TeamShiftMemberRow({
     ) : null;
 
   return (
-    <View style={!isFirst && styles.teamMemberRowBorder}>
+    <View>
+      {isFirst ? null : <View style={styles.teamMemberSeparator} />}
       <PressableRow onPress={onPress} style={styles.teamMemberRow}>
         <View
           style={[

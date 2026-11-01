@@ -345,20 +345,16 @@ describe("ProfilePasswordScreen", () => {
     expect(signOutMobileSessions).toHaveBeenCalledTimes(2);
   });
 
-  it("masks each field until its own toggle is pressed, and shows the strength rules", () => {
+  // iOS's secure field is the system's own, with no reveal, as Settings' are.
+  it("keeps every field masked on iOS, with no reveal, and shows the strength rules", () => {
     getSupabaseClient.mockReturnValue({ auth: {} } as never);
 
     render(<ProfilePasswordScreen />);
 
+    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
-
-    fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
-
-    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Show / })).not.toBeInTheDocument();
 
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
@@ -370,6 +366,27 @@ describe("ProfilePasswordScreen", () => {
       target: { value: "New-password-123" },
     });
     expect(screen.getByText("Strong")).toBeInTheDocument();
+  });
+
+  // Material's password field keeps its eye, one per field.
+  it("masks each field on Android until its own toggle is pressed", async () => {
+    getSupabaseClient.mockReturnValue({ auth: {} } as never);
+    vi.resetModules();
+    vi.doMock("react-native", async () =>
+      createReactNativeModule(await import("react"), { platformOS: "android" }),
+    );
+    const AndroidScreen = (await import("./ProfilePasswordScreen")).default;
+
+    render(<AndroidScreen />);
+
+    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
+
+    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
+    vi.doUnmock("react-native");
   });
 
   it("does not reach Supabase when the assurance preflight fails", async () => {

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ActivityIndicator,
   StyleSheet,
   TextInput,
   View,
@@ -19,7 +20,8 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
-import { Button } from "../../../shared/components/Button";
+import { Button, type ButtonTone } from "../../../shared/components/Button";
+import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { SelectionCheck } from "../../../shared/components/SelectionCheck";
 import { SelectionCheckbox } from "../../../shared/components/SelectionCheckbox";
@@ -584,7 +586,10 @@ export function ProfileChoiceGroup<TId extends string | number>({
                 disabled={item.disabled}
                 key={item.id}
                 onPress={() => onToggle(item.id)}
-                style={[styles.choiceRow, index < items.length - 1 && styles.rowDivider]}
+                style={[
+                  styles.choiceRow,
+                  index < items.length - 1 && !IS_NATIVE_LIST && styles.rowDivider,
+                ]}
               >
                 {item.leading}
                 {item.detail ? (
@@ -626,6 +631,9 @@ export function ProfileChoiceGroup<TId extends string | number>({
                     ) : null}
                   </View>
                 )}
+                {index < items.length - 1 && IS_NATIVE_LIST ? (
+                  <View style={styles.insetDivider} />
+                ) : null}
               </PressableRow>
             );
           })}
@@ -735,6 +743,10 @@ const personLayoutStyles = StyleSheet.create({
   actionRowItem: {
     flex: 1,
   },
+  // The same break above the foot's actions as the drawn stack takes.
+  actionGroup: {
+    paddingTop: mobileSpace.lg,
+  },
 });
 
 /** The stack of fact lines under a centered hero's name. */
@@ -800,6 +812,149 @@ export function ProfileActionStack({ children }: { children: ReactNode }) {
   return <View style={personLayoutStyles.actionStack}>{children}</View>;
 }
 
+/**
+ * An action in a list card: its words in the tint, or in red when it takes
+ * something away, the way Settings draws Sign Out or Contacts Delete Contact.
+ */
+export function ProfileListAction({
+  label,
+  tone = "brand",
+  disabled = false,
+  loading = false,
+  accessibilityLabel,
+  isLast = false,
+  align = "leading",
+  trailing,
+  onPress,
+}: {
+  label: string;
+  tone?: "brand" | "danger";
+  disabled?: boolean;
+  loading?: boolean;
+  accessibilityLabel?: string;
+  isLast?: boolean;
+  /** Centered for a lone row in its own group, as Sign Out is. */
+  align?: "leading" | "center";
+  /** Drawn at the row's end, such as the chevron of a row that opens more. */
+  trailing?: ReactNode;
+  onPress: () => void | Promise<unknown>;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const color = tone === "danger" ? mobileColors.dangerText : mobileColors.brand;
+
+  return (
+    <PressableRow
+      accessibilityLabel={accessibilityLabel ?? label}
+      disabled={disabled || loading}
+      onPress={onPress}
+      style={[styles.actionRow, align === "center" && styles.actionRowCentered]}
+    >
+      <Text
+        fit="compact"
+        numberOfLines={1}
+        style={[styles.actionRowLabel, align === "leading" && styles.actionRowLabelFill, { color }]}
+      >
+        {label}
+      </Text>
+      {loading ? <ActivityIndicator color={color} size="small" /> : trailing}
+      {!isLast ? <View style={styles.insetDivider} /> : null}
+    </PressableRow>
+  );
+}
+
+export interface ProfileActionItem {
+  key: string;
+  label: string;
+  onPress: () => void;
+  tone?: "brand" | "danger";
+  /** The drawn button's tone, off the platforms' own lists. */
+  buttonTone?: ButtonTone;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+/**
+ * Actions that end a page: on a phone a list card of tinted rows, Revoke and
+ * the like in red; elsewhere one full-width button each.
+ */
+export function ProfileActionGroup({ actions }: { actions: ProfileActionItem[] }) {
+  if (actions.length === 0) return null;
+  if (IS_NATIVE_LIST) {
+    return (
+      <View style={personLayoutStyles.actionGroup}>
+        <ProfileList>
+          {actions.map((action, index) => (
+            <ProfileListAction
+              disabled={action.disabled}
+              isLast={index === actions.length - 1}
+              key={action.key}
+              label={action.label}
+              loading={action.loading}
+              onPress={action.onPress}
+              tone={action.tone}
+            />
+          ))}
+        </ProfileList>
+      </View>
+    );
+  }
+  return (
+    <ProfileActionStack>
+      {actions.map((action) => (
+        <Button
+          disabled={action.disabled}
+          key={action.key}
+          label={action.label}
+          loading={action.loading}
+          onPress={action.onPress}
+          tone={action.buttonTone ?? (action.tone === "danger" ? "danger" : "secondary")}
+        />
+      ))}
+    </ProfileActionStack>
+  );
+}
+
+/** A setting with a switch at the row's end, in a list card. */
+export function ProfileSwitchRow({
+  label,
+  detail,
+  accessibilityLabel,
+  value,
+  disabled = false,
+  isLast = false,
+  onValueChange,
+}: {
+  label: string;
+  detail?: string;
+  accessibilityLabel: string;
+  value: boolean;
+  disabled?: boolean;
+  isLast?: boolean;
+  onValueChange: (next: boolean) => void;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+
+  return (
+    <View style={[styles.switchRow, !isLast && !IS_NATIVE_LIST && styles.rowDivider]}>
+      <View style={styles.rowCopy}>
+        <Text style={styles.switchLabel}>{label}</Text>
+        {detail ? <Text style={styles.switchDetail}>{detail}</Text> : null}
+      </View>
+      <AppSwitch
+        accessibilityLabel={accessibilityLabel}
+        disabled={disabled}
+        value={value}
+        onValueChange={onValueChange}
+      />
+      {!isLast && IS_NATIVE_LIST ? <View style={styles.insetDivider} /> : null}
+    </View>
+  );
+}
+
 /** Compatibility wrapper for existing two-action profile rows. */
 export function ProfileActionRow({ children }: { children: ReactNode }) {
   return (
@@ -822,6 +977,18 @@ export function useProfilePrimitiveStyles() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   return useMemo(() => createProfilePrimitiveStyles(mobileColors), [mobileColors, isDark]);
+}
+
+/**
+ * A grouped list card's edge: none on the gray page in light mode, a hairline
+ * in dark, where the card and the page are close.
+ */
+export function groupedCardEdge(mobileColors: MobileColors, isDark: boolean): ViewStyle {
+  if (!IS_NATIVE_LIST) return { borderColor: mobileColors.cardBorder, borderWidth: 1 };
+  return {
+    borderColor: isDark ? mobileColors.borderSubtle : "transparent",
+    borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+  };
 }
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
@@ -926,7 +1093,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       textAlign: "center",
     },
     heroMetaLabel: {
-      ...mobileText.caption,
+      ...(IS_NATIVE_LIST ? mobileText.meta : mobileText.caption),
       color: mobileColors.textSubtle,
     },
     heroMetaValue: {
@@ -981,26 +1148,24 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     panel: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
       gap: mobileSpace.md,
       padding: 16,
       ...mobileElevation("card", isDark),
+      ...groupedCardEdge(mobileColors, isDark),
     },
     // The clip sits on an inner view: iOS drops a view's own shadow when the
     // same view clips its children, so the shadow-casting list stays unclipped
     // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
       ...mobileElevation("card", isDark),
+      ...groupedCardEdge(mobileColors, isDark),
     },
     listClip: {
       overflow: "hidden",
-      borderRadius: mobileRadii.card - 1,
+      borderRadius: IS_NATIVE_LIST ? mobileRadii.card : mobileRadii.card - 1,
     },
     listPlain: {
       gap: 0,
@@ -1155,7 +1320,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderColor: mobileColors.dangerText,
     },
     errorText: {
-      ...mobileText.caption,
+      ...(IS_NATIVE_LIST ? mobileText.meta : mobileText.caption),
       color: mobileColors.dangerText,
     },
     choiceGroup: {
@@ -1204,6 +1369,40 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     choiceMarkSelected: {
       backgroundColor: mobileColors.brand,
+    },
+    actionRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.sm,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+    },
+    actionRowCentered: {
+      justifyContent: "center",
+    },
+    actionRowLabel: {
+      ...mobileText.rowTitle,
+      flexShrink: 1,
+    },
+    actionRowLabelFill: {
+      flex: 1,
+    },
+    switchRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+    },
+    switchLabel: {
+      ...(IS_NATIVE_LIST ? mobileText.rowTitle : mobileTextWeighted("cardTitle", "medium")),
+      color: mobileColors.textPrimary,
+    },
+    switchDetail: {
+      ...(IS_NATIVE_LIST ? mobileText.meta : mobileText.body),
+      color: mobileColors.textMuted,
     },
     iconPlain: {
       alignItems: "center",

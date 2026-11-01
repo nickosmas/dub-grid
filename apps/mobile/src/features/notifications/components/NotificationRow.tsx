@@ -305,11 +305,11 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTextWeighted("rowTitle", "bold"),
     },
     groupCount: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
     time: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },
@@ -318,7 +318,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
     note: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textSecondary,
     },
     noteLabel: {
@@ -352,7 +352,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.controlNeutralBg,
     },
     actionLabel: {
-      ...mobileText.label,
+      ...mobileText.meta,
       color: mobileColors.textSecondary,
     },
   });

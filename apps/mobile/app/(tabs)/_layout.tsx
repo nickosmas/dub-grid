@@ -124,9 +124,10 @@ export default function TabsLayout() {
             fontFamily: mobileTypography.fontFamily.semibold,
             fontSize: mobileText.badge.fontSize,
           },
+          // UIKit keeps the weight when a tab is selected; only the colour changes.
           selected: {
             color: mobileColors.brand,
-            fontFamily: mobileTypography.fontFamily.bold,
+            fontFamily: mobileTypography.fontFamily.semibold,
             fontSize: mobileText.badge.fontSize,
           },
         }}

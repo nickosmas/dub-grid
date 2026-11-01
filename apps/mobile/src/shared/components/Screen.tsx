@@ -609,14 +609,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
     // why this can't share a view with `stickyHeaderShell`'s `overflow:
     // "hidden"` on iOS.
     // No shadow over a page background: the wash runs through the header,
-    // and a shadow band under the shell read as a hard seam in it.
+    // and a shadow band under the shell read as a hard seam in it. None on
+    // iOS either, whose bars sit flush with the grouped page at rest.
     stickyHeaderShadow: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       zIndex: 10,
-      ...(hasPageBackground ? null : mobileElevation("header", isDark)),
+      ...(hasPageBackground || Platform.OS === "ios" ? null : mobileElevation("header", isDark)),
     },
     stickyHeaderShell: {
       // The fill has to stay opaque: content scrolls under this shell and must

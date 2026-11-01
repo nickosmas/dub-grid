@@ -1,15 +1,14 @@
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "../../../shared/components/Button";
+import { ContentUnavailable } from "../../../shared/components/ContentUnavailable";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { getOrgStatus } from "../../../shared/lib/api";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 function formatLockedMessage(message: string): string {
   return message.replace(/^Organization unavailable\.\s*/i, "").trim() || message;
@@ -110,22 +109,16 @@ export function OrganizationLockedScreen({
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.copy}>
-          <Text style={styles.eyebrow}>Account access</Text>
-          <Text style={styles.title}>Organization unavailable</Text>
-          <Text style={styles.body}>{body}</Text>
+        <ContentUnavailable
+          body={body}
+          iconName="business-outline"
+          primaryAction={{ label: "Try again", loading: isRetrying, onPress: onRetry }}
+          secondaryAction={{ label: "Sign out", onPress: onSignOut }}
+          title="Organization unavailable"
+        >
           {detailLine ? <Text style={styles.detail}>{detailLine}</Text> : null}
           {graceDate ? <Text style={styles.detail}>Grace period ends {graceDate}.</Text> : null}
-        </View>
-
-        <ActionButtons
-          primaryAction={
-            <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
-          }
-          style={styles.actions}
-        >
-          <Button label="Sign out" onPress={onSignOut} tone="neutral" />
-        </ActionButtons>
+        </ContentUnavailable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,31 +133,13 @@ const createStyles = (mobileColors: MobileColors) =>
     content: {
       flexGrow: 1,
       justifyContent: "center",
-      paddingHorizontal: 24,
+      paddingHorizontal: 32,
       paddingVertical: 32,
-      gap: mobileSpacing.sectionGap,
-    },
-    copy: {
-      gap: mobileSpacing.cardGap,
-    },
-    eyebrow: {
-      ...mobileText.label,
-      color: mobileColors.brand,
-      textTransform: "uppercase",
-    },
-    title: {
-      ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
-    },
-    body: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
     },
     detail: {
       ...mobileText.body,
       color: mobileColors.textSubtle,
-    },
-    actions: {
-      gap: mobileSpacing.cardGap,
+      textAlign: "center",
+      maxWidth: 320,
     },
   });

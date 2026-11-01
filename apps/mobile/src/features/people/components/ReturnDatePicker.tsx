@@ -308,7 +308,7 @@ function createStyles(mobileColors: MobileColors) {
       flexDirection: "row",
     },
     weekday: {
-      ...mobileTextWeighted("caption", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       flex: 1,
       color: mobileColors.textSubtle,
       textAlign: "center",
@@ -344,7 +344,7 @@ function createStyles(mobileColors: MobileColors) {
       gap: mobileSpace.sm,
     },
     fieldLabel: {
-      ...mobileTextWeighted("caption", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSubtle,
     },
     fieldShell: {
@@ -368,7 +368,7 @@ function createStyles(mobileColors: MobileColors) {
       color: mobileColors.textSubtle,
     },
     hint: {
-      ...mobileTextWeighted("caption", "regular"),
+      ...mobileTextWeighted("meta", "regular"),
       color: mobileColors.textSubtle,
     },
     iosCard: {

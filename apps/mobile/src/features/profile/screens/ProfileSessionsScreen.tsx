@@ -26,18 +26,17 @@ import {
 } from "../../../shared/lib/auth-reset";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { Collapsible } from "../../../shared/motion/Collapsible";
-import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileElevation,
-  mobileRadii,
   mobileSpace,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
-import { ProfileSection } from "../components/ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { ProfileList, ProfileListAction, ProfileSection } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { SessionDetailSheet } from "../components/SessionDetailSheet";
 import { SignOutScopeSheet, type SignOutScope } from "../components/SignOutScopeSheet";
@@ -65,8 +64,7 @@ type SessionConfirmation =
  */
 export default function ProfileSessionsScreen() {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const handoff = useModalHandoff();
@@ -239,61 +237,84 @@ export default function ProfileSessionsScreen() {
                 title="No devices signed in"
               />
             ) : (
-              <View style={styles.sessionList}>
-                <View style={styles.sessionListClip}>
-                  {active.map((session, index) => (
-                    <SessionRow
-                      key={session.id}
-                      isLast={index === active.length - 1}
-                      session={session}
-                      onPress={() => setOpenSession(session)}
-                    />
-                  ))}
-                </View>
-              </View>
+              <ProfileList>
+                {active.map((session, index) => (
+                  <SessionRow
+                    key={session.id}
+                    isLast={index === active.length - 1}
+                    session={session}
+                    onPress={() => setOpenSession(session)}
+                  />
+                ))}
+              </ProfileList>
             )}
           </ProfileSection>
 
           {stale.length > 0 ? (
             <ProfileSection>
-              <View style={styles.sessionList}>
-                <View style={styles.sessionListClip}>
-                  <PressableRow
-                    accessibilityLabel={`Inactive devices (${stale.length})`}
-                    style={[styles.disclosureRow, isStaleOpen && styles.sessionRowDivider]}
-                    onPress={() => setStaleOpen((open) => !open)}
-                  >
-                    <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
-                    <Ionicons
-                      color={mobileColors.textSubtle}
-                      name={isStaleOpen ? "chevron-up" : "chevron-down"}
-                      size={20}
+              <ProfileList>
+                {/* A disclosure row as the system's lists draw one: the
+                    chevron points on while closed and turns down open. */}
+                <PressableRow
+                  accessibilityLabel={`Inactive devices (${stale.length})`}
+                  style={[
+                    styles.disclosureRow,
+                    isStaleOpen && !IS_NATIVE_LIST && styles.sessionRowDivider,
+                  ]}
+                  onPress={() => setStaleOpen((open) => !open)}
+                >
+                  <Text style={styles.disclosureLabel}>Inactive devices ({stale.length})</Text>
+                  <Ionicons
+                    color={mobileColors.textSubtle}
+                    name={
+                      IS_NATIVE_LIST
+                        ? isStaleOpen
+                          ? "chevron-down"
+                          : "chevron-forward"
+                        : isStaleOpen
+                          ? "chevron-up"
+                          : "chevron-down"
+                    }
+                    size={IS_NATIVE_LIST ? 17 : 20}
+                  />
+                  {isStaleOpen && IS_NATIVE_LIST ? <View style={styles.insetDivider} /> : null}
+                </PressableRow>
+                <Collapsible open={isStaleOpen}>
+                  {stale.map((session, index) => (
+                    <SessionRow
+                      key={session.id}
+                      isLast={index === stale.length - 1}
+                      session={session}
+                      onPress={() => setOpenSession(session)}
                     />
-                  </PressableRow>
-                  <Collapsible open={isStaleOpen}>
-                    {stale.map((session, index) => (
-                      <SessionRow
-                        key={session.id}
-                        isLast={index === stale.length - 1}
-                        session={session}
-                        onPress={() => setOpenSession(session)}
-                      />
-                    ))}
-                  </Collapsible>
-                </View>
-              </View>
+                  ))}
+                </Collapsible>
+              </ProfileList>
             </ProfileSection>
           ) : null}
 
           {/* Below the list, not above it: the page should open on what is
               signed in, not on the two ways to sign everything out. */}
           <ProfileSection>
-            <Button
-              label="Sign out devices"
-              loading={sessionScopeLoading != null}
-              onPress={() => setScopeSheetVisible(true)}
-              tone="danger"
-            />
+            {IS_NATIVE_LIST ? (
+              <ProfileList>
+                <ProfileListAction
+                  align="center"
+                  isLast
+                  label="Sign out devices"
+                  loading={sessionScopeLoading != null}
+                  onPress={() => setScopeSheetVisible(true)}
+                  tone="danger"
+                />
+              </ProfileList>
+            ) : (
+              <Button
+                label="Sign out devices"
+                loading={sessionScopeLoading != null}
+                onPress={() => setScopeSheetVisible(true)}
+                tone="danger"
+              />
+            )}
           </ProfileSection>
         </>
       )}
@@ -336,21 +357,31 @@ function SessionRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const label = formatSessionDeviceLabel(session);
 
   return (
     <PressableRow
       accessibilityLabel={label}
-      style={[styles.sessionRow, !isLast && styles.sessionRowDivider]}
+      style={[styles.sessionRow, !isLast && !IS_NATIVE_LIST && styles.sessionRowDivider]}
       onPress={onPress}
     >
-      <View style={styles.sessionIcon}>
-        <Text fit="fixed" style={styles.sessionIconText}>
-          {formatSessionPlatform(session.platform)}
-        </Text>
-      </View>
+      {IS_NATIVE_LIST ? (
+        // The device's glyph alone, in the list's ink, as Settings marks a row.
+        <View style={styles.sessionGlyph}>
+          <Ionicons
+            color={mobileColors.textSecondary}
+            name={SESSION_PLATFORM_ICONS[session.platform ?? ""] ?? "help-circle-outline"}
+            size={24}
+          />
+        </View>
+      ) : (
+        <View style={styles.sessionIcon}>
+          <Text fit="fixed" style={styles.sessionIconText}>
+            {formatSessionPlatform(session.platform)}
+          </Text>
+        </View>
+      )}
       <View style={styles.sessionCopy}>
         <View style={styles.sessionTitleRow}>
           <Text numberOfLines={1} style={styles.sessionTitle}>
@@ -370,27 +401,24 @@ function SessionRow({
         </Text>
         <Text style={styles.sessionBody}>{formatSessionLastActive(session.lastActiveAt)}</Text>
       </View>
-      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      <Ionicons
+        color={mobileColors.textSubtle}
+        name="chevron-forward"
+        size={IS_NATIVE_LIST ? 17 : 22}
+      />
+      {!isLast && IS_NATIVE_LIST ? <View style={styles.sessionInsetDivider} /> : null}
     </PressableRow>
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const SESSION_PLATFORM_ICONS: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
+  ios: "phone-portrait-outline",
+  android: "phone-portrait-outline",
+  web: "desktop-outline",
+};
+
+const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    // The clip sits on an inner view: iOS drops a view's own shadow when the
-    // same view clips its children, so the shadow-casting list stays unclipped
-    // and the rows are clipped to the corners one level down.
-    sessionList: {
-      backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      ...mobileElevation("card", isDark),
-    },
-    sessionListClip: {
-      overflow: "hidden",
-      borderRadius: mobileRadii.card - 1,
-    },
     sessionRow: {
       alignItems: "center",
       flexDirection: "row",
@@ -413,6 +441,27 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       width: 36,
     },
+    sessionGlyph: {
+      alignItems: "center",
+      width: 28,
+    },
+    // Inset to the text, past the 28pt glyph.
+    sessionInsetDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 16 + 28 + 12,
+      position: "absolute",
+      right: 0,
+    },
+    insetDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 16,
+      position: "absolute",
+      right: 0,
+    },
     sessionIconText: {
       ...mobileText.micro,
       color: mobileColors.textSecondary,
@@ -434,16 +483,16 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 1,
       minWidth: 0,
     },
+    // A tinted capsule on the phones, without an outline, at a size to read.
     sessionCurrentBadge: {
-      backgroundColor: mobileColors.brand,
+      backgroundColor: IS_NATIVE_LIST ? mobileColors.brandSoft : mobileColors.brand,
       borderRadius: 999,
       paddingHorizontal: mobileSpace.sm,
       paddingVertical: mobileSpace.xs,
     },
-    sessionCurrentBadgeText: {
-      ...mobileTextWeighted("micro", "bold"),
-      color: mobileColors.textInverse,
-    },
+    sessionCurrentBadgeText: IS_NATIVE_LIST
+      ? { ...mobileTextWeighted("meta", "semibold"), color: mobileColors.brand }
+      : { ...mobileTextWeighted("meta", "bold"), color: mobileColors.textInverse },
     sessionBody: {
       ...mobileText.body,
       color: mobileColors.textMuted,
@@ -458,7 +507,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 12,
     },
     disclosureLabel: {
-      ...mobileTextWeighted("cardTitle", "medium"),
+      ...(IS_NATIVE_LIST ? mobileText.rowTitle : mobileTextWeighted("cardTitle", "medium")),
       color: mobileColors.textPrimary,
     },
   });

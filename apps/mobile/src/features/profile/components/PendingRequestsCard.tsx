@@ -4,7 +4,9 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { ProfileList, ProfileListAction, ProfileSection } from "./ProfilePrimitives";
 import {
   mobileRadii,
   mobileText,
@@ -49,6 +51,38 @@ export function PendingRequestsCard({
 
   const countLabel =
     requests.length === 1 ? "1 pending request" : `${requests.length} pending requests`;
+
+  if (IS_NATIVE_LIST) {
+    // A grouped section: the count as its header, each request a row of what
+    // it is with Cancel request under it in red, as Settings lists a pending
+    // change with its own way out.
+    return (
+      <ProfileSection
+        description="Waiting on admin review. You can cancel a request anytime."
+        title={countLabel}
+      >
+        <ProfileList>
+          {requests.map((request, index) => (
+            <View key={request.id}>
+              <View style={styles.nativeRow}>
+                <Text style={styles.nativeRowTitle}>{TYPE_LABELS[request.type]}</Text>
+                <Text style={styles.rowDescription}>{TYPE_DESCRIPTIONS[request.type]}</Text>
+                <Text style={styles.rowMeta}>Submitted {formatSubmittedAt(request.createdAt)}</Text>
+                <View style={styles.nativeDivider} />
+              </View>
+              <ProfileListAction
+                isLast={index === requests.length - 1}
+                label="Cancel request"
+                loading={cancellingId === request.id}
+                onPress={() => onCancel(request)}
+                tone="danger"
+              />
+            </View>
+          ))}
+        </ProfileList>
+      </ProfileSection>
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -148,5 +182,22 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     rowAction: {
       alignItems: "flex-start",
+    },
+    nativeRow: {
+      gap: mobileSpace.xs,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+    },
+    nativeRowTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    nativeDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 16,
+      position: "absolute",
+      right: 0,
     },
   });

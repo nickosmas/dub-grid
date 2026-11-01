@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Button } from "./Button";
+import { CONTENT_UNAVAILABLE_ICON_SIZE } from "./ContentUnavailable";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
@@ -16,16 +17,14 @@ import {
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
 
-// `borderlessBackgroundColor` is the tone's border colour used as a fill. The
-// soft tints are a step off white, which is enough behind an outline and not
-// enough without one: drop the outline and the fill is the only thing left to
-// separate the banner from the page, so it steps up the same hue's ramp.
+// The fill is the tone's border colour. The soft tints are a step off white,
+// which was enough behind an outline; with the outline gone (a flat tint, as
+// the platforms draw a notice) the fill alone separates the banner from the
+// page, so it steps up the same hue's ramp.
 const createStatusBannerTone = (mobileColors: MobileColors) =>
   ({
     error: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-      borderlessBackgroundColor: mobileColors.dangerBorder,
+      backgroundColor: mobileColors.dangerBorder,
       iconColor: mobileColors.dangerText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -34,9 +33,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       inlineActionTone: "danger" as const,
     },
     warning: {
-      backgroundColor: mobileColors.warningSoft,
-      borderColor: mobileColors.warningBorder,
-      borderlessBackgroundColor: mobileColors.warningBorder,
+      backgroundColor: mobileColors.warningBorder,
       iconColor: mobileColors.warningText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -45,9 +42,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       inlineActionTone: "secondary" as const,
     },
     info: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-      borderlessBackgroundColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandBorder,
       iconColor: mobileColors.brand,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -56,9 +51,7 @@ const createStatusBannerTone = (mobileColors: MobileColors) =>
       inlineActionTone: "secondary" as const,
     },
     success: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
-      borderlessBackgroundColor: mobileColors.successBorder,
+      backgroundColor: mobileColors.successBorder,
       iconColor: mobileColors.successText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
@@ -76,7 +69,6 @@ export function StatusBanner({
   actionLabel,
   onAction,
   fillScreen = false,
-  bordered = true,
 }: {
   title: string;
   body?: string;
@@ -85,10 +77,7 @@ export function StatusBanner({
   actionLabel?: string;
   onAction?: () => void;
   fillScreen?: boolean;
-  /**
-   * Drop the outline where the banner is a quiet aside rather than an
-   * interruption, and the tinted fill alone is enough to set it off.
-   */
+  /** @deprecated The banner is always a flat tint without an outline. */
   bordered?: boolean;
 }) {
   const mobileColors = useMobileColors();
@@ -111,17 +100,7 @@ export function StatusBanner({
   }
 
   return (
-    <View
-      style={[
-        styles.banner,
-        bordered
-          ? { backgroundColor: palette.backgroundColor, borderColor: palette.borderColor }
-          : {
-              backgroundColor: palette.borderlessBackgroundColor,
-              borderWidth: 0,
-            },
-      ]}
-    >
+    <View style={[styles.banner, { backgroundColor: palette.backgroundColor }]}>
       <View style={styles.copyRow}>
         <Ionicons color={palette.iconColor} name={palette.iconName} size={24} style={styles.icon} />
         <View style={styles.copy}>
@@ -176,7 +155,7 @@ function CenteredStatus({
   return (
     <View style={[centeredStyles.card, fillScreen ? fillScreenAnchorStyles.fill : null]}>
       {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
-      <Ionicons color={iconColor} name={iconName} size={32} />
+      <Ionicons color={iconColor} name={iconName} size={CONTENT_UNAVAILABLE_ICON_SIZE} />
       <View style={centeredStyles.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.title}>
           {title}
@@ -204,7 +183,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     banner: {
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
       padding: 16,
       gap: mobileSpace.md,
     },
@@ -250,13 +228,13 @@ const createCenteredStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     title: {
-      ...mobileText.sectionTitle,
+      ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
       textAlign: "center",
     },
     body: {
       ...mobileText.body,
-      color: mobileColors.textMuted,
+      color: mobileColors.textSubtle,
       textAlign: "center",
       maxWidth: 320,
     },

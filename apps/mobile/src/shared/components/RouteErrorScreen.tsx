@@ -2,9 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
-import { Button } from "./Button";
+import { ContentUnavailable } from "./ContentUnavailable";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { mobileText, type MobileColors } from "../theme/tokens";
 
 /**
  * Full-screen fallback for an unrecoverable render error or an unmatched route.
@@ -37,17 +37,16 @@ export function RouteErrorScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.iconFrame}>
-        <Ionicons color={mobileColors.brand} name={iconName} size={28} />
-      </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
-      {isDevBuild && detail ? <Text style={styles.detail}>{detail}</Text> : null}
-      {actionLabel && onAction ? (
-        <View style={styles.action}>
-          <Button label={actionLabel} onPress={onAction} tone="primary" />
-        </View>
-      ) : null}
+      <ContentUnavailable
+        body={body}
+        iconName={iconName}
+        primaryAction={
+          actionLabel && onAction ? { label: actionLabel, onPress: onAction } : undefined
+        }
+        title={title}
+      >
+        {isDevBuild && detail ? <Text style={styles.detail}>{detail}</Text> : null}
+      </ContentUnavailable>
     </View>
   );
 }
@@ -58,37 +57,13 @@ function createStyles(mobileColors: MobileColors) {
       alignItems: "center",
       backgroundColor: mobileColors.background,
       flex: 1,
-      gap: 12,
       justifyContent: "center",
       paddingHorizontal: 32,
-    },
-    iconFrame: {
-      alignItems: "center",
-      backgroundColor: mobileColors.brandSoft,
-      borderRadius: mobileRadii.pill,
-      height: 56,
-      justifyContent: "center",
-      marginBottom: 4,
-      width: 56,
-    },
-    title: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-      textAlign: "center",
-    },
-    body: {
-      ...mobileText.body,
-      color: mobileColors.textSubtle,
-      textAlign: "center",
     },
     detail: {
       ...mobileText.meta,
       color: mobileColors.textMuted,
       textAlign: "center",
-    },
-    action: {
-      marginTop: 8,
-      minWidth: 180,
     },
   });
 }

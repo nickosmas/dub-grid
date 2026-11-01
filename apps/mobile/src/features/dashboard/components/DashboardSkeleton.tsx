@@ -8,6 +8,7 @@ import {
   skeletonRows,
   useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { ScheduleMeSkeleton } from "../../schedule/components/ScheduleSkeleton";
 import {
@@ -105,7 +106,7 @@ function DashboardCardSkeleton({
   return (
     <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="title" width={titleWidth} style={styles.grow} />
+        <SkeletonLine variant="cardTitle" width={titleWidth} style={styles.grow} />
         <SkeletonLine variant="label" width={52} />
       </View>
       <SkeletonCardSurface>
@@ -129,7 +130,7 @@ function DashboardHeroSkeleton() {
   return (
     <View style={styles.cardGroup}>
       <View style={styles.cardTitleRow}>
-        <SkeletonLine variant="title" width={88} />
+        <SkeletonLine variant="cardTitle" width={88} />
       </View>
       <SkeletonCardSurface>
         <View style={styles.heroCoverage}>
@@ -245,11 +246,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     cardGroup: {
       gap: mobileSpace.sm,
     },
+    // Inset to the card's text on device, as `DashboardCard`'s header is.
     cardTitleRow: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: mobileSpace.md,
+      paddingHorizontal: IS_NATIVE_LIST ? mobileSpace.lg : 0,
     },
     heroCoverage: {
       gap: mobileSpace.sm,
