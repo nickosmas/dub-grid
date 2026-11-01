@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createScreenModule } from "../../../test/native";
+import {
+  createNativeStackMock,
+  createReactNativeModule,
+  createScreenModule,
+} from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -13,7 +17,9 @@ const routerBack = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
-vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: Object.assign(() => null, { getImageSource: () => Promise.resolve(null) }),
+}));
 
 vi.mock("@tanstack/react-query", () => ({
   onlineManager: { isOnline: () => true },
@@ -22,10 +28,26 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient,
 }));
 
-vi.mock("expo-router", () => ({
-  router: { back: routerBack },
-  useLocalSearchParams,
-}));
+vi.mock("expo-router", async () => {
+  const React = await import("react");
+  const { Toolbar, Screen } = createNativeStackMock(React);
+  // The X's discard menu, its actions pressed like any button.
+  const Menu = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("div", { role: "menu" }, children);
+  const MenuAction = ({
+    children,
+    onPress,
+  }: {
+    children?: React.ReactNode;
+    onPress?: () => void;
+  }) => React.createElement("button", { onClick: onPress, type: "button" }, children);
+  return {
+    router: { back: routerBack },
+    useLocalSearchParams,
+    useNavigation: () => ({ setOptions: () => undefined }),
+    Stack: { Screen, Toolbar: Object.assign(Toolbar, { Menu, MenuAction }) },
+  };
+});
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
@@ -189,6 +211,20 @@ describe("AddToScheduleScreen", () => {
     expect(allMutatePayloads(mutationCalls)).toContainEqual(
       expect.objectContaining({ focusAreaIds: [2], roleIds: [], certificationId: null }),
     );
+  });
+
+  // Add sits in the navigation bar, and the X it gains once something is
+  // picked leaves after its own menu has asked, without asking a second time.
+  it("puts Add in the bar and leaves from the X without asking twice", () => {
+    renderScreen({});
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to schedule" })).toHaveTextContent("Add");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Discard these assignments?")).not.toBeInTheDocument();
   });
 
   // The update contract wants the whole staff record, so anything this form

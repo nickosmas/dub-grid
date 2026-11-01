@@ -12,7 +12,7 @@ import {
 
 const ICON_SIZE = 14;
 
-type NoteTextVariant = Extract<TextVariant, "caption" | "body" | "rowTitle">;
+type NoteTextVariant = Extract<TextVariant, "meta" | "body" | "rowTitle">;
 
 /**
  * A shift's schedule notes, spelled out: one sticky-note icon, then the names
@@ -24,7 +24,7 @@ export function ScheduleNoteLabels({
   notes,
   inverse = false,
   showIcon = true,
-  textVariant = "caption",
+  textVariant = "meta",
   style,
 }: {
   notes: readonly MobileScheduleIndicator[];

@@ -181,12 +181,12 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     gap: mobileSpace.sm,
   },
+  // Text links stack centred under the primary action, as the platforms'
+  // own sign-in screens set them, rather than sharing a row as drawn buttons.
   secondaryActions: {
-    flexDirection: "row",
-    gap: mobileSpace.sm,
+    alignItems: "center",
   },
   secondaryAction: {
-    flex: 1,
-    minWidth: 0,
+    maxWidth: "100%",
   },
 });

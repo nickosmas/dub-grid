@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:98be86210cd25f8d1e5856dcaec2b1fe35cca6268a713b148734b78526135cf9"
+      "evidenceFingerprint": "sha256:90f2a80e5f5bbab21e3a32e00873fde05011c181fea513f3efcdfa0e99e2980e"
     },
     {
       "id": "quickstart",
@@ -309,7 +309,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f545925c9ae436ada95bed2cf9158bcb192547d7d889047290332a8ae36bbb70"
+      "evidenceFingerprint": "sha256:51b10050ca7c0b9e3d993e6aa3d678932035cad36fdc3d82f25c9ef89c733c08"
     },
     {
       "id": "schedule-grid",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8808d00718fe6e33c083070be8c9143014985865bcbd332d0c74a7cc77157500"
+      "evidenceFingerprint": "sha256:4c2563dab6fbd546bb18c56c77f6a0074c93d59dd194daa5cc87eca58422758b"
     },
     {
       "id": "draft-publish",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2c341d407a9fee75cc29cc417aaad010d24514b22050fe0dcb170d4c947b5b56"
+      "evidenceFingerprint": "sha256:9693cdcd72c83acf682794eba475369f31a9ea17e9ca316ecf08451ce5f51dc2"
     },
     {
       "id": "dashboard",
@@ -686,7 +686,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fb02ef51579a438c75238eb4fda5118640abd5532d41f228ae6c9cee5ba79102"
+      "evidenceFingerprint": "sha256:db0824a7fe204fbc65b82cd4fb930caf3525d4ab54debe351477b36d6457b40b"
     },
     {
       "id": "roster",
@@ -758,7 +758,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b80f7f34566b7ca27c68450942b038a83635878aa303847c2af8125825126952"
+      "evidenceFingerprint": "sha256:d23fc2addfabd547448b834f6b8f4d80d7fbfe15f3c2ec3b8c50fecf03305cb9"
     },
     {
       "id": "person-detail",
@@ -839,7 +839,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6cef2394c9a24ab9adec791c9dc1877cc35afdfba5b7b82307d1ffe9bff84b1d"
+      "evidenceFingerprint": "sha256:ee8b57a142305b4efbfd3a83b6e68c8c5abe720cb458dce6373bdf8a27c6206c"
     },
     {
       "id": "invitations",
@@ -1310,7 +1310,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b50f0c0cf07f9be7d0565f743b18e6e93b08adc46c7270566f8dd81e39882c57"
+      "evidenceFingerprint": "sha256:5c7907303611fd460f778bb094f8540b36368c296da24e075a2fba4e40d7d1fe"
     },
     {
       "id": "alerts",
@@ -1376,7 +1376,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:73e13f06c22a65d6048db1ba00dcce5ebbb5d86cff58a1504ce60b6766508884"
+      "evidenceFingerprint": "sha256:aa0abe7fd904e6a8894837fb6290c093656efc193aba0f95e48b30fe7a424c45"
     },
     {
       "id": "reports",
@@ -1502,7 +1502,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3b25379c02c851bd2b278402f64ec10d652d3957619d42512e7894afe1a6797f"
+      "evidenceFingerprint": "sha256:bcbd040d4328f4197d2ba1037de904c8eb6b63850444035a9b62d369f956ad09"
     },
     {
       "id": "security-sessions",
@@ -1581,7 +1581,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ff27eed03854c15b1835a97719668dc781a0ac16ad1455575b2e4cf312295509"
+      "evidenceFingerprint": "sha256:7f804c791f1b87441ad2da0e9662118427d1eadf4902f5dd00a62d1a5c59a098"
     },
     {
       "id": "privacy-controls",
@@ -1644,7 +1644,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:0f6e7641e889da4c5ca2c5e110418f5b8464d4f33eb5399ed5034829c5348b15"
+      "evidenceFingerprint": "sha256:c205165c33e6e5ef9480ed5f9416fcf791094f214deb941ed47e92cb73feb07a"
     },
     {
       "id": "schedule-rules-display",
@@ -2073,7 +2073,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:24e77a0eb456f70832154f6057738478967ee3f854e92f9f9f6baf9b91f7b08c"
+      "evidenceFingerprint": "sha256:c25ea5e19f0e744300de8e03ec6be7bdafee7fd5954d3f54032e9d0e17f920f2"
     },
     {
       "id": "integrations-exports",

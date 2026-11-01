@@ -106,7 +106,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.dangerText,
     },
     overtimeLabel: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
     label: {
@@ -114,7 +114,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     value: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });

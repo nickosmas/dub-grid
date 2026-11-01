@@ -9,7 +9,7 @@ import {
   mobilePillOverflow,
   mobileRadii,
   mobileSpace,
-  mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../theme/tokens";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -18,7 +18,10 @@ export type ChipTone = "neutral" | "brand" | "success" | "warning" | "danger";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Brings a 24pt pill up to the 44pt minimum touch target. */
+// 13pt, the smallest size for text people read.
+const CHIP_LABEL = mobileTextWeighted("meta", "semibold");
+
+/** Brings a 26pt pill past the 44pt minimum touch target. */
 const CHIP_HIT_SLOP = { top: 10, bottom: 10, left: 0, right: 0 } as const;
 
 /**
@@ -62,16 +65,12 @@ export function Chip({
   const body = (
     <>
       {icon ? (
-        <Ionicons
-          color={mobileColors[palette.label]}
-          name={icon}
-          size={mobileText.label.fontSize}
-        />
+        <Ionicons color={mobileColors[palette.label]} name={icon} size={CHIP_LABEL.fontSize} />
       ) : null}
       <Text
         fit="compact"
         style={[
-          mobileText.label,
+          CHIP_LABEL,
           onPress ? mobilePillOverflow.interactiveText : mobilePillOverflow.displayText,
           { color: mobileColors[palette.label] },
         ]}
@@ -108,7 +107,7 @@ export function Chip({
       accessibilityState={{ selected, disabled }}
       android_ripple={androidRipple}
       disabled={disabled}
-      // A chip is 24pt tall (16 line height plus its padding), well under the
+      // A chip is 26pt tall (18 line height plus its padding), well under the
       // 44pt minimum touch target. Pad the deficit out rather than growing the
       // pill, which is drawn small on purpose. Vertical only: chips sit in rows
       // 8pt apart, so a horizontal slop would overlap the neighbour's target.

@@ -51,8 +51,6 @@ const createStyles = (mobileColors: MobileColors) =>
       marginHorizontal: -SCREEN_BLEED,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
       padding: mobileSpace.lg,
       gap: mobileSpace.lg,
     },
@@ -78,7 +76,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     detail: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });

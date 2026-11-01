@@ -41,8 +41,8 @@ describe("AppearanceSheet", () => {
 
     render(<AppearanceSheet visible onDismiss={onDismiss} />);
 
-    expect(screen.getByLabelText("Dark")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByLabelText("Light")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByLabelText("Dark")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByLabelText("Light")).toHaveAttribute("aria-checked", "false");
   });
 
   it("applies the chosen preference and closes the sheet", () => {

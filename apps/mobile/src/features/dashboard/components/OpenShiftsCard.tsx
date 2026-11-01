@@ -111,7 +111,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     neededLabel: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
     label: {
@@ -119,7 +119,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     meta: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });

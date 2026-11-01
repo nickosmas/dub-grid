@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
-import { mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileSpace, mobileTextWeighted, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
+import { IS_NATIVE_LIST } from "../lib/native-list";
 
 /** Extra things the person should know before confirming, one short point each. */
 export interface ConfirmSummary {
@@ -14,7 +15,8 @@ export interface ConfirmSummary {
 /** Web's publish summary box, as a list of what a confirm does. */
 export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   if (summary.points.length === 0) return null;
   // A box with one item reads oddly; a lone fact reads as a sentence, unless
   // a title names the box, as Changes and Stays the same do.
@@ -29,7 +31,13 @@ export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
   return (
     <View accessibilityLabel={summary.title ?? "Keep in mind"} style={styles.section}>
       {/* No visible label by default; the view keeps a name for screen readers. */}
-      {summary.title ? <AppText variant="bodyStrong">{summary.title}</AppText> : null}
+      {summary.title ? (
+        IS_NATIVE_LIST ? (
+          <AppText style={styles.groupHeader}>{summary.title}</AppText>
+        ) : (
+          <AppText variant="bodyStrong">{summary.title}</AppText>
+        )
+      ) : null}
       <View style={styles.box}>
         {summary.points.map((point, index) => (
           <View key={point} style={[styles.point, index > 0 && styles.divided]}>
@@ -44,16 +52,23 @@ export function ConfirmSummaryBox({ summary }: { summary: ConfirmSummary }) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
+    // A phone's sheet is the grouped gray, so the points are a white grouped
+    // card there, edged only in dark mode.
     box: {
       alignSelf: "stretch",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: mobileColors.border,
+      borderWidth: IS_NATIVE_LIST && !isDark ? 0 : StyleSheet.hairlineWidth,
+      borderColor: IS_NATIVE_LIST ? mobileColors.borderSubtle : mobileColors.border,
       borderRadius: mobileRadii.card,
-      backgroundColor: mobileColors.background,
+      backgroundColor: IS_NATIVE_LIST ? mobileColors.surface : mobileColors.background,
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.xs,
+    },
+    // A grouped list's header: 17pt semibold, over the card's text.
+    groupHeader: {
+      ...mobileTextWeighted("sectionTitle", "semibold"),
+      paddingHorizontal: mobileSpace.lg,
     },
     lone: {
       alignSelf: "stretch",

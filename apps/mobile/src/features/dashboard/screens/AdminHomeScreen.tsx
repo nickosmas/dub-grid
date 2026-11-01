@@ -6,6 +6,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -25,7 +26,6 @@ import { WeekNavigatorHeader } from "../../schedule/components/WeekNavigatorHead
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { CoverageWash } from "../components/CoverageWash";
-import { PeriodLoadingOverlay } from "../components/PeriodLoadingOverlay";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
@@ -90,15 +90,15 @@ export function AdminHomeScreen() {
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || mine.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
   });
-  // A week change keeps the previous week's cards on screen under a scrim
-  // with one spinner in the middle, instead of locking the stepper or dropping
-  // to a skeleton: the change is visible as a change, not a freeze. Placeholder
-  // data is exactly that state, the other week still on screen while this one
-  // loads; a background refetch of the week already shown, from a pull or a
-  // realtime nudge, is not.
+  // A week change keeps the previous week's cards on screen, undimmed, with a
+  // small spinner beside the header's week until the new one lands, instead
+  // of locking the stepper or dropping to a skeleton. Placeholder data is
+  // exactly that state, the other week still on screen while this one loads;
+  // a background refetch of the week already shown, from a pull or a realtime
+  // nudge, is not.
   const isRefetching = dashboardQuery.isPlaceholderData || mine.isPlaceholderData;
   // The weeks either side are fetched alongside this one, so the stepper
-  // finds them in cache and moves without the scrim.
+  // usually finds them in cache and moves without a spinner.
   usePrefetchAdjacentDashboardWeeks({
     accessToken,
     range,
@@ -106,12 +106,13 @@ export function AdminHomeScreen() {
     ready: bootstrapQuery.data !== undefined,
     currentUpdatedAt: dashboardQuery.dataUpdatedAt,
   });
-  // The login page's aurora in the period's coverage colour, the viewport's
-  // height and fixed behind everything: status bar, sticky header and content.
+  // The web build keeps the login page's aurora in the period's coverage
+  // colour behind everything; on device the page is the plain grouped gray.
   const { height: windowHeight } = useWindowDimensions();
   const header = (
     <View style={styles.header}>
       <WeekNavigatorHeader
+        loading={isRefetching}
         now={now}
         range={range}
         selectedDate={selectedDate}
@@ -249,15 +250,18 @@ export function AdminHomeScreen() {
         ]
       : teamSections;
 
+  const wash = IS_NATIVE_LIST ? undefined : (
+    <CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />
+  );
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      pageBackground={<CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />}
+      pageBackground={wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={<CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />}
+      stickyHeaderBackground={wash}
       stickyHeader={header}
-      renderOverlay={isRefetching ? () => <PeriodLoadingOverlay /> : undefined}
     >
       <View style={styles.cards}>
         {sections.map((section, index) => (
@@ -272,8 +276,7 @@ export function AdminHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  // The page's own section rhythm: each card is a titled section again, and
-  // the coloured halos want air between them.
+  // The page's own section rhythm: each card is a titled group.
   cards: {
     gap: mobileSpacing.sectionGap,
   },

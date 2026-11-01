@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Linking, StyleSheet, View } from "react-native";
-import { Button } from "../../../shared/components/Button";
-import { Text } from "../../../shared/components/Text";
-import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -14,8 +11,6 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
-import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -27,7 +22,8 @@ import {
 import {
   ProfileList,
   ProfileNavRow,
-  ProfilePanel,
+  ProfileListAction,
+  ProfileSwitchRow,
   ProfileSection,
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
@@ -74,8 +70,6 @@ function normalizePrefs(input: unknown): PrefsShape {
 }
 
 export default function ProfileNotificationsScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
@@ -189,42 +183,36 @@ export default function ProfileNotificationsScreen() {
       ) : (
         <View style={styles.body}>
           <ProfileSection title="Push notifications">
-            <ProfilePanel>
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleCopy}>
-                  <Text style={styles.rowTitle}>Push to this device</Text>
-                  <Text style={styles.rowDescription}>
-                    {push.isSupported
-                      ? push.permissionState === "denied"
-                        ? "Notifications are off for DubGrid in your device settings."
-                        : "Get alerts on this device when the app is closed."
-                      : "Push notifications are not supported on this device."}
-                  </Text>
-                  {/* The OS will not ask again once denied, so the only way
-                      forward is its settings page: offer it right here. */}
-                  {push.isSupported && push.permissionState === "denied" ? (
-                    <View style={styles.settingsLink}>
-                      <Button
-                        label="Open Settings"
-                        onPress={() => {
-                          void Linking.openSettings();
-                        }}
-                        size="sm"
-                        tone="link"
-                      />
-                    </View>
-                  ) : null}
-                </View>
-                <AppSwitch
-                  accessibilityLabel="Push notifications"
-                  disabled={!pushSwitchEnabled || push.permissionState === "denied"}
-                  value={push.permissionState === "granted"}
-                  onValueChange={() => {
-                    void togglePush();
+            <ProfileList>
+              <ProfileSwitchRow
+                accessibilityLabel="Push notifications"
+                detail={
+                  push.isSupported
+                    ? push.permissionState === "denied"
+                      ? "Notifications are off for DubGrid in your device settings."
+                      : "Get alerts on this device when the app is closed."
+                    : "Push notifications are not supported on this device."
+                }
+                disabled={!pushSwitchEnabled || push.permissionState === "denied"}
+                isLast={!(push.isSupported && push.permissionState === "denied")}
+                label="Push to this device"
+                value={push.permissionState === "granted"}
+                onValueChange={() => {
+                  void togglePush();
+                }}
+              />
+              {/* The OS will not ask again once denied, so the only way
+                  forward is its settings page: offer it right here. */}
+              {push.isSupported && push.permissionState === "denied" ? (
+                <ProfileListAction
+                  isLast
+                  label="Open Settings"
+                  onPress={() => {
+                    void Linking.openSettings();
                   }}
                 />
-              </View>
-            </ProfilePanel>
+              ) : null}
+            </ProfileList>
           </ProfileSection>
 
           <ProfileSection
@@ -264,31 +252,8 @@ export default function ProfileNotificationsScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    body: {
-      gap: 16,
-    },
-    toggleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 16,
-      padding: 16,
-    },
-    toggleCopy: {
-      flex: 1,
-      gap: 4,
-    },
-    rowTitle: {
-      ...mobileTextWeighted("cardTitle", "medium"),
-      color: mobileColors.textPrimary,
-    },
-    rowDescription: {
-      ...mobileText.caption,
-      color: mobileColors.textMuted,
-    },
-    settingsLink: {
-      alignSelf: "flex-start",
-    },
-  });
+const styles = StyleSheet.create({
+  body: {
+    gap: 16,
+  },
+});

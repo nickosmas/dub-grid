@@ -21,6 +21,7 @@ import {
   mobileSpace,
   mobileTabularText,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { coverageColor } from "../lib/coverage";
@@ -87,12 +88,10 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
         <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={CHEVRON_SIZE} />
       </PressableRow>
       {daily.length > 0 ? (
-        <View style={styles.strip}>
-          {/* Measured inside the padding: the pages must match the strip's
-              own box, not the padded wrapper's. */}
-          <View onLayout={handleStripLayout}>
-            <DailyStrip daily={daily} pageWidth={stripWidth} styles={styles} />
-          </View>
+        // The full row's width, under the chevron too: seven readable columns
+        // need every point a small phone has.
+        <View onLayout={handleStripLayout}>
+          <DailyStrip daily={daily} pageWidth={stripWidth} styles={styles} />
         </View>
       ) : null}
     </View>
@@ -289,10 +288,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       gap: mobileSpace.sm,
     },
-    // Keeps the day columns on the meter's width, clear of the chevron column.
-    strip: {
-      paddingRight: CHEVRON_SIZE + mobileSpace.sm,
-    },
     // Wraps so that at the larger text sizes the figures drop under the
     // name instead of squeezing it to its first letter.
     rowHeader: {
@@ -314,7 +309,7 @@ const createStyles = (mobileColors: MobileColors) =>
       flexShrink: 1,
     },
     filledText: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textSubtle,
     },
     pctText: {
@@ -331,11 +326,12 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.pill,
     },
     // The daily grid web's expanded coverage panel shows, one column per day.
-    // Fixed-size chrome: it must keep its shape at every text setting.
+    // Fixed-size chrome: it must keep its shape at every text setting. The
+    // equal columns carry no gap of their own, so "12/15" at a readable 13pt
+    // still fits seven across a 375pt phone, centred in its column.
     dailyRow: {
       flexDirection: "row",
       justifyContent: "space-between",
-      gap: mobileSpace.xs,
     },
     dailyPager: {
       gap: mobileSpace.xs,
@@ -356,7 +352,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: mobileSpace.xs,
     },
     dayLabel: {
-      ...mobileText.micro,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textSubtle,
     },
     dayDot: {
@@ -365,7 +361,7 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: 4,
     },
     dayCount: {
-      ...mobileText.micro,
-      color: mobileColors.textMuted,
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
     },
   });

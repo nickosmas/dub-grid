@@ -323,7 +323,7 @@ export function ManagementUserActionsSheet({
         {/* One field, wrapped: the sheet body puts 16 between its direct
             children, which would break a label off from its own value. */}
         <View style={styles.field}>
-          <AppText tone="secondary" variant="label">
+          <AppText tone="secondary" variant="meta">
             {MANAGEMENT_DEPARTMENT_LABELS.plural}
           </AppText>
           <AppText tone="muted">{departmentNames.join(", ") || "None"}</AppText>

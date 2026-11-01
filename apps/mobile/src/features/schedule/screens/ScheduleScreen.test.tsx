@@ -892,7 +892,7 @@ describe("ScheduleScreen", () => {
       heroCard.textContent?.indexOf("Shift 2") ?? Number.MAX_SAFE_INTEGER,
     );
     expect(screen.getAllByTestId("split-shift-dashed-divider").length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId("upcoming-shift-dashed-divider").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("upcoming-shift-divider").length).toBeGreaterThan(0);
     expect(screen.getAllByText("FRI")).toHaveLength(1);
     expect(screen.getAllByText("17")).toHaveLength(1);
   });

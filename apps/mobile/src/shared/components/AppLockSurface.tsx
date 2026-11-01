@@ -1,13 +1,10 @@
 import { useMemo } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { useAppLockSurface } from "../lib/app-lock";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpace, mobileText, type MobileColors } from "../theme/tokens";
-import { ActionButtons } from "./ActionButtons";
+import { mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppSplashScreen } from "./AppSplashScreen";
-import { Button } from "./Button";
-import { Text } from "./Text";
+import { ContentUnavailable } from "./ContentUnavailable";
 
 interface AppLockSurfaceProps {
   failed: boolean;
@@ -44,19 +41,13 @@ function AppLockedPage({ retrying, onRetry, onSignOut }: Omit<AppLockSurfaceProp
 
   return (
     <View accessibilityRole="alert" style={styles.page}>
-      <View style={styles.iconFrame}>
-        <Ionicons color={mobileColors.brand} name="lock-closed-outline" size={28} />
-      </View>
-      <Text style={styles.title}>The app is locked</Text>
-      <Text style={styles.body}>Verify it's you to continue, or sign out.</Text>
-      <ActionButtons
-        primaryAction={
-          <Button label="Unlock" loading={retrying} onPress={onRetry} tone="primary" />
-        }
-        style={styles.actions}
-      >
-        <Button disabled={retrying} label="Sign out" onPress={onSignOut} tone="neutral" />
-      </ActionButtons>
+      <ContentUnavailable
+        body="Verify it's you to continue, or sign out."
+        iconName="lock-closed-outline"
+        primaryAction={{ label: "Unlock", loading: retrying, onPress: onRetry }}
+        secondaryAction={{ label: "Sign out", disabled: retrying, onPress: onSignOut }}
+        title="The app is locked"
+      />
     </View>
   );
 }
@@ -67,29 +58,7 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       backgroundColor: mobileColors.background,
       flex: 1,
-      gap: mobileSpace.md,
       justifyContent: "center",
       paddingHorizontal: mobileSpace["3xl"],
-    },
-    iconFrame: {
-      alignItems: "center",
-      backgroundColor: mobileColors.brandSoft,
-      borderRadius: mobileRadii.pill,
-      height: 56,
-      justifyContent: "center",
-      width: 56,
-    },
-    title: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-      textAlign: "center",
-    },
-    body: {
-      ...mobileText.body,
-      color: mobileColors.textSubtle,
-      textAlign: "center",
-    },
-    actions: {
-      marginTop: mobileSpace.sm,
     },
   });

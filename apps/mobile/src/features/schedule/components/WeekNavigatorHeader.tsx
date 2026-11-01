@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { View, type StyleProp, type TextStyle } from "react-native";
+import { ActivityIndicator, View, type StyleProp, type TextStyle } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import type { MobileScheduleRange } from "@dubgrid/contracts";
@@ -64,9 +64,11 @@ export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
 
 /**
  * Home's header on both homes: the chosen day, its week, the week stepper and
- * the alerts bell.
+ * the alerts bell. `loading` puts the system's small spinner beside the week
+ * while another week loads, with the page left as it was underneath.
  */
 export function WeekNavigatorHeader({
+  loading = false,
   selectedDate,
   todayDate,
   range,
@@ -77,6 +79,7 @@ export function WeekNavigatorHeader({
   onNextWeek,
   onToday,
 }: {
+  loading?: boolean;
   selectedDate: string;
   todayDate: string;
   range: MobileScheduleRange;
@@ -103,9 +106,19 @@ export function WeekNavigatorHeader({
         <Text fit="fixed" style={styles.meWeekNavigatorTitle}>
           {formatScheduleDayLabel(selectedDate, now, timeZone)}
         </Text>
-        <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
-          {formatScheduleRange(range, timeZone)}
-        </Text>
+        <View style={styles.meWeekNavigatorRangeRow}>
+          <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
+            {formatScheduleRange(range, timeZone)}
+          </Text>
+          {loading ? (
+            <ActivityIndicator
+              accessibilityLabel="Loading week"
+              color={mobileColors.textSecondary}
+              size="small"
+              testID="period-loading"
+            />
+          ) : null}
+        </View>
       </View>
       <View style={styles.meWeekNavigatorActions}>
         <View style={styles.meWeekRangeControlGroup}>
