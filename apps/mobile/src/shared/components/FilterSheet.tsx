@@ -277,10 +277,10 @@ const createStyles = (mobileColors: MobileColors) =>
       minHeight: 48,
       paddingHorizontal: mobileSpace.lg,
     },
+    // The group header of the owner's grouped lists: 17pt semibold, sentence case.
     sectionTitleIos: {
-      ...mobileText.meta,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
+      ...mobileTextWeighted("sectionTitle", "semibold"),
+      color: mobileColors.textPrimary,
     },
     sectionTitleAndroid: {
       ...mobileTextWeighted("meta", "semibold"),
@@ -303,7 +303,7 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTextWeighted("body", "medium"),
     },
     selectionRowDetail: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });
