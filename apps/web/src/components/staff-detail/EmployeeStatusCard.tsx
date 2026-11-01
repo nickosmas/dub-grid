@@ -12,22 +12,25 @@ interface EmployeeStatusCardProps {
   absenceTypes?: readonly AbsenceType[];
   /** Change status, when the viewer may change it. */
   action?: ReactNode;
-  /** A pill right after the status's name, such as No app access. */
-  badge?: ReactNode;
   /** Edit plan on the planned card, when the viewer may change it. */
   planAction?: ReactNode;
+  /**
+   * A card sharing the status card's row as an equal column from 768px, such
+   * as the staff page's invite card; the planned cards then sit below.
+   */
+  companion?: ReactNode;
 }
+
+const LATER_GRID = "grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3";
 
 function CardText({
   eyebrow,
   title,
-  badge,
   detail,
   color,
 }: {
   eyebrow?: string;
   title: string;
-  badge?: ReactNode;
   detail: string;
   color: string;
 }) {
@@ -44,14 +47,11 @@ function CardText({
           {eyebrow}
         </span>
       ) : null}
-      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <span
-          className="dg-tabular-nums"
-          style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color }}
-        >
-          {title}
-        </span>
-        {badge}
+      <span
+        className="dg-tabular-nums"
+        style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color }}
+      >
+        {title}
       </span>
       <span
         className="dg-tabular-nums"
@@ -72,8 +72,8 @@ export function EmployeeStatusCard({
   employee,
   absenceTypes = [],
   action,
-  badge,
   planAction,
+  companion,
 }: EmployeeStatusCardProps) {
   const absenceId =
     employee.status === "inactive" ? employee.awayAbsenceTypeId : employee.plannedAbsenceTypeId;
@@ -93,29 +93,28 @@ export function EmployeeStatusCard({
     minWidth: 0,
   } as const;
 
-  return (
-    <div
-      data-slot="employee-status-card"
-      className="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3"
+  const statusSection = (
+    <section
+      aria-label="Staff status"
+      data-status={current.kind}
+      style={{
+        ...cardStyle,
+        border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
+        background: active ? "var(--dg-color-surface)" : colors.bg,
+      }}
     >
-      <section
-        aria-label="Status"
-        data-status={current.kind}
-        style={{
-          ...cardStyle,
-          border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
-          background: active ? "var(--dg-color-surface)" : colors.bg,
-        }}
-      >
-        <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
-        <CardText
-          title={current.title}
-          badge={badge}
-          detail={current.detail}
-          color={active ? "var(--dg-color-text-primary)" : colors.text}
-        />
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </section>
+      <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
+      <CardText
+        title={current.title}
+        detail={current.detail}
+        color={active ? "var(--dg-color-text-primary)" : colors.text}
+      />
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </section>
+  );
+
+  const laterCards = (
+    <>
       {starts ? (
         <section
           aria-label="First day"
@@ -155,6 +154,25 @@ export function EmployeeStatusCard({
           {planAction ? <div className="shrink-0">{planAction}</div> : null}
         </section>
       ) : null}
+    </>
+  );
+
+  if (companion) {
+    return (
+      <div data-slot="employee-status-card" className="flex flex-col gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          {statusSection}
+          {companion}
+        </div>
+        {starts || planned ? <div className={LATER_GRID}>{laterCards}</div> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div data-slot="employee-status-card" className={LATER_GRID}>
+      {statusSection}
+      {laterCards}
     </div>
   );
 }

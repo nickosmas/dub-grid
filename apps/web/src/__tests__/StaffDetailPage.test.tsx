@@ -680,10 +680,11 @@ describe("StaffDetailPage", () => {
 
     expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
     expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
-    // Once in the banner, once as the Record card's account state.
-    expect(screen.getAllByText("Invitation pending")).toHaveLength(2);
+    // The invite card beside the status says where it stands; the Access card names the state.
+    expect(screen.getByText(/^Invited .+, hasn't joined$/)).toBeInTheDocument();
+    expect(screen.getAllByText("Invitation pending")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change staff status" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
   });
 
@@ -800,7 +801,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Manages")).toBeInTheDocument();
     expect(screen.getByText("HR")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Change status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change staff status" })).toBeInTheDocument();
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
     // Management settings always open in a popup, never inline in the card.
@@ -868,15 +869,18 @@ describe("StaffDetailPage", () => {
     expect(within(dialog).getByText("Role")).toBeInTheDocument();
   });
 
-  it("says someone has no app access, and offers an invite where they can be invited", async () => {
+  it("says someone isn't invited yet, and offers an invite where they can be invited", async () => {
     mockedFetchEmployeeInvitations.mockResolvedValue([]);
 
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Internal notes");
 
-    expect(screen.getByText("No app access")).toBeInTheDocument();
-    // In the header and on the Access card.
-    expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(2);
+    expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+    // On the invite card and as the Access card's access level.
+    expect(screen.getAllByText("Not invited yet")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
+    // Only the Access card's; the header no longer offers one.
+    expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(1);
   });
 
   it("leaves the role out of the management card, which now covers departments only", async () => {
@@ -1051,7 +1055,7 @@ describe("StaffDetailPage", () => {
         .mockResolvedValueOnce({ ...mockEmployee, status: "inactive", version: 2 });
 
       render(<StaffDetailPage employeeId="emp-1" />);
-      fireEvent.click(await screen.findByRole("button", { name: "Change status" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Change staff status" }));
       const dialog = screen.getByRole("alertdialog");
       fireEvent.click(within(dialog).getByRole("radio", { name: choice }));
       fireEvent.click(within(dialog).getByRole("button", { name: confirmLabel }));

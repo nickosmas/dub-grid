@@ -24,13 +24,14 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { AccessInsignia } from "./AccessInsignia";
-import { PendingInvitationBanner } from "./PendingInvitationBanner";
 import { StaffPanelFooter } from "./StaffPanelFooter";
 import {
   EmployeeStatusActions,
   StatusCardActions,
 } from "@/components/staff-detail/EmployeeStatusActions";
 import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard";
+import { InvitationCard } from "@/components/staff-detail/InvitationCard";
+import type { PersonAccountState } from "@/lib/person-account-state";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useIsInSandbox } from "@/hooks";
@@ -48,6 +49,8 @@ interface StaffDetailPanelProps {
   canManageEmployees: boolean;
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
+  /** Whether they can sign in, and if not where their invitation stands, for the invite card. */
+  accountState?: PersonAccountState | null;
   onSave: (emp: Employee) => boolean | Promise<boolean>;
   /** Called instead of `onSave` when the admin confirms changing the email
    *  while a pending invitation exists — see EditEmployeePanel. */
@@ -112,6 +115,7 @@ export function StaffDetailPanel({
   canManageEmployees,
   orgId,
   pendingInviteByEmployeeId,
+  accountState = null,
   onSave,
   onSaveWithReinvite,
   onRemove,
@@ -157,18 +161,20 @@ export function StaffDetailPanel({
     !employee.userId &&
     Boolean(employee.email) &&
     Boolean(pendingInvitation || (orgId && onInvite));
+  const invitationState =
+    canManageEmployees &&
+    employee.status !== "removed" &&
+    accountState &&
+    accountState.kind !== "linked"
+      ? accountState
+      : null;
   const showManagementAccessAction = Boolean(
     canManageManagementAccess && onManageManagementAccess && employee.status !== "removed",
   );
   const showSendInviteAction = showInviteActions && !pendingInvitation;
   const showEmploymentStatusActions = canManageEmployees && !isSelf;
-  const showPendingInvitationActions = Boolean(pendingInvitation && onRevoke);
   const showPermissionsAction = Boolean(onPermissionsChange && orgRole === "admin");
-  const showPersonActionFooter =
-    showPendingInvitationActions ||
-    showPermissionsAction ||
-    showSendInviteAction ||
-    showManagementAccessAction;
+  const showPersonActionFooter = showPermissionsAction || showManagementAccessAction;
   // Person actions are a single, predictable two-column grid. The final action
   // spans both columns when the count is odd, so buttons remain symmetrical
   // whether an organization exposes one, two, three, or more actions.
@@ -188,9 +194,6 @@ export function StaffDetailPanel({
       closePanel();
     }
   }, [closePanel, requestClose]);
-
-  const handleReinvite =
-    onResend && pendingInvitation ? () => onResend(pendingInvitation.id) : undefined;
 
   // Reset scroll when switching employees
   useEffect(() => {
@@ -393,11 +396,21 @@ export function StaffDetailPanel({
               employee={employee}
               absenceTypes={absenceTypes}
               action={showEmploymentStatusActions ? cardActions : undefined}
-              badge={
-                orgRole ? undefined : <span className="dg-status-card-note">· No app access</span>
-              }
               planAction={showEmploymentStatusActions ? statusActions("Edit plan") : undefined}
             />
+            {invitationState ? (
+              <div style={{ marginTop: 12 }}>
+                <InvitationCard
+                  state={invitationState}
+                  onInvite={showSendInviteAction && onInvite ? () => onInvite(employee) : undefined}
+                  onResend={onResend}
+                  onRevoke={onRevoke}
+                  disabledReason={
+                    isInSandbox ? "Invitations aren't available in sandbox mode." : undefined
+                  }
+                />
+              </div>
+            ) : null}
           </div>
           <InlineEditEmployee
             employee={employee}
@@ -427,20 +440,12 @@ export function StaffDetailPanel({
           actions={
             showPersonActionFooter ? (
               <div className="flex flex-col gap-3">
-                {pendingInvitation && onRevoke && (
-                  <PendingInvitationBanner
-                    pendingInvitation={pendingInvitation}
-                    onReinvite={handleReinvite}
-                    onRevoke={onRevoke}
-                    isInSandbox={isInSandbox}
-                  />
-                )}
                 {/* Permissions belong to the person, not to the management-access
                 popup: that popup edits departments and nothing else, on every
                 surface, so it is the same popup wherever it opens from. Role
                 already lives in the header's inline select, so this renders
                 only the permissions launcher. */}
-                {(showPermissionsAction || showSendInviteAction || showManagementAccessAction) && (
+                {(showPermissionsAction || showManagementAccessAction) && (
                   <div
                     data-slot="staff-person-actions"
                     className="grid grid-cols-2 items-stretch gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
@@ -453,33 +458,6 @@ export function StaffDetailPanel({
                         labels={{ focusAreaLabel, certificationLabel, roleLabel }}
                         permissionActionClassName="w-full"
                       />
-                    )}
-                    {showSendInviteAction && onInvite && (
-                      <Button
-                        onClick={() => onInvite(employee)}
-                        disabled={isInSandbox}
-                        className="dg-btn dg-btn-secondary w-full"
-                        title={
-                          isInSandbox
-                            ? "Sending invitations isn't available in sandbox mode."
-                            : undefined
-                        }
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                          <polyline points="22,6 12,13 2,6" />
-                        </svg>
-                        Send invitation
-                      </Button>
                     )}
                     {showManagementAccessAction && onManageManagementAccess && (
                       <Button

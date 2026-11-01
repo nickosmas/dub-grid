@@ -17,6 +17,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { savePeopleOrder } from "@/lib/people-order";
+import { getPersonAccountState } from "@/lib/person-account-state";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -130,6 +131,12 @@ import ScrollableTabs from "@/components/ScrollableTabs";
 const REORDER_SETTLE_MS = 220;
 
 const getEmployeeId = (employee: Employee) => employee.id;
+
+function isExpiredInvitation(invitation: Invitation): boolean {
+  return (
+    !invitation.acceptedAt && !invitation.revokedAt && new Date(invitation.expiresAt) <= new Date()
+  );
+}
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -308,6 +315,8 @@ export function MembersSection({
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
+  // Kept apart from the pending ones, which drive the list; the slideover's invite card names them.
+  const [expiredInvitations, setExpiredInvitations] = useState<Invitation[]>([]);
   const loadedInvitationsForOrgIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -323,6 +332,7 @@ export function MembersSection({
             (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
           ),
         );
+        setExpiredInvitations(invites.filter(isExpiredInvitation));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -768,6 +778,7 @@ export function MembersSection({
             (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
           ),
         );
+        setExpiredInvitations(invites.filter(isExpiredInvitation));
       })
       .catch(() => {});
   }
@@ -873,6 +884,15 @@ export function MembersSection({
     ? ([...employees, ...inactiveEmployees, ...removedEmployees].find(
         (employee) => employee.id === expandedEmpId,
       ) ?? null)
+    : null;
+  const selectedAccountState = selectedEmployee
+    ? getPersonAccountState(
+        selectedEmployee,
+        [...pendingInvitations, ...expiredInvitations].filter(
+          (invitation) => invitation.employeeId === selectedEmployee.id,
+        ),
+        nowMs,
+      )
     : null;
   const selectedEmployeeDirectoryPerson = selectedEmployee
     ? (directory.find((person) => person.employeeId === selectedEmployee.id) ?? null)
@@ -1769,7 +1789,7 @@ export function MembersSection({
                           )}
                           {canViewEmployeeDetails && activeTab === "all" && (
                             <TableHead className="w-[110px] border-[var(--dg-color-border-light)] md:border-r">
-                              Status
+                              Staff status
                             </TableHead>
                           )}
                           <TableHead className="border-r border-[var(--dg-color-border-light)]">
@@ -1878,7 +1898,7 @@ export function MembersSection({
                       <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Role
                       </TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Staff status</TableHead>
                       <TableHead className="w-[40px] pr-6" />
                     </UITableRow>
                   </TableHeader>
@@ -2212,6 +2232,7 @@ export function MembersSection({
           canManageEmployees={canManageEmployees}
           orgId={orgId}
           pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+          accountState={selectedAccountState}
           onSave={handleSave}
           onSaveWithReinvite={onSaveWithReinvite}
           onRemove={onRemove}

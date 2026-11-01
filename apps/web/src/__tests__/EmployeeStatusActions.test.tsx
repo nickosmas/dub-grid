@@ -101,11 +101,8 @@ function renderActions(
   return handlers;
 }
 
-async function openDialog(
-  user: ReturnType<typeof userEvent.setup>,
-  title = "Change Alice Smith's status?",
-) {
-  await user.click(screen.getByRole("button", { name: "Change status" }));
+async function openDialog(user: ReturnType<typeof userEvent.setup>, title = "Change staff status") {
+  await user.click(screen.getByRole("button", { name: "Change staff status" }));
   return screen.getByRole("alertdialog", { name: title });
 }
 
@@ -134,7 +131,7 @@ describe("EmployeeStatusActions", () => {
         />,
       );
       expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-        "Change status",
+        "Change staff status",
       ]);
       unmount();
     }
@@ -154,7 +151,7 @@ describe("EmployeeStatusActions", () => {
       "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
     // Nothing is picked yet, so there's nothing to confirm.
-    expect(within(dialog).getByRole("button", { name: "Change status" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Change staff status" })).toBeDisabled();
   });
 
   it("names the picked change in the title and keeps what stays apart from what changes", async () => {
@@ -343,7 +340,7 @@ describe("EmployeeStatusActions", () => {
     expect(away).toHaveTextContent("Only someone on the schedule can be marked away.");
     await user.click(away);
     expect(away).toHaveAttribute("aria-checked", "false");
-    expect(within(dialog).getByRole("button", { name: "Change status" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Change staff status" })).toBeDisabled();
   });
 
   it("reinstates a suspended person", async () => {
@@ -896,7 +893,7 @@ describe("EmployeeStatusActions", () => {
     unmount();
     render(<StatusCardActions employee={makeEmployee()} canEdit {...base} />);
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Change status",
+      "Change staff status",
     ]);
   });
 
@@ -973,7 +970,7 @@ describe("EmployeeStatusActions", () => {
       />,
     );
 
-    expect(cardButtons()).toEqual(["Change status"]);
+    expect(cardButtons()).toEqual(["Change staff status"]);
     const dialog = await openDialog(user);
     expect(within(dialog).getByRole("radio", { name: /^Suspended/ })).toHaveAttribute(
       "aria-disabled",

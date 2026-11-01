@@ -88,24 +88,6 @@ vi.mock("@/components/EditEmployeePanel", () => ({
   ),
 }));
 vi.mock("@/components/InviteEmployeeModal", () => ({ default: () => <div /> }));
-vi.mock("@/components/staff/PendingInvitationBanner", () => ({
-  PendingInvitationBanner: ({
-    pendingInvitation,
-    onReinvite,
-    expired,
-  }: {
-    pendingInvitation: { id: string };
-    onReinvite?: () => void;
-    expired?: boolean;
-  }) => (
-    <div data-testid="invitation-banner" data-expired={String(Boolean(expired))}>
-      {pendingInvitation.id}
-      <button type="button" onClick={onReinvite}>
-        Resend
-      </button>
-    </div>
-  ),
-}));
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
   replaceOrganizationInvitationAccessGuarded: vi.fn(),
@@ -289,43 +271,62 @@ describe("StaffDetailPage", () => {
       vi.mocked(fetchEmployeeById).mockResolvedValue(unlinked as never);
     });
 
-    it("offers Reinvite on an expired invitation and no second invitation", async () => {
+    it("offers Resend on an expired invitation and no second invitation", async () => {
       vi.mocked(fetchEmployeeInvitations).mockResolvedValue([
         invitationFor({ id: "inv-expired", expiresAt: new Date(Date.now() - HOUR).toISOString() }),
       ] as never);
       renderPage();
 
-      const banner = await screen.findByTestId("invitation-banner");
-      expect(banner).toHaveAttribute("data-expired", "true");
+      const card = await screen.findByRole("region", { name: "Invitation" });
+      expect(card).toHaveAttribute("data-invitation", "expired");
+      expect(within(card).getByText(/^Invite expired /)).toBeInTheDocument();
       await screen.findByText("Account");
       expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
         "Invitation expired",
       );
       expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
+      expect(within(card).queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "Resend" }));
+      fireEvent.click(within(card).getByRole("button", { name: "Resend" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Resend" }));
       await waitFor(() => expect(resendInvitation).toHaveBeenCalledWith("inv-expired", "org-1"));
     });
 
-    it("shows a live invitation as pending", async () => {
+    it("shows a live invitation as pending, with Resend and Revoke", async () => {
       vi.mocked(fetchEmployeeInvitations).mockResolvedValue([invitationFor({})] as never);
       renderPage();
 
-      const banner = await screen.findByTestId("invitation-banner");
-      expect(banner).toHaveAttribute("data-expired", "false");
+      const card = await screen.findByRole("region", { name: "Invitation" });
+      expect(card).toHaveAttribute("data-invitation", "pending");
+      expect(within(card).getByText(/^Invited .+, hasn't joined$/)).toBeInTheDocument();
+      expect(within(card).getByText(/^The invite expires /)).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Resend" })).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Revoke" })).toBeInTheDocument();
       await screen.findByText("Account");
       expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
         "Invitation pending",
       );
     });
 
-    it("offers Send invitation when there is no open invitation", async () => {
+    it("offers Invite when there is no open invitation", async () => {
       vi.mocked(fetchEmployeeInvitations).mockResolvedValue([] as never);
       renderPage();
 
-      // In the header and on the Access card.
-      expect(await screen.findAllByRole("button", { name: "Send invitation" })).toHaveLength(2);
-      expect(screen.queryByTestId("invitation-banner")).not.toBeInTheDocument();
+      const card = await screen.findByRole("region", { name: "Invitation" });
+      expect(within(card).getByText("Not invited yet")).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Invite" })).toBeInTheDocument();
+      // The Access card keeps its own; the header no longer has one.
+      expect(screen.getAllByRole("button", { name: "Send invitation" })).toHaveLength(1);
+    });
+
+    it("leaves the invite card off for someone offboarded", async () => {
+      vi.mocked(fetchEmployeeById).mockResolvedValue({ ...unlinked, status: "removed" } as never);
+      vi.mocked(fetchEmployeeInvitations).mockResolvedValue([] as never);
+      renderPage();
+
+      await screen.findByRole("region", { name: "Staff status" });
+      expect(screen.queryByRole("region", { name: "Invitation" })).not.toBeInTheDocument();
     });
   });
 
