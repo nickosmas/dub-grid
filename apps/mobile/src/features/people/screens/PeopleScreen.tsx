@@ -868,7 +868,7 @@ export default function PeopleScreen() {
                   selected={staffFilters.appAccess === "invited"}
                 />
                 <SelectionRow
-                  label="No app access"
+                  label="Not invited yet"
                   onPress={() => setStaffFilter("appAccess", "none")}
                   selected={staffFilters.appAccess === "none"}
                 />

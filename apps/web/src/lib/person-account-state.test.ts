@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Invitation } from "@/types";
-import { getPersonAccountState } from "./person-account-state";
+import { describeInvitationCard, getPersonAccountState } from "./person-account-state";
 
 const NOW = Date.parse("2026-09-26T12:00:00.000Z");
 const HOUR = 3_600_000;
@@ -97,5 +97,46 @@ describe("getPersonAccountState", () => {
     expect(getPersonAccountState({ userId: null, email: "" }, [], NOW)).toEqual({
       kind: "no-email",
     });
+  });
+});
+
+describe("describeInvitationCard", () => {
+  // Noon UTC keeps the day the same in every US timezone the suite runs in.
+  const sentAt = "2026-10-30T12:00:00.000Z";
+  const expiresAt = "2026-11-06T12:00:00.000Z";
+
+  it("invites someone never invited, or asks for an email first", () => {
+    expect(describeInvitationCard({ kind: "not-invited" })).toEqual({
+      title: "Not invited yet",
+      detail: "Invite them to see their schedule and requests in the app.",
+    });
+    expect(describeInvitationCard({ kind: "no-email" })).toEqual({
+      title: "Not invited yet",
+      detail: "Add an email to invite them.",
+    });
+  });
+
+  it("dates a pending invite by when it went out and when it expires", () => {
+    expect(
+      describeInvitationCard({
+        kind: "pending",
+        invitationId: "inv-1",
+        email: "mina@example.com",
+        sentAt,
+        expiresAt,
+      }),
+    ).toEqual({ title: "Invited Oct 30, hasn't joined", detail: "The invite expires Nov 6." });
+  });
+
+  it("dates an expired invite by its expiry, with no line under it", () => {
+    expect(
+      describeInvitationCard({
+        kind: "expired",
+        invitationId: "inv-1",
+        email: "mina@example.com",
+        sentAt,
+        expiresAt: sentAt,
+      }),
+    ).toEqual({ title: "Invite expired Oct 30", detail: null });
   });
 });

@@ -80,7 +80,7 @@ export interface EmployeeStatusActionsProps {
   excludeChoice?: StatusAction;
   /**
    * For someone with an away planned: Edit plan opens its dates alone, and
-   * Change status the list alone, so the two never offer the same thing.
+   * Change staff status the list alone, so the two never offer the same thing.
    */
   focus?: "plan" | "status";
   /**
@@ -334,7 +334,7 @@ function PlanCancelToggle({
 }
 
 /**
- * Every status change goes through one Change status button and one dialog
+ * Every status change goes through one Change staff status button and one dialog
  * (51d): a card at the top says where they stand, the list holds every other
  * status (one they can't move to now is disabled and says why), the title and
  * confirm button name what happens, and what changes is kept apart from what
@@ -356,7 +356,7 @@ export function EmployeeStatusActions({
   onSetPlannedChange,
   absenceTypes = [],
   variant,
-  label = "Change status",
+  label = "Change staff status",
   initialChoice,
   excludeChoice,
   focus,
@@ -441,7 +441,7 @@ export function EmployeeStatusActions({
       (!(option.action in handlers) || Boolean(handlers[option.action])),
   );
   // A button that names its own change (Reinstate, Restore, Offboard) opens a
-  // confirmation for that change alone. Change status always opens the list.
+  // confirmation for that change alone. Change staff status always opens the list.
   const onlyChoice =
     focus === "plan" || !initialChoice
       ? null
@@ -793,7 +793,7 @@ export function EmployeeStatusActions({
                     : plannedLeave
                       ? `Change ${displayName}'s last day?`
                       : `Change ${displayName}'s planned time away?`
-            : `Change ${displayName}'s status?`)
+            : "Change staff status")
         }
         message={
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -896,7 +896,7 @@ export function EmployeeStatusActions({
                   onSetPlannedChange &&
                   focus !== "status")
               ? "Save changes"
-              : "Change status"
+              : "Change staff status"
         }
         confirmDisabled={
           !choice &&
@@ -956,7 +956,7 @@ export function EmployeeStatusActions({
  * Mark active, Restore) as a button, and a menu naming each other change
  * that can be made now (Mark away, Offboard, and for someone Away, Change
  * return date). Every one opens a confirmation for that change alone. Active
- * people get Change status, or a button named for the one change left.
+ * people get Change staff status, or a button named for the one change left.
  */
 export function StatusCardActions(
   props: Omit<

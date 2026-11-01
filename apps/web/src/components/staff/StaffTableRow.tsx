@@ -327,7 +327,7 @@ function StaffRowCells({
             bordered={false}
             dot
             className="gap-1.5 rounded-full px-2"
-            aria-label={`Status: ${statusLabel}`}
+            aria-label={`Staff status: ${statusLabel}`}
           >
             {statusLabel}
           </StatusPill>

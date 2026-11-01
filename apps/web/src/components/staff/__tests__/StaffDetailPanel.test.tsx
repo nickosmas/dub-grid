@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { StaffDetailPanel } from "@/components/staff/StaffDetailPanel";
@@ -182,10 +182,50 @@ describe("StaffDetailPanel access controls", () => {
     expect(screen.queryByRole("button", { expanded: false })).toBeNull();
   });
 
-  it("says so plainly when the person has no login at all", () => {
-    renderPanel({ orgRole: null });
+  it("says where an invitation stands for someone with no login, under the status card", () => {
+    renderPanel({
+      orgRole: null,
+      employee: { ...employee, userId: null },
+      accountState: { kind: "not-invited" },
+      onInvite: vi.fn(),
+    });
 
-    expect(screen.getByText("· No app access")).toBeTruthy();
+    expect(screen.queryByText(/No app access/)).toBeNull();
+    const card = screen.getByRole("region", { name: "Invitation" });
+    expect(card).toHaveTextContent("Not invited yet");
+    expect(card).toHaveTextContent("Invite them to see their schedule and requests in the app.");
+    expect(within(card).getByRole("button", { name: "Invite" })).toBeTruthy();
+  });
+
+  it("offers Resend and Revoke on a pending invitation, and no card once offboarded", () => {
+    const pending = {
+      kind: "pending" as const,
+      invitationId: "inv-1",
+      email: "pat@example.com",
+      sentAt: "2026-10-30T12:00:00.000Z",
+      expiresAt: "2026-11-06T12:00:00.000Z",
+    };
+    renderPanel({
+      employee: { ...employee, userId: null },
+      accountState: pending,
+      onResend: vi.fn(),
+      onRevoke: vi.fn(),
+    });
+
+    const card = screen.getByRole("region", { name: "Invitation" });
+    expect(card).toHaveTextContent("Invited Oct 30, hasn't joined");
+    expect(card).toHaveTextContent("The invite expires Nov 6.");
+    expect(within(card).getByRole("button", { name: "Resend" })).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Revoke" })).toBeTruthy();
+
+    cleanup();
+    renderPanel({
+      employee: { ...employee, userId: null, status: "removed" },
+      accountState: pending,
+      onResend: vi.fn(),
+      onRevoke: vi.fn(),
+    });
+    expect(screen.queryByRole("region", { name: "Invitation" })).toBeNull();
   });
 
   it("keeps access in the header, next to the name, not in the action row", () => {
@@ -203,10 +243,10 @@ describe("StaffDetailPanel access controls", () => {
     expect(row).not.toContainElement(screen.getByTestId("employee-status-actions"));
   });
 
-  it("puts Change status in the status card under the name", () => {
+  it("puts Change staff status in the status card under the name", () => {
     renderPanel({ orgRole: "user" });
 
-    const card = screen.getByRole("region", { name: "Status" });
+    const card = screen.getByRole("region", { name: "Staff status" });
     expect(card).toHaveTextContent("Active");
     expect(card).toHaveTextContent("Can sign in and be scheduled.");
     expect(card).toContainElement(screen.getByTestId("employee-status-actions"));
@@ -219,7 +259,7 @@ describe("StaffDetailPanel access controls", () => {
       employee: { ...employee, status: "active", suspendedAt: "2026-10-26T12:00:00Z" },
     });
 
-    const card = screen.getByRole("region", { name: "Status" });
+    const card = screen.getByRole("region", { name: "Staff status" });
     expect(card).toHaveTextContent("Suspended since Oct 26");
     expect(screen.queryByTestId("employee-status-actions")).toBeNull();
     expect(
@@ -244,9 +284,10 @@ describe("StaffDetailPanel access controls", () => {
     expect(screen.getByRole("img", { name: "Away from Nov 10, back Jan 4" })).toBeTruthy();
   });
 
-  it("puts Send invitation in the same row as Add to Management, not stacked above it", () => {
+  it("puts Invite on the invite card, not in the footer beside Add to Management", () => {
     renderPanel({
       employee: { ...employee, userId: null, email: "pat@example.com" },
+      accountState: { kind: "not-invited" },
       canManageEmployees: true,
       orgId: "org-1",
       canManageManagementAccess: true,
@@ -254,9 +295,11 @@ describe("StaffDetailPanel access controls", () => {
       onInvite: vi.fn(),
     });
 
-    const manageButton = screen.getByRole("button", { name: /Add to Management/ });
-    const inviteButton = screen.getByRole("button", { name: /Send invitation/ });
-    expect(inviteButton.parentElement).toBe(manageButton.parentElement);
+    const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
+    const inviteButton = screen.getByRole("button", { name: "Invite" });
+    expect(screen.getByRole("region", { name: "Invitation" })).toContainElement(inviteButton);
+    expect(actionFooter).not.toContainElement(inviteButton);
+    expect(screen.queryByRole("button", { name: /Send invitation/ })).toBeNull();
   });
 
   it("keeps person actions outside the scrolling form and immediately above editor actions", () => {
@@ -302,21 +345,17 @@ describe("StaffDetailPanel access controls", () => {
 
   it("uses the shared two-column grid for person actions", () => {
     renderPanel({
-      employee: { ...employee, userId: null, email: "pat@example.com" },
       canManageManagementAccess: true,
       onManageManagementAccess: vi.fn(),
-      onInvite: vi.fn(),
     });
 
     const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
-    const inviteButton = screen.getByRole("button", { name: /send invitation/i });
     const managementButton = screen.getByRole("button", { name: /add to management/i });
 
     const personActions = document.querySelector<HTMLElement>('[data-slot="staff-person-actions"]');
 
-    expect(actionFooter).toContainElement(inviteButton);
-    expect(inviteButton.parentElement).toBe(managementButton.parentElement);
-    expect(personActions).toContainElement(inviteButton);
+    expect(actionFooter).toContainElement(managementButton);
+    expect(personActions).toContainElement(managementButton);
     expect(personActions).toHaveClass(
       "grid",
       "grid-cols-2",
