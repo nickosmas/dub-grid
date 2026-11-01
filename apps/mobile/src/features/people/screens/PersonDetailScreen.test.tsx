@@ -18,6 +18,7 @@ const stackScreenOptions: StackScreenOptions[] = [];
 type StackScreenOptions = {
   title?: string;
   headerRight?: () => ReactNode;
+  headerLeft?: () => ReactNode;
 };
 const pushToast = vi.fn();
 const routerReplace = vi.fn();
@@ -52,7 +53,12 @@ vi.mock("expo-router", () => ({
     // header's "Edit" the way it presses anything else on the page.
     Screen: (props: { options?: StackScreenOptions }) => {
       stackScreenOptions.push(props.options ?? {});
-      return <div data-testid="navigation-bar">{props.options?.headerRight?.() ?? null}</div>;
+      return (
+        <div data-testid="navigation-bar">
+          {props.options?.headerLeft?.() ?? null}
+          {props.options?.headerRight?.() ?? null}
+        </div>
+      );
     },
   },
   useLocalSearchParams,
@@ -934,7 +940,7 @@ describe("PersonDetailScreen", () => {
     // throw away, which the dedicated test below covers.
     expect(screen.getByText("Cancel")).toBeInTheDocument();
     expect(screen.queryByText("Discard")).not.toBeInTheDocument();
-    expect(screen.getByText("Save changes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
@@ -2043,8 +2049,9 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(bar.getByRole("button", { name: "Edit" }));
 
-      expect(screen.getByText("Save changes")).toBeInTheDocument();
-      expect(stackScreenOptions.at(-1)?.headerRight).toBeUndefined();
+      // Editing, the bar holds Cancel and Save in Edit's place.
+      expect(bar.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+      expect(bar.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();

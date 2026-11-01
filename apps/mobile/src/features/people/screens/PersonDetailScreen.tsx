@@ -57,7 +57,11 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import {
+  createHeaderEditActions,
+  createHeaderTextAction,
+} from "../../../shared/navigation/HeaderTextAction";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   changeMobilePersonOrgRole,
   checkMobilePersonContact,
@@ -1424,7 +1428,15 @@ export default function PersonDetailScreen() {
   return (
     <Screen
       bottomPaddingMode="stack"
-      footer={footer}
+      footer={
+        IS_NATIVE_LIST ? (
+          editing && confirmationError && !showSaveConfirmation ? (
+            <InlineError message={confirmationError} />
+          ) : null
+        ) : (
+          footer
+        )
+      }
       onRefresh={manualRefresh.refresh}
       onScroll={handlePersonScroll}
       refreshing={manualRefresh.isRefreshing}
@@ -1443,19 +1455,37 @@ export default function PersonDetailScreen() {
           },
           // Edit lives in the bar, where iOS puts it, not in the action row:
           // it is the one action about the page rather than about the person.
-          // Cleared while editing, when the footer's Save and Cancel own it.
-          ...createHeaderTextAction(
-            canEdit && !editing
-              ? {
-                  label: "Edit",
-                  accessibilityHint: "Opens the staff details editor",
-                  onPress: () => {
-                    setEditing(true);
-                    setDraft(makeDraft(person));
-                  },
-                }
-              : null,
-          ),
+          // While editing, the phones put Save and Cancel in the bar too; the
+          // web build keeps them in the footer.
+          ...(editing && IS_NATIVE_LIST
+            ? createHeaderEditActions({
+                save: {
+                  label: "Save",
+                  accessibilityLabel: "Save changes",
+                  disabled: updateMutation.isPending || !hasChanges || hasEditValidationErrors,
+                  loading: updateMutation.isPending,
+                  onPress: handleSave,
+                },
+                discard: {
+                  label: getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges }),
+                  onPress: hasChanges ? guard.discard : guard.requestClose,
+                },
+              })
+            : { headerLeft: undefined, headerBackVisible: true }),
+          ...(editing && IS_NATIVE_LIST
+            ? {}
+            : createHeaderTextAction(
+                canEdit && !editing
+                  ? {
+                      label: "Edit",
+                      accessibilityHint: "Opens the staff details editor",
+                      onPress: () => {
+                        setEditing(true);
+                        setDraft(makeDraft(person));
+                      },
+                    }
+                  : null,
+              )),
         }}
       />
       <AccountLinkChallengeModal

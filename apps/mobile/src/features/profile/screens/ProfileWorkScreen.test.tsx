@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
@@ -25,6 +26,18 @@ vi.mock("react-native", async () => createReactNativeModule(await import("react"
 vi.mock("expo-router", () => ({
   router: {
     back: routerBack,
+  },
+  Stack: {
+    // The bar's edit actions rendered in place, so a test presses Save and
+    // Discard where the phones show them.
+    Screen: (props: {
+      options?: { headerLeft?: () => ReactNode; headerRight?: () => ReactNode };
+    }) => (
+      <div data-testid="navigation-bar">
+        {props.options?.headerLeft?.() ?? null}
+        {props.options?.headerRight?.() ?? null}
+      </div>
+    ),
   },
 }));
 
@@ -424,13 +437,10 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    // Save is grayed rather than removed, so the footer doesn't reflow the
-    // moment the first field changes. Cancel is the only other button: it is
-    // always live, because backing out is valid whether or not there is work.
+    // Save is grayed rather than removed, so the bar doesn't reflow the moment
+    // the first field changes. With nothing typed the back button leads the
+    // bar; Discard takes its place once there is something to throw away.
     expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
-    // Nothing typed yet, so the dismiss button reads Cancel; it becomes Discard
-    // once there is something to throw away.
-    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("radio", { name: "RN" }));
 
@@ -523,12 +533,11 @@ describe("ProfileWorkScreen", () => {
     expect(updateUser).not.toHaveBeenCalled();
   });
 
-  it("leaves the screen when Cancel is pressed on a clean draft", () => {
+  it("leaves a clean draft to the back button, with no Cancel of its own", () => {
     render(<ProfileWorkScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
   });
 
   it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
@@ -542,7 +551,7 @@ describe("ProfileWorkScreen", () => {
     // Reset in place. Leaving with edits in hand is the back gesture's job, so
     // Discard must not navigate.
     expect(routerBack).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 

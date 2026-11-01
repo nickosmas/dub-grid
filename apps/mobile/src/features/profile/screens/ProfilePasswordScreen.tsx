@@ -1,3 +1,4 @@
+import { Stack } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
   PASSWORD_MISMATCH_MESSAGE,
@@ -17,6 +18,8 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { createHeaderEditActions } from "../../../shared/navigation/HeaderTextAction";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   getProfile,
@@ -360,7 +363,9 @@ export default function ProfilePasswordScreen() {
     <Screen
       bottomPaddingMode="tabbed"
       footer={
-        contentState.kind === "loading" || contentState.kind === "error" ? null : (
+        IS_NATIVE_LIST ||
+        contentState.kind === "loading" ||
+        contentState.kind === "error" ? null : (
           <View style={styles.submitRow}>
             <Button
               disabled={(!passwordChanged && !passwordLooksReady) || passwordSaving}
@@ -373,6 +378,19 @@ export default function ProfilePasswordScreen() {
       }
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {IS_NATIVE_LIST && contentState.kind !== "loading" && contentState.kind !== "error" ? (
+        <Stack.Screen
+          options={createHeaderEditActions({
+            save: {
+              label: passwordChanged ? "Finish" : "Update",
+              accessibilityLabel: passwordChanged ? "Finish signing out" : "Update password",
+              disabled: (!passwordChanged && !passwordLooksReady) || passwordSaving,
+              loading: passwordSaving,
+              onPress: requestPasswordChange,
+            },
+          })}
+        />
+      ) : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={3} sections={1} showHero={false} />

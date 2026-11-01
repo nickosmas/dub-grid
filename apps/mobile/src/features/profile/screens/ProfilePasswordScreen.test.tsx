@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
@@ -20,6 +21,16 @@ const signOutMobileSessions = vi.fn();
 const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("expo-router", () => ({
+  Stack: {
+    // The bar's action rendered in place, so a test presses it where the
+    // phones show it.
+    Screen: (props: { options?: { headerRight?: () => ReactNode } }) => (
+      <div data-testid="navigation-bar">{props.options?.headerRight?.() ?? null}</div>
+    ),
+  },
+}));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,

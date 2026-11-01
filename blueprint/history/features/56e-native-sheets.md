@@ -29,6 +29,15 @@ Every bottom sheet and popup uses the platform's own element (owner,
   own (a choice to make before confirming) is a native sheet.
 - **The app lock** (a gate, or any sheet asking for a cover backdrop) keeps
   the drawn sheet, whose opaque cover a native sheet can't give.
+- **Actions at the top** (owner, 2026-10-31: "get rid of all bottom buttons in
+  all edit surfaces in favor of top liquid glass approach"): a sheet's Cancel
+  and primary action leave its footer for its bar, the close button on the
+  leading edge and the action as a tinted glass capsule on the trailing one
+  (a text button on Android), labelled with its verb ("Add", "Save"); a second
+  action such as Clear all takes the leading slot. Profile details, the
+  person editor and the password screen put Save (or Update) in the
+  navigation bar, filled, and Discard in place of the back button while there
+  are changes. A long scrolled sheet fades out above the home indicator.
 - **People rows** mark an Admin or Super Admin with the star alone (blue or
   gold, named for screen readers), not a labeled pill, leaving the row's room
   for their status (owner, 2026-10-31).
