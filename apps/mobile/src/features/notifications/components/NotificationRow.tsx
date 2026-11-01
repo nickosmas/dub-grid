@@ -8,7 +8,6 @@ import ReanimatedSwipeable, {
 import Animated, {
   Extrapolation,
   interpolate,
-  interpolateColor,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -98,17 +97,18 @@ export function NotificationRow({
     }
   };
 
-  // Unread is the dot and the weight, as in Mail; the row keeps the page's fill.
-  const restingFill = mobileColors.background;
-  const revealedFill = mobileColors.surfaceSecondary;
+  // Unread is the dot and the weight, as in Mail. Swiped, the row keeps the
+  // page's fill and only rounds its corners against the white track.
   const cardStyle = useAnimatedStyle(() => ({
     borderRadius: interpolate(reveal.value, [0, 1], [0, mobileRadii.card], Extrapolation.CLAMP),
-    backgroundColor: interpolateColor(reveal.value, [0, 1], [restingFill, revealedFill]),
   }));
 
   return (
     <ReanimatedSwipeable
       ref={swipeable}
+      // White under the row, as Mail draws it: hidden while the row rests
+      // over it, then the strip the rounded row and its buttons sit on.
+      containerStyle={styles.swipeTrack}
       friction={2}
       onSwipeableClose={handleClose}
       onSwipeableWillOpen={handleWillOpen}
@@ -263,6 +263,7 @@ const createStyles = (mobileColors: MobileColors) =>
     // row keeps the gutter as its own padding so its text lines up with the
     // page. The card's radius clips the press highlight underneath.
     card: {
+      backgroundColor: mobileColors.background,
       overflow: "hidden",
     },
     row: {
@@ -324,8 +325,11 @@ const createStyles = (mobileColors: MobileColors) =>
     noteLabel: {
       color: mobileColors.textMuted,
     },
-    // The actions sit on the page showing through behind the card, one round
-    // button per slot with its label underneath, as iOS Mail lays them out.
+    swipeTrack: {
+      backgroundColor: mobileColors.surface,
+    },
+    // The actions sit on the white track behind the card, one round button
+    // per slot with its label underneath, as iOS Mail lays them out.
     actions: {
       flexDirection: "row",
       alignItems: "center",
