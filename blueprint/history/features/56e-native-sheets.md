@@ -33,10 +33,11 @@ Every bottom sheet and popup uses the platform's own element (owner,
   all edit surfaces in favor of top liquid glass approach"): a sheet's Cancel
   and primary action leave its footer for its bar, the close button on the
   leading edge and the action as a tinted glass capsule on the trailing one
-  (a text button on Android), labelled with its verb ("Add", "Save"); a second
-  action such as Clear all takes the leading slot. Profile details, the
+  (a text button on Android), labelled with its verb ("Add", "Save"), and
+  gray glass while it can't be pressed; a second action such as Clear all
+  takes the leading slot only while it has something to act on. Profile details, the
   person editor and the password screen put Save (or Update) in the
-  navigation bar, filled, and Discard in place of the back button while there
+  navigation bar as the system's prominent item, and Discard in place of the back button while there
   are changes. A long scrolled sheet fades out above the home indicator.
 - **People rows** mark an Admin or Super Admin with the star alone (blue or
   gold, named for screen readers), not a labeled pill, leaving the row's room
@@ -45,9 +46,9 @@ Every bottom sheet and popup uses the platform's own element (owner,
   2026-10-31): iOS follows the title with a chevron, Android puts an arrow at
   the row's trailing edge (`SectionHeading`), in place of "See all".
 - **Section tags** (the Schedule focus areas, the Requests and Alerts tabs)
-  are Liquid Glass capsules on iOS 26, gray-tinted at rest and brand-tinted
+  are Liquid Glass capsules on iOS 26, clear glass at rest and brand-tinted
   while selected, and Material 3 filter chips on Android with a check mark,
-  each count in a small blue-tinted circle.
+  each count in a small gray circle.
 - **Lists and cards** are the platforms' grouped lists (owner: surfaces "fully
   native"): the page is iOS's grouped gray (#F2F2F7, black in dark mode under
   #1C1C1E cards), cards are flat and separate by fill with no shadow or
