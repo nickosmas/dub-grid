@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   SkeletonBlock,
@@ -10,12 +10,7 @@ import {
   useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import {
-  mobileControl,
-  mobileRadii,
-  type MobileColors,
-  mobileSpace,
-} from "../../../shared/theme/tokens";
+import { mobileRadii, type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 import { createStyles as createScheduleStyles } from "../screens/scheduleScreenStyles";
 import { SCHEDULE_DATE_TILE_MIN_HEIGHT, SCHEDULE_DATE_TILE_MIN_WIDTH } from "./ScheduleDateTile";
 
@@ -67,22 +62,23 @@ export function ScheduleMeSkeleton({
       <View style={scheduleStyles.upcomingSectionBlock}>
         <View style={scheduleStyles.upcomingSectionHeader}>
           <SkeletonLine variant="sectionTitle" width="46%" style={styles.grow} />
-          <SkeletonPill height={mobileControl.sm} width={132} />
+          <SkeletonLine variant="body" width={96} />
         </View>
         <View style={scheduleStyles.upcomingShiftsCard}>
           {skeletonRows(rowCount, (index) => (
-            <View
-              key={`upcoming-skeleton-${index}`}
-              style={[
-                scheduleStyles.upcomingShiftRow,
-                index > 0 ? scheduleStyles.upcomingShiftRowBorder : null,
-              ]}
-            >
-              <View style={styles.upcomingDateTile} />
-              <View style={scheduleStyles.upcomingShiftCopy}>
-                <SkeletonLine variant="sectionTitle" width="66%" />
-                <SkeletonLine variant="rowTitle" width="48%" />
-                <SkeletonLine variant="caption" width="38%" />
+            <View key={`upcoming-skeleton-${index}`}>
+              {/* Inside the card's padding already, so the hairline needs no
+                  inset of its own here. */}
+              {index > 0 ? (
+                <View style={[scheduleStyles.upcomingDaySeparator, styles.daySeparatorInPadding]} />
+              ) : null}
+              <View style={scheduleStyles.upcomingShiftRow}>
+                <View style={styles.upcomingDateTile} />
+                <View style={scheduleStyles.upcomingShiftCopy}>
+                  <SkeletonLine variant="sectionTitle" width="66%" />
+                  <SkeletonLine variant="rowTitle" width="48%" />
+                  <SkeletonLine variant="caption" width="38%" />
+                </View>
               </View>
             </View>
           ))}
@@ -121,19 +117,16 @@ export function ScheduleTeamSkeleton({
           </View>
           <View style={scheduleStyles.teamGroupCard}>
             {skeletonRows(rowsPerGroup, (rowIndex) => (
-              <View
-                key={`team-member-skeleton-${groupIndex}-${rowIndex}`}
-                style={[
-                  scheduleStyles.teamMemberRow,
-                  rowIndex > 0 ? scheduleStyles.teamMemberRowBorder : null,
-                ]}
-              >
-                <SkeletonCircle size={48} />
-                <View style={styles.teamMemberCopy}>
-                  <SkeletonLine variant="rowTitle" width={rowIndex === 1 ? "44%" : "58%"} />
+              <Fragment key={`team-member-skeleton-${groupIndex}-${rowIndex}`}>
+                {rowIndex > 0 ? <View style={scheduleStyles.teamMemberSeparator} /> : null}
+                <View style={scheduleStyles.teamMemberRow}>
+                  <SkeletonCircle size={48} />
+                  <View style={styles.teamMemberCopy}>
+                    <SkeletonLine variant="rowTitle" width={rowIndex === 1 ? "44%" : "58%"} />
+                  </View>
+                  {rowIndex === 0 ? <SkeletonPill height={22} width={92} /> : null}
                 </View>
-                {rowIndex === 0 ? <SkeletonPill height={22} width={92} /> : null}
-              </View>
+              </Fragment>
             ))}
           </View>
         </View>
@@ -148,6 +141,10 @@ const createStyles = (mobileColors: MobileColors) =>
     // percentage of; growing the wrapper gives it the row's free space.
     grow: {
       flex: 1,
+    },
+    daySeparatorInPadding: {
+      left: 0,
+      right: 0,
     },
     upcomingDateTile: {
       backgroundColor: mobileColors.skeletonBase,

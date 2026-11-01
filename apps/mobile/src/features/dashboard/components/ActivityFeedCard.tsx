@@ -105,14 +105,14 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: mobileListRow.paddingVertical,
     },
     type: {
-      ...mobileTextWeighted("caption", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
     },
     label: {
       ...mobileText.body,
       color: mobileColors.textPrimary,
     },
     value: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });

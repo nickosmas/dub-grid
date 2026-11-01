@@ -461,7 +461,7 @@ describe("AdminHomeScreen", () => {
     );
   });
 
-  it("covers the page with a centered spinner while the next period is still fetching", () => {
+  it("shows a small spinner beside the week, with the page undimmed, while the next period is still fetching", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -476,10 +476,12 @@ describe("AdminHomeScreen", () => {
     render(<AdminHomeScreen />);
 
     expect(screen.getByTestId("period-loading")).toBeInTheDocument();
-    expect(screen.getByLabelText("Loading period")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading week")).toBeInTheDocument();
+    // The page stays on screen and usable underneath: the stepper still works.
+    expect(screen.getByLabelText("Next week")).toBeEnabled();
   });
 
-  it("lifts the loading overlay once the period has landed", () => {
+  it("drops the spinner once the period has landed", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -488,7 +490,7 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       isPlaceholderData: false,
       // A background refetch of the period already on screen is not a period
-      // change, so it gets no scrim.
+      // change, so it gets no spinner.
       isFetching: true,
       isError: false,
       data: EMPTY_DASHBOARD_DATA,

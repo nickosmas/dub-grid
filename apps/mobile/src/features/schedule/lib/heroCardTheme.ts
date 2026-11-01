@@ -13,8 +13,11 @@ export const HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as cons
 export const HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
 export const HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 export const HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
-export const HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
-export const HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
+// The flat fill the hero takes on device, where a native card has no
+// gradient: the gradient's own middle, so the card keeps its blue in dark mode
+// rather than settling on the gradient's near-black navy ground.
+export const HERO_CARD_FLAT_LIGHT = HERO_CARD_GRADIENT_LIGHT[1];
+export const HERO_CARD_FLAT_DARK = HERO_CARD_GRADIENT_DARK[1];
 // A chip that sits on the hero gradient lightens the gradient rather than
 // bringing a surface of its own; `SplitShiftBadge` and `ShiftChangeBadge`
 // share these so the two chips in the hero's title row match.

@@ -108,12 +108,12 @@ const createStyles = (mobileColors: MobileColors) =>
       flexShrink: 1,
     },
     meta: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
     // The request type as a word in the caption, coloured by its tone; a
     // pill per row was the loudest thing on the card.
     type: {
-      ...mobileTextWeighted("caption", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
     },
   });

@@ -7,10 +7,10 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
   mobileSpace,
-  mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
+import { HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 
 type ShiftChange = NonNullable<MobileScheduleEntry["change"]>;
 
@@ -87,14 +87,12 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       justifyContent: "center",
       borderRadius: mobileRadii.pill,
-      borderWidth: 1,
       backgroundColor: HERO_INVERSE_CHIP_FILL,
-      borderColor: HERO_INVERSE_CHIP_BORDER,
       paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     textInverse: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("label", "semibold"),
       textTransform: "none",
       includeFontPadding: false,
       textAlignVertical: "center",

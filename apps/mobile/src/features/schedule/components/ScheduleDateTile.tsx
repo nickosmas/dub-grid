@@ -19,7 +19,7 @@ export const SCHEDULE_DATE_TILE_MIN_WIDTH = 60;
 export const SCHEDULE_DATE_TILE_MIN_HEIGHT = 68;
 
 /**
- * The calendar tile that fronts a day: weekday over day number in a framed
+ * The calendar tile that fronts a day: weekday over day number in a tinted
  * box, filled with the brand colour when the day is today (owner, 2026-11-01:
  * no red dot for today). Home's Your Week rows and the
  * Requests feed's date rail draw the same tile, so a date reads the same
@@ -63,16 +63,16 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: SCHEDULE_DATE_TILE_MIN_WIDTH,
       minHeight: SCHEDULE_DATE_TILE_MIN_HEIGHT,
       borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
+      // A tinted fill with no outline, which reads on a white card and on
+      // the grouped page alike.
+      backgroundColor: mobileColors.controlNeutralBg,
       alignItems: "center",
       justifyContent: "center",
-      gap: mobileSpace.sm,
+      gap: mobileSpace.xs,
     },
     weekday: {
-      ...mobileTextWeighted("badge", "semibold"),
-      color: mobileColors.textSubtle,
+      ...mobileTextWeighted("meta", "semibold"),
+      color: mobileColors.textSecondary,
     },
     day: {
       ...mobileTextWeighted("title", "bold"),
@@ -81,7 +81,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     tileToday: {
       backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
     },
     textToday: {
       color: mobileColors.onBrandText,

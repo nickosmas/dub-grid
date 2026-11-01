@@ -9,7 +9,7 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
-import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
+import { HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 import {
   mobileOnAccent,
   mobileRadii,
@@ -354,18 +354,16 @@ const createStyles = (mobileColors: MobileColors) =>
       alignSelf: "flex-start",
       alignItems: "center",
       borderRadius: mobileRadii.pill,
-      borderWidth: 1,
       flexDirection: "row",
       gap: mobileSpace.xs,
       paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
     },
     badgeInverse: {
       backgroundColor: HERO_INVERSE_CHIP_FILL,
-      borderColor: HERO_INVERSE_CHIP_BORDER,
     },
     badgeText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("label", "semibold"),
       color: mobileColors.brand,
       textTransform: "none",
     },
@@ -483,7 +481,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileOnAccent.secondary,
     },
     segmentEyebrow: {
-      ...mobileText.micro,
+      ...mobileText.label,
       color: mobileColors.brand,
     },
     segmentTitle: {

@@ -15,6 +15,8 @@ import {
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { HERO_INVERSE_CHIP_BORDER, HERO_INVERSE_CHIP_FILL } from "../lib/heroCardTheme";
 import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 
@@ -32,17 +34,7 @@ const pressableBleed = {
   paddingHorizontal: PRESSABLE_INSET,
 };
 
-export const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 export const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
-/**
- * How far the open-shift carousel bleeds into the page gutter so a card's side
- * shadow is not cut at the strip's edge, and how much room the section keeps
- * below its cards. The vertical room the shadow actually needs comes from the
- * elevation token, and the strip's bottom margin takes back whatever exceeds
- * this so the rhythm to the next section does not move with the token.
- */
-export const OPEN_SHIFT_CARD_SIDE_BLEED = 18;
-export const OPEN_SHIFT_CARD_FOOTROOM = 36;
 /**
  * The hero's collaborator stack: each avatar sits in a frame painted the
  * block's own navy, and the frame is exactly the avatar plus the ring, so
@@ -77,6 +69,14 @@ export const MONTH_EXPAND_SECTION_GAP = 14;
  */
 const TIMELINE_RAIL_WIDTH = 2;
 const TIMELINE_DOT_SIZE = 12;
+const TEAM_MEMBER_AVATAR_SIZE = 48;
+const TEAM_MEMBER_ROW_GAP = 16;
+
+/**
+ * A group's header: the platforms' prominent 17pt semibold on device, the
+ * larger drawn heading on the web build.
+ */
+const meGroupTitle = IS_NATIVE_LIST ? mobileText.cardTitle : mobileTextWeighted("title", "bold");
 
 export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
@@ -111,6 +111,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
+    meWeekNavigatorRangeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
+    },
     meWeekNavigatorActions: {
       flexDirection: "row",
       alignItems: "center",
@@ -123,19 +128,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       gap: 8,
     },
-    // The shadow lives on this view and the clip on the one inside: iOS clips
-    // a view's own shadow when it also clips its children, which is why the
-    // hero's blue glow never rendered there.
+    // A flat card like every other on the grouped page: the brand fill sets
+    // it apart, with no shadow or edge of its own.
     meHeroCard: {
       position: "relative",
       borderRadius: mobileRadii.card,
-      shadowOffset: {
-        width: 0,
-        height: 14,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 28,
-      elevation: 5,
     },
     meHeroCardClip: {
       overflow: "hidden",
@@ -189,15 +186,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "#CBD5E1",
     },
     meHeroBadgeText: {
-      ...mobileText.label,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textInverse,
-      textTransform: "uppercase",
     },
     meHeroDateTile: {
       minWidth: 58,
       borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileOnAccent.hairline,
       backgroundColor: mobileOnAccent.fill,
       alignItems: "center",
       justifyContent: "center",
@@ -206,7 +200,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 8,
     },
     meHeroDateWeekday: {
-      ...mobileText.label,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileOnAccent.tertiary,
     },
     meHeroDateDay: {
@@ -266,7 +260,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     previousShiftText: {
       flex: 1,
       minWidth: 0,
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textSubtle,
     },
     previousShiftTextInverse: {
@@ -346,6 +340,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       marginTop: mobileSpace.sm,
       marginBottom: mobileSpace.sm,
     },
+    // On device the people on shift are a row of the card under a hairline,
+    // not a box of their own inside it.
+    meHeroCollaboratorsRow: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileOnAccent.hairline,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: mobileSpace.md,
+      paddingTop: mobileSpace.md,
+    },
     meHeroCollaboratorLabelRow: {
       flex: 1,
       minWidth: 0,
@@ -411,32 +416,26 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "space-between",
       gap: mobileSpace.md,
+      paddingHorizontal: IS_NATIVE_LIST ? mobileSpace.lg : 0,
     },
     upcomingSectionTitle: {
-      ...mobileTextWeighted("title", "bold"),
+      ...meGroupTitle,
       flex: 1,
       color: mobileColors.textPrimary,
     },
-    // The secondary control pair rather than the soft brand fill: on the
-    // aurora-washed page `brandSoft` is the same tint as the ground.
-    upcomingHoursBadge: {
-      borderRadius: mobileRadii.control,
-      backgroundColor: mobileColors.controlSecondaryBg,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-    },
-    upcomingHoursBadgeText: {
-      ...mobileText.bodyStrong,
+    // The week's hours as the header's trailing detail, plain text the way a
+    // grouped list puts a count beside its header.
+    upcomingHoursText: {
+      ...mobileText.body,
       ...mobileTabularText,
-      color: mobileColors.controlSecondaryFg,
+      color: mobileColors.textSecondary,
     },
     upcomingShiftsCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: 20,
-      ...mobileElevation("card", isDark),
     },
     upcomingDateGroup: {
       flexDirection: "row",
@@ -493,20 +492,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textSecondary,
     },
-    upcomingShiftRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
+    // Above every day but the first, inset to the card's content on both
+    // sides as a grouped list's separators are. Laid over the day's top edge,
+    // since the day itself bleeds to the card's edges for today's tint.
+    upcomingDaySeparator: {
+      position: "absolute",
+      top: 0,
+      left: 20,
+      right: 20,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
-    upcomingShiftDashedDivider: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    upcomingShiftDashedDividerSegment: {
-      flex: 1,
-      height: 1,
-      borderRadius: 999,
-      backgroundColor: mobileColors.border,
+    // Between shifts on one day: the same hairline, starting at the shift's
+    // text rather than under the date tile.
+    upcomingShiftDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
     upcomingShiftRowToday: {
       backgroundColor: mobileColors.brandSoft,
@@ -573,8 +574,12 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
     },
     meSectionTitle: {
-      ...mobileTextWeighted("title", "bold"),
+      ...meGroupTitle,
       color: mobileColors.textPrimary,
+    },
+    // A grouped list's header starts on the rows' text line, not the card edge.
+    meGroupHeading: {
+      paddingHorizontal: IS_NATIVE_LIST ? mobileSpace.lg : 0,
     },
     meSectionLink: {
       ...mobileText.bodyStrong,
@@ -620,19 +625,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // A horizontal ScrollView clips to its bounds, so the card shadow needs
     // the token's own reach below the last card or it ends in a hard line.
+    // Runs to the screen's edges and starts its first card on the page's
+    // gutter, so the cards scroll out from under the edge like the App
+    // Store's shelves. The cards are flat, so no room is kept for a shadow.
     openShiftCarousel: {
-      marginHorizontal: -OPEN_SHIFT_CARD_SIDE_BLEED,
-      marginBottom: Math.min(
-        0,
-        OPEN_SHIFT_CARD_FOOTROOM - mobileElevationExtent("card", isDark).bottom,
-      ),
+      marginHorizontal: -getScreenGutter(),
     },
     openShiftCarouselContent: {
       gap: mobileSpace.md,
-      paddingHorizontal: OPEN_SHIFT_CARD_SIDE_BLEED,
-      paddingTop: 4,
-      paddingBottom: mobileElevationExtent("card", isDark).bottom,
-      paddingRight: OPEN_SHIFT_CARD_SIDE_BLEED + 4,
+      paddingHorizontal: getScreenGutter(),
     },
     openShiftDateCard: {
       width: 320,
@@ -647,34 +648,37 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 12,
       paddingHorizontal: mobileSpace.lg,
     },
+    // Grows to the carousel's tallest day, so every card is one height and
+    // each Claim row sits on the same line.
     openShiftDateCardItems: {
+      flexGrow: 1,
       gap: mobileSpace.md,
     },
-    // The day sheet's scroll view clips at both edges, so the list keeps the
-    // cards' shadow reach above the first and below the last one.
+    // The day sheet sits on the grouped gray, so its cards are the same flat
+    // white cards as the page's.
     openShiftSheetList: {
       gap: mobileSpace.md,
-      paddingTop: mobileElevationExtent("raised", isDark).top,
-      paddingBottom: mobileElevationExtent("raised", isDark).bottom,
-    },
-    // On the sheet's own surface a full card lift reads as too much depth.
-    openShiftSheetCard: {
-      ...mobileElevation("raised", isDark),
-    },
-    openShiftDateCardItemsStacked: {
-      gap: 0,
-      minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
-      position: "relative",
     },
     openShiftCard: {
+      flexGrow: 1,
       minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
       gap: 12,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
       borderColor: mobileColors.cardBorder,
       padding: mobileSpace.lg,
-      ...mobileElevation("card", isDark),
+    },
+    // The card's action rows supply its bottom edge, and the card clips the
+    // last row's press highlight to its corners.
+    cardWithActionRows: {
+      paddingBottom: 0,
+      overflow: "hidden",
+    },
+    // Sinks a card's action rows to its foot when the card is taller than its
+    // content, as the carousel's equal-height cards are.
+    cardActionRowsFoot: {
+      marginTop: "auto",
     },
     openShiftCardSurface: {
       gap: 12,
@@ -685,16 +689,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     openShiftSplitPanel: {
       gap: mobileSpace.md,
     },
-    openShiftCardLead: {
-      zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
-    },
-    // The peeking ghosts sit under the lead card, so they take the quieter
-    // level on both platforms; overriding one iOS property left the full
-    // `boxShadow` cast in place.
-    openShiftCardStacked: {
-      position: "absolute",
-      ...mobileElevation("raised", isDark),
-    },
     requestList: {
       gap: mobileSpace.md,
     },
@@ -702,10 +696,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.md,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
       borderColor: mobileColors.cardBorder,
       padding: mobileSpace.lg,
-      ...mobileElevation("card", isDark),
     },
     requestHeaderRow: {
       flexDirection: "row",
@@ -747,15 +740,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },
-    requestActions: {
-      flexDirection: "row",
-      gap: 12,
-    },
+    // A tinted fill with no outline, as the platforms draw a status capsule.
     jobPill: {
       ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
-      borderWidth: 1,
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.sm,
     },
@@ -776,16 +765,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     jobPillEyebrowText: {
-      ...mobileText.micro,
+      ...mobileText.label,
     },
-    // The ramp floors at `micro`; a compact eyebrow keeps that size.
+    // The ramp floors at 12pt, the smallest a capsule's words may be.
     jobPillEyebrowTextCompact: {
-      fontSize: mobileText.micro.fontSize,
+      fontSize: mobileText.label.fontSize,
     },
+    // Sentence case at a readable size, as the platforms' own tag capsules.
     jobPillText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
-      textTransform: "uppercase",
     },
     jobPillMentoredText: {
       textTransform: "none",
@@ -794,7 +783,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // a sibling of the label, so it has to state them or it falls back to the
     // system default size and sits off the label's baseline.
     jobPillMentoredInlineText: {
-      ...mobileTextWeighted("badge", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       textTransform: "none",
     },
     jobPillMentoredInlineTextCompact: {
@@ -816,16 +805,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
+      backgroundColor: mobileColors.controlNeutralBg,
       minHeight: 28,
       justifyContent: "center",
       paddingHorizontal: mobileSpace.md,
       paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
-      ...mobileText.badge,
+      ...mobileText.label,
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
     },
@@ -891,7 +878,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.sm,
     },
     monthCalendarWeekdayLabel: {
-      ...mobileTextWeighted("label", "bold"),
+      ...mobileTextWeighted("meta", "semibold"),
       flex: 1,
       color: mobileColors.textSubtle,
       textAlign: "center",
@@ -983,12 +970,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
-      paddingHorizontal: 8,
+      // On the card's text line, as a grouped list's header is.
+      paddingHorizontal: mobileSpace.lg,
     },
     shiftGroupTitle: {
       flex: 1,
       minWidth: 0,
-      ...mobileTextWeighted("title", "bold"),
+      ...meGroupTitle,
       color: mobileColors.textPrimary,
     },
     shiftGroupTime: {
@@ -1006,14 +994,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     shiftGroupTimeStacked: {
       textAlign: "left",
     },
+    // A grouped list's section: flat on the page, a hairline only in dark mode,
+    // and the rows' own padding for its height.
     teamGroupCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
       borderColor: mobileColors.cardBorder,
-      paddingHorizontal: 20,
-      paddingVertical: mobileSpace.md,
-      ...mobileElevation("card", isDark),
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.xs,
     },
     teamGroupMembers: {
       marginTop: 0,
@@ -1021,19 +1010,21 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     teamMemberRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 16,
+      gap: TEAM_MEMBER_ROW_GAP,
       minHeight: 72,
       paddingVertical: 16,
       ...pressableBleed,
     },
-    teamMemberRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
+    // Between rows only, starting at the name rather than under the avatar.
+    teamMemberSeparator: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: TEAM_MEMBER_AVATAR_SIZE + TEAM_MEMBER_ROW_GAP,
+      backgroundColor: mobileColors.borderSubtle,
     },
     teamMemberAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: TEAM_MEMBER_AVATAR_SIZE,
+      height: TEAM_MEMBER_AVATAR_SIZE,
+      borderRadius: TEAM_MEMBER_AVATAR_SIZE / 2,
       backgroundColor: mobileColors.brandSoft,
       borderWidth: 1,
       borderColor: mobileColors.brandBorder,

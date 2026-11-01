@@ -2,10 +2,10 @@ import { useMemo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { SectionHeading } from "../../../shared/components/SectionHeading";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
-  mobileElevation,
   mobileRadii,
   mobileSpace,
   mobileText,
@@ -13,10 +13,10 @@ import {
 } from "../../../shared/theme/tokens";
 
 /**
- * A dashboard section in the Apple Health idiom: a title (followed by a
- * chevron when it opens a fuller screen) over a plain surface on the page's coverage wash. The figures
- * inside are the content, and an optional sentence closes the card under a
- * hairline.
+ * A dashboard section as a grouped list draws one: a title (followed by a
+ * chevron when it opens a fuller screen) over a flat card on the grouped
+ * page. The figures inside are the content, and an optional sentence closes
+ * the card under a hairline.
  *
  * `surface={false}` keeps the header and drops the box, for content that is
  * already made of its own shapes (the schedule's shift pills) and would only
@@ -44,21 +44,19 @@ export function DashboardCard({
 
   return (
     <View style={styles.group}>
-      <SectionHeading onOpen={onOpen} title={title} titleStyle={styles.title} />
+      <View style={styles.heading}>
+        <SectionHeading onOpen={onOpen} title={title} titleStyle={styles.title} />
+      </View>
       {surface ? (
-        <View style={styles.frame}>
-          <View style={[styles.glow, mobileElevation("card", isDark)]}>
-            <View style={styles.surface}>
-              <View style={styles.body}>{children}</View>
-              {summary ? (
-                <View style={styles.summary}>
-                  <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.summaryText}>
-                    {summary}
-                  </Text>
-                </View>
-              ) : null}
+        <View style={styles.surface}>
+          <View style={styles.body}>{children}</View>
+          {summary ? (
+            <View style={styles.summary}>
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.summaryText}>
+                {summary}
+              </Text>
             </View>
-          </View>
+          ) : null}
         </View>
       ) : (
         <View style={styles.body}>{children}</View>
@@ -69,17 +67,12 @@ export function DashboardCard({
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    frame: {},
-    // The halo: a wide, soft `boxShadow` in the tone's colour, which both
-    // platforms draw the same way. A neutral card keeps the ordinary lift.
-    glow: {
-      borderRadius: mobileRadii.card,
-    },
     surface: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      // Dark mode keeps the hairline, where a shadow alone cannot draw an edge.
-      borderWidth: isDark ? 1 : 0,
+      // No shadow: the card separates from the grouped page by its fill, with
+      // a hairline in dark mode where the two are close.
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
       borderColor: mobileColors.cardBorder,
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.lg,
@@ -88,8 +81,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     group: {
       gap: mobileSpace.sm,
     },
+    // A grouped list's header starts on the rows' text line, not the card edge.
+    heading: {
+      paddingHorizontal: IS_NATIVE_LIST ? mobileSpace.lg : 0,
+    },
+    // The platforms' prominent group header (17pt semibold) on device; the
+    // web build keeps the larger drawn heading.
     title: {
-      ...mobileText.title,
+      ...(IS_NATIVE_LIST ? mobileText.cardTitle : mobileText.title),
       color: mobileColors.textPrimary,
     },
     body: {

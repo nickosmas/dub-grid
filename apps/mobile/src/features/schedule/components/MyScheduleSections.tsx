@@ -1,8 +1,7 @@
-import { ActionButtons } from "../../../shared/components/ActionButtons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { scheduleNotesForRow, scheduleNotesForSegment } from "../lib/scheduleNotes";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
@@ -12,8 +11,9 @@ import { PressableRow } from "../../../shared/components/PressableRow";
 import { SectionHeading } from "../../../shared/components/SectionHeading";
 import { LinearGradient } from "expo-linear-gradient";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
-import { Button } from "../../../shared/components/Button";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { CardActionRows } from "./CardActionRows";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { ScheduleDateTile } from "./ScheduleDateTile";
 import type {
@@ -27,12 +27,7 @@ import { getAvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileOnAccent,
-  MAX_FONT_SCALE,
-  mobileBorderColorFromText,
-  type MobileColors,
-} from "../../../shared/theme/tokens";
+import { mobileOnAccent, MAX_FONT_SCALE, type MobileColors } from "../../../shared/theme/tokens";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { getMobileRequestActionKey } from "../../shift-requests/lib/request-action-feedback";
 import {
@@ -53,13 +48,13 @@ import {
 import {
   HERO_CARD_BACKGROUND_DARK,
   HERO_CARD_BACKGROUND_LIGHT,
+  HERO_CARD_FLAT_DARK,
+  HERO_CARD_FLAT_LIGHT,
   HERO_CARD_GRADIENT_DARK,
   HERO_CARD_GRADIENT_END,
   HERO_CARD_GRADIENT_LIGHT,
   HERO_CARD_GRADIENT_LOCATIONS,
   HERO_CARD_GRADIENT_START,
-  HERO_CARD_SHADOW_DARK,
-  HERO_CARD_SHADOW_LIGHT,
   HERO_COLLABORATOR_BACKGROUND_DARK,
   HERO_COLLABORATOR_BACKGROUND_LIGHT,
 } from "../lib/heroCardTheme";
@@ -101,11 +96,7 @@ import type {
   MobileScheduleEntrySegment,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
-import {
-  MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS,
-  OPEN_SHIFT_CARD_MIN_HEIGHT,
-  createStyles,
-} from "../screens/scheduleScreenStyles";
+import { createStyles } from "../screens/scheduleScreenStyles";
 import {
   getOpenShiftAbsenceTypeId,
   getOpenShiftFocusAreaName,
@@ -118,12 +109,6 @@ import {
  * so a single failure raises a single toast rather than one from each.
  */
 const SCHEDULE_REQUESTS_ERROR_TOAST_KEY = "schedule-requests-error";
-// How far each card behind the lead peeks out below it and steps in at the
-// sides. Tight on purpose: at 10pt a four-card deck trailed 30pt of ledges
-// under the lead card and read as a stack of trays rather than a fanned deck.
-const OPEN_SHIFT_STACK_PEEK_HEIGHT = 6;
-const OPEN_SHIFT_STACK_SIDE_INSET = 4;
-const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 
 function getRequestSegments(request: MobileShiftRequest, which: "requester" | "target") {
   const legacyRequest = request as MobileShiftRequest & {
@@ -309,11 +294,13 @@ function MeSectionHeader({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <SectionHeading
-      onOpen={actionLabel ? onAction : undefined}
-      title={title}
-      titleStyle={styles.meSectionTitle}
-    />
+    <View style={styles.meGroupHeading}>
+      <SectionHeading
+        onOpen={actionLabel ? onAction : undefined}
+        title={title}
+        titleStyle={styles.meSectionTitle}
+      />
+    </View>
   );
 }
 
@@ -342,8 +329,6 @@ export function JobPill({
   const showsLabeledValue = chip.eyebrowLabel != null;
   const shouldRenderEyebrowInsidePill = eyebrowDisplay === "inside" && chip.eyebrowLabel;
   const shouldRenderSingleLinePill = !showsLabeledValue || eyebrowDisplay === "outside";
-  const pillBorderColor =
-    chip.kind === "general" ? mobileBorderColorFromText(chip.textColor) : chip.borderColor;
 
   return (
     <View
@@ -351,10 +336,7 @@ export function JobPill({
       style={[
         styles.jobPill,
         compact && styles.jobPillCompact,
-        {
-          backgroundColor: chip.backgroundColor,
-          borderColor: pillBorderColor,
-        },
+        { backgroundColor: chip.backgroundColor },
       ]}
     >
       {shouldRenderSingleLinePill ? (
@@ -571,14 +553,27 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
+  // The avatars' rings are cut from whatever sits behind them: the card's own
+  // fill on device, where the people are a row of the card, or the box's
+  // fill on the web build.
   const collaboratorBackground = {
-    backgroundColor: isDark
-      ? HERO_COLLABORATOR_BACKGROUND_DARK
-      : HERO_COLLABORATOR_BACKGROUND_LIGHT,
+    backgroundColor: IS_NATIVE_LIST
+      ? isDark
+        ? HERO_CARD_FLAT_DARK
+        : HERO_CARD_FLAT_LIGHT
+      : isDark
+        ? HERO_COLLABORATOR_BACKGROUND_DARK
+        : HERO_COLLABORATOR_BACKGROUND_LIGHT,
   };
 
   return (
-    <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
+    <View
+      style={
+        IS_NATIVE_LIST
+          ? styles.meHeroCollaboratorsRow
+          : [styles.meHeroCollaborators, collaboratorBackground]
+      }
+    >
       <View style={styles.meHeroCollaboratorLabelRow}>
         <Ionicons color={mobileOnAccent.tertiary} name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
@@ -924,7 +919,9 @@ export function MeHeroCard({
     </View>
   );
 
-  const heroGradient = (
+  // On device the hero is one flat brand fill, as a native card is; the web
+  // build keeps the drawn gradient.
+  const heroGradient = IS_NATIVE_LIST ? null : (
     <LinearGradient
       colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
       locations={HERO_CARD_GRADIENT_LOCATIONS}
@@ -935,8 +932,13 @@ export function MeHeroCard({
     />
   );
   const heroCardThemeStyle = {
-    backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
-    shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,
+    backgroundColor: IS_NATIVE_LIST
+      ? isDark
+        ? HERO_CARD_FLAT_DARK
+        : HERO_CARD_FLAT_LIGHT
+      : isDark
+        ? HERO_CARD_BACKGROUND_DARK
+        : HERO_CARD_BACKGROUND_LIGHT,
   };
 
   return (
@@ -1022,11 +1024,9 @@ export function UpcomingShiftsSection({
       <View style={styles.upcomingSectionHeader}>
         <Text style={styles.upcomingSectionTitle}>Your week</Text>
         {hoursLabel ? (
-          <View style={styles.upcomingHoursBadge}>
-            <Text fit="compact" style={styles.upcomingHoursBadgeText}>
-              {hoursLabel}
-            </Text>
-          </View>
+          <Text fit="compact" style={styles.upcomingHoursText}>
+            {hoursLabel}
+          </Text>
         ) : null}
       </View>
 
@@ -1038,7 +1038,6 @@ export function UpcomingShiftsSection({
               key={group.date}
               style={[
                 styles.upcomingDateGroup,
-                groupIndex > 0 && styles.upcomingShiftRowBorder,
                 isToday && styles.upcomingShiftRowToday,
                 isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
                 isToday &&
@@ -1047,6 +1046,7 @@ export function UpcomingShiftsSection({
               ]}
               testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
             >
+              {groupIndex > 0 ? <View style={styles.upcomingDaySeparator} /> : null}
               <View style={styles.upcomingDateColumn}>
                 <ScheduleDateTile
                   date={group.date}
@@ -1102,7 +1102,7 @@ export function UpcomingShiftsSection({
                               </Text>
                             </View>
                           </PressableRow>
-                          <UpcomingShiftDashedDivider />
+                          <UpcomingShiftDivider />
                         </Fragment>
                       ) : null;
                     })}
@@ -1120,7 +1120,7 @@ export function UpcomingShiftsSection({
 
                       return (
                         <Fragment key={item.key}>
-                          {itemIndex > 0 ? <UpcomingShiftDashedDivider /> : null}
+                          {itemIndex > 0 ? <UpcomingShiftDivider /> : null}
                           <PressableRow
                             onPress={() => onPressEntry(item.entry)}
                             style={styles.upcomingShiftRow}
@@ -1207,7 +1207,7 @@ export function UpcomingShiftsSection({
                       const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
                       return restOfDayChip && !restOfDayAbsenceComesFirst(entry) ? (
                         <Fragment key={`${entry.employeeId}:${entry.date}:rest-of-day`}>
-                          <UpcomingShiftDashedDivider />
+                          <UpcomingShiftDivider />
                           <PressableRow
                             onPress={() => onPressEntry(entry)}
                             style={styles.upcomingShiftRow}
@@ -1230,7 +1230,7 @@ export function UpcomingShiftsSection({
                     })}
                     {group.deletedEntries.map((entry) => (
                       <Fragment key={`${entry.employeeId}:${entry.date}`}>
-                        <UpcomingShiftDashedDivider />
+                        <UpcomingShiftDivider />
                         <View style={styles.upcomingDeletedHistoryRow}>
                           <PreviousChange entry={entry} change={entry.change} firstOfDay />
                         </View>
@@ -1247,7 +1247,7 @@ export function UpcomingShiftsSection({
   );
 }
 
-function UpcomingShiftDashedDivider() {
+function UpcomingShiftDivider() {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -1255,13 +1255,9 @@ function UpcomingShiftDashedDivider() {
   return (
     <View
       pointerEvents="none"
-      style={styles.upcomingShiftDashedDivider}
-      testID="upcoming-shift-dashed-divider"
-    >
-      {UPCOMING_SHIFT_DIVIDER_DASHES.map((_, index) => (
-        <View key={index} style={styles.upcomingShiftDashedDividerSegment} />
-      ))}
-    </View>
+      style={styles.upcomingShiftDivider}
+      testID="upcoming-shift-divider"
+    />
   );
 }
 
@@ -1306,10 +1302,9 @@ export function OpenShiftsSection({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { pushToast } = useToast();
   // The day whose full list is open in the sheet; the carousel itself never
-  // grows, a stacked day is a deck the reader taps to open.
+  // grows, a day with more than one shift shows its first and opens the rest.
   const [openDate, setOpenDate] = useState<string | null>(null);
   const handoff = useModalHandoff();
-  const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   useEffect(() => {
     if (requestsError) {
       pushClientFriendlyErrorToast(pushToast, {
@@ -1348,18 +1343,6 @@ export function OpenShiftsSection({
     ],
   );
   const dateGroups = availableOpenShiftFeed.groups;
-  const noteStackCardHeight = useCallback((date: string, height: number) => {
-    setStackCardHeights((currentHeights) => {
-      if (currentHeights[date] === height) {
-        return currentHeights;
-      }
-
-      return {
-        ...currentHeights,
-        [date]: height,
-      };
-    });
-  }, []);
   const openGroup =
     openDate != null ? (dateGroups.find((group) => group.date === openDate) ?? null) : null;
   const renderFeedCard = (
@@ -1375,14 +1358,13 @@ export function OpenShiftsSection({
        * behind an open sheet anyway.
        */
       runAction?: (action: () => void) => void;
-      /** Cards on the day sheet sit on its surface and take the quieter lift. */
-      surface?: "carousel" | "sheet";
     },
   ) => {
     const runAction = options?.runAction ?? ((action: () => void) => action());
-    const cardStyle = [
+    const cardStyle = styles.openShiftCard;
+    const cardWithActionsStyle = [
       styles.openShiftCard,
-      options?.surface === "sheet" ? styles.openShiftSheetCard : null,
+      IS_NATIVE_LIST && styles.cardWithActionRows,
     ];
     const cardSurfaceProps =
       options?.onToggle != null
@@ -1488,24 +1470,30 @@ export function OpenShiftsSection({
       }
 
       return (
-        <View key={item.key} style={cardStyle}>
+        <View key={item.key} style={cardWithActionsStyle}>
           {cardSurface}
           {volunteerBlockReason ? (
             <Text style={styles.scheduleRowMeta}>{volunteerBlockReason}</Text>
           ) : null}
-          <Button
-            disabled={
-              Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
-            }
-            label="Claim"
-            loading={isVolunteerLoading}
-            onPress={() => {
-              if (item.openShift.canVolunteer === false) {
-                return;
-              }
-              runAction(() => onVolunteer(item.openShift));
-            }}
-            tone="secondary"
+          <CardActionRows
+            actions={[
+              {
+                key: "claim",
+                label: "Claim",
+                disabled:
+                  Boolean(pendingAction) ||
+                  !linkedEmployeeId ||
+                  item.openShift.canVolunteer === false,
+                loading: isVolunteerLoading,
+                onPress: () => {
+                  if (item.openShift.canVolunteer === false) {
+                    return;
+                  }
+                  runAction(() => onVolunteer(item.openShift));
+                },
+              },
+            ]}
+            style={styles.cardActionRowsFoot}
           />
         </View>
       );
@@ -1579,15 +1567,20 @@ export function OpenShiftsSection({
     );
 
     return (
-      <View key={item.key} style={cardStyle}>
+      <View key={item.key} style={cardWithActionsStyle}>
         {cardSurface}
-        <Button
-          disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
-          icon={isPendingVolunteerRequest ? "hourglass-outline" : undefined}
-          label={isPendingVolunteerRequest ? "Pending approval" : "Claim"}
-          loading={isClaimLoading}
-          onPress={() => runAction(() => onClaim(item.request.id))}
-          tone="secondary"
+        <CardActionRows
+          actions={[
+            {
+              key: "claim",
+              label: isPendingVolunteerRequest ? "Pending approval" : "Claim",
+              disabled: isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId,
+              loading: isClaimLoading,
+              onPress: () => runAction(() => onClaim(item.request.id)),
+              webIcon: isPendingVolunteerRequest ? "hourglass-outline" : undefined,
+            },
+          ]}
+          style={styles.cardActionRowsFoot}
         />
       </View>
     );
@@ -1613,12 +1606,11 @@ export function OpenShiftsSection({
       >
         {dateGroups.map((group) => {
           const dateLabel = formatCompactScheduleDate(group.date);
-          const deckItems = group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
-          const isStack = deckItems.length > 1;
-          const hiddenStackCount = isStack ? deckItems.length - 1 : 0;
-          const stackedDeckHeight = hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT;
-          const stackCardHeight = stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
-          const openSheetLabel = `Show all open shifts for ${dateLabel}`;
+          const leadItem = group.items[0];
+          // A day with more than one shift shows its first, flat like the
+          // rest, and opens the whole day in a sheet; the count beside the
+          // date says how many there are.
+          const opensDay = group.items.length > 1;
 
           return (
             <View key={group.date} style={styles.openShiftDateCard}>
@@ -1630,56 +1622,18 @@ export function OpenShiftsSection({
                   tone="secondary"
                 />
               </View>
-              <View
-                style={[
-                  styles.openShiftDateCardItems,
-                  isStack && styles.openShiftDateCardItemsStacked,
-                  isStack && {
-                    minHeight: stackCardHeight,
-                    paddingBottom: stackedDeckHeight,
-                  },
-                ]}
-              >
-                {isStack ? (
-                  <>
-                    {deckItems.slice(1).map((item, index) => {
-                      const stackIndex = index + 1;
-                      const top = stackIndex * OPEN_SHIFT_STACK_PEEK_HEIGHT;
-                      const inset = stackIndex * OPEN_SHIFT_STACK_SIDE_INSET;
-
-                      return (
-                        <View
-                          key={`${item.key}-stacked`}
-                          pointerEvents="none"
-                          style={[
-                            styles.openShiftCard,
-                            styles.openShiftCardStacked,
-                            {
-                              height: stackCardHeight,
-                              left: inset,
-                              right: inset,
-                              top,
-                              zIndex: deckItems.length - stackIndex,
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                    <View
-                      onLayout={(event) => {
-                        noteStackCardHeight(group.date, event.nativeEvent.layout.height);
-                      }}
-                      style={styles.openShiftCardLead}
-                    >
-                      {renderFeedCard(deckItems[0] as AvailableShiftFeedItem, {
-                        accessibilityLabel: openSheetLabel,
-                        onToggle: () => setOpenDate(group.date),
-                      })}
-                    </View>
-                  </>
-                ) : (
-                  deckItems.map((item) => renderFeedCard(item))
-                )}
+              <View style={styles.openShiftDateCardItems}>
+                {leadItem
+                  ? renderFeedCard(
+                      leadItem,
+                      opensDay
+                        ? {
+                            accessibilityLabel: `Show all open shifts for ${dateLabel}`,
+                            onToggle: () => setOpenDate(group.date),
+                          }
+                        : undefined,
+                    )
+                  : null}
               </View>
             </View>
           );
@@ -1707,7 +1661,6 @@ export function OpenShiftsSection({
                 setOpenDate(null);
                 handoff(action);
               },
-              surface: "sheet",
             }),
           )}
         </View>
@@ -1776,7 +1729,10 @@ export function ShiftCoverRequestsSection({
             pendingAction?.key === getMobileRequestActionKey(request.id, declineBody);
 
           return (
-            <View key={request.id} style={styles.requestCard}>
+            <View
+              key={request.id}
+              style={[styles.requestCard, IS_NATIVE_LIST && styles.cardWithActionRows]}
+            >
               <View style={styles.requestHeaderRow}>
                 <View style={styles.requestHeaderCopy}>
                   <View
@@ -1821,25 +1777,26 @@ export function ShiftCoverRequestsSection({
                 </View>
               ) : null}
 
-              <ActionButtons
-                primaryAction={
-                  <Button
-                    disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label="Accept"
-                    loading={isAcceptLoading}
-                    onPress={() => onRespond(request.id, true)}
-                  />
-                }
-                style={styles.requestActions}
-              >
-                <Button
-                  disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                  label="Decline"
-                  loading={isDeclineLoading}
-                  onPress={() => onRespond(request.id, false)}
-                  tone="neutral"
-                />
-              </ActionButtons>
+              <CardActionRows
+                actions={[
+                  {
+                    key: "accept",
+                    label: "Accept",
+                    primary: true,
+                    disabled: Boolean(pendingAction) || !linkedEmployeeId,
+                    loading: isAcceptLoading,
+                    onPress: () => onRespond(request.id, true),
+                  },
+                  {
+                    key: "decline",
+                    label: "Decline",
+                    webTone: "neutral",
+                    disabled: Boolean(pendingAction) || !linkedEmployeeId,
+                    loading: isDeclineLoading,
+                    onPress: () => onRespond(request.id, false),
+                  },
+                ]}
+              />
             </View>
           );
         })}
