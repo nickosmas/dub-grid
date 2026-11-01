@@ -113,29 +113,13 @@ const BUTTON_SOLID_FILLS = {
 const MOBILE_LIGHT = {
   ...BUTTON_SOLID_FILLS,
   /**
-   * The light page: plain white, the same value as `surface`.
-   *
-   * This is a deliberate reversal. The page used to be a slate gray (#EFF2F6)
-   * so that white cards separated from it by fill alone, at 1.12:1 — and that
-   * ratio was the *only* thing drawing a card's edge, since `cardBorder` is
-   * transparent in light mode. Product direction is now a white page with cards
-   * lifted off it, so the separation moves wholesale from fill to shadow:
-   * `mobileElevation("card")` carries it, and it was strengthened in the same
-   * change precisely because it is now load-bearing rather than decorative.
-   *
-   * The consequence to keep in mind: **a card with no elevation is invisible in
-   * light mode.** Anything that wants to read as a distinct surface on this page
-   * needs `getCardSurfaceStyle` (or its own elevation), not just `surface` as a
-   * fill. `contrast.test.ts` no longer holds a card/page fill ratio for that
-   * reason, and holds the shadow's strength instead.
-   *
-   * The neutral *fills* that sit on this page (`controlNeutralBg`,
-   * `skeletonBase`) keep their slate tint and now carry more of the visual
-   * weight, since they are the only tinted shapes left on a white ground.
-   *
-   * Dark mode is untouched — its surfaces already separate on their own.
+   * The grouped page: iOS's `systemGroupedBackground`, the gray a Settings
+   * list sits on, used on Android too. White cards separate from it by fill
+   * alone, as native grouped lists do, so cards carry no shadow
+   * (`mobileElevation("card")` is flat) and no border (owner, 2026-10-31:
+   * surfaces "fully native").
    */
-  background: "#FFFFFF",
+  background: "#F2F2F7",
   /**
    * Neutral control fill — the Filter button, chips, the segmented-control
    * track, and `tone="plain"`.
@@ -148,7 +132,7 @@ const MOBILE_LIGHT = {
    * perceivable edge — this now sits much nearer that line than before, and
    * anything lighter needs a border or a shadow bought back first.
    */
-  controlNeutralBg: "#E5E9EE",
+  controlNeutralBg: "#E3E3E8",
   /**
    * Edge for the neutral control fills above: the segmented-control track and
    * the tab strip's idle tabs.
@@ -166,7 +150,7 @@ const MOBILE_LIGHT = {
    */
   controlNeutralBorder: "#D6DDE5",
   /** Secondary control fill. On a white card: 1.09 -> 1.28. */
-  controlSecondaryBg: "#D6E4FB",
+  controlSecondaryBg: "#D1E2FB",
   /**
    * Secondary control label. Darkened alongside its fill: keeping the standard
    * `brand` blue on the darker fill would drop the label to 4.03:1 and fail AA.
@@ -214,8 +198,12 @@ const MOBILE_LIGHT = {
 
 const MOBILE_DARK = {
   ...BUTTON_SOLID_FILLS,
-  /** Dark surfaces already separate well, so the page background is unchanged. */
-  background: darkColorTokens.background,
+  /**
+   * iOS's dark grouped pair: a black page under `secondarySystemGroupedBackground`
+   * cards, which separate by fill without a shadow or an edge.
+   */
+  background: "#000000",
+  surface: "#1C1C1E",
   controlNeutralBg: "#26262B",
   /**
    * Dark counterpart, softened alongside the light one. A dark hairline needs
@@ -227,11 +215,8 @@ const MOBILE_DARK = {
   controlSecondaryBg: "#1B2E4E",
   /** Brighter than light mode's, to stay legible on a dark fill. */
   controlSecondaryFg: "#7FB0FF",
-  /**
-   * Dark mode keeps the hairline: a shadow against a near-black page is
-   * invisible, so the edge is the only thing separating a card from it.
-   */
-  cardBorder: darkColorTokens.borderSubtle,
+  /** The card's fill separates it from the black page, as a grouped list's does. */
+  cardBorder: "transparent",
   /**
    * Sits between `surface` (#121214) and `borderSubtle` (#2A2A2F): light
    * enough to read as a filled shape on a card, dark enough not to glow.
@@ -336,16 +321,21 @@ export const mobileSoftGradient = softGradientTokens;
  * app, whose own gradient is correct as it stands.
  */
 const MOBILE_BRAND_WASH_LIGHT = ["#F2F6FE", "#EDF3FD", MOBILE_LIGHT.background] as const;
+const MOBILE_BRAND_WASH_DARK = ["#0A1222", "#04080F", MOBILE_DARK.background] as const;
 
 export function mobileSoftGradientStops(
   kind: SoftGradientKind,
   isDark: boolean,
 ): readonly [string, string, string] {
-  if (kind === "brandWash" && !isDark) {
-    return MOBILE_BRAND_WASH_LIGHT;
+  if (kind === "brandWash") {
+    return isDark ? MOBILE_BRAND_WASH_DARK : MOBILE_BRAND_WASH_LIGHT;
   }
-
-  return getSoftGradientStops(kind, isDark);
+  const stops = getSoftGradientStops(kind, isDark);
+  if (kind === "surfaceSheen" && isDark) {
+    // The sheen dissolves into the card, which is darker on mobile than web.
+    return [stops[0], stops[1], MOBILE_DARK.surface];
+  }
+  return stops;
 }
 export { getMobileEasingCurve as mobileEasingCurve };
 export type {
@@ -371,7 +361,8 @@ export function mobileElevation(
   level: MobileElevationLevel,
   isDark: boolean,
 ): MobileElevation & ViewStyle {
-  return getMobileElevation(level, isDark);
+  // A card is a grouped list's section: flat, separated from the page by fill.
+  return getMobileElevation(level === "card" ? "flat" : level, isDark);
 }
 
 /**

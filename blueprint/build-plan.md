@@ -1267,7 +1267,7 @@
         Material top app bar with icon actions, Add person as a floating
         action button, a Material search bar and filter chips, and Android's
         own bottom navigation in place of the floating tab bar.
-  - [ ] 56e. **Native sheets and dialogs** - every bottom sheet and popup
+  - [x] 56e. **Native sheets and dialogs** - every bottom sheet and popup
         uses the platform's own: a native sheet with detents and the grabber
         on iOS (Liquid Glass on iOS 26) and a Material bottom sheet on
         Android; confirmations as the system alert on iOS and Material's

@@ -12,11 +12,13 @@ import type { MobileColors } from "../theme/tokens";
  * the filter sheets all say "chosen" the same way. A bare brand tick was tried
  * here and read lighter than the disc on the pickers beside it. Drawn as a
  * view rather than `checkmark-circle` because that glyph is spoken for:
- * `ToastProvider` and `StatusBanner` use it to mean success.
+ * `ToastProvider` and `StatusBanner` use it to mean success. The phones draw
+ * their own: a bare checkmark on iOS, a radio button on Android.
  */
-export function SelectionCheck() {
+export function SelectionCheck({ selected = true }: { selected?: boolean }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  if (!selected) return null;
 
   return (
     <View style={styles.disc}>

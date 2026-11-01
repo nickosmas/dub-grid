@@ -15,6 +15,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { SelectionCheck } from "../../../shared/components/SelectionCheck";
+import { IS_ANDROID_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
@@ -644,8 +645,8 @@ export default function ProfileScreen() {
                   // its rounded edge would undo exactly that.
                   showDivider={
                     index < memberships.length - 1 &&
-                    !membership.isCurrent &&
-                    !memberships[index + 1]?.isCurrent
+                    (IS_NATIVE_LIST ||
+                      (!membership.isCurrent && !memberships[index + 1]?.isCurrent))
                   }
                   onPress={() => {
                     // UIKit will not present the confirmation over an existing
@@ -755,7 +756,9 @@ function OrganizationOptionRow({
       </View>
       {/* The row's own accessibilityLabel already says "current organization",
           so the mark is decorative here. */}
-      {membership.isCurrent ? <SelectionCheck /> : null}
+      {membership.isCurrent || IS_ANDROID_LIST ? (
+        <SelectionCheck selected={membership.isCurrent} />
+      ) : null}
     </>
   );
 
@@ -765,10 +768,15 @@ function OrganizationOptionRow({
   // can't do anything.
   if (membership.isCurrent) {
     return (
-      <View style={styles.orgOptionSlot}>
+      <View
+        style={[styles.orgOptionSlot, IS_NATIVE_LIST && showDivider && styles.orgOptionDivider]}
+      >
         <View
           accessibilityLabel={`${name}, current organization`}
-          style={[styles.orgOptionRow, styles.orgOptionCurrent]}
+          style={[
+            styles.orgOptionRow,
+            IS_NATIVE_LIST ? styles.orgOptionNative : styles.orgOptionCurrent,
+          ]}
         >
           {body}
         </View>
@@ -783,7 +791,11 @@ function OrganizationOptionRow({
   // square band spanning the whole group.
   return (
     <View style={[styles.orgOptionSlot, showDivider && styles.orgOptionDivider]}>
-      <PressableRow accessibilityLabel={name} style={styles.orgOptionRow} onPress={onPress}>
+      <PressableRow
+        accessibilityLabel={name}
+        style={[styles.orgOptionRow, IS_NATIVE_LIST && styles.orgOptionNative]}
+        onPress={onPress}
+      >
         {body}
       </PressableRow>
     </View>
@@ -819,6 +831,12 @@ const createStyles = (mobileColors: MobileColors) =>
       // than being shunted inward by the margin.
       paddingHorizontal: 16 - ORG_OPTION_INSET,
       paddingVertical: 12,
+    },
+    // A native list's row spans the group; the current one carries only its mark.
+    orgOptionNative: {
+      borderRadius: 0,
+      margin: 0,
+      paddingHorizontal: mobileSpace.lg,
     },
     orgOptionCurrent: {
       // A control fill, not `surfaceSecondary`: these rows sit on `surface`

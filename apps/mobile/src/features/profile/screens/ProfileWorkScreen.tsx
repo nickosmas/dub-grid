@@ -26,6 +26,8 @@ import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
@@ -547,10 +549,26 @@ export default function ProfileWorkScreen() {
       </View>
     ) : null;
 
+  // On the phones the editor's actions sit in the navigation bar; the web build
+  // and the tests keep them along the bottom.
+  const barActions =
+    IS_NATIVE_LIST && draft && profile ? (
+      <EditBarActions
+        save={{
+          label: isNameRequest ? "Send" : "Save",
+          accessibilityLabel: isNameRequest ? "Send request" : "Save changes",
+          disabled: saveMutation.isPending || !hasChanges || hasValidationErrors,
+          loading: saveMutation.isPending,
+          onPress: handleSave,
+        }}
+        discard={hasChanges ? { label: "Discard", onPress: discardChanges } : null}
+      />
+    ) : null;
+
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      footer={footer}
+      footer={IS_NATIVE_LIST ? null : footer}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -559,6 +577,7 @@ export default function ProfileWorkScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {barActions}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton
