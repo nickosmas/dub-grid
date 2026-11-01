@@ -2425,7 +2425,7 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  describe("access level in the editor", () => {
+  describe("access level on the page", () => {
     function renderForAccess(options: {
       canManageManagementAccess?: boolean;
       person?: Record<string, unknown>;
@@ -2469,21 +2469,20 @@ describe("PersonDetailScreen", () => {
       });
 
       render(<PersonDetailScreen />);
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
       return mutationCalls;
     }
 
     const accessRow = () => screen.getByRole("button", { name: /^Access level/ });
 
-    // The role is the first setting in the editor, ahead of the name, and it
-    // opens the picker on its own rather than riding on Save.
-    it("puts the access level first in the editor for a linked member", () => {
+    // On the page, not behind Edit, and it opens the picker on its own rather
+    // than riding on Save.
+    it("shows the access level on the page for a linked member", () => {
       renderForAccess({
         person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
       expect(accessRow()).toHaveTextContent("User");
-      const headings = ["Access", "Basic info"].map((title) => screen.getByText(title));
+      const headings = ["Access", "Contact"].map((title) => screen.getByText(title));
       expect(
         headings[0]!.compareDocumentPosition(headings[1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
@@ -2501,13 +2500,28 @@ describe("PersonDetailScreen", () => {
       expect(screen.queryByText("Access")).not.toBeInTheDocument();
     });
 
-    it("leaves the row out without the permission", () => {
+    it("shows the level without a way to change it without the permission", () => {
       renderForAccess({
         canManageManagementAccess: false,
-        person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
+        person: { orgRole: "admin", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
       expect(screen.queryByRole("button", { name: /^Access level/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Access level")).toBeInTheDocument();
+      expect(screen.getByText("Admin")).toBeInTheDocument();
+    });
+
+    it("counts an Admin's permissions under the level", () => {
+      renderForAccess({
+        person: {
+          orgRole: "admin",
+          membershipUpdatedAt: "2026-01-01T00:00:00.000Z",
+          adminPermissionCount: { granted: 18, total: 25 },
+        },
+      });
+
+      expect(screen.getByText("Permissions")).toBeInTheDocument();
+      expect(screen.getByText("18 of 25")).toBeInTheDocument();
     });
 
     // The invitation's `roleToAssign` is the role until it is accepted; reading

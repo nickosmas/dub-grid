@@ -222,6 +222,54 @@ describe("AddEmployeeModal", () => {
     });
   });
 
+  describe("Invites", () => {
+    function getEmailInputs() {
+      return Array.from(
+        document.body.querySelectorAll<HTMLInputElement>('input[placeholder="name@example.com"]'),
+      );
+    }
+
+    it("invites only the people ticked, each with their access level", async () => {
+      const { onAdd } = renderModal();
+      const firstNames = getFirstNameInputs();
+      const lastNames = getLastNameInputs();
+      const emails = getEmailInputs();
+      for (const [index, name] of ["Jane", "Omar", "Ruth"].entries()) {
+        await userEvent.type(firstNames[index]!, name);
+        await userEvent.type(lastNames[index]!, "Doe");
+      }
+      await userEvent.type(emails[0]!, "jane@calmhaven.org");
+      await userEvent.type(emails[1]!, "omar@calmhaven.org");
+
+      // Ruth has no email, so she can't be invited.
+      const inviteBoxes = screen.getAllByRole("checkbox", { name: /Invite to the app/ });
+      expect(inviteBoxes).toHaveLength(2);
+      expect(screen.getByRole("checkbox", { name: "Add an email to invite" })).toBeDisabled();
+      await userEvent.click(inviteBoxes[1]!);
+
+      await userEvent.click(screen.getByRole("button", { name: "Access level" }));
+      await userEvent.click(screen.getByRole("option", { name: "Admin" }));
+      // Super Admin is offered only by someone who holds it.
+      expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Add 3 Staff Members, Invite 1" }));
+
+      expect(onAdd.mock.calls[0][0]).toHaveLength(3);
+      expect(onAdd.mock.calls[0][1]).toEqual([{ email: "jane@calmhaven.org", role: "admin" }]);
+    });
+
+    it("ticks and clears everyone with an email at once", async () => {
+      renderModal();
+      await userEvent.type(getEmailInputs()[0]!, "jane@calmhaven.org");
+      const all = screen.getByRole("checkbox", { name: "Invite everyone with an email" });
+      expect(all).toBeChecked();
+
+      await userEvent.click(all);
+      expect(screen.getByRole("checkbox", { name: "Invite to the app" })).not.toBeChecked();
+      expect(all).not.toBeChecked();
+    });
+  });
+
   describe("Toggles", () => {
     it("clicking a focus area button selects it; resulting submission includes that focus area", async () => {
       const onAdd = vi.fn();

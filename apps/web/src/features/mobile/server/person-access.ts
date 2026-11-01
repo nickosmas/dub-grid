@@ -8,6 +8,7 @@ import {
 import type { MobilePerson } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rowToEmployee } from "@/lib/db/mappers";
+import { countMobileAdminPermissions } from "./admin-permission-count";
 import { mapEmployeeToMobilePerson } from "./routes/people";
 
 /**
@@ -59,6 +60,7 @@ export async function loadMobilePersonWithAccess(
     managementDeptAdminIds: membership?.dept_admin_ids ?? pendingInvitation?.dept_admin_ids ?? [],
     orgRole: toMobileOrgRole(membership?.org_role),
     membershipUpdatedAt: membership?.updated_at ?? null,
+    adminPermissionCount: countMobileAdminPermissions(membership),
     pendingInvitation: pendingInvitation
       ? {
           id: pendingInvitation.id,

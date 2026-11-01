@@ -1019,6 +1019,11 @@ export const mobilePersonSchema = z.object({
    * management access lives on the membership, so the two need separate guards.
    */
   membershipUpdatedAt: z.string().nullable().default(null),
+  /** An Admin's permissions, as granted of total; null for any other tier. */
+  adminPermissionCount: z
+    .object({ granted: z.number().int().nonnegative(), total: z.number().int().nonnegative() })
+    .nullable()
+    .default(null),
   pendingInvitation: z
     .object({
       id: z.string().uuid(),
@@ -1148,6 +1153,8 @@ export const mobilePersonStatusUpdateResponseSchema = z.object({
 
 export const mobilePersonInvitationCreateBodySchema = z.object({
   email: z.string().trim().email(),
+  /** The access level the invite grants; Super Admin only from a Super Admin. */
+  orgRole: mobileRoleSchema.default("user"),
   linkExistingAccount: z.boolean().optional(),
   reconcileName: z.boolean().optional(),
 });
@@ -1468,7 +1475,7 @@ export type MobilePersonUpdateBody = z.infer<typeof mobilePersonUpdateBodySchema
 export type MobileCreateShiftRequestBody = z.infer<typeof mobileCreateShiftRequestBodySchema>;
 export type MobileUpdateShiftRequestBody = z.infer<typeof mobileUpdateShiftRequestBodySchema>;
 export type MobilePersonStatusUpdateBody = z.infer<typeof mobilePersonStatusUpdateBodySchema>;
-export type MobilePersonInvitationCreateBody = z.infer<
+export type MobilePersonInvitationCreateBody = z.input<
   typeof mobilePersonInvitationCreateBodySchema
 >;
 export type MobilePersonInvitationActionBody = z.infer<

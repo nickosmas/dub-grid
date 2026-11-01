@@ -10,7 +10,9 @@ import {
 } from "@dubgrid/contracts";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
+import type { AssignableOrganizationRole } from "@/types";
 import { Employee, FocusArea, NamedItem } from "@/types";
+import type { NewStaffInvite } from "@/features/employees/client/new-staff-invites";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { FirstDayField } from "@/components/staff/FirstDayField";
@@ -28,6 +30,9 @@ type RowEntry = {
   focusAreaIds: number[];
   /** Their first day (YYYY-MM-DD, 51g4), or empty for none. */
   firstDay: string;
+  /** Send them an invite to the app; only possible with an email. */
+  invite: boolean;
+  role: AssignableOrganizationRole;
 };
 
 type RowDraft = Omit<RowEntry, "_id">;
@@ -42,8 +47,16 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
     certificationId,
     focusAreaIds,
     firstDay: "",
+    invite: true,
+    role: "user",
   };
 }
+
+const ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
+  { value: "user", label: "User" },
+  { value: "admin", label: "Admin" },
+];
+const SUPER_ADMIN_OPTION = { value: "super_admin" as const, label: "Super Admin" };
 
 function serializeRows(rows: RowDraft[]): string {
   return JSON.stringify(
@@ -64,8 +77,10 @@ interface AddEmployeeModalProps {
   certifications: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
+  /** Super Admin is offered only by someone who holds it. */
+  canGrantSuperAdmin?: boolean;
   /** Return the add's promise so the button shows it working. */
-  onAdd: (employees: NewEmployeeData[]) => void | Promise<unknown>;
+  onAdd: (employees: NewEmployeeData[], invites: NewStaffInvite[]) => void | Promise<unknown>;
   onClose: () => void;
 }
 
@@ -74,9 +89,11 @@ export default function AddEmployeeModal({
   certifications,
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certification",
+  canGrantSuperAdmin = false,
   onAdd,
   onClose,
 }: AddEmployeeModalProps) {
+  const roleOptions = canGrantSuperAdmin ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS;
   const isMobile = useMediaQuery(MOBILE);
   const descriptionId = useId();
   const defaultCertId: number | null = null;
@@ -103,6 +120,8 @@ export default function AddEmployeeModal({
           certificationId: defaultCertId,
           focusAreaIds: [...defaultFocusAreaIds],
           firstDay: "",
+          invite: true,
+          role: "user" as const,
         })),
       ),
     [defaultCertId, defaultFocusAreaIds],
@@ -117,6 +136,8 @@ export default function AddEmployeeModal({
         certificationId: row.certificationId,
         focusAreaIds: row.focusAreaIds,
         firstDay: row.firstDay,
+        invite: row.invite,
+        role: row.role,
       })),
     ) !== initialRowsSnapshot;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -154,6 +175,12 @@ export default function AddEmployeeModal({
       !rowErrors[index]?.lastName &&
       !rowErrors[index]?.email,
   );
+
+  const canInviteRow = (row: RowEntry, index: number) =>
+    row.email.trim().length > 0 && !rowErrors[index]?.email;
+  const invitableRows = rows.filter(canInviteRow);
+  const inviteAll = invitableRows.length > 0 && invitableRows.every((row) => row.invite);
+  const invitedRows = validRows.filter((row) => row.invite && row.email.trim().length > 0);
 
   const updateRow = useCallback((id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
@@ -209,8 +236,9 @@ export default function AddEmployeeModal({
         deptAdminIds: [],
         version: 0,
       })),
+      invitedRows.map((r) => ({ email: normalizeOptionalStaffEmail(r.email), role: r.role })),
     );
-  }, [validRows, onAdd]);
+  }, [validRows, invitedRows, onAdd]);
 
   const scrollMaxHeight = isMobile ? "calc(100dvh - 300px)" : "min(620px, calc(100vh - 250px))";
 
@@ -220,6 +248,15 @@ export default function AddEmployeeModal({
     color: "var(--dg-type-field-title-color)",
     letterSpacing: "var(--dg-type-field-title-letter-spacing)",
     lineHeight: "var(--dg-type-field-title-line-height)",
+  };
+
+  const checkboxLabelStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    cursor: "pointer",
+    fontSize: "var(--dg-fs-label)",
+    color: "var(--dg-color-text-secondary)",
   };
 
   return (
@@ -299,6 +336,7 @@ export default function AddEmployeeModal({
               >
                 Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
                 {validRows.length !== 1 ? "s" : ""}
+                {invitedRows.length > 0 ? `, Invite ${invitedRows.length}` : ""}
               </Button>
             </div>
           </div>
@@ -322,13 +360,39 @@ export default function AddEmployeeModal({
           <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
             <div
               style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
               }}
             >
-              {rows.length} row{rows.length === 1 ? "" : "s"} total
-              {" · "}
-              {validRows.length} ready to add
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--dg-color-text-muted)",
+                }}
+              >
+                {rows.length} row{rows.length === 1 ? "" : "s"} total
+                {" · "}
+                {validRows.length} ready to add
+              </div>
+              <label style={checkboxLabelStyle}>
+                <input
+                  type="checkbox"
+                  className="dg-checkbox"
+                  checked={inviteAll}
+                  disabled={invitableRows.length === 0}
+                  onChange={() =>
+                    setRows((prev) =>
+                      prev.map((r, index) =>
+                        canInviteRow(r, index) ? { ...r, invite: !inviteAll } : r,
+                      ),
+                    )
+                  }
+                />
+                Invite everyone with an email
+              </label>
             </div>
             <div
               style={{
@@ -576,6 +640,50 @@ export default function AddEmployeeModal({
                         onChange={(firstDay) => updateRow(row._id, { firstDay })}
                         labelStyle={fieldLabelStyle}
                       />
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile
+                          ? "1fr"
+                          : "minmax(0, 1fr) minmax(220px, 0.6fr)",
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      <label
+                        style={{
+                          ...checkboxLabelStyle,
+                          color: canInviteRow(row, idx)
+                            ? checkboxLabelStyle.color
+                            : "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          className="dg-checkbox"
+                          checked={canInviteRow(row, idx) && row.invite}
+                          disabled={!canInviteRow(row, idx)}
+                          onChange={(e) => updateRow(row._id, { invite: e.target.checked })}
+                        />
+                        {canInviteRow(row, idx) ? "Invite to the app" : "Add an email to invite"}
+                      </label>
+                      {canInviteRow(row, idx) && row.invite ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
+                            Access level
+                          </span>
+                          <CustomSelect
+                            ariaLabel="Access level"
+                            value={row.role}
+                            options={roleOptions}
+                            onChange={(role) => updateRow(row._id, { role })}
+                            style={{ flex: 1, minWidth: 0 }}
+                            fontSize={12}
+                          />
+                        </div>
+                      ) : null}
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

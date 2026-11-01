@@ -474,6 +474,54 @@ describe("mobile person invitation route", () => {
     );
   });
 
+  it("grants the access level the invite asks for", async () => {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: { canManageEmployees: true, isSuperAdmin: false, isGridmaster: false },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+    });
+
+    const { POST } = await import("./person-invitation");
+    const response = await POST(
+      makeRequest({ email: "mina@example.com", orgRole: "admin" }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+      serviceClient,
+      expect.objectContaining({ roleToAssign: "admin" }),
+    );
+    expect(insertMobileAuditLogEntry).toHaveBeenCalledWith(
+      serviceClient,
+      expect.objectContaining({
+        details: expect.objectContaining({ roleToAssign: "admin" }),
+      }),
+    );
+  });
+
+  it("refuses a Super Admin invite from someone who isn't one", async () => {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: { canManageEmployees: true, isSuperAdmin: false, isGridmaster: false },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+    });
+
+    const { POST } = await import("./person-invitation");
+    const response = await POST(
+      makeRequest({ email: "mina@example.com", orgRole: "super_admin" }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(403);
+    expect(createMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+    expect(sendResendEmail).not.toHaveBeenCalled();
+  });
+
   it("does not create a mobile invitation when email delivery is not configured", async () => {
     delete process.env.RESEND_API_KEY;
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
