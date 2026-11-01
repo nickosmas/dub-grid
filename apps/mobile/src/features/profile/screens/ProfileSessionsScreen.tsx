@@ -492,7 +492,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     sessionCurrentBadgeText: IS_NATIVE_LIST
       ? { ...mobileTextWeighted("meta", "semibold"), color: mobileColors.brand }
-      : { ...mobileTextWeighted("micro", "bold"), color: mobileColors.textInverse },
+      : { ...mobileTextWeighted("meta", "bold"), color: mobileColors.textInverse },
     sessionBody: {
       ...mobileText.body,
       color: mobileColors.textMuted,

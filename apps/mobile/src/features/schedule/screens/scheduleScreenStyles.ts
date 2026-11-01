@@ -765,11 +765,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     jobPillEyebrowText: {
-      ...mobileText.label,
+      ...mobileText.meta,
     },
-    // The ramp floors at 12pt, the smallest a capsule's words may be.
+    // The ramp floors at 13pt, the smallest a capsule's words may be.
     jobPillEyebrowTextCompact: {
-      fontSize: mobileText.label.fontSize,
+      fontSize: mobileText.meta.fontSize,
     },
     // Sentence case at a readable size, as the platforms' own tag capsules.
     jobPillText: {
@@ -787,19 +787,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       textTransform: "none",
     },
     jobPillMentoredInlineTextCompact: {
-      fontSize: mobileText.label.fontSize,
-      lineHeight: mobileText.label.lineHeight,
+      fontSize: mobileText.meta.fontSize,
+      lineHeight: mobileText.meta.lineHeight,
     },
     jobPillTextCompact: {
-      fontSize: mobileText.label.fontSize,
-      lineHeight: mobileText.label.lineHeight,
+      fontSize: mobileText.meta.fontSize,
+      lineHeight: mobileText.meta.lineHeight,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
     },
     jobPillValueTextCompact: {
-      fontSize: mobileText.label.fontSize,
+      fontSize: mobileText.meta.fontSize,
     },
     mentoredPill: {
       ...mobilePillOverflow.displayContainer,
@@ -812,7 +812,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
-      ...mobileText.label,
+      ...mobileText.meta,
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
     },

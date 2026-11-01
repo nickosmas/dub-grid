@@ -92,7 +92,7 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: mobileSpace.xs,
     },
     textInverse: {
-      ...mobileTextWeighted("label", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
       textTransform: "none",
       includeFontPadding: false,
       textAlignVertical: "center",

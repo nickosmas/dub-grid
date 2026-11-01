@@ -363,7 +363,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: HERO_INVERSE_CHIP_FILL,
     },
     badgeText: {
-      ...mobileTextWeighted("label", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.brand,
       textTransform: "none",
     },
@@ -481,7 +481,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileOnAccent.secondary,
     },
     segmentEyebrow: {
-      ...mobileText.label,
+      ...mobileText.meta,
       color: mobileColors.brand,
     },
     segmentTitle: {
