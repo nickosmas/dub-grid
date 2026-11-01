@@ -37,9 +37,12 @@ section title. A field with no panel gets its own card, and the invite
 sheet's fields share one.
 
 **iOS dates.** Every date field (Starts, Return date, Last day, First day,
-Ends) is a row like Calendar's: the date sits in a gray capsule that turns
-the tint while its calendar is open under it in the same card, and the hint
-reads as the group's footer.
+Ends) is a row like Calendar's: the date sits in a gray capsule, and tapping
+the row opens the system calendar (SwiftUI's graphical date picker) inline in
+the same card. Picking a day closes it. An empty row opens on the first day
+offered, a tinted row under the calendar clears the date, and the hint reads
+as the group's footer. A popover was tried and set aside at the owner's call
+(2026-10-31). Android and the tests keep the app's month grid.
 
 **Selection.**
 
