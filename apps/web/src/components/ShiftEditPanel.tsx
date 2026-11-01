@@ -30,6 +30,7 @@ import {
   Employee,
   ScheduleCellInput,
   ScheduleCellSegmentInput,
+  ScheduleCellState,
   ScheduleNoteShift,
   ShiftJobSegment,
 } from "@/types";
@@ -92,7 +93,11 @@ import {
 import { SeriesSummaryCard } from "@/components/shift-panel/SeriesSummaryCard";
 import { SeriesScopeChoices } from "@/components/shift-panel/SeriesScopeChoices";
 import { describeSeriesPattern, formatSeriesSpan, seriesScopeOptions } from "@/lib/series-summary";
-import { buildShiftChangeResolvers, describeCellStateChange } from "@/lib/shift-change-web";
+import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  describeMentoringChanges,
+} from "@/lib/shift-change-web";
 import {
   cellStateToChangeDay,
   describeShiftChangeItem,
@@ -189,6 +194,8 @@ interface ShiftEditPanelProps {
   pastDayNotice?: string | null;
   /** A corrected past day (53c): when, by whom and why. */
   correctedLabel?: string | null;
+  /** The corrected day as published before its first correction, and as corrected now. */
+  correctedChange?: { before: ScheduleCellState | null; after: ScheduleCellState | null } | null;
   /** True when the underlying cell changed externally while the panel was open. */
   isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
@@ -432,6 +439,7 @@ export default function ShiftEditPanel({
   correction = null,
   pastDayNotice = null,
   correctedLabel = null,
+  correctedChange = null,
   isStale = false,
   focusAreas = [],
   certifications = [],
@@ -728,6 +736,23 @@ export default function ShiftEditPanel({
       }),
     [assignments, shiftCategories, jobs, absenceTypes, focusAreas],
   );
+  const correctedView =
+    correctedLabel && correctedChange && (correctedChange.before || correctedChange.after)
+      ? describeCellStateChange(
+          correctedChange.before,
+          correctedChange.after,
+          formatDateKey(modal.date),
+          shiftChangeResolvers,
+        )
+      : null;
+  const correctedNotes =
+    correctedLabel && correctedChange
+      ? describeMentoringChanges(
+          correctedChange.before,
+          correctedChange.after,
+          shiftChangeResolvers,
+        )
+      : [];
 
   function segmentsMatchInitial(): boolean {
     if (currentSegments.length !== initialSegments.length) return false;
@@ -4399,6 +4424,28 @@ export default function ShiftEditPanel({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
+          {((correctedView && correctedView.kind !== "none") || correctedNotes.length > 0) && (
+            <div
+              data-correction-change
+              style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}
+            >
+              {correctedView && correctedView.kind !== "none" && (
+                <ShiftChangeCard change={correctedView} layout="stacked" />
+              )}
+              {correctedNotes.map((note) => (
+                <p
+                  key={note}
+                  style={{
+                    margin: 0,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--dg-color-text-secondary)",
+                  }}
+                >
+                  {note}
+                </p>
+              ))}
+            </div>
+          )}
           {correctedLabel && (
             <p
               data-correction-notice

@@ -23,6 +23,7 @@ import type {
   NamedItem,
   PublishChange,
   ScheduleCellInput,
+  ScheduleCellState,
   ShiftCategory,
   AssignmentDefinition,
   ShiftDisplayMode,
@@ -35,6 +36,9 @@ export interface CorrectionMark {
   reason: string | null;
   correctedBy?: string | null;
   correctedAt?: string;
+  /** The day as published before its first correction, and as corrected now. */
+  before?: ScheduleCellState | null;
+  after?: ScheduleCellState | null;
 }
 
 export interface ScheduleGridAccessors {

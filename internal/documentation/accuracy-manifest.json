@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1692b3c226a74eda714d30e17cec4460d3c44d6f6f5ab2bb0611c16c671f0923"
+      "evidenceFingerprint": "sha256:48b69d2e52b182f23883d203da20c96c9683a5fb7914af66913a6054d960cbc6"
     },
     {
       "id": "introduction",
@@ -161,7 +161,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:45b3d2aca9a95d3e16c1ed09a409de9835debf752b5b7d07ce54d8a35eb3036f"
+      "evidenceFingerprint": "sha256:98be86210cd25f8d1e5856dcaec2b1fe35cca6268a713b148734b78526135cf9"
     },
     {
       "id": "quickstart",
@@ -237,7 +237,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e12075efb612bfc05742627e02295b0d7726aa99e3dd2a5f8aec8876aa62d8b4"
+      "evidenceFingerprint": "sha256:4e1fac296224d846db343885f355dbb8b661c46c8c327d8dcbc774a47e10feee"
     },
     {
       "id": "onboarding",
@@ -384,7 +384,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9305700c410c7b187831341ca6732bae120f692d13847cac40b9807d7ed25e2e"
+      "evidenceFingerprint": "sha256:211d277d9c05aae84368b681cbf88487376650745ada26db9e0d04fc8ccaaee3"
     },
     {
       "id": "draft-publish",
@@ -441,7 +441,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0c67c3e4222a4b7576fc6870479ebcaf83937424b2f15a9fb83f421021e20ba7"
+      "evidenceFingerprint": "sha256:2c627f983d32603c22b60adfefce033faeb9d4267dce7ceed2a6b8ada4410aa4"
     },
     {
       "id": "recurring-shifts",
@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2b5708892dd33cf8a08e1bf8c1d9541a35cce3d388650f229f91a49a157400cf"
+      "evidenceFingerprint": "sha256:8496e0fbdb281d12dd81a39c4cdc05fcce3a9b8846b9f7d30f79d55d9fe2a084"
     },
     {
       "id": "realtime",
@@ -542,7 +542,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:acadc412c56bbc35fa986686c2f0518bc0a573ec863feb1d3c372ad5f98abf1a"
+      "evidenceFingerprint": "sha256:72865bab0f0aeb50daaf805cc454d25027f0dec13ee53ebb44cea2731f3f6f3b"
     },
     {
       "id": "shift-requests",
@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c259176ed08002431d195578c8bc9581bd6cbf2d1c1c0157cdc7c8f77ca45a66"
+      "evidenceFingerprint": "sha256:ea5580de16de9e3cf9eeddb38a62d80e1800cefd191bafdf1ecef093e4996a91"
     },
     {
       "id": "dashboard",
@@ -1009,7 +1009,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f1577067cca658c346135c9b885f186cdbf16793e1103c539458ea974139f939"
+      "evidenceFingerprint": "sha256:381bdc5bc5e143a95e18f4673abc80d8b673a5f187237faa2c02d0a4a4683350"
     },
     {
       "id": "terminology",
@@ -1858,7 +1858,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7a790b34eb4e9705db42e1ba88c577a85f33e9deab70b1b4af166c1f8bdf1a06"
+      "evidenceFingerprint": "sha256:1d04cc4e77db73514b24809eda8c95208965bc56696cd9195bb6ec7b199fc268"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1967,7 +1967,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:69e5804f1e5ba5dc375ec73cbe46b4c8e8f2104c5f0215a41054430abaf843b2"
+      "evidenceFingerprint": "sha256:10fe533b070350f4143de832c545ecda48703fa7338cf30247ccc8b74130bc32"
     },
     {
       "id": "coverage-open-shifts",
@@ -2018,7 +2018,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:727e64422202c0e0bc16302c5b68ae7f9e8a1f262c1fe4dcb5df1a872baab097"
+      "evidenceFingerprint": "sha256:4c8fb00cf6b3a32d54f70fe53ed4844dae2c0b7be164ac65e1972ba269af9361"
     },
     {
       "id": "mobile-schedule",
@@ -2131,7 +2131,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ba50a00e421ad62401d4243881decea41f9532e07259e45b3fe3cf91e875c3de"
+      "evidenceFingerprint": "sha256:f9c23df7a7a887c1e4d86a31c86e7eb2f970ace14718cd11a30adb623b19472c"
     }
   ],
   "surfaceExclusions": [

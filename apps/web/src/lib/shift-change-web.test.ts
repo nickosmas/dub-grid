@@ -13,6 +13,7 @@ import {
   buildShiftChangeResolvers,
   cellStateFromParts,
   describeCellStateChange,
+  describeMentoringChanges,
   formatShiftChangeWasText,
   mergeCellPublishChanges,
 } from "./shift-change-web";
@@ -166,6 +167,28 @@ describe("describeCellStateChange", () => {
   it("names a retired shift with (archived)", () => {
     const change = describeCellStateChange(worked(9), worked(1), "2026-10-25", resolvers);
     expect(change.before.items[0].plain).toContain("Weekend Day (archived)");
+  });
+});
+
+describe("describeMentoringChanges", () => {
+  function mentored(shiftId: number, isMentored: boolean): ScheduleCellState {
+    const state = worked(shiftId);
+    return { ...state, segments: [{ ...state.segments[0], isMentored }] };
+  }
+
+  it("names a shift on both sides whose mentoring changed", () => {
+    expect(describeMentoringChanges(mentored(1, false), mentored(1, true), resolvers)).toEqual([
+      "Day Shift is now mentored.",
+    ]);
+    expect(describeMentoringChanges(mentored(1, true), mentored(1, false), resolvers)).toEqual([
+      "Day Shift is no longer mentored.",
+    ]);
+  });
+
+  it("says nothing for an unchanged, added or removed shift", () => {
+    expect(describeMentoringChanges(mentored(1, true), mentored(1, true), resolvers)).toEqual([]);
+    expect(describeMentoringChanges(mentored(1, false), mentored(2, true), resolvers)).toEqual([]);
+    expect(describeMentoringChanges(null, mentored(1, true), resolvers)).toEqual([]);
   });
 });
 

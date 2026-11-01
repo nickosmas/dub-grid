@@ -1191,7 +1191,7 @@ export async function POST(req: NextRequest) {
         const buildCorrectionsPage = (from: number, to: number) =>
           auth.serviceClient
             .from("schedule_cell_corrections")
-            .select("id, emp_id, date, reason, corrected_by, corrected_at")
+            .select("id, emp_id, date, reason, corrected_by, corrected_at, before, after")
             .eq("org_id", data.orgId)
             .gte("date", data.startDate)
             .lte("date", data.endDate)
@@ -1205,18 +1205,28 @@ export async function POST(req: NextRequest) {
           reason: string | null;
           corrected_by: string | null;
           corrected_at: string;
+          before: SnapshotPayload | null;
+          after: SnapshotPayload | null;
         }>(buildCorrectionsPage);
-        // Oldest first, so each day keeps its latest correction.
+        // Oldest first, so each day keeps its latest correction, and its
+        // Before is the day as published before anyone corrected it.
         const latest = new Map<string, (typeof rows)[number]>();
-        for (const row of rows) latest.set(`${row.emp_id}_${row.date}`, row);
+        const firstBefore = new Map<string, SnapshotPayload | null>();
+        for (const row of rows) {
+          const key = `${row.emp_id}_${row.date}`;
+          if (!firstBefore.has(key)) firstBefore.set(key, row.before);
+          latest.set(key, row);
+        }
 
         return NextResponse.json({
-          corrections: [...latest.values()].map((row) => ({
+          corrections: [...latest.entries()].map(([key, row]) => ({
             empId: row.emp_id,
             date: row.date,
             reason: row.reason,
             correctedBy: row.corrected_by,
             correctedAt: row.corrected_at,
+            before: cellStateFromSnapshotPayload(firstBefore.get(key) ?? null),
+            after: cellStateFromSnapshotPayload(row.after),
           })),
         });
       }

@@ -9,6 +9,7 @@ import type {
   ScheduleNote,
   ScheduleNoteShift,
   ScheduleCellInput,
+  ScheduleCellState,
   ShiftMap,
   ShiftSeries,
   ShiftSeriesPattern,
@@ -710,6 +711,10 @@ export interface CellCorrection {
   reason: string | null;
   correctedBy: string | null;
   correctedAt: string;
+  /** The day as published before its first correction; null when it was empty. */
+  before: ScheduleCellState | null;
+  /** The day as its latest correction left it; null when it was cleared. */
+  after: ScheduleCellState | null;
 }
 
 /** The latest correction of each corrected day in a date range, for editors. */
