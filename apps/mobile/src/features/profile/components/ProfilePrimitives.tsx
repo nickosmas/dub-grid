@@ -725,7 +725,7 @@ const personLayoutStyles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: "row",
-    gap: IS_NATIVE_LIST ? mobileSpace.sm : mobileSpace.md,
+    gap: mobileSpace.md,
     justifyContent: "center",
     paddingBottom: 16,
   },
@@ -777,9 +777,6 @@ export function ProfileQuickActions({ children }: { children: ReactNode }) {
  * glyph beside its name, so the button says what it does without a tap. The
  * colour is the icon's. A pill with nothing to act on stays in place, dimmed,
  * so the pair keeps its shape whether or not a phone or email is on file.
- *
- * On a phone it is the tile Contacts puts under a name: the glyph over its
- * word in the tint, on a small white tile of the grouped page.
  */
 export function ProfileQuickAction({
   icon,
@@ -795,20 +792,6 @@ export function ProfileQuickAction({
   onPress: () => void;
 }) {
   const isDark = useIsDarkMode();
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  if (IS_NATIVE_LIST) {
-    const tint = disabled ? mobileColors.textSubtle : mobileColors.brand;
-    return (
-      <PressableRow disabled={disabled} onPress={onPress} style={styles.quickTile}>
-        <Ionicons color={tint} name={icon} size={20} />
-        <Text fit="compact" numberOfLines={1} style={[styles.quickTileLabel, { color: tint }]}>
-          {label}
-        </Text>
-      </PressableRow>
-    );
-  }
 
   return (
     <Button
@@ -1386,21 +1369,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     choiceMarkSelected: {
       backgroundColor: mobileColors.brand,
-    },
-    quickTile: {
-      alignItems: "center",
-      backgroundColor: mobileColors.surface,
-      borderRadius: 12,
-      flex: 1,
-      gap: mobileSpace.xs,
-      justifyContent: "center",
-      maxWidth: 160,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.sm,
-      ...groupedCardEdge(mobileColors, isDark),
-    },
-    quickTileLabel: {
-      ...mobileTextWeighted("meta", "medium"),
     },
     actionRow: {
       alignItems: "center",

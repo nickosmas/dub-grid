@@ -128,11 +128,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexShrink: 0,
       gap: 8,
     },
-    // A flat card like every other on the grouped page: the brand fill sets
-    // it apart, with no shadow or edge of its own.
+    // The shadow lives on this view and the clip on the one inside: iOS clips
+    // a view's own shadow when it also clips its children, which is why the
+    // hero's blue glow never rendered there.
     meHeroCard: {
       position: "relative",
       borderRadius: mobileRadii.card,
+      shadowOffset: {
+        width: 0,
+        height: 14,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 28,
+      elevation: 5,
     },
     meHeroCardClip: {
       overflow: "hidden",
@@ -186,12 +194,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "#CBD5E1",
     },
     meHeroBadgeText: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileText.label,
       color: mobileColors.textInverse,
+      textTransform: "uppercase",
     },
     meHeroDateTile: {
       minWidth: 58,
       borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileOnAccent.hairline,
       backgroundColor: mobileOnAccent.fill,
       alignItems: "center",
       justifyContent: "center",
@@ -200,7 +211,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: 8,
     },
     meHeroDateWeekday: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileText.label,
       color: mobileOnAccent.tertiary,
     },
     meHeroDateDay: {
@@ -339,17 +350,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: mobileSpace.sm,
       marginTop: mobileSpace.sm,
       marginBottom: mobileSpace.sm,
-    },
-    // On device the people on shift are a row of the card under a hairline,
-    // not a box of their own inside it.
-    meHeroCollaboratorsRow: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: mobileOnAccent.hairline,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-      paddingTop: mobileSpace.md,
     },
     meHeroCollaboratorLabelRow: {
       flex: 1,

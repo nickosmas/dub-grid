@@ -478,9 +478,7 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    // The date is the card's group header, not a tile beside the title.
-    expect(screen.getByText("Thursday, April 16")).toHaveAttribute("role", "header");
-    expect(screen.queryByLabelText("Thu, Apr 16")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Thu, Apr 16")).toBeInTheDocument();
     expect(screen.queryByText("Thursday, April 16, 2026")).not.toBeInTheDocument();
     expect(
       screen.getByLabelText("Published Apr 15, 2026, 11:30 AM by Mina Diaz"),
@@ -773,13 +771,11 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getAllByText("7:00 AM - 3:00 PM").length).toBeGreaterThan(0);
     const detailCardText = screen.getByTestId("shift-detail-card").textContent;
     expect(detailCardText).toBeDefined();
-    // The person's name sits under the shift in the title row; the job is the
-    // next row of the card.
-    expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
-    expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Supervisor"));
-    expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(
-      detailCardText!.indexOf("Emergency"),
+    expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(
+      detailCardText!.indexOf("Supervisor"),
     );
+    expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
+    expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Emergency"));
     expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
       detailCardText!.indexOf("Emergency"),
     );
@@ -2614,7 +2610,7 @@ describe("ShiftDetailScreen", () => {
 
     fireEvent.click(screen.getByText("Drop shift"));
     expect(
-      screen.getByRole("radio", {
+      screen.getByRole("button", {
         name: /Shift 1: Day Shift \(7:00 AM - 3:00 PM\) · In progress/i,
       }),
     ).toBeDisabled();

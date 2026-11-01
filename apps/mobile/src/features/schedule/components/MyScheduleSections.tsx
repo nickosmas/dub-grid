@@ -48,13 +48,13 @@ import {
 import {
   HERO_CARD_BACKGROUND_DARK,
   HERO_CARD_BACKGROUND_LIGHT,
-  HERO_CARD_FLAT_DARK,
-  HERO_CARD_FLAT_LIGHT,
   HERO_CARD_GRADIENT_DARK,
   HERO_CARD_GRADIENT_END,
   HERO_CARD_GRADIENT_LIGHT,
   HERO_CARD_GRADIENT_LOCATIONS,
   HERO_CARD_GRADIENT_START,
+  HERO_CARD_SHADOW_DARK,
+  HERO_CARD_SHADOW_LIGHT,
   HERO_COLLABORATOR_BACKGROUND_DARK,
   HERO_COLLABORATOR_BACKGROUND_LIGHT,
 } from "../lib/heroCardTheme";
@@ -553,27 +553,14 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
-  // The avatars' rings are cut from whatever sits behind them: the card's own
-  // fill on device, where the people are a row of the card, or the box's
-  // fill on the web build.
   const collaboratorBackground = {
-    backgroundColor: IS_NATIVE_LIST
-      ? isDark
-        ? HERO_CARD_FLAT_DARK
-        : HERO_CARD_FLAT_LIGHT
-      : isDark
-        ? HERO_COLLABORATOR_BACKGROUND_DARK
-        : HERO_COLLABORATOR_BACKGROUND_LIGHT,
+    backgroundColor: isDark
+      ? HERO_COLLABORATOR_BACKGROUND_DARK
+      : HERO_COLLABORATOR_BACKGROUND_LIGHT,
   };
 
   return (
-    <View
-      style={
-        IS_NATIVE_LIST
-          ? styles.meHeroCollaboratorsRow
-          : [styles.meHeroCollaborators, collaboratorBackground]
-      }
-    >
+    <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
       <View style={styles.meHeroCollaboratorLabelRow}>
         <Ionicons color={mobileOnAccent.tertiary} name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
@@ -919,9 +906,7 @@ export function MeHeroCard({
     </View>
   );
 
-  // On device the hero is one flat brand fill, as a native card is; the web
-  // build keeps the drawn gradient.
-  const heroGradient = IS_NATIVE_LIST ? null : (
+  const heroGradient = (
     <LinearGradient
       colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
       locations={HERO_CARD_GRADIENT_LOCATIONS}
@@ -932,13 +917,8 @@ export function MeHeroCard({
     />
   );
   const heroCardThemeStyle = {
-    backgroundColor: IS_NATIVE_LIST
-      ? isDark
-        ? HERO_CARD_FLAT_DARK
-        : HERO_CARD_FLAT_LIGHT
-      : isDark
-        ? HERO_CARD_BACKGROUND_DARK
-        : HERO_CARD_BACKGROUND_LIGHT,
+    backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,
   };
 
   return (

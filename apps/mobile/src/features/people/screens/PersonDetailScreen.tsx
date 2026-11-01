@@ -1549,23 +1549,13 @@ export default function PersonDetailScreen() {
           canOffboard={reach.canOffboard}
           onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
           person={person}
-          accessNote={
-            IS_NATIVE_LIST && invitationBanner
-              ? {
-                  title: invitationBanner.title,
-                  detail: invitationBanner.body,
-                  tone: invitationBanner.tone,
-                }
-              : null
-          }
         />
       ) : null}
 
       {/* Where the app account stands, one line under the actions rather than a
           chip competing with the name. Someone with an account needs no banner:
-          the states worth surfacing are the two a manager can act on. A phone
-          states it as a row of the status group instead. */}
-      {!editing && invitationBanner && !IS_NATIVE_LIST ? (
+          the states worth surfacing are the two a manager can act on. */}
+      {!editing && invitationBanner ? (
         <StatusBanner
           body={invitationBanner.body}
           bordered={false}
