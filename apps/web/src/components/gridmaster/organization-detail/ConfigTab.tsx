@@ -390,7 +390,7 @@ export function ConfigTab({
                             fontWeight: 700,
                             background: at.background,
                             color: at.text,
-                            border: `1.5px solid ${at.border}`,
+                            border: "1.5px solid transparent",
                           }}
                         >
                           {at.label}

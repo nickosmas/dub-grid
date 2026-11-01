@@ -111,7 +111,7 @@ describe("resolveAbsenceStripes", () => {
 describe("absence stripe drawing", () => {
   it("writes the approved CSS", () => {
     expect(absenceStripeCss("#FECACA", "#FEE2E2")).toBe(
-      "repeating-linear-gradient(135deg, #FECACA 0, #FECACA 6px, #FEE2E2 6px, #FEE2E2 12px)",
+      "repeating-linear-gradient(135deg, #FECACA 0, #FECACA 6px, #FEE2E2 6px, #FEE2E2 12px) border-box",
     );
   });
 });

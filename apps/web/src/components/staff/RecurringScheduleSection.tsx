@@ -431,7 +431,6 @@ function RecurringShiftPill({
         bottom: 4,
         left: 4,
         background: pillBackground,
-        backgroundOrigin: "border-box",
         border: isDirty ? `2px dashed ${pillText}` : FILLED_PILL_BORDER,
         borderRadius: "var(--dg-radius-md)",
         color: pillText,

@@ -44,7 +44,7 @@ function getAssignmentStyle(
   if (!assignment.color) {
     return {
       background: "var(--dg-color-bg-secondary)",
-      borderColor: assignment.border ?? "var(--dg-color-border)",
+      borderColor: "transparent",
       color: assignment.text ?? "var(--dg-color-text-primary)",
     };
   }
@@ -58,7 +58,7 @@ function getAssignmentStyle(
   );
   return {
     background: resolved.color,
-    borderColor: resolved.border,
+    borderColor: "transparent",
     color: resolved.text,
   };
 }

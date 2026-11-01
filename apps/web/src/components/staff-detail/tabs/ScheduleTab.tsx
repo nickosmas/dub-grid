@@ -366,8 +366,8 @@ function RecurringWeekCard({
 function WeekPill({ pill }: { pill: DayPill }) {
   return (
     <div
-      className="flex min-h-[62px] flex-1 flex-col justify-center rounded-[var(--dg-radius-sm)] border p-2 [overflow-wrap:anywhere]"
-      style={{ background: pill.background, borderColor: pill.border, color: pill.textColor }}
+      className="flex min-h-[62px] flex-1 flex-col justify-center rounded-[var(--dg-radius-sm)] border border-transparent p-2 [overflow-wrap:anywhere]"
+      style={{ background: pill.background, color: pill.textColor }}
     >
       <span className="text-[length:var(--dg-type-badge-size)] font-semibold leading-[1.25]">
         {pill.name}

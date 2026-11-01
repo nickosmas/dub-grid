@@ -342,7 +342,12 @@ export function resolveAbsenceStripes(color: string, isDark: boolean): AbsenceSt
   return { stripeA, stripeB, text, border: borderColor(text) };
 }
 
+/**
+ * A `background` shorthand value. It carries `border-box` so the stripes run
+ * under a transparent pill border; a separate `backgroundOrigin` is reset
+ * whenever the shorthand is set after it.
+ */
 export function absenceStripeCss(stripeA: string, stripeB: string): string {
   const w = ABSENCE_STRIPE_WIDTH;
-  return `repeating-linear-gradient(135deg, ${stripeA} 0, ${stripeA} ${w}px, ${stripeB} ${w}px, ${stripeB} ${w * 2}px)`;
+  return `repeating-linear-gradient(135deg, ${stripeA} 0, ${stripeA} ${w}px, ${stripeB} ${w}px, ${stripeB} ${w * 2}px) border-box`;
 }

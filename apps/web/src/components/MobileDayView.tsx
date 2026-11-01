@@ -605,7 +605,6 @@ export default function MobileDayView({
                                   background: pill.foreignInitials
                                     ? "var(--dg-color-surface)"
                                     : pill.bg,
-                                  backgroundOrigin: "border-box",
                                   color: pill.text,
                                   borderRadius: pill.foreignInitials
                                     ? seamRadius(2, [...seams, "top"])
