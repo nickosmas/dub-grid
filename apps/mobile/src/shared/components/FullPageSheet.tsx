@@ -1,14 +1,26 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import {
+  type LayoutChangeEvent,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { registerModalPresentation } from "../lib/modal-presentation";
+import { IS_IOS_LIST, IS_NATIVE_LIST } from "../lib/native-list";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { InsideSheetContext } from "./BottomSheetModal";
-import { createIconControlStyle } from "./icon-control-style";
+import { ChromeIconButton } from "./ChromeIconButton";
+import { createIconControlStyle, ICON_CONTROL_SIZE } from "./icon-control-style";
 import { Pressable } from "./Pressable";
+import { liftSheetActions, type ButtonProps } from "./sheet-bar-actions";
+import { BarAction } from "./SheetBarAction";
 import { AppLockOverlay } from "./AppLockSurface";
 import { useAppLockSurface } from "../lib/app-lock";
 
@@ -35,6 +47,12 @@ import { useAppLockSurface } from "../lib/app-lock";
  *
  * Registers as a task `sheet`, so it obeys the one-task-sheet rule and a
  * confirmation may still sit on top of it.
+ *
+ * On iOS and Android the footer's `SheetActions` move into the top bar, as
+ * `BottomSheetModal` does (owner, 2026-10-31): the X closes, the primary is
+ * the trailing action (a checkmark when it only saves), and a Back is a
+ * worded item beside the X, so one tap still closes the whole task. The web
+ * build keeps the footer.
  */
 export function FullPageSheet({
   visible,
@@ -89,6 +107,15 @@ export function FullPageSheet({
     onDismiss();
   };
 
+  const lifted = IS_NATIVE_LIST ? liftSheetActions(footer) : null;
+  const bodyFooter = lifted?.primary ? lifted.rest : footer;
+  const back = lifted?.cancel?.label === "Back" ? lifted.cancel : undefined;
+  const onCancel = lifted?.onCancel;
+  const close = () => {
+    if (onCancel && !back) void onCancel(undefined as never);
+    else handleDismiss();
+  };
+
   return (
     <Modal
       allowSwipeDismissal={!dismissDisabled && !hasUnsavedChanges && !lockEngaged}
@@ -101,38 +128,50 @@ export function FullPageSheet({
     >
       <InsideSheetContext.Provider value>
         <View style={styles.root}>
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <AppText fit="fixed" variant="screenTitle">
-                {title}
-              </AppText>
-              {subtitle ? (
-                <AppText tone="secondary" variant="body">
-                  {subtitle}
+          {IS_NATIVE_LIST ? (
+            <NativeSheetBar
+              back={back}
+              closeDisabled={dismissDisabled}
+              onClose={close}
+              primary={lifted?.primary}
+              secondary={lifted?.secondary}
+              subtitle={subtitle}
+              title={title}
+            />
+          ) : (
+            <View style={styles.header}>
+              <View style={styles.headerCopy}>
+                <AppText fit="fixed" variant="screenTitle">
+                  {title}
                 </AppText>
-              ) : null}
+                {subtitle ? (
+                  <AppText tone="secondary" variant="body">
+                    {subtitle}
+                  </AppText>
+                ) : null}
+              </View>
+              <Pressable
+                accessibilityLabel="Close"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: dismissDisabled }}
+                disabled={dismissDisabled}
+                hitSlop={10}
+                onPress={handleDismiss}
+                style={[styles.closeButton, dismissDisabled && styles.closeButtonDisabled]}
+              >
+                <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityLabel="Close"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: dismissDisabled }}
-              disabled={dismissDisabled}
-              hitSlop={10}
-              onPress={handleDismiss}
-              style={[styles.closeButton, dismissDisabled && styles.closeButtonDisabled]}
-            >
-              <Ionicons color={mobileColors.textPrimary} name="close" size={20} />
-            </Pressable>
-          </View>
+          )}
           <ScrollView
-            contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
+            contentContainerStyle={[styles.body, bodyFooter ? styles.bodyWithFooter : null]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             style={styles.scroll}
           >
             {children}
           </ScrollView>
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
+          {bodyFooter ? <View style={styles.footer}>{bodyFooter}</View> : null}
           {overlay}
           <AppLockOverlay />
         </View>
@@ -140,6 +179,118 @@ export function FullPageSheet({
     </Modal>
   );
 }
+
+/**
+ * The sheet's top bar on iOS and Android. iOS centres the title between the
+ * leading X (and Back) and the trailing action, both sides as wide as
+ * the wider one; Android is Material 3's full-screen dialog bar, the title
+ * left-aligned after the leading icon and the action at the end.
+ */
+function NativeSheetBar({
+  title,
+  subtitle,
+  back,
+  primary,
+  secondary,
+  closeDisabled,
+  onClose,
+}: {
+  title: string;
+  subtitle?: string;
+  back?: ButtonProps;
+  primary?: ButtonProps;
+  secondary?: ButtonProps;
+  closeDisabled: boolean;
+  onClose: () => void;
+}) {
+  const mobileColors = useMobileColors();
+  const { top: topInset } = useSafeAreaInsets();
+  const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
+  const sideWidth = IS_IOS_LIST ? Math.max(sideWidths.leading, sideWidths.trailing) : 0;
+  const measure = (side: "leading" | "trailing") => (event: LayoutChangeEvent) => {
+    const width = Math.ceil(event.nativeEvent.layout.width);
+    setSideWidths((current) => (current[side] === width ? current : { ...current, [side]: width }));
+  };
+
+  const closeColor = closeDisabled ? mobileColors.textSubtle : mobileColors.textPrimary;
+
+  return (
+    <View style={[barStyles.bar, !IS_IOS_LIST && { paddingTop: topInset + mobileSpace.sm }]}>
+      <View style={[barStyles.side, { minWidth: sideWidth }]}>
+        <View onLayout={measure("leading")} style={barStyles.sideContent}>
+          <ChromeIconButton accessibilityLabel="Close" disabled={closeDisabled} onPress={onClose}>
+            {IS_IOS_LIST ? (
+              <Ionicons color={closeColor} name="close" size={22} />
+            ) : (
+              <MaterialIcons color={closeColor} name="close" size={24} />
+            )}
+          </ChromeIconButton>
+          {back ? <BarAction action={back} kind="secondary" /> : null}
+        </View>
+      </View>
+      <View style={IS_IOS_LIST ? barStyles.iosTitles : barStyles.materialTitles}>
+        <AppText
+          accessibilityRole="header"
+          align={IS_IOS_LIST ? "center" : undefined}
+          fit="fixed"
+          numberOfLines={IS_IOS_LIST ? 2 : 1}
+          variant={IS_IOS_LIST ? "cardTitle" : "title"}
+        >
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText
+            align={IS_IOS_LIST ? "center" : undefined}
+            numberOfLines={2}
+            tone="secondary"
+            variant="meta"
+          >
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+      <View style={[barStyles.side, barStyles.trailing, { minWidth: sideWidth }]}>
+        <View onLayout={measure("trailing")} style={barStyles.sideContent}>
+          {secondary ? <BarAction action={secondary} kind="secondary" /> : null}
+          {primary ? <BarAction action={primary} kind="primary" title={title} /> : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const barStyles = StyleSheet.create({
+  // A pageSheet already sits below the status bar; on Android the modal is
+  // its own window and takes the inset itself.
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileSpace.sm,
+    minHeight: ICON_CONTROL_SIZE + mobileSpace.sm,
+    paddingHorizontal: mobileSpace.lg,
+    paddingTop: mobileSpace.md,
+    paddingBottom: mobileSpace.md,
+  },
+  side: {
+    flexDirection: "row",
+  },
+  sideContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileSpace.sm,
+  },
+  trailing: {
+    justifyContent: "flex-end",
+  },
+  iosTitles: {
+    flex: 1,
+    alignItems: "center",
+  },
+  materialTitles: {
+    flex: 1,
+    gap: mobileSpace.xs,
+  },
+});
 
 const createStyles = (
   mobileColors: MobileColors,

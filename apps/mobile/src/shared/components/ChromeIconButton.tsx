@@ -12,6 +12,8 @@ export type ChromeIconButtonProps = {
   children: ReactNode;
   /** Drawn over the button's top-right edge, such as an unread count. */
   badge?: ReactNode;
+  /** Kept on screen but inert, such as Close while a request is in flight. */
+  disabled?: boolean;
 };
 
 /**
@@ -24,6 +26,7 @@ export function ChromeIconButton({
   onPress,
   children,
   badge,
+  disabled = false,
 }: ChromeIconButtonProps) {
   const mobileColors = useMobileColors();
 
@@ -32,6 +35,8 @@ export function ChromeIconButton({
       <Pressable
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
+        accessibilityState={disabled ? { disabled } : undefined}
+        disabled={disabled}
         android_ripple={{ color: mobileColors.rippleNeutral, borderless: false }}
         hitSlop={10}
         onPress={onPress}
