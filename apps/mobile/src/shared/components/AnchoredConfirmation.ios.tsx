@@ -2,6 +2,9 @@ import { useEffect, useRef, type ReactElement } from "react";
 import { Button, ConfirmationDialog, Host, RNHostView, Text } from "@expo/ui/swift-ui";
 import type { AnchoredConfirmationRequest } from "./anchored-confirmation";
 
+/** Whether a confirmation can open from the control that asked for it (iOS). */
+export const CAN_ANCHOR_CONFIRMATION = true;
+
 /**
  * SwiftUI's confirmation dialog attached to the button that asked for it,
  * which iOS 26 opens as a glass popover from that button, as Contacts does
