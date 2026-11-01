@@ -36,8 +36,8 @@ describe("ShiftChangeCard (46d)", () => {
     );
     render(<ShiftChangeCard change={change} showDayBar />);
 
-    expect(screen.getByText("BEFORE · 16 hrs")).toBeInTheDocument();
-    expect(screen.getByText("AFTER · 4 hrs")).toBeInTheDocument();
+    expect(screen.getByText("Before · 16 hrs")).toBeInTheDocument();
+    expect(screen.getByText("After · 4 hrs")).toBeInTheDocument();
     expect(screen.getByText("Shift 2")).toBeInTheDocument();
     expect(screen.getByText("Removed")).toBeInTheDocument();
     expect(
@@ -60,8 +60,8 @@ describe("ShiftChangeCard (46d)", () => {
     const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-22" });
     render(<ShiftChangeCard change={change} />);
 
-    expect(screen.getByText("NEW")).toBeInTheDocument();
-    expect(screen.queryByText("BEFORE")).not.toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
+    expect(screen.queryByText("Before")).not.toBeInTheDocument();
     expect(screen.queryByText("No shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Added")).not.toBeInTheDocument();
   });
@@ -83,9 +83,22 @@ describe("ShiftChangeButton (46d)", () => {
     );
     render(<ShiftChangeButton change={change} />);
 
-    expect(screen.queryByText("BEFORE")).not.toBeInTheDocument();
+    expect(screen.queryByText("Before")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "See what changed" }));
-    expect(screen.getByText("BEFORE")).toBeInTheDocument();
-    expect(screen.getByText("AFTER")).toBeInTheDocument();
+    expect(screen.getByText("Before")).toBeInTheDocument();
+    expect(screen.getByText("After")).toBeInTheDocument();
+  });
+
+  it("opens the same sheet from a grouped list's row", () => {
+    const change = describeShiftChange(
+      { items: [shift()] },
+      { items: [shift({ focusAreaName: "Memory Care" })] },
+      { date: "2026-10-22" },
+    );
+    render(<ShiftChangeButton change={change} variant="row" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "See what changed" }));
+    expect(screen.getByText("Before")).toHaveAttribute("role", "header");
+    expect(screen.getByText("After")).toHaveAttribute("role", "header");
   });
 });

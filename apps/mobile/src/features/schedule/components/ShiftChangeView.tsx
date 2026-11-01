@@ -18,8 +18,15 @@ import {
   mobileSpace,
   mobileTabularText,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
+import {
+  DetailGroup,
+  DetailNavLabel,
+  DetailNavRow,
+  DetailRowFrame,
+} from "./shift-detail/DetailList";
 
 export type ShiftChange = z.infer<typeof shiftChangeSchema>;
 type ShiftChangeSide = ShiftChange["before"];
@@ -72,7 +79,8 @@ function Parts({
   );
 }
 
-function ItemLines({
+/** One shift or absence of a side, as a row of that side's card. */
+function ItemRow({
   item,
   styles,
   highlight,
@@ -84,68 +92,75 @@ function ItemLines({
   showStatus: boolean;
 }) {
   const changedStyle = highlight ? styles.changed : styles.unchanged;
+  const status = showStatus && (item.status === "added" || item.status === "removed");
   return (
-    <View style={styles.item}>
+    <DetailRowFrame style={styles.item}>
       {item.breakBefore ? (
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.breakLine}>
           {`Break · ${hoursText(item.breakBefore.minutes)}, ${formatScheduleTimeValue(item.breakBefore.start)} - ${formatScheduleTimeValue(item.breakBefore.end)}`}
         </Text>
       ) : null}
-      <View style={styles.itemHeader}>
-        {item.label ? (
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.itemLabel}>
-            {LABEL_TEXT[item.label]}
-          </Text>
-        ) : null}
-        {showStatus && (item.status === "added" || item.status === "removed") ? (
-          <View style={item.status === "added" ? styles.addedTag : styles.removedTag}>
-            <Text
-              fit="compact"
-              style={item.status === "added" ? styles.addedTagText : styles.removedTagText}
-            >
-              {item.status === "added" ? "Added" : "Removed"}
+      {item.label || status ? (
+        <View style={styles.itemHeader}>
+          {item.label ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.itemLabel}>
+              {LABEL_TEXT[item.label]}
             </Text>
-          </View>
-        ) : null}
-      </View>
+          ) : null}
+          {status ? (
+            <View style={item.status === "added" ? styles.addedTag : styles.removedTag}>
+              <Text
+                fit="compact"
+                style={item.status === "added" ? styles.addedTagText : styles.removedTagText}
+              >
+                {item.status === "added" ? "Added" : "Removed"}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       <Parts parts={item.title} style={styles.itemTitle} changedStyle={changedStyle} />
       {detailLines(item.detail).map((line, index) => (
         <Parts key={index} parts={line} style={styles.itemDetail} changedStyle={changedStyle} />
       ))}
-    </View>
+    </DetailRowFrame>
   );
 }
 
-function SideItems({
+/** A side of the change as its own group: the heading over a card of its items. */
+function SideGroup({
+  heading,
   side,
   styles,
   highlight,
   showStatus = true,
 }: {
+  heading: string;
   side: ShiftChangeSide;
   styles: ReturnType<typeof createStyles>;
   highlight: boolean;
   showStatus?: boolean;
 }) {
-  if (side.items.length === 0) {
-    return (
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.noShift}>
-        No shift
-      </Text>
-    );
-  }
   return (
-    <View style={styles.items}>
-      {side.items.map((item, index) => (
-        <ItemLines
-          key={index}
-          item={item}
-          styles={styles}
-          highlight={highlight}
-          showStatus={showStatus}
-        />
-      ))}
-    </View>
+    <DetailGroup title={sideHeading(heading, side)} titleTone={highlight ? "brand" : "default"}>
+      {side.items.length === 0 ? (
+        <DetailRowFrame>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.noShift}>
+            No shift
+          </Text>
+        </DetailRowFrame>
+      ) : (
+        side.items.map((item, index) => (
+          <ItemRow
+            key={index}
+            item={item}
+            styles={styles}
+            highlight={highlight}
+            showStatus={showStatus}
+          />
+        ))
+      )}
+    </DetailGroup>
   );
 }
 
@@ -183,22 +198,24 @@ function DayBar({
     </View>
   );
   return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.bar}
-    >
-      {track(change.before, false)}
-      {track(change.after, true)}
-      <View style={styles.barScale}>
-        <Text fit="fixed" style={styles.barScaleText}>
-          {formatScheduleTimeValue(scale.start)}
-        </Text>
-        <Text fit="fixed" style={styles.barScaleText}>
-          {formatScheduleTimeValue(scale.end)}
-        </Text>
+    <DetailGroup>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.bar}
+      >
+        {track(change.before, false)}
+        {track(change.after, true)}
+        <View style={styles.barScale}>
+          <Text fit="fixed" style={styles.barScaleText}>
+            {formatScheduleTimeValue(scale.start)}
+          </Text>
+          <Text fit="fixed" style={styles.barScaleText}>
+            {formatScheduleTimeValue(scale.end)}
+          </Text>
+        </View>
       </View>
-    </View>
+    </DetailGroup>
   );
 }
 
@@ -210,9 +227,9 @@ function accessibleSummary(change: ShiftChange): string {
 }
 
 /**
- * A shift change as Before and After headings, every field that tells the two
+ * A shift change as Before and After groups, every field that tells the two
  * apart, the changed ones marked (item 46d). The web's ShiftChangeCard,
- * stacked for a phone.
+ * stacked for a phone as grouped rows.
  */
 export function ShiftChangeCard({
   change,
@@ -226,31 +243,16 @@ export function ShiftChangeCard({
   if (change.kind === "none") return null;
   if (isNewShiftChange(change)) {
     return (
-      <View accessibilityLabel={accessibleSummary(change)} style={styles.card}>
-        <View style={styles.side}>
-          <Text fit="fixed" style={[styles.heading, styles.afterHeading]}>
-            {sideHeading("NEW", change.after)}
-          </Text>
-          <SideItems side={change.after} styles={styles} highlight showStatus={false} />
-        </View>
+      <View accessibilityLabel={accessibleSummary(change)} style={styles.groups}>
+        <SideGroup heading="New" highlight showStatus={false} side={change.after} styles={styles} />
       </View>
     );
   }
   return (
-    <View accessibilityLabel={accessibleSummary(change)} style={styles.card}>
+    <View accessibilityLabel={accessibleSummary(change)} style={styles.groups}>
       {showDayBar ? <DayBar change={change} styles={styles} /> : null}
-      <View style={styles.side}>
-        <Text fit="fixed" style={styles.heading}>
-          {sideHeading("BEFORE", change.before)}
-        </Text>
-        <SideItems side={change.before} styles={styles} highlight={false} />
-      </View>
-      <View style={[styles.side, styles.afterSide]}>
-        <Text fit="fixed" style={[styles.heading, styles.afterHeading]}>
-          {sideHeading("AFTER", change.after)}
-        </Text>
-        <SideItems side={change.after} styles={styles} highlight />
-      </View>
+      <SideGroup heading="Before" highlight={false} side={change.before} styles={styles} />
+      <SideGroup heading="After" highlight side={change.after} styles={styles} />
     </View>
   );
 }
@@ -279,10 +281,17 @@ export function ShiftChangeSheet({
 }
 
 /**
- * The "What changed" button that opens the sheet. Shift detail and Your Week
- * share it, so the two read and behave the same.
+ * The "What changed" control that opens the sheet. Shift detail and Your Week
+ * share it, so the two read and behave the same. `row` is a grouped list's
+ * row with a chevron, for a screen that sets it in a card of rows.
  */
-export function ShiftChangeButton({ change }: { change: ShiftChange }) {
+export function ShiftChangeButton({
+  change,
+  variant = "button",
+}: {
+  change: ShiftChange;
+  variant?: "button" | "row";
+}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [open, setOpen] = useState(false);
@@ -290,17 +299,23 @@ export function ShiftChangeButton({ change }: { change: ShiftChange }) {
   if (change.kind === "none" || isNewShiftChange(change)) return null;
   return (
     <>
-      <PressableRow
-        accessibilityLabel="See what changed"
-        onPress={() => setOpen(true)}
-        style={styles.button}
-      >
-        <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.buttonText}>
-          What changed
-        </Text>
-        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
-      </PressableRow>
+      {variant === "row" ? (
+        <DetailNavRow accessibilityLabel="See what changed" onPress={() => setOpen(true)}>
+          <DetailNavLabel>What changed</DetailNavLabel>
+        </DetailNavRow>
+      ) : (
+        <PressableRow
+          accessibilityLabel="See what changed"
+          onPress={() => setOpen(true)}
+          style={styles.button}
+        >
+          <Ionicons color={mobileColors.textSubtle} name="arrow-undo-outline" size={16} />
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.buttonText}>
+            What changed
+          </Text>
+          <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
+        </PressableRow>
+      )}
       <ShiftChangeSheet change={change} visible={open} onDismiss={() => setOpen(false)} />
     </>
   );
@@ -308,33 +323,8 @@ export function ShiftChangeButton({ change }: { change: ShiftChange }) {
 
 function createStyles(colors: MobileColors) {
   return StyleSheet.create({
-    card: {
-      borderRadius: mobileRadii.control,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderSubtle,
-      backgroundColor: colors.surface,
-      overflow: "hidden",
-    },
-    side: {
-      gap: mobileSpace.xs,
-      paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
-    },
-    afterSide: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.borderSubtle,
-    },
-    heading: {
-      ...mobileText.micro,
-      ...mobileTabularText,
-      color: colors.textMuted,
-      letterSpacing: 0.8,
-    },
-    afterHeading: {
-      color: colors.brand,
-    },
-    items: {
-      gap: mobileSpace.sm,
+    groups: {
+      gap: mobileSpace.lg,
     },
     item: {
       gap: mobileSpace.xs,
@@ -342,11 +332,11 @@ function createStyles(colors: MobileColors) {
     itemHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: mobileSpace.xs,
+      gap: mobileSpace.sm,
     },
     itemLabel: {
-      ...mobileText.caption,
-      color: colors.textSecondary,
+      ...mobileText.meta,
+      color: colors.textMuted,
     },
     itemTitle: {
       ...mobileText.bodyStrong,
@@ -363,7 +353,7 @@ function createStyles(colors: MobileColors) {
     },
     unchanged: {},
     breakLine: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: colors.textMuted,
     },
@@ -374,25 +364,27 @@ function createStyles(colors: MobileColors) {
     addedTag: {
       borderRadius: mobileRadii.pill,
       backgroundColor: colors.successSoft,
-      paddingHorizontal: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: 1,
     },
     removedTag: {
       borderRadius: mobileRadii.pill,
       backgroundColor: colors.dangerSoft,
-      paddingHorizontal: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: 1,
     },
     addedTagText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("meta", "semibold"),
       color: colors.successText,
     },
     removedTagText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("meta", "semibold"),
       color: colors.dangerText,
     },
     bar: {
       gap: mobileSpace.xs,
-      paddingHorizontal: mobileSpace.md,
-      paddingTop: mobileSpace.sm,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.md,
     },
     barTrack: {
       height: 8,
@@ -422,7 +414,7 @@ function createStyles(colors: MobileColors) {
       justifyContent: "space-between",
     },
     barScaleText: {
-      ...mobileText.micro,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: colors.textMuted,
     },
