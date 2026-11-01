@@ -979,16 +979,17 @@ export default function PersonDetailScreen() {
       orgRole,
     ),
   };
-  // The editor's Access row is the role control, the way web's Access column
-  // is. It only exists where there is something to write to: a membership, or
-  // an invitation carrying the role until it is accepted. Someone with neither
-  // has no access record at all, so web prints a dash and offers no dropdown;
-  // here the row stays out and the banner below the hero says what to do.
-  const canChangeOrgRole =
-    canManageManagementAccess &&
-    !isSelf &&
-    person.status !== "removed" &&
+  // The Access row is the role control, the way web's Access column is. It
+  // only exists where there is something to write to: a membership, or an
+  // invitation carrying the role until it is accepted. Someone with neither
+  // has no access record at all, so web prints a dash; here the group stays
+  // out and the status card's invite line says what to do.
+  const hasAccessRecord =
+    canViewEmployeeDetails &&
     (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
+  const canChangeOrgRole =
+    hasAccessRecord && canManageManagementAccess && !isSelf && person.status !== "removed";
+  const adminPermissionCount = orgRole === "admin" ? person.adminPermissionCount : null;
   // Where their invitation stands, for someone who can't sign in yet. A
   // viewer without employee details gets no line: the API redacts `userId`
   // and the invitation for them, so every colleague would read as not invited.
@@ -1665,27 +1666,6 @@ export default function PersonDetailScreen() {
 
       {editing ? (
         <>
-          {/* The role is the first setting in the editor, ahead of the name:
-              it is the one that changes what the person can do. It applies on
-              its own through the sheet's confirmation rather than with Save,
-              since changing it may revoke and resend an invitation, which is
-              nothing to bundle silently into a form submit. */}
-          {canChangeOrgRole ? (
-            <ProfileSection title="Access">
-              <ProfileList>
-                <ProfileNavRow
-                  iconName="key-outline"
-                  isLast
-                  label="Access level"
-                  value={ORG_ROLE_LABELS[orgRole]}
-                  onPress={() => {
-                    setOrgRoleError(null);
-                    setShowOrgRole(true);
-                  }}
-                />
-              </ProfileList>
-            </ProfileSection>
-          ) : null}
           <EditPanel
             certificationLabel={certificationLabel}
             certifications={bootstrapQuery.data?.certifications ?? []}
@@ -1715,6 +1695,44 @@ export default function PersonDetailScreen() {
         </>
       ) : (
         <>
+          {/* What they can do, on the page rather than behind Edit. It applies
+              on its own through the sheet's confirmation, since changing it
+              may revoke and resend an invitation. */}
+          {hasAccessRecord ? (
+            <ProfileSection title="Access">
+              <ProfileList>
+                {canChangeOrgRole ? (
+                  <ProfileNavRow
+                    iconName="key-outline"
+                    isLast={!adminPermissionCount}
+                    label="Access level"
+                    value={ORG_ROLE_LABELS[orgRole]}
+                    onPress={() => {
+                      setOrgRoleError(null);
+                      setShowOrgRole(true);
+                    }}
+                  />
+                ) : (
+                  <ProfileInfoRow
+                    iconName="key-outline"
+                    isLast={!adminPermissionCount}
+                    label="Access level"
+                    value={ORG_ROLE_LABELS[orgRole]}
+                  />
+                )}
+                {/* Choosing them stays on the web; the count says how far they reach. */}
+                {adminPermissionCount ? (
+                  <ProfileInfoRow
+                    iconName="shield-checkmark-outline"
+                    isLast
+                    label="Permissions"
+                    value={`${adminPermissionCount.granted} of ${adminPermissionCount.total}`}
+                  />
+                ) : null}
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
+
           {/* Contact details are a manager's view; the API blanks them for
               everyone else, and "No email on file" would state a blank as a
               fact. Managers still see the placeholder for a genuinely empty

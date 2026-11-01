@@ -260,8 +260,49 @@ describe("AddPersonSheet", () => {
     await waitFor(() => {
       expect(createMobilePersonInvitation).toHaveBeenCalledWith("token-123", "emp-1", {
         email: "nia@dubgrid.com",
+        orgRole: "user",
       });
     });
+  });
+
+  it("invites with the access level picked", async () => {
+    createMobilePerson.mockResolvedValue({ success: true, person: { id: "emp-1" } });
+    createMobilePersonInvitation.mockResolvedValue({});
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    expect(screen.queryByLabelText("Invite to the app")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nia@dubgrid.com" } });
+    expect(screen.getByLabelText("Invite to the app")).toBeChecked();
+    // Super Admin is offered only by someone who holds it.
+    expect(screen.queryByRole("button", { name: /^Super Admin/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+    await waitFor(() => {
+      expect(createMobilePersonInvitation).toHaveBeenCalledWith("token-123", "emp-1", {
+        email: "nia@dubgrid.com",
+        orgRole: "admin",
+      });
+    });
+  });
+
+  it("adds someone with an email without inviting them", async () => {
+    createMobilePerson.mockResolvedValue({ success: true, person: { id: "emp-1" } });
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nia@dubgrid.com" } });
+    fireEvent.click(screen.getByLabelText("Invite to the app"));
+    expect(screen.queryByRole("button", { name: /^Admin/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+    await waitFor(() => expect(createMobilePerson).toHaveBeenCalledTimes(1));
+    expect(createMobilePersonInvitation).not.toHaveBeenCalled();
   });
 
   it("says so when the person was created but the invitation could not be sent", async () => {

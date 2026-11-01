@@ -146,7 +146,9 @@ export interface MobileOrganizationMembershipRow extends Pick<
 export interface MobileManagementMembershipRow extends Pick<
   DbOrganizationMembership,
   "user_id" | "department_ids" | "dept_admin_ids" | "org_role" | "updated_at"
-> {}
+> {
+  admin_permissions?: Record<string, boolean> | null;
+}
 
 export interface MobileEmbeddedEmployeeRow {
   id: string;
@@ -561,7 +563,7 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
   const data = await fetchAllMobileRows<Record<string, unknown>>((from, to) =>
     serviceClient
       .from("organization_memberships")
-      .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
+      .select("user_id, department_ids, dept_admin_ids, org_role, updated_at, admin_permissions")
       .eq("org_id", orgId)
       .in("user_id", uniqueUserIds)
       .is("archived_at", null)
@@ -576,6 +578,7 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
       dept_admin_ids: number[] | null;
       org_role: string;
       updated_at: string | null;
+      admin_permissions: Record<string, boolean> | null;
     }>
   ).map((row) => ({
     user_id: row.user_id,
@@ -583,6 +586,7 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
     dept_admin_ids: row.dept_admin_ids ?? [],
     org_role: row.org_role,
     updated_at: row.updated_at ?? null,
+    admin_permissions: row.admin_permissions ?? null,
   }));
 }
 
