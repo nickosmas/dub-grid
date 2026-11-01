@@ -678,7 +678,6 @@ function ShiftPill({
         ),
         ...gapBefore(index, shift.seams, "stacked", 4),
         background: shift.background,
-        backgroundOrigin: "border-box",
         color: shift.textColor,
         boxSizing: "border-box",
         // Wraps only between words: the cell is wide enough for ordinary
