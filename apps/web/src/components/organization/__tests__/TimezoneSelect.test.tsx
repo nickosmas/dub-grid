@@ -26,9 +26,11 @@ describe("TimezoneSelect", () => {
 
     render(<TimezoneSelect value="America/Los_Angeles" onChange={vi.fn()} />);
 
+    // The offset changes with daylight saving time, so the zone is found by
+    // its city alone.
     await user.click(
       screen.getByRole("button", {
-        name: /utc-7 . los angeles \(america\)/i,
+        name: /utc[-+]\d+ . los angeles \(america\)/i,
       }),
     );
 
