@@ -98,8 +98,9 @@ export function NotificationRow({
     }
   };
 
-  const restingFill = isUnread ? mobileColors.brandSoft : mobileColors.background;
-  const revealedFill = isUnread ? mobileColors.brandSoft : mobileColors.surfaceSecondary;
+  // Unread is the dot and the weight, as in Mail; the row keeps the page's fill.
+  const restingFill = mobileColors.background;
+  const revealedFill = mobileColors.surfaceSecondary;
   const cardStyle = useAnimatedStyle(() => ({
     borderRadius: interpolate(reveal.value, [0, 1], [0, mobileRadii.card], Extrapolation.CLAMP),
     backgroundColor: interpolateColor(reveal.value, [0, 1], [restingFill, revealedFill]),

@@ -1,11 +1,8 @@
-import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text } from "../../../src/shared/components/Text";
+import { useState } from "react";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
-  FilterButton,
   FilterSheet,
   SelectionRow,
   SelectionSection,
@@ -17,18 +14,16 @@ import {
 } from "../../../src/features/dashboard/components/ActivityFeedCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
+import { DashboardListSection } from "../../../src/features/dashboard/components/DashboardListSection";
+import { HeaderFilterAction } from "../../../src/shared/navigation/HeaderFilterAction";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
-import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
 const ACTIVITY_TYPES: ActivityType[] = ["publish", "request", "user_signup"];
 type TypeFilter = "all" | ActivityType;
 
 export default function ActivityExpandedScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   // Drilling in from Home used to lose pull-to-refresh entirely: these routes
   // share Home's cached query, so the only way to refresh was to back out.
@@ -108,42 +103,25 @@ export default function ActivityExpandedScreen() {
         </SelectionSection>
       </FilterSheet>
 
-      <View style={styles.headerRow}>
-        <Text style={styles.count}>
-          {filtered.length} {filtered.length === 1 ? "event" : "events"}
-        </Text>
-        <FilterButton
-          accessibilityLabel="Filter activity"
-          activeCount={activeFilterCount}
-          expanded={isFilterVisible}
-          onPress={() => setIsFilterVisible(true)}
-        />
-      </View>
+      <HeaderFilterAction
+        accessibilityLabel="Filter activity"
+        activeCount={activeFilterCount}
+        onPress={() => setIsFilterVisible(true)}
+      />
 
       {filtered.length === 0 ? (
         <EmptyStateCard iconName="options-outline" title="No activity matches this filter" />
       ) : (
-        <DashboardRowList
-          items={filtered}
-          keyExtractor={(item) => item.id}
-          renderItem={(item) => <ActivityRow item={item} />}
-        />
+        <DashboardListSection
+          caption={`${filtered.length} ${filtered.length === 1 ? "event" : "events"}`}
+        >
+          <DashboardRowList
+            items={filtered}
+            keyExtractor={(item) => item.id}
+            renderItem={(item) => <ActivityRow item={item} />}
+          />
+        </DashboardListSection>
       )}
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-      paddingTop: 12,
-      paddingBottom: 4,
-    },
-    count: {
-      ...mobileText.label,
-    },
-  });

@@ -552,7 +552,12 @@ export function buildActivityFeed(
       type: "request",
       description: describeShiftRequestActivity({
         type: request.type,
-        shiftName: request.requesterPresentation.shiftName || request.requesterPresentation.label,
+        // Spelled out, as the app names a shift everywhere: the segment carries
+        // the shift's name when the cell-level one is empty, before the code.
+        shiftName:
+          request.requesterPresentation.segments?.[0]?.shiftName ||
+          request.requesterPresentation.shiftName ||
+          request.requesterPresentation.label,
         requesterName: request.requesterName,
         status: request.status,
       }),

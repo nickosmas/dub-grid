@@ -4,6 +4,7 @@ import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import { ActionQueueRow } from "../../../src/features/dashboard/components/ActionQueueCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
+import { DashboardListSection } from "../../../src/features/dashboard/components/DashboardListSection";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
@@ -65,11 +66,15 @@ export default function PendingApprovalsExpandedScreen() {
       {requests.length === 0 ? (
         <EmptyStateCard iconName="checkmark-circle" title="No requests are waiting on you" />
       ) : (
-        <DashboardRowList
-          items={requests}
-          keyExtractor={(request) => request.id}
-          renderItem={(request) => <ActionQueueRow request={request} />}
-        />
+        <DashboardListSection
+          caption={`${requests.length} ${requests.length === 1 ? "request" : "requests"}`}
+        >
+          <DashboardRowList
+            items={requests}
+            keyExtractor={(request) => request.id}
+            renderItem={(request) => <ActionQueueRow request={request} />}
+          />
+        </DashboardListSection>
       )}
     </Screen>
   );

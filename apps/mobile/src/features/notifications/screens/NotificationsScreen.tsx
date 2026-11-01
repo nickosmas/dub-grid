@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text } from "../../../shared/components/Text";
+import { Platform, StyleSheet, View } from "react-native";
+import { Stack } from "expo-router";
+import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
@@ -40,19 +41,10 @@ import {
   resolveAlertNativeRoute,
 } from "../lib/openNotificationAction";
 import { NotificationRowListSkeleton } from "../components/NotificationRowListSkeleton";
-import { SkeletonLine } from "../../../shared/components/skeleton";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileElevation,
-  mobileRadii,
-  mobilePillOverflow,
-  mobileText,
-  mobileTextWeighted,
-  type MobileColors,
-  mobileSpace,
-} from "../../../shared/theme/tokens";
+import { type MobileColors, mobileSpace } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 
@@ -401,26 +393,10 @@ export default function NotificationsScreen() {
             tabs={filterTabs}
           />
         )}
-        {/* The unread row is almost always there once the facets land, so the
-            placeholder holds its height and the list does not drop on load.
-            Its action is a text button, so the placeholder is a text line. */}
-        {contentState.kind === "loading" && contentState.showSkeleton ? (
-          <View style={styles.actionRow}>
-            <SkeletonLine variant="sectionTitle" width={104} />
-            <SkeletonLine variant="bodyStrong" width={112} />
-          </View>
-        ) : null}
+        {/* Mark all read is a bar action, as in Mail; how many are unread is
+            already on the Unread filter. */}
         {unreadCount > 0 ? (
-          <View style={styles.actionRow}>
-            <Text style={styles.actionCopy}>{unreadCount} unread</Text>
-            <Button
-              compact
-              label="Mark all read"
-              loading={busy}
-              onPress={() => setConfirmingMarkAllRead(true)}
-              tone="link"
-            />
-          </View>
+          <MarkAllReadBarAction disabled={busy} onPress={() => setConfirmingMarkAllRead(true)} />
         ) : null}
         {/* Inside the header block so the placeholder rows sit the same
             compact gap below the unread row that the real rows do. */}
@@ -473,16 +449,6 @@ const createStyles = (mobileColors: MobileColors) =>
     headerArea: {
       gap: mobileSpace.md,
     },
-    actionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    actionCopy: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
     // Rows, not cards: the list is one column with a hairline between
     // alerts, the way a mailbox reads, and the row's actions sit behind a
     // swipe rather than on a panel of their own. The column bleeds past the
@@ -501,3 +467,31 @@ const createStyles = (mobileColors: MobileColors) =>
       marginHorizontal: getScreenGutter(),
     },
   });
+
+/** Mark all read in the navigation bar: the words on iOS, Material's done-all icon on Android. */
+function MarkAllReadBarAction({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
+  const androidIcon = useToolbarIcon("checkmark.circle", "done-all");
+
+  return (
+    <Stack.Toolbar placement="right">
+      {Platform.OS === "android" ? (
+        androidIcon ? (
+          <Stack.Toolbar.Button
+            accessibilityLabel="Mark all read"
+            disabled={disabled}
+            icon={androidIcon}
+            onPress={onPress}
+          />
+        ) : null
+      ) : (
+        <Stack.Toolbar.Button
+          accessibilityLabel="Mark all read"
+          disabled={disabled}
+          onPress={onPress}
+        >
+          Mark all read
+        </Stack.Toolbar.Button>
+      )}
+    </Stack.Toolbar>
+  );
+}

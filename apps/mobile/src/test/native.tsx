@@ -674,3 +674,33 @@ export function createScreenModule(React: ReactModule) {
     getCardSurfaceStyle: () => ({}),
   };
 }
+
+/**
+ * expo-router's native header pieces as plain elements a test can find by
+ * label and press: bar buttons render as buttons (with their words, when they
+ * have any), and the search field draws nothing.
+ */
+export function createNativeStackMock(React: typeof import("react")) {
+  type ButtonProps = {
+    accessibilityLabel?: string;
+    onPress?: () => void;
+    disabled?: boolean;
+    children?: React.ReactNode;
+  };
+  const Toolbar = Object.assign(
+    ({ children }: { children?: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    {
+      Button: ({ accessibilityLabel, onPress, disabled, children }: ButtonProps) =>
+        React.createElement(
+          "button",
+          { "aria-label": accessibilityLabel, disabled, onClick: onPress },
+          children,
+        ),
+      View: ({ children }: { children?: React.ReactNode }) =>
+        React.createElement(React.Fragment, null, children),
+      Badge: () => null,
+    },
+  );
+  return { Toolbar, SearchBar: () => null };
+}
