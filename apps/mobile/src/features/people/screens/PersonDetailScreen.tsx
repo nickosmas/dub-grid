@@ -58,6 +58,8 @@ import { SelectionRow, SelectionSection } from "../../../shared/components/Filte
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import { EditBarActions } from "../../../shared/navigation/EditBarActions";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   changeMobilePersonOrgRole,
   checkMobilePersonContact,
@@ -1424,7 +1426,15 @@ export default function PersonDetailScreen() {
   return (
     <Screen
       bottomPaddingMode="stack"
-      footer={footer}
+      footer={
+        IS_NATIVE_LIST ? (
+          editing && confirmationError && !showSaveConfirmation ? (
+            <InlineError message={confirmationError} />
+          ) : null
+        ) : (
+          footer
+        )
+      }
       onRefresh={manualRefresh.refresh}
       onScroll={handlePersonScroll}
       refreshing={manualRefresh.isRefreshing}
@@ -1443,7 +1453,8 @@ export default function PersonDetailScreen() {
           },
           // Edit lives in the bar, where iOS puts it, not in the action row:
           // it is the one action about the page rather than about the person.
-          // Cleared while editing, when the footer's Save and Cancel own it.
+          // While editing, the phones put Save and Cancel in the bar too; the
+          // web build keeps them in the footer.
           ...createHeaderTextAction(
             canEdit && !editing
               ? {
@@ -1458,6 +1469,21 @@ export default function PersonDetailScreen() {
           ),
         }}
       />
+      {editing && IS_NATIVE_LIST ? (
+        <EditBarActions
+          discard={{
+            label: getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges }),
+            onPress: hasChanges ? guard.discard : guard.requestClose,
+          }}
+          save={{
+            label: "Save",
+            accessibilityLabel: "Save changes",
+            disabled: updateMutation.isPending || !hasChanges || hasEditValidationErrors,
+            loading: updateMutation.isPending,
+            onPress: handleSave,
+          }}
+        />
+      ) : null}
       <AccountLinkChallengeModal
         challenge={accountLinkChallenge}
         error={invitationError}

@@ -26,6 +26,7 @@ import {
   type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { Pressable } from "./Pressable";
+import { SectionHeading } from "./SectionHeading";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
@@ -529,19 +530,16 @@ export function Card({
   detail,
   headerAccessory,
   onSeeAll,
-  seeAllLabel = "See all",
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
   headerAccessory?: ReactNode;
   /**
-   * Opens the full version of what the card previews. Renders as a link in
-   * the header's trailing slot, where a reader looks for it, rather than as a
-   * button under the list, where it used to sit below three rows of content.
+   * Opens the full version of what the card previews, through the title
+   * (`SectionHeading`), rather than a button under the list.
    */
   onSeeAll?: () => void;
-  seeAllLabel?: string;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -551,31 +549,16 @@ export function Card({
     <View style={styles.cardGroup}>
       {/* The header sits on the page background, above the white surface —
           a section heading over its content rather than inside it. */}
-      <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderCopy}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardTitle}>
-            {title}
-          </Text>
-        </View>
-        {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
-        {onSeeAll ? (
-          // A plain pressable rather than a link `Button`: the header is one
-          // line of hierarchy and a 36pt control beside the title competed with
-          // it. The slop keeps the target at the platform minimum.
-          <Pressable
-            accessibilityLabel={`${seeAllLabel}: ${title}`}
-            accessibilityRole="button"
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            onPress={onSeeAll}
-            style={({ pressed }) => [styles.cardSeeAll, pressed && styles.cardSeeAllPressed]}
-          >
-            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardSeeAllLabel}>
-              {seeAllLabel}
-            </Text>
-            <Ionicons color={mobileColors.brand} name="chevron-forward" size={14} />
-          </Pressable>
-        ) : null}
-      </View>
+      <SectionHeading
+        accessory={
+          headerAccessory ? (
+            <View style={styles.cardHeaderAccessory}>{headerAccessory}</View>
+          ) : undefined
+        }
+        onOpen={onSeeAll}
+        title={title}
+        titleStyle={styles.cardTitle}
+      />
       <View style={styles.card}>
         {body ? (
           <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.cardBody}>
@@ -667,34 +650,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       gap: mobileSpace.sm,
     },
     card: getCardSurfaceStyle(mobileColors, isDark),
-    cardHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-    },
-    cardHeaderCopy: {
-      flex: 1,
-      minWidth: 0,
-    },
     cardHeaderAccessory: {
       justifyContent: "center",
-    },
-    cardSeeAll: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.xs,
-      borderRadius: mobileRadii.control,
-      marginHorizontal: -mobileSpace.sm,
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
-    },
-    cardSeeAllPressed: {
-      backgroundColor: mobileColors.navActiveBg,
-    },
-    cardSeeAllLabel: {
-      ...mobileText.label,
-      color: mobileColors.brand,
     },
     // `title`, one step under the screen's own heading: at `screenTitle` a
     // dashboard of six cards read as six page titles down one scroll.

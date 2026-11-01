@@ -13,6 +13,7 @@ import {
   mobileSpace,
 } from "../../../shared/theme/tokens";
 import { ProfileIcon } from "../../profile/components/ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 
 export type AddPersonKind = "scheduled" | "management";
 
@@ -96,7 +97,7 @@ const createStyles = (mobileColors: MobileColors) =>
     // without it there was no edge at all in light mode (see SignOutScopeSheet).
     options: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: IS_NATIVE_LIST ? "transparent" : mobileColors.borderSubtle,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",

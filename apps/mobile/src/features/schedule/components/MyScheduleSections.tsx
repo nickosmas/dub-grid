@@ -9,6 +9,7 @@ import { Text } from "../../../shared/components/Text";
 import { AnimatedMeterFill } from "../../../shared/motion/AnimatedMeterFill";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
+import { SectionHeading } from "../../../shared/components/SectionHeading";
 import { LinearGradient } from "expo-linear-gradient";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
@@ -308,16 +309,11 @@ function MeSectionHeader({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
-    <View style={styles.meSectionHeader}>
-      <View style={styles.meSectionHeaderCopy}>
-        <Text style={styles.meSectionTitle}>{title}</Text>
-      </View>
-      {actionLabel && onAction ? (
-        <Pressable accessibilityRole="button" onPress={onAction}>
-          <Text style={styles.meSectionLink}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <SectionHeading
+      onOpen={actionLabel ? onAction : undefined}
+      title={title}
+      titleStyle={styles.meSectionTitle}
+    />
   );
 }
 
