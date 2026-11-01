@@ -69,6 +69,16 @@ export const MENTORED_CORNER_CLEARANCE = 21;
  */
 export const LOCK_CORNER_CLEARANCE = 26;
 
+/** The corrected-day mark: a circle in the cell's top-right corner, outside the pill. */
+export const CORRECTION_MARK_SIZE = 14;
+export const CORRECTION_MARK_INSET = 3;
+/**
+ * The strip a corrected cell keeps clear on its right for the mark. Pills end
+ * before it, so the mark never lands on the mentored "M" or anything else the
+ * pill draws in its own top-right corner.
+ */
+export const CORRECTION_MARK_GUTTER = CORRECTION_MARK_SIZE + 2 * CORRECTION_MARK_INSET;
+
 /** Leg length of the request corner fold, and the room a neighbour must leave it. */
 export const REQUEST_FOLD_SIZE = 16;
 /**
