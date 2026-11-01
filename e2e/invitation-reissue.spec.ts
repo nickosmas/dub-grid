@@ -274,21 +274,21 @@ test.describe("invitation reissue and revoke", () => {
       await changeAccess.getByRole("button", { name: "Cancel" }).click();
       await expect(changeAccess).toBeHidden();
 
-      // The detail slideover's pending-invitation banner.
+      // The detail slideover's invite card.
       await row.getByRole("cell", { name: "Full-time" }).click();
-      const banner = page.getByText("Invitation pending").locator("xpath=../../..");
-      await expect(banner).toContainText(employeeEmail);
+      const slideoverInvite = page.getByRole("region", { name: "Invitation" });
+      await expect(slideoverInvite).toContainText(/hasn.t joined/);
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Resend" }),
+        slideoverInvite.getByRole("button", { name: "Resend" }),
         REISSUE,
         "4a-slideover-reinvite-confirmation",
       );
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Revoke", exact: true }),
+        slideoverInvite.getByRole("button", { name: "Revoke", exact: true }),
         REVOKE,
         "4b-slideover-revoke-confirmation",
       );
@@ -319,18 +319,19 @@ test.describe("invitation reissue and revoke", () => {
 
       // The full detail page.
       await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people/${staff.employeeId}`);
-      await page.getByText("Invitation pending").first().waitFor({ timeout: 120_000 });
+      const pageInvite = page.getByRole("region", { name: "Invitation" });
+      await pageInvite.getByText(/hasn.t joined/).waitFor({ timeout: 120_000 });
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Resend" }),
+        pageInvite.getByRole("button", { name: "Resend" }),
         REISSUE,
         "3a-detail-page-reinvite-confirmation",
       );
       await askAndCancel(
         page,
         testInfo,
-        page.getByRole("button", { name: "Revoke", exact: true }),
+        pageInvite.getByRole("button", { name: "Revoke", exact: true }),
         REVOKE,
         "3b-detail-page-revoke-confirmation",
       );
@@ -440,9 +441,10 @@ test.describe("invitation reissue and revoke", () => {
         } else {
           await page.goto(`${QA_CALM_HAVEN_ORIGIN}/people/${employeeId}`);
         }
-        await page.getByText("Invitation pending").first().waitFor({ timeout: 120_000 });
+        const inviteCard = page.getByRole("region", { name: "Invitation" });
+        await inviteCard.getByText(/hasn.t joined/).waitFor({ timeout: 120_000 });
 
-        await page.getByRole("button", { name: "Resend" }).click();
+        await inviteCard.getByRole("button", { name: "Resend" }).click();
         const confirm = page.getByRole("alertdialog", { name: /^Resend the invitation to / });
         const resend = page.waitForResponse(
           (response) =>
@@ -548,7 +550,10 @@ test.describe("invitation reissue and revoke", () => {
       const row = rowFor(page, `Reissue ${lastName}`);
       await row.waitFor({ timeout: 60_000 });
       await row.getByRole("cell", { name: "Full-time" }).click();
-      await page.getByRole("button", { name: "Send invitation" }).click();
+      await page
+        .getByRole("region", { name: "Invitation" })
+        .getByRole("button", { name: "Invite", exact: true })
+        .click();
 
       const invite = page.getByRole("dialog", { name: /^Invite / });
       const create = page.waitForResponse(
