@@ -22,7 +22,7 @@ const COUNT_SIZE = 20;
 /**
  * A tab as a Material 3 filter chip: outlined at rest, filled with the
  * brand's container colour and led by a check mark while selected, with the
- * count in a small blue-tinted circle after the label.
+ * count in a small gray circle after the label.
  */
 export function ScrollableTabStripTab({
   label,
@@ -97,11 +97,11 @@ const createStyles = (mobileColors: MobileColors) =>
       height: COUNT_SIZE,
       borderRadius: COUNT_SIZE / 2,
       paddingHorizontal: mobileSpace.xs,
-      backgroundColor: mobileColors.controlSecondaryBg,
+      backgroundColor: mobileColors.controlNeutralBg,
     },
     count: {
       ...mobileTextWeighted("caption", "bold"),
-      color: mobileColors.controlSecondaryFg,
+      color: mobileColors.textSecondary,
       fontVariant: ["tabular-nums"],
     },
   });

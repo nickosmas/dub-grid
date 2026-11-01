@@ -17,14 +17,14 @@ import type { ScrollableTabStripTabProps } from "./ScrollableTabStripTab.types";
 export type { ScrollableTabStripTabProps } from "./ScrollableTabStripTab.types";
 
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
-// The system fill gray, so an idle capsule reads as glass on a plain page
-// rather than disappearing into it (owner, 2026-10-31).
-const IDLE_GLASS_TINT = "rgba(120, 120, 128, 0.26)";
+// The count's circle takes the system fill gray; the capsule itself stays
+// clear glass at rest (owner, 2026-10-31).
+const COUNT_FILL = "rgba(120, 120, 128, 0.16)";
 
 /**
- * A tab as an iOS 26 Liquid Glass capsule: gray-tinted glass at rest, tinted
- * with the brand colour while selected, and its count in a small circle with
- * a blue hue (a white one on the selected capsule). Before iOS 26 it keeps a
+ * A tab as an iOS 26 Liquid Glass capsule: clear glass at rest, tinted with
+ * the brand colour while selected, and its count in a small gray circle (a
+ * white one on the selected capsule). Before iOS 26 it keeps a
  * filled capsule.
  */
 export function ScrollableTabStripTab({
@@ -69,7 +69,7 @@ export function ScrollableTabStripTab({
           glassEffectStyle="regular"
           isInteractive
           style={styles.capsule}
-          tintColor={isActive ? mobileColors.brand : IDLE_GLASS_TINT}
+          tintColor={isActive ? mobileColors.brand : undefined}
         >
           {content}
         </GlassView>
@@ -117,14 +117,14 @@ const createStyles = (mobileColors: MobileColors) =>
       height: COUNT_SIZE,
       borderRadius: COUNT_SIZE / 2,
       paddingHorizontal: mobileSpace.xs,
-      backgroundColor: mobileColors.controlSecondaryBg,
+      backgroundColor: COUNT_FILL,
     },
     countPillOnTint: {
       backgroundColor: "rgba(255, 255, 255, 0.24)",
     },
     count: {
       ...mobileTextWeighted("caption", "bold"),
-      color: mobileColors.controlSecondaryFg,
+      color: mobileColors.textSecondary,
       fontVariant: ["tabular-nums"],
     },
     countOnTint: {

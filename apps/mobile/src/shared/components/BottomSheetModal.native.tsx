@@ -132,7 +132,9 @@ function liftSheetActions(node: ReactNode): LiftedActions {
         const props = (second as ReactElement<ButtonProps>).props;
         if (props.tone === "plain" || (props.label && CANCEL_LABELS.has(props.label))) {
           lifted.onCancel = props.onPress;
-        } else {
+        } else if (!props.disabled) {
+          // A second action with nothing to act on (Clear all with no filter
+          // set) gives its place back to the close button.
           lifted.secondary = props;
         }
       }
@@ -220,13 +222,13 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
               <View>
                 <BottomSheetScrollView
                   automaticallyAdjustKeyboardInsets
-                  contentContainerStyle={[styles.body, !barFooter && styles.bodyScrollEnd]}
+                  contentContainerStyle={[styles.body, styles.bodyScrollEnd]}
                   keyboardShouldPersistTaps="handled"
                   style={{ maxHeight: scrollBodyMaxHeight }}
                 >
                   {children}
                 </BottomSheetScrollView>
-                {barFooter ? null : (
+                {
                   // The system keeps the home indicator's inset below the
                   // content, so a scrolled list ends on a hard line there; it
                   // fades out instead, as iOS 26's scroll edge effect does.
@@ -235,7 +237,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
                     pointerEvents="none"
                     style={styles.scrollEdge}
                   />
-                )}
+                }
               </View>
             ) : (
               <View style={styles.body}>{children}</View>
