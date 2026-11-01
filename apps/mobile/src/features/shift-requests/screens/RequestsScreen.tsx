@@ -1088,7 +1088,11 @@ export default function RequestsScreen() {
               <Button
                 label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
                 onPress={confirmRequestAction}
-                tone="primary"
+                tone={
+                  requestActionConfirmation?.feedback.confirmStyle === "destructive"
+                    ? "danger"
+                    : "primary"
+                }
               />
             }
           >

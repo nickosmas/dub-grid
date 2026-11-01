@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { Alert, StyleSheet, View, type AlertButton } from "react-native";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -9,6 +9,7 @@ import { Button } from "./Button";
 import { ConfirmSummaryBox, type ConfirmSummary } from "./ConfirmSummaryBox";
 import { InlineError } from "./InlineError";
 import type { ConfirmationModalProps } from "./ConfirmationModal";
+import { AnchoredConfirmationContext } from "./anchored-confirmation";
 
 export type { ConfirmationModalProps } from "./ConfirmationModal";
 
@@ -36,6 +37,31 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
   const latest = useRef(props);
   latest.current = props;
   const shownRef = useRef(false);
+  // A plain destructive question inside an iOS sheet opens from its close
+  // button instead of the middle of the screen.
+  const showAnchored = useContext(AnchoredConfirmationContext);
+  const anchored =
+    showAnchored != null &&
+    props.confirmTone === "danger" &&
+    !props.secondaryAction &&
+    !props.summary;
+
+  useEffect(() => {
+    if (!anchored || !showAnchored) return;
+    if (!visible) {
+      showAnchored(null);
+      return;
+    }
+    const current = latest.current;
+    showAnchored({
+      title: current.title,
+      body: current.body,
+      confirmLabel: current.confirmLabel,
+      onConfirm: confirm,
+      onCancel: () => latest.current.onCancel(),
+    });
+    return () => showAnchored(null);
+  }, [anchored, showAnchored, visible]);
 
   const confirm = () => {
     const current = latest.current;
@@ -47,6 +73,7 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
   };
 
   useEffect(() => {
+    if (anchored) return;
     if (!visible) {
       shownRef.current = false;
       return;

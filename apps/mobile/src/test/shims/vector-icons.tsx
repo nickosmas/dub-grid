@@ -22,6 +22,10 @@ function Icon({ name, size: _size, color: _color, accessibilityLabel, ...rest }:
   });
 }
 
+// The real families draw a glyph to an image for native header buttons; there
+// is no native side to draw to here.
+Icon.getImageSource = (): Promise<null> => Promise.resolve(null);
+
 // Default export covers subpath imports (@expo/vector-icons/Ionicons, etc.).
 export default Icon;
 

@@ -27,11 +27,12 @@ const routerPush = vi.fn();
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
-  default: () => null,
+  default: Object.assign(() => null, { getImageSource: () => Promise.resolve(null) }),
 }));
 
+// Every family resolves to the one icon shim, so this mock is Ionicons too.
 vi.mock("@expo/vector-icons/FontAwesome6", () => ({
-  default: () => null,
+  default: Object.assign(() => null, { getImageSource: () => Promise.resolve(null) }),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -44,6 +45,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("expo-router", () => ({
+  useNavigation: () => ({ setOptions: () => undefined }),
   router: {
     replace: routerReplace,
     push: routerPush,
@@ -66,6 +68,17 @@ vi.mock("expo-router", () => ({
             onClick={props.onPress}
             type="button"
           >
+            {props.children}
+          </button>
+        ),
+        // The X's discard menu, its action pressed like any button.
+        Menu: (props: { children?: ReactNode; accessibilityLabel?: string }) => (
+          <div aria-label={props.accessibilityLabel} role="menu">
+            {props.children}
+          </div>
+        ),
+        MenuAction: (props: { children?: ReactNode; onPress?: () => void }) => (
+          <button onClick={props.onPress} type="button">
             {props.children}
           </button>
         ),
@@ -957,11 +970,11 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText("Staffing")).toBeInTheDocument();
     expect(screen.getByText("Assignments")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
-    // Two buttons, and the dismiss one carries web's tri-state: nothing typed
-    // yet, so it reads Cancel. It becomes Discard once there is something to
-    // throw away, which the dedicated test below covers.
-    expect(screen.getByText("Cancel")).toBeInTheDocument();
-    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    // Two icon buttons, and the X carries web's tri-state: nothing typed yet,
+    // so it is Cancel. It becomes Discard once there is something to throw
+    // away, which the dedicated test below covers.
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Discard" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
@@ -982,18 +995,19 @@ describe("PersonDetailScreen", () => {
     const firstName = screen.getByDisplayValue("Mina");
     fireEvent.change(firstName, { target: { value: "Minara" } });
 
-    expect(screen.getByText("Discard")).toBeInTheDocument();
-    expect(screen.queryByText("Cancel")).not.toBeInTheDocument();
+    // The X now asks first, from a menu whose one action discards.
+    const discardMenu = screen.getByRole("menu", { name: "Discard" });
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Discard"));
+    fireEvent.click(within(discardMenu).getByRole("button", { name: "Discard" }));
 
     // Reset in place: the field is back to its saved value, the panel is still
-    // open, and the button has gone back to Cancel. Leaving is the back
-    // gesture's job, which is guarded separately.
+    // open, and the X has gone back to Cancel. Leaving is the back gesture's
+    // job, which is guarded separately.
     expect(screen.getByDisplayValue("Mina")).toBeInTheDocument();
     expect(screen.getByText("Basic info")).toBeInTheDocument();
-    expect(screen.getByText("Cancel")).toBeInTheDocument();
-    expect(screen.queryByText("Discard")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Discard" })).not.toBeInTheDocument();
   });
 
   it("hides an incompatible role while keeping a selected legacy role removable", () => {

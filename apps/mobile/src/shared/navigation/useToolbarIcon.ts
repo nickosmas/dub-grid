@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Platform, type ImageSourcePropType } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { Stack } from "expo-router";
 import { useMobileColors } from "../providers/ThemeModeProvider";
@@ -32,4 +33,32 @@ export function useToolbarIcon(
   }, [material, mobileColors.textPrimary]);
 
   return Platform.OS === "android" ? androidSource : sf;
+}
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+/**
+ * An iOS header icon drawn to an image in a set colour, for a prominent bar
+ * item: iOS draws a symbol on the filled brand capsule in a pale tint of it,
+ * where the system's own commit glyph is white. Undefined on Android, whose
+ * toolbar tints its icons itself.
+ */
+export function useIosToolbarImage(
+  ionicon: IoniconName,
+  color: string,
+): ImageSourcePropType | undefined {
+  const [source, setSource] = useState<ImageSourcePropType | undefined>();
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    let cancelled = false;
+    void Ionicons.getImageSource(ionicon, 24, color).then((image) => {
+      if (!cancelled && image) setSource(image);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ionicon, color]);
+
+  return source;
 }
