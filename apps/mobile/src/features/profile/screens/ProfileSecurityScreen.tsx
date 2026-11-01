@@ -1,10 +1,8 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Platform, StyleSheet, View } from "react-native";
-import { Text } from "../../../shared/components/Text";
-import { AppSwitch } from "../../../shared/components/AppSwitch";
+import { Platform } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
@@ -24,17 +22,17 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useAppLockEnabled } from "../../../shared/providers/AppLockProvider";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   ProfileList,
   ProfileNavRow,
-  ProfilePanel,
+  ProfileListAction,
   ProfileSection,
+  ProfileSwitchRow,
 } from "../components/ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { formatSessionCount } from "../components/session-format";
 
@@ -55,8 +53,6 @@ const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending
  * app-lock toggle (one switch, nothing to unfold) stays inline.
  */
 export default function ProfileSecurityScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
@@ -203,35 +199,46 @@ export default function ProfileSecurityScreen() {
 
           {!appLockUnsupported ? (
             <ProfileSection title="App lock">
-              <ProfilePanel>
-                <View style={styles.toggleRow}>
-                  <View style={styles.toggleCopy}>
-                    <Text style={styles.rowTitle}>Require unlock on this device</Text>
-                    <Text style={styles.rowDescription}>{APP_LOCK_DESCRIPTION}</Text>
-                  </View>
-                  <AppSwitch
-                    accessibilityLabel="App lock"
-                    disabled={appLockToggling}
-                    value={appLockEnabled}
-                    onValueChange={(next) => void toggleAppLock(next)}
-                  />
-                </View>
-              </ProfilePanel>
+              <ProfileList>
+                <ProfileSwitchRow
+                  accessibilityLabel="App lock"
+                  detail={APP_LOCK_DESCRIPTION}
+                  disabled={appLockToggling}
+                  isLast
+                  label="Require unlock on this device"
+                  value={appLockEnabled}
+                  onValueChange={(next) => void toggleAppLock(next)}
+                />
+              </ProfileList>
             </ProfileSection>
           ) : null}
 
           {!isSuperAdmin ? (
             <ProfileSection>
-              <Button
-                disabled={
-                  deletionRequestMutation.isPending ||
-                  Boolean(profileQuery.data.pendingAccountDeletionRequest)
-                }
-                label="Request account deletion"
-                loading={deletionRequestMutation.isPending}
-                onPress={() => setIsConfirmingDeletion(true)}
-                tone="danger"
-              />
+              {IS_NATIVE_LIST ? (
+                <ProfileList>
+                  <ProfileListAction
+                    align="center"
+                    disabled={Boolean(profileQuery.data.pendingAccountDeletionRequest)}
+                    isLast
+                    label="Request account deletion"
+                    loading={deletionRequestMutation.isPending}
+                    onPress={() => setIsConfirmingDeletion(true)}
+                    tone="danger"
+                  />
+                </ProfileList>
+              ) : (
+                <Button
+                  disabled={
+                    deletionRequestMutation.isPending ||
+                    Boolean(profileQuery.data.pendingAccountDeletionRequest)
+                  }
+                  label="Request account deletion"
+                  loading={deletionRequestMutation.isPending}
+                  onPress={() => setIsConfirmingDeletion(true)}
+                  tone="danger"
+                />
+              )}
             </ProfileSection>
           ) : null}
         </>
@@ -252,26 +259,3 @@ export default function ProfileSecurityScreen() {
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    toggleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 16,
-      justifyContent: "space-between",
-    },
-    toggleCopy: {
-      flex: 1,
-      gap: 4,
-      minWidth: 0,
-    },
-    rowTitle: {
-      ...mobileTextWeighted("cardTitle", "medium"),
-      color: mobileColors.textPrimary,
-    },
-    rowDescription: {
-      ...mobileText.caption,
-      color: mobileColors.textMuted,
-    },
-  });

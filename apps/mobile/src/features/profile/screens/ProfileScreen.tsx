@@ -65,6 +65,7 @@ import {
   ProfileIcon,
   ProfileInfoRow,
   ProfileList,
+  ProfileListAction,
   ProfileNavRow,
   ProfileSection,
   formatProfileValue,
@@ -422,14 +423,29 @@ export default function ProfileScreen() {
             }}
           />
           {accessToken ? (
-            <Button
-              label="Force sign out"
-              loading={isSigningOut}
-              onPress={() => {
-                setPendingConfirmation({ kind: "logout", force: true });
-              }}
-              tone="neutral"
-            />
+            IS_NATIVE_LIST ? (
+              <ProfileList>
+                <ProfileListAction
+                  align="center"
+                  isLast
+                  label="Force sign out"
+                  loading={isSigningOut}
+                  onPress={() => {
+                    setPendingConfirmation({ kind: "logout", force: true });
+                  }}
+                  tone="danger"
+                />
+              </ProfileList>
+            ) : (
+              <Button
+                label="Force sign out"
+                loading={isSigningOut}
+                onPress={() => {
+                  setPendingConfirmation({ kind: "logout", force: true });
+                }}
+                tone="neutral"
+              />
+            )
           ) : null}
         </>
       ) : contentState.kind === "empty" || !profile ? (
@@ -609,25 +625,53 @@ export default function ProfileScreen() {
               destructive one does not read as that list's last row. Switch
               first, Sign Out last and in the danger fill: the one that ends
               the session ends the page, and looks like what it does. */}
-          <ProfileSection style={styles.footerActions}>
-            <View style={styles.footerActionStack}>
+          {/* On the phones each is a row in its own group, as Settings ends
+              an account page: Switch in the tint, Sign out in red. */}
+          {IS_NATIVE_LIST ? (
+            <ProfileSection style={styles.footerActionsNative}>
               {canSwitchOrganizations ? (
-                <Button
-                  label="Switch organization"
-                  onPress={() => setIsSwitchModalVisible(true)}
-                  tone="secondary"
-                />
+                <ProfileList>
+                  <ProfileListAction
+                    isLast
+                    label="Switch organization"
+                    onPress={() => setIsSwitchModalVisible(true)}
+                  />
+                </ProfileList>
               ) : null}
-              <Button
-                label="Sign out"
-                loading={isSigningOut}
-                onPress={() => {
-                  setPendingConfirmation({ kind: "logout" });
-                }}
-                tone="danger"
-              />
-            </View>
-          </ProfileSection>
+              <ProfileList>
+                <ProfileListAction
+                  align="center"
+                  isLast
+                  label="Sign out"
+                  loading={isSigningOut}
+                  onPress={() => {
+                    setPendingConfirmation({ kind: "logout" });
+                  }}
+                  tone="danger"
+                />
+              </ProfileList>
+            </ProfileSection>
+          ) : (
+            <ProfileSection style={styles.footerActions}>
+              <View style={styles.footerActionStack}>
+                {canSwitchOrganizations ? (
+                  <Button
+                    label="Switch organization"
+                    onPress={() => setIsSwitchModalVisible(true)}
+                    tone="secondary"
+                  />
+                ) : null}
+                <Button
+                  label="Sign out"
+                  loading={isSigningOut}
+                  onPress={() => {
+                    setPendingConfirmation({ kind: "logout" });
+                  }}
+                  tone="danger"
+                />
+              </View>
+            </ProfileSection>
+          )}
 
           <BottomSheetModal
             expandable
@@ -890,6 +934,10 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     footerActionStack: {
       gap: mobileSpace.md,
+    },
+    footerActionsNative: {
+      gap: mobileSpace.xl,
+      paddingTop: mobileSpace.md,
     },
     switchOverlay: {
       ...StyleSheet.absoluteFill,

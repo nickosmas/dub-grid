@@ -82,6 +82,8 @@ import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
 import { StatusMarkIcon } from "../components/StatusMark";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { ProfileList, ProfileSection } from "../../profile/components/ProfilePrimitives";
 
 const EMPLOYEE_STATUSES: readonly EmployeeStatus[] = ["active", "inactive", "removed"];
 
@@ -940,24 +942,46 @@ export default function PeopleScreen() {
       />
 
       {canManageEmployees && profileRequests.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>People requests</Text>
-          <View style={styles.linkList}>
-            <View style={styles.linkListClip}>
-              {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
-                <View
-                  key={request.id}
-                  style={[
-                    styles.requestRow,
-                    index < profileRequests.length - 1 && styles.rowDivider,
-                  ]}
-                >
-                  <View style={styles.requestCopy}>
-                    <Text style={styles.personName}>{request.requesterName}</Text>
-                    <Text style={styles.personSubtitle}>
-                      {request.type === "account_deletion" ? "Account deletion" : "Name change"}
-                    </Text>
+        // One grouped section on the phones: each request a row, with Reject
+        // and Approve compact at its end, as Mail answers an invitation.
+        <ProfileSection title="People requests">
+          <ProfileList>
+            {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
+              <View
+                key={request.id}
+                style={[
+                  styles.requestRow,
+                  IS_NATIVE_LIST && styles.requestRowNative,
+                  index < profileRequests.length - 1 && !IS_NATIVE_LIST && styles.rowDivider,
+                ]}
+              >
+                <View style={[styles.requestCopy, IS_NATIVE_LIST && styles.requestCopyNative]}>
+                  <Text style={styles.personName}>{request.requesterName}</Text>
+                  <Text style={styles.personSubtitle}>
+                    {request.type === "account_deletion" ? "Account deletion" : "Name change"}
+                  </Text>
+                </View>
+                {IS_NATIVE_LIST ? (
+                  <View style={styles.requestActions}>
+                    <Button
+                      compact
+                      disabled={resolveRequestMutation.isPending}
+                      label="Reject"
+                      onPress={() => {
+                        setProfileRequestConfirmation({ request, action: "reject" });
+                      }}
+                      tone="neutral"
+                    />
+                    <Button
+                      compact
+                      disabled={resolveRequestMutation.isPending}
+                      label="Approve"
+                      onPress={() => {
+                        setProfileRequestConfirmation({ request, action: "approve" });
+                      }}
+                    />
                   </View>
+                ) : (
                   <ActionButtons
                     primaryAction={
                       <Button
@@ -987,11 +1011,14 @@ export default function PeopleScreen() {
                       tone="neutral"
                     />
                   </ActionButtons>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
+                )}
+                {index < profileRequests.length - 1 && IS_NATIVE_LIST ? (
+                  <View style={styles.requestDivider} />
+                ) : null}
+              </View>
+            ))}
+          </ProfileList>
+        </ProfileSection>
       ) : null}
 
       {contentState.kind === "loading" ? (
@@ -1244,27 +1271,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     rosterRow: {
       paddingHorizontal: getScreenGutter(),
     },
-    sectionTitle: {
-      ...mobileTextWeighted("sectionTitle", "medium"),
-      color: mobileColors.textSubtle,
-      paddingHorizontal: mobileSpace.lg,
-      // Air above a title that follows another section's card; the card's
-      // own gap below the title stays at the section's `gap`.
-      paddingTop: mobileSpace.sm,
-    },
-    // The clip sits on an inner view: iOS drops a view's own shadow when the
-    // same view clips its children.
-    linkList: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      ...mobileElevation("card", isDark),
-    },
-    linkListClip: {
-      overflow: "hidden",
-      borderRadius: mobileRadii.card - 1,
-    },
     // The highlight bleeds past the content on both sides and rounds off,
     // rather than sitting as a square block flush with the text. The inset
     // is given back as padding so the row stays on the gutter line, and
@@ -1294,8 +1300,25 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: 16,
       paddingVertical: mobileSpace.md,
     },
+    requestRowNative: {
+      alignItems: "center",
+      flexDirection: "row",
+    },
     requestCopy: {
       gap: mobileSpace.xs,
+    },
+    requestCopyNative: {
+      flex: 1,
+      minWidth: 0,
+    },
+    // Inset to the text, between rows only.
+    requestDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 16,
+      position: "absolute",
+      right: 0,
     },
     requestActions: {
       flexDirection: "row",
@@ -1334,7 +1357,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textMuted,
     },
     personPlanned: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: mobileColors.textMuted,
       flexShrink: 1,

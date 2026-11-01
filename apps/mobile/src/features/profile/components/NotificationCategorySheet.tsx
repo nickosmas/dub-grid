@@ -6,13 +6,13 @@ import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileRadii,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
-import { ProfileIcon } from "./ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { ProfileIcon, ProfileList } from "./ProfilePrimitives";
 
 export type NotificationChannel = "in_app" | "email";
 
@@ -75,11 +75,14 @@ export function NotificationCategorySheet({
       onDismiss={onDismiss}
     >
       {category ? (
-        <View style={styles.list}>
+        <ProfileList>
           {CHANNELS.map((channel, index) => (
             <View
               key={channel.id}
-              style={[styles.row, index < CHANNELS.length - 1 && styles.rowDivider]}
+              style={[
+                styles.row,
+                index < CHANNELS.length - 1 && !IS_NATIVE_LIST && styles.rowDivider,
+              ]}
             >
               <ProfileIcon name={channel.icon} />
               <View style={styles.copy}>
@@ -91,9 +94,12 @@ export function NotificationCategorySheet({
                 value={category.channels[channel.id]}
                 onValueChange={() => onToggle(category.key, channel.id)}
               />
+              {index < CHANNELS.length - 1 && IS_NATIVE_LIST ? (
+                <View style={styles.insetDivider} />
+              ) : null}
             </View>
           ))}
-        </View>
+        </ProfileList>
       ) : null}
     </BottomSheetModal>
   );
@@ -113,17 +119,14 @@ export function formatChannelSummary(channels: Record<NotificationChannel, boole
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    list: {
-      backgroundColor: mobileColors.surface,
-      // A hairline, not `cardBorder`. Cards on the page are drawn by their
-      // shadow, which is why `cardBorder` is transparent in light mode - but a
-      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
-      // no shadow to draw it there was no edge at all in light mode. Dark is
-      // unchanged: `cardBorder` already resolves to this token there.
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      overflow: "hidden",
+    // Inset to the text, past the icon column (16 + 28 + 12).
+    insetDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 56,
+      position: "absolute",
+      right: 0,
     },
     row: {
       alignItems: "center",
@@ -142,11 +145,11 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     label: {
-      ...mobileTextWeighted("cardTitle", "medium"),
+      ...(IS_NATIVE_LIST ? mobileText.rowTitle : mobileTextWeighted("cardTitle", "medium")),
       color: mobileColors.textPrimary,
     },
     description: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       color: mobileColors.textMuted,
     },
   });

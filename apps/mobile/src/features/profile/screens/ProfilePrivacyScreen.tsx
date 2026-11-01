@@ -1,29 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text } from "../../../shared/components/Text";
-import { AppSwitch } from "../../../shared/components/AppSwitch";
+import { useEffect, useState } from "react";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import {
-  mobileText,
-  mobileTextWeighted,
-  type MobileColors,
-  mobileSpace,
-} from "../../../shared/theme/tokens";
 import { getLegalUrls, getStoredConsent, setStoredConsent } from "../../consent/lib/consent";
 import {
   ProfileList,
   ProfileNavRow,
-  ProfilePanel,
   ProfileSection,
+  ProfileSwitchRow,
 } from "../components/ProfilePrimitives";
 
 export default function ProfilePrivacyScreen() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { pushToast } = useToast();
   // null until the stored consent is read. Defaulting to `false` rendered the
   // switch off and then visibly flipped it on for anyone who had opted in.
@@ -70,22 +60,17 @@ export default function ProfilePrivacyScreen() {
         title="Analytics"
         description="Essential data keeps the app working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
       >
-        <ProfilePanel>
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleCopy}>
-              <Text style={styles.toggleLabel}>Analytics</Text>
-              <Text style={styles.toggleDescription}>
-                Share anonymous usage data to help us improve the app.
-              </Text>
-            </View>
-            <AppSwitch
-              accessibilityLabel="Analytics consent"
-              disabled={saving || analytics === null}
-              value={analytics ?? false}
-              onValueChange={(next) => void handleToggle(next)}
-            />
-          </View>
-        </ProfilePanel>
+        <ProfileList>
+          <ProfileSwitchRow
+            accessibilityLabel="Analytics consent"
+            detail="Share anonymous usage data to help us improve the app."
+            disabled={saving || analytics === null}
+            isLast
+            label="Analytics"
+            value={analytics ?? false}
+            onValueChange={(next) => void handleToggle(next)}
+          />
+        </ProfileList>
       </ProfileSection>
 
       <ProfileSection title="Policies">
@@ -111,26 +96,3 @@ export default function ProfilePrivacyScreen() {
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    toggleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 12,
-      justifyContent: "space-between",
-    },
-    toggleCopy: {
-      flex: 1,
-      gap: mobileSpace.xs,
-      minWidth: 0,
-    },
-    toggleLabel: {
-      ...mobileTextWeighted("cardTitle", "medium"),
-      color: mobileColors.textPrimary,
-    },
-    toggleDescription: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-  });

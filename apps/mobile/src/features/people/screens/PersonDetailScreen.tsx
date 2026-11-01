@@ -119,7 +119,7 @@ import {
   ProfileInfoRow,
   ProfileList,
   ProfileNavRow,
-  ProfileActionStack,
+  ProfileActionGroup,
   ProfilePanel,
   ProfileQuickAction,
   ProfileQuickActions,
@@ -1549,13 +1549,23 @@ export default function PersonDetailScreen() {
           canOffboard={reach.canOffboard}
           onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
           person={person}
+          accessNote={
+            IS_NATIVE_LIST && invitationBanner
+              ? {
+                  title: invitationBanner.title,
+                  detail: invitationBanner.body,
+                  tone: invitationBanner.tone,
+                }
+              : null
+          }
         />
       ) : null}
 
       {/* Where the app account stands, one line under the actions rather than a
           chip competing with the name. Someone with an account needs no banner:
-          the states worth surfacing are the two a manager can act on. */}
-      {!editing && invitationBanner ? (
+          the states worth surfacing are the two a manager can act on. A phone
+          states it as a row of the status group instead. */}
+      {!editing && invitationBanner && !IS_NATIVE_LIST ? (
         <StatusBanner
           body={invitationBanner.body}
           bordered={false}
@@ -1754,66 +1764,73 @@ export default function PersonDetailScreen() {
               app is the everyday action and the one that takes them off it
               sits at the very bottom on its own. */}
           {canManageEmployees ? (
-            <ProfileActionStack>
-              {!person.userId && person.status !== "removed" && person.email ? (
-                person.pendingInvitation ? (
-                  <>
-                    <Button
-                      label="Resend invite"
-                      loading={invitationMutation.isPending}
-                      onPress={() => setInvitationConfirmAction("resend")}
-                      tone="neutral"
-                    />
-                    <Button
-                      disabled={invitationMutation.isPending}
-                      label="Revoke invite"
-                      onPress={() => setInvitationConfirmAction("revoke")}
-                      tone="danger"
-                    />
-                  </>
-                ) : (
-                  <Button
-                    label="Send invitation"
-                    loading={invitationMutation.isPending}
-                    onPress={() => setInvitationConfirmAction("create")}
-                    tone="secondary"
-                  />
-                )
-              ) : null}
-              {/* Only offered to someone who isn't on the grid at all. Anyone
-                  with focus areas changes them in the edit panel, where
-                  clearing them all is what takes them back off it. */}
-              {person.status !== "removed" && !isOnSchedule ? (
-                <Button
-                  label="Add to schedule"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/person/[id]/schedule",
-                      params: { id: person.id },
-                    })
-                  }
-                  tone="secondary"
-                />
-              ) : null}
-              {/* Granting management access to someone with no account sends
-                  an invitation, and an invitation needs an address. With no
-                  email on file the button stays off the page rather than
-                  opening a sheet that can only say so; the editor is where an
-                  address gets added. Existing access is still editable and
-                  removable whatever the contact details say. */}
-              {canManageManagementAccess &&
-              person.status !== "removed" &&
-              !isSelf &&
-              (hasManagementAccess(person) || person.email) ? (
-                <Button
-                  label={
-                    hasManagementAccess(person) ? "Edit management access" : "Add to management"
-                  }
-                  onPress={() => setShowManagementAccess(true)}
-                  tone="secondary"
-                />
-              ) : null}
-            </ProfileActionStack>
+            <ProfileActionGroup
+              actions={[
+                ...(!person.userId && person.status !== "removed" && person.email
+                  ? person.pendingInvitation
+                    ? [
+                        {
+                          key: "resend",
+                          label: "Resend invite",
+                          loading: invitationMutation.isPending,
+                          onPress: () => setInvitationConfirmAction("resend"),
+                          buttonTone: "neutral" as const,
+                        },
+                        {
+                          key: "revoke",
+                          disabled: invitationMutation.isPending,
+                          label: "Revoke invite",
+                          onPress: () => setInvitationConfirmAction("revoke"),
+                          tone: "danger" as const,
+                        },
+                      ]
+                    : [
+                        {
+                          key: "send",
+                          label: "Send invitation",
+                          loading: invitationMutation.isPending,
+                          onPress: () => setInvitationConfirmAction("create"),
+                        },
+                      ]
+                  : []),
+                // Only offered to someone who isn't on the grid at all. Anyone
+                // with focus areas changes them in the edit panel, where
+                // clearing them all is what takes them back off it.
+                ...(person.status !== "removed" && !isOnSchedule
+                  ? [
+                      {
+                        key: "schedule",
+                        label: "Add to schedule",
+                        onPress: () =>
+                          router.push({
+                            pathname: "/person/[id]/schedule",
+                            params: { id: person.id },
+                          }),
+                      },
+                    ]
+                  : []),
+                // Granting management access to someone with no account sends
+                // an invitation, and an invitation needs an address. With no
+                // email on file the action stays off the page rather than
+                // opening a sheet that can only say so; the editor is where an
+                // address gets added. Existing access is still editable and
+                // removable whatever the contact details say.
+                ...(canManageManagementAccess &&
+                person.status !== "removed" &&
+                !isSelf &&
+                (hasManagementAccess(person) || person.email)
+                  ? [
+                      {
+                        key: "management",
+                        label: hasManagementAccess(person)
+                          ? "Edit management access"
+                          : "Add to management",
+                        onPress: () => setShowManagementAccess(true),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           ) : null}
         </>
       )}
@@ -2612,19 +2629,27 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.body,
       color: mobileColors.textSecondary,
     },
-    modalInfoPanel: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      // A hairline, not `cardBorder`. Cards on the page are drawn by their
-      // shadow, which is why `cardBorder` is transparent in light mode - but a
-      // card inside a sheet is deliberately flat (see `flatInSheet`), so with
-      // no shadow to draw it there was no edge at all in light mode. Dark is
-      // unchanged: `cardBorder` already resolves to this token there.
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      gap: 8,
-      padding: 16,
-    },
+    // A grouped card of text on a phone's sheet, which is the grouped gray.
+    modalInfoPanel: IS_NATIVE_LIST
+      ? {
+          backgroundColor: mobileColors.surface,
+          borderRadius: mobileRadii.card,
+          gap: 8,
+          padding: 16,
+        }
+      : {
+          backgroundColor: mobileColors.surfaceSecondary,
+          // A hairline, not `cardBorder`. Cards on the page are drawn by their
+          // shadow, which is why `cardBorder` is transparent in light mode - but a
+          // card inside a sheet is deliberately flat (see `flatInSheet`), so with
+          // no shadow to draw it there was no edge at all in light mode. Dark is
+          // unchanged: `cardBorder` already resolves to this token there.
+          borderColor: mobileColors.borderSubtle,
+          borderRadius: mobileRadii.card,
+          borderWidth: 1,
+          gap: 8,
+          padding: 16,
+        },
     modalInfoTitle: {
       ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,

@@ -19,7 +19,13 @@ import { BottomSheetModal, SheetHeader } from "../../../shared/components/Bottom
 import { Button } from "../../../shared/components/Button";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
 import { Text } from "../../../shared/components/Text";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import {
+  ProfileList,
+  ProfileListAction,
+  groupedCardEdge,
+} from "../../profile/components/ProfilePrimitives";
 import {
   mobileRadii,
   mobileSpace,
@@ -121,7 +127,8 @@ export function StatusIconCircle({
         backgroundColor: colors.bg,
         borderColor: colors.border,
         borderRadius: size / 2,
-        borderWidth: 1,
+        // A tinted fill alone on the platforms' lists, as their status marks are.
+        borderWidth: IS_NATIVE_LIST ? 0 : 1,
         height: size,
         justifyContent: "center",
         width: size,
@@ -156,6 +163,8 @@ interface StatusCardsProps {
    * choices below carry the colour there.
    */
   plain?: boolean;
+  /** Where their app access stands, as a row of the status group on a phone. */
+  accessNote?: { title: string; detail?: string; tone: "info" | "warning" } | null;
 }
 
 /**
@@ -169,9 +178,11 @@ export function StatusCards({
   canOffboard = true,
   disabled = false,
   plain = false,
+  accessNote = null,
 }: StatusCardsProps) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const [moreOpen, setMoreOpen] = useState(false);
   const handoff = useModalHandoff();
   const absenceId =
@@ -266,6 +277,171 @@ export function StatusCards({
     />
   );
 
+  const moreSheet =
+    onChangeStatus && moreItems.length > 0 ? (
+      <BottomSheetModal
+        debugName="More status changes"
+        header={<SheetHeader title="More status changes" />}
+        onDismiss={() => setMoreOpen(false)}
+        visible={moreOpen}
+      >
+        {IS_NATIVE_LIST ? (
+          <ProfileList>
+            {moreItems.map((item, index) => (
+              <ProfileListAction
+                isLast={index === moreItems.length - 1}
+                key={item.key}
+                label={item.label}
+                onPress={() => {
+                  setMoreOpen(false);
+                  handoff(() => onChangeStatus(item.opening));
+                }}
+              />
+            ))}
+          </ProfileList>
+        ) : (
+          <View style={styles.stack}>
+            {moreItems.map((item) => (
+              <Button
+                key={item.key}
+                label={item.label}
+                onPress={() => {
+                  setMoreOpen(false);
+                  // The status sheet waits for this one to finish leaving.
+                  handoff(() => onChangeStatus(item.opening));
+                }}
+                tone="secondary"
+              />
+            ))}
+          </View>
+        )}
+      </BottomSheetModal>
+    ) : null;
+
+  if (IS_NATIVE_LIST) {
+    // A grouped section, as Settings states a fact and offers what to do
+    // about it: where they stand as a row, then each change as a tinted row.
+    const rowActions: { key: string; label: string; onPress: () => void }[] = !onChangeStatus
+      ? []
+      : suggested
+        ? [
+            {
+              key: suggested.action,
+              label: describeStatusAction(suggested.action, "").label,
+              onPress: () => onChangeStatus({ only: suggested.action }),
+            },
+            ...(moreItems.length > 0
+              ? [{ key: "more", label: "More status changes", onPress: () => setMoreOpen(true) }]
+              : []),
+          ]
+        : available.length === 1
+          ? [
+              {
+                key: available[0].action,
+                label: describeStatusAction(available[0].action, "").label,
+                onPress: () => onChangeStatus({ only: available[0].action }),
+              },
+            ]
+          : available.length > 1
+            ? [
+                {
+                  key: "change",
+                  label: "Change status",
+                  onPress: () => onChangeStatus({ focus: "status" }),
+                },
+              ]
+            : [];
+    const planActions =
+      planned && onChangeStatus && !plain
+        ? [{ key: "plan", label: "Edit plan", onPress: () => onChangeStatus({ focus: "plan" }) }]
+        : [];
+    return (
+      <View style={styles.stack}>
+        <View
+          accessibilityLabel={`Status: ${current.title}. ${current.detail}`}
+          accessibilityRole="summary"
+          style={styles.group}
+          testID="status-card"
+        >
+          <StatusGroupRow
+            detail={current.detail}
+            divided={Boolean(accessNote) || rowActions.length > 0}
+            icon={STATUS_KIND_ICONS[current.kind]}
+            title={current.title}
+            titleColor={quiet ? mobileColors.textPrimary : colors.text}
+            tone={current.tone}
+          />
+          {accessNote ? (
+            <StatusGroupRow
+              detail={accessNote.detail}
+              divided={rowActions.length > 0}
+              icon={
+                accessNote.tone === "warning" ? "mail-unread-outline" : "phone-portrait-outline"
+              }
+              title={accessNote.title}
+              titleColor={mobileColors.textPrimary}
+              tone={accessNote.tone === "warning" ? "warning" : "neutral"}
+            />
+          ) : null}
+          {rowActions.map((action, index) => (
+            <ProfileListAction
+              disabled={disabled}
+              isLast={index === rowActions.length - 1}
+              key={action.key}
+              label={action.label}
+              onPress={action.onPress}
+            />
+          ))}
+        </View>
+        {starts ? (
+          <View
+            accessibilityLabel={`First day: ${starts.title}. ${starts.detail}`}
+            accessibilityRole="summary"
+            style={styles.group}
+            testID="starts-card"
+          >
+            <StatusGroupRow
+              detail={starts.detail}
+              eyebrow="First day"
+              icon="calendar"
+              title={starts.title}
+              titleColor={warning.text}
+              tone="warning"
+            />
+          </View>
+        ) : null}
+        {planned ? (
+          <View
+            accessibilityLabel={`Planned: ${planned.title}. ${planned.detail}`}
+            accessibilityRole="summary"
+            style={styles.group}
+            testID="planned-card"
+          >
+            <StatusGroupRow
+              detail={planned.detail}
+              divided={planActions.length > 0}
+              eyebrow="Planned"
+              icon="calendar"
+              title={planned.title}
+              titleColor={warning.text}
+              tone="warning"
+            />
+            {planActions.map((action) => (
+              <ProfileListAction
+                disabled={disabled}
+                isLast
+                key={action.key}
+                label={action.label}
+                onPress={action.onPress}
+              />
+            ))}
+          </View>
+        ) : null}
+        {moreSheet}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.stack}>
       <View
@@ -345,37 +521,72 @@ export function StatusCards({
           ) : null}
         </View>
       ) : null}
-      {onChangeStatus && moreItems.length > 0 ? (
-        <BottomSheetModal
-          debugName="More status changes"
-          header={<SheetHeader title="More status changes" />}
-          onDismiss={() => setMoreOpen(false)}
-          visible={moreOpen}
-        >
-          <View style={styles.stack}>
-            {moreItems.map((item) => (
-              <Button
-                key={item.key}
-                label={item.label}
-                onPress={() => {
-                  setMoreOpen(false);
-                  // The status sheet waits for this one to finish leaving.
-                  handoff(() => onChangeStatus(item.opening));
-                }}
-                tone="secondary"
-              />
-            ))}
-          </View>
-        </BottomSheetModal>
-      ) : null}
+      {moreSheet}
     </View>
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+/** One fact in a status group: its tinted icon, then what it is and since when. */
+function StatusGroupRow({
+  icon,
+  tone,
+  eyebrow,
+  title,
+  titleColor,
+  detail,
+  divided = false,
+}: {
+  icon: IconName;
+  tone: StatusTone;
+  eyebrow?: string;
+  title: string;
+  titleColor: string;
+  detail?: string;
+  divided?: boolean;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  return (
+    <View style={styles.groupRow}>
+      <StatusIconCircle name={icon} tone={tone} />
+      <View style={styles.copy}>
+        {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+        <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
+        {detail ? <Text style={styles.detail}>{detail}</Text> : null}
+      </View>
+      {divided ? <View style={styles.groupDivider} /> : null}
+    </View>
+  );
+}
+
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     stack: {
-      gap: mobileSpace.sm,
+      gap: IS_NATIVE_LIST ? mobileSpace.lg : mobileSpace.sm,
+    },
+    group: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      overflow: "hidden",
+      ...groupedCardEdge(mobileColors, isDark),
+    },
+    groupRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+    },
+    // Inset to the text, past the 32pt icon.
+    groupDivider: {
+      backgroundColor: mobileColors.borderSubtle,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      left: 16 + 32 + mobileSpace.md,
+      position: "absolute",
+      right: 0,
     },
     card: {
       borderRadius: mobileRadii.card,
@@ -404,7 +615,7 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     eyebrow: {
-      ...mobileTextWeighted("caption", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textSecondary,
     },
     title: {
@@ -412,7 +623,7 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTabularText,
     },
     detail: {
-      ...mobileText.caption,
+      ...mobileText.meta,
       ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
