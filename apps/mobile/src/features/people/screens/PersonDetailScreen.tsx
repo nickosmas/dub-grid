@@ -2199,12 +2199,14 @@ function PlanCancelRow({
   return (
     <>
       <AnchoredConfirmation
+        fullWidth
         request={
           CAN_ANCHOR_CONFIRMATION && confirming
             ? {
                 title: copy.title,
                 body,
                 confirmLabel: copy.label,
+                cancelLabel: keepLabel,
                 onConfirm: () => void onConfirm(),
                 onCancel: onDismiss,
               }
@@ -2244,8 +2246,10 @@ function PlanCancelRow({
 }
 
 const planCancelStyles = StyleSheet.create({
+  // Its own group, apart from the plan's fields, as Delete Event is.
   row: {
     alignItems: "center",
+    marginTop: mobileSpace.md,
     borderRadius: mobileRadii.card,
     justifyContent: "center",
     minHeight: 52,

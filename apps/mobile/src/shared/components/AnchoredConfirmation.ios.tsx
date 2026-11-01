@@ -14,9 +14,12 @@ export const CAN_ANCHOR_CONFIRMATION = true;
 export function AnchoredConfirmation({
   request,
   children,
+  fullWidth = false,
 }: {
   request: AnchoredConfirmationRequest | null;
   children: ReactElement;
+  /** Spans the row it sits in, such as a list's destructive row; else hugs its button. */
+  fullWidth?: boolean;
 }) {
   // The dialog animates out after the request clears, so it keeps the last
   // words it showed.
@@ -29,7 +32,7 @@ export function AnchoredConfirmation({
   const shown = latest.current;
 
   return (
-    <Host matchContents>
+    <Host matchContents={fullWidth ? { vertical: true } : true}>
       <ConfirmationDialog
         isPresented={request != null}
         onIsPresentedChange={(presented) => {
@@ -41,7 +44,7 @@ export function AnchoredConfirmation({
         titleVisibility="visible"
       >
         <ConfirmationDialog.Trigger>
-          <RNHostView matchContents>{children}</RNHostView>
+          <RNHostView matchContents={fullWidth ? { vertical: true } : true}>{children}</RNHostView>
         </ConfirmationDialog.Trigger>
         <ConfirmationDialog.Actions>
           <Button
@@ -51,6 +54,16 @@ export function AnchoredConfirmation({
               latest.current?.onConfirm();
             }}
             role="destructive"
+          />
+          {/* A plain button rather than the cancel role, which the popover
+              hides: changing your mind is an answer on screen (owner,
+              2026-11-01). */}
+          <Button
+            label={shown?.cancelLabel ?? ""}
+            onPress={() => {
+              answered.current = true;
+              latest.current?.onCancel();
+            }}
           />
         </ConfirmationDialog.Actions>
         {shown?.body ? (

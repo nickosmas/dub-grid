@@ -10,6 +10,7 @@ export function AnchoredConfirmation({
 }: {
   request: AnchoredConfirmationRequest | null;
   children: ReactElement;
+  fullWidth?: boolean;
 }) {
   return children;
 }

@@ -198,6 +198,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
     onDismiss,
     dismissDisabled = false,
     scrollable = false,
+    expandable = false,
     header,
     footer,
     overlay,
@@ -221,7 +222,9 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
   // Android's sheet has one partly open state and full screen, and changing
   // how it is sized remounts its content, so the choice holds while it shows.
   if (!visible) androidResizableRef.current = null;
-  else if (androidResizableRef.current === null) androidResizableRef.current = overflows;
+  else if (androidResizableRef.current === null) {
+    androidResizableRef.current = overflows || expandable;
+  }
   // A sheet that scrolls opens at its content's height, or at most most of
   // the screen, and a long one drags up to fill it. iOS sizes it by detents
   // throughout, so a height change while it shows just moves the detent.
@@ -234,7 +237,9 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
         ? [openHeight]
         : overflows
           ? [openHeight, "100%"]
-          : [naturalHeight];
+          : expandable
+            ? [naturalHeight, "100%"]
+            : [naturalHeight];
 
   return (
     <BottomSheet

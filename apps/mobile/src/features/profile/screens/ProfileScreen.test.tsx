@@ -666,10 +666,10 @@ describe("ProfileScreen", () => {
     expect(screen.queryByText("Selected")).not.toBeInTheDocument();
     expect(screen.queryByText("Tap to switch")).not.toBeInTheDocument();
 
-    // Roles read as labels, and the separator can't be mistaken for part of a
-    // hyphenated slug.
-    expect(screen.getByText("dubgrid-health · Admin")).toBeInTheDocument();
-    expect(screen.queryByText(/dubgrid-health - admin/)).not.toBeInTheDocument();
+    // Each row says your access there as a label, without the organization's
+    // address.
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.queryByText(/dubgrid-health ·/)).not.toBeInTheDocument();
   });
 
   it("resets the mobile session after a successful sign-out", async () => {

@@ -57,6 +57,7 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
       title: current.title,
       body: current.body,
       confirmLabel: current.confirmLabel,
+      cancelLabel: current.cancelLabel ?? "Cancel",
       onConfirm: confirm,
       onCancel: () => latest.current.onCancel(),
     });
