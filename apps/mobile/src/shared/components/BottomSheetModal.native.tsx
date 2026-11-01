@@ -21,12 +21,12 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, {
   BottomSheetScrollView,
   BottomSheetView,
 } from "@expo/ui/community/bottom-sheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, mobileTextWeighted } from "../theme/tokens";
 import { ActionButtons } from "./ActionButtons";
@@ -76,13 +76,6 @@ function useKeyboardHeight() {
 }
 
 const IS_IOS = Platform.OS === "ios";
-
-/** A colour at zero alpha: iOS fades a gradient to "transparent" through gray. */
-function transparentOf(hex: string): string {
-  const value = hex.replace("#", "");
-  const [r, g, b] = [0, 2, 4].map((offset) => parseInt(value.slice(offset, offset + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, 0)`;
-}
 
 type ButtonProps = ComponentProps<typeof Button>;
 
@@ -164,6 +157,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
   const mobileColors = useMobileColors();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const keyboardHeight = useKeyboardHeight();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const scrollBodyMaxHeight =
     keyboardHeight > 0
       ? Math.max(MIN_SCROLL_BODY, windowHeight - keyboardHeight - SHEET_CHROME_ALLOWANCE)
@@ -219,26 +213,23 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
           <BottomSheetView style={[styles.sheet, { width: windowWidth }]}>
             {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
             {scrollable ? (
-              <View>
-                <BottomSheetScrollView
-                  automaticallyAdjustKeyboardInsets
-                  contentContainerStyle={[styles.body, styles.bodyScrollEnd]}
-                  keyboardShouldPersistTaps="handled"
-                  style={{ maxHeight: scrollBodyMaxHeight }}
-                >
-                  {children}
-                </BottomSheetScrollView>
-                {
-                  // The system keeps the home indicator's inset below the
-                  // content, so a scrolled list ends on a hard line there; it
-                  // fades out instead, as iOS 26's scroll edge effect does.
-                  <LinearGradient
-                    colors={[transparentOf(mobileColors.background), mobileColors.background]}
-                    pointerEvents="none"
-                    style={styles.scrollEdge}
-                  />
-                }
-              </View>
+              <BottomSheetScrollView
+                automaticallyAdjustKeyboardInsets
+                contentContainerStyle={[
+                  styles.body,
+                  !barFooter && { paddingBottom: bottomInset + mobileSpace.lg },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                // With nothing below it, the list runs on under the home
+                // indicator, as a system sheet's does, rather than stopping
+                // on a hard line above the system's bottom inset.
+                style={[
+                  { maxHeight: scrollBodyMaxHeight },
+                  !barFooter && { marginBottom: -bottomInset },
+                ]}
+              >
+                {children}
+              </BottomSheetScrollView>
             ) : (
               <View style={styles.body}>{children}</View>
             )}
@@ -560,16 +551,6 @@ const styles = StyleSheet.create({
   },
   materialActionLabel: {
     ...mobileTextWeighted("bodyStrong", "semibold"),
-  },
-  bodyScrollEnd: {
-    paddingBottom: mobileSpace["2xl"],
-  },
-  scrollEdge: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: mobileSpace["2xl"],
   },
   body: {
     paddingHorizontal: mobileSpace.xl,

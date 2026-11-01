@@ -259,10 +259,6 @@ export function Screen<T = never>({
       isIosStickyHeader ? { top: stickyHeaderHeight, left: 0, bottom: 0, right: 0 } : undefined,
     [isIosStickyHeader, stickyHeaderHeight],
   );
-  const iosContentOffset = useMemo(
-    () => (isIosStickyHeader ? { x: 0, y: -stickyHeaderHeight } : undefined),
-    [isIosStickyHeader, stickyHeaderHeight],
-  );
   // `scrollViewRef` hands callers a *logical* content coordinate space —
   // y: 0 always means "the true top of my content" — rather than the raw
   // native ScrollView's contentOffset space. On iOS the floating sticky
@@ -301,8 +297,10 @@ export function Screen<T = never>({
   // its top hidden under the header.
   useEffect(() => {
     if (!settleUnderHeaderRef.current || stickyHeaderHeight === 0) return;
-    settleUnderHeaderRef.current = false;
+    // Cleared only once the scroll runs: a second measurement before then
+    // cancels this frame, and must still find the settle pending.
     const frame = requestAnimationFrame(() => {
+      settleUnderHeaderRef.current = false;
       // A programmatic scroll reports no onScroll, so record where it lands.
       scrollYRef.current = -stickyHeaderHeight;
       internalListRef.current?.scrollToOffset({ offset: -stickyHeaderHeight, animated: false });
@@ -380,7 +378,6 @@ export function Screen<T = never>({
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={contentContainerStyle}
       contentInset={iosContentInset}
-      contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       scrollEnabled={scrollEnabled}
       bounces={scrollEnabled}
@@ -413,7 +410,6 @@ export function Screen<T = never>({
       // which lost the iOS large-title collapse and pull-to-refresh.
       contentContainerStyle={contentContainerStyle}
       contentInset={iosContentInset}
-      contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       scrollEnabled={scrollEnabled}
       bounces={scrollEnabled}
@@ -496,7 +492,13 @@ export function Screen<T = never>({
               // A header that grows later, as a native control inside it
               // reports its size, settles the page again while it is still at
               // the top.
-              const isAtTop = scrollYRef.current <= -stickyHeaderHeight + 1;
+              // A settle still pending counts as the top: the header can
+              // measure again (a native control inside it reporting its
+              // size) before the first scroll runs, and the page would
+              // otherwise rest pulled down by the difference, its refresh
+              // spinner half drawn under the header.
+              const isAtTop =
+                settleUnderHeaderRef.current || scrollYRef.current <= -stickyHeaderHeight + 1;
               if (isIosStickyHeader && (stickyHeaderHeight === 0 || isAtTop)) {
                 settleUnderHeaderRef.current = true;
               }
