@@ -8,34 +8,20 @@ import {
   mobileSpace,
   type MobileColors,
 } from "../../theme/tokens";
-import {
-  SkeletonBlock,
-  SkeletonGroup,
-  SkeletonLine,
-  SkeletonPill,
-  skeletonRows,
-} from "./primitives";
-import {
-  SCHEDULE_DATE_TILE_MIN_HEIGHT,
-  SCHEDULE_DATE_TILE_MIN_WIDTH,
-} from "../../../features/schedule/components/ScheduleDateTile";
+import { SkeletonGroup, SkeletonLine, SkeletonPill, skeletonRows } from "./primitives";
 
 /**
  * The request card list, as the Requests tabs and a shift's own request list
  * draw it: a 16-radius card whose header carries the title with a status
  * chip at the far end, two lines of detail, then a hairline and one control
  * (Volunteer, Approve). One placeholder for every tab so none drifts.
- * `dateRail` fronts the cards with the Available feed's date tiles and the
- * line that joins them, two cards on the first day and one on each after.
  */
 export function CardRowListSkeleton({
   rows = 4,
   showActions = true,
-  dateRail = false,
 }: {
   rows?: number;
   showActions?: boolean;
-  dateRail?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -61,31 +47,7 @@ export function CardRowListSkeleton({
     </View>
   ));
 
-  if (!dateRail) {
-    return <SkeletonGroup style={styles.list}>{cards}</SkeletonGroup>;
-  }
-
-  const groups = [cards.slice(0, 2), ...cards.slice(2).map((card) => [card])].filter(
-    (group) => group.length > 0,
-  );
-
-  return (
-    <SkeletonGroup>
-      {groups.map((group, index) => (
-        <View key={`card-rail-skeleton-${index}`} style={styles.railGroup}>
-          <View style={styles.rail}>
-            <SkeletonBlock
-              height={SCHEDULE_DATE_TILE_MIN_HEIGHT}
-              radius={mobileRadii.control}
-              width={SCHEDULE_DATE_TILE_MIN_WIDTH}
-            />
-            {index < groups.length - 1 ? <View style={styles.railLine} /> : null}
-          </View>
-          <View style={styles.list}>{group}</View>
-        </View>
-      ))}
-    </SkeletonGroup>
-  );
+  return <SkeletonGroup style={styles.list}>{cards}</SkeletonGroup>;
 }
 
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
@@ -99,24 +61,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
       gap: mobileSpace.md,
-    },
-    // Mirrors the Requests feed's `dateGroup`, `dateRail` and `dateRailLine`.
-    railGroup: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: mobileSpace.md,
-      paddingBottom: mobileSpace.lg,
-    },
-    rail: {
-      alignItems: "center",
-      gap: mobileSpace.xs,
-    },
-    railLine: {
-      flex: 1,
-      width: 2,
-      borderRadius: 999,
-      backgroundColor: mobileColors.borderSubtle,
-      marginBottom: -mobileSpace.lg + mobileSpace.xs,
     },
     card: {
       backgroundColor: mobileColors.surface,
