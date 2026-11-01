@@ -12,10 +12,10 @@ Every bottom sheet and popup uses the platform's own element (owner,
 
 - **Sheets** are `@expo/ui`'s community bottom sheet: SwiftUI's sheet on iOS
   (the system grabber, swipe down or the scrim to close, Liquid Glass on
-  iOS 26) and Material 3's ModalBottomSheet on Android. A sheet that fits its
-  content is sized to it; a sheet that scrolls opens at full height, like a
-  system form sheet, so the keyboard never pushes its title and actions off
-  the screen. Its header follows each platform (owner, 2026-10-31: "make sure
+  iOS 26) and Material 3's ModalBottomSheet on Android. Every sheet is only as
+  tall as its content (owner, 2026-10-31); a long one scrolls within a capped
+  body, and while the keyboard is up the body shrinks so the title, the
+  focused field and the actions stay above it. Its header follows each platform (owner, 2026-10-31: "make sure
   sheet headers design is native", citing the HIG Sheets page and Material 3's
   bottom sheets): on iOS a bar under the grabber with the close button as a
   glass circle on the leading edge and the title centered at 17 points; on
@@ -72,9 +72,9 @@ Every bottom sheet and popup uses the platform's own element (owner,
 - iOS Simulator (iOS 26.5): People's filter sheet and Profile's Display mode
   are fitted SwiftUI sheets with the grabber, close by swipe, scrim and the
   close button, and open again after a swipe; Add person's kind choice wraps
-  its descriptions; the Add person form opens at full height and, with the
-  keyboard up, keeps its title in place and its Cancel and Add person buttons
-  above the keyboard; Sign out is the iOS 26 system alert with a red Sign out.
+  its descriptions; the Add person form fits its content and, with the
+  keyboard up, keeps its title, the field and its Cancel and Add person
+  buttons above the keyboard; Sign out is the iOS 26 system alert with a red Sign out.
 - Android emulator: not verified. The Pixel 10 Pro XL emulator froze (adb
   stopped answering) three times this session soon after the app launched,
   before a sheet could be opened. The Android path is `@expo/ui`'s Material 3

@@ -586,8 +586,8 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   Android's own Material bottom navigation in place of the floating tab bar.
 - **56e - Native sheets and dialogs:** shipped; every sheet is the
   platform's own (SwiftUI's sheet with its grabber on iOS, Material's bottom
-  sheet on Android), fitted to its content or, when it scrolls, at full height
-  like a form sheet so the keyboard never hides its title or buttons; a
+  sheet on Android), only as tall as its content, with a long one scrolling
+  and staying above the keyboard; a
   confirmation that is only words is the system alert, one with a choice of
   its own a native sheet, each keeping its wording. The app lock keeps its
   drawn cover. Headers follow each platform, People rows mark admins with the

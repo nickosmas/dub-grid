@@ -1,5 +1,5 @@
-import { createContext, useContext, useRef, type ComponentProps } from "react";
-import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import { createContext, useContext, useEffect, useRef, useState, type ComponentProps } from "react";
+import { Keyboard, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheet, {
   BottomSheetScrollView,
@@ -20,11 +20,34 @@ import {
 export * from "./BottomSheetModalDrawn";
 
 /**
- * A sheet that scrolls opens at full height, like a system form sheet, so the
- * keyboard never pushes its title and actions off the screen; a sheet sized to
- * its content is lifted whole when a field takes focus.
+ * A sheet is only as tall as its content (owner, 2026-10-31); a long one
+ * scrolls within this share of the screen, which keeps its title clear of the
+ * grabber.
  */
-const SCROLLING_SNAP_POINTS = ["100%"];
+const SCROLL_BODY_MAX_SHARE = 0.62;
+/**
+ * Room the title row, the footer and the sheet's own insets take, so a body
+ * sized to the space above the keyboard leaves the whole sheet in view. The
+ * system lifts a fitted sheet onto the keyboard; it never resizes it.
+ */
+const SHEET_CHROME_ALLOWANCE = 300;
+const MIN_SCROLL_BODY = 120;
+
+/** The keyboard's height while it is up, else 0. */
+function useKeyboardHeight() {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = IS_IOS ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = IS_IOS ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => setHeight(event.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
 
 const IS_IOS = Platform.OS === "ios";
 
@@ -42,7 +65,12 @@ const SheetCloseContext = createContext<SheetClose | null>(null);
  */
 export function BottomSheetModal(props: BottomSheetModalProps) {
   const mobileColors = useMobileColors();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight();
+  const scrollBodyMaxHeight =
+    keyboardHeight > 0
+      ? Math.max(MIN_SCROLL_BODY, windowHeight - keyboardHeight - SHEET_CHROME_ALLOWANCE)
+      : windowHeight * SCROLL_BODY_MAX_SHARE;
   // The native sheet reports every dismissal, including one the caller made by
   // hiding it; only a dismissal while it should be showing is the person's.
   const visibleRef = useRef(props.visible);
@@ -68,10 +96,9 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
       // The grouped page colour, as a system sheet holding a list has: its
       // groups and cards are white on it, with no outline.
       backgroundStyle={{ backgroundColor: mobileColors.background }}
-      enableDynamicSizing={!scrollable}
+      enableDynamicSizing
       enablePanDownToClose={!dismissDisabled}
       index={visible ? 0 : -1}
-      snapPoints={scrollable ? SCROLLING_SNAP_POINTS : undefined}
       onClose={() => {
         if (visibleRef.current) onDismiss();
       }}
@@ -87,16 +114,14 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
           {/* A sheet sized to its content lays React Native out without a set
             width, so text in a row never wraps. The app is phone-only, where
             a sheet is as wide as the screen. */}
-          <BottomSheetView
-            style={[styles.sheet, scrollable && styles.sheetFill, { width: windowWidth }]}
-          >
+          <BottomSheetView style={[styles.sheet, { width: windowWidth }]}>
             {header ?? (IS_IOS ? <IosSheetBar /> : null)}
             {scrollable ? (
               <BottomSheetScrollView
                 automaticallyAdjustKeyboardInsets
                 contentContainerStyle={styles.body}
                 keyboardShouldPersistTaps="handled"
-                style={styles.scroll}
+                style={{ maxHeight: scrollBodyMaxHeight }}
               >
                 {children}
               </BottomSheetScrollView>
@@ -212,12 +237,6 @@ const styles = StyleSheet.create({
     gap: mobileSpace.xs,
     paddingHorizontal: mobileSpace.xl,
     paddingBottom: mobileSpace.md,
-  },
-  sheetFill: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
   },
   body: {
     paddingHorizontal: mobileSpace.xl,

@@ -19,7 +19,7 @@ export type { ScrollableTabStripTabProps } from "./ScrollableTabStripTab.types";
 const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 // The system fill gray, so an idle capsule reads as glass on a plain page
 // rather than disappearing into it (owner, 2026-10-31).
-const IDLE_GLASS_TINT = "rgba(120, 120, 128, 0.16)";
+const IDLE_GLASS_TINT = "rgba(120, 120, 128, 0.26)";
 
 /**
  * A tab as an iOS 26 Liquid Glass capsule: gray-tinted glass at rest, tinted
