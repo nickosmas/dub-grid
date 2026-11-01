@@ -612,7 +612,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2c341d407a9fee75cc29cc417aaad010d24514b22050fe0dcb170d4c947b5b56"
+      "evidenceFingerprint": "sha256:9693cdcd72c83acf682794eba475369f31a9ea17e9ca316ecf08451ce5f51dc2"
     },
     {
       "id": "dashboard",
@@ -1310,7 +1310,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b50f0c0cf07f9be7d0565f743b18e6e93b08adc46c7270566f8dd81e39882c57"
+      "evidenceFingerprint": "sha256:3a9ebe489ba72c8f92a16de11c1835ecede2b90941c820070a80929c05811108"
     },
     {
       "id": "alerts",
@@ -2073,7 +2073,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:24e77a0eb456f70832154f6057738478967ee3f854e92f9f9f6baf9b91f7b08c"
+      "evidenceFingerprint": "sha256:037ea820d51ec8d43ac1027ec8b9adc32b920c15b20ff467af978575b7fec5e7"
     },
     {
       "id": "integrations-exports",

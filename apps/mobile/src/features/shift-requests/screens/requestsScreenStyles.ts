@@ -1,11 +1,11 @@
 import { StyleSheet } from "react-native";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   mobilePillOverflow,
   mobileElevation,
   mobileRadii,
   mobileRadius,
   mobileSpace,
-  mobileSpacing,
   mobileTabularText,
   mobileText,
   mobileTextWeighted,
@@ -20,9 +20,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     section: {
       gap: mobileSpace.md,
     },
-    // A day's tile and its cards side by side. The groups carry their own
-    // spacing as bottom padding rather than a list gap so the rail's line
-    // can run through it and meet the next tile.
+    // The onboarding tour's Cover shifts preview still fronts its card with
+    // the old date rail (`CoverShiftsPreview.tsx`); Requests itself heads each
+    // day with a list header instead.
     dateGroupList: {
       gap: 0,
     },
@@ -48,22 +48,42 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
       gap: mobileSpace.md,
     },
-    requestCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.cardBorder,
-      padding: 16,
+    groupItems: {
       gap: mobileSpace.md,
-      ...mobileElevation("card", isDark),
     },
-    openShiftCard: {
-      gap: 12,
-      padding: mobileSpace.lg,
-    },
+    // One inset grouped card per request: the details, the shift and the
+    // actions are rows of the same card, never a box inside it.
+    requestCard: IS_NATIVE_LIST
+      ? {
+          backgroundColor: mobileColors.surface,
+          borderRadius: mobileRadii.card,
+          // Dark mode keeps a hairline, where the page and the card are close.
+          borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+          borderColor: mobileColors.borderSubtle,
+          overflow: "hidden",
+        }
+      : {
+          backgroundColor: mobileColors.surface,
+          borderRadius: mobileRadii.card,
+          borderWidth: 1,
+          borderColor: mobileColors.cardBorder,
+          overflow: "hidden",
+          ...mobileElevation("card", isDark),
+        },
     requestCardHighlighted: {
+      borderWidth: 1,
       borderColor: mobileColors.brand,
       backgroundColor: mobileColors.brandSoft,
+    },
+    cardRow: {
+      gap: mobileSpace.sm,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.md,
+    },
+    cardSeparator: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: mobileSpace.lg,
+      backgroundColor: mobileColors.borderSubtle,
     },
     cardHeader: {
       flexDirection: "row",
@@ -76,24 +96,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "space-between",
       alignItems: "center",
       gap: 12,
-    },
-    cardTitleRow: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.md,
-    },
-    cardBody: {
-      gap: mobileSpace.md,
-    },
-    cardActions: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "flex-start",
-      gap: 8,
-      paddingTop: mobileSpace.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: mobileColors.borderSubtle,
     },
     requestTitle: {
       ...mobileText.cardTitle,
@@ -118,38 +120,37 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textMuted,
       // Matches the pill's text below: Android's default font padding throws
-      // off vertical centering against the bordered/padded pill next to it.
+      // off vertical centering against the padded pill next to it.
       includeFontPadding: false,
-    },
-    shiftPillRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "center",
-      gap: 8,
     },
     splitShiftPanel: {
       gap: mobileSpace.md,
     },
-    splitShiftPanelLabel: {
-      ...mobileTextWeighted("meta", "bold"),
-      color: mobileColors.textMuted,
-    },
-    // A shift inside a request card: a panel on the card's secondary surface,
-    // one radius step in from the card so the two read as nested, not stacked.
-    shiftPanel: {
+    shiftBlock: {
       gap: mobileSpace.xs,
-      padding: mobileSpace.md,
-      borderRadius: mobileRadii.control,
-      backgroundColor: mobileColors.surfaceSecondary,
     },
-    // Room for the swap disc that straddles the seam between two panels.
-    shiftPanelSeamBelow: {
-      paddingBottom: mobileSpace.lg + mobileSpace.sm,
+    // A swap's two shifts stack beside one swap glyph, split by a hairline,
+    // so the card says "these two trade places" without a disc on a seam.
+    swapGroup: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: mobileSpace.md,
     },
-    shiftPanelSeamAbove: {
-      paddingTop: mobileSpace.lg + mobileSpace.sm,
+    swapGutter: {
+      width: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    shiftPanelPerson: {
+    swapShifts: {
+      flex: 1,
+      minWidth: 0,
+    },
+    swapDivider: {
+      height: StyleSheet.hairlineWidth,
+      marginVertical: mobileSpace.md,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    shiftPerson: {
       ...mobileText.meta,
       color: mobileColors.textMuted,
     },
@@ -159,53 +160,30 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "flex-start",
       gap: mobileSpace.xs,
     },
-    shiftPanelTitle: {
+    shiftTitle: {
       ...mobileText.rowTitle,
       color: mobileColors.textPrimary,
     },
-    shiftPanelContext: {
+    shiftContext: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
     },
-    shiftPanelWhen: {
+    shiftWhen: {
       ...mobileTextWeighted("meta", "medium"),
       ...mobileTabularText,
       color: mobileColors.textMuted,
     },
-    // The arrow sits between the two panels, and its negative margin pulls
-    // them in so the column's gap does not open twice around it.
-    swapPanels: {},
-    // Centred on the seam between the two panels; the surface-coloured ring
-    // lifts the disc off both.
-    swapSeam: {
-      height: mobileSpace.xs,
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "visible",
-      zIndex: 1,
-    },
-    swapArrow: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      borderWidth: 3,
-      borderColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brandSoft,
-    },
+    // A tinted fill without an outline.
     statusChip: {
       ...mobilePillOverflow.displayContainer,
       borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.border,
       backgroundColor: mobileColors.surfaceSecondary,
       paddingHorizontal: mobileSpace.md,
-      paddingVertical: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
       alignSelf: "flex-start",
     },
     statusChipText: {
-      ...mobileTextWeighted("caption", "semibold"),
+      ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
       includeFontPadding: false,
@@ -217,21 +195,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     awaitingNote: {
       ...mobileText.meta,
       color: mobileColors.warningText,
-    },
-    queueGroup: {
-      gap: mobileSpace.md,
-    },
-    queueGroupHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: mobileSpace.sm,
-    },
-    queueGroupTitle: {
-      ...mobileTextWeighted("sectionTitle", "medium"),
-      color: mobileColors.textSubtle,
-    },
-    openShiftContextStack: {
-      gap: 8,
     },
     openShiftContextText: {
       ...mobileText.rowTitle,
@@ -261,16 +224,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 4,
       minWidth: 0,
     },
+    // Nothing a person reads sits under 13pt, so every pill line takes `meta`.
     jobPillEyebrowText: {
-      ...mobileText.micro,
+      ...mobileText.meta,
       includeFontPadding: false,
     },
-    // The ramp floors at `micro`; a compact eyebrow keeps that size.
-    jobPillEyebrowTextCompact: {
-      fontSize: mobileText.micro.fontSize,
-    },
     jobPillText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
       textTransform: "uppercase",
       includeFontPadding: false,
@@ -282,32 +242,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // a sibling of the label, so it has to state them or it falls back to the
     // system default size and sits off the label's baseline.
     jobPillMentoredInlineText: {
-      ...mobileTextWeighted("badge", "medium"),
+      ...mobileTextWeighted("meta", "medium"),
       textTransform: "none",
       includeFontPadding: false,
-    },
-    jobPillMentoredInlineTextCompact: {
-      fontSize: mobileText.label.fontSize,
-      lineHeight: mobileText.label.lineHeight,
-    },
-    jobPillTextCompact: {
-      fontSize: mobileText.label.fontSize,
-      lineHeight: mobileText.label.lineHeight,
     },
     jobPillValueText: {
       ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
       includeFontPadding: false,
     },
-    jobPillValueTextCompact: {
-      fontSize: mobileText.label.fontSize,
-    },
     mentoredPill: {
       ...mobilePillOverflow.displayContainer,
       alignSelf: "flex-start",
       borderRadius: mobileRadius.md,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surfaceSecondary,
       minHeight: 28,
       justifyContent: "center",
@@ -315,7 +262,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: mobileSpace.xs,
     },
     mentoredPillText: {
-      ...mobileText.badge,
+      ...mobileTextWeighted("meta", "semibold"),
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
       includeFontPadding: false,
