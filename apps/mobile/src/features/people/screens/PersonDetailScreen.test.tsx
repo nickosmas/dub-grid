@@ -1510,12 +1510,8 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Change status" }));
       pick(/^Away/);
       fireEvent.click(screen.getByRole("button", { name: "Starts, none" }));
+      // Picking a day closes its calendar.
       choose(day(1));
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: `Starts, ${formatReturnDate(day(1), { weekday: true })}`,
-        }),
-      );
       fireEvent.click(screen.getByRole("button", { name: "Return date, none" }));
       choose(day(2));
       expect(

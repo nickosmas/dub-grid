@@ -11,6 +11,7 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { Text } from "../../../shared/components/Text";
 import { IS_IOS_LIST } from "../../../shared/lib/native-list";
+import { HAS_NATIVE_DATE_CALENDAR, NativeDateCalendar } from "./NativeDateCalendar";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -155,6 +156,11 @@ export function ReturnDateField({
   const accessibilityLabel = value ? `${label}, ${shown}` : `${label}, none`;
 
   if (IS_IOS_LIST) {
+    // Picking a day closes the calendar under the row (owner, 2026-10-31).
+    const pick = (date: string) => {
+      onChange(date);
+      setOpen(false);
+    };
     // A grouped-list row as Calendar's event editor draws a date: the name on
     // the leading edge, the day in a gray capsule on the trailing edge that
     // turns the tint while its calendar is open under it, in the same card,
@@ -167,7 +173,13 @@ export function ReturnDateField({
             accessibilityRole="button"
             accessibilityState={{ disabled, expanded: open }}
             disabled={disabled}
-            onPress={() => setOpen((current) => !current)}
+            onPress={() => {
+              // The system calendar always shows a chosen day, so opening an
+              // empty row picks the first day offered, as turning on a date
+              // in Reminders does; the clear row under it sets it back.
+              if (HAS_NATIVE_DATE_CALENDAR && !open && !value) onChange(minDate);
+              setOpen((current) => !current);
+            }}
             style={styles.iosRow}
           >
             <Text style={styles.iosLabel}>{label}</Text>
@@ -187,22 +199,37 @@ export function ReturnDateField({
           </Pressable>
           {open ? (
             <View style={styles.iosCalendar}>
-              <ReturnDateCalendar
-                maxDate={maxDate}
-                minDate={minDate}
-                onChange={(date) => onChange(date)}
-                value={value}
-              />
-              {value ? (
-                <Button
-                  compact
-                  disabled={disabled}
-                  label={emptyLabel}
-                  onPress={() => onChange(null)}
-                  tone="plain"
+              {HAS_NATIVE_DATE_CALENDAR ? (
+                <NativeDateCalendar
+                  maxDate={maxDate}
+                  minDate={minDate}
+                  onChange={pick}
+                  value={value}
                 />
-              ) : null}
+              ) : (
+                <ReturnDateCalendar
+                  maxDate={maxDate}
+                  minDate={minDate}
+                  onChange={pick}
+                  value={value}
+                />
+              )}
             </View>
+          ) : null}
+          {open && value ? (
+            // Clearing is a row of the list in the tint, as an iOS list's
+            // actions are, and closes the calendar with the date.
+            <Pressable
+              accessibilityRole="button"
+              disabled={disabled}
+              onPress={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+              style={({ pressed }) => [styles.iosClearRow, pressed && styles.iosClearPressed]}
+            >
+              <Text style={styles.iosClearLabel}>{emptyLabel}</Text>
+            </Pressable>
           ) : null}
         </View>
         {hint ? <Text style={[styles.hint, styles.iosHint]}>{hint}</Text> : null}
@@ -380,6 +407,21 @@ function createStyles(mobileColors: MobileColors) {
       marginLeft: 16,
       paddingRight: 16,
       paddingVertical: mobileSpace.sm,
+    },
+    iosClearRow: {
+      borderTopColor: mobileColors.borderSubtle,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      justifyContent: "center",
+      marginLeft: 16,
+      minHeight: 48,
+      paddingRight: 16,
+    },
+    iosClearPressed: {
+      opacity: 0.5,
+    },
+    iosClearLabel: {
+      ...mobileTextWeighted("body", "regular"),
+      color: mobileColors.brand,
     },
     // The group's footer: inset to the rows' text, at the system's footnote size.
     iosHint: {
