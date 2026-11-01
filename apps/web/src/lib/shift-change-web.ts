@@ -248,6 +248,33 @@ export function publishChangeHasStates(change: PublishChange): boolean {
   );
 }
 
+/**
+ * The shifts on both sides whose mentoring changed, as sentences. The change
+ * model leaves mentoring out, so a correction that only changed it would
+ * otherwise say nothing about what it changed.
+ */
+export function describeMentoringChanges(
+  before: ScheduleCellState | null | undefined,
+  after: ScheduleCellState | null | undefined,
+  resolvers: ShiftChangeResolvers,
+): string[] {
+  if (!before || !after) return [];
+  const wasMentored = new Map(
+    before.segments.map((segment) => [
+      buildShiftJobPairKey(segment.shiftId, segment.jobId),
+      segment.isMentored ?? false,
+    ]),
+  );
+  return after.segments.flatMap((segment) => {
+    const was = wasMentored.get(buildShiftJobPairKey(segment.shiftId, segment.jobId));
+    const now = segment.isMentored ?? false;
+    if (was === undefined || was === now) return [];
+    const resolved = resolvers.segment(segment.shiftId, segment.jobId);
+    const name = resolved?.shiftName ?? resolved?.jobName ?? UNKNOWN_SHIFT_NAME;
+    return [now ? `${name} is now mentored.` : `${name} is no longer mentored.`];
+  });
+}
+
 const LABEL_TEXT = { shift1: "Shift 1", shift2: "Shift 2", absence: "Absence" } as const;
 
 /**
