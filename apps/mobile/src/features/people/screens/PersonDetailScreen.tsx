@@ -2318,6 +2318,23 @@ function AccountLinkChallengeModal({
   return (
     <BottomSheetModal
       dismissDisabled={isPending}
+      footer={
+        <>
+          {error ? <InlineError message={error} /> : null}
+          <SheetActions
+            primaryAction={
+              <Button
+                disabled={isPending}
+                label={isMismatch ? "Use account name" : "Link existing account"}
+                loading={isPending}
+                onPress={onConfirm}
+              />
+            }
+          >
+            <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
+          </SheetActions>
+        </>
+      }
       header={<SheetHeader subtitle={subtitle} title={title} />}
       onDismiss={onCancel}
       visible={challenge != null}
@@ -2337,22 +2354,6 @@ function AccountLinkChallengeModal({
         <ProfileInfoRow label="Staff profile" value={employeeName} />
         <ProfileInfoRow isLast label="Account name" value={accountName} />
       </ProfileList>
-
-      <View style={styles.modalActionStack}>
-        {error ? <InlineError message={error} /> : null}
-        <SheetActions
-          primaryAction={
-            <Button
-              disabled={isPending}
-              label={isMismatch ? "Use account name" : "Link existing account"}
-              loading={isPending}
-              onPress={onConfirm}
-            />
-          }
-        >
-          <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
-        </SheetActions>
-      </View>
     </BottomSheetModal>
   );
 }
@@ -2657,9 +2658,5 @@ const createStyles = (mobileColors: MobileColors) =>
     modalInfoText: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
-    },
-    modalActionStack: {
-      gap: mobileSpace.md,
-      paddingTop: 4,
     },
   });
