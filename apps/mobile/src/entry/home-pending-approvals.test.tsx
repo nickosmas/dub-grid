@@ -1,12 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createSafeAreaContextModule } from "../test/native";
+import {
+  createReactNativeModule,
+  createSafeAreaContextModule,
+  createNativeStackMock,
+} from "../test/native";
 
 const useExpandedDashboardQuery = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 // The rows navigate on press now, so the screen pulls in the router.
-vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
+vi.mock("expo-router", async () => ({
+  router: { push: vi.fn() },
+  Stack: createNativeStackMock(await import("react")),
+}));
 vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 
 vi.mock("react-native-safe-area-context", async () =>

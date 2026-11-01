@@ -1,12 +1,9 @@
 import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text } from "../../../src/shared/components/Text";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
-  FilterButton,
   FilterSheet,
   SelectionRow,
   SelectionSection,
@@ -14,18 +11,16 @@ import {
 import { StaffHoursRow } from "../../../src/features/dashboard/components/StaffHoursCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
+import { DashboardListSection } from "../../../src/features/dashboard/components/DashboardListSection";
+import { HeaderFilterAction } from "../../../src/shared/navigation/HeaderFilterAction";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
-import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
 type SortMode = "overtime" | "alphabetical";
 const UNASSIGNED_LABEL = "Unassigned";
 
 export default function StaffHoursExpandedScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const focusAreaLabel = bootstrapQuery.data?.currentOrg?.labels?.focusArea ?? "Focus Areas";
   // Drilling in from Home used to lose pull-to-refresh entirely: these routes
@@ -135,17 +130,11 @@ export default function StaffHoursExpandedScreen() {
         </SelectionSection>
       </FilterSheet>
 
-      <View style={styles.headerRow}>
-        <Text style={styles.count}>
-          {sorted.length} {sorted.length === 1 ? "person" : "people"}
-        </Text>
-        <FilterButton
-          accessibilityLabel="Filter overtime watch"
-          activeCount={activeFilterCount}
-          expanded={isFilterVisible}
-          onPress={() => setIsFilterVisible(true)}
-        />
-      </View>
+      <HeaderFilterAction
+        accessibilityLabel="Filter overtime watch"
+        activeCount={activeFilterCount}
+        onPress={() => setIsFilterVisible(true)}
+      />
 
       {sorted.length === 0 ? (
         <EmptyStateCard
@@ -153,27 +142,16 @@ export default function StaffHoursExpandedScreen() {
           title={`No one is over ${dashboardQuery.data.overtimeThresholdHours}h this period`}
         />
       ) : (
-        <DashboardRowList
-          items={sorted}
-          keyExtractor={(entry) => entry.employeeId}
-          renderItem={(entry) => <StaffHoursRow entry={entry} />}
-        />
+        <DashboardListSection
+          caption={`${sorted.length} ${sorted.length === 1 ? "person" : "people"}`}
+        >
+          <DashboardRowList
+            items={sorted}
+            keyExtractor={(entry) => entry.employeeId}
+            renderItem={(entry) => <StaffHoursRow entry={entry} />}
+          />
+        </DashboardListSection>
       )}
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-      paddingTop: 12,
-      paddingBottom: 4,
-    },
-    count: {
-      ...mobileText.label,
-    },
-  });

@@ -427,6 +427,28 @@ describe("buildActivityFeed", () => {
     });
   });
 
+  it("names the shift from its segment when the cell carries only the code", () => {
+    const requests = [
+      {
+        id: "req-3",
+        type: "pickup",
+        status: "approved",
+        requesterName: "Alex Rivera",
+        requesterShiftDate: "2026-05-12",
+        requesterPresentation: {
+          label: "E",
+          shiftName: null,
+          segments: [{ shiftName: "Evening Shift" }],
+        },
+        createdAt: "2026-05-10T09:00:00.000Z",
+      } as unknown as MobileShiftRequest,
+    ];
+
+    const result = buildActivityFeed([], requests, [], new Map());
+
+    expect(result[0]?.description).toBe("Pickup request · Evening Shift · Approved");
+  });
+
   it("reads a resolved request's status as copy, never the raw token", () => {
     const requests = [
       {

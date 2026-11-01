@@ -1,12 +1,9 @@
 import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text } from "../../../src/shared/components/Text";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
-  FilterButton,
   FilterSheet,
   SelectionRow,
   SelectionSection,
@@ -17,19 +14,17 @@ import {
 } from "../../../src/features/dashboard/components/OpenShiftsCard";
 import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { DashboardRowList } from "../../../src/features/dashboard/components/DashboardRowList";
+import { DashboardListSection } from "../../../src/features/dashboard/components/DashboardListSection";
+import { HeaderFilterAction } from "../../../src/shared/navigation/HeaderFilterAction";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
-import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors, mobileSpace } from "../../../src/shared/theme/tokens";
 
 const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 type UrgencyFilter = (typeof URGENCY_OPTIONS)[number];
 const UNASSIGNED_LABEL = "Unassigned";
 
 export default function OpenShiftsExpandedScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const focusAreaLabel = bootstrapQuery.data?.currentOrg?.labels?.focusArea ?? "Focus Areas";
   // Drilling in from Home used to lose pull-to-refresh entirely: these routes
@@ -140,17 +135,11 @@ export default function OpenShiftsExpandedScreen() {
         </SelectionSection>
       </FilterSheet>
 
-      <View style={styles.headerRow}>
-        <Text style={styles.count}>
-          {filtered.length} {filtered.length === 1 ? "shift" : "shifts"}
-        </Text>
-        <FilterButton
-          accessibilityLabel="Filter open shifts"
-          activeCount={activeFilterCount}
-          expanded={isFilterVisible}
-          onPress={() => setIsFilterVisible(true)}
-        />
-      </View>
+      <HeaderFilterAction
+        accessibilityLabel="Filter open shifts"
+        activeCount={activeFilterCount}
+        onPress={() => setIsFilterVisible(true)}
+      />
 
       {filtered.length === 0 ? (
         activeFilterCount > 0 ? (
@@ -162,27 +151,16 @@ export default function OpenShiftsExpandedScreen() {
           />
         )
       ) : (
-        <DashboardRowList
-          items={filtered}
-          keyExtractor={(shift) => shift.id}
-          renderItem={(shift) => <OpenShiftRow shift={shift} />}
-        />
+        <DashboardListSection
+          caption={`${filtered.length} ${filtered.length === 1 ? "shift" : "shifts"}`}
+        >
+          <DashboardRowList
+            items={filtered}
+            keyExtractor={(shift) => shift.id}
+            renderItem={(shift) => <OpenShiftRow shift={shift} />}
+          />
+        </DashboardListSection>
       )}
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: mobileSpace.md,
-      paddingTop: 12,
-      paddingBottom: 4,
-    },
-    count: {
-      ...mobileText.label,
-    },
-  });
