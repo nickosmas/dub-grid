@@ -495,7 +495,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:328cbe696b9790fdc2ba49815102123a504570ca8fdcad329f3e55c976963799"
+      "evidenceFingerprint": "sha256:3bfa8df3c0b8675791220f2dfd8a0e2357b6b8f95a3ce77093ba77b0ed009503"
     },
     {
       "id": "realtime",
@@ -839,7 +839,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:11023b198448c619889b967e0c1cb30c67a84170186a23427da285b3011e0ecb"
+      "evidenceFingerprint": "sha256:1f7b842f3abf7709419d5acaf77e3f01c78177232d4452f0478ac1a9b7456aa9"
     },
     {
       "id": "invitations",
@@ -1502,7 +1502,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:185b6983e3dc0f8ca3b152c502c4314d3ca923c41130fe2445862acfb327ef3e"
+      "evidenceFingerprint": "sha256:ab01885bacfc4abc75aa992b65d5572cd8a8d832131f2ef33d10121b1b4eca47"
     },
     {
       "id": "security-sessions",
@@ -1697,7 +1697,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4f1a687bc7f3ff4ffe486e0fa910d09d567595c621ecdf4894182dfa5d4fac09"
+      "evidenceFingerprint": "sha256:606468ba6751b227a03ca5ae009ab784667c7ad6aa44fe9ed273642250821cc9"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1915,7 +1915,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:59cdbe14436668729f229b053fa4ff700a15e42a98b39689028c961a3464f4a4"
+      "evidenceFingerprint": "sha256:3c05326fc45ae1367b622cc28a0f7fe9f977a074f7588facb776c0c883531b04"
     },
     {
       "id": "schedule-tools",
