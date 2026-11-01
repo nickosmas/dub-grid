@@ -58,7 +58,7 @@ import { SelectionRow, SelectionSection } from "../../../shared/components/Filte
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
-import { EditBarActions } from "../../../shared/navigation/EditBarActions";
+import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   changeMobilePersonOrgRole,
@@ -1474,6 +1474,7 @@ export default function PersonDetailScreen() {
           discard={{
             label: getMobileEditorDismissLabel({ hasUnsavedChanges: hasChanges }),
             onPress: hasChanges ? guard.discard : guard.requestClose,
+            confirm: hasChanges ? DISCARD_CONFIRM : undefined,
           }}
           save={{
             label: "Save",

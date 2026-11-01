@@ -24,6 +24,7 @@ const stepUpRun = vi.fn();
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("expo-router", () => ({
+  useNavigation: () => ({ setOptions: () => undefined }),
   router: {
     back: routerBack,
   },
@@ -48,6 +49,17 @@ vi.mock("expo-router", () => ({
             {props.children}
           </button>
         ),
+        // The X's discard menu, its action pressed like any button.
+        Menu: (props: { children?: ReactNode; accessibilityLabel?: string }) => (
+          <div aria-label={props.accessibilityLabel} role="menu">
+            {props.children}
+          </div>
+        ),
+        MenuAction: (props: { children?: ReactNode; onPress?: () => void }) => (
+          <button onClick={props.onPress} type="button">
+            {props.children}
+          </button>
+        ),
       },
     ),
     // The bar's edit actions rendered in place, so a test presses Save and
@@ -64,7 +76,7 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
-  default: () => null,
+  default: Object.assign(() => null, { getImageSource: () => Promise.resolve(null) }),
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));

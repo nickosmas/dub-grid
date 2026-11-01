@@ -27,7 +27,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
-import { EditBarActions } from "../../../shared/navigation/EditBarActions";
+import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
@@ -561,7 +561,11 @@ export default function ProfileWorkScreen() {
           loading: saveMutation.isPending,
           onPress: handleSave,
         }}
-        discard={hasChanges ? { label: "Discard", onPress: discardChanges } : null}
+        discard={
+          hasChanges
+            ? { label: "Discard", onPress: discardChanges, confirm: DISCARD_CONFIRM }
+            : null
+        }
       />
     ) : null;
 
