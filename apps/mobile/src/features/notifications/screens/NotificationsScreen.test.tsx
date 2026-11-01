@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createScreenModule } from "../../../test/native";
+import {
+  createNativeStackMock,
+  createReactNativeModule,
+  createScreenModule,
+} from "../../../test/native";
 
 const useInfiniteQuery = vi.fn();
 const useQuery = vi.fn();
@@ -29,12 +33,12 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("expo-router", () => ({
+vi.mock("expo-router", async () => ({
   router: {
     push,
   },
-  // The search field lives in the native header, which these tests don't draw.
-  Stack: { SearchBar: () => null },
+  // The search field and bar buttons live in the native header.
+  Stack: createNativeStackMock(await import("react")),
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));

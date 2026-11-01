@@ -1,10 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule, createSafeAreaContextModule } from "../test/native";
+import {
+  createNativeStackMock,
+  createReactNativeModule,
+  createSafeAreaContextModule,
+} from "../test/native";
 
 const useExpandedDashboardQuery = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+vi.mock("expo-router", async () => ({
+  router: { push: vi.fn() },
+  Stack: createNativeStackMock(await import("react")),
+}));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
