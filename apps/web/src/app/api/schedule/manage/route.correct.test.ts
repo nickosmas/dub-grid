@@ -173,3 +173,95 @@ describe("POST /api/schedule/manage correctShift", () => {
     expect(await response.json()).toMatchObject({ code: "PAST_DAY" });
   });
 });
+
+describe("POST /api/schedule/manage fetchCorrections", () => {
+  function payload(overrides: Record<string, unknown>) {
+    return {
+      state_kind: "worked",
+      shift_ids: [80],
+      job_ids: [43],
+      is_mentored_flags: [false],
+      focus_area_id: 51,
+      absence_type_id: null,
+      custom_start_time: null,
+      custom_end_time: null,
+      series_id: null,
+      from_recurring: false,
+      ...overrides,
+    };
+  }
+
+  it("gives each day its latest correction, Before from the first and After from the latest", async () => {
+    const rows = [
+      {
+        id: "c1",
+        emp_id: employeeId,
+        date: "2026-10-27",
+        reason: "Wrong shift recorded",
+        corrected_by: "user-a",
+        corrected_at: "2026-10-28T10:00:00Z",
+        before: payload({}),
+        after: payload({ shift_ids: [83], job_ids: [44] }),
+      },
+      {
+        id: "c2",
+        emp_id: employeeId,
+        date: "2026-10-27",
+        reason: null,
+        corrected_by: "user-b",
+        corrected_at: "2026-10-29T10:00:00Z",
+        before: payload({ shift_ids: [83], job_ids: [44] }),
+        after: payload({ shift_ids: [83], job_ids: [44], is_mentored_flags: [true] }),
+      },
+      {
+        id: "c3",
+        emp_id: employeeId,
+        date: "2026-10-26",
+        reason: "Called off",
+        corrected_by: "user-a",
+        corrected_at: "2026-10-28T11:00:00Z",
+        before: null,
+        after: payload({ state_kind: "deleted", shift_ids: [], job_ids: [] }),
+      },
+    ];
+    const query = {
+      select: () => query,
+      eq: () => query,
+      gte: () => query,
+      lte: () => query,
+      order: () => query,
+      range: async () => ({ data: rows, error: null }),
+    };
+    requireOrgPermissions.mockResolvedValue({
+      serviceClient: { from: () => query },
+      orgId,
+      permissions: { canEditShifts: true },
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/schedule/manage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "fetchCorrections",
+          orgId,
+          startDate: "2026-10-25",
+          endDate: "2026-10-31",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const { corrections } = await response.json();
+    expect(corrections).toHaveLength(2);
+    const twice = corrections.find((row: { date: string }) => row.date === "2026-10-27");
+    expect(twice).toMatchObject({
+      reason: null,
+      correctedBy: "user-b",
+      before: { kind: "worked", segments: [{ shiftId: 80, jobId: 43, isMentored: false }] },
+      after: { kind: "worked", segments: [{ shiftId: 83, jobId: 44, isMentored: true }] },
+    });
+    const cleared = corrections.find((row: { date: string }) => row.date === "2026-10-26");
+    expect(cleared).toMatchObject({ before: null, after: null });
+  });
+});

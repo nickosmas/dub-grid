@@ -9,6 +9,7 @@ import ScheduleGrid, {
 import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { getReadableTextOnSurface } from "@/lib/colors";
 import {
+  CORRECTION_MARK_GUTTER,
   MENTORED_CORNER_CLEARANCE,
   REQUEST_FOLD_CLEARANCE,
   REQUEST_FOLD_SIZE,
@@ -2587,12 +2588,48 @@ describe("ScheduleGrid", () => {
       )[1];
       // The card says it, so the cell has no native tooltip on top.
       expect(cell.getAttribute("title")).toBeNull();
+      // The pill ends before the mark's strip, so the mark never covers the pill's own corner.
+      const pill = cell.querySelector<HTMLElement>('[data-shift-pill="single"]')!;
+      expect(pill.style.right).toBe(`${CORRECTION_MARK_GUTTER}px`);
       fireEvent.mouseEnter(cell.querySelector('[data-shift-pill="single"]')!);
       await waitFor(() => {
         const detail = document.querySelector("[data-correction-detail]");
         expect(detail?.textContent).toMatch(
           /^Corrected .* by Mina\.\nReason: Sent home sick at 10$/,
         );
+      });
+    });
+
+    it("shows in the hover card what the day was before it was corrected", async () => {
+      observedWidth = 1600;
+      const corrected = formatDateKey(week1[1]);
+      const worked = (customStartTime: string | null, customEndTime: string | null) => ({
+        kind: "worked" as const,
+        segments: [{ shiftId: 1, jobId: 9, position: 0, isMentored: false }],
+        absenceTypeId: null,
+        customStartTime,
+        customEndTime,
+        seriesId: null,
+        fromRecurring: false,
+      });
+      renderGrid({
+        todayKey: formatDateKey(week1[3]),
+        corrections: new Map([
+          [
+            `emp-1_${corrected}`,
+            { reason: "Left at 1", before: worked(null, null), after: worked("07:00", "13:00") },
+          ],
+        ]),
+        shiftCategories: [{ ...shiftCategories[0], startTime: "07:00", endTime: "15:00" }],
+      });
+
+      const cell = (screen.getAllByRole("gridcell") as HTMLElement[]).filter(
+        (gridCell) => gridCell.dataset.empId === "emp-1",
+      )[1];
+      fireEvent.mouseEnter(cell.querySelector('[data-shift-pill="single"]')!);
+      await waitFor(() => {
+        const change = document.querySelector("[data-correction-change]");
+        expect(change?.textContent).toMatch(/3:00 PM/);
       });
     });
   });

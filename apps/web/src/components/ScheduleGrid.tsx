@@ -21,7 +21,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { ChevronDown, ChevronLeft, ChevronRight, Pencil, UserPen, Users } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, History, UserPen, Users } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/Button";
 import { useRememberedFold } from "@/hooks/useRememberedFold";
@@ -37,6 +37,7 @@ import {
   buildShiftChangeResolvers,
   cellStateFromParts,
   describeCellStateChange,
+  describeMentoringChanges,
   formatShiftChangeWasText,
   publishChangeHasStates,
 } from "@/lib/shift-change-web";
@@ -133,6 +134,9 @@ import {
   shouldUseShiftColorForDiffState,
   GridDiffBadge,
   MentoredShiftBadge,
+  CORRECTION_MARK_GUTTER,
+  CORRECTION_MARK_INSET,
+  CORRECTION_MARK_SIZE,
   LOCK_CORNER_CLEARANCE,
   MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
@@ -713,6 +717,27 @@ const SHIFT_DETAIL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
+/** One change in the hover card: the full card for several items, else what it was. */
+function HoverChangeView({ view }: { view: ShiftChange }) {
+  if (view.kind === "multi") {
+    return <ShiftChangeCard change={view} layout="stacked" showDayBar />;
+  }
+  if (isNewShiftChange(view)) {
+    // One item on a day that had nothing has no Before to show.
+    return (
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          color: "var(--dg-color-text-muted)",
+        }}
+      >
+        {formatShiftChangeWasText(view)}
+      </div>
+    );
+  }
+  return <ShiftChangeWas change={view} />;
+}
+
 function ShiftDetailHoverCard({
   enabled,
   employeeName,
@@ -725,6 +750,8 @@ function ShiftDetailHoverCard({
   changes = [],
   publicationLabel,
   correctionLabel = null,
+  correctionChange = null,
+  correctionNotes = [],
   children,
 }: {
   enabled: boolean;
@@ -741,6 +768,10 @@ function ShiftDetailHoverCard({
   publicationLabel: string | null;
   /** A corrected past day (53c): when, by whom and why. */
   correctionLabel?: string | null;
+  /** What the correction changed, shown with its label. */
+  correctionChange?: ShiftChange | null;
+  /** What the correction changed that the change model leaves out, such as mentoring. */
+  correctionNotes?: string[];
   children: React.ReactElement<
     React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
   >;
@@ -750,8 +781,16 @@ function ShiftDetailHoverCard({
 
   if (!enabled) return children;
   const shownChanges = changes.filter((change) => change.view.kind !== "none");
-  const hasRichChanges = shownChanges.length > 0;
-  const hasMultiChange = shownChanges.some((change) => change.view.kind === "multi");
+  const shownCorrection =
+    correctionLabel && correctionChange && correctionChange.kind !== "none"
+      ? correctionChange
+      : null;
+  const shownCorrectionNotes = correctionLabel ? correctionNotes : [];
+  const hasRichChanges =
+    shownChanges.length > 0 || !!shownCorrection || shownCorrectionNotes.length > 0;
+  const hasMultiChange =
+    shownChanges.some((change) => change.view.kind === "multi") ||
+    shownCorrection?.kind === "multi";
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -910,21 +949,7 @@ function ShiftDetailHoverCard({
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
-                      {view.kind === "multi" ? (
-                        <ShiftChangeCard change={view} layout="stacked" showDayBar />
-                      ) : isNewShiftChange(view) ? (
-                        // One item on a day that had nothing has no Before to show.
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-caption)",
-                            color: "var(--dg-color-text-muted)",
-                          }}
-                        >
-                          {formatShiftChangeWasText(view)}
-                        </div>
-                      ) : (
-                        <ShiftChangeWas change={view} />
-                      )}
+                      <HoverChangeView view={view} />
                     </div>
                   ))}
                   {publicationLabel ? (
@@ -936,6 +961,25 @@ function ShiftDetailHoverCard({
                       }}
                     >
                       {publicationLabel}
+                    </div>
+                  ) : null}
+                  {shownCorrection || shownCorrectionNotes.length > 0 ? (
+                    <div
+                      data-correction-change
+                      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                    >
+                      {shownCorrection ? <HoverChangeView view={shownCorrection} /> : null}
+                      {shownCorrectionNotes.map((note) => (
+                        <div
+                          key={note}
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-secondary)",
+                          }}
+                        >
+                          {note}
+                        </div>
+                      ))}
                     </div>
                   ) : null}
                   {correctionLabel ? (
@@ -2718,6 +2762,23 @@ const SectionBlock = memo(function SectionBlock({
                         // and nothing moves into or out of it.
                         const isPastDay = isPastDateKey(dateKey, todayKey);
                         const correction = isPastDay ? corrections?.get(cellKey) : undefined;
+                        const correctionGutter = correction ? CORRECTION_MARK_GUTTER : null;
+                        const correctionChange =
+                          correction && (correction.before || correction.after)
+                            ? describeCellStateChange(
+                                correction.before,
+                                correction.after,
+                                dateKey,
+                                shiftChangeResolvers,
+                              )
+                            : null;
+                        const correctionNotes = correction
+                          ? describeMentoringChanges(
+                              correction.before,
+                              correction.after,
+                              shiftChangeResolvers,
+                            )
+                          : [];
                         const correctionLabel = correction
                           ? formatCorrectionLabel({
                               reason: correction.reason,
@@ -2883,11 +2944,13 @@ const SectionBlock = memo(function SectionBlock({
                                 className="dg-grid-correction-mark"
                                 style={{
                                   position: "absolute",
-                                  top: 3,
-                                  right: 3 + cornerLockClearance,
+                                  // Below the lock avatar when a peer holds the cell,
+                                  // so both stay in the strip the pills leave clear.
+                                  top: CORRECTION_MARK_INSET + cornerLockClearance,
+                                  right: CORRECTION_MARK_INSET,
                                   zIndex: 9,
-                                  width: 14,
-                                  height: 14,
+                                  width: CORRECTION_MARK_SIZE,
+                                  height: CORRECTION_MARK_SIZE,
                                   borderRadius: 999,
                                   display: "flex",
                                   alignItems: "center",
@@ -2898,7 +2961,7 @@ const SectionBlock = memo(function SectionBlock({
                                   pointerEvents: "none",
                                 }}
                               >
-                                <Pencil size={8} strokeWidth={2.5} />
+                                <History size={9} strokeWidth={2.5} />
                               </span>
                             )}
                             <div
@@ -3489,7 +3552,7 @@ const SectionBlock = memo(function SectionBlock({
                                               aria-hidden="true"
                                               style={getBulkSelectionRingStyle({
                                                 topInset: singleTopInset,
-                                                rightInset: singleSideInset,
+                                                rightInset: correctionGutter ?? singleSideInset,
                                                 bottomInset: singleBottomInset,
                                                 leftInset: singleSideInset,
                                                 topDividerInset,
@@ -3510,6 +3573,8 @@ const SectionBlock = memo(function SectionBlock({
                                             changes={hoverChanges}
                                             publicationLabel={publicationLabel}
                                             correctionLabel={correctionLabel}
+                                            correctionChange={correctionChange}
+                                            correctionNotes={correctionNotes}
                                           >
                                             <div
                                               data-shift-pill="single"
@@ -3520,7 +3585,9 @@ const SectionBlock = memo(function SectionBlock({
                                               style={{
                                                 position: "absolute",
                                                 top: insetFromVisibleCellTop(singleTopInset),
-                                                right: runOpenRight ? 0 : `${singleSideInset}px`,
+                                                right: runOpenRight
+                                                  ? 0
+                                                  : `${correctionGutter ?? singleSideInset}px`,
                                                 bottom: `${singleBottomInset}px`,
                                                 left: runOpenLeft
                                                   ? 0
@@ -3795,7 +3862,7 @@ const SectionBlock = memo(function SectionBlock({
                                               // note strip, so it stops short of the dots.
                                               rightInset={
                                                 singleHasNotes
-                                                  ? singleSideInset +
+                                                  ? (correctionGutter ?? singleSideInset) +
                                                     1 +
                                                     NOTE_LANE_INSET +
                                                     noteMarksWidth(noteMarks.length) +
@@ -3963,7 +4030,7 @@ const SectionBlock = memo(function SectionBlock({
                                             aria-hidden="true"
                                             style={getBulkSelectionRingStyle({
                                               topInset: multiTopInset,
-                                              rightInset: multiSideInset,
+                                              rightInset: correctionGutter ?? multiSideInset,
                                               bottomInset: multiBottomInset,
                                               leftInset: multiSideInset,
                                               topDividerInset,
@@ -3984,12 +4051,14 @@ const SectionBlock = memo(function SectionBlock({
                                           changes={hoverChanges}
                                           publicationLabel={publicationLabel}
                                           correctionLabel={correctionLabel}
+                                          correctionChange={correctionChange}
+                                          correctionNotes={correctionNotes}
                                         >
                                           <div
                                             style={{
                                               position: "absolute",
                                               top: insetFromVisibleCellTop(multiTopInset),
-                                              right: `${multiSideInset}px`,
+                                              right: `${correctionGutter ?? multiSideInset}px`,
                                               bottom: `${multiBottomInset}px`,
                                               left: insetFromVisibleCellLeft(multiSideInset),
                                               display: "flex",
@@ -4824,6 +4893,8 @@ const SectionBlock = memo(function SectionBlock({
                                       changes={hoverChanges}
                                       publicationLabel={publicationLabel}
                                       correctionLabel={correctionLabel}
+                                      correctionChange={correctionChange}
+                                      correctionNotes={correctionNotes}
                                     >
                                       {deletedPill}
                                     </ShiftDetailHoverCard>

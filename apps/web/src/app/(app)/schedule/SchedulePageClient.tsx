@@ -5822,14 +5822,24 @@ function SchedulerContent({
           await refetchScheduleDataRef.current();
         }
         const correctedDateKey = formatDateKey(panel.date);
+        // The server holds the day's Before (its first correction) and After;
+        // without them the mark stands and the detail follows the next read.
+        const saved = await fetchCorrections(orgId, correctedDateKey, correctedDateKey)
+          .then((rows) => rows.find((row) => row.empId === panel.empId) ?? null)
+          .catch(() => null);
         setCorrections((current) =>
-          new Map(current).set(`${panel.empId}_${correctedDateKey}`, {
-            empId: panel.empId,
-            date: correctedDateKey,
-            reason: reason || null,
-            correctedBy: authUser?.id ?? null,
-            correctedAt: new Date().toISOString(),
-          }),
+          new Map(current).set(
+            `${panel.empId}_${correctedDateKey}`,
+            saved ?? {
+              empId: panel.empId,
+              date: correctedDateKey,
+              reason: reason || null,
+              correctedBy: authUser?.id ?? null,
+              correctedAt: new Date().toISOString(),
+              before: null,
+              after: null,
+            },
+          ),
         );
         closeEditPanel();
         toast.success("Day corrected.");
@@ -9648,6 +9658,7 @@ function SchedulerContent({
               }
               pastDayNotice={pastDayNotice}
               correctedLabel={editPanelCorrectedLabel}
+              correctedChange={editPanelCorrection ?? null}
               allowShiftEdits={canEditShifts && (!editPanelIsPast || canCorrectPanelDay)}
               canEditScheduleIndicators={canEditNotes && !editPanelIsPast}
               getActiveIndicatorIds={panelActiveIndicatorIds}
