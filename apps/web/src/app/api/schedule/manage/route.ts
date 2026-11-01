@@ -1191,7 +1191,7 @@ export async function POST(req: NextRequest) {
         const buildCorrectionsPage = (from: number, to: number) =>
           auth.serviceClient
             .from("schedule_cell_corrections")
-            .select("id, emp_id, date, reason, corrected_at")
+            .select("id, emp_id, date, reason, corrected_by, corrected_at")
             .eq("org_id", data.orgId)
             .gte("date", data.startDate)
             .lte("date", data.endDate)
@@ -1203,6 +1203,7 @@ export async function POST(req: NextRequest) {
           emp_id: string;
           date: string;
           reason: string | null;
+          corrected_by: string | null;
           corrected_at: string;
         }>(buildCorrectionsPage);
         // Oldest first, so each day keeps its latest correction.
@@ -1214,6 +1215,7 @@ export async function POST(req: NextRequest) {
             empId: row.emp_id,
             date: row.date,
             reason: row.reason,
+            correctedBy: row.corrected_by,
             correctedAt: row.corrected_at,
           })),
         });

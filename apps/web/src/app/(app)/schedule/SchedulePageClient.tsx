@@ -26,6 +26,7 @@ import ScheduleGrid, {
 } from "@/components/ScheduleGrid";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { buildRowAbsenceRuns } from "@/components/schedule-grid/absenceRuns";
+import { formatCorrectionLabel } from "@/components/schedule-grid/gridHelpers";
 import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import { settleWithRequestTimeout } from "@/lib/fetch-with-timeout";
@@ -1885,6 +1886,7 @@ function SchedulerContent({
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
   const needsAuditNames =
     publishHistory.length > 0 ||
+    corrections.size > 0 ||
     publishedDateRanges.some((range) => !!range.publishedBy) ||
     (canRenderAuthorNames &&
       (showAudit ||
@@ -1913,6 +1915,11 @@ function SchedulerContent({
     for (const range of publishedDateRanges) {
       if (range.publishedBy && !profileNameCache.current.has(range.publishedBy)) {
         uncached.add(range.publishedBy);
+      }
+    }
+    for (const correction of corrections.values()) {
+      if (correction.correctedBy && !profileNameCache.current.has(correction.correctedBy)) {
+        uncached.add(correction.correctedBy);
       }
     }
     if (uncached.size === 0) {
@@ -1946,7 +1953,7 @@ function SchedulerContent({
     return () => {
       cancelled = true;
     };
-  }, [needsAuditNames, org?.id, publishHistory, publishedDateRanges, shifts]);
+  }, [corrections, needsAuditNames, org?.id, publishHistory, publishedDateRanges, shifts]);
 
   // Split publish history by overlap with the currently visible window so
   // the banner, toggle, and overlay only describe publishes that touch
@@ -5743,6 +5750,19 @@ function SchedulerContent({
         ? "Only a Super Admin can correct a day more than 14 days ago."
         : "Correcting a past day needs Publish schedule."
       : null;
+  const editPanelCorrection =
+    editPanel && editPanelIsPast
+      ? corrections.get(`${editPanel.empId}_${editPanelDateKey}`)
+      : undefined;
+  const editPanelCorrectedLabel = editPanelCorrection
+    ? formatCorrectionLabel({
+        reason: editPanelCorrection.reason,
+        correctedAt: editPanelCorrection.correctedAt,
+        correctedBy: editPanelCorrection.correctedBy,
+        resolveName: (userId) => auditNames.get(userId) ?? null,
+        timeZone: orgTimeZone,
+      })
+    : null;
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
 
   const handleSaveCorrection = useCallback(
@@ -5807,6 +5827,7 @@ function SchedulerContent({
             empId: panel.empId,
             date: correctedDateKey,
             reason: reason || null,
+            correctedBy: authUser?.id ?? null,
             correctedAt: new Date().toISOString(),
           }),
         );
@@ -5819,6 +5840,7 @@ function SchedulerContent({
       }
     },
     [
+      authUser?.id,
       buildEntryPayload,
       closeEditPanel,
       editPanel,
@@ -9625,6 +9647,7 @@ function SchedulerContent({
                   : null
               }
               pastDayNotice={pastDayNotice}
+              correctedLabel={editPanelCorrectedLabel}
               allowShiftEdits={canEditShifts && (!editPanelIsPast || canCorrectPanelDay)}
               canEditScheduleIndicators={canEditNotes && !editPanelIsPast}
               getActiveIndicatorIds={panelActiveIndicatorIds}

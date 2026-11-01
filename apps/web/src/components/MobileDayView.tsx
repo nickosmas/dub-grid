@@ -18,7 +18,12 @@ import {
   AbsenceType,
 } from "@/types";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
-import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import {
+  borderColor,
+  DRAFT_BORDER_COLORS,
+  FILLED_PILL_BORDER,
+  resolveShiftPillColors,
+} from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { attachedPillSeams, gapBefore, seamBorders, seamRadius } from "@/lib/attached-pill";
 import { useTheme } from "next-themes";
@@ -587,7 +592,10 @@ export default function MobileDayView({
                             const fs = pills.length > 1 ? 8 : 10;
                             const seams = pillSeams[pillIdx];
                             const pillBorder =
-                              getDraftBorderStyle(draftKind) ?? "1px solid var(--dg-color-border)";
+                              getDraftBorderStyle(draftKind) ??
+                              (pill.foreignInitials
+                                ? "1px solid var(--dg-color-border)"
+                                : FILLED_PILL_BORDER);
                             const codePill = (
                               <span
                                 key={`pill-${pill.label}-${pillIdx}`}
@@ -597,6 +605,7 @@ export default function MobileDayView({
                                   background: pill.foreignInitials
                                     ? "var(--dg-color-surface)"
                                     : pill.bg,
+                                  backgroundOrigin: "border-box",
                                   color: pill.text,
                                   borderRadius: pill.foreignInitials
                                     ? seamRadius(2, [...seams, "top"])

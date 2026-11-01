@@ -320,6 +320,13 @@ export function normalizePresetBg(bgHex: string | null | undefined): string {
   return parseHex(bgHex) ?? DEFAULT_PREDEFINED_COLOR_BG;
 }
 
+/**
+ * A filled pill needs no outline. The border stays, transparent, so a filled
+ * pill keeps the same size as an outlined one; stripes behind it need
+ * `background-origin: border-box` or they restart at the padding edge.
+ */
+export const FILLED_PILL_BORDER = "1px solid transparent";
+
 /** Returns the text color as a semi-transparent rgba for use as a border. */
 export function borderColor(textHex: string, opacity = 0.35): string {
   const { r, g, b } = hexToRgb(textHex);

@@ -17,7 +17,7 @@ import {
 import { MaybeHint } from "@/components/ui/hint";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
-import { DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import {
   attachedPillSeams,
@@ -673,11 +673,12 @@ function ShiftPill({
         ...seamBorders(
           shift.borderKind
             ? `2px dashed ${DRAFT_BORDER_COLORS[shift.borderKind]}`
-            : `1px solid ${shift.border}`,
+            : FILLED_PILL_BORDER,
           shift.seams,
         ),
         ...gapBefore(index, shift.seams, "stacked", 4),
         background: shift.background,
+        backgroundOrigin: "border-box",
         color: shift.textColor,
         boxSizing: "border-box",
         // Wraps only between words: the cell is wide enough for ordinary

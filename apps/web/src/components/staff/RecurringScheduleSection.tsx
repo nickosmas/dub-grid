@@ -28,6 +28,7 @@ import {
   borderColor,
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
+  FILLED_PILL_BORDER,
   toDarkPillColors,
 } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
@@ -408,7 +409,6 @@ function RecurringShiftPill({
   const darkPill = isDarkTheme && !absenceFill ? toDarkPillColors(rawPillBackground) : null;
   const pillBackground = absenceFill?.background ?? darkPill?.bg ?? rawPillBackground;
   const pillText = absenceFill?.text ?? darkPill?.text ?? rawPillText;
-  const fallbackBorder = `1px solid ${absenceFill?.border ?? borderColor(pillText)}`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
@@ -431,7 +431,8 @@ function RecurringShiftPill({
         bottom: 4,
         left: 4,
         background: pillBackground,
-        border: isDirty ? `2px dashed ${pillText}` : fallbackBorder,
+        backgroundOrigin: "border-box",
+        border: isDirty ? `2px dashed ${pillText}` : FILLED_PILL_BORDER,
         borderRadius: "var(--dg-radius-md)",
         color: pillText,
         display: "flex",

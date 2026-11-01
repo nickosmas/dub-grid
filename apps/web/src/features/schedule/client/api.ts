@@ -708,6 +708,7 @@ export interface CellCorrection {
   empId: string;
   date: string;
   reason: string | null;
+  correctedBy: string | null;
   correctedAt: string;
 }
 
