@@ -2,9 +2,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Children,
   createContext,
+  isValidElement,
   useContext,
   useMemo,
   type ComponentProps,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import {
@@ -239,10 +241,37 @@ export function ProfilePanel({
   const insideSheet = useIsInsideSheet();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
+  // On iOS a panel holding fields is a grouped form: a white card of rows,
+  // each a label and its value, with separators only between them. Anything
+  // else in it, such as password hints, is a padded row of its own.
+  const rows = Children.toArray(children);
+  const isField = (child: ReactNode) => isValidElement(child) && child.type === ProfileTextInput;
+  if (IS_IOS_LIST && rows.some(isField)) {
+    return (
+      <View style={[styles.list, insideSheet ? styles.flatInSheet : null, style]}>
+        <View style={styles.listClip}>
+          <FormRowContext.Provider value>
+            {rows.map((row, index) => (
+              <View key={(row as ReactElement).key ?? index}>
+                {isField(row) ? row : <View style={styles.formExtraRow}>{row}</View>}
+                {index < rows.length - 1 ? <View style={styles.insetDivider} /> : null}
+              </View>
+            ))}
+          </FormRowContext.Provider>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.panel, insideSheet ? styles.flatInSheet : null, style]}>{children}</View>
   );
 }
+
+/** Set by a panel of fields, whose card and separators the rows sit in. */
+const FormRowContext = createContext(false);
+
+const OPTIONAL_SUFFIX = /\s*\(optional\)$/i;
 
 export function ProfileList({
   children,
@@ -377,11 +406,68 @@ export function ProfileTextInput({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
-  const nativeInputStyle = IS_IOS_LIST
-    ? styles.inputIos
-    : IS_ANDROID_LIST
-      ? styles.inputAndroid
-      : null;
+  const inFormRow = useContext(FormRowContext);
+  const insideSheet = useIsInsideSheet();
+  const nativeInputStyle = IS_ANDROID_LIST ? styles.inputAndroid : null;
+
+  if (IS_IOS_LIST) {
+    // A grouped-form row (owner, 2026-10-31): the field's name once, on the
+    // leading edge, and what was typed on the trailing edge, the way
+    // Settings lays out a form. A placeholder that only repeats the name is
+    // dropped; an optional field says so there instead. A multi-line field
+    // is a text area under its section's title, named by its placeholder.
+    const name = label.replace(OPTIONAL_SUFFIX, "");
+    const placeholder = resolvedInputProps.placeholder;
+    const repeatsName =
+      placeholder != null &&
+      placeholder.replace(OPTIONAL_SUFFIX, "").trim().toLowerCase() === name.toLowerCase();
+    const multiline = Boolean(resolvedInputProps.multiline);
+    const shownPlaceholder = multiline
+      ? (placeholder ?? name)
+      : placeholder && !repeatsName
+        ? placeholder
+        : OPTIONAL_SUFFIX.test(label)
+          ? "Optional"
+          : undefined;
+    const input = (
+      <TextInput
+        accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
+        {...resolvedInputProps}
+        inputAccessoryViewID={inputAccessoryViewID}
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
+        placeholder={shownPlaceholder}
+        placeholderTextColor={mobileColors.textSubtle}
+        selectionColor={mobileColors.brand}
+        style={[
+          styles.iosFieldInput,
+          multiline ? styles.iosFieldMultiline : styles.iosFieldValue,
+          textInputStyle,
+          inputStyle,
+        ]}
+      />
+    );
+    return (
+      <View style={containerStyle}>
+        <View style={inFormRow ? null : [styles.list, insideSheet ? styles.flatInSheet : null]}>
+          {multiline ? (
+            input
+          ) : (
+            <View style={styles.iosFieldRow}>
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.iosFieldLabel}>
+                {name}
+              </Text>
+              {input}
+              {trailingAccessory ? (
+                <View style={styles.inputAccessory}>{trailingAccessory}</View>
+              ) : null}
+            </View>
+          )}
+          {error ? <Text style={[styles.errorText, styles.iosFieldError]}>{error}</Text> : null}
+        </View>
+        {keyboardDoneAccessory}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.field, containerStyle]}>
@@ -391,8 +477,7 @@ export function ProfileTextInput({
           style={[
             styles.inputShell,
             nativeInputStyle,
-            focused &&
-              (IS_ANDROID_LIST ? styles.inputFocusedAndroid : !IS_IOS_LIST && styles.inputFocused),
+            focused && (IS_ANDROID_LIST ? styles.inputFocusedAndroid : styles.inputFocused),
             error && styles.inputError,
           ]}
         >
@@ -428,8 +513,7 @@ export function ProfileTextInput({
             styles.input,
             nativeInputStyle,
             resolvedInputProps.multiline && styles.inputMultiline,
-            focused &&
-              (IS_ANDROID_LIST ? styles.inputFocusedAndroid : !IS_IOS_LIST && styles.inputFocused),
+            focused && (IS_ANDROID_LIST ? styles.inputFocusedAndroid : styles.inputFocused),
             error && styles.inputError,
             textInputStyle,
             inputStyle,
@@ -490,7 +574,19 @@ export function ProfileChoiceGroup<TId extends string | number>({
 
   return (
     <View style={styles.choiceGroup}>
-      {label ? <Text style={[styles.fieldLabel, styles.choiceGroupLabel]}>{label}</Text> : null}
+      {label ? (
+        <Text
+          style={
+            IS_IOS_LIST
+              ? [styles.sectionTitle, styles.sectionTitleIos]
+              : IS_ANDROID_LIST
+                ? [styles.sectionTitle, styles.sectionTitleAndroid]
+                : [styles.fieldLabel, styles.choiceGroupLabel]
+          }
+        >
+          {label}
+        </Text>
+      ) : null}
       <View style={[styles.list, insideSheet ? styles.flatInSheet : null]}>
         <View style={styles.listClip}>
           {items.map((item, index) => {
@@ -528,9 +624,7 @@ export function ProfileChoiceGroup<TId extends string | number>({
                     {item.name}
                   </Text>
                 )}
-                {IS_IOS_LIST ? (
-                  <SelectionCheck selected={selected} />
-                ) : IS_ANDROID_LIST ? (
+                {IS_NATIVE_LIST ? (
                   selection === "single" ? (
                     <SelectionCheck selected={selected} />
                   ) : (
@@ -871,16 +965,16 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // own gap below the title stays at the section's `gap`.
       paddingTop: mobileSpace.sm,
     },
-    // iOS: a grouped list's header, small, uppercase and gray, over the rows'
-    // content.
+    // iOS: a grouped list's header at the system's increased prominence,
+    // the title of the group in the text colour rather than a small gray
+    // caption (owner, 2026-10-31: no text too small to read comfortably).
     sectionTitleIos: {
-      ...mobileText.meta,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
+      ...mobileTextWeighted("sectionTitle", "semibold"),
+      color: mobileColors.textPrimary,
     },
-    // Material 3: a list subheader, small and in the brand colour.
+    // Material 3: a list subheader in the brand colour.
     sectionTitleAndroid: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileTextWeighted("body", "semibold"),
       color: mobileColors.brand,
     },
     sectionDescription: {
@@ -966,7 +1060,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       minWidth: 0,
     },
     rowLabel: {
-      ...mobileText.caption,
+      ...(IS_NATIVE_LIST ? mobileText.meta : mobileText.caption),
       color: mobileColors.textSubtle,
     },
     rowValue: {
@@ -1028,14 +1122,44 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // iOS: a form field is text on the group's own surface, with a hairline
     // under it, not a box.
-    inputIos: {
-      backgroundColor: "transparent",
-      borderColor: "transparent",
-      borderBottomColor: mobileColors.borderSubtle,
-      borderRadius: 0,
-      borderWidth: 0,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: 0,
+    formExtraRow: {
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+    },
+    iosFieldRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+      minHeight: 52,
+      paddingHorizontal: 16,
+    },
+    iosFieldLabel: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      flexShrink: 0,
+      maxWidth: "50%",
+    },
+    iosFieldInput: {
+      ...mobileInputText("regular"),
+      fontSize: mobileText.body.fontSize,
+      color: mobileColors.textPrimary,
+    },
+    iosFieldValue: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: mobileSpace.md,
+      textAlign: "right",
+    },
+    iosFieldMultiline: {
+      lineHeight: mobileText.body.lineHeight,
+      minHeight: 96,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.md,
+      textAlignVertical: "top",
+    },
+    iosFieldError: {
+      paddingHorizontal: 16,
+      paddingBottom: mobileSpace.md,
     },
     // Material 3's outlined text field.
     inputAndroid: {

@@ -10,6 +10,7 @@ import {
 } from "@dubgrid/schedule-core";
 import { Button } from "../../../shared/components/Button";
 import { Text } from "../../../shared/components/Text";
+import { IS_IOS_LIST } from "../../../shared/lib/native-list";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -150,14 +151,70 @@ export function ReturnDateField({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [open, setOpen] = useState(initiallyOpen);
+  const shown = value ? formatReturnDate(value, { weekday: true }) : emptyLabel;
+  const accessibilityLabel = value ? `${label}, ${shown}` : `${label}, none`;
+
+  if (IS_IOS_LIST) {
+    // A grouped-list row as Calendar's event editor draws a date: the name on
+    // the leading edge, the day in a gray capsule on the trailing edge that
+    // turns the tint while its calendar is open under it, in the same card,
+    // and the hint as the group's footer (owner, 2026-10-31).
+    return (
+      <View style={styles.field}>
+        <View style={styles.iosCard}>
+          <Pressable
+            accessibilityLabel={accessibilityLabel}
+            accessibilityRole="button"
+            accessibilityState={{ disabled, expanded: open }}
+            disabled={disabled}
+            onPress={() => setOpen((current) => !current)}
+            style={styles.iosRow}
+          >
+            <Text style={styles.iosLabel}>{label}</Text>
+            <View style={styles.iosValuePill}>
+              <Text
+                fit="compact"
+                style={[
+                  styles.fieldValue,
+                  styles.iosValue,
+                  !value && styles.fieldPlaceholder,
+                  open && styles.iosValueOpen,
+                ]}
+              >
+                {shown}
+              </Text>
+            </View>
+          </Pressable>
+          {open ? (
+            <View style={styles.iosCalendar}>
+              <ReturnDateCalendar
+                maxDate={maxDate}
+                minDate={minDate}
+                onChange={(date) => onChange(date)}
+                value={value}
+              />
+              {value ? (
+                <Button
+                  compact
+                  disabled={disabled}
+                  label={emptyLabel}
+                  onPress={() => onChange(null)}
+                  tone="plain"
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+        {hint ? <Text style={[styles.hint, styles.iosHint]}>{hint}</Text> : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable
-        accessibilityLabel={
-          value ? `${label}, ${formatReturnDate(value, { weekday: true })}` : `${label}, none`
-        }
+        accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
@@ -166,7 +223,7 @@ export function ReturnDateField({
       >
         <Ionicons color={mobileColors.textSubtle} name="calendar-outline" size={18} />
         <Text fit="compact" style={[styles.fieldValue, !value && styles.fieldPlaceholder]}>
-          {value ? formatReturnDate(value, { weekday: true }) : emptyLabel}
+          {shown}
         </Text>
         <Ionicons
           color={mobileColors.textSubtle}
@@ -286,6 +343,48 @@ function createStyles(mobileColors: MobileColors) {
     hint: {
       ...mobileTextWeighted("caption", "regular"),
       color: mobileColors.textSubtle,
+    },
+    iosCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      overflow: "hidden",
+    },
+    iosRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.md,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      paddingVertical: mobileSpace.sm,
+    },
+    iosLabel: {
+      ...mobileTextWeighted("body", "regular"),
+      flex: 1,
+      color: mobileColors.textPrimary,
+    },
+    iosValuePill: {
+      backgroundColor: mobileColors.controlNeutralBg,
+      borderRadius: mobileRadii.control,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.xs,
+    },
+    iosValue: {
+      flex: 0,
+    },
+    iosValueOpen: {
+      color: mobileColors.brand,
+    },
+    iosCalendar: {
+      borderTopColor: mobileColors.borderSubtle,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      marginLeft: 16,
+      paddingRight: 16,
+      paddingVertical: mobileSpace.sm,
+    },
+    // The group's footer: inset to the rows' text, at the system's footnote size.
+    iosHint: {
+      ...mobileTextWeighted("meta", "regular"),
+      paddingHorizontal: 16,
     },
   });
 }

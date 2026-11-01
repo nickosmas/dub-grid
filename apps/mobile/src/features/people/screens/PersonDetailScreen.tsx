@@ -1942,19 +1942,12 @@ export default function PersonDetailScreen() {
           </>
         }
       >
-        {showChoices || hasStatusTopFields ? (
+        {/* Where they stand is on the page behind the sheet, so the sheet
+            starts at what can change (owner, 2026-10-31). */}
+        {hasStatusTopFields ? (
           <View
             style={showChoices ? [styles.statusTop, styles.statusTopDivided] : styles.statusTop}
           >
-            {/* A confirmation names its change in the title, so it skips where they stand. */}
-            {showChoices ? (
-              <StatusCards
-                absenceTypes={absenceTypes}
-                canOffboard={reach.canOffboard}
-                person={person}
-                plain
-              />
-            ) : null}
             {isAway && !statusChoice ? (
               <>
                 <ReturnDateField
@@ -2079,7 +2072,6 @@ export default function PersonDetailScreen() {
                 />
               ),
             }))}
-            label="Change to"
             selection="single"
             selectedIds={statusChoice ? [statusChoice] : []}
             onToggle={(id) => {
@@ -2099,8 +2091,8 @@ export default function PersonDetailScreen() {
             label="Reason"
             placeholder={
               statusChoice === "archive"
-                ? "Reason (optional) - e.g. Left the company"
-                : "Reason (optional) - e.g. Family leave"
+                ? "Optional, e.g. Left the company"
+                : "Optional, e.g. Family leave"
             }
             value={inactiveNote}
             onChangeText={setInactiveNote}
@@ -2461,7 +2453,7 @@ function EditPanel({
         </ProfilePanel>
       </ProfileSection>
 
-      <ProfileSection title="Staffing">
+      <ProfileSection>
         <ProfileChoiceGroup
           items={[
             { id: 0, name: "Full-time" },
@@ -2487,7 +2479,7 @@ function EditPanel({
         />
       </ProfileSection>
 
-      <ProfileSection title="Assignments">
+      <ProfileSection>
         {/* Raised once for the whole section rather than under the chips that
             produced it. Only management users can come off the schedule at
             all - for anyone else an empty set is the group's own validation

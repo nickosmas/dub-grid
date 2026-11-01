@@ -8,6 +8,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({ default: () => null }));
 vi.mock("../../../shared/components/BottomSheetModal", async () => {
   const React = await import("react");
   return {
+    useIsInsideSheet: () => true,
     BottomSheetModal: ({
       children,
       footer,

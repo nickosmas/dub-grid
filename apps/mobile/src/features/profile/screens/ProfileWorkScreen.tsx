@@ -874,7 +874,7 @@ function EditPanel({
 
       {hasLinkedEmployee && canEditProfileDirectly ? (
         <>
-          <ProfileSection title="Staffing">
+          <ProfileSection>
             <ProfileChoiceGroup
               items={[
                 { id: 0, name: "Full-time" },
@@ -900,7 +900,7 @@ function EditPanel({
             />
           </ProfileSection>
 
-          <ProfileSection title="Assignments">
+          <ProfileSection>
             <SectionNotice messages={assignmentNotices} />
             <ProfileChoiceGroup
               error={fieldErrors.focusAreaIds}
