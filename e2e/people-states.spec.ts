@@ -166,7 +166,7 @@ test.describe("person detail states", () => {
     // (has an account yet, already management, already on schedule) - try
     // each of StaffDetailPage.tsx's conditional actions and use whichever
     // one this seeded employee actually shows.
-    const candidates = ["Send invitation", "Add to management", "Add to schedule"];
+    const candidates = ["Send invitation", "Add to an administrative team", "Add to schedule"];
     let opened = false;
     for (const label of candidates) {
       const button = page.getByRole("button", { name: label });
