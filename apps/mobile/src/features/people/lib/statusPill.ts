@@ -4,7 +4,6 @@ import {
   mobilePillOverflow,
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -59,7 +58,6 @@ export function getMobileStatusPill(
     },
     textStyle: {
       ...mobileTextWeighted("meta", "bold"),
-      ...mobileTabularText,
       ...mobilePillOverflow.displayText,
       color: tone.text,
     },

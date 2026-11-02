@@ -24,7 +24,6 @@ import {
   mobileListRow,
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -311,7 +310,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     time: {
       ...mobileText.meta,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     message: {

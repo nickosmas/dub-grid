@@ -16,7 +16,6 @@ import {
   MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -326,7 +325,6 @@ function createStyles(colors: MobileColors) {
     },
     heading: {
       ...mobileText.micro,
-      ...mobileTabularText,
       color: colors.textMuted,
       letterSpacing: 0.8,
     },
@@ -354,7 +352,6 @@ function createStyles(colors: MobileColors) {
     },
     itemDetail: {
       ...mobileText.body,
-      ...mobileTabularText,
       color: colors.textSecondary,
     },
     changed: {
@@ -364,7 +361,6 @@ function createStyles(colors: MobileColors) {
     unchanged: {},
     breakLine: {
       ...mobileText.caption,
-      ...mobileTabularText,
       color: colors.textMuted,
     },
     noShift: {
@@ -423,7 +419,6 @@ function createStyles(colors: MobileColors) {
     },
     barScaleText: {
       ...mobileText.micro,
-      ...mobileTabularText,
       color: colors.textMuted,
     },
     button: {

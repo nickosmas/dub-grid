@@ -12,7 +12,6 @@ import {
   MAX_FONT_SCALE,
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -199,7 +198,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     coverageFigure: {
       ...mobileText.display,
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     coverageLabel: {
@@ -245,7 +243,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     statValue: {
       ...mobileText.title,
-      ...mobileTabularText,
     },
     statLabel: {
       ...mobileText.meta,

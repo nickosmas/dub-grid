@@ -19,7 +19,6 @@ import {
   mobileListRow,
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -122,7 +121,7 @@ function WeekRow({ days, styles }: { days: CoverageDay[]; styles: Styles }) {
         {dayLetter(day.dateKey)}
       </Text>
       <View style={[styles.dayDot, { backgroundColor: dayColor(mobileColors, day.status) }]} />
-      <Text fit="fixed" style={[styles.dayCount, mobileTabularText]}>
+      <Text fit="fixed" style={styles.dayCount}>
         {day.status === "none" ? "-" : `${day.filledCount}/${day.requiredCount}`}
       </Text>
     </View>

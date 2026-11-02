@@ -6,7 +6,6 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   mobileTypography,
@@ -214,7 +213,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailTimeValue: {
       ...mobileText.rowTitle,
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     previousShiftSheetDetails: {
@@ -274,7 +272,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     detailDateDay: {
       ...mobileText.heroMetric,
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     detailFootnote: {
@@ -379,7 +376,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     shiftmateSegmentTime: {
       flexShrink: 0,
       ...mobileTextWeighted("meta", "semibold"),
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     shiftmateRow: {
@@ -500,7 +496,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     swapSummaryDate: {
       ...mobileTextWeighted("meta", "medium"),
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     swapSummaryNote: {
@@ -691,7 +686,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     swapDateChipDay: {
       ...mobileTextWeighted("title", "bold"),
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     swapDateChipTextActive: {
@@ -705,7 +699,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
     },
     swapDateCountText: {
       ...mobileText.micro,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     swapDateCountTextActive: {

@@ -464,10 +464,6 @@ export const MAX_TEXT_SIZE = 32;
 
 export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;
 
-export const mobileTabularText = {
-  fontVariant: ["tabular-nums"],
-} satisfies TextStyle;
-
 export const mobilePillOverflow = {
   displayContainer: {
     maxWidth: "100%",

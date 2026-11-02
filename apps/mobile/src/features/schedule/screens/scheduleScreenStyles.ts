@@ -9,7 +9,6 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpacing,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -108,7 +107,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meWeekNavigatorRangeLabel: {
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
     meWeekNavigatorRangeRow: {
@@ -216,7 +214,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDateDay: {
       ...mobileText.heroMetric,
-      ...mobileTabularText,
       color: mobileColors.textInverse,
     },
     meHeroTitle: {
@@ -318,7 +315,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroTimeText: {
       ...mobileText.sectionTitle,
-      ...mobileTabularText,
       color: mobileColors.textInverse,
       flexShrink: 1,
     },
@@ -427,7 +423,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // grouped list puts a count beside its header.
     upcomingHoursText: {
       ...mobileText.body,
-      ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
     upcomingShiftsCard: {
@@ -560,7 +555,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // secondary to the shift name, not competing with it for attention.
     upcomingShiftTimeText: {
       ...mobileText.meta,
-      ...mobileTabularText,
       color: mobileColors.textSubtle,
     },
     meSectionHeader: {
@@ -587,7 +581,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     scheduleRowDate: {
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     scheduleRowTitle: {
@@ -620,7 +613,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     scheduleRowTimeText: {
       ...mobileText.body,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     // A horizontal ScrollView clips to its bounds, so the card shadow needs
@@ -737,7 +729,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     requestDateText: {
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     // A tinted fill with no outline, as the platforms draw a status capsule.
@@ -956,7 +947,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dateHighlightText: {
       ...mobileTextWeighted("rowTitle", "bold"),
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     dateHighlightTextSelected: {
@@ -1004,7 +994,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     shiftGroupTime: {
       flexShrink: 0,
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.textSubtle,
       textAlign: "right",
     },
@@ -1081,7 +1070,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     teamMemberTime: {
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.textSubtle,
     },
     teamMemberSplitBadgeRow: {
