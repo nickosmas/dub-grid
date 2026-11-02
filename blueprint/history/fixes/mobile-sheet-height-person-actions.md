@@ -31,6 +31,13 @@
   opens Edit with the keyboard on that field (`ProfileInfoRow` takes an
   `onPress`). The inline entry field and its one-field save are gone.
 - `ProfileActionGroup` always draws full-width buttons, as Profile does.
+- Home and Schedule could open with their content under the header on a slow
+  first load (seen once on the simulator, shifted by exactly the header's
+  176pt). The one settle scroll ran before the header inset landed and was
+  clamped to 0. Until the page is touched, `Screen` now settles again 150ms
+  and 500ms later, when the content size changes, and when a scroll leaves
+  the top. Only these two screens use the sticky header, and neither moves
+  the page by itself.
 
 ## Checks
 
@@ -40,4 +47,6 @@
 - On the iOS 26.5 Simulator: Coverage's filter sheet shows its whole list,
   People's long filter opens full height, the person page's Contact rows
   match, and the admin team button matches Profile's buttons.
-- Not checked: an Android emulator or a physical phone.
+- Not checked: an Android emulator or a physical phone. The header bug did
+  not happen again in four cold launches, with or without the change, so the
+  fix is not proven against it; logs showed each launch settling at -176.
