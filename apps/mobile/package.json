@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@dubgrid/api-client": "*",
+    "@dubgrid/authz": "*",
     "@dubgrid/client-errors": "*",
     "@dubgrid/contracts": "*",
     "@dubgrid/design-tokens": "*",

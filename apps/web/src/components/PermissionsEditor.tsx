@@ -9,41 +9,29 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import ChangeReviewModal, { type ReviewChange } from "@/components/review/ChangeReviewModal";
-import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "@/features/permissions";
+import {
+  CONFIGURABLE_PERMISSION_KEYS as CONFIGURABLE_KEYS,
+  DEFAULT_PERMISSION_LABELS as DEFAULT_LABELS,
+  PERMISSION_CATEGORY_LABELS as CATEGORY_LABELS,
+  PERMISSION_CATEGORY_ORDER as CATEGORY_ORDER,
+  PERMISSION_MODULES,
+  buildInitialPermissions,
+  countPermissionLevels,
+  describePermissionModule as describeModule,
+  editCellState,
+  impliedViewNote as impliedNote,
+  togglePermissionModule,
+  viewCellState,
+  type PermissionCellState as CellState,
+  type PermissionEditorLabels,
+  type PermissionModule,
+} from "@dubgrid/authz";
 import type { AdminPermissions } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { Switch } from "@/components/ui/switch";
 
-type PermissionKey = keyof AdminPermissions;
-
-type Category = "CORE" | "ADMINISTRATION";
-
-/** Org-customizable terms the row descriptions mention. */
-export interface PermissionEditorLabels {
-  focusAreaLabel: string;
-  certificationLabel: string;
-  roleLabel: string;
-}
-
-export interface PermissionModule {
-  id: string;
-  title: string;
-  description: string | ((labels: PermissionEditorLabels) => string);
-  icon: keyof typeof MODULE_ICONS;
-  category: Category;
-  viewKeys: PermissionKey[];
-  editKeys: PermissionKey[];
-  alwaysOnView?: boolean;
-  /**
-   * Keys owned by other rows that grant this row's view level on the server.
-   * The row has no view key of its own, so the cell reports whether any of
-   * these is on instead of showing a switch.
-   */
-  viewIncludedWith?: PermissionKey[];
-  /** A dependency the switches cannot express, shown under the description. */
-  note?: string;
-}
+export type { PermissionEditorLabels, PermissionModule } from "@dubgrid/authz";
 
 export interface PermissionReviewConfig {
   title: string;
@@ -51,201 +39,6 @@ export interface PermissionReviewConfig {
   changes: ReviewChange[];
   confirmLabel?: string;
   warningText?: string;
-}
-
-const CATEGORY_LABELS: Record<Category, string> = {
-  CORE: "Scheduling and staff",
-  ADMINISTRATION: "Administration",
-};
-
-const CATEGORY_ORDER: Category[] = ["CORE", "ADMINISTRATION"];
-
-const DEFAULT_LABELS: PermissionEditorLabels = {
-  focusAreaLabel: "Focus Areas",
-  certificationLabel: "Certifications",
-  roleLabel: "Roles",
-};
-
-function inSentence(label: string): string {
-  return label.toLowerCase();
-}
-
-export const PERMISSION_MODULES: PermissionModule[] = [
-  {
-    id: "schedule",
-    title: "Schedule",
-    description: "Edit shifts and schedule notes on the organization-wide schedule.",
-    icon: "calendar",
-    category: "CORE",
-    viewKeys: [],
-    editKeys: ["canEditShifts", "canEditNotes"],
-    alwaysOnView: true,
-  },
-  {
-    id: "publish",
-    title: "Publish schedule",
-    description: "Make draft schedule changes live for staff.",
-    icon: "send",
-    category: "CORE",
-    viewKeys: [],
-    editKeys: ["canPublishSchedule"],
-  },
-  {
-    id: "recurring-shifts",
-    title: "Recurring shifts",
-    description: "Manage recurring shift templates and series, and apply them to date ranges.",
-    icon: "repeat",
-    category: "CORE",
-    viewKeys: ["canViewRecurringShifts"],
-    editKeys: ["canManageRecurringShifts", "canApplyRecurringSchedule", "canManageShiftSeries"],
-    note: "Applying to the grid and creating series also need Schedule: Edit.",
-  },
-  {
-    id: "staff",
-    title: "Staff",
-    description: (labels) =>
-      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add and invite people, change their status, and set their access role.`,
-    icon: "users",
-    category: "CORE",
-    viewKeys: ["canViewEmployeeDetails"],
-    editKeys: ["canManageEmployees"],
-  },
-  {
-    id: "shift-requests",
-    title: "Shift requests",
-    description: "Approve or reject pickup, swap, and call-off requests.",
-    icon: "checkCircle",
-    category: "CORE",
-    viewKeys: [],
-    editKeys: ["canApproveShiftRequests"],
-    viewIncludedWith: ["canApproveShiftRequests", "canManageEmployees", "canEditShifts"],
-    note: "Seeing everyone's requests comes with Approve, Staff: Edit, or Schedule: Edit.",
-  },
-  {
-    id: "coverage",
-    title: "Coverage",
-    description: "Set staffing minimums and coverage targets.",
-    icon: "barChart",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewCoverageRequirements"],
-    editKeys: ["canManageCoverageRequirements"],
-  },
-  {
-    id: "departments-labels",
-    title: "Departments & labels",
-    description: (labels) =>
-      `Manage departments and ${inSentence(labels.focusAreaLabel)}, plus the ${inSentence(labels.roleLabel)}, ${inSentence(labels.certificationLabel)}, and terminology labels.`,
-    icon: "tag",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewFocusAreas", "canViewOrgLabels"],
-    editKeys: ["canManageFocusAreas", "canManageOrgLabels"],
-  },
-  {
-    id: "scheduling-config",
-    title: "Shifts, jobs & schedule notes",
-    description: "Manage shift codes, jobs, absence types, and schedule note types.",
-    icon: "settings",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewScheduleDefinitions", "canViewIndicatorTypes"],
-    editKeys: ["canManageScheduleDefinitions", "canManageIndicatorTypes"],
-  },
-  {
-    id: "dashboard",
-    title: "Dashboard",
-    description: "View analytics and statistics.",
-    icon: "pieChart",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewDashboardAnalytics"],
-    editKeys: [],
-  },
-  {
-    id: "reports",
-    title: "Reports",
-    description: "View staff hours, staff activity, and shift category reports, and export them.",
-    icon: "fileText",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewReports"],
-    editKeys: [],
-  },
-];
-
-const ALWAYS_ON_KEYS = new Set<PermissionKey>(["canViewSchedule", "canViewStaff"]);
-
-/** Never delegatable: authz forces these off for admins whatever is stored. */
-const SUPER_ADMIN_ONLY_KEYS = new Set<PermissionKey>(["canManageOrgSettings"]);
-
-const CONFIGURABLE_KEYS: PermissionKey[] = PERMISSION_MODULES.flatMap((m) => [
-  ...m.viewKeys,
-  ...m.editKeys,
-]).filter((k) => !ALWAYS_ON_KEYS.has(k) && !SUPER_ADMIN_ONLY_KEYS.has(k));
-
-function buildInitialPermissions(
-  initialPermissions: AdminPermissions | null | undefined,
-): AdminPermissions {
-  // Same base the resolver uses, so a key the stored set never mentions shows
-  // the access the admin actually has; starting from all-off would have a save
-  // of any other switch silently revoke it.
-  const initial: AdminPermissions = {
-    ...ADMIN_DEFAULT_PERMS,
-    ...(initialPermissions ?? {}),
-    canViewSchedule: true,
-    canViewStaff: true,
-  };
-  for (const key of SUPER_ADMIN_ONLY_KEYS) {
-    initial[key] = false;
-  }
-  return initial;
-}
-
-function describeModule(mod: PermissionModule, labels: PermissionEditorLabels): string {
-  return typeof mod.description === "function" ? mod.description(labels) : mod.description;
-}
-
-function isOn(perms: AdminPermissions, keys: PermissionKey[]): boolean {
-  return keys.length > 0 && keys.every((k) => perms[k] === true);
-}
-
-/** Rows whose edit level is on and grants the given view key on the server. */
-function modulesImplying(viewKey: PermissionKey, perms: AdminPermissions): PermissionModule[] {
-  const sources = VIEW_IMPLICATIONS[viewKey] ?? [];
-  return PERMISSION_MODULES.filter((m) =>
-    m.editKeys.some((k) => sources.includes(k) && perms[k] === true),
-  );
-}
-
-type CellState =
-  { kind: "switch"; on: boolean } | { kind: "text"; label: string } | { kind: "empty" };
-
-function viewCellState(mod: PermissionModule, perms: AdminPermissions): CellState {
-  if (mod.alwaysOnView) return { kind: "text", label: "Always on" };
-  if (mod.viewKeys.length > 0) {
-    const implied = mod.viewKeys.every((vk) => modulesImplying(vk, perms).length > 0);
-    if (implied) return { kind: "text", label: "Included" };
-    return { kind: "switch", on: isOn(perms, mod.viewKeys) };
-  }
-  if (mod.viewIncludedWith) {
-    const on = mod.viewIncludedWith.some((k) => perms[k] === true);
-    return { kind: "text", label: on ? "Included" : "Off" };
-  }
-  return { kind: "empty" };
-}
-
-function editCellState(mod: PermissionModule, perms: AdminPermissions): CellState {
-  if (mod.editKeys.length > 0) return { kind: "switch", on: isOn(perms, mod.editKeys) };
-  if (mod.viewKeys.length > 0) return { kind: "text", label: "Read only" };
-  return { kind: "empty" };
-}
-
-function impliedNote(mod: PermissionModule, perms: AdminPermissions): string | null {
-  if (mod.viewKeys.length === 0) return null;
-  const sources = new Map<string, PermissionModule>();
-  for (const vk of mod.viewKeys) {
-    for (const source of modulesImplying(vk, perms)) sources.set(source.id, source);
-  }
-  if (sources.size === 0) return null;
-  if (sources.size === 1 && sources.has(mod.id)) return "Included with Edit.";
-  const titles = [...sources.values()].filter((m) => m.id !== mod.id).map((m) => m.title);
-  return `Included with ${titles.join(", ")}.`;
 }
 
 const iconProps = {
@@ -470,21 +263,9 @@ export default function PermissionsEditor({
     setPerms(initialPerms);
   }, [initialPerms]);
 
-  // Edit implies view within a row, so turning Edit on brings View with it;
-  // while Edit is on the View cell reads "Included" and cannot be switched off.
-  // Cross-row implications (Dashboard) are left to the resolver rather than
-  // written into the stored set.
+  // While Edit is on the View cell reads "Included" and cannot be switched off.
   function toggleModule(mod: PermissionModule, direction: "view" | "edit") {
-    setPerms((prev) => {
-      const keys = direction === "view" ? mod.viewKeys : mod.editKeys;
-      const next = { ...prev };
-      const newVal = !isOn(prev, keys);
-      for (const key of keys) next[key] = newVal;
-      if (direction === "edit" && newVal) {
-        for (const key of mod.viewKeys) next[key] = true;
-      }
-      return next;
-    });
+    setPerms((prev) => togglePermissionModule(prev, mod, direction));
   }
 
   const hasChanges = CONFIGURABLE_KEYS.some((key) => perms[key] !== initialPerms[key]);
@@ -535,23 +316,7 @@ export default function PermissionsEditor({
     setReviewConfig(nextReview);
   }
 
-  // Counts what the screen shows (one access role per switch) rather than
-  // the stored keys behind it, which is what the old counter did.
-  const levelCount = PERMISSION_MODULES.reduce(
-    (acc, mod) => {
-      for (const state of [viewCellState(mod, perms), editCellState(mod, perms)]) {
-        if (state.kind === "switch") {
-          acc.total += 1;
-          if (state.on) acc.enabled += 1;
-        } else if (state.kind === "text" && (state.label === "Included" || state.label === "Off")) {
-          acc.total += 1;
-          if (state.label === "Included") acc.enabled += 1;
-        }
-      }
-      return acc;
-    },
-    { enabled: 0, total: 0 },
-  );
+  const levelCount = countPermissionLevels(perms);
 
   const groupedModules = CATEGORY_ORDER.map((cat) => ({
     category: cat,
