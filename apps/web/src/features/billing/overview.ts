@@ -132,7 +132,7 @@ export function describeSeatGap(seatsInUse: number, paidSeats: number | null): s
   if (paidSeats == null) return null;
   const gap = seatsInUse - paidSeats;
   const sync =
-    "DubGrid Support updates your paid seats to match the seats in use, and the change is prorated on your next invoice.";
+    "We update your paid seats to match the seats in use, and the change is prorated on your next invoice.";
   if (gap > 0) {
     return `${gap === 1 ? "1 seat in use isn't" : `${gap} seats in use aren't`} paid for yet. ${sync}`;
   }
@@ -789,14 +789,12 @@ function paused(summary: Summary, now: Date): Partial<BillingOverview> {
       : "";
   return {
     title: "Billing for your organization is paused.",
-    lead: "If you have questions about the pause, contact DubGrid Support.",
+    lead: "If you have questions about the pause, contact us.",
     banner: {
       tone: "info",
       icon: "paused",
       message: `${
-        pausedAt
-          ? `DubGrid Support paused billing on ${formatLongDate(pausedAt)}.`
-          : "DubGrid Support paused billing."
+        pausedAt ? `We paused billing on ${formatLongDate(pausedAt)}.` : "We paused billing."
       } Your organization stays open, and you won't be charged while billing is paused.${trialNote}`,
     },
     visual: { kind: "icon", icon: "paused", caption: "Billing paused", tone: "info" },
@@ -815,7 +813,7 @@ function paused(summary: Summary, now: Date): Partial<BillingOverview> {
       {
         key: "resumes",
         label: "Billing resumes",
-        when: "When DubGrid Support resumes it",
+        when: "When we resume it",
         state: "upcoming",
       },
     ],
@@ -850,7 +848,7 @@ function paused(summary: Summary, now: Date): Partial<BillingOverview> {
 function suspended(summary: Summary): Partial<BillingOverview> {
   return {
     title: "Your organization is suspended.",
-    lead: "Contact DubGrid Support to find out why and what happens next.",
+    lead: "Contact us to find out why and what happens next.",
     visual: { kind: "icon", icon: "suspended", caption: "Organization suspended", tone: "danger" },
     timeline: [],
     stats: compact([

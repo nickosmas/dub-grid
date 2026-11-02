@@ -28,7 +28,7 @@ export function getGateMessage(state: OrganizationAccessState | undefined): stri
     case "locked":
       return "This organization is on hold until an administrator sorts out its billing.";
     case "suspended":
-      return "This organization was suspended by DubGrid staff. Your administrator can tell you more.";
+      return "We've suspended this organization. Your administrator can tell you more.";
     case "archived":
       return "This organization is no longer available. Sign out to use a different account.";
     default:

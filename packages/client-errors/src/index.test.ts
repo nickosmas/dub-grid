@@ -66,9 +66,7 @@ describe("formatClientErrorMessage", () => {
         ),
         "fallback",
       ),
-    ).toBe(
-      "DubGrid Support closed this account, so it can't be added. Contact them if it should be reopened.",
-    );
+    ).toBe("We closed this account, so it can't be added. Contact us if it should be reopened.");
   });
 
   it("passes through a plain, non-technical raw message", () => {

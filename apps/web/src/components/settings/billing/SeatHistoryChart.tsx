@@ -391,8 +391,8 @@ export function SeatHistoryChart({ history }: { history: SeatHistoryMonth[] }) {
                   lineHeight: 1.5,
                 }}
               >
-                {caption} Paid seats follow them when DubGrid Support updates your subscription, so
-                the two can differ for a while after someone joins or leaves.
+                {caption} Paid seats follow them when we update your subscription, so the two can
+                differ for a while after someone joins or leaves.
               </p>
             )}
             {asTable ? (

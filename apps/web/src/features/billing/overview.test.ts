@@ -43,7 +43,7 @@ function summary(overrides: Partial<OrganizationBillingSummary>): Summary {
 describe("describeSeatGap", () => {
   it("says what the difference between seats in use and paid seats means", () => {
     expect(describeSeatGap(32, 30)).toBe(
-      "2 seats in use aren't paid for yet. DubGrid Support updates your paid seats to match the seats in use, and the change is prorated on your next invoice.",
+      "2 seats in use aren't paid for yet. We update your paid seats to match the seats in use, and the change is prorated on your next invoice.",
     );
     expect(describeSeatGap(29, 30)).toMatch(/^You're paying for 1 seat that nobody is using\./);
     expect(describeSeatGap(30, 30)).toBe(
@@ -220,7 +220,7 @@ describe("describeBillingOverview", () => {
     );
     expect(overview.action).toBeNull();
     expect(overview.banner?.message).toBe(
-      `DubGrid Support paused billing on ${formatLongDate(at(9, 20))}. Your organization stays open, and you won't be charged while billing is paused.`,
+      `We paused billing on ${formatLongDate(at(9, 20))}. Your organization stays open, and you won't be charged while billing is paused.`,
     );
     expect(overview.stats.find((stat) => stat.key === "paused-for")?.value).toBe("7 days");
   });

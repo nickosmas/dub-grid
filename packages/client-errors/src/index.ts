@@ -133,8 +133,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     // Raised by the database guards in migration 021 whenever an organization
     // tries to invite, reactivate, or re-add a platform-terminated account.
     pattern: /ACCOUNT_TERMINATED/,
-    message:
-      "DubGrid Support closed this account, so it can't be added. Contact them if it should be reopened.",
+    message: "We closed this account, so it can't be added. Contact us if it should be reopened.",
   },
   {
     pattern: /unauthorized|forbidden|not authorized|permission denied/i,
