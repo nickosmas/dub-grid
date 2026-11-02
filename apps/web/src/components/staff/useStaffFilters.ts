@@ -10,7 +10,7 @@ export type SortKey = "seniority" | "name" | "access";
 export const STAFF_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "seniority", label: "Sort: Seniority" },
   { value: "name", label: "Sort: Name" },
-  { value: "access", label: "Sort: Access level" },
+  { value: "access", label: "Sort: Access role" },
 ];
 export type EmploymentTypeFilter = "all" | Employee["employmentType"];
 export type AccountLinkFilter = "all" | "linked" | "unlinked";

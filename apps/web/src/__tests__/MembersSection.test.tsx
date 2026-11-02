@@ -927,7 +927,7 @@ describe("MembersSection — management roster filters", () => {
 
     await user.click(screen.getByRole("button", { name: /Filter/i }));
     expect(screen.getByText("Employment")).toBeInTheDocument();
-    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+    expect(screen.queryByText("Access role")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Done" }));
 
     await showManagementView(user);
@@ -938,10 +938,10 @@ describe("MembersSection — management roster filters", () => {
     expect(screen.getByText("Invitation")).toBeInTheDocument();
     expect(screen.getByText("Sort by")).toBeInTheDocument();
     // Twice: the section of access-level filters, and the sort by it.
-    expect(screen.getAllByText("Access level")).toHaveLength(2);
+    expect(screen.getAllByText("Access role")).toHaveLength(2);
   });
 
-  it("filters the roster by access level", async () => {
+  it("filters the roster by access role", async () => {
     const user = userEvent.setup();
     mockDirectory = [
       makePerson({ personId: "person-1", firstName: "Jamie", lastName: "Rivera" }),
@@ -1014,7 +1014,7 @@ describe("MembersSection — management roster filters", () => {
     await waitFor(() => expect(saved()?.ids).toEqual(["emp-c"]));
   });
 
-  it("sorts the roster alphabetically, and by access level on request", async () => {
+  it("sorts the roster alphabetically, and by access role on request", async () => {
     const user = userEvent.setup();
     // Zoe outranks Alex, so the two sorts disagree and the order is a real
     // signal rather than alphabetical order twice.
@@ -1043,7 +1043,7 @@ describe("MembersSection — management roster filters", () => {
     expect(namesInOrder()).toEqual(["Alex Brooks", "Zoe Adams"]);
 
     await user.click(screen.getByRole("button", { name: /Filter/i }));
-    await user.click(screen.getByRole("button", { name: "Access level" }));
+    await user.click(screen.getByRole("button", { name: "Access role" }));
 
     expect(namesInOrder()).toEqual(["Zoe Adams", "Alex Brooks"]);
   });

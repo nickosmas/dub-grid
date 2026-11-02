@@ -265,7 +265,7 @@ describe("AddPersonSheet", () => {
     });
   });
 
-  it("invites with the access level picked", async () => {
+  it("invites with the access role picked", async () => {
     createMobilePerson.mockResolvedValue({ success: true, person: { id: "emp-1" } });
     createMobilePersonInvitation.mockResolvedValue({});
     renderWithMutation();

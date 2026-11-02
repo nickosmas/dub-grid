@@ -375,7 +375,7 @@ describe("StaffDetailPage", () => {
     it("hides them from a caller who does not manage employees", async () => {
       renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: false });
 
-      await screen.findByText("Access level");
+      await screen.findByText("Access role");
       expect(screen.queryByText("Manages")).not.toBeInTheDocument();
     });
   });

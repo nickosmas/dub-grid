@@ -25,7 +25,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     render(<MemberAccessControls orgRole="user" onRoleChange={onRoleChange} />);
     await user.click(screen.getByRole("button", { name: "User" }));
     await user.click(await screen.findByRole("option", { name: "Admin" }));
-    await user.click(await screen.findByRole("button", { name: "Change access level" }));
+    await user.click(await screen.findByRole("button", { name: "Change access role" }));
   }
 
   it("changes no role and reports no success when step-up is cancelled before the action", async () => {
@@ -34,7 +34,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     await confirmRoleChange(onRoleChange);
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("button", { name: "Change access role" })).not.toBeInTheDocument(),
     );
     expect(stepUpRun).toHaveBeenCalledTimes(1);
     expect(onRoleChange).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     await confirmRoleChange(onRoleChange);
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("button", { name: "Change access role" })).not.toBeInTheDocument(),
     );
     expect(onRoleChange).toHaveBeenCalledTimes(1);
     expect(onRoleChange).toHaveBeenCalledWith("admin", "stale-token");

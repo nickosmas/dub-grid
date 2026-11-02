@@ -52,7 +52,7 @@ export function ManagementFilterPopover({
       onClearAll={onClearAll}
       onClose={onClose}
     >
-      <FilterSection title="Access level">
+      <FilterSection title="Access role">
         <FilterChip active={filterRole === "all"} onClick={() => onFilterRoleChange("all")}>
           All
         </FilterChip>
@@ -93,7 +93,7 @@ export function ManagementFilterPopover({
           Alphabetical
         </FilterChip>
         <FilterChip active={sortKey === "access"} onClick={() => onSortKeyChange("access")}>
-          Access level
+          Access role
         </FilterChip>
       </FilterSection>
     </FilterPanelShell>

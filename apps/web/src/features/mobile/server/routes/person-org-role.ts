@@ -142,7 +142,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // ── No account yet: the role lives on the invitation ──
   if (!loaded.pendingInvitation) {
     return NextResponse.json(
-      { error: "Send an invitation before changing their access level." },
+      { error: "Send an invitation before changing their access role." },
       { status: 400 },
     );
   }

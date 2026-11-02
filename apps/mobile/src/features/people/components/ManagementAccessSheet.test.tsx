@@ -144,22 +144,22 @@ describe("ManagementAccessSheet", () => {
 
   // Role changes belong to the access badge on the profile. This sheet asks
   // for a role only when nothing exists yet to hold one.
-  it("keeps the access level off the sheet for someone who already has an account", () => {
+  it("keeps the access role off the sheet for someone who already has an account", () => {
     renderSheet({ userId: "user-1", orgRole: "admin", managementDepartmentIds: [9] });
 
-    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+    expect(screen.queryByText("Access role")).not.toBeInTheDocument();
   });
 
-  it("keeps the access level off the sheet for someone holding a pending invitation", () => {
+  it("keeps the access role off the sheet for someone holding a pending invitation", () => {
     renderSheet({ pendingInvitation: STAFF_INVITATION });
 
-    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+    expect(screen.queryByText("Access role")).not.toBeInTheDocument();
   });
 
-  it("asks for an access level only for a brand-new invitation", () => {
+  it("asks for an access role only for a brand-new invitation", () => {
     renderSheet({ userId: null });
 
-    expect(screen.getByText("Access level")).toBeInTheDocument();
+    expect(screen.getByText("Access role")).toBeInTheDocument();
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
     // Two lists on one sheet each carry a header to tell them apart.
     expect(screen.getByText("Management Departments")).toBeInTheDocument();

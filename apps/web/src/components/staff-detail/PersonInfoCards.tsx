@@ -164,7 +164,7 @@ export function AccessCard({
   return (
     <AboutCard title="Access" action={action}>
       <dl className="m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-        <InfoField label="Access level">{access}</InfoField>
+        <InfoField label="Access role">{access}</InfoField>
         {orgRole === "admin" && permissionValues.length > 0 ? (
           <InfoField label="Permissions">
             <span className="dg-tabular-nums">

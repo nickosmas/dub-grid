@@ -626,7 +626,7 @@ export function MembersSection({
     null,
   );
 
-  // The roster filters on its own attributes (department, access level,
+  // The roster filters on its own attributes (department, access role,
   // invitation) rather than the staff panel's, which its rows can't answer.
   const managementFilters = useManagementFilters({
     managementUsers: departmentUsers,

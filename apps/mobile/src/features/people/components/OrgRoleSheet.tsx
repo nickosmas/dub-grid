@@ -41,7 +41,7 @@ export function getPersonOrgRoleSubject(person: MobilePerson): OrgRoleSubject {
 }
 
 /**
- * The access level on its own, opened from the Access row at the top of a
+ * The access role on its own, opened from the Access row at the top of a
  * person's editor and from the roster's actions sheet for someone with no
  * profile to edit.
  * Management departments are not here on purpose: someone can be an Admin
@@ -87,10 +87,10 @@ export function OrgRoleSheet({
       };
     }
     return {
-      title: `Change access level to ${ORG_ROLE_LABELS[next]}?`,
+      title: `Change access role to ${ORG_ROLE_LABELS[next]}?`,
       body: "Their access updates right away.",
       points: [],
-      confirmLabel: "Change access level",
+      confirmLabel: "Change access role",
       confirmTone: "primary" as const,
     };
   }, [currentRole, invitationEmail, pendingRole]);
@@ -119,7 +119,7 @@ export function OrgRoleSheet({
   return (
     <BottomSheetModal
       footer={error ? <InlineError message={error} /> : undefined}
-      header={<SheetHeader subtitle={displayName} title="Access level" />}
+      header={<SheetHeader subtitle={displayName} title="Access role" />}
       overlay={confirmationOverlay}
       scrollable
       visible={visible}

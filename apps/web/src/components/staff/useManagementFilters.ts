@@ -32,7 +32,7 @@ function getFullName(person: DirectoryPerson): string {
  *
  * The two halves of the directory are different populations: a staff row has
  * a focus area, a certification and an employment type, a roster row has a
- * management department, an access level and an invitation. Neither set says
+ * management department, an access role and an invitation. Neither set says
  * anything about the other list, so each half filters on its own.
  */
 export function useManagementFilters({

@@ -858,7 +858,7 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Internal notes");
 
-    expect(screen.getByText("Access level")).toBeInTheDocument();
+    expect(screen.getByText("Access role")).toBeInTheDocument();
     expect(screen.getByText("User")).toBeInTheDocument();
     // Not a management user, so what they manage stays away entirely.
     expect(screen.queryByText("Manages")).not.toBeInTheDocument();
@@ -876,7 +876,7 @@ describe("StaffDetailPage", () => {
     await screen.findByText("Internal notes");
 
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
-    // On the invite card and as the Access card's access level.
+    // On the invite card and as the Access card's access role.
     expect(screen.getAllByText("Not invited yet")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
     // The invite card is the one place to invite from.
@@ -913,8 +913,8 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Internal notes");
 
-    // One access level, and what they manage beside it.
-    expect(screen.getAllByText("Access level")).toHaveLength(1);
+    // One access role, and what they manage beside it.
+    expect(screen.getAllByText("Access role")).toHaveLength(1);
     expect(screen.getByText("Manages")).toBeInTheDocument();
   });
 
