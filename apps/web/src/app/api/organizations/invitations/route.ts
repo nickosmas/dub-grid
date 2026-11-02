@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import {
   normalizeOptionalUsPhone,
   normalizeOptionalStaffEmail,
@@ -531,12 +531,14 @@ export async function DELETE(req: NextRequest) {
       req,
     });
 
-    void dispatchNotificationEvent(user.id, {
-      action: "invitation_revoked",
-      orgId,
-      invitationId,
-      inviteeEmail: latestInvitation.email,
-    });
+    after(() =>
+      dispatchNotificationEvent(user.id, {
+        action: "invitation_revoked",
+        orgId,
+        invitationId,
+        inviteeEmail: latestInvitation.email,
+      }),
+    );
 
     return NextResponse.json({ success: true, invitation: latestInvitation });
   } catch (err) {
@@ -785,12 +787,14 @@ export async function POST(req: NextRequest) {
 
       // One invitation, reissued with new access: nothing was revoked or
       // created, so the old pair told super admins it had been canceled.
-      void dispatchNotificationEvent(user.id, {
-        action: "invitation_resent",
-        orgId,
-        invitationId,
-        inviteeEmail: replacementInvitation.email,
-      });
+      after(() =>
+        dispatchNotificationEvent(user.id, {
+          action: "invitation_resent",
+          orgId,
+          invitationId,
+          inviteeEmail: replacementInvitation.email,
+        }),
+      );
 
       // The token goes only to the invitee's inbox, never back to the caller.
       return NextResponse.json({
@@ -904,12 +908,14 @@ export async function POST(req: NextRequest) {
       req,
     });
 
-    void dispatchNotificationEvent(user.id, {
-      action: "invitation_resent",
-      orgId,
-      invitationId,
-      inviteeEmail: latestInvitation.email,
-    });
+    after(() =>
+      dispatchNotificationEvent(user.id, {
+        action: "invitation_resent",
+        orgId,
+        invitationId,
+        inviteeEmail: latestInvitation.email,
+      }),
+    );
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { recordInvoiceEvent } from "@/lib/billing-history";
 import {
   getStripe,
@@ -139,13 +139,15 @@ export async function POST(req: NextRequest) {
           });
         }
         if (result?.orgId && invoice.id) {
-          void dispatchNotificationEvent("stripe-webhook", {
-            action: "billing_payment_failed",
-            orgId: result.orgId,
-            stripeInvoiceId: invoice.id,
-            amountDue: invoice.amount_due ?? null,
-            currency: invoice.currency ?? null,
-          });
+          after(() =>
+            dispatchNotificationEvent("stripe-webhook", {
+              action: "billing_payment_failed",
+              orgId: result.orgId,
+              stripeInvoiceId: invoice.id,
+              amountDue: invoice.amount_due ?? null,
+              currency: invoice.currency ?? null,
+            }),
+          );
         }
         break;
       }

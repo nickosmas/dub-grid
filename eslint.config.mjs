@@ -9,6 +9,7 @@ import { requireBusyButton } from "./eslint-rules/require-busy-button.mjs";
 import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler.mjs";
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
 import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
+import { noFloatingServerWork } from "./eslint-rules/no-floating-server-work.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 import { noCopyStyleDrift } from "./eslint-rules/no-copy-style-drift.mjs";
 
@@ -26,6 +27,7 @@ const designPlugin = {
     "no-floating-async-handler": noFloatingAsyncHandler,
     "no-misplaced-use-client": noMisplacedUseClient,
     "no-raw-mobile-metrics": noRawMobileMetrics,
+    "no-floating-server-work": noFloatingServerWork,
   },
 };
 
@@ -413,8 +415,10 @@ const eslintConfig = defineConfig([
   {
     files: ["apps/web/src/app/api/**/*.{ts,tsx}", "apps/web/src/features/**/server/**/*.{ts,tsx}"],
     ignores: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
+    plugins: { design: designPlugin },
     rules: {
       "no-console": "error",
+      "design/no-floating-server-work": "error",
     },
   },
   {
