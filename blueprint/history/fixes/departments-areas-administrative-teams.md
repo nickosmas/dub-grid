@@ -23,13 +23,13 @@ The defaults behind the configurable labels can't be changed cleanly either:
 
 KISS: names and defaults only. The structure, data model and behavior stay as they are (owner decisions, 2026-11-02).
 
-| Today | Becomes |
-|---|---|
-| Scheduled departments | **Departments** (default of the existing department label) |
-| Focus areas | **Areas** (default of the existing area label, with presets) |
-| Management departments | **Administrative Teams** (fixed name, always spelled out, never shortened) |
-| One management department | **a team** ("Add team", "Edit teams") |
-| People page **Management** view | **Administrative Teams** |
+| Today                           | Becomes                                                                    |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| Scheduled departments           | **Departments** (default of the existing department label)                 |
+| Focus areas                     | **Areas** (default of the existing area label, with presets)               |
+| Management departments          | **Administrative Teams** (fixed name, always spelled out, never shortened) |
+| One management department       | **a team** ("Add team", "Edit teams")                                      |
+| People page **Management** view | **Administrative Teams**                                                   |
 
 **Labels:**
 

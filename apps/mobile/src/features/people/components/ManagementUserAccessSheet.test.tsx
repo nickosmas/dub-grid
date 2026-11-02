@@ -86,9 +86,7 @@ describe("ManagementUserAccessSheet", () => {
 
     fireEvent.click(screen.getByText("Operations"));
 
-    expect(
-      screen.getByText("Saving now revokes their pending invitation."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Saving now revokes their pending invitation.")).toBeInTheDocument();
   });
 
   it("still saves an ordinary department change through onSubmit", () => {

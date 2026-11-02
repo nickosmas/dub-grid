@@ -370,9 +370,7 @@ describe("ProfileWorkScreen", () => {
     render(<ProfileWorkScreen />);
 
     expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Administrative Teams/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Administrative Teams/ })).not.toBeInTheDocument();
   });
 
   // The same allowance the person page makes for a teammate with management
@@ -384,7 +382,9 @@ describe("ProfileWorkScreen", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
 
     expect(
-      screen.getByText("Saving now removes you from the schedule. You'll stay on your administrative teams."),
+      screen.getByText(
+        "Saving now removes you from the schedule. You'll stay on your administrative teams.",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Select at least one focus area.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();

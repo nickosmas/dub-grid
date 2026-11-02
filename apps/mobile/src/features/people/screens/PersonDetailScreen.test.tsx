@@ -2352,12 +2352,16 @@ describe("PersonDetailScreen", () => {
     it("keeps management access out of reach without the permission", () => {
       renderWithManagementAccess({ canManageManagementAccess: false });
 
-      expect(screen.queryByRole("button", { name: "Add to an administrative team" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add to an administrative team" }),
+      ).not.toBeInTheDocument();
     });
 
     it("names the action for whether they are already on the roster", () => {
       renderWithManagementAccess({});
-      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Add to an administrative team" }),
+      ).toBeInTheDocument();
 
       // Someone who already manages changes it from the Manages row in Access.
       renderWithManagementAccess({ person: { managementDepartmentIds: [9] } });
@@ -2395,7 +2399,9 @@ describe("PersonDetailScreen", () => {
     it("offers no Add to Management to someone with no email on file", () => {
       renderWithManagementAccess({ person: { email: "" } });
 
-      expect(screen.queryByRole("button", { name: "Add to an administrative team" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add to an administrative team" }),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
@@ -2425,7 +2431,9 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Add to an administrative team" }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
