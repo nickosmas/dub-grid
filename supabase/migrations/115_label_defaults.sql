@@ -1,4 +1,4 @@
--- 114: Organizations that never chose a label follow the product default.
+-- 115: Organizations that never chose a label follow the product default.
 --
 -- Organization setup and Settings > Labels used to store the default text
 -- itself, so a later default never reached those organizations. The app now

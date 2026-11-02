@@ -747,6 +747,7 @@
             "packages/authz/src/index.ts",
             "packages/authz/src/permission-sets.ts",
             "supabase/migrations/067_inactive_staff_unschedulable.sql",
+            "supabase/migrations/114_leaving_grid_publishes_removals.sql",
             "supabase/migrations/037_mfa_enrolled_claim.sql",
             "apps/mobile/src/features/people/screens/PeopleScreen.tsx"
           ],
@@ -763,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8212b10ef2d3562c5b3b5a7bbd7a93ec3a5513d0f799d68f5814ee230386e92a"
+      "evidenceFingerprint": "sha256:d343bb74be88b651c3992e89ef229b61b81fc2c5277ba0475ca0f31a0f761b91"
     },
     {
       "id": "person-detail",
@@ -1320,7 +1321,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:19a42b036444523ee54fe3bd682e058f66b02397f9bb50df834854bb674a2bb5"
+      "evidenceFingerprint": "sha256:16773b5c5afa141e5174aaceaa60120218218027b8958939819043633a8e42a9"
     },
     {
       "id": "alerts",

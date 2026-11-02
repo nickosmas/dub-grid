@@ -63,11 +63,11 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 
 **Done when:** unit tests show an empty label and the current default store `NULL`, a custom label is trimmed and stored, and an earlier default typed on purpose is kept. Route tests show the create route writes `NULL` for an unchanged label. `npm run type-check` and `npm run test` pass.
 
-### 2. Migration 114: reset the stored old defaults
+### 2. Migration 115: reset the stored old defaults
 
 - [x] Built and approved (checked against a scratch Postgres; no Supabase stack in the cloud session)
 
-- `supabase/migrations/114_label_defaults.sql` (built as 113; renumbered when `dev` took 113 for invitation permissions), is a data-only `UPDATE` of the two old defaults to `NULL`. It is locked in `checksums.sha256`.
+- `supabase/migrations/115_label_defaults.sql` (built as 113; renumbered twice as `dev` took 113 and 114), is a data-only `UPDATE` of the two old defaults to `NULL`. It is locked in `checksums.sha256`.
 
 **Done when:** `npm run db:migrations:check` passes. A live test against the local stack shows "Focus Areas" becomes `NULL`, "Wings" is unchanged, and the organization reads "Areas".
 
@@ -136,7 +136,7 @@ Kept on purpose: the employee CSV export's "Focus Areas" column header (`apps/we
 
 ## Completion notes
 
-- **Merged with `dev`** (#277 and #280, Admin permissions in the app) before completing. `dev` took migration 113, so this fix's migration is 114. The permissions module moved to `packages/authz`, and its default labels now read the shared defaults too.
+- **Merged with `dev`** (#277 and #280, Admin permissions in the app) before completing. `dev` took migrations 113 and 114, so this fix's migration is 115. The permissions module moved to `packages/authz`, and its default labels now read the shared defaults too.
 - **A wider sweep than the spec named:** about 30 more user-facing strings that hardcoded "focus area" (errors, permission names, Gridmaster labels, the person shifts CSV header, activity-log nouns) now say "area", so nothing reads as a leftover beside the new default. The employee CSV export's "Focus Areas" header stays, because bulk import reads it back.
 - **Checks on the merged tree:** `npm run lint`, `npm run type-check`, `npm run build`, `npm run test:web` (6,778 passed, 375 skipped), the mobile suite (1,555 passed), `npm run db:migrations:check`, `npm run docs:check:closed`, `docs:validate` and `docs:links`. `npm run lint:rules` fails in this container because Node 22.23's `node --test` rejects a directory; the same 30 rule tests pass when given by file.
 - **Not done here:** browser and simulator screenshots (no Supabase stack or simulator in the cloud session), and the live-stack run of the migration test (it ran against a plain Postgres instead).
