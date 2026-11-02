@@ -10,6 +10,9 @@ import { capturedPanGestures } from "../../../test/gesture-handler-stub";
 const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useQueryClient = vi.fn();
+const useQueries = vi.fn(
+  ({ combine }: { combine?: (results: unknown[]) => unknown }) => combine?.([]) ?? [],
+);
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const routerPush = vi.fn();
@@ -35,6 +38,7 @@ vi.mock("@tanstack/react-query", () => ({
   },
   keepPreviousData: (previousData: unknown) => previousData,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 }));
@@ -2515,7 +2519,10 @@ describe("ScheduleScreen", () => {
   it("shows job-focused team rows and opens shift detail from the Schedule tab", () => {
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByText("Today, Apr 16")).toBeInTheDocument();
+    // The header names the month, its year only outside the current one.
+    expect(screen.getByText("April")).toBeInTheDocument();
+    // Today is Home's arrow, shown only away from today.
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("today-date-dot-2026-04-16")).not.toBeInTheDocument();
     // Focus areas are a shared ScrollableTabStrip now, so they carry role="tab"
     // and their bare label, matching the Requests strip.

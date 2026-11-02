@@ -12,7 +12,7 @@ import {
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -84,8 +84,10 @@ import {
   buildWeeklyHoursSummary,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
+  formatCalendarMonthTitle,
   formatScheduleDayLabel,
   formatScheduleTimeRange,
+  getCalendarDotRanges,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleEntryAbsenceTypeId,
@@ -98,6 +100,7 @@ import {
   getScheduleMonthStartDate,
   getScheduleMonthWeekIndexForDate,
   getScheduleRangeForDate,
+  getScheduledDates,
   getSplitShiftSegmentsForEntry,
   isDeletedScheduleHistory,
   sortScheduleEntries,
@@ -131,7 +134,7 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
@@ -162,42 +165,6 @@ type TeamScheduleShiftGroup = {
   timeRange: string | null;
   title: string;
 };
-
-function formatScheduleHeaderDate(date: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00.000Z`));
-}
-
-function formatTeamScheduleHeaderDateLabel(
-  date: string,
-  today: Date,
-  timeZone?: string | null,
-): string {
-  const isoToday = getIsoDateInTimeZone(today, timeZone);
-  const dateLabel = formatScheduleHeaderDate(date);
-
-  if (date === isoToday) {
-    return `Today, ${dateLabel}`;
-  }
-
-  if (date === addDaysToIsoDate(isoToday, -1)) {
-    return `Yesterday, ${dateLabel}`;
-  }
-
-  if (date === addDaysToIsoDate(isoToday, 1)) {
-    return `Tomorrow, ${dateLabel}`;
-  }
-
-  const weekdayLabel = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00.000Z`));
-
-  return `${weekdayLabel}, ${dateLabel}`;
-}
 
 function normalizeTeamShiftGroupKey(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -583,14 +550,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
-  const teamHeaderDateLabel = formatTeamScheduleHeaderDateLabel(selectedDate, now, timeZone);
+  const currentTimeValue = getCurrentTimeValue(now, timeZone);
+  // Collapsed, the strip always shows the selected day's month: an anchor left
+  // from browsing would put the selected week outside the grid and blank the
+  // strip once a swipe passed the month's edge.
+  const visibleCalendarMonth =
+    (isCalendarOpen && calendarMonthAnchor) || getScheduleMonthStartDate(selectedDate);
+  const teamHeaderTitle = formatCalendarMonthTitle(visibleCalendarMonth, todayDate);
   const isSelectedToday = selectedDate === todayDate;
   // The Today control's arrow points the way today lies: back from a future
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
   // which reads as forward, so the backward one is that glyph mirrored.
   const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
-  const currentTimeValue = getCurrentTimeValue(now, timeZone);
-  const visibleCalendarMonth = calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
   const nextWeekDate = addDaysToIsoDate(selectedDate, 7);
   const previousWeekDays = useMemo(
@@ -625,6 +596,26 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     [isCalendarOpen, nextMonthAnchor, selectedDate, timeZone],
   );
   const anchorWeekIndex = getScheduleMonthWeekIndexForDate(visibleCalendarMonth, selectedDate);
+  // A dot marks each day the person works, from their own schedule in fixed
+  // four-week blocks around the month shown (the strip's neighbouring weeks
+  // included).
+  const dotRanges = useMemo(
+    () =>
+      getCalendarDotRanges(
+        addDaysToIsoDate(monthWeeks[0]?.[0]?.date ?? selectedDate, -7),
+        addDaysToIsoDate(monthWeeks.at(-1)?.at(-1)?.date ?? selectedDate, 7),
+      ),
+    [monthWeeks, selectedDate],
+  );
+  const scheduledDates = useQueries({
+    queries: dotRanges.map((dotRange) => ({
+      queryKey: mobileQueryKeys.dashboardSchedule(accessToken, dotRange),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        getMySchedule(accessToken!, dotRange, signal),
+      enabled: isTeamScope && Boolean(accessToken) && linkedEmployee !== null,
+    })),
+    combine: combineScheduledDates,
+  });
   // One shared row height for every week row (swipeable or static) so the
   // grid stays perfectly aligned as it slides — no per-row measurement.
   const monthGridRowsHeight =
@@ -897,11 +888,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectDate(nextDate: string) {
     commitSelectedDate(nextDate);
-    // Not redundant with closeCalendarExpansion's own reset below: that
-    // early-returns when the calendar is already collapsed (e.g. tapping a
-    // date directly in the week strip), so this is what keeps
-    // visibleCalendarMonth correct in that case.
-    setCalendarMonthAnchor(getScheduleMonthStartDate(nextDate));
+    // Cleared here too: closeCalendarExpansion returns early while collapsed,
+    // and a month pinned by a tap would outlive the swipes that leave it.
+    setCalendarMonthAnchor(null);
     closeCalendarExpansion();
   }
 
@@ -1291,6 +1280,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                       }}
                       accessible={row.key === "current"}
                       dateLabel={formatScheduleDayLabel(day.date, now, timeZone)}
+                      isScheduled={scheduledDates.has(day.date)}
                       onPress={() => handleSelectDate(day.date)}
                     />
                   ))}
@@ -1309,6 +1299,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               day={day}
               accessible={isCenterMonth}
               dateLabel={formatScheduleDayLabel(day.date, now, timeZone)}
+              isScheduled={scheduledDates.has(day.date)}
               onPress={() => handleSelectDate(day.date)}
             />
           ))}
@@ -1321,8 +1312,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text fit="fixed" style={styles.teamHeaderTitle}>
-            {teamHeaderDateLabel}
+          <Text accessibilityRole="header" fit="fixed" style={styles.teamHeaderTitle}>
+            {teamHeaderTitle}
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
@@ -1342,8 +1333,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <View style={styles.calendarBlock}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
-          {MONTH_WEEKDAY_LABELS.map((label) => (
-            <Text key={label} fit="fixed" style={styles.monthCalendarWeekdayLabel}>
+          {MONTH_WEEKDAY_LABELS.map((label, index) => (
+            <Text key={index} fit="fixed" style={styles.monthCalendarWeekdayLabel}>
               {label}
             </Text>
           ))}
@@ -1427,6 +1418,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
+      stickyHeaderShellStyle={isTeamScope ? styles.teamHeaderCard : undefined}
     >
       <View>
         {/* The focus-area pills carry per-day counts, so they can't paint before
@@ -1632,6 +1624,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   );
 }
 
+function combineScheduledDates(
+  results: Array<UseQueryResult<Awaited<ReturnType<typeof getMySchedule>>>>,
+): Set<string> {
+  return getScheduledDates(results.flatMap((result) => result.data?.entries ?? []));
+}
+
 type MonthDayCellDay = {
   date: string;
   dayLabel: string;
@@ -1645,12 +1643,15 @@ type MonthDayCellDay = {
 function MonthDayCell({
   day,
   dateLabel,
+  isScheduled = false,
   onPress,
   accessible = true,
 }: {
   day: MonthDayCellDay;
   /** Human-readable date, e.g. "Today, Apr 16" — see the label below. */
   dateLabel: string;
+  /** The person works a shift that day, marked with a dot under the date. */
+  isScheduled?: boolean;
   onPress: () => void;
   // The week-swipe strip always keeps the previous/next week mounted
   // off-screen (clipped horizontally) so a swipe can start instantly. Those
@@ -1666,7 +1667,9 @@ function MonthDayCell({
     <Pressable
       // `day.date` is a raw ISO string; screen readers announce it digit by
       // digit ("Select date 2026-08-03"). Speak it the way the UI reads it.
-      accessibilityLabel={accessible ? `Select ${dateLabel}` : undefined}
+      accessibilityLabel={
+        accessible ? `Select ${dateLabel}${isScheduled ? ", you're scheduled" : ""}` : undefined
+      }
       accessibilityRole={accessible ? "button" : undefined}
       accessibilityState={accessible ? { selected: day.isSelected } : undefined}
       android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
@@ -1694,6 +1697,15 @@ function MonthDayCell({
           {day.dayLabel}
         </Text>
       </View>
+      {isScheduled ? (
+        <View
+          style={[
+            styles.dateScheduledDot,
+            day.isSelected && styles.dateScheduledDotSelected,
+            day.isCurrentMonth === false && styles.dateHighlightOutsideMonth,
+          ]}
+        />
+      ) : null}
     </Pressable>
   );
 }
