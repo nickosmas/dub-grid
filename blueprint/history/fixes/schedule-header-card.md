@@ -30,6 +30,9 @@
   days and the API answers at most 31 a request.
 - Collapsed, the strip always shows the selected day's month, and tapping a
   day no longer pins one.
+- The handle is wider (48pt) and a lighter gray, and a tap on it (or
+  VoiceOver's activate) opens or closes the month as a drag does (owner,
+  2026-11-02, fix/schedule-grab-handle).
 
 ## Checks
 

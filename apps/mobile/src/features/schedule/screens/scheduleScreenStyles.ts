@@ -880,11 +880,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       paddingVertical: mobileSpace.xs,
     },
+    // Wider and lighter than a sheet's grabber, so it reads as the card's own
+    // handle rather than a divider (owner, 2026-11-02).
     calendarDragHandleBar: {
-      width: 36,
+      width: 48,
       height: 5,
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.textSubtle,
+      opacity: 0.35,
     },
     weekSwipeRowClip: {
       overflow: "hidden",
