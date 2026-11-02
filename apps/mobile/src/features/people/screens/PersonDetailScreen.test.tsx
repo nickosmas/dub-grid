@@ -1048,6 +1048,26 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
 
+  it("shows an empty contact field as a row that opens Edit on that field", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ email: "mina@dubgrid.com", phone: "" }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByText("mina@dubgrid.com")).toBeInTheDocument();
+    // Nothing on the page is typed into; the field is added in Edit.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Add phone"));
+
+    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).toHaveFocus();
+  });
+
   it("swaps Cancel for Discard once edited, and Discard resets without leaving", () => {
     useQuery.mockReturnValue({
       data: { person: makePerson() },

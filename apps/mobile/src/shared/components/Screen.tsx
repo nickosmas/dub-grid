@@ -44,6 +44,8 @@ import {
  * Breathing room left between a focused field and the top of the keyboard.
  */
 const KEYBOARD_BOTTOM_OFFSET = 24;
+/** When a page that hasn't been touched settles under its header again. */
+const SETTLE_RETRY_DELAYS_MS = [150, 500];
 
 /** Card header icon frame. Also the min height of the title and accessory
  * columns beside it, so a one-line title centres against the icon. */
@@ -225,10 +227,43 @@ export function Screen<T = never>({
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const settleUnderHeaderRef = useRef(false);
   const scrollYRef = useRef(0);
+  // Until the person touches the page, it belongs under the header. On a slow
+  // first load the system can still move it after the settle below has run
+  // (a loading state swapped for a short empty state resets the offset), and
+  // the page opened with its top tucked under the header.
+  const untouchedRef = useRef(true);
+  const resettleFrameRef = useRef<number | null>(null);
+  // A content size change can move the offset without reporting a scroll, so
+  // it re-pins whatever the last reported offset was.
+  const keepUnderHeader = (y: number | null) => {
+    const height = stickyHeaderHeightRef.current;
+    if (Platform.OS !== "ios" || !stickyHeader || height === 0) return;
+    if (!untouchedRef.current || settleUnderHeaderRef.current) return;
+    if ((y !== null && y <= -height + 1) || resettleFrameRef.current !== null) return;
+    resettleFrameRef.current = requestAnimationFrame(() => {
+      resettleFrameRef.current = null;
+      if (!untouchedRef.current) return;
+      scrollYRef.current = -height;
+      internalListRef.current?.scrollToOffset({ offset: -height, animated: false });
+      internalScrollViewRef.current?.scrollTo({ x: 0, y: -height, animated: false });
+    });
+  };
+  const keepUnderHeaderRef = useRef(keepUnderHeader);
+  keepUnderHeaderRef.current = keepUnderHeader;
   const handleScroll: ScreenScrollViewProps["onScroll"] = (event) => {
     scrollYRef.current = event.nativeEvent?.contentOffset?.y ?? scrollYRef.current;
+    keepUnderHeader(scrollYRef.current);
     onScroll?.(event);
   };
+  const handleTouchStart = () => {
+    untouchedRef.current = false;
+  };
+  useEffect(
+    () => () => {
+      if (resettleFrameRef.current !== null) cancelAnimationFrame(resettleFrameRef.current);
+    },
+    [],
+  );
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
@@ -306,7 +341,16 @@ export function Screen<T = never>({
       internalListRef.current?.scrollToOffset({ offset: -stickyHeaderHeight, animated: false });
       internalScrollViewRef.current?.scrollTo({ x: 0, y: -stickyHeaderHeight, animated: false });
     });
-    return () => cancelAnimationFrame(frame);
+    // On a slow first load the inset can land later still, clamping that
+    // scroll to 0 without reporting it; settling again costs nothing when the
+    // page is already in place.
+    const retries = SETTLE_RETRY_DELAYS_MS.map((delay) =>
+      setTimeout(() => keepUnderHeaderRef.current(null), delay),
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      retries.forEach(clearTimeout);
+    };
   }, [stickyHeaderHeight]);
 
   useEffect(() => {
@@ -385,7 +429,9 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
+      onContentSizeChange={() => keepUnderHeader(null)}
       onScroll={handleScroll}
+      onTouchStart={handleTouchStart}
       refreshControl={refreshControl}
       scrollEventThrottle={scrollEventThrottle}
       showsVerticalScrollIndicator={false}
@@ -420,7 +466,9 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
+      onContentSizeChange={() => keepUnderHeader(null)}
       onScroll={handleScroll}
+      onTouchStart={handleTouchStart}
       // Mounted for the life of the screen once it can refresh, never only
       // while `scrollEnabled`. On iOS the control is the scroll view's first
       // child, so adding or removing it moves the content container to a
