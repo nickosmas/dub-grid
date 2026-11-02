@@ -502,6 +502,68 @@ describe("mobile person invitation route", () => {
     );
   });
 
+  it("stores the permissions a Super Admin chose for an Admin invite", async () => {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: {
+        canManageEmployees: true,
+        canConfigureAdminPermissions: true,
+        isSuperAdmin: true,
+        isGridmaster: false,
+      },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "owner@example.com" },
+    });
+
+    const { POST } = await import("./person-invitation");
+    const response = await POST(
+      makeRequest({
+        email: "mina@example.com",
+        orgRole: "admin",
+        adminPermissions: { canViewReports: false, canEditShifts: true },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createMobileEmployeeInvitationRow).toHaveBeenCalledWith(
+      serviceClient,
+      expect.objectContaining({
+        roleToAssign: "admin",
+        adminPermissions: expect.objectContaining({ canViewReports: false, canEditShifts: true }),
+      }),
+    );
+  });
+
+  it("refuses chosen permissions from an Admin", async () => {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: {
+        canManageEmployees: true,
+        canConfigureAdminPermissions: false,
+        isSuperAdmin: false,
+        isGridmaster: false,
+      },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+    });
+
+    const { POST } = await import("./person-invitation");
+    const response = await POST(
+      makeRequest({
+        email: "mina@example.com",
+        orgRole: "admin",
+        adminPermissions: { canViewReports: false },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(403);
+    expect(createMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+  });
+
   it("refuses a Super Admin invite from someone who isn't one", async () => {
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
     requireMobileAuth.mockResolvedValue({

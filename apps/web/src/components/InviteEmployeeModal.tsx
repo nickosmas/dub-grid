@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
 import { Employee, NamedItem, Department, Invitation } from "@/types";
+import type { AdminPermissions } from "@/types";
+import { InvitePermissionsField } from "@/components/InvitePermissionsField";
 import { Button } from "@/components/Button";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
@@ -71,6 +73,9 @@ export default function InviteEmployeeModal({
   const [phone, setPhone] = useState("");
   const [departmentIds, setDepartmentIds] = useState<number[]>([]);
   const [role, setRole] = useState<AssignableOrganizationRole>("user");
+  const [adminPermissions, setAdminPermissions] = useState<AdminPermissions | null>(null);
+  // Only a Super Admin sets an Admin's permissions; anyone else's invite gets the standard set.
+  const setsPermissions = (isSuperAdmin || isGridmaster) && role === "admin";
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -105,7 +110,7 @@ export default function InviteEmployeeModal({
       phone,
       departmentIds: [...departmentIds].sort((left, right) => left - right),
       role,
-    }) !== initialDraftSnapshot;
+    }) !== initialDraftSnapshot || adminPermissions !== null;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
     onDiscard: onClose,
@@ -256,6 +261,9 @@ export default function InviteEmployeeModal({
             phone: isManagementInvite ? normalizeOptionalUsPhone(phone) || undefined : undefined,
             departmentIds:
               isManagementInvite && departmentIds.length > 0 ? departmentIds : undefined,
+            ...(setsPermissions && adminPermissions
+              ? { adminPermissions: { ...adminPermissions } }
+              : {}),
           },
           accessToken,
         );
@@ -564,6 +572,14 @@ export default function InviteEmployeeModal({
               onChange={(v) => setRole(v as AssignableOrganizationRole)}
             />
           </div>
+
+          {setsPermissions && (
+            <InvitePermissionsField
+              value={adminPermissions}
+              onChange={setAdminPermissions}
+              disabled={sending}
+            />
+          )}
 
           {/* Sandbox notice */}
           {isInSandbox && (

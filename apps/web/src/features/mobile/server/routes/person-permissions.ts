@@ -3,7 +3,7 @@ import {
   mobilePersonPermissionsBodySchema,
   mobilePersonPermissionsResponseSchema,
 } from "@dubgrid/contracts";
-import { CONFIGURABLE_PERMISSION_KEYS, buildInitialPermissions } from "@dubgrid/authz";
+import { applyConfigurablePermissions } from "@dubgrid/authz";
 import { insertMobileAuditLogEntry } from "@dubgrid/data-access";
 import {
   SELF_ACTION_FORBIDDEN_CODE,
@@ -27,8 +27,7 @@ function getRequestIp(req: NextRequest): string | null {
 /**
  * An Admin's permissions, from the app's Permissions screen. The same bar as
  * web's access route: a Super Admin, never on their own account, against the
- * membership as they last saw it. Only the keys the editor shows are taken from
- * the request; the always-on and Super Admin-only keys keep their fixed values.
+ * membership as they last saw it.
  */
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -76,11 +75,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
 
   const current = (membership.admin_permissions ?? null) as AdminPermissions | null;
-  const next = buildInitialPermissions(current);
-  for (const key of CONFIGURABLE_PERMISSION_KEYS) {
-    const value = parsed.data.adminPermissions[key];
-    if (typeof value === "boolean") next[key] = value;
-  }
+  const next = applyConfigurablePermissions(current, parsed.data.adminPermissions);
 
   const changes = buildAdminPermissionChanges(current, next);
   if (changes.length === 0) {

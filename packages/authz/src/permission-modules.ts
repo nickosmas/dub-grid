@@ -195,6 +195,22 @@ export function buildInitialPermissions(
   return initial;
 }
 
+/**
+ * `base` with only the switches an editor shows taken from `requested`; the
+ * always-on and Super Admin-only keys keep their fixed values whatever is sent.
+ */
+export function applyConfigurablePermissions(
+  base: Partial<AdminPermissions> | null | undefined,
+  requested: Partial<Record<string, boolean>>,
+): AdminPermissions {
+  const next = buildInitialPermissions(base);
+  for (const key of CONFIGURABLE_PERMISSION_KEYS) {
+    const value = requested[key];
+    if (typeof value === "boolean") next[key] = value;
+  }
+  return next;
+}
+
 export function describePermissionModule(
   mod: PermissionModule,
   labels: PermissionEditorLabels,
