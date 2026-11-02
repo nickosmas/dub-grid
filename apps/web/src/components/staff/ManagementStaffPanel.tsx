@@ -468,7 +468,7 @@ export function ManagementStaffPanel({
         className={`dg-panel dg-panel--x-wide${closing ? " closing" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Management staff detail"
+        aria-label="Administrative team member detail"
       >
         {/* Header */}
         <div className="staff-detail-header">

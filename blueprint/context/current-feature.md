@@ -115,7 +115,7 @@ Kept on purpose: the employee CSV export's "Focus Areas" column header (`apps/we
 
 ### 7. Seed data and public docs
 
-- [ ] Built and approved
+- [x] Built and approved (the seed now stores no department label, so seeded organizations show the default; `npm run docs:check:closed`, `docs:validate` and `docs:links` pass)
 
 - In `seed.ts` and `supabase/seed_*.sql`, comments and printed text use the new names. Calm Haven's team named Administration stays, and reads "Administrative Teams → Administration".
 - **Public docs:** `docs/configuration/departments-and-focus-areas.mdx` (title and slug, with a redirect from the old path), `docs/staff/roster.mdx`, `docs/staff/detail-page.mdx`, `docs/configuration/shifts-jobs-and-absences.mdx`, the Labels page (`docs/configuration/terminology.mdx`), and any other page the docs inventory flags. The pages describe customer behavior only.

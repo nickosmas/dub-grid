@@ -400,8 +400,8 @@ BEGIN
     (org, 'Marilyn',        'Davenport',  cert_jlcsn, ARRAY[role_dvcsn],                    28, ARRAY[fa_vcsn],                 'active')
   ON CONFLICT (org_id, first_name, last_name) WHERE archived_at IS NULL DO NOTHING;
 
-  -- ── Assign some employees to management departments ─────────────────────────
-  -- ~20% of employees get a management department assignment
+  -- ── Assign some employees to administrative teams ───────────────────────────
+  -- ~20% of employees are on an administrative team
   -- Sullivan & Crawford are admins (get dept permission template), others are users
   UPDATE public.employees SET
     department_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Administration')],

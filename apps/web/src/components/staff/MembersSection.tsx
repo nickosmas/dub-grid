@@ -1522,7 +1522,7 @@ export function MembersSection({
                             setShowManagementInvite(true);
                           }}
                         >
-                          Management staff
+                          Administrative team
                         </MenuItem>
                       </MenuContent>
                     </Menu>

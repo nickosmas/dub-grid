@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:265d13f161e8a1ee45531f89e97c4bade4634ab66d184938a72a933378841885",
+  "sourceDigest": "sha256:ad8c99f5a330cf5fa9a4b3be94e53853919ee12e383c1510978fab880b49c95f",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4912,6 +4912,16 @@
       "sha256": "2ccb8538c40090be5aacdb639dd58fecb85af760d23afbd08de068f2eae4be4d",
       "source": {
         "path": "supabase/migrations/112_correction_reason_typed.sql"
+      }
+    },
+    {
+      "id": "migration:113_label_defaults.sql",
+      "version": "113",
+      "name": "label_defaults",
+      "file": "113_label_defaults.sql",
+      "sha256": "eeb50fc993130014824fad8a58386b88d8eaf8b3ee9ff93642b565f2d4a0a2a4",
+      "source": {
+        "path": "supabase/migrations/113_label_defaults.sql"
       }
     }
   ],

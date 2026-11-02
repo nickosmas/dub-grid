@@ -68,7 +68,7 @@
               "configuration/organization",
               "configuration/shifts-jobs-and-absences",
               "configuration/schedule-rules-and-display",
-              "configuration/departments-and-focus-areas",
+              "configuration/departments-and-areas",
               "configuration/roles-certifications-and-indicators",
               "configuration/coverage-requirements",
               "configuration/terminology",
@@ -99,7 +99,12 @@
   "redirects": [
     {
       "source": "/configuration/focus-areas",
-      "destination": "/configuration/departments-and-focus-areas",
+      "destination": "/configuration/departments-and-areas",
+      "permanent": true
+    },
+    {
+      "source": "/configuration/departments-and-focus-areas",
+      "destination": "/configuration/departments-and-areas",
       "permanent": true
     },
     {
