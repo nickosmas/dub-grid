@@ -56,7 +56,7 @@ export const ME_HERO_AVATAR_FRAME_OVERLAP = -12;
 export const HEADER_CONTROL_HEIGHT = 44;
 // Fallback single-row height, used until the real row is measured. Matches
 // monthCalendarDaySlot's minHeight in styles below.
-export const WEEK_STRIP_ROW_HEIGHT = 44;
+export const WEEK_STRIP_ROW_HEIGHT = 50;
 // Fixed size for the circular date highlight, shared by every week/month row.
 export const DATE_HIGHLIGHT_SIZE = 36;
 // Matches monthCalendarWeek/monthCalendarWeeks gap in styles below.
@@ -855,6 +855,25 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     weekStripFrame: {
       overflow: "hidden",
+    },
+    // The team schedule's header is one white card on the gray page, its
+    // handle at the card's foot (owner, 2026-11-02).
+    teamHeaderCard: {
+      backgroundColor: mobileColors.surface,
+      borderBottomLeftRadius: 28,
+      borderBottomRightRadius: 28,
+      paddingBottom: mobileSpace.xs,
+    },
+    dateScheduledDot: {
+      position: "absolute",
+      bottom: 2,
+      width: 5,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: mobileColors.textSubtle,
+    },
+    dateScheduledDotSelected: {
+      backgroundColor: mobileColors.brand,
     },
     calendarDragHandleRow: {
       alignItems: "center",

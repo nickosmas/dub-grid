@@ -180,3 +180,54 @@ export function getSplitShiftBadgeLabel(count: number): string | null {
 export function getSplitShiftSegmentLabel(index: number, count: number): string {
   return count > 1 ? `Shift ${index + 1}` : "Shift";
 }
+
+/** The calendar's month title: "November", with the year only outside the current one. */
+export function formatCalendarMonthTitle(monthStart: string, todayDate: string): string {
+  const showYear = monthStart.slice(0, 4) !== todayDate.slice(0, 4);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    ...(showYear ? { year: "numeric" } : null),
+    timeZone: "UTC",
+  }).format(new Date(`${monthStart}T00:00:00.000Z`));
+}
+
+/** The dates the person works a shift, which the calendar marks with a dot; an absence alone isn't one. */
+export function getScheduledDates(entries: ReadonlyArray<MobileScheduleEntry>): Set<string> {
+  const dates = new Set<string>();
+  for (const entry of entries) {
+    if (entry.state.kind === "worked" && entry.state.segments.length > 0) dates.add(entry.date);
+  }
+  return dates;
+}
+
+const DOT_BLOCK_DAYS = 28;
+// A Sunday, so every block starts on the first day of a calendar week.
+const DOT_BLOCK_EPOCH = Date.UTC(2023, 0, 1);
+const MS_PER_DAY = 86_400_000;
+
+function isoDateAtDay(dayIndex: number): string {
+  return new Date(DOT_BLOCK_EPOCH + dayIndex * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
+/**
+ * Four-week ranges covering `startDate` to `endDate`, on fixed boundaries so
+ * the same block is fetched once and reused as the calendar moves. A month
+ * grid can show 42 days and the schedule API answers at most 31 a request.
+ */
+export function getCalendarDotRanges(
+  startDate: string,
+  endDate: string,
+): Array<{ startDate: string; endDate: string }> {
+  const dayOf = (date: string) =>
+    Math.floor((Date.parse(`${date}T00:00:00.000Z`) - DOT_BLOCK_EPOCH) / MS_PER_DAY);
+  const firstBlock = Math.floor(dayOf(startDate) / DOT_BLOCK_DAYS);
+  const lastBlock = Math.floor(dayOf(endDate) / DOT_BLOCK_DAYS);
+  const ranges: Array<{ startDate: string; endDate: string }> = [];
+  for (let block = firstBlock; block <= lastBlock; block++) {
+    ranges.push({
+      startDate: isoDateAtDay(block * DOT_BLOCK_DAYS),
+      endDate: isoDateAtDay(block * DOT_BLOCK_DAYS + DOT_BLOCK_DAYS - 1),
+    });
+  }
+  return ranges;
+}
