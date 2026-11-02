@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:798f5944a0bac79a5111c3e9aaa80b2d80133ef233009bbf4132dea41f6f8855",
+  "sourceDigest": "sha256:715f057bd50000f407ce087406df2e62c816d9c15eb64e78cfad8ce5339000b3",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4924,6 +4924,16 @@
       "sha256": "2ccb8538c40090be5aacdb639dd58fecb85af760d23afbd08de068f2eae4be4d",
       "source": {
         "path": "supabase/migrations/112_correction_reason_typed.sql"
+      }
+    },
+    {
+      "id": "migration:113_invite_admin_permissions.sql",
+      "version": "113",
+      "name": "invite_admin_permissions",
+      "file": "113_invite_admin_permissions.sql",
+      "sha256": "3a42f07194af9e501145ec29a8282a21af607701b3417855b3c05cb34220b5b0",
+      "source": {
+        "path": "supabase/migrations/113_invite_admin_permissions.sql"
       }
     }
   ],

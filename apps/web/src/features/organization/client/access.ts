@@ -191,6 +191,8 @@ export async function createOrganizationInvitation(
     phone?: string;
     departmentIds?: number[];
     deptAdminIds?: number[];
+    /** An Admin invite's permissions, chosen by a Super Admin before it goes out. */
+    adminPermissions?: Record<string, boolean>;
   },
   accessToken?: string,
 ): Promise<{ invitationId: string; expiresAt: string; resent?: boolean }> {

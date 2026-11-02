@@ -1157,6 +1157,8 @@ export const mobilePersonInvitationCreateBodySchema = z.object({
   email: z.string().trim().email(),
   /** The access role the invite grants; Super Admin only from a Super Admin. */
   orgRole: mobileRoleSchema.default("user"),
+  /** An Admin invite's permissions, set by a Super Admin before it goes out. */
+  adminPermissions: z.record(z.string(), z.boolean()).optional(),
   linkExistingAccount: z.boolean().optional(),
   reconcileName: z.boolean().optional(),
 });
@@ -1277,6 +1279,7 @@ export const mobileManagementUserInviteBodySchema = z.object({
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema.default(""),
   orgRole: mobileRoleSchema,
+  adminPermissions: z.record(z.string(), z.boolean()).optional(),
   managementDepartmentIds: z.array(z.number().int()).min(1),
 });
 

@@ -807,7 +807,7 @@ function mobilePermissionKeys(sourceFile: ts.SourceFile): Set<string> {
 
 export function collectPermissions(repoRoot: string): PermissionItem[] {
   const domainFile = path.join(repoRoot, "packages/domain/src/permissions.ts");
-  const authzFile = path.join(repoRoot, "packages/authz/src/index.ts");
+  const authzFile = path.join(repoRoot, "packages/authz/src/permission-sets.ts");
   const editorFile = path.join(repoRoot, "packages/authz/src/permission-modules.ts");
   const mobileFile = path.join(repoRoot, "packages/contracts/src/mobile.ts");
   const domain = parseTypeScript(domainFile);

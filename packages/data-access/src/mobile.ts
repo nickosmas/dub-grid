@@ -1776,6 +1776,8 @@ export async function createMobileEmployeeInvitationRow(
     /** Management departments the invite grants once accepted. */
     departmentIds?: number[];
     deptAdminIds?: number[];
+    /** An Admin invite's permissions, copied onto the membership on accept. */
+    adminPermissions?: Record<string, boolean> | null;
   },
 ): Promise<MobileInvitationRow> {
   const { data, error } = await serviceClient
@@ -1791,6 +1793,7 @@ export async function createMobileEmployeeInvitationRow(
       ...(input.phone === undefined ? {} : { phone: input.phone }),
       ...(input.departmentIds === undefined ? {} : { department_ids: input.departmentIds }),
       ...(input.deptAdminIds === undefined ? {} : { dept_admin_ids: input.deptAdminIds }),
+      ...(input.adminPermissions ? { admin_permissions: input.adminPermissions } : {}),
     })
     .select(INVITATION_COLS)
     .single();
