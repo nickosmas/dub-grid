@@ -1,4 +1,4 @@
-import { describeEmploymentStatus } from "@dubgrid/domain";
+import { describeEmploymentStatus, resolveOrganizationLabel } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
 import { summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -497,9 +497,12 @@ async function getOrgCopyLabels(orgId: string): Promise<OrgCopyLabels> {
     .eq("id", orgId)
     .maybeSingle();
   return {
-    focusAreaLabel: (data?.focus_area_label as string | null) ?? "Focus Areas",
-    certificationLabel: (data?.certification_label as string | null) ?? "Certifications",
-    roleLabel: (data?.role_label as string | null) ?? "Roles",
+    focusAreaLabel: resolveOrganizationLabel("focusArea", data?.focus_area_label as string | null),
+    certificationLabel: resolveOrganizationLabel(
+      "certification",
+      data?.certification_label as string | null,
+    ),
+    roleLabel: resolveOrganizationLabel("role", data?.role_label as string | null),
   };
 }
 

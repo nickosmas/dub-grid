@@ -35,6 +35,7 @@ import { WizardStepper } from "./organization-setup/WizardStepper";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { requireCredentialAssurance } from "@/features/account/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
@@ -79,9 +80,13 @@ export default function OrganizationSetupWizard({
   const [addressCountry, setAddressCountry] = useState("");
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("");
-  const [focusAreaLabel, setFocusAreaLabel] = useState("Focus Areas");
-  const [certificationLabel, setCertificationLabel] = useState("Certifications");
-  const [roleLabel, setRoleLabel] = useState("Roles");
+  const [focusAreaLabel, setFocusAreaLabel] = useState<string>(
+    DEFAULT_ORGANIZATION_LABELS.focusArea,
+  );
+  const [certificationLabel, setCertificationLabel] = useState<string>(
+    DEFAULT_ORGANIZATION_LABELS.certification,
+  );
+  const [roleLabel, setRoleLabel] = useState<string>(DEFAULT_ORGANIZATION_LABELS.role);
   const [createdEmployeeCount, setCreatedEmployeeCount] = useState(0);
 
   // ── Step 2: Super Admin ───────────────────────────────────────────────────
@@ -596,7 +601,7 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   value={focusAreaLabel}
                   onChange={(e) => setFocusAreaLabel(e.target.value)}
-                  placeholder="Focus Areas"
+                  placeholder={DEFAULT_ORGANIZATION_LABELS.focusArea}
                 />
               </div>
               <div>
@@ -1045,8 +1050,8 @@ export default function OrganizationSetupWizard({
                 <CustomSelect
                   value={dept.type}
                   options={[
-                    { value: "scheduled", label: "Scheduled" },
-                    { value: "management", label: "Management" },
+                    { value: "scheduled", label: "Department" },
+                    { value: "management", label: "Administrative Team" },
                   ]}
                   onChange={(val) =>
                     updateDepartmentRow(idx, {
@@ -1125,14 +1130,14 @@ export default function OrganizationSetupWizard({
                       ? [
                           {
                             value: "__none__",
-                            label: "Select scheduled department",
+                            label: "Select department",
                           },
                           ...scheduledDepartments.map((department) => ({
                             value: department.id,
                             label: department.name.trim() || "Unnamed department",
                           })),
                         ]
-                      : [{ value: "__none__", label: "Add a scheduled department first" }]
+                      : [{ value: "__none__", label: "Add a department first" }]
                   }
                   onChange={(val) =>
                     updateFocusArea(idx, {
@@ -1512,7 +1517,7 @@ export default function OrganizationSetupWizard({
                       <CustomSelect
                         value={selectedDepartmentId}
                         options={[
-                          { value: "__none__", label: "Select scheduled department" },
+                          { value: "__none__", label: "Select department" },
                           ...scheduledDepartments.map((department) => ({
                             value: department.id,
                             label: department.name.trim() || "Unnamed department",

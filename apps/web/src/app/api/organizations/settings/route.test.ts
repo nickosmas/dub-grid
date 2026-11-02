@@ -464,6 +464,55 @@ describe("PUT /api/organizations/settings", () => {
     );
   });
 
+  describe("organization labels", () => {
+    async function saveLabels(
+      currentOverrides: Record<string, unknown>,
+      labels: Record<string, string>,
+    ) {
+      const currentRow = makeOrganizationRow(
+        "2026-04-15T18:00:00.000000+00:00",
+        currentOverrides,
+      );
+      organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+      organizationUpdateMaybeSingle.mockResolvedValueOnce({
+        data: makeOrganizationRow("2026-04-15T18:10:00.000000+00:00"),
+        error: null,
+      });
+      return PUT(
+        makeRequest({
+          orgId: currentRow.id,
+          expectedUpdatedAt: currentRow.updated_at,
+          ...labels,
+        }),
+      );
+    }
+
+    it("stores nothing when a label is changed to the default", async () => {
+      const response = await saveLabels(
+        { focus_area_label: "Wings", certification_label: "Training", role_label: "Jobs" },
+        { focusAreaLabel: "Areas", certificationLabel: "Certifications", roleLabel: "Roles" },
+      );
+
+      expect(response.status).toBe(200);
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          focus_area_label: null,
+          certification_label: null,
+          role_label: null,
+        }),
+      );
+    });
+
+    it("stores a custom label as typed, trimmed", async () => {
+      const response = await saveLabels({ focus_area_label: null }, { focusAreaLabel: "  Wings " });
+
+      expect(response.status).toBe(200);
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ focus_area_label: "Wings" }),
+      );
+    });
+  });
+
   it("persists what staff see after a publish", async () => {
     const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", {
       staff_see_shift_changes: true,

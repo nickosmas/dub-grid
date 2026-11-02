@@ -126,7 +126,7 @@ export async function saveOrganizationSetupConfig({
     )
   ) {
     throw new Error(
-      "Assign each focus area to a scheduled department before saving configuration.",
+      "Assign each area to a department before saving configuration.",
     );
   }
 
@@ -147,7 +147,7 @@ export async function saveOrganizationSetupConfig({
     })
   ) {
     throw new Error(
-      "Assign each job to a scheduled department, focus area, and shift before saving configuration.",
+      "Assign each job to a department, area and shift before saving configuration.",
     );
   }
 

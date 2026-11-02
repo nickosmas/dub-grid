@@ -1,4 +1,4 @@
-import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import { capitalizeFirst, pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
@@ -352,7 +352,7 @@ export default function PeopleScreen() {
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certifications";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(

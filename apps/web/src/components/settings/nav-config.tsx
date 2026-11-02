@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import {
   BuildingIcon,
   BillingIcon,
@@ -116,7 +116,7 @@ export function buildNavGroups(
   overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
-  const focusArea = singularLabelNoun(overrides?.focusAreaLabel ?? "Focus Areas");
+  const focusArea = singularLabelNoun(overrides?.focusAreaLabel ?? DEFAULT_ORGANIZATION_LABELS.focusArea);
   const roles = pluralLabelNoun(overrides?.roleLabel ?? "Roles");
   const certifications = pluralLabelNoun(overrides?.certificationLabel ?? "Certifications");
 
@@ -136,7 +136,7 @@ export function buildNavGroups(
         label: "Labels",
         Icon: LabelsIcon,
         description:
-          "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'.",
+          "Customize the terminology used in your organization. For example, rename 'Areas' to 'Wings' or 'Units'.",
       });
     if (generalItems.length > 0)
       groups.push({ id: "general", label: "General", items: generalItems });

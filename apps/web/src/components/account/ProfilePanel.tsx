@@ -61,7 +61,7 @@ import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Banner } from "@/components/ui/Banner";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 interface ProfilePanelProps {
   user: User | null;
@@ -851,8 +851,8 @@ export function ProfilePanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="dg-card-title">Management departments</div>
-                <div className="dg-card-description">Management department assignment.</div>
+                <div className="dg-card-title">{ADMINISTRATIVE_TEAM_LABELS.plural}</div>
+                <div className="dg-card-description">Teams you're on outside the schedule.</div>
               </div>
               {canManageManagementAccess && employee && (
                 <Button
@@ -860,7 +860,7 @@ export function ProfilePanel({
                   onClick={() => setIsEditingManagementAccess(true)}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
-                  {showManagementAccess ? "Edit management access" : "Add to management"}
+                  {showManagementAccess ? "Edit administrative teams" : "Add to an administrative team"}
                 </Button>
               )}
             </div>
@@ -901,7 +901,9 @@ export function ProfilePanel({
           }}
           frame={(fields, actions) => (
             <Modal
-              title={showManagementAccess ? "Edit management access" : "Add to management"}
+              title={
+                showManagementAccess ? "Edit administrative teams" : "Add to an administrative team"
+              }
               onClose={closeManagementAccessEditor}
               onRequestClose={requestManagementAccessClose}
               className="dg-modal--tight-header"

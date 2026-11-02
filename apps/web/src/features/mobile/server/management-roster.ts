@@ -137,7 +137,7 @@ export function getRequestIp(req: NextRequest): string | null {
 export function managementConflictResponse() {
   return NextResponse.json(
     {
-      error: changedElsewhereMessage("their management access"),
+      error: changedElsewhereMessage("their administrative teams"),
       code: "ORG_ACCESS_CONFLICT",
     },
     { status: 409 },
@@ -163,7 +163,7 @@ export async function requireManagementRosterActor(
   if (!allowed) {
     return {
       response: NextResponse.json(
-        { error: "You don't have permission to change who's in management." },
+        { error: "You don't have permission to change who's on an administrative team." },
         { status: 403 },
       ),
     };

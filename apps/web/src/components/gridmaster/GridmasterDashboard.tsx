@@ -13,7 +13,7 @@ import {
   formatClientLabel,
   formatOrganizationRoleLabel,
 } from "@/lib/client-facing";
-import { effectiveBillingStatus } from "@dubgrid/domain";
+import { effectiveBillingStatus, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle } from "@/lib/styles";
 import { gmHeaderStyle, gmTableStyle, gmThStyle } from "@/components/gridmaster/table-styles";
@@ -773,7 +773,7 @@ export default function GridmasterDashboard({
                           borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        {c.focusAreaLabel && c.focusAreaLabel !== "Focus Areas" ? (
+                        {c.focusAreaLabel && c.focusAreaLabel !== DEFAULT_ORGANIZATION_LABELS.focusArea ? (
                           <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>
                             {c.focusAreaLabel}
                           </span>

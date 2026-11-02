@@ -712,7 +712,7 @@ describe("StaffView", () => {
       expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Bob Beta" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
-      expect(screen.getByText("Scheduled Departments: Residential")).toBeInTheDocument();
+      expect(screen.getByText("Departments: Residential")).toBeInTheDocument();
       expect(screen.getByText("Department admin: Residential")).toBeInTheDocument();
     });
 

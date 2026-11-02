@@ -36,7 +36,7 @@ async function requireRosterMember(req: NextRequest, personId: string) {
 
   const managementUser = await findManagementUser(auth.serviceClient, auth.currentOrg.id, personId);
   if (!managementUser) {
-    return { response: NextResponse.json({ error: "Management user not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: "That person isn't on an administrative team." }, { status: 404 }) };
   }
   if (managementUser.userId && managementUser.userId === auth.user.id) {
     return {
@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
   const parsed = mobileManagementUserUpdateBodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Check the management access details and try again." },
+      { error: "Check the administrative team details and try again." },
       { status: 400 },
     );
   }
@@ -72,7 +72,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ personI
   );
   if (invalidIds.length > 0) {
     return NextResponse.json(
-      { error: "Select management departments from this organization." },
+      { error: "Select administrative teams from this organization." },
       { status: 400 },
     );
   }

@@ -13,7 +13,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 export default function OrganizationLabels({
   organization,
@@ -40,7 +40,7 @@ export default function OrganizationLabels({
     focusAreaLabel:
       form.focusAreaLabel.trim().length > 0
         ? getLineTextError(form.focusAreaLabel, {
-            label: "Focus area label",
+            label: "Area label",
             maxLength: 50,
             required: true,
             disallowUrl: true,
@@ -95,12 +95,12 @@ export default function OrganizationLabels({
         ...organization,
         focusAreaLabel: form.focusAreaLabel.trim()
           ? normalizeLineText(form.focusAreaLabel, {
-              label: "Focus area label",
+              label: "Area label",
               maxLength: 50,
               required: true,
               disallowUrl: true,
             })
-          : "Focus Areas",
+          : DEFAULT_ORGANIZATION_LABELS.focusArea,
         certificationLabel: form.certificationLabel.trim()
           ? normalizeLineText(form.certificationLabel, {
               label: "Certification label",
@@ -108,7 +108,7 @@ export default function OrganizationLabels({
               required: true,
               disallowUrl: true,
             })
-          : "Certifications",
+          : DEFAULT_ORGANIZATION_LABELS.certification,
         roleLabel: form.roleLabel.trim()
           ? normalizeLineText(form.roleLabel, {
               label: "Role label",
@@ -116,7 +116,7 @@ export default function OrganizationLabels({
               required: true,
               disallowUrl: true,
             })
-          : "Roles",
+          : DEFAULT_ORGANIZATION_LABELS.role,
       };
       const result = await saveOrganizationSettingsWithRecovery({
         baseline: organization,
@@ -194,11 +194,11 @@ export default function OrganizationLabels({
           style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
         >
           <div>
-            <label style={labelStyle}>Focus areas label</label>
+            <label style={labelStyle}>Areas label</label>
             <input
               value={form.focusAreaLabel}
               onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
-              placeholder="Focus Areas"
+              placeholder={DEFAULT_ORGANIZATION_LABELS.focusArea}
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
@@ -225,7 +225,7 @@ export default function OrganizationLabels({
                 margin: "4px 0 0",
               }}
             >
-              e.g. Focus Areas, Departments, Units
+              e.g. Areas, Wings, Units
             </p>
           </div>
           <div>

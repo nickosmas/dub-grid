@@ -805,7 +805,7 @@ describe("StaffDetailPage", () => {
     expect(screen.queryByText("Management access editor")).not.toBeInTheDocument();
 
     // Management settings always open in a popup, never inline in the card.
-    fireEvent.click(screen.getByRole("button", { name: "Edit management access" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit administrative teams" }));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByText("Management access editor")).toBeInTheDocument();

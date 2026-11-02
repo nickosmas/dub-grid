@@ -22,7 +22,7 @@ describe("PrintOptionsModal", () => {
       />,
     );
 
-    await user.click(screen.getByLabelText(/All Focus Areas/i));
+    await user.click(screen.getByLabelText(/All Areas/i));
     await user.click(screen.getByRole("button", { name: /Preview/i }));
 
     expect(onPrint).toHaveBeenCalledWith(

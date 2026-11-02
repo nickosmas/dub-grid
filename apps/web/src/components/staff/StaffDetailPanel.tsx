@@ -480,8 +480,8 @@ export function StaffDetailPanel({
                           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                         </svg>
                         {hasManagementAccess || hasPendingManagementInvite
-                          ? "Edit management access"
-                          : "Add to Management"}
+                          ? "Edit administrative teams"
+                          : "Add to an administrative team"}
                       </Button>
                     )}
                   </div>

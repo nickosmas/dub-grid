@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import Link from "next/link";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
@@ -44,7 +44,7 @@ interface ExpandedOpenShiftsProps {
 export default function ExpandedOpenShifts({
   openShifts,
   publishedWindowState = "published",
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   onClose,
 }: ExpandedOpenShiftsProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");

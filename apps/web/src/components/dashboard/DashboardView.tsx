@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { LazyProgressFallback } from "@/components/ui/lazy-fallback";
@@ -897,7 +897,7 @@ export default function DashboardView({
       return {
         statusLabel: "Coverage",
         title: "Coverage is below target",
-        description: `Some ${pluralLabelNoun(org.focusAreaLabel || "Focus Areas")} are short-staffed this period.`,
+        description: `Some ${pluralLabelNoun(org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea)} are short-staffed this period.`,
         actionLabel: "Review coverage",
         actionHref: "/schedule",
       };
@@ -1182,7 +1182,7 @@ export default function DashboardView({
           <ExpandedCoverage
             sections={sectionCoverage}
             focusAreas={focusAreas}
-            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
+            focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
             hasRequirements={hasCoverageRequirements}
             publishedWindowState={publishedWindowState}
             onClose={closeExpanded}
@@ -1192,7 +1192,7 @@ export default function DashboardView({
           <ExpandedOpenShifts
             openShifts={openShifts}
             publishedWindowState={publishedWindowState}
-            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
+            focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
             onClose={closeExpanded}
           />
         )}
@@ -1204,7 +1204,7 @@ export default function DashboardView({
             focusAreas={focusAreas}
             canNavigateToDetailsPage={permissions.canManageEmployees}
             otThreshold={overtimeThreshold}
-            focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
+            focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
             onClose={closeExpanded}
           />
         )}

@@ -12,6 +12,7 @@ import {
   statusChoices,
   type StatusAction,
   type StatusActionCopy,
+  DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 import {
   Linking,
@@ -482,7 +483,7 @@ export default function PersonDetailScreen() {
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   // Declared up here rather than with the other labels below because
   // `handleSave` names it in a validation message.
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
 
   function updateCachedPerson(nextPerson: MobilePerson) {
     queryClient.setQueryData(mobileQueryKeys.person(accessToken, nextPerson.id), {

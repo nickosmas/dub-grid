@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
-import { pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { ShiftCategory, FocusArea, ShiftDisplayMode } from "@/types";
 import { Button } from "@/components/Button";
 import {
@@ -73,7 +73,7 @@ function ShiftCategoriesSettings({
   onChange,
   canManageScheduleDefinitions,
   shiftDisplayMode = "code",
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];

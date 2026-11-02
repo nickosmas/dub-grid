@@ -285,7 +285,7 @@ export function ManagementStaffPanel({
       phone: touched.phone ? validatePhone(phone) : null,
       managementDepartmentIds:
         !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
-          ? "People who are not on the schedule must stay assigned to at least one management department."
+          ? "People who are not on the schedule must stay on at least one administrative team."
           : null,
     }),
     [deptIds.length, email, emailReadOnly, firstName, isEmployee, lastName, phone, touched],

@@ -245,7 +245,7 @@ describe("settings dirty save controls", () => {
       screen.queryByText("Scheduled only. Does not rename management departments."),
     ).not.toBeInTheDocument();
     // The other three labels remain customizable.
-    expect(screen.getByText("Focus areas label")).toBeInTheDocument();
+    expect(screen.getByText("Areas label")).toBeInTheDocument();
     expect(screen.getByText("Certifications label")).toBeInTheDocument();
     expect(screen.getByText("Roles label")).toBeInTheDocument();
   });
@@ -2977,7 +2977,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByText(/1 department.*1 focus area.*1 shift/i));
+    await user.click(screen.getByText(/1 department.*1 area.*1 shift/i));
 
     const namePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
     expect(namePreview).not.toBeNull();
@@ -3258,7 +3258,7 @@ describe("settings dirty save controls", () => {
     await user.clear(input);
     await user.type(input, "https://units.example");
 
-    expect(screen.getByText("Focus area label cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByText("Area label cannot contain a URL")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
   });

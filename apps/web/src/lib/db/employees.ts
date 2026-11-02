@@ -282,7 +282,7 @@ async function postCreateEmployeeFromOrgUser(
     throw new Error(
       formatClientErrorMessage(
         payload?.error,
-        "We couldn't add management user to the schedule. Try again.",
+        "We couldn't add them to the schedule. Try again.",
       ),
     );
   }

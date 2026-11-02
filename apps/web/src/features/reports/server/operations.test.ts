@@ -1130,7 +1130,7 @@ describe("operations reports", () => {
     );
     const employeeDirectoryCsv = buildOperationsReportCsv(payload, "employee-directory");
     expect(employeeDirectoryCsv).toContain(
-      "Employee ID,Employee,Staff status,Employment type,Email,Phone,Focus areas,Roles,Certification,Departments\r\n#1001,Avery Ng,Active,Full-time,avery@example.com,555-0101,North,RN,CNA,Care",
+      "Employee ID,Employee,Staff status,Employment type,Email,Phone,Areas,Roles,Certification,Departments\r\n#1001,Avery Ng,Active,Full-time,avery@example.com,555-0101,North,RN,CNA,Care",
     );
     expect(employeeDirectoryCsv).not.toContain("full_time");
     expect(buildOperationsReportCsv(payload, "account-access")).toContain(
@@ -1160,7 +1160,7 @@ describe("operations reports", () => {
           "Employment type",
           "Email",
           "Phone",
-          "Focus areas",
+          "Areas",
           "Roles",
           "Certification",
           "Departments",
@@ -1244,7 +1244,7 @@ describe("operations reports", () => {
         headers: [
           "Staff member",
           "Date",
-          "Focus area",
+          "Area",
           "Shift",
           "Job",
           "Start time",
@@ -1255,7 +1255,7 @@ describe("operations reports", () => {
       },
       {
         report: "coverage",
-        headers: ["Date", "Focus area", "Shift", "Job", "Required", "Scheduled", "Open slots"],
+        headers: ["Date", "Area", "Shift", "Job", "Required", "Scheduled", "Open slots"],
         firstRow: ["May 3, 2026", "North", "Day", "Caregiver", 2, 1, 1],
       },
       {
@@ -1272,13 +1272,13 @@ describe("operations reports", () => {
           "Requester's shift date",
           "Requester's shift",
           "Requester's job",
-          "Requester's focus area",
+          "Requester's area",
           "Requester's time",
           "Teammate",
           "Teammate's shift date",
           "Teammate's shift",
           "Teammate's job",
-          "Teammate's focus area",
+          "Teammate's area",
           "Teammate's time",
           "Absence type",
           "Submitted",
@@ -1350,7 +1350,7 @@ describe("operations reports", () => {
           "Employee",
           "Staff status",
           "Employment type",
-          "Focus areas",
+          "Areas",
           "Roles",
           "Account linked",
           "Invitation status",
@@ -1374,7 +1374,7 @@ describe("operations reports", () => {
           "Staff status",
           "Certification",
           "Roles",
-          "Focus areas",
+          "Areas",
           "Departments",
           "Certification status",
           "Role status",
@@ -1419,7 +1419,7 @@ describe("operations reports", () => {
       },
       {
         report: "shift-notes",
-        headers: ["Date", "Employee", "Schedule note", "Focus area"],
+        headers: ["Date", "Employee", "Schedule note", "Area"],
         firstRow: ["May 3, 2026", "Avery Ng", "Late", "North"],
       },
     ];
@@ -1592,7 +1592,7 @@ describe("operations reports", () => {
 
     const csv = buildOperationsReportCsv(payload, "shift-notes");
 
-    expect(csv.split("\r\n")[0]).toBe("Date,Employee,Schedule note,Focus area");
+    expect(csv.split("\r\n")[0]).toBe("Date,Employee,Schedule note,Area");
     expect(csv).toContain('"May 3, 2026",Avery Ng,Late,North');
     expect(csv).toContain('"May 4, 2026",Blake Diaz,Late,North');
     expect(csv.split("\r\n")).toHaveLength(4);

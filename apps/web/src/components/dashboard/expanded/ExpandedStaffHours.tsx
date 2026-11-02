@@ -1,6 +1,6 @@
 import { getAvatarTone, getAvatarTypography, resolveAvatarSeed } from "@dubgrid/design-tokens";
 import { useState, useMemo } from "react";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
@@ -35,7 +35,7 @@ export default function ExpandedStaffHours({
   focusAreas,
   canNavigateToDetailsPage,
   otThreshold = 40,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   onClose,
 }: ExpandedStaffHoursProps) {
   const { resolvedTheme } = useTheme();

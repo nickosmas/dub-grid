@@ -185,7 +185,7 @@ export function AccessCard({
                   type="button"
                   onClick={onEditManagement}
                   className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[var(--dg-color-link)] hover:underline"
-                  aria-label="Edit management access"
+                  aria-label="Edit administrative teams"
                 >
                   Edit
                 </button>

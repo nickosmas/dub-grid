@@ -399,7 +399,7 @@ describe("EditEmployeePanel", () => {
       expect(onSaveBlockedChange).toHaveBeenLastCalledWith(false);
 
       await user.click(screen.getByRole("button", { name: "North" }));
-      expect(screen.getByText("At least one focus areas is required")).toBeVisible();
+      expect(screen.getByText("At least one area is required")).toBeVisible();
       expect(onSaveBlockedChange).toHaveBeenLastCalledWith(true);
 
       await user.click(screen.getByRole("button", { name: "North" }));

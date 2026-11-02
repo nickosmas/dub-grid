@@ -26,6 +26,7 @@ import {
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { usePersonEditor } from "../hooks/usePersonEditor";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 type ScheduleDraft = {
   certificationId: number | null;
@@ -172,7 +173,7 @@ export default function AddToScheduleScreen() {
     );
   }
 
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";

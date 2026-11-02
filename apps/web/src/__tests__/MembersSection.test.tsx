@@ -452,7 +452,7 @@ describe("MembersSection — management-only view access", () => {
     });
 
     expect(screen.getByTestId("staff-detail-panel")).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Add to management" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add to an administrative team" })).toBeInTheDocument();
     expect(screen.getByTestId("employee-management-access-editor")).toBeInTheDocument();
     expect(lastStaffDetailPanelProps).not.toHaveProperty("managementAccessEditor");
   });

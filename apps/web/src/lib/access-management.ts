@@ -1,6 +1,7 @@
 import type { AdminPermissions, Invitation, OrganizationUser } from "@/types";
 import { PERMISSION_LABELS } from "@/lib/permission-labels";
 import type { ReviewChange } from "@/components/review/ChangeReviewModal";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 export interface AccessReviewChange extends ReviewChange {
   previousValue: unknown;
@@ -182,7 +183,7 @@ export function buildInvitationChanges(
   if (formatIdList(previous.departmentIds) !== formatIdList(nextInvitation.departmentIds)) {
     changes.push({
       key: "departmentIds",
-      label: "Management Departments",
+      label: ADMINISTRATIVE_TEAM_LABELS.plural,
       previousValue: previous.departmentIds ?? [],
       nextValue: nextInvitation.departmentIds ?? [],
       previousDisplay: formatIdList(previous.departmentIds),

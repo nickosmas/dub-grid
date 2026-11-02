@@ -277,9 +277,9 @@ describe("ProfilePanel", () => {
         managementDepartmentIds: [],
       });
 
-      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
     });
 
@@ -308,9 +308,9 @@ describe("ProfilePanel", () => {
         refetchProfile,
       });
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to an administrative team" }));
 
-      const dialog = screen.getByRole("dialog", { name: "Add to management" });
+      const dialog = screen.getByRole("dialog", { name: "Add to an administrative team" });
       expect(within(dialog).getByTestId("employee-management-access-editor")).toBeInTheDocument();
       expect(lastManagementAccessEditorProps?.employee.id).toBe("employee-1");
 
@@ -335,7 +335,7 @@ describe("ProfilePanel", () => {
         ],
       });
 
-      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit administrative teams" })).toBeInTheDocument();
     });
 
     it("hides the department field entirely for a viewer with neither departments nor permission", () => {

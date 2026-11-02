@@ -119,7 +119,7 @@ describe("rowToOrganization", () => {
     expect(result.employeeCount).toBeNull();
     expect(result.addressLine1).toBe("456 Oak Ave");
     expect(result.address).toBe("456 Oak Ave");
-    expect(result.departmentLabel).toBe("Scheduled Departments");
+    expect(result.departmentLabel).toBe("Departments");
     expect(result.payPeriodStartDate).toBeNull();
   });
 });

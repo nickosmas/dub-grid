@@ -46,7 +46,7 @@ function getRequestIp(req: NextRequest): string | null {
 function conflictResponse(person: LoadedMobilePerson["person"]) {
   return NextResponse.json(
     {
-      error: changedElsewhereMessage("their management access"),
+      error: changedElsewhereMessage("their administrative teams"),
       code: "ORG_ACCESS_CONFLICT",
       person,
     },
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   const parsed = mobileManagementAccessBodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Check the management access details and try again." },
+      { error: "Check the administrative team details and try again." },
       { status: 400 },
     );
   }
@@ -101,7 +101,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   );
   if (invalidIds.length > 0) {
     return NextResponse.json(
-      { error: "Select management departments from this organization." },
+      { error: "Select administrative teams from this organization." },
       { status: 400 },
     );
   }
@@ -201,7 +201,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   const email = (parsed.data.email ?? loaded.person.email ?? "").trim();
   if (!email) {
     return NextResponse.json(
-      { error: "Add an email address for this teammate before granting management access." },
+      { error: "Add an email address before adding them to an administrative team." },
       { status: 400 },
     );
   }

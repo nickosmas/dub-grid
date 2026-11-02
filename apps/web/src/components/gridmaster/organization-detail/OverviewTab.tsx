@@ -31,7 +31,7 @@ import { type Employee, type Organization } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 // Overview tab for the gridmaster OrganizationDetail view.
 
@@ -91,9 +91,9 @@ export function OverviewTab({
         addressCountry: editAddressCountry.trim(),
       }),
       timezone: editTimezone || null,
-      focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
-      certificationLabel: editCertLabel.trim() || "Certifications",
-      roleLabel: editRoleLabel.trim() || "Roles",
+      focusAreaLabel: editFocusAreaLabel.trim() || DEFAULT_ORGANIZATION_LABELS.focusArea,
+      certificationLabel: editCertLabel.trim() || DEFAULT_ORGANIZATION_LABELS.certification,
+      roleLabel: editRoleLabel.trim() || DEFAULT_ORGANIZATION_LABELS.role,
       shiftDisplayMode: editShiftDisplayMode,
       enforceConflictPrevention: editEnforceConflictPrevention,
       dataRetentionDays: editDataRetentionDays,

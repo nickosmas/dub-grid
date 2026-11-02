@@ -3,7 +3,7 @@
 ## Departments, Areas and Administrative Teams
 
 **Type:** Fix
-**Status:** not started
+**Status:** in progress
 **Branch:** `claude/departments-areas-administrative-teams` (cloud session; merges into `dev` by pull request)
 
 ## The problem
@@ -34,7 +34,7 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 **Labels:**
 
 - **One shared default** for each label (Areas, Departments, Certifications, Roles) in `packages/domain`. Every web and mobile fallback reads it.
-- **Store only a choice.** A label that is empty, or equal to the default, is stored as `NULL`. `NULL` means "use the product default".
+- **Store only a choice.** A label that is empty, or equal to the current default, is stored as `NULL`. `NULL` means "use the product default". An earlier default typed on purpose ("Focus Areas") is kept as a choice; resetting the old stored defaults is the migration's job.
 - **One data-only migration** resets the old stored defaults to `NULL`: `focus_area_label = 'Focus Areas'` and `department_label = 'Scheduled Departments'`. Custom labels (Calm Haven's "Wings") are untouched. An organization that deliberately chose "Focus Areas" will see "Areas" and can set it back.
 - **Presets** for the area label: Areas, Units, Wings, Halls, Floors, Neighborhoods, Desks and Locations, as one-tap choices beside the free-text field. They appear in Settings > Labels, the Gridmaster setup wizard and the onboarding Identity step.
 - **No team label** for now; "Administrative Teams" is fixed.
@@ -47,19 +47,25 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 - **Plural and singular forms.** They still come from `terminology-copy.ts`, so "Areas" reads "area" in sentences.
 - **Label limits.** A label still has 50 characters and no URLs.
 - **Older mobile builds.** The mobile API already sends the resolved label (`apps/web/src/features/mobile/server/data.ts:2157`), so they show the new default with no app update.
-- **Deploy order.** The migration is safe before or after the web release, because old code already shows "Focus Areas" for `NULL`. It is still reported before the release PR merges, per the production migration rule in `AGENTS.md`.
+- **Deploy order.** Apply the migration after the web release. Old code still writes "Focus Areas" when an organization is created or its labels saved, so a reset applied first could be undone before the release lands. Either order is safe to run (old code shows "Focus Areas" for `NULL`), and it is reported before the release PR merges, per the production migration rule in `AGENTS.md`.
 
 ## Build steps
 
 ### 1. Shared defaults, and storing only a choice
 
+- [x] Built and approved
+
 - Add the label defaults (Areas, Departments, Certifications, Roles) to `packages/domain`, with a helper that turns a submitted label into the value to store (`NULL` when empty or equal to the default).
 - `rowToOrganizationTerminology` (`apps/web/src/lib/db/mappers.ts:103`) and `notifications/server/events.ts:500` read the shared defaults.
 - The settings route (`apps/web/src/app/api/organizations/settings/route.ts:419`), the Gridmaster create route (`manage/route.ts:377-380`), the Gridmaster Overview tab save (`organization-detail/OverviewTab.tsx:94`) and Settings > Labels store through the helper.
 
-**Done when:** unit tests show an empty label, the default, and the old default ("Focus Areas", "Scheduled Departments") all store `NULL`, while a custom label is trimmed and stored. Route tests show the create route writes `NULL` for an unchanged label. `npm run type-check` and `npm run test` pass.
+- The client save paths (Settings > Labels, the Gridmaster Overview tab and the setup wizard's starting values) send the shared default for a blank label, not the old text.
+
+**Done when:** unit tests show an empty label and the current default store `NULL`, a custom label is trimmed and stored, and an earlier default typed on purpose is kept. Route tests show the create route writes `NULL` for an unchanged label. `npm run type-check` and `npm run test` pass.
 
 ### 2. Migration 113: reset the stored old defaults
+
+- [x] Built and approved (checked against a scratch Postgres; no Supabase stack in the cloud session)
 
 - `supabase/migrations/113_label_defaults.sql`, using the next free number on `dev` at build time, is a data-only `UPDATE` of the two old defaults to `NULL`. It is locked in `checksums.sha256`.
 
@@ -67,12 +73,18 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 
 ### 3. Every fallback reads the shared default
 
+- [x] Built and approved
+
 - Replace each hardcoded `"Focus Areas"` and `"Scheduled Departments"` fallback and prop default on web and mobile with the shared constant. `rg '"Focus Areas"|"Scheduled Departments"' apps packages` should find only tests and the migration.
 - The Labels setting is named after the new default ("Departments label", "Areas label") in `apps/web/src/lib/organization-settings.ts:90-93`. Help text that cites "Focus Areas" as the example (`settings/nav-config.tsx:139`, `onboarding/steps/IdentityStep.tsx:71`) is updated.
 
 **Done when:** the search above is clean, tests that asserted the old default are updated, and type-check, lint and tests pass.
 
+Kept on purpose: the employee CSV export's "Focus Areas" column header (`apps/web/src/app/api/export/route.ts`), because bulk import reads it back as `focus_areas`, and the person CSV's "Focus Areas" row (`lib/staff-detail-stats.ts`), which has no label in reach. Both are file formats, not screen copy.
+
 ### 4. Administrative Teams on web
+
+- [x] Built and approved (browser screenshots still to take: the cloud session has no Supabase stack to sign in against)
 
 - **Settings > Departments** (`DepartmentsSettings.tsx`, `SettingsPage.tsx`): the sections are the department label and **Administrative Teams**. Add, rename, archive and the dialogs say "team".
 - **People** (`MembersSection.tsx`, `StaffView.tsx`, `useManagementFilters.ts`, `ManagementStaffPanel.tsx`): the view toggle reads **On Schedule** and **Administrative Teams**, and so do filters and empty states.
@@ -85,6 +97,8 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 
 ### 5. Administrative Teams on mobile
 
+- [ ] Built and approved
+
 - `MANAGEMENT_DEPARTMENT_LABELS` (`apps/mobile/src/shared/lib/departments.ts`) becomes the Administrative Teams wording.
 - The People segment (`PeopleScreen.tsx:702`) reads **Administrative Teams** (`FitText` shrinks it to the slot; it never wraps).
 - `ProfileWorkScreen.tsx`, `ManagementUserInviteSheet.tsx`, the person detail screen and the mobile API's user-facing messages (`features/mobile/server/routes/*management*`) follow.
@@ -93,11 +107,15 @@ KISS: names and defaults only. The structure, data model and behavior stay as th
 
 ### 6. Area label presets
 
+- [ ] Built and approved
+
 - Settings > Labels, the Gridmaster setup wizard (`OrganizationSetupWizard.tsx:82, 599`) and the onboarding Identity step offer the presets as one-tap choices beside the free-text field. A preset fills the field; the field still takes any name.
 
 **Done when:** a test shows choosing a preset saves it and choosing Areas stores `NULL`. Browser screenshots show the presets in Settings and the wizard.
 
 ### 7. Seed data and public docs
+
+- [ ] Built and approved
 
 - In `seed.ts` and `supabase/seed_*.sql`, comments and printed text use the new names. Calm Haven's team named Administration stays, and reads "Administrative Teams → Administration".
 - **Public docs:** `docs/configuration/departments-and-focus-areas.mdx` (title and slug, with a redirect from the old path), `docs/staff/roster.mdx`, `docs/staff/detail-page.mdx`, `docs/configuration/shifts-jobs-and-absences.mdx`, the Labels page (`docs/configuration/terminology.mdx`), and any other page the docs inventory flags. The pages describe customer behavior only.

@@ -14,6 +14,7 @@ import type { AdminPermissions } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { Switch } from "@/components/ui/switch";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 type PermissionKey = keyof AdminPermissions;
 
@@ -61,9 +62,9 @@ const CATEGORY_LABELS: Record<Category, string> = {
 const CATEGORY_ORDER: Category[] = ["CORE", "ADMINISTRATION"];
 
 const DEFAULT_LABELS: PermissionEditorLabels = {
-  focusAreaLabel: "Focus Areas",
-  certificationLabel: "Certifications",
-  roleLabel: "Roles",
+  focusAreaLabel: DEFAULT_ORGANIZATION_LABELS.focusArea,
+  certificationLabel: DEFAULT_ORGANIZATION_LABELS.certification,
+  roleLabel: DEFAULT_ORGANIZATION_LABELS.role,
 };
 
 function inSentence(label: string): string {

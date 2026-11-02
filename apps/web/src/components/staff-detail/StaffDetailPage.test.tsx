@@ -361,7 +361,7 @@ describe("StaffDetailPage", () => {
       expect(await screen.findByText("Manages")).toBeInTheDocument();
       expect(screen.getByText("Nursing Office")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
     });
 
@@ -369,7 +369,7 @@ describe("StaffDetailPage", () => {
       renderWith({});
 
       expect(await screen.findByText("Manages")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit administrative teams" })).toBeInTheDocument();
     });
 
     it("hides them from a caller who does not manage employees", async () => {
