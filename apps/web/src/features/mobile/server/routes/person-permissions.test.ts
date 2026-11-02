@@ -67,7 +67,7 @@ function loadedAdmin(
 function makeServiceClient(updatedRow: unknown = { id: "m-1" }) {
   const maybeSingle = vi.fn(async () => ({ data: updatedRow, error: null }));
   const chain = {
-    update: vi.fn(() => chain),
+    update: vi.fn((_row: { admin_permissions: Record<string, boolean> }) => chain),
     eq: vi.fn(() => chain),
     select: vi.fn(() => ({ maybeSingle })),
   };
