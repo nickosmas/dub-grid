@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ADMINISTRATIVE_TEAM_LABELS,
   DEFAULT_ORGANIZATION_LABELS,
+  ORGANIZATION_LABEL_EXAMPLES,
+  organizationLabelHint,
   resolveOrganizationLabel,
   storedOrganizationLabel,
 } from "./organization-labels";
@@ -55,5 +57,27 @@ describe("administrative team labels", () => {
       pluralLower: "administrative teams",
       singularLower: "administrative team",
     });
+  });
+});
+
+describe("label example hints", () => {
+  it("lists each label's examples after e.g.", () => {
+    expect(organizationLabelHint("focusArea")).toBe(
+      "e.g. Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations",
+    );
+    expect(organizationLabelHint("certification")).toBe(
+      "e.g. Certifications, Credentials, Licenses, Qualifications, Designations, Skill Levels, Training",
+    );
+    expect(organizationLabelHint("role")).toBe(
+      "e.g. Roles, Positions, Responsibilities, Duties, Titles",
+    );
+  });
+
+  it("starts each list with the label's default", () => {
+    for (const key of Object.keys(ORGANIZATION_LABEL_EXAMPLES) as Array<
+      keyof typeof ORGANIZATION_LABEL_EXAMPLES
+    >) {
+      expect(ORGANIZATION_LABEL_EXAMPLES[key][0]).toBe(DEFAULT_ORGANIZATION_LABELS[key]);
+    }
   });
 });

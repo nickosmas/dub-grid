@@ -1067,7 +1067,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:21906676ba1e5c9645eafc8a5c7f8f6570db24fb4472d869c4a6b5376103b356"
+      "evidenceFingerprint": "sha256:e9ab7cf601631faaa2ea7fe0a3d1415177bc28fc625a6411c1e927ec22ae8748"
     },
     {
       "id": "roles",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6eed25345e9ce1d7b3b12a5894cb36130fd2690bf793323d9bff7c11e1e36488"
+      "evidenceFingerprint": "sha256:6335c2f6b5383e4a6f0add2368c6c10b011cbd3d39d9de06cc21835a67cea34a"
     },
     {
       "id": "roles-certifications-indicators",

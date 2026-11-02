@@ -40,14 +40,24 @@ export const ADMINISTRATIVE_TEAM_LABELS = {
   singularLower: "administrative team",
 } as const;
 
-/** One-tap choices for the area label, care and other workplaces alike. Free text still works. */
-export const AREA_LABEL_PRESETS = [
-  "Areas",
-  "Units",
-  "Wings",
-  "Halls",
-  "Floors",
-  "Neighborhoods",
-  "Desks",
-  "Locations",
-] as const;
+/** Examples shown under each editable label's field. The first is the default. */
+export const ORGANIZATION_LABEL_EXAMPLES = {
+  focusArea: ["Areas", "Units", "Wings", "Halls", "Floors", "Neighborhoods", "Locations"],
+  certification: [
+    "Certifications",
+    "Credentials",
+    "Licenses",
+    "Qualifications",
+    "Designations",
+    "Skill Levels",
+    "Training",
+  ],
+  role: ["Roles", "Positions", "Responsibilities", "Duties", "Titles"],
+} as const;
+
+export type EditableOrganizationLabelKey = keyof typeof ORGANIZATION_LABEL_EXAMPLES;
+
+/** The hint line under a label's field, such as "e.g. Roles, Positions, Duties". */
+export function organizationLabelHint(key: EditableOrganizationLabelKey): string {
+  return `e.g. ${ORGANIZATION_LABEL_EXAMPLES[key].join(", ")}`;
+}

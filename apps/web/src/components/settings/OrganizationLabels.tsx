@@ -13,8 +13,11 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-import { AreaLabelPresets } from "@/components/settings/AreaLabelPresets";
+import {
+  changedElsewhereMessage,
+  DEFAULT_ORGANIZATION_LABELS,
+  organizationLabelHint,
+} from "@dubgrid/domain";
 
 export default function OrganizationLabels({
   organization,
@@ -219,19 +222,22 @@ export default function OrganizationLabels({
                 {fieldErrors.focusAreaLabel}
               </p>
             ) : null}
-            {readOnly ? null : (
-              <AreaLabelPresets
-                value={form.focusAreaLabel}
-                onSelect={(label) => setForm((p) => ({ ...p, focusAreaLabel: label }))}
-              />
-            )}
+            <p
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--dg-color-text-muted)",
+                margin: "4px 0 0",
+              }}
+            >
+              {organizationLabelHint("focusArea")}
+            </p>
           </div>
           <div>
             <label style={labelStyle}>Certifications label</label>
             <input
               value={form.certificationLabel}
               onChange={(e) => setForm((p) => ({ ...p, certificationLabel: e.target.value }))}
-              placeholder="Certifications"
+              placeholder={DEFAULT_ORGANIZATION_LABELS.certification}
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
@@ -260,7 +266,7 @@ export default function OrganizationLabels({
                 margin: "4px 0 0",
               }}
             >
-              e.g. Certifications, Designations
+              {organizationLabelHint("certification")}
             </p>
           </div>
           <div>
@@ -268,7 +274,7 @@ export default function OrganizationLabels({
             <input
               value={form.roleLabel}
               onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
-              placeholder="Roles"
+              placeholder={DEFAULT_ORGANIZATION_LABELS.role}
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
@@ -293,7 +299,7 @@ export default function OrganizationLabels({
                 margin: "4px 0 0",
               }}
             >
-              e.g. Responsibilities, Positions
+              {organizationLabelHint("role")}
             </p>
           </div>
         </div>
