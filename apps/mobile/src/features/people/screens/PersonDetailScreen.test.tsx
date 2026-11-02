@@ -940,6 +940,7 @@ describe("PersonDetailScreen", () => {
 
       expect(screen.queryByTestId("status-line-invitation")).not.toBeInTheDocument();
       expect(screen.getByText("The invite hasn't been sent yet.")).toBeInTheDocument();
+      expect(screen.getByText("App invite")).toBeInTheDocument();
       fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
       expect(screen.getByText("Invite to the app")).toBeInTheDocument();
       expect(screen.getByText("Sends to")).toBeInTheDocument();
@@ -990,7 +991,7 @@ describe("PersonDetailScreen", () => {
       cleanup();
 
       renderInvitation({ userId: "user-1", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" });
-      expect(screen.queryByText("Invite")).not.toBeInTheDocument();
+      expect(screen.queryByText("App invite")).not.toBeInTheDocument();
       expect(screen.getByText("Access role")).toBeInTheDocument();
     });
   });

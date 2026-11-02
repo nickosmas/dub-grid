@@ -1733,7 +1733,7 @@ export default function PersonDetailScreen() {
                     emphasis="label"
                     iconName="mail-outline"
                     isLast={!hasAccessRecord && !managesDepartments}
-                    label="Invite"
+                    label="App invite"
                     value={inviteRow.value}
                     trailing={
                       inviteRow.action ? (
