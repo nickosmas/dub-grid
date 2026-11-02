@@ -55,7 +55,8 @@ export function ConfigTab({
       {/* Focus Areas */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          {organization.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea} ({activeFocusAreas.length})
+          {organization.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea} (
+          {activeFocusAreas.length})
           {archivedFocusAreas.length > 0 && (
             <span
               style={{

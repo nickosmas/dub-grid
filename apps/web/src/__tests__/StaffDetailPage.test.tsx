@@ -798,7 +798,7 @@ describe("StaffDetailPage", () => {
 
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Internal notes");
-    expect(screen.getByText("Manages")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
     expect(screen.getByText("HR")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resend" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change staff status" })).toBeInTheDocument();
@@ -861,7 +861,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Access role")).toBeInTheDocument();
     expect(screen.getByText("User")).toBeInTheDocument();
     // Not a management user, so what they manage stays away entirely.
-    expect(screen.queryByText("Manages")).not.toBeInTheDocument();
+    expect(screen.queryByText("Administrative Teams")).not.toBeInTheDocument();
 
     // The role and permissions open in their own popup, apart from Edit details.
     fireEvent.click(screen.getByRole("button", { name: "Change access" }));
@@ -915,7 +915,7 @@ describe("StaffDetailPage", () => {
 
     // One access role, and what they manage beside it.
     expect(screen.getAllByText("Access role")).toHaveLength(1);
-    expect(screen.getByText("Manages")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
   });
 
   it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {

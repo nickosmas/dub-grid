@@ -260,7 +260,8 @@ export default function SettingsPage({
   const focusAreaLabel = organization.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea;
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
-  const scheduledDepartmentLabel = organization.departmentLabel || DEFAULT_ORGANIZATION_LABELS.department;
+  const scheduledDepartmentLabel =
+    organization.departmentLabel || DEFAULT_ORGANIZATION_LABELS.department;
   const navGroups = useMemo(
     () =>
       buildNavGroups(perms, {

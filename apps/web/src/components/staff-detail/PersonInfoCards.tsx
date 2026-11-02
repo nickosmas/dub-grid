@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { describePlannedChangeInFull, formatFirstDay, plannedReturn } from "@dubgrid/domain";
+import {
+  ADMINISTRATIVE_TEAM_LABELS,
+  describePlannedChangeInFull,
+  formatFirstDay,
+  plannedReturn,
+} from "@dubgrid/domain";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateTimeLabel } from "@/lib/client-facing";
@@ -173,7 +178,7 @@ export function AccessCard({
           </InfoField>
         ) : null}
         {managedDepartments ? (
-          <InfoField label="Manages">
+          <InfoField label={ADMINISTRATIVE_TEAM_LABELS.plural}>
             <span className="inline-flex flex-wrap items-baseline gap-x-2">
               {managedDepartments.length > 0 ? (
                 managedDepartments.join(", ")

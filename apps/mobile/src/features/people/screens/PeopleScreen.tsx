@@ -1,4 +1,10 @@
-import { capitalizeFirst, pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+  ADMINISTRATIVE_TEAM_LABELS,
+} from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
@@ -260,8 +266,8 @@ export default function PeopleScreen() {
       await managementUsersQuery.refetch();
       pushToast({
         tone: "success",
-        title: "Management invitation sent",
-        message: "They'll join management once they accept.",
+        title: "Invitation sent",
+        message: "They'll join their administrative teams once they accept.",
       });
     },
     // Inline: the invite sheet stays open on failure, and it is a `<Modal>` —
@@ -269,10 +275,7 @@ export default function PeopleScreen() {
     onMutate: () => setInviteError(null),
     onError: (error) => {
       setInviteError(
-        getClientFriendlyErrorMessage(
-          error,
-          "We couldn't send that management invitation right now.",
-        ),
+        getClientFriendlyErrorMessage(error, "We couldn't send that invitation right now."),
       );
     },
   });
@@ -352,7 +355,8 @@ export default function PeopleScreen() {
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certifications";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const useCompactRoleCertificationLabels =
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   const managementDepartments = useMemo(
@@ -613,7 +617,9 @@ export default function PeopleScreen() {
               // `employees` row until it is accepted. Its actions come up here.
               setManagementUserActions(managementUser);
             }}
-            subtitle={departmentNames.join(", ") || managementUser.email || "No departments"}
+            subtitle={
+              departmentNames.join(", ") || managementUser.email || "No administrative teams"
+            }
           />
         </View>
       );
@@ -689,7 +695,7 @@ export default function PeopleScreen() {
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
-        title={isManagementTab ? "Filter management" : "Filter staff"}
+        title={isManagementTab ? "Filter administrative teams" : "Filter staff"}
         onClearAll={clearFilters}
         onDismiss={() => setIsFilterModalVisible(false)}
         onDone={() => setIsFilterModalVisible(false)}
@@ -699,8 +705,8 @@ export default function PeopleScreen() {
           <SegmentedSwitch
             accessibilityLabel="Directory section"
             options={[
-              { value: "schedule", label: "Schedule" },
-              { value: "management", label: "Management" },
+              { value: "schedule", label: "On Schedule" },
+              { value: "management", label: ADMINISTRATIVE_TEAM_LABELS.plural },
             ]}
             value={rosterTab}
             onChange={setRosterTab}
@@ -708,9 +714,9 @@ export default function PeopleScreen() {
         ) : null}
         {isManagementTab ? (
           <>
-            <SelectionSection label="Management department">
+            <SelectionSection label="Administrative team">
               <SelectionRow
-                label="All management departments"
+                label="All administrative teams"
                 onPress={() => setManagementFilter("departmentId", "all")}
                 selected={managementFilters.departmentId === "all"}
               />
@@ -938,7 +944,7 @@ export default function PeopleScreen() {
         onOpenFilters={() => setIsFilterModalVisible(true)}
       />
       <ScreenSearch
-        placeholder={isManagementTab ? "Search management" : "Search people"}
+        placeholder={isManagementTab ? "Search administrative teams" : "Search people"}
         onSearchChange={setSearchValue}
       />
 
@@ -1049,9 +1055,9 @@ export default function PeopleScreen() {
         managementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
-            body="Nobody has management access yet. Invite someone, or add a teammate to management from their staff profile."
+            body="Nobody is on an administrative team yet. Invite someone, or add someone from their staff profile."
             iconName="briefcase-outline"
-            title="No management users yet"
+            title="Nobody on an administrative team yet"
           />
         ) : filteredManagementUsers.length === 0 ? (
           <EmptyStateCard

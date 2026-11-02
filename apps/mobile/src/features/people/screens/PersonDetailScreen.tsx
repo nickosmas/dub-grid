@@ -13,6 +13,7 @@ import {
   type StatusAction,
   type StatusActionCopy,
   DEFAULT_ORGANIZATION_LABELS,
+  ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
 import {
   Linking,
@@ -483,7 +484,8 @@ export default function PersonDetailScreen() {
     bootstrapQuery.data?.currentOrg?.useCompactRoleCertificationLabels ?? false;
   // Declared up here rather than with the other labels below because
   // `handleSave` names it in a validation message.
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
 
   function updateCachedPerson(nextPerson: MobilePerson) {
     queryClient.setQueryData(mobileQueryKeys.person(accessToken, nextPerson.id), {
@@ -1787,7 +1789,7 @@ export default function PersonDetailScreen() {
                     <ProfileNavRow
                       iconName="briefcase-outline"
                       isLast
-                      label="Manages"
+                      label={ADMINISTRATIVE_TEAM_LABELS.plural}
                       value={managementDepartmentNames}
                       onPress={() => setShowManagementAccess(true)}
                     />
@@ -1796,7 +1798,7 @@ export default function PersonDetailScreen() {
                       emphasis="label"
                       iconName="briefcase-outline"
                       isLast
-                      label="Manages"
+                      label={ADMINISTRATIVE_TEAM_LABELS.plural}
                       value={managementDepartmentNames}
                     />
                   )
@@ -2000,7 +2002,7 @@ export default function PersonDetailScreen() {
                 // opening a sheet that can only say so; the editor is where an
                 // address gets added. Existing access is still editable and
                 // removable whatever the contact details say.
-                // Someone who already manages changes it from the Manages row.
+                // Someone who already manages changes it from the Administrative Teams row.
                 ...(canManageManagementAccess &&
                 person.status !== "removed" &&
                 !isSelf &&
@@ -2009,7 +2011,7 @@ export default function PersonDetailScreen() {
                   ? [
                       {
                         key: "management",
-                        label: "Add to management",
+                        label: "Add to an administrative team",
                         onPress: () => setShowManagementAccess(true),
                       },
                     ]
@@ -2623,7 +2625,7 @@ function EditPanel({
   };
   const assignmentNotices =
     hasManagementAccess && draft.focusAreaIds.length === 0
-      ? ["Saving now removes them from the schedule. They'll keep management access."]
+      ? ["Saving now removes them from the schedule. They'll stay on their administrative teams."]
       : [];
   const toggle = (key: "focusAreaIds" | "roleIds", id: number) => {
     const current = draft[key];

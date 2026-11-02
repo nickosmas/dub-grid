@@ -68,7 +68,12 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { changedElsewhereMessage, pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import {
+  changedElsewhereMessage,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 

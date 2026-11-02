@@ -1439,7 +1439,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           ) : null
         ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
           <ScrollableTabStrip
-            accessibilityLabel={bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea}
+            accessibilityLabel={
+              bootstrapQuery.data?.currentOrg.labels.focusArea ??
+              DEFAULT_ORGANIZATION_LABELS.focusArea
+            }
             activeKey={activeTeamFocusAreaKey}
             onSelect={handleSelectFocusArea}
             tabs={teamFocusAreaTabs}

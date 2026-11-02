@@ -392,7 +392,7 @@ describe("PersonDetailScreen", () => {
   });
 
   // The page said nothing about management access: the only trace of it was
-  // whether the button at the foot read "Add to management" or "Edit
+  // whether the button at the foot read "Add to an administrative team" or "Edit
   // Management Access", and the number an admin identifies someone by was
   // missing entirely. The two kinds of department take a row each — where they
   // are scheduled, and what they manage, are different facts.
@@ -410,8 +410,7 @@ describe("PersonDetailScreen", () => {
     // Scheduled departments stay in Assignments; the ones they manage are
     // part of what they can do, under Access.
     expect(screen.getByText("Departments")).toBeInTheDocument();
-    expect(screen.getByText("Manages")).toBeInTheDocument();
-    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Administrative Teams")).toHaveLength(1);
     expect(screen.getByText("Employee ID")).toBeInTheDocument();
     expect(screen.getByText("#12")).toBeInTheDocument();
   });
@@ -594,12 +593,12 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByText("Scheduled Departments")).toBeInTheDocument();
-    expect(screen.getByText("Manages")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
     expect(screen.queryByText("Management Scheduled Departments")).not.toBeInTheDocument();
   });
 
   // `hasManagementAccess` is true for a plain staff app invitation too, so
-  // gating the section on it printed an empty "Management Departments" row for
+  // gating the section on it printed an empty "Administrative Teams" row for
   // anyone with an invite out.
   it("leaves the management section off for a staff invitation", () => {
     useQuery.mockReturnValue({
@@ -624,7 +623,7 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
+    expect(screen.queryByText("Administrative Teams")).not.toBeInTheDocument();
   });
 
   // The edit draft used to be synced from the person in an effect, and effects
@@ -2238,7 +2237,7 @@ describe("PersonDetailScreen", () => {
       expect(names.slice(footStart)).toEqual([
         "Revoke invite",
         "Add to schedule",
-        "Add to management",
+        "Add to an administrative team",
       ]);
       // The status card sits between the contact pair and the sections, and
       // the invite's Resend comes after it, in Access.
@@ -2352,19 +2351,19 @@ describe("PersonDetailScreen", () => {
     it("keeps management access out of reach without the permission", () => {
       renderWithManagementAccess({ canManageManagementAccess: false });
 
-      expect(screen.queryByRole("button", { name: "Add to management" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to an administrative team" })).not.toBeInTheDocument();
     });
 
     it("names the action for whether they are already on the roster", () => {
       renderWithManagementAccess({});
-      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
 
       // Someone who already manages changes it from the Manages row in Access.
       renderWithManagementAccess({ person: { managementDepartmentIds: [9] } });
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
-      expect(screen.getAllByText("Manages").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Administrative Teams").length).toBeGreaterThan(0);
     });
 
     // Management settings always open in a popup over whatever raised them,
@@ -2373,17 +2372,17 @@ describe("PersonDetailScreen", () => {
     it("opens management access in a sheet, not a pushed screen", () => {
       renderWithManagementAccess({});
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to an administrative team" }));
 
       // The button and, now, the sheet's title.
-      expect(screen.getAllByText("Add to management")).toHaveLength(2);
+      expect(screen.getAllByText("Add to an administrative team")).toHaveLength(2);
       expect(routerPush).not.toHaveBeenCalled();
     });
 
     it("offers only the org's management departments, never its scheduled ones", () => {
       renderWithManagementAccess({});
 
-      fireEvent.click(screen.getByRole("button", { name: "Add to management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add to an administrative team" }));
 
       expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
       expect(screen.queryByRole("checkbox", { name: "North Wing" })).not.toBeInTheDocument();
@@ -2395,9 +2394,9 @@ describe("PersonDetailScreen", () => {
     it("offers no Add to Management to someone with no email on file", () => {
       renderWithManagementAccess({ person: { email: "" } });
 
-      expect(screen.queryByRole("button", { name: "Add to management" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add to an administrative team" })).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
     });
 
@@ -2406,8 +2405,8 @@ describe("PersonDetailScreen", () => {
     it("keeps the Manages row for someone already on the roster without an email", () => {
       renderWithManagementAccess({ person: { email: "", managementDepartmentIds: [9] } });
 
-      fireEvent.click(screen.getByText("Manages"));
-      expect(screen.getAllByText(/management/i).length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByText("Administrative Teams"));
+      expect(screen.getAllByText(/administrative team/i).length).toBeGreaterThan(0);
     });
 
     // A plain app invitation carries no management departments, so it must not
@@ -2425,9 +2424,9 @@ describe("PersonDetailScreen", () => {
         },
       });
 
-      expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
     });
   });
@@ -2623,7 +2622,7 @@ describe("PersonDetailScreen", () => {
 
       expect(
         screen.getByText(
-          "Saving now removes them from the schedule. They'll keep management access.",
+          "Saving now removes them from the schedule. They'll stay on their administrative teams.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
@@ -2655,7 +2654,7 @@ describe("PersonDetailScreen", () => {
 
       expect(
         screen.queryByText(
-          "Saving now removes them from the schedule. They'll keep management access.",
+          "Saving now removes them from the schedule. They'll stay on their administrative teams.",
         ),
       ).not.toBeInTheDocument();
     });

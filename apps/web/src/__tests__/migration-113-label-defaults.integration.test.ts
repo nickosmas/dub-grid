@@ -25,7 +25,9 @@ async function probeDb(): Promise<boolean> {
   const probe = new Client(DB_CONFIG);
   try {
     await probe.connect();
-    await probe.query("SELECT focus_area_label, department_label FROM public.organizations LIMIT 1");
+    await probe.query(
+      "SELECT focus_area_label, department_label FROM public.organizations LIMIT 1",
+    );
     return true;
   } catch {
     return false;

@@ -469,10 +469,7 @@ describe("PUT /api/organizations/settings", () => {
       currentOverrides: Record<string, unknown>,
       labels: Record<string, string>,
     ) {
-      const currentRow = makeOrganizationRow(
-        "2026-04-15T18:00:00.000000+00:00",
-        currentOverrides,
-      );
+      const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", currentOverrides);
       organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
       organizationUpdateMaybeSingle.mockResolvedValueOnce({
         data: makeOrganizationRow("2026-04-15T18:10:00.000000+00:00"),

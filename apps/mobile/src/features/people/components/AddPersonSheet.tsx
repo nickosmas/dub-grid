@@ -7,7 +7,11 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
-import { FIRST_DAY_FIELD_HINT, PLANNED_START_MAX_DAYS, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import {
+  FIRST_DAY_FIELD_HINT,
+  PLANNED_START_MAX_DAYS,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
   BottomSheetModal,
@@ -113,7 +117,8 @@ export function AddPersonSheet({
     !invite ||
     orgRole !== "user";
 
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   // A new hire's first day (51g4) is today or later here; an earlier one is set on the web.
   const today = getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null);
   const certificationLabel =

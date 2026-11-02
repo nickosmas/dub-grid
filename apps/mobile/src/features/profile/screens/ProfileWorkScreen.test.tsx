@@ -313,7 +313,7 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByText("Nursing")).toBeInTheDocument();
     // The kind you manage is a separate row from the kind you're scheduled in,
     // and its label is fixed rather than composed from the org's own noun.
-    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
     expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
     expect(screen.getByText("Employee ID")).toBeInTheDocument();
     expect(screen.getByText("#87")).toBeInTheDocument();
@@ -338,16 +338,16 @@ describe("ProfileWorkScreen", () => {
     grantManagementAccessPermission();
     render(<ProfileWorkScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Management Departments/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Administrative Teams/ }));
 
-    expect(screen.getByText("Edit management access")).toBeInTheDocument();
+    expect(screen.getByText("Edit administrative teams")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Clinical Leadership" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
   });
 
-  it("offers Add to management from the row when you manage nothing yet", () => {
+  it("offers Add to an administrative team from the row when you manage nothing yet", () => {
     grantManagementAccessPermission();
     useQuery.mockReturnValue({
       data: { ...profileData, managementDepartmentIds: [] },
@@ -357,11 +357,11 @@ describe("ProfileWorkScreen", () => {
     });
     render(<ProfileWorkScreen />);
 
-    const row = screen.getByRole("button", { name: /^Management Departments/ });
-    expect(row).toHaveTextContent("Not in management");
+    const row = screen.getByRole("button", { name: /^Administrative Teams/ });
+    expect(row).toHaveTextContent("Not on an administrative team");
     fireEvent.click(row);
 
-    expect(screen.getByText("Add to management")).toBeInTheDocument();
+    expect(screen.getByText("Add to an administrative team")).toBeInTheDocument();
   });
 
   // Without the permission the departments stay a fact, not a control, and
@@ -371,7 +371,7 @@ describe("ProfileWorkScreen", () => {
 
     expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Management Departments/ }),
+      screen.queryByRole("button", { name: /^Administrative Teams/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -384,7 +384,7 @@ describe("ProfileWorkScreen", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
 
     expect(
-      screen.getByText("Saving now removes you from the schedule. You'll keep management access."),
+      screen.getByText("Saving now removes you from the schedule. You'll stay on your administrative teams."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Select at least one focus area.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();

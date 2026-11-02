@@ -125,9 +125,7 @@ export async function saveOrganizationSetupConfig({
         focusArea.departmentId == null || !scheduledDepartmentRowIds.has(focusArea.departmentId),
     )
   ) {
-    throw new Error(
-      "Assign each area to a department before saving configuration.",
-    );
+    throw new Error("Assign each area to a department before saving configuration.");
   }
 
   if (
@@ -146,9 +144,7 @@ export async function saveOrganizationSetupConfig({
       return !hasDepartment || !hasFocusArea || !hasShift;
     })
   ) {
-    throw new Error(
-      "Assign each job to a department, area and shift before saving configuration.",
-    );
+    throw new Error("Assign each job to a department, area and shift before saving configuration.");
   }
 
   if (shiftDisplayMode !== "code") {

@@ -773,7 +773,8 @@ export default function GridmasterDashboard({
                           borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
-                        {c.focusAreaLabel && c.focusAreaLabel !== DEFAULT_ORGANIZATION_LABELS.focusArea ? (
+                        {c.focusAreaLabel &&
+                        c.focusAreaLabel !== DEFAULT_ORGANIZATION_LABELS.focusArea ? (
                           <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>
                             {c.focusAreaLabel}
                           </span>

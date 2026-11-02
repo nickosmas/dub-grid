@@ -58,7 +58,7 @@ describe("management confirmation errors", () => {
   });
 
   it.each([
-    ["member", "Remove from management", "Remove access"],
+    ["member", "Remove from administrative teams", "Remove access"],
     ["pending_invite", "Resend invite", "Resend"],
     ["pending_invite", "Revoke invite", "Revoke"],
   ] as const)(

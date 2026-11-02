@@ -201,9 +201,7 @@ describe("ManagementStaffPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
 
-    expect(
-      screen.getByText(/must stay on at least one administrative team/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/must stay on at least one administrative team/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
 

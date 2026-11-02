@@ -284,7 +284,9 @@ export default function InviteEmployeeModal({
     <>
       <Modal
         title={
-          isManagementInvite ? "Invite to an administrative team" : `Invite ${getEmployeeDisplayName(employee)}`
+          isManagementInvite
+            ? "Invite to an administrative team"
+            : `Invite ${getEmployeeDisplayName(employee)}`
         }
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
@@ -520,7 +522,8 @@ export default function InviteEmployeeModal({
           {isManagementInvite && managementDepts.length > 0 && (
             <div>
               <label style={labelStyle}>
-                {ADMINISTRATIVE_TEAM_LABELS.plural} <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                {ADMINISTRATIVE_TEAM_LABELS.plural}{" "}
+                <span style={{ color: "var(--dg-color-danger)" }}>*</span>
               </label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {managementDepts.map((department) => (

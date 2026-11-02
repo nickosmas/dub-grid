@@ -485,7 +485,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const assignmentNotices = useMemo(() => {
       const notices: string[] = [];
       if (isManagementUser && form.focusAreaIds.length === 0) {
-        notices.push("Saving now removes them from the schedule. They'll stay on their administrative teams.");
+        notices.push(
+          "Saving now removes them from the schedule. They'll stay on their administrative teams.",
+        );
       }
       return notices;
     }, [isManagementUser, form.focusAreaIds.length]);

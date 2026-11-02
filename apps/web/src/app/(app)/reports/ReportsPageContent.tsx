@@ -377,7 +377,9 @@ function ReportsContent() {
     ],
   );
   const filtersKey = useMemo(() => serializeFilters(reportFilters), [reportFilters]);
-  const focusAreaTerm = pluralLabelNoun(org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea);
+  const focusAreaTerm = pluralLabelNoun(
+    org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea,
+  );
   const reportOptions = useMemo(
     () =>
       REPORT_OPTIONS.map((option) =>

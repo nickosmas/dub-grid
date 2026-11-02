@@ -116,7 +116,9 @@ export function buildNavGroups(
   overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
-  const focusArea = singularLabelNoun(overrides?.focusAreaLabel ?? DEFAULT_ORGANIZATION_LABELS.focusArea);
+  const focusArea = singularLabelNoun(
+    overrides?.focusAreaLabel ?? DEFAULT_ORGANIZATION_LABELS.focusArea,
+  );
   const roles = pluralLabelNoun(overrides?.roleLabel ?? "Roles");
   const certifications = pluralLabelNoun(overrides?.certificationLabel ?? "Certifications");
 

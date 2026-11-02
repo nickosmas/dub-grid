@@ -36,7 +36,12 @@ async function requireRosterMember(req: NextRequest, personId: string) {
 
   const managementUser = await findManagementUser(auth.serviceClient, auth.currentOrg.id, personId);
   if (!managementUser) {
-    return { response: NextResponse.json({ error: "That person isn't on an administrative team." }, { status: 404 }) };
+    return {
+      response: NextResponse.json(
+        { error: "That person isn't on an administrative team." },
+        { status: 404 },
+      ),
+    };
   }
   if (managementUser.userId && managementUser.userId === auth.user.id) {
     return {

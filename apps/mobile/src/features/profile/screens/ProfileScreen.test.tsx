@@ -328,7 +328,7 @@ describe("ProfileScreen", () => {
     // A fixed label, never composed from the org's own department noun — an
     // org that calls its scheduled kind "Scheduled Departments" was getting
     // "Management Scheduled Departments" here.
-    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
     expect(screen.getByText("Clinical Leadership, Operations")).toBeInTheDocument();
     // A row each: where you are scheduled and what you manage are different
     // facts, and the same person commonly has both.
@@ -347,7 +347,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
     // The org's own label for the scheduled kind — this fixture's is
     // "Department", singular — never appears as a row of its own.
     expect(screen.queryByText("Department")).not.toBeInTheDocument();

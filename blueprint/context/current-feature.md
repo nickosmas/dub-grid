@@ -97,7 +97,7 @@ Kept on purpose: the employee CSV export's "Focus Areas" column header (`apps/we
 
 ### 5. Administrative Teams on mobile
 
-- [ ] Built and approved
+- [x] Built and approved (simulator screenshot still to take: the cloud session has no simulator; the person page's "Manages" row on web and mobile became Administrative Teams too)
 
 - `MANAGEMENT_DEPARTMENT_LABELS` (`apps/mobile/src/shared/lib/departments.ts`) becomes the Administrative Teams wording.
 - The People segment (`PeopleScreen.tsx:702`) reads **Administrative Teams** (`FitText` shrinks it to the slot; it never wraps).

@@ -173,7 +173,8 @@ export default function AddToScheduleScreen() {
     );
   }
 
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
@@ -213,7 +214,7 @@ export default function AddToScheduleScreen() {
         />
       ) : (
         <>
-          <ProfileSection description="Assignments put them on the schedule. Their management access doesn't change.">
+          <ProfileSection description="Assignments put them on the schedule. Their administrative teams don't change.">
             <ProfileChoiceGroup
               error={focusAreaError}
               items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}

@@ -412,7 +412,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     fireEvent.click(screen.getByText("Done"));
 
     fireEvent.click(screen.getByText("Mina Diaz"));
@@ -478,13 +478,13 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
 
     expect(routerPush).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Resend invite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit administrative teams" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke invite" })).toBeInTheDocument();
     // The sheet names the departments too — the row behind it already does, so
     // both are on screen.
@@ -546,7 +546,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
     fireEvent.click(screen.getByRole("button", { name: "Change access role" }));
@@ -612,11 +612,11 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText("Add person"));
     expect(screen.getByText("Scheduled staff")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative team"));
 
     // The chooser leaves first, then the form is presented: iOS refuses a
     // present that overlaps a dismiss.
-    expect(await screen.findByText("Invite management user")).toBeInTheDocument();
+    expect(await screen.findByText("Invite to an administrative team")).toBeInTheDocument();
     // Access roles are the described list, and an admin cannot hand out Super Admin.
     expect(
       screen.getByText("Manages the schedule and staff, within their permissions."),
@@ -1335,14 +1335,14 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Area")).toBeInTheDocument();
     // Access role is the one control both halves share, so the roster-only
     // sections are what prove the staff sheet is showing.
-    expect(screen.queryByText("Management department")).not.toBeInTheDocument();
+    expect(screen.queryByText("Administrative team")).not.toBeInTheDocument();
     expect(screen.queryByText("Invitation")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
 
     expect(screen.queryByText("Area")).not.toBeInTheDocument();
     expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
-    expect(screen.getByText("Management department")).toBeInTheDocument();
+    expect(screen.getByText("Administrative team")).toBeInTheDocument();
     expect(screen.getByText("Invitation")).toBeInTheDocument();
     // Twice: the section of access-level filters, and the sort by it.
     expect(screen.getAllByText("Access role")).toHaveLength(2);
@@ -1354,7 +1354,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     // Also a badge on the row behind the sheet; the sheet's row comes first.
     fireEvent.click(screen.getAllByText("Super Admin")[0]);
 
@@ -1368,7 +1368,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
 
     expect(screen.getByText("Ida Shaw")).toBeInTheDocument();
@@ -1383,11 +1383,11 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Administrative Teams"));
     fireEvent.click(screen.getAllByText("Invitation pending")[0]);
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    fireEvent.click(screen.getByText("Schedule"));
+    fireEvent.click(screen.getByText("On Schedule"));
 
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
     expect(screen.getByText("June Patel")).toBeInTheDocument();

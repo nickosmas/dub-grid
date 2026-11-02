@@ -280,10 +280,7 @@ async function postCreateEmployeeFromOrgUser(
   if (mismatchError) throw mismatchError;
   if (!response.ok || !payload?.employee) {
     throw new Error(
-      formatClientErrorMessage(
-        payload?.error,
-        "We couldn't add them to the schedule. Try again.",
-      ),
+      formatClientErrorMessage(payload?.error, "We couldn't add them to the schedule. Try again."),
     );
   }
   return payload.employee;

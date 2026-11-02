@@ -860,7 +860,9 @@ export function ProfilePanel({
                   onClick={() => setIsEditingManagementAccess(true)}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
-                  {showManagementAccess ? "Edit administrative teams" : "Add to an administrative team"}
+                  {showManagementAccess
+                    ? "Edit administrative teams"
+                    : "Add to an administrative team"}
                 </Button>
               )}
             </div>

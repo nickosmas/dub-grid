@@ -63,7 +63,8 @@ export default function CoverageExpandedScreen() {
   }
 
   const sections = dashboardQuery.data.coverageBySection;
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels?.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels?.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const filtered =
     focusAreaFilter === "all"
       ? sections

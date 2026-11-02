@@ -116,11 +116,11 @@ describe("ManagementAccessSheet", () => {
 
   it("names itself for whether they are already on the roster", () => {
     renderSheet();
-    expect(screen.getByText("Add to management")).toBeInTheDocument();
+    expect(screen.getByText("Add to an administrative team")).toBeInTheDocument();
 
     cleanup();
     renderSheet({ managementDepartmentIds: [9] });
-    expect(screen.getByText("Edit management access")).toBeInTheDocument();
+    expect(screen.getByText("Edit administrative teams")).toBeInTheDocument();
   });
 
   // The reported bug: `hasManagementAccess` also returned true for a plain app
@@ -129,8 +129,8 @@ describe("ManagementAccessSheet", () => {
   it("treats a plain staff invitation as no management access", () => {
     renderSheet({ pendingInvitation: STAFF_INVITATION });
 
-    expect(screen.getByText("Add to management")).toBeInTheDocument();
-    expect(screen.getByText("Select at least one management department")).toBeInTheDocument();
+    expect(screen.getByText("Add to an administrative team")).toBeInTheDocument();
+    expect(screen.getByText("Select at least one administrative team")).toBeInTheDocument();
   });
 
   // An empty selection means two different things either side of that line: a
@@ -138,7 +138,7 @@ describe("ManagementAccessSheet", () => {
   it("reads an empty selection as a missing answer for someone not on the roster yet", () => {
     renderSheet();
 
-    expect(screen.getByText("Select at least one management department")).toBeInTheDocument();
+    expect(screen.getByText("Select at least one administrative team")).toBeInTheDocument();
     expect(screen.queryByText(/Saving now removes/)).not.toBeInTheDocument();
   });
 
@@ -162,7 +162,7 @@ describe("ManagementAccessSheet", () => {
     expect(screen.getByText("Access role")).toBeInTheDocument();
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
     // Two lists on one sheet each carry a header to tell them apart.
-    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
   });
 
   // The sheet's title is the header. A lone departments list under it used
@@ -170,7 +170,7 @@ describe("ManagementAccessSheet", () => {
   it("leaves the header off a lone departments list", () => {
     renderSheet({ userId: "user-1", orgRole: "admin", managementDepartmentIds: [9] });
 
-    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
+    expect(screen.queryByText("Administrative Teams")).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Operations" })).toBeInTheDocument();
   });
 
@@ -242,7 +242,7 @@ describe("ManagementAccessSheet", () => {
 
     expect(
       screen.getByText(
-        "Saving now removes their management access. Their staff profile stays as it is.",
+        "Saving now takes them off every administrative team. Their staff profile stays as it is.",
       ),
     ).toBeInTheDocument();
 

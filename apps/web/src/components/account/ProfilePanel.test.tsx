@@ -277,7 +277,9 @@ describe("ProfilePanel", () => {
         managementDepartmentIds: [],
       });
 
-      expect(screen.getByRole("button", { name: "Add to an administrative team" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Add to an administrative team" }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();

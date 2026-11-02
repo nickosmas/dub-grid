@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { capitalizeFirst, pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+  ADMINISTRATIVE_TEAM_LABELS,
+} from "@dubgrid/domain";
 import { Department, FocusArea } from "@/types";
 import { Button } from "@/components/Button";
 import {
@@ -301,8 +307,7 @@ function DepartmentSection({
   onDepartmentsChange: (departments: Department[]) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
 }) {
-  const addLabel =
-    type === "scheduled" ? departmentLabel.replace(/s$/i, "") : "Team";
+  const addLabel = type === "scheduled" ? departmentLabel.replace(/s$/i, "") : "Team";
   const emptyTitle =
     type === "scheduled"
       ? `No ${departmentLabel.toLowerCase()} defined yet`
