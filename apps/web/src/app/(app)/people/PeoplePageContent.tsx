@@ -15,6 +15,11 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import type { BulkStatusChangeHandler, BulkStatusOutcome } from "@/features/employees/client";
+import {
+  sendNewStaffInvites,
+  type NewStaffInvite,
+} from "@/features/employees/client/new-staff-invites";
+import { createOrganizationInvitation } from "@/features/organization/client";
 
 function PeopleContent() {
   const {
@@ -75,6 +80,50 @@ function PeopleContent() {
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
   const statusStepUp = useSharedStepUp();
+  const inviteStepUp = useSharedStepUp();
+
+  const inviteAddedPeople = useCallback(
+    async (added: { id: string; email: string }[], invites: NewStaffInvite[]) => {
+      const inviteOrgId = orgId ?? org?.id;
+      if (!inviteOrgId || invites.length === 0) return;
+      const pending = new Map(invites.map((invite) => [invite.email.toLowerCase(), invite]));
+      const failed: string[] = [];
+      try {
+        const completed = await inviteStepUp.run((accessToken) =>
+          sendNewStaffInvites({
+            added,
+            pending,
+            failed,
+            send: (invite) =>
+              createOrganizationInvitation(
+                {
+                  email: invite.email,
+                  role: invite.role,
+                  orgId: inviteOrgId,
+                  employeeId: invite.employeeId,
+                },
+                accessToken,
+              ),
+          }),
+        );
+        if (!completed) {
+          toast.info("No invites were sent. Invite them from their page.");
+          return;
+        }
+      } catch (err) {
+        toast.error(formatClientErrorMessage(err, "We couldn't send those invites. Try again."));
+        return;
+      }
+      const sent = invites.length - failed.length;
+      if (failed.length > 0) {
+        toast.error(
+          `Couldn't invite ${failed.join(", ")}. Invite ${failed.length === 1 ? "them" : "each"} from their page.`,
+        );
+      }
+      if (sent > 0) toast.success(sent === 1 ? "Invite sent" : `${sent} invites sent`);
+    },
+    [inviteStepUp, org?.id, orgId],
+  );
   /** Resolves whether the change went through; a cancelled prompt counts as not. */
   const runStatusChange = async (
     action: (accessToken?: string) => Promise<boolean>,
@@ -145,6 +194,7 @@ function PeopleContent() {
     <>
       <ProgressBar loading={isLoading} />
       {statusStepUp.dialog}
+      {inviteStepUp.dialog}
       {focusAreaQuestion.dialog}
 
       {!isLoading && (
@@ -224,10 +274,13 @@ function PeopleContent() {
               certifications={certifications}
               focusAreaLabel={org?.focusAreaLabel}
               certificationLabel={org?.certificationLabel}
-              onAdd={async (dataList: NewEmployeeData[]) => {
+              canGrantSuperAdmin={isSuperAdmin || isGridmaster}
+              onAdd={async (dataList: NewEmployeeData[], invites: NewStaffInvite[]) => {
                 // A failed add keeps the modal and its typed rows for a retry.
                 const added = await handleAddEmployee(dataList);
-                if (added) setShowAddModal(false);
+                if (!added) return;
+                setShowAddModal(false);
+                await inviteAddedPeople(added, invites);
               }}
               onClose={() => setShowAddModal(false)}
             />

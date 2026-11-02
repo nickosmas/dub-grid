@@ -37,10 +37,14 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   ProfileChoiceGroup,
+  ProfileList,
   ProfilePanel,
   ProfileSection,
+  ProfileSwitchRow,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { OrgRoleChoice } from "./OrgRoleChoice";
+import type { OrgRole } from "./OrgRoleSheet";
 
 /**
  * Add a scheduled staff member. A sheet, like the management invitation next
@@ -76,6 +80,8 @@ export function AddPersonSheet({
   const [certificationId, setCertificationId] = useState<number | null>(null);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>([]);
   const [firstDay, setFirstDay] = useState<string | null>(null);
+  const [invite, setInvite] = useState(true);
+  const [orgRole, setOrgRole] = useState<OrgRole>("user");
   const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
   /**
    * Field errors only the server can find, chiefly a duplicate email. Kept apart
@@ -103,7 +109,9 @@ export function AddPersonSheet({
     employmentType !== "full_time" ||
     certificationId !== null ||
     focusAreaIds.length > 0 ||
-    firstDay !== null;
+    firstDay !== null ||
+    !invite ||
+    orgRole !== "user";
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   // A new hire's first day (51g4) is today or later here; an earlier one is set on the web.
@@ -143,6 +151,9 @@ export function AddPersonSheet({
   // must never be what stops a legitimate save: the 409 the create returns is
   // still there as the real gate.
   const emailToCheck = emailFormatError ? "" : email.trim();
+  // An invite needs an address, so the choice appears once one is typed.
+  const canInvite = emailToCheck !== "";
+  const canGrantSuperAdmin = bootstrapQuery.data?.effectiveRole === "super_admin";
   useEffect(() => {
     if (!accessToken || !emailToCheck) {
       setServerFieldErrors((current) =>
@@ -190,10 +201,11 @@ export function AddPersonSheet({
 
       let invitationSent = true;
 
-      if (normalizedEmail) {
+      if (normalizedEmail && invite) {
         try {
           await createMobilePersonInvitation(accessToken!, result.person.id, {
             email: normalizedEmail,
+            orgRole,
           });
         } catch {
           // The person was created, so this isn't fatal and must not roll the
@@ -261,6 +273,8 @@ export function AddPersonSheet({
     setCertificationId(null);
     setFocusAreaIds([]);
     setFirstDay(null);
+    setInvite(true);
+    setOrgRole("user");
     setServerFieldErrors({});
   }
 
@@ -395,6 +409,29 @@ export function AddPersonSheet({
               />
             </ProfilePanel>
           </ProfileSection>
+
+          {canInvite ? (
+            <>
+              <ProfileSection>
+                <ProfileList>
+                  <ProfileSwitchRow
+                    accessibilityLabel="Invite to the app"
+                    isLast
+                    label="Invite to the app"
+                    value={invite}
+                    onValueChange={setInvite}
+                  />
+                </ProfileList>
+              </ProfileSection>
+              {invite ? (
+                <OrgRoleChoice
+                  canGrantSuperAdmin={canGrantSuperAdmin}
+                  value={orgRole}
+                  onChange={setOrgRole}
+                />
+              ) : null}
+            </>
+          ) : null}
 
           <ProfileSection>
             <ProfileChoiceGroup

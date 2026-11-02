@@ -109,6 +109,7 @@ import {
   type ShiftChangeResolvers,
 } from "@dubgrid/schedule-core";
 import { fetchShiftChangeResolvers } from "@/lib/server/schedule-context";
+import { countMobileAdminPermissions } from "./admin-permission-count";
 import { normalizeCoverageRuleConfig, timesOverlap, type TimeRange } from "@/lib/schedule-logic";
 
 type EmbeddedEmployee = {
@@ -2100,6 +2101,9 @@ export async function fetchMobilePeople(
     ),
     membershipUpdatedAt:
       (row.user_id ? managementMembershipByUserId.get(row.user_id)?.updated_at : null) ?? null,
+    adminPermissionCount: countMobileAdminPermissions(
+      row.user_id ? managementMembershipByUserId.get(row.user_id) : null,
+    ),
     pendingInvitation: invitationByEmployeeId.get(row.id)
       ? {
           id: invitationByEmployeeId.get(row.id)!.id,
