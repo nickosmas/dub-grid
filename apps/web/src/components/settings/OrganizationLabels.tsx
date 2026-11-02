@@ -14,6 +14,7 @@ import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import { AreaLabelPresets } from "@/components/settings/AreaLabelPresets";
 
 export default function OrganizationLabels({
   organization,
@@ -218,15 +219,12 @@ export default function OrganizationLabels({
                 {fieldErrors.focusAreaLabel}
               </p>
             ) : null}
-            <p
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-muted)",
-                margin: "4px 0 0",
-              }}
-            >
-              e.g. Areas, Wings, Units
-            </p>
+            {readOnly ? null : (
+              <AreaLabelPresets
+                value={form.focusAreaLabel}
+                onSelect={(label) => setForm((p) => ({ ...p, focusAreaLabel: label }))}
+              />
+            )}
           </div>
           <div>
             <label style={labelStyle}>Certifications label</label>

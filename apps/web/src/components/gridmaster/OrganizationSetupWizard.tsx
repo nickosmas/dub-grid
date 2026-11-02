@@ -36,6 +36,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { requireCredentialAssurance } from "@/features/account/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import { AreaLabelPresets } from "@/components/settings/AreaLabelPresets";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
@@ -594,7 +595,7 @@ export default function OrganizationSetupWizard({
             >
               <div>
                 <label style={labelStyle} htmlFor={ids.focusAreaLabel}>
-                  Focus areas label
+                  Areas label
                 </label>
                 <input
                   id={ids.focusAreaLabel}
@@ -603,6 +604,7 @@ export default function OrganizationSetupWizard({
                   onChange={(e) => setFocusAreaLabel(e.target.value)}
                   placeholder={DEFAULT_ORGANIZATION_LABELS.focusArea}
                 />
+                <AreaLabelPresets value={focusAreaLabel} onSelect={setFocusAreaLabel} />
               </div>
               <div>
                 <label style={labelStyle} htmlFor={ids.certificationLabel}>

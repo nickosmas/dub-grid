@@ -39,3 +39,15 @@ export const ADMINISTRATIVE_TEAM_LABELS = {
   pluralLower: "administrative teams",
   singularLower: "administrative team",
 } as const;
+
+/** One-tap choices for the area label, care and other workplaces alike. Free text still works. */
+export const AREA_LABEL_PRESETS = [
+  "Areas",
+  "Units",
+  "Wings",
+  "Halls",
+  "Floors",
+  "Neighborhoods",
+  "Desks",
+  "Locations",
+] as const;

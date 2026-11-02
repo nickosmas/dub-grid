@@ -205,7 +205,7 @@ describe("OrganizationSetupWizard", () => {
       "placeholder",
       "Acme Healthcare",
     );
-    expect(screen.getByLabelText(/focus areas label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/areas label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/certifications label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/roles label/i)).toBeInTheDocument();
 

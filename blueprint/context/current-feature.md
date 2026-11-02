@@ -107,7 +107,7 @@ Kept on purpose: the employee CSV export's "Focus Areas" column header (`apps/we
 
 ### 6. Area label presets
 
-- [ ] Built and approved
+- [x] Built and approved (onboarding reuses Settings > Labels, so two places carry them; browser screenshots still to take)
 
 - Settings > Labels, the Gridmaster setup wizard (`OrganizationSetupWizard.tsx:82, 599`) and the onboarding Identity step offer the presets as one-tap choices beside the free-text field. A preset fills the field; the field still takes any name.
 
