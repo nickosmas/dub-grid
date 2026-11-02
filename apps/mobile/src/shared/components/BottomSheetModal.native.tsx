@@ -35,15 +35,17 @@ import {
 export * from "./BottomSheetModalDrawn";
 
 /**
- * A sheet is only as tall as its content (owner, 2026-10-31); a long one
- * opens at this share of the screen and drags up to fill it, as the system's
- * own sheets do (owner, same day).
+ * A sheet is only as tall as its content (owner, 2026-10-31), and opens tall
+ * enough to show all of it; only content taller than the screen opens the
+ * sheet full height and scrolls (owner, 2026-11-02).
  */
 const SCROLL_BODY_MAX_SHARE = 0.62;
 /** The space `@expo/ui` puts between the grabber and a detent sheet's content. */
 const IOS_GRABBER_SPACE = 16;
-/** How much of the screen a sheet that scrolls opens at, before it's dragged up. */
-const RESIZABLE_OPEN_SHARE = 0.7;
+/** Before the content is measured, a sheet that scrolls opens at this share. */
+const UNMEASURED_OPEN_SHARE = 0.7;
+/** How far below the status bar the system's full-height sheet starts. */
+const FULL_SHEET_TOP_GAP = 10;
 
 type SheetSizes = { header: number; content: number; footer: number };
 /**
@@ -71,6 +73,8 @@ function useKeyboardHeight() {
 }
 
 const IS_IOS = Platform.OS === "ios";
+/** iOS 26 floats a sheet that isn't full height above the screen's foot. */
+const IOS_FLOATING_SHEETS = IS_IOS && Number.parseInt(String(Platform.Version), 10) >= 26;
 
 type SheetClose = {
   onClose: () => void;
@@ -98,7 +102,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
   const mobileColors = useMobileColors();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const keyboardHeight = useKeyboardHeight();
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const scrollBodyMaxHeight =
     keyboardHeight > 0
       ? Math.max(MIN_SCROLL_BODY, windowHeight - keyboardHeight - SHEET_CHROME_ALLOWANCE)
@@ -133,39 +137,40 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
 
   const lifted = liftSheetActions(footer);
   const barFooter = lifted.primary ? lifted.rest : footer;
-  // A detent's height stops at the home indicator, and the system adds the
-  // inset below it, which a list with nothing under it already pads for.
+  // A list with nothing under it pads for the home indicator and runs one
+  // inset past the sheet's foot. Before iOS 26 a detent stops at the home
+  // indicator and the system adds the inset below it; iOS 26's floating sheet
+  // adds nothing, so its detent holds the whole sheet.
+  const footerHeight = barFooter ? sizes.footer : -(IOS_FLOATING_SHEETS ? 1 : 2) * bottomInset;
   const naturalHeight =
     sizes.content > 0
-      ? IOS_GRABBER_SPACE +
-        sizes.header +
-        sizes.content +
-        (barFooter ? sizes.footer : -2 * bottomInset) +
-        mobileSpace.sm
+      ? IOS_GRABBER_SPACE + sizes.header + sizes.content + footerHeight + mobileSpace.sm
       : 0;
-  const openHeight = Math.round(windowHeight * RESIZABLE_OPEN_SHARE);
-  const overflows = naturalHeight > openHeight;
-  // Android's sheet has one partly open state and full screen, and changing
-  // how it is sized remounts its content, so the choice holds while it shows.
+  // The tallest a sheet gets: the system's full-height sheet, which stops
+  // short of the status bar.
+  const fullHeight = windowHeight - topInset - FULL_SHEET_TOP_GAP;
+  const overflows = naturalHeight > fullHeight;
+  // Android's sheet is either sized to its content or full screen, and
+  // changing how it is sized remounts its content, so the choice holds while
+  // it shows.
   if (!visible) androidResizableRef.current = null;
   else if (androidResizableRef.current === null) {
-    androidResizableRef.current = overflows || expandable;
+    androidResizableRef.current = overflows;
   }
-  // A sheet that scrolls opens at its content's height, or at most most of
-  // the screen, and a long one drags up to fill it. iOS sizes it by detents
-  // throughout, so a height change while it shows just moves the detent.
+  // A sheet that scrolls opens at its content's height, so everything in it
+  // shows; only content taller than the screen opens it full height to
+  // scroll. iOS sizes it by detents throughout, so a height change while it
+  // shows just moves the detent.
   const resizable = scrollable && (IS_IOS || androidResizableRef.current === true);
   const snapPoints = !resizable
     ? undefined
-    : !IS_IOS
-      ? ["50%", "100%"]
+    : !IS_IOS || overflows
+      ? ["100%"]
       : naturalHeight === 0
-        ? [openHeight]
-        : overflows
-          ? [openHeight, "100%"]
-          : expandable
-            ? [naturalHeight, "100%"]
-            : [naturalHeight];
+        ? [Math.round(windowHeight * UNMEASURED_OPEN_SHARE)]
+        : expandable
+          ? [naturalHeight, "100%"]
+          : [naturalHeight];
 
   return (
     <BottomSheet
