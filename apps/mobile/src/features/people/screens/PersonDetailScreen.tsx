@@ -86,11 +86,7 @@ import {
 import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import { ReturnDateField } from "../components/ReturnDatePicker";
-import {
-  getDepartmentNames,
-  getScheduledDepartmentNames,
-  MANAGEMENT_DEPARTMENT_LABELS,
-} from "../../../shared/lib/departments";
+import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
 import {
   getClientFriendlyErrorMessage,
   pushClientFriendlyErrorToast,
@@ -131,19 +127,20 @@ import { useMobileStepUpAction } from "../../profile/hooks/useMobileStepUpAction
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
-import { hasManagementAccess } from "../lib/managementAccess";
 import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { SectionNotice } from "../components/SectionNotice";
 import {
   STATUS_KIND_ICONS,
   STATUS_KIND_TONES,
+  describePlannedLine,
   StaffStatusCard,
   StatusIconCircle,
   StatusMarkIcon,
-  type StatusCardLine,
   type StatusSheetOpening,
 } from "../components/StatusMark";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
+import { PersonInviteSheet } from "../components/PersonInviteSheet";
+import { statusForViewer } from "../lib/statusForViewer";
 import {
   getPersonOrgRole,
   getPersonOrgRoleSubject,
@@ -358,6 +355,7 @@ export default function PersonDetailScreen() {
     useState<MobileAccountLinkChallenge | null>(null);
   const [showOrgRole, setShowOrgRole] = useState(false);
   const [showManagementAccess, setShowManagementAccess] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [orgRoleError, setOrgRoleError] = useState<string | null>(null);
   /**
    * Field errors the server found, kept apart from the ones this screen can work
@@ -615,6 +613,7 @@ export default function PersonDetailScreen() {
     onMutate: () => setInvitationError(null),
     mutationFn: async (input: {
       action: "create" | "resend" | "revoke";
+      orgRole?: OrgRole;
       linkExistingAccount?: boolean;
       reconcileName?: boolean;
     }) => {
@@ -622,6 +621,7 @@ export default function PersonDetailScreen() {
       if (input.action === "create") {
         return createMobilePersonInvitation(accessToken!, person.id, {
           email: person.email,
+          orgRole: input.orgRole,
           linkExistingAccount: input.linkExistingAccount,
           reconcileName: input.reconcileName,
         });
@@ -641,6 +641,7 @@ export default function PersonDetailScreen() {
       const challenge = parseMobileAccountLinkChallenge(error);
       if (challenge) {
         setInvitationConfirmAction(null);
+        setShowInviteSheet(false);
         handoffInvitation(() => setAccountLinkChallenge(challenge));
         return;
       }
@@ -655,6 +656,7 @@ export default function PersonDetailScreen() {
       updateCachedPerson(result.person);
       setAccountLinkChallenge(null);
       setInvitationConfirmAction(null);
+      setShowInviteSheet(false);
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       const title =
         result.result === "account_linked"
@@ -699,7 +701,7 @@ export default function PersonDetailScreen() {
       pushToast({
         tone: "success",
         title:
-          result.result === "invitation_replaced" ? "Invitation replaced" : "Access level updated",
+          result.result === "invitation_replaced" ? "Invitation replaced" : "Access role updated",
         message:
           result.result === "invitation_replaced"
             ? "A replacement invitation is on its way."
@@ -834,6 +836,29 @@ export default function PersonDetailScreen() {
       return;
     }
     return updateMutation.mutateAsync(buildUpdateBody());
+  }
+
+  /** Saves one empty contact field typed on the page, leaving the rest as stored. */
+  function saveContactField(patch: Pick<Partial<MobilePersonUpdateBody>, "email" | "phone">) {
+    if (!person) return;
+    return updateMutation
+      .mutateAsync({
+        expectedVersion: person.version,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        employmentType: person.employmentType,
+        phone: person.phone,
+        email: person.email,
+        contactNotes: person.contactNotes,
+        certificationId: person.certificationId,
+        focusAreaIds: person.focusAreaIds,
+        roleIds: person.roleIds,
+        departmentIds: person.departmentIds,
+        ...patch,
+      })
+      .catch(() => {
+        // The mutation owns its user-facing error.
+      });
   }
 
   function buildUpdateBody(): MobilePersonUpdateBody {
@@ -979,61 +1004,54 @@ export default function PersonDetailScreen() {
       orgRole,
     ),
   };
-  // The Access row is the role control, the way web's Access column is. It
-  // only exists where there is something to write to: a membership, or an
-  // invitation carrying the role until it is accepted. Someone with neither
-  // has no access record at all, so web prints a dash; here the group stays
-  // out and the status card's invite line says what to do.
-  const hasAccessRecord =
-    canViewEmployeeDetails &&
-    (person.userId ? person.membershipUpdatedAt != null : person.pendingInvitation != null);
-  const canChangeOrgRole =
-    hasAccessRecord && canManageManagementAccess && !isSelf && person.status !== "removed";
-  const adminPermissionCount = orgRole === "admin" ? person.adminPermissionCount : null;
-  // Where their invitation stands, for someone who can't sign in yet. A
-  // viewer without employee details gets no line: the API redacts `userId`
-  // and the invitation for them, so every colleague would read as not invited.
-  // The links are the foot's old invite buttons, for the managers who had them.
+  const shownStatus = statusForViewer(person, canManageEmployees);
+  // Where their invite stands, only until they join: the API redacts `userId`
+  // and the invite for a viewer without employee details, so for them every
+  // colleague would read as not invited, and the row stays out.
   const invitation = person.pendingInvitation;
   const invitationExpired = invitation ? Date.parse(invitation.expiresAt) <= Date.now() : false;
   const canSendInvite = canManageEmployees && Boolean(person.email);
-  const invitationLine: StatusCardLine | null =
+  const inviteRow: { value: string; action?: { label: string; onPress: () => void } } | null =
     !canViewEmployeeDetails || person.userId || person.status === "removed"
       ? null
-      : invitation
-        ? {
-            key: "invitation",
-            icon: invitationExpired ? "alert-circle" : "time-outline",
-            tone: invitationExpired ? "warning" : undefined,
-            text: invitationExpired
-              ? `Invite expired ${formatInviteDay(invitation.expiresAt)}`
-              : invitation.updatedAt
-                ? `Invited ${formatInviteDay(invitation.updatedAt)}, hasn't joined`
-                : "Invited, hasn't joined",
-            link: canSendInvite
-              ? {
-                  label: "Resend",
-                  accessibilityLabel: "Resend invite",
-                  disabled: invitationMutation.isPending,
-                  // An expired invite is no longer pending to the server, so a
-                  // fresh one goes out in its place.
-                  onPress: () =>
-                    setInvitationConfirmAction(invitationExpired ? "create" : "resend"),
-                }
-              : undefined,
-          }
-        : {
-            key: "invitation",
-            icon: "mail-outline",
-            text: "Not invited yet",
-            link: canSendInvite
-              ? {
-                  label: "Send invite",
-                  disabled: invitationMutation.isPending,
-                  onPress: () => setInvitationConfirmAction("create"),
-                }
-              : undefined,
-          };
+      : !person.email
+        ? { value: "Add email to send an invite." }
+        : invitation && !invitationExpired
+          ? {
+              value: invitation.updatedAt
+                ? `Sent ${formatInviteDay(invitation.updatedAt)} but not accepted yet.`
+                : "Sent but not accepted yet.",
+              action: canSendInvite
+                ? { label: "Resend", onPress: () => setInvitationConfirmAction("resend") }
+                : undefined,
+            }
+          : {
+              value: invitation
+                ? `The invite expired on ${formatInviteDay(invitation.expiresAt)}.`
+                : "The invite hasn't been sent yet.",
+              action: canSendInvite
+                ? {
+                    label: invitation ? "Send again" : "Send",
+                    onPress: () => {
+                      setInvitationError(null);
+                      setShowInviteSheet(true);
+                    },
+                  }
+                : undefined,
+            };
+  // The role exists only where something holds it: a membership, or an invite
+  // still open. An expired invite holds none until a new one goes out.
+  const hasAccessRecord =
+    canViewEmployeeDetails &&
+    person.status !== "removed" &&
+    (person.userId ? person.membershipUpdatedAt != null : invitation != null && !invitationExpired);
+  const canChangeOrgRole = hasAccessRecord && canManageManagementAccess && !isSelf;
+  const adminPermissionCount = orgRole === "admin" ? person.adminPermissionCount : null;
+  const managesDepartments =
+    canViewEmployeeDetails &&
+    person.status !== "removed" &&
+    person.managementDepartmentIds.length > 0;
+  const canChangeManagement = managesDepartments && canManageManagementAccess && !isSelf;
   // A manager reads "None" as a gap to fill; a colleague reads it as noise.
   // The rows that can be empty drop out for viewers without details, and the
   // Staffing section with them when nothing is left in it.
@@ -1617,9 +1635,7 @@ export default function PersonDetailScreen() {
         initials={getProfileInitials(fullName)}
         orgRole={orgRole}
         title={fullName}
-        titleAdornment={
-          canViewEmployeeDetails ? <StatusMarkIcon person={person} size={18} /> : null
-        }
+        titleAdornment={shownStatus ? <StatusMarkIcon person={shownStatus} size={18} /> : null}
       />
 
       {/* The contact pair, always both, as tiles the reader can name: a
@@ -1653,15 +1669,25 @@ export default function PersonDetailScreen() {
       ) : null}
 
       {/* Where they stand, under the contact pair: one row that opens Change
-          staff status, then a line for a plan and for their invitation. */}
-      {!editing && canViewEmployeeDetails ? (
+          staff status, then a line for a plan. */}
+      {!editing && canManageEmployees ? (
         <StaffStatusCard
           absenceTypes={absenceTypes}
           disabled={statusMutation.isPending}
-          lines={invitationLine ? [invitationLine] : []}
-          onChangeStatus={canManageEmployees && !isSelf ? openStatusSheet : undefined}
+          onChangeStatus={!isSelf ? openStatusSheet : undefined}
           person={person}
         />
+      ) : !editing && shownStatus ? (
+        // Someone who can't change statuses only opens Active colleagues, so
+        // all there is to tell them is a planned away, with no Active above it.
+        <ProfileList>
+          <ProfileInfoRow
+            iconName="calendar-outline"
+            isLast
+            label="Status"
+            value={describePlannedLine(shownStatus) ?? ""}
+          />
+        </ProfileList>
       ) : null}
 
       {editing ? (
@@ -1695,39 +1721,84 @@ export default function PersonDetailScreen() {
         </>
       ) : (
         <>
-          {/* What they can do, on the page rather than behind Edit. It applies
-              on its own through the sheet's confirmation, since changing it
-              may revoke and resend an invitation. */}
-          {hasAccessRecord ? (
+          {/* What they can do in the app, on the page rather than behind
+              Edit: the invite until they join, then the role, which applies on
+              its own through the sheet's confirmation, since changing it may
+              revoke and resend an invite. */}
+          {inviteRow || hasAccessRecord || managesDepartments ? (
             <ProfileSection title="Access">
               <ProfileList>
-                {canChangeOrgRole ? (
-                  <ProfileNavRow
-                    iconName="key-outline"
-                    isLast={!adminPermissionCount}
-                    label="Access level"
-                    value={ORG_ROLE_LABELS[orgRole]}
-                    onPress={() => {
-                      setOrgRoleError(null);
-                      setShowOrgRole(true);
-                    }}
-                  />
-                ) : (
+                {inviteRow ? (
                   <ProfileInfoRow
-                    iconName="key-outline"
-                    isLast={!adminPermissionCount}
-                    label="Access level"
-                    value={ORG_ROLE_LABELS[orgRole]}
+                    emphasis="label"
+                    iconName="mail-outline"
+                    isLast={!hasAccessRecord && !managesDepartments}
+                    label="Invite"
+                    value={inviteRow.value}
+                    trailing={
+                      inviteRow.action ? (
+                        <Button
+                          disabled={invitationMutation.isPending}
+                          fullWidth={false}
+                          label={inviteRow.action.label}
+                          onPress={inviteRow.action.onPress}
+                          size="sm"
+                          tone="link"
+                        />
+                      ) : undefined
+                    }
                   />
-                )}
+                ) : null}
+                {hasAccessRecord ? (
+                  canChangeOrgRole ? (
+                    <ProfileNavRow
+                      iconName="key-outline"
+                      isLast={!adminPermissionCount && !managesDepartments}
+                      label="Access role"
+                      value={ORG_ROLE_LABELS[orgRole]}
+                      onPress={() => {
+                        setOrgRoleError(null);
+                        setShowOrgRole(true);
+                      }}
+                    />
+                  ) : (
+                    <ProfileInfoRow
+                      emphasis="label"
+                      iconName="key-outline"
+                      isLast={!adminPermissionCount && !managesDepartments}
+                      label="Access role"
+                      value={ORG_ROLE_LABELS[orgRole]}
+                    />
+                  )
+                ) : null}
                 {/* Choosing them stays on the web; the count says how far they reach. */}
-                {adminPermissionCount ? (
+                {hasAccessRecord && adminPermissionCount ? (
                   <ProfileInfoRow
+                    emphasis="label"
                     iconName="shield-checkmark-outline"
-                    isLast
+                    isLast={!managesDepartments}
                     label="Permissions"
                     value={`${adminPermissionCount.granted} of ${adminPermissionCount.total}`}
                   />
+                ) : null}
+                {managesDepartments ? (
+                  canChangeManagement ? (
+                    <ProfileNavRow
+                      iconName="briefcase-outline"
+                      isLast
+                      label="Manages"
+                      value={managementDepartmentNames}
+                      onPress={() => setShowManagementAccess(true)}
+                    />
+                  ) : (
+                    <ProfileInfoRow
+                      emphasis="label"
+                      iconName="briefcase-outline"
+                      isLast
+                      label="Manages"
+                      value={managementDepartmentNames}
+                    />
+                  )
                 ) : null}
               </ProfileList>
             </ProfileSection>
@@ -1740,17 +1811,44 @@ export default function PersonDetailScreen() {
           {canViewEmployeeDetails ? (
             <ProfileSection title="Contact">
               <ProfileList>
-                <ProfileInfoRow
-                  iconName="mail-outline"
-                  label="Email"
-                  value={person.email || "No email on file"}
-                />
-                <ProfileInfoRow
-                  iconName="call-outline"
-                  isLast
-                  label="Phone"
-                  value={person.phone || "No phone on file"}
-                />
+                {/* An empty field is ready to type into for a manager, saved
+                    when they finish; a filled one changes through Edit, so a
+                    stray tap can't rewrite it. */}
+                {!person.email && canManageEmployees ? (
+                  <ContactEntryField
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    label="Email"
+                    saving={updateMutation.isPending}
+                    validate={getOptionalStaffEmailError}
+                    onSave={(email) =>
+                      saveContactField({ email: normalizeOptionalStaffEmail(email) })
+                    }
+                  />
+                ) : (
+                  <ProfileInfoRow
+                    iconName="mail-outline"
+                    label="Email"
+                    value={person.email || "No email on file"}
+                  />
+                )}
+                {!person.phone && canManageEmployees ? (
+                  <ContactEntryField
+                    autoComplete="tel"
+                    keyboardType="phone-pad"
+                    label="Phone"
+                    saving={updateMutation.isPending}
+                    validate={getOptionalUsPhoneError}
+                    onSave={(phone) => saveContactField({ phone: normalizeOptionalUsPhone(phone) })}
+                  />
+                ) : (
+                  <ProfileInfoRow
+                    iconName="call-outline"
+                    isLast
+                    label="Phone"
+                    value={person.phone || "No phone on file"}
+                  />
+                )}
               </ProfileList>
             </ProfileSection>
           ) : null}
@@ -1830,16 +1928,6 @@ export default function PersonDetailScreen() {
                 label={departmentLabel}
                 value={scheduledDepartmentNames}
               />
-              {/* Gated on the departments themselves, not on
-                  `hasManagementAccess`: that is also true for a plain staff app
-                  invitation, and would print an empty row for one. */}
-              {person.managementDepartmentIds.length > 0 ? (
-                <ProfileInfoRow
-                  iconName="briefcase-outline"
-                  label={MANAGEMENT_DEPARTMENT_LABELS.plural}
-                  value={managementDepartmentNames}
-                />
-              ) : null}
               <ProfileInfoRow
                 iconName="albums-outline"
                 isLast={!showRolesRow}
@@ -1911,16 +1999,16 @@ export default function PersonDetailScreen() {
                 // opening a sheet that can only say so; the editor is where an
                 // address gets added. Existing access is still editable and
                 // removable whatever the contact details say.
+                // Someone who already manages changes it from the Manages row.
                 ...(canManageManagementAccess &&
                 person.status !== "removed" &&
                 !isSelf &&
-                (hasManagementAccess(person) || person.email)
+                !managesDepartments &&
+                person.email
                   ? [
                       {
                         key: "management",
-                        label: hasManagementAccess(person)
-                          ? "Edit management access"
-                          : "Add to management",
+                        label: "Add to management",
                         onPress: () => setShowManagementAccess(true),
                       },
                     ]
@@ -2230,6 +2318,26 @@ export default function PersonDetailScreen() {
         onDismiss={() => setShowManagementAccess(false)}
         person={person}
         visible={showManagementAccess}
+      />
+      <PersonInviteSheet
+        canGrantSuperAdmin={bootstrapQuery.data?.effectiveRole === "super_admin"}
+        email={person.email}
+        error={invitationError}
+        isPending={invitationMutation.isPending}
+        onDismiss={() => {
+          setInvitationError(null);
+          setShowInviteSheet(false);
+        }}
+        onSend={(orgRole) =>
+          new Promise<void>((resolve) => {
+            invitationMutation.mutate(
+              { action: "create", orgRole },
+              { onSettled: () => resolve() },
+            );
+          })
+        }
+        personName={fullName}
+        visible={showInviteSheet}
       />
       <OrgRoleSheet
         error={orgRoleError}
@@ -2736,3 +2844,54 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
   });
+
+/** An empty contact field on the page, ready to type into and saved on Done. */
+function ContactEntryField({
+  label,
+  keyboardType,
+  autoComplete,
+  saving,
+  validate,
+  onSave,
+}: {
+  label: string;
+  keyboardType: "email-address" | "phone-pad";
+  autoComplete: "email" | "tel";
+  saving: boolean;
+  validate: (value: string) => string | null;
+  onSave: (value: string) => unknown;
+}) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function commit() {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError(null);
+      return;
+    }
+    const problem = validate(trimmed);
+    setError(problem);
+    if (!problem) void onSave(trimmed);
+  }
+
+  return (
+    <ProfileTextInput
+      autoCapitalize="none"
+      autoComplete={autoComplete}
+      autoCorrect={false}
+      editable={!saving}
+      error={error}
+      keyboardType={keyboardType}
+      label={label}
+      returnKeyType="done"
+      value={value}
+      onBlur={commit}
+      onChangeText={(next) => {
+        setValue(next);
+        if (error) setError(null);
+      }}
+      onSubmitEditing={commit}
+    />
+  );
+}

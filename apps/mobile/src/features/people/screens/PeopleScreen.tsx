@@ -81,6 +81,7 @@ import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { getMobileStatusPill } from "../lib/statusPill";
+import { statusForViewer } from "../lib/statusForViewer";
 import { StatusMarkIcon } from "../components/StatusMark";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { ProfileList, ProfileSection } from "../../profile/components/ProfilePrimitives";
@@ -100,7 +101,7 @@ type ManagementSortMode = "alphabetical" | "access";
  * The two halves of the directory are different populations, so each carries
  * its own filters. Staff rows have focus areas, a certification, an employment
  * type and an active/inactive status; management rows have management
- * departments, an access level and an invitation that may still be pending.
+ * departments, an access role and an invitation that may still be pending.
  * Neither set says anything about the other list, so the sheet swaps with the
  * tab rather than offering filters the visible roster can't answer.
  */
@@ -440,7 +441,7 @@ export default function PeopleScreen() {
           !canManageEmployees || staffFilters.appAccess === "all"
             ? true
             : getPersonAppAccess(person) === staffFilters.appAccess;
-        // Access level is admin-only for the same reason as app access above:
+        // Access role is admin-only for the same reason as app access above:
         // the tier it narrows on is never printed on a regular user's rows.
         // Staff with no account count as Users, so picking that tier returns
         // everyone but the admins.
@@ -642,7 +643,7 @@ export default function PeopleScreen() {
           name={getFullName(person)}
           navigable={navigable}
           orgRole={person.orgRole}
-          staffStatus={person}
+          staffStatus={statusForViewer(person, canManageEmployees) ?? undefined}
           onPress={() => {
             if (isSelf) {
               router.push("/(tabs)/profile");
@@ -724,9 +725,9 @@ export default function PeopleScreen() {
               ))}
             </SelectionSection>
 
-            <SelectionSection label="Access level">
+            <SelectionSection label="Access role">
               <SelectionRow
-                label="All access levels"
+                label="All access roles"
                 onPress={() => setManagementFilter("orgRole", "all")}
                 selected={managementFilters.orgRole === "all"}
               />
@@ -766,7 +767,7 @@ export default function PeopleScreen() {
                 selected={managementFilters.sort === "alphabetical"}
               />
               <SelectionRow
-                label="Access level"
+                label="Access role"
                 onPress={() => setManagementFilter("sort", "access")}
                 selected={managementFilters.sort === "access"}
               />
@@ -876,9 +877,9 @@ export default function PeopleScreen() {
             ) : null}
 
             {canManageEmployees ? (
-              <SelectionSection label="Access level">
+              <SelectionSection label="Access role">
                 <SelectionRow
-                  label="All access levels"
+                  label="All access roles"
                   onPress={() => setStaffFilter("orgRole", "all")}
                   selected={staffFilters.orgRole === "all"}
                 />
@@ -921,7 +922,7 @@ export default function PeopleScreen() {
               />
               {canManageEmployees ? (
                 <SelectionRow
-                  label="Access level"
+                  label="Access role"
                   onPress={() => setStaffFilter("sort", "access")}
                   selected={staffFilters.sort === "access"}
                 />
@@ -1027,7 +1028,7 @@ export default function PeopleScreen() {
         ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
-          body="Your access level doesn't include the staff directory. Ask an Admin if you need it."
+          body="Your access role doesn't include the staff directory. Ask an Admin if you need it."
           fillScreen
           tone="warning"
           title="Directory unavailable"
@@ -1055,7 +1056,7 @@ export default function PeopleScreen() {
         ) : filteredManagementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
-            body="Try a different name, email, department, or access level."
+            body="Try a different name, email, department, or access role."
             iconName="search-outline"
             title="No matches"
           />

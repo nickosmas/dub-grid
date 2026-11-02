@@ -83,7 +83,7 @@ export function PersonMembershipActions({
         );
       });
       if (!completed) return;
-      toast.success("Access level updated");
+      toast.success("Access role updated");
       setRoleConfirm(false);
       onChanged();
     } catch (error) {
@@ -125,7 +125,7 @@ export function PersonMembershipActions({
         }}
         disabled={busy}
       >
-        Change access level
+        Change access role
       </Button>
       {membership.orgRole === "admin" ? (
         <Button
@@ -146,7 +146,7 @@ export function PersonMembershipActions({
 
       {roleConfirm && !stepUp.dialog && (
         <ConfirmDialog
-          title={`Change this person's access level in ${organization.org.name}?`}
+          title={`Change this person's access role in ${organization.org.name}?`}
           message={
             <div className="flex flex-col gap-3">
               <span>
@@ -154,14 +154,14 @@ export function PersonMembershipActions({
                 level applies at their next sign-in.
               </span>
               <CustomSelect
-                ariaLabel="New access level"
+                ariaLabel="New access role"
                 value={nextRole}
                 options={ROLE_OPTIONS.filter((option) => option.value !== membership.orgRole)}
                 onChange={setNextRole}
               />
             </div>
           }
-          confirmLabel="Change access level"
+          confirmLabel="Change access role"
           variant="warning"
           isLoading={busy}
           onConfirm={handleRoleChange}

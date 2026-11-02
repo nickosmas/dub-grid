@@ -474,7 +474,7 @@ describe("mobile person invitation route", () => {
     );
   });
 
-  it("grants the access level the invite asks for", async () => {
+  it("grants the access role the invite asks for", async () => {
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
     requireMobileAuth.mockResolvedValue({
       currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },

@@ -302,12 +302,21 @@ export function ProfileInfoRow({
   label,
   value,
   detail,
+  trailing,
+  emphasis = "value",
   isLast = false,
 }: {
   iconName?: IconName;
   label: string;
   value: string;
   detail?: string;
+  /** An action at the row's end, such as a link button. */
+  trailing?: ReactNode;
+  /**
+   * Which line leads. "label" draws it like `ProfileNavRow`, the name over a
+   * quieter value, so a list mixing both kinds of row reads the same way.
+   */
+  emphasis?: "value" | "label";
   isLast?: boolean;
 }) {
   const mobileColors = useMobileColors();
@@ -324,8 +333,8 @@ export function ProfileInfoRow({
     >
       {iconName ? <ProfileIcon name={iconName} /> : null}
       <View style={styles.rowCopy}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        <Text numberOfLines={2} style={styles.rowValue}>
+        <Text style={emphasis === "label" ? styles.navLabel : styles.rowLabel}>{label}</Text>
+        <Text numberOfLines={2} style={emphasis === "label" ? styles.rowDetail : styles.rowValue}>
           {value}
         </Text>
         {detail ? (
@@ -334,6 +343,7 @@ export function ProfileInfoRow({
           </Text>
         ) : null}
       </View>
+      {trailing}
       {!isLast && IS_NATIVE_LIST ? (
         <View style={[styles.insetDivider, iconName ? styles.insetDividerIcon : null]} />
       ) : null}

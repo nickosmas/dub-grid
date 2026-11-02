@@ -407,16 +407,11 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    const scheduled = screen.getByText("Departments");
-    const managed = screen.getByText("Management Departments");
-
-    expect(scheduled).toBeInTheDocument();
-    expect(managed).toBeInTheDocument();
-    // Adjacent rows in Assignments rather than a section of their own, which
-    // read as a second Assignments block for anyone who had both.
-    expect(scheduled.parentElement?.parentElement?.parentElement).toBe(
-      managed.parentElement?.parentElement?.parentElement,
-    );
+    // Scheduled departments stay in Assignments; the ones they manage are
+    // part of what they can do, under Access.
+    expect(screen.getByText("Departments")).toBeInTheDocument();
+    expect(screen.getByText("Manages")).toBeInTheDocument();
+    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
     expect(screen.getByText("Employee ID")).toBeInTheDocument();
     expect(screen.getByText("#12")).toBeInTheDocument();
   });
@@ -599,7 +594,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.getByText("Scheduled Departments")).toBeInTheDocument();
-    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Manages")).toBeInTheDocument();
     expect(screen.queryByText("Management Scheduled Departments")).not.toBeInTheDocument();
   });
 
@@ -911,14 +906,15 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(screen.queryByText("Pending for mina@dubgrid.com")).not.toBeInTheDocument();
     expect(screen.getByText("Status updated")).toBeInTheDocument();
-    // Where the account stands is a line on the status card, not a chip
-    // competing with the name. The invite here expired before today.
-    const line = within(screen.getByTestId("status-line-invitation"));
-    expect(line.getByText(/^Invite expired /)).toBeInTheDocument();
-    expect(line.getByRole("button", { name: "Resend invite" })).toBeInTheDocument();
+    // The invite sits in Access, not on the status card. This one expired
+    // before today, so it holds no role until a new one goes out.
+    expect(screen.queryByTestId("status-line-invitation")).not.toBeInTheDocument();
+    expect(screen.getByText(/^The invite expired on /)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send again" })).toBeInTheDocument();
+    expect(screen.queryByText("Access role")).not.toBeInTheDocument();
   });
 
-  describe("invitation line", () => {
+  describe("invite row", () => {
     function renderInvitation(person: Record<string, unknown>) {
       const mutate = vi.fn();
       useMutation.mockReturnValue({ error: null, isPending: false, mutate });
@@ -939,48 +935,41 @@ describe("PersonDetailScreen", () => {
       updatedAt: "2026-10-30T18:00:00.000Z",
     };
 
-    it("says someone hasn't been invited, and sends one from its link", () => {
+    it("sends an invite with the access role picked in its sheet", () => {
       const mutate = renderInvitation({ pendingInvitation: null });
 
-      // The foot's old Send invitation button is gone; the line's link replaces it.
-      expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
-      const line = within(screen.getByTestId("status-line-invitation"));
-      expect(line.getByText("Not invited yet")).toBeInTheDocument();
-      fireEvent.click(line.getByRole("button", { name: "Send invite" }));
-      expect(screen.getByText("Send an invitation to mina@dubgrid.com?")).toBeInTheDocument();
-      confirmDialog("Send invitation");
+      expect(screen.queryByTestId("status-line-invitation")).not.toBeInTheDocument();
+      expect(screen.getByText("The invite hasn't been sent yet.")).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
+      expect(screen.getByText("Invite to the app")).toBeInTheDocument();
+      expect(screen.getByText("Sends to")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Send" }).at(-1)!);
 
-      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "create" });
-      expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "create", orgRole: "admin" });
     });
 
-    it("offers no link without an email on file", () => {
+    it("asks for an email without offering to send", () => {
       renderInvitation({ pendingInvitation: null, email: "" });
 
-      const line = within(screen.getByTestId("status-line-invitation"));
-      expect(line.getByText("Not invited yet")).toBeInTheDocument();
-      expect(line.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getByText("Add email to send an invite.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
     });
 
-    it("says when a pending invite went out, and resends it from its link", () => {
+    it("says when a sent invite went out, and resends it", () => {
       const mutate = renderInvitation({ pendingInvitation: pending });
 
-      const line = within(screen.getByTestId("status-line-invitation"));
-      expect(line.getByText("Invited Oct 30, hasn't joined")).toBeInTheDocument();
-      fireEvent.click(line.getByRole("button", { name: "Resend invite" }));
+      expect(screen.getByText("Sent Oct 30 but not accepted yet.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Resend" }));
       expect(screen.getByText("Resend the invitation to mina@dubgrid.com?")).toBeInTheDocument();
       confirmDialog("Resend");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({ action: "resend" });
-      // Revoke stays at the foot, in red; Resend moved to the line.
-      const names = screen
-        .getAllByRole("button")
-        .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-      expect(names.filter((name) => name === "Resend invite")).toHaveLength(1);
-      expect(names).toContain("Revoke invite");
+      // Revoke stays at the foot, in red.
+      expect(screen.getByRole("button", { name: "Revoke invite" })).toBeInTheDocument();
     });
 
-    it("leaves the links to managers", () => {
+    it("leaves the actions to managers", () => {
       const manager = useBootstrap();
       useBootstrap.mockReturnValue({
         ...manager,
@@ -991,15 +980,18 @@ describe("PersonDetailScreen", () => {
       });
       renderInvitation({ pendingInvitation: pending });
 
-      const line = within(screen.getByTestId("status-line-invitation"));
-      expect(line.getByText("Invited Oct 30, hasn't joined")).toBeInTheDocument();
-      expect(line.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.getByText("Sent Oct 30 but not accepted yet.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Resend" })).not.toBeInTheDocument();
     });
 
-    it("leaves an offboarded person's invitation unstated", () => {
+    it("drops the row once they've joined, and for someone offboarded", () => {
       renderInvitation({ pendingInvitation: null, status: "removed" });
+      expect(screen.queryByText("The invite hasn't been sent yet.")).not.toBeInTheDocument();
+      cleanup();
 
-      expect(screen.queryByTestId("status-line-invitation")).not.toBeInTheDocument();
+      renderInvitation({ userId: "user-1", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" });
+      expect(screen.queryByText("Invite")).not.toBeInTheDocument();
+      expect(screen.getByText("Access role")).toBeInTheDocument();
     });
   });
 
@@ -1210,16 +1202,15 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Send invite" }));
-    expect(screen.getByText(/^Send an invitation to .+\?$/)).toBeInTheDocument();
-    confirmDialog("Send invitation");
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" }).at(-1)!);
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(
       screen.getByText(/^An existing app account matches this staff profile\./),
     ).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Send an invitation to .+\?$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Invite to the app")).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link existing account"));
@@ -1317,9 +1308,8 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Send invite" }));
-    expect(screen.getByText(/^Send an invitation to .+\?$/)).toBeInTheDocument();
-    confirmDialog("Send invitation");
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" }).at(-1)!);
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
     expect(
@@ -1327,7 +1317,7 @@ describe("PersonDetailScreen", () => {
         /matches this staff profile\. You can link it instead of sending a new invitation\./,
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/^Send an invitation to .+\?$/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Invite to the app")).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link existing account"));
@@ -1423,7 +1413,23 @@ describe("PersonDetailScreen", () => {
       ]);
     });
 
-    it("draws the row without a chevron or a sheet for someone who can't change it", () => {
+    it("shows only a planned away to someone who can't change it", () => {
+      const manager = useBootstrap();
+      useBootstrap.mockReturnValue({
+        ...manager,
+        data: {
+          ...manager.data,
+          permissions: { canManageEmployees: false, canViewEmployeeDetails: true },
+        },
+      });
+      // A planned away says something to them, without Active or a way to change it.
+      renderWithStatusMutation({ plannedStatus: "away", plannedFrom: day(5) });
+      expect(screen.queryByTestId("status-card")).not.toBeInTheDocument();
+      expect(screen.getByText("Status")).toBeInTheDocument();
+      expect(screen.getByText(/^Away from /)).toBeInTheDocument();
+    });
+
+    it("leaves Active unsaid for someone who can't change it", () => {
       const manager = useBootstrap();
       useBootstrap.mockReturnValue({
         ...manager,
@@ -1433,12 +1439,7 @@ describe("PersonDetailScreen", () => {
         },
       });
       renderWithStatusMutation();
-
-      const card = within(screen.getByTestId("status-card"));
-      expect(card.queryByRole("button")).not.toBeInTheDocument();
-      expect(
-        card.getByLabelText("Status: Active. Can sign in and be scheduled."),
-      ).toBeInTheDocument();
+      expect(screen.queryByTestId("status-card")).not.toBeInTheDocument();
     });
 
     it("lists Suspend disabled for someone with no account", () => {
@@ -2238,12 +2239,12 @@ describe("PersonDetailScreen", () => {
         "Add to schedule",
         "Add to management",
       ]);
-      // The status card sits between the contact pair and the sections: its
-      // row, then the invitation line's Resend.
+      // The status card sits between the contact pair and the sections, and
+      // the invite's Resend comes after it, in Access.
       const row = names.findIndex((name) => name?.startsWith("Status: "));
       expect(row).toBeGreaterThan(names.indexOf("Email"));
-      expect(names.indexOf("Resend invite")).toBe(row + 1);
-      expect(names.indexOf("Resend invite")).toBeLessThan(footStart);
+      expect(names.indexOf("Resend")).toBeGreaterThan(row);
+      expect(names.indexOf("Resend")).toBeLessThan(footStart);
       // The foot follows every section: Assignments is the last titled one.
       const assignments = screen.getByText("Assignments");
       expect(
@@ -2357,8 +2358,12 @@ describe("PersonDetailScreen", () => {
       renderWithManagementAccess({});
       expect(screen.getByRole("button", { name: "Add to management" })).toBeInTheDocument();
 
+      // Someone who already manages changes it from the Manages row in Access.
       renderWithManagementAccess({ person: { managementDepartmentIds: [9] } });
-      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit management access" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getAllByText("Manages").length).toBeGreaterThan(0);
     });
 
     // Management settings always open in a popup over whatever raised them,
@@ -2397,10 +2402,11 @@ describe("PersonDetailScreen", () => {
 
     // Existing access stays editable and removable whatever the contact
     // details say: taking someone off the roster must never need an address.
-    it("keeps Edit Management Access for someone already on the roster without an email", () => {
+    it("keeps the Manages row for someone already on the roster without an email", () => {
       renderWithManagementAccess({ person: { email: "", managementDepartmentIds: [9] } });
 
-      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+      fireEvent.click(screen.getByText("Manages"));
+      expect(screen.getAllByText(/management/i).length).toBeGreaterThan(0);
     });
 
     // A plain app invitation carries no management departments, so it must not
@@ -2425,7 +2431,7 @@ describe("PersonDetailScreen", () => {
     });
   });
 
-  describe("access level on the page", () => {
+  describe("access role on the page", () => {
     function renderForAccess(options: {
       canManageManagementAccess?: boolean;
       person?: Record<string, unknown>;
@@ -2472,11 +2478,11 @@ describe("PersonDetailScreen", () => {
       return mutationCalls;
     }
 
-    const accessRow = () => screen.getByRole("button", { name: /^Access level/ });
+    const accessRow = () => screen.getByRole("button", { name: /^Access role/ });
 
     // On the page, not behind Edit, and it opens the picker on its own rather
     // than riding on Save.
-    it("shows the access level on the page for a linked member", () => {
+    it("shows the access role on the page for a linked member", () => {
       renderForAccess({
         person: { orgRole: "user", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
@@ -2496,8 +2502,8 @@ describe("PersonDetailScreen", () => {
     it("leaves the row out with no account and no invitation", () => {
       renderForAccess({ person: { orgRole: null, userId: null } });
 
-      expect(screen.queryByRole("button", { name: /^Access level/ })).not.toBeInTheDocument();
-      expect(screen.queryByText("Access")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Access role/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("Access role")).not.toBeInTheDocument();
     });
 
     it("shows the level without a way to change it without the permission", () => {
@@ -2506,8 +2512,8 @@ describe("PersonDetailScreen", () => {
         person: { orgRole: "admin", membershipUpdatedAt: "2026-01-01T00:00:00.000Z" },
       });
 
-      expect(screen.queryByRole("button", { name: /^Access level/ })).not.toBeInTheDocument();
-      expect(screen.getByText("Access level")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Access role/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Access role")).toBeInTheDocument();
       expect(screen.getByText("Admin")).toBeInTheDocument();
     });
 
@@ -2534,7 +2540,7 @@ describe("PersonDetailScreen", () => {
           pendingInvitation: {
             id: "inv-1",
             email: "mina@dubgrid.com",
-            expiresAt: "2026-02-01T00:00:00.000Z",
+            expiresAt: "2099-02-01T00:00:00.000Z",
             updatedAt: "2026-01-01T00:00:00.000Z",
             roleToAssign: "admin",
           },
@@ -2551,7 +2557,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(accessRow());
       fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
-      confirmDialog("Change access level");
+      confirmDialog("Change access role");
 
       expect(allMutatePayloads(mutationCalls)).toContain("admin");
     });
@@ -2564,7 +2570,7 @@ describe("PersonDetailScreen", () => {
           pendingInvitation: {
             id: "inv-1",
             email: "mina@dubgrid.com",
-            expiresAt: "2026-02-01T00:00:00.000Z",
+            expiresAt: "2099-02-01T00:00:00.000Z",
             updatedAt: "2026-01-01T00:00:00.000Z",
             roleToAssign: "user",
           },

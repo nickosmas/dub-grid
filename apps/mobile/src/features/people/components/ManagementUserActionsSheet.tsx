@@ -153,10 +153,10 @@ export function ManagementUserActionsSheet({
           result.result === "access_removed"
             ? "Management access removed"
             : roleChanged
-              ? "Access level updated"
+              ? "Access role updated"
               : "Management access updated",
         message: roleChanged
-          ? "Their access level was updated."
+          ? "Their access role was updated."
           : "Their management access was updated.",
       });
     },
@@ -287,7 +287,7 @@ export function ManagementUserActionsSheet({
               />
               <Button
                 disabled={isPending}
-                label="Change access level"
+                label="Change access role"
                 onPress={() => {
                   setIsActionsHidden(true);
                   handoff(() => setShowRoleSheet(true));

@@ -259,7 +259,7 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
 
   it("changes the role with the assured token", async () => {
     await chooseAdminForMember();
-    fireEvent.click(await screen.findByRole("button", { name: "Change access level" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change access role" }));
 
     await waitFor(() =>
       expect(updateOrganizationMembershipGuarded).toHaveBeenCalledWith(
@@ -277,18 +277,18 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
     expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
       updateOrganizationMembershipGuarded.mock.invocationCallOrder[0],
     );
-    expect(toast.success).toHaveBeenCalledWith("Access level updated");
+    expect(toast.success).toHaveBeenCalledWith("Access role updated");
   });
 
   it("changes nothing when step-up is cancelled, and clears the loading state", async () => {
     stepUpRun.mockResolvedValue(false);
 
     await chooseAdminForMember();
-    fireEvent.click(await screen.findByRole("button", { name: "Change access level" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Change access role" }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Change access level" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Change access role" })).toBeEnabled(),
     );
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe("Gridmaster Users tab: role change (41d3, F-16)", () => {
 
     expect(screen.getByRole("button", { name: "User" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("dialog", { name: "Confirm it's you" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change access level" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change access role" })).not.toBeInTheDocument();
   });
 });
 

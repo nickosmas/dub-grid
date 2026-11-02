@@ -84,7 +84,7 @@ export function InlineRoleSelect({
           title={
             pendingInvitationEmail
               ? `Change the invitation for ${pendingInvitationEmail} to ${ORG_ROLE_LABELS[pending]}?`
-              : `Change their access level to ${ORG_ROLE_LABELS[pending]}?`
+              : `Change their access role to ${ORG_ROLE_LABELS[pending]}?`
           }
           message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
           summary={
@@ -97,7 +97,7 @@ export function InlineRoleSelect({
                 }
               : undefined
           }
-          confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access level"}
+          confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access role"}
           variant="warning"
           isLoading={saving}
           onCancel={() => {
@@ -116,15 +116,12 @@ export function InlineRoleSelect({
               toast.success(
                 pendingInvitationEmail
                   ? `Invitation replaced with ${ORG_ROLE_LABELS[next]} access.`
-                  : `Access level changed to ${ORG_ROLE_LABELS[next]}.`,
+                  : `Access role changed to ${ORG_ROLE_LABELS[next]}.`,
               );
               setPending(null);
             } catch (error) {
               toast.error(
-                formatClientErrorMessage(
-                  error,
-                  "We couldn't change their access level. Try again.",
-                ),
+                formatClientErrorMessage(error, "We couldn't change their access role. Try again."),
               );
             } finally {
               setSaving(false);

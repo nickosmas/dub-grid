@@ -92,7 +92,7 @@ export function SelectionSection({
 }: {
   /**
    * Omit for the one list under a sheet whose title already names it: a
-   * header restating "Access level" under "App access" was the one thing on
+   * header restating "Access role" under "App access" was the one thing on
    * the sheet that said nothing.
    */
   label?: string;
