@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:67a660fe6728c93817383ae91f8961c00db5b71ddc57a65b55355e3cecc088af"
+      "evidenceFingerprint": "sha256:c66d61670915d780f2bad97c1b3d8dbf914330b05ba3f29b84c7e00d98a12949"
     },
     {
       "id": "introduction",
@@ -122,7 +122,7 @@
           "id": "product",
           "claims": [
             "organizations are separate, each at its own subdomain",
-            "labels default to Areas, Certifications and Roles and are renamed under Settings > Labels",
+            "labels default to Schedule Areas, Certifications and Roles and are renamed under Settings > Labels",
             "1 Week, 2 Weeks, Month; two weeks by default",
             "drafts until publish",
             "presence never locks; a conflicting save refreshes",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c61a717b0ac01f9fdc738cc93a4c86ebc355f4ab0459d35729ec0e07509d2ac3"
+      "evidenceFingerprint": "sha256:6a98d8c87d3b0184f43a901f97e63c59e4b0c0aeb758d2c6d772fc7f6b18c1e8"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:310e5fc9b09a8ecc932f632eaf08004f230c3fed5ce906118ace382f2d4f1a21"
+      "evidenceFingerprint": "sha256:aadb8ea2cc0120d5869c1abed9e03ce9a546320b979004035e2a9a34cb961bdd"
     },
     {
       "id": "onboarding",
@@ -336,7 +336,7 @@
         {
           "id": "schedule",
           "claims": [
-            "rows grouped by department and area; Ungrouped; Open Shifts and count rows",
+            "rows grouped by department and schedule area; Ungrouped; Open Shifts and count rows",
             "unpublished periods hidden from non-editors",
             "toolbar views, navigation, pay-period alignment, focus tabs, sort, search highlights, coverage",
             "Month is read-only; phones show one day",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8796227244255829372251396410560c129159d56591becf3e92e04606f03844"
+      "evidenceFingerprint": "sha256:e03f3fa47e948f26d7d5a39266d56328c7b86435030a8987dc6e23d44104b534"
     },
     {
       "id": "draft-publish",
@@ -444,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:577ccf51c98a98b88e65725abb9a1cd3a8efe18ecdc940c335dfd7ae57e28679"
+      "evidenceFingerprint": "sha256:f24bd13479e342cbf8b488041f36f7ce0093c6d0958903ddd06fc996fa46fc11"
     },
     {
       "id": "recurring-shifts",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2b03ffe6505170e58cbe2e2b53f4268214e4ae61cc623e4c63fe54a46b673176"
+      "evidenceFingerprint": "sha256:9dc4dc94c484d8e6456451398df47ba9e9070a32f7e20f0a5237ae7563c9b2c8"
     },
     {
       "id": "realtime",
@@ -546,7 +546,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:24257fd033dcdda8270dcfdb1acf642caa293e016275f74028bc34bb0b4a8cad"
+      "evidenceFingerprint": "sha256:1a103e8ab828d7a0dfd138cb57ce4a9e7bcc06ce0c290d2507e98e54747b3516"
     },
     {
       "id": "shift-requests",
@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3d8b7abd8781cf16a184c1e94791cc2dbfb7520e7ba2cdd2199d23e90fc7b662"
+      "evidenceFingerprint": "sha256:19d0fcd6ddb62a39c6eccbbc86cc044375e978f66e35fae93363ccedffca0dfa"
     },
     {
       "id": "dashboard",
@@ -690,7 +690,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c056d837de459be7ccc10afdfeda590830ae2158608b74389dc44ead44192c79"
+      "evidenceFingerprint": "sha256:cd4279763361234d81cb406ec7b543675dcab9c99bd1fbe3a60d1b1138c545be"
     },
     {
       "id": "roster",
@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d343bb74be88b651c3992e89ef229b61b81fc2c5277ba0475ca0f31a0f761b91"
+      "evidenceFingerprint": "sha256:2495be0f0891eaf3bb69f72f2c10c7d40141bd98db395efed6991c8dd33ff7f6"
     },
     {
       "id": "person-detail",
@@ -793,12 +793,12 @@
           "id": "person",
           "claims": [
             "person page needs view-details permission; one page with Back to People",
-            "header contents: name, access star, status icon, roles, areas and employment, email and phone, Send invitation, Add to schedule or management, Edit details; previous and next person in the People list's order",
+            "header contents: name, access star, status icon, roles, schedule areas and employment, email and phone, Send invitation, Add to schedule or management, Edit details; previous and next person in the People list's order",
             "status card under the header; Overview About: Work, Access and Record cards; Edit details in the header edits the details, Change access and the management Edit sit on the Access card; account states, last active, and the Record card",
             "Send invitation, Add to schedule or management, Activate or Deactivate; invitation banner Reinvite and Revoke",
-            "edit fields; area rule for scheduled and management people",
+            "edit fields; schedule area rule for scheduled and management people",
             "login email rules: required with an account, step-up, sign-out and notices to both addresses, unique, pending invite reissue",
-            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; a month at a time with arrows, Today and Dates; Overview stats for the period with What they work under them, areas when they differ, This week and Needs attention",
+            "Overview, Schedule, Requests and Activity tabs; older tab links open the tab that holds them; who sees the recurring schedule, Requests and Activity; a month at a time with arrows, Today and Dates; Overview stats for the period with What they work under them, schedule areas when they differ, This week and Needs attention",
             "profile change requests reviewed under People > Requests",
             "mobile person screen sections and actions",
             "Schedule tab: recurring schedule with preferences, then shifts and time off as a month calendar first for every period (the period's days stand out, the rest of the month dimmed) or as a list grouped by week from Show as list, with what a draft replaces, correction reason, absence, notes, marks for drafts, corrections and time off planned or now, the show dropdown, CSV export, and day off hidden unless shown",
@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7b2c0b006dae4f07a1c3c0bb085bb6c627361892d218ddf86d4e1e70c8839451"
+      "evidenceFingerprint": "sha256:2d1c8528372d5c0a0c02dc5c7776288c3ab945dbd62a8e1fd265f45daadd5bc6"
     },
     {
       "id": "invitations",
@@ -964,7 +964,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bd138a9ea6528ca1277535481d99363ec215261f4247878ea99ac462336fcd56"
+      "evidenceFingerprint": "sha256:bdf2140dd4a55924b3e99805c1d36ce9997b96eb83b44d8c9732a7aa21895c0d"
     },
     {
       "id": "coverage",
@@ -988,7 +988,7 @@
         {
           "id": "coverage",
           "claims": [
-            "requirements per area and shift or job option, grouped by shift plus general jobs",
+            "requirements per schedule area and shift or job option, grouped by shift plus general jobs",
             "same every day or per day; 0 to 999; 0 means no requirement and removes it; shifts unaffected",
             "mentored credit lives in Schedule Rules",
             "where coverage shows on the schedule and dashboard",
@@ -1017,7 +1017,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:edbba1f41bcf6e250af36248ad3ad55b9b9b039d8bf1708af339d08d0feabb27"
+      "evidenceFingerprint": "sha256:8b744b37325a787aa204ae451b68c07cf8376913d3da9aa8feeefe4ffc57bd7e"
     },
     {
       "id": "terminology",
@@ -1067,7 +1067,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:21906676ba1e5c9645eafc8a5c7f8f6570db24fb4472d869c4a6b5376103b356"
+      "evidenceFingerprint": "sha256:807afc4d69f3d80ee9db3268d8f754a71a0e930eaf2fd0e443310c3328384c97"
     },
     {
       "id": "roles",
@@ -1121,7 +1121,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ade94c4e0a11dac10b865d42c84b6ff84bf6d502a6ddb6336be8926dbc395132"
+      "evidenceFingerprint": "sha256:4e9c535675cb94a5d097eeddd7e2b227ad0cad594dd20e9db163935dbdd1bbb7"
     },
     {
       "id": "admin-permissions",
@@ -1165,7 +1165,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:243d1337f819620d7ff2d935266621dbd3ed0b5caf9136ebddb9b5f39e8b403f"
+      "evidenceFingerprint": "sha256:9c5a408dd9d52f32c8d48201c500ef9f7a0eec46acadab05ce5fd2f779a29e61"
     },
     {
       "id": "billing",
@@ -1235,7 +1235,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:21072090c56ca91d7ffacfa42322222ef7cfd2c6fa0691168440997af9cb493e"
+      "evidenceFingerprint": "sha256:141f3fa3ba9c541f065de348f66fd23947ff623049f83ebc387bd97f88b9454f"
     },
     {
       "id": "mobile-navigation",
@@ -1321,7 +1321,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1d20f15e64da3ca3a990b23faf67fbd2a20378ab5de759c0f7d14b73a2a660f0"
+      "evidenceFingerprint": "sha256:0e98326cf9bf570a910085fee919cb3fff2dd029d214a0ae53bf159b55ebe973"
     },
     {
       "id": "alerts",
@@ -1387,7 +1387,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:0bb0d22c7fe76d02b87d9a7cfee8ccb13f2b180147b40030fa2f6851e3f8d7d2"
+      "evidenceFingerprint": "sha256:9c2ef203040b9bba15d452bad2c47e9dd772a971db4db0ed184d576d55dd0228"
     },
     {
       "id": "reports",
@@ -1439,7 +1439,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:de53fe66ea1566fa1711888891b8cb67fe9e6a295550dec20861e6612f3d7045"
+      "evidenceFingerprint": "sha256:227033f0f34774aeed5a3ab894688f50b46f9449a865918353b319f88a378de1"
     },
     {
       "id": "profile",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:085b1a8b58933ec8290adc6780b955111fc1a6a872be41be832eebb9a1429e37"
+      "evidenceFingerprint": "sha256:1e002dc3888d92d8591da2e93d3159c8ece3a98792f2f1c3e6f175207c954448"
     },
     {
       "id": "security-sessions",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6eed25345e9ce1d7b3b12a5894cb36130fd2690bf793323d9bff7c11e1e36488"
+      "evidenceFingerprint": "sha256:0372da802cc1a4838e1fba2d038f01940306e0f938bb6c4fc90ea79fd361ad90"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1764,7 +1764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9ab81e86ce8751eaafb00db61215375054556906ec95e14f21e00b2ddfae641c"
+      "evidenceFingerprint": "sha256:e9f71b22fcfc1ca76258995132ef6fbe49886983b47c91937732ed59f9725d48"
     },
     {
       "id": "organization-activity-controls",
@@ -1821,7 +1821,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:95ed1dda42ff99a4f7751489730e84de8c81858b6654565a6d24ebc478a0585c"
+      "evidenceFingerprint": "sha256:001001eb51db387751a28dd3ac12e9dec8ad5dbab08da1643a844bb7ad9fef57"
     },
     {
       "id": "departments-focus-areas",
@@ -1845,11 +1845,11 @@
         {
           "id": "departments",
           "claims": [
-            "departments with areas; administrative teams for unscheduled people",
-            "Edit to add departments and areas; name limits and uniqueness; split into areas; drag to reorder",
+            "departments with schedule areas; administrative teams for unscheduled people",
+            "Edit to add departments and schedule areas; name limits and uniqueness; split into schedule areas; drag to reorder",
             "empty department hint",
             "archive with Rename Instead when in use; delete when unused",
-            "grid grouping; a person in several areas appears in each; toolbar filter",
+            "grid grouping; a person in several schedule areas appears in each; toolbar filter",
             "who can view and change"
           ],
           "sourceFiles": [
@@ -1874,7 +1874,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8008a94ae0241524ede9e6427bc3223c5c20f9605e44f28cbee2db780c6d2bf8"
+      "evidenceFingerprint": "sha256:6295ef5c982ce730c085f9366b181a618defb290315103e1fa0ae70ea9416554"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1901,7 +1901,7 @@
           "id": "codes",
           "claims": [
             "no built-in shifts, jobs or absences; setup needs one shift and one job",
-            "shift fields and limits per area; code made from name, hidden in full-name mode",
+            "shift fields and limits per schedule area; code made from name, hidden in full-name mode",
             "job groups; shift-only assignments and the default shift job",
             "job fields; placement; per-shift settings; eligibility matching; ordering",
             "absence fields and limits",
@@ -1932,7 +1932,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a9c40bcb2b8da9190980058e2561a642b2b04850f2159faccedb3b2901c17f94"
+      "evidenceFingerprint": "sha256:c68aeb2dc5e51b1c6d6c73ae2ae58c52924c60ec0222822e1ff8caaf5188eb0a"
     },
     {
       "id": "schedule-tools",
@@ -1984,7 +1984,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:78a15e1ae8d209516baa50454e40cf3675adf37774d81165208525620932dc3a"
+      "evidenceFingerprint": "sha256:c0e02702e3533f7c1f4e9765f4e025ae48cf10e0aeabf404411de68511b00158"
     },
     {
       "id": "coverage-open-shifts",
@@ -2008,7 +2008,7 @@
           "id": "coverage-open-shifts",
           "claims": [
             "editors see working coverage while staff see published coverage",
-            "open-shift staffing checks area, role, certification, absence, and overlap",
+            "open-shift staffing checks schedule area, role, certification, absence, and overlap",
             "eligible staff can offer to cover a visible open shift through a pickup request",
             "call-off vacancies follow the Organization's visibility setting"
           ],
@@ -2035,7 +2035,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:63d7fb70b6511d1e1bf3442dc262240831361935a0eb3866f87d5f4ea704f9fd"
+      "evidenceFingerprint": "sha256:212cc27f1114890731d089f4f67d4d701dce897d7985cf056813dc3a49703da8"
     },
     {
       "id": "mobile-schedule",
@@ -2058,7 +2058,7 @@
         {
           "id": "mobile-schedule-actions",
           "claims": [
-            "week and month navigation with area filtering",
+            "week and month navigation with schedule area filtering",
             "shift detail shows schedule facts and supports drop, pickup, call-off, and swap requests",
             "mobile schedule surfaces explain loading, unavailable, unlinked, error, and retry states",
             "schedule authoring and publication remain web-only",
@@ -2090,7 +2090,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:f2600b32875d81a2b0615b60395b6981ecc416792f70566d1588a26f24a528e2"
+      "evidenceFingerprint": "sha256:89d4fe945df872ef52cc65c0be4addfdd3f0f6478102cefd0d13a02bd3141e23"
     },
     {
       "id": "integrations-exports",
@@ -2148,7 +2148,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:49e7944b2428ce2d77d02b5219e53cc73f23365ea6ce91c9b56ce45cdd23c561"
+      "evidenceFingerprint": "sha256:846ae88f6c5e120f3c3650a4338a2a1b1ba614d918f40c885dd9a25d98124e77"
     }
   ],
   "surfaceExclusions": [

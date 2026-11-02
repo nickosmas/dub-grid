@@ -16,7 +16,6 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -301,7 +300,6 @@ function createStyles(mobileColors: MobileColors) {
     },
     monthLabel: {
       ...mobileTextWeighted("rowTitle", "semibold"),
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     week: {
@@ -334,7 +332,6 @@ function createStyles(mobileColors: MobileColors) {
     },
     dayText: {
       ...mobileTextWeighted("rowTitle", "medium"),
-      ...mobileTabularText,
       color: mobileColors.textPrimary,
     },
     dayTextSelected: {
@@ -360,7 +357,6 @@ function createStyles(mobileColors: MobileColors) {
     },
     fieldValue: {
       ...mobileTextWeighted("body", "regular"),
-      ...mobileTabularText,
       flex: 1,
       color: mobileColors.textPrimary,
     },

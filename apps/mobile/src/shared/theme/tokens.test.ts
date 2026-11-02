@@ -9,7 +9,6 @@ import {
   mobilePillOverflow,
   mobileInputText,
   mobileSpacing,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   mobileAvatarText,
@@ -181,14 +180,6 @@ describe("Inter product weights", () => {
     expect(mobileInputText("semibold", false)).toEqual({ fontWeight: "600" });
     expect(mobileInputText("regular", true)).not.toHaveProperty("fontWeight");
     expect(mobileInputText("regular", false)).not.toHaveProperty("fontFamily");
-  });
-});
-
-describe("mobileTabularText", () => {
-  it("uses the native tabular-numeral feature without changing type scale", () => {
-    expect(mobileTabularText).toEqual({ fontVariant: ["tabular-nums"] });
-    expect(mobileTabularText).not.toHaveProperty("fontSize");
-    expect(mobileTabularText).not.toHaveProperty("lineHeight");
   });
 });
 

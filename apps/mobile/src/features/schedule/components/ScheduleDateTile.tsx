@@ -5,7 +5,6 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
   mobileSpace,
-  mobileTabularText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -76,7 +75,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     day: {
       ...mobileTextWeighted("title", "bold"),
-      ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
     tileToday: {

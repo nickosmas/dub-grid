@@ -87,7 +87,7 @@ function groupShifts(
   for (const shift of shifts) {
     const key = shift.focusAreaId == null ? "general" : String(shift.focusAreaId);
     const title =
-      shift.focusAreaId == null ? "Any area" : (focusAreaName(shift.focusAreaId) ?? null);
+      shift.focusAreaId == null ? "Any schedule area" : (focusAreaName(shift.focusAreaId) ?? null);
     const group = groups.get(key) ?? { key, title, items: [] };
     group.items.push({
       id: shift.id,

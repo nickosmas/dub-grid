@@ -102,6 +102,5 @@ const createStyles = (mobileColors: MobileColors) =>
     count: {
       ...mobileTextWeighted("caption", "bold"),
       color: mobileColors.textSecondary,
-      fontVariant: ["tabular-nums"],
     },
   });

@@ -35,8 +35,7 @@ import { WizardStepper } from "./organization-setup/WizardStepper";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { requireCredentialAssurance } from "@/features/account/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
-import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-import { AreaLabelPresets } from "@/components/settings/AreaLabelPresets";
+import { DEFAULT_ORGANIZATION_LABELS, organizationLabelHint } from "@dubgrid/domain";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
@@ -595,7 +594,7 @@ export default function OrganizationSetupWizard({
             >
               <div>
                 <label style={labelStyle} htmlFor={ids.focusAreaLabel}>
-                  Areas label
+                  Schedule areas label
                 </label>
                 <input
                   id={ids.focusAreaLabel}
@@ -604,7 +603,15 @@ export default function OrganizationSetupWizard({
                   onChange={(e) => setFocusAreaLabel(e.target.value)}
                   placeholder={DEFAULT_ORGANIZATION_LABELS.focusArea}
                 />
-                <AreaLabelPresets value={focusAreaLabel} onSelect={setFocusAreaLabel} />
+                <p
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-text-muted)",
+                    margin: "4px 0 0",
+                  }}
+                >
+                  {organizationLabelHint("focusArea")}
+                </p>
               </div>
               <div>
                 <label style={labelStyle} htmlFor={ids.certificationLabel}>
@@ -615,8 +622,17 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   value={certificationLabel}
                   onChange={(e) => setCertificationLabel(e.target.value)}
-                  placeholder="Certifications"
+                  placeholder={DEFAULT_ORGANIZATION_LABELS.certification}
                 />
+                <p
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-text-muted)",
+                    margin: "4px 0 0",
+                  }}
+                >
+                  {organizationLabelHint("certification")}
+                </p>
               </div>
               <div>
                 <label style={labelStyle} htmlFor={ids.roleLabel}>
@@ -627,8 +643,17 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   value={roleLabel}
                   onChange={(e) => setRoleLabel(e.target.value)}
-                  placeholder="Roles"
+                  placeholder={DEFAULT_ORGANIZATION_LABELS.role}
                 />
+                <p
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--dg-color-text-muted)",
+                    margin: "4px 0 0",
+                  }}
+                >
+                  {organizationLabelHint("role")}
+                </p>
               </div>
             </div>
           </div>
@@ -1682,7 +1707,7 @@ export default function OrganizationSetupWizard({
                 <SectionNotice
                   tone="warning"
                   messages={[
-                    "Staff need an area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
+                    "Staff need a schedule area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
                   ]}
                 />
               </div>

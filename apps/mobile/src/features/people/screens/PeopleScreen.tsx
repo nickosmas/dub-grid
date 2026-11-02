@@ -69,7 +69,6 @@ import {
   mobileAvatarText,
   mobileElevation,
   mobileRadii,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -1366,7 +1365,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     personPlanned: {
       ...mobileText.meta,
-      ...mobileTabularText,
       color: mobileColors.textMuted,
       flexShrink: 1,
     },

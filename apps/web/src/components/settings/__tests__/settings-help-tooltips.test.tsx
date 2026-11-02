@@ -87,9 +87,20 @@ describe("settings help cleanup", () => {
     render(<OrganizationLabels organization={organization as never} onSave={vi.fn()} />);
 
     expect(screen.queryByText("How custom labels work")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Suggested area labels" })).toBeInTheDocument();
-    expect(screen.getByText("e.g. Certifications, Designations")).toBeInTheDocument();
-    expect(screen.getByText("e.g. Responsibilities, Positions")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "e.g. Schedule Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "e.g. Certifications, Credentials, Licenses, Qualifications, Designations, Skill Levels, Training",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("e.g. Roles, Positions, Responsibilities, Duties, Titles"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: /Suggested/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
 

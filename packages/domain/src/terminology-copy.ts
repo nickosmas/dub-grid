@@ -1,5 +1,5 @@
 /**
- * Organization labels ("Areas", "Wings", "Certifications") are stored in
+ * Organization labels ("Schedule Areas", "Wings", "Certifications") are stored in
  * their plural, title-cased display form. These put one into a sentence or a
  * column heading without hardcoding the default term. The trailing "s" is
  * stripped naively, which covers every label the settings realistically

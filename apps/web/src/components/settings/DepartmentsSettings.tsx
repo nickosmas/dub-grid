@@ -717,7 +717,7 @@ function DepartmentSection({
 
       onDepartmentsChange(savedDepts);
       if (failedFocusAreaWrites > 0) {
-        lastSaveErrorRef.current = new Error("Some areas did not save.");
+        lastSaveErrorRef.current = new Error("Some schedule areas did not save.");
         toast.error(focusAreaFailureMessage(failedFocusAreaWrites, focusAreaWrites));
         return;
       }

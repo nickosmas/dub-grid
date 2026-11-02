@@ -42,8 +42,8 @@ knowledge of the codebase.
 - Write **Organization**, never "workspace" and never the abbreviation "org".
   `org` is a code identifier only.
 - Several labels are customizable per organization. Name the default, and say
-  it is configurable rather than presenting it as fixed: Areas (formerly Focus
-  Areas), Departments (formerly Scheduled Departments), Certifications
+  it is configurable rather than presenting it as fixed: Schedule Areas
+  (formerly Focus Areas), Departments (formerly Scheduled Departments), Certifications
   (formerly Skill Levels), shift codes, absence types, and role labels.
 - Groups of people who aren't scheduled are **Administrative Teams**, always
   spelled out (formerly management departments). One is "a team" or "an

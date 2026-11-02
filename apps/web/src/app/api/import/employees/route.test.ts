@@ -116,7 +116,9 @@ describe("POST /api/import/employees", () => {
       success: true,
       inserted: 1,
       total: 2,
-      errors: [{ row: 2, error: '"Rehab Wing" doesn\'t match any area in your organization.' }],
+      errors: [
+        { row: 2, error: '"Rehab Wing" doesn\'t match any schedule area in your organization.' },
+      ],
     });
     expect(employeeInserts).toHaveBeenCalledTimes(1);
     expect(employeeInserts).toHaveBeenCalledWith([

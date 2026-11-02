@@ -742,7 +742,8 @@ Archived one never does (item 51).
 - "Organization" is customer-facing terminology. Code may use `org` or
   `organization`; "workspace" is reserved for the literal `workspace_kind`
   field. Customers say "schedule notes"; code keeps `indicator`.
-- Schedule data uses tabular numerals.
+- Schedule data uses tabular numerals on web; the mobile app uses Inter's
+  proportional figures throughout (owner, 2026-11-02).
 - Times shown to people are 12-hour (`7:00 AM - 3:00 PM`); a shift crossing
   midnight names both days (`Wed 11:00 PM - Thu 7:00 AM`).
 - Mobile has native primitives and motion while preserving the same product

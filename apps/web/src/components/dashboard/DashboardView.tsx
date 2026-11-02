@@ -1127,7 +1127,7 @@ export default function DashboardView({
             const setupSteps = [
               {
                 done: focusAreas.length > 0,
-                label: `Configure ${org.focusAreaLabel || "areas"}`,
+                label: `Configure ${org.focusAreaLabel || "schedule areas"}`,
                 href: "/settings?section=staff-departments",
               },
               {
