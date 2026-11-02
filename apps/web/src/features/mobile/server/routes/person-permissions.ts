@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import {
   mobilePersonPermissionsBodySchema,
   mobilePersonPermissionsResponseSchema,
@@ -125,13 +125,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  void dispatchNotificationEvent(auth.user.id, {
-    action: "admin_permissions_changed",
-    orgId: auth.currentOrg.id,
-    targetUserId: membership.user_id,
-    before: current as Record<string, boolean> | null,
-    after: next as unknown as Record<string, boolean>,
-  });
+  after(() =>
+    dispatchNotificationEvent(auth.user.id, {
+      action: "admin_permissions_changed",
+      orgId: auth.currentOrg.id,
+      targetUserId: membership.user_id,
+      before: current as Record<string, boolean> | null,
+      after: next as unknown as Record<string, boolean>,
+    }),
+  );
 
   const person = await loadMobilePersonWithAccess(auth.serviceClient, auth.currentOrg.id, id);
   return NextResponse.json(

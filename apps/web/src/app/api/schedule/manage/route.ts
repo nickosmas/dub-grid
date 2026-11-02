@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type {
@@ -53,7 +53,7 @@ import type {
 
 export const dynamic = "force-dynamic";
 
-/** Fire-and-forget audit log write — never blocks or throws on the hot schedule-edit path. */
+/** Writes the audit row after the response, so the schedule-edit path never waits on it. */
 function logScheduleAudit(
   serviceClient: SupabaseClient,
   entry: {
@@ -66,10 +66,9 @@ function logScheduleAudit(
     details: Record<string, unknown>;
   },
 ): void {
-  try {
-    void serviceClient
-      .from("audit_log")
-      .insert({
+  after(async () => {
+    try {
+      const { error } = await serviceClient.from("audit_log").insert({
         org_id: entry.orgId,
         actor_id: entry.actorId,
         actor_email: entry.actorEmail,
@@ -77,15 +76,14 @@ function logScheduleAudit(
         resource_type: entry.resourceType,
         resource_id: entry.resourceId,
         details: entry.details,
-      })
-      .then(({ error }) => {
-        if (error) {
-          logger.error({ error, action: entry.action }, "Schedule audit log write failed");
-        }
       });
-  } catch (error) {
-    logger.error({ error, action: entry.action }, "Schedule audit log write failed");
-  }
+      if (error) {
+        logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+      }
+    } catch (error) {
+      logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+    }
+  });
 }
 
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
@@ -2544,14 +2542,16 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "schedule_note_changed",
-          orgId: data.orgId,
-          empId: data.employeeId,
-          date: data.date,
-          mode: "upsert",
-          status,
-        });
+        after(() =>
+          dispatchNotificationEvent(auth.actor.id, {
+            action: "schedule_note_changed",
+            orgId: data.orgId,
+            empId: data.employeeId,
+            date: data.date,
+            mode: "upsert",
+            status,
+          }),
+        );
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
           actorId: auth.actor.id,
@@ -2616,14 +2616,16 @@ export async function POST(req: NextRequest) {
 
         // Only fire when removing a previously-published note — draft
         // deletes are editor-only state changes.
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "schedule_note_changed",
-          orgId: data.orgId,
-          empId: data.employeeId,
-          date: data.date,
-          mode: "delete",
-          status: data.existingStatus === "draft" ? "draft" : "published",
-        });
+        after(() =>
+          dispatchNotificationEvent(auth.actor.id, {
+            action: "schedule_note_changed",
+            orgId: data.orgId,
+            empId: data.employeeId,
+            date: data.date,
+            mode: "delete",
+            status: data.existingStatus === "draft" ? "draft" : "published",
+          }),
+        );
         logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
           actorId: auth.actor.id,

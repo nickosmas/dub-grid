@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbEmployee } from "@dubgrid/db-types";
 import {
@@ -99,11 +100,13 @@ export async function insertEmployees(args: {
 
   const added = inserted.map(({ index, row }) => ({ index, employee: rowToEmployee(row) }));
   for (const { employee } of added) {
-    void dispatchNotificationEvent(actor.id, {
-      action: "employee_created",
-      orgId,
-      empId: employee.id,
-    });
+    after(() =>
+      dispatchNotificationEvent(actor.id, {
+        action: "employee_created",
+        orgId,
+        empId: employee.id,
+      }),
+    );
   }
   if (added.length > 0) {
     const { error: auditError } = await serviceClient.from("audit_log").insert(

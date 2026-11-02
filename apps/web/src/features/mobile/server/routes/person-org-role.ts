@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import {
   mobilePersonOrgRoleBodySchema,
   mobilePersonOrgRoleResponseSchema,
@@ -104,13 +104,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return NextResponse.json({ error: outcome.message }, { status: 400 });
     }
 
-    void dispatchNotificationEvent(auth.user.id, {
+    const roleChanged = {
       action: "role_changed",
       orgId: auth.currentOrg.id,
       targetUserId: loaded.userId,
       fromRole: loaded.membership.org_role ?? "user",
       toRole: orgRole,
-    });
+    } as const;
+    after(() => dispatchNotificationEvent(auth.user.id, roleChanged));
 
     await insertMobileAuditLogEntry(auth.serviceClient, {
       org_id: auth.currentOrg.id,

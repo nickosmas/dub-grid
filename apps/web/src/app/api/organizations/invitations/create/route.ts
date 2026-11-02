@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import {
   normalizeOptionalUsPhone,
   normalizeRequiredStaffEmail,
@@ -387,12 +387,14 @@ export async function POST(req: NextRequest) {
       userAgent: req.headers.get("user-agent"),
     });
 
-    void dispatchNotificationEvent(user.id, {
-      action: "invitation_created",
-      orgId,
-      invitationId,
-      inviteeEmail: inviteeEmail,
-    });
+    after(() =>
+      dispatchNotificationEvent(user.id, {
+        action: "invitation_created",
+        orgId,
+        invitationId,
+        inviteeEmail: inviteeEmail,
+      }),
+    );
 
     return NextResponse.json({
       invitationId,

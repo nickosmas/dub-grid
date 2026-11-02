@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   // invalidate immediately so an archived org's subdomain stops resolving
   // right away instead of appearing valid until the cache expires.
   if (org.slug) {
-    void cacheDel(CacheKey.orgBySlug(org.slug));
+    await cacheDel(CacheKey.orgBySlug(org.slug));
   }
 
   // Cancel the Stripe subscription. A Stripe failure must not block the
