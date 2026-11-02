@@ -25,18 +25,25 @@ sign-in and the security notices already used `after()`.
   are as fast as before.
 - `logScheduleAudit` in `schedule/manage` and `schedule/recurring` writes inside
   `after()`, still logging (never throwing) on a failed write.
-- Deleting an organization clears its subdomain cache entry in `after()` too.
-- A lint rule, `design/no-floating-server-work`, fails a `void <call>` or a
-  floating `call().then/catch/finally(...)` in `app/api` and
-  `features/**/server`, so new code can't drop work this way. A handler on a
-  promise held in a variable (awaited elsewhere) is allowed.
+- Deleting an organization awaits clearing its subdomain cache entry, as its
+  comment always said ("invalidate immediately").
+- A lint rule, `design/no-floating-server-work`, fails a `void <call>`, a
+  floating `call().then/catch/finally(...)` and a bare call to an alert sender
+  (`dispatchNotificationEvent`, `sendNotification`,
+  `notifyPublishedShiftChanges`) in `app/api` and `features/**/server`, so new
+  code can't drop work this way. A handler on a promise held in a variable
+  (awaited elsewhere) is allowed. Other bare async calls need type information
+  the rule doesn't have.
+- An independent review found no correctness bugs. Left as is: `cacheThrough`
+  in `lib/cache.ts` fills the cache without waiting, which at worst skips one
+  cache fill.
 - The web test setup runs `after()` tasks in place, since a route test has no
   request scope; files that need to hold a task back keep their own mock.
 
 ## Done when
 
 - [x] No `void dispatchNotificationEvent(` or floating audit write remains in
-      server code, and the lint rule fails one (`npm run lint:rules`, 11 cases).
+      server code, and the lint rule fails one (`npm run lint:rules`, 16 cases).
 - [x] `npm run type-check`, `npm run lint` and the touched routes' tests pass.
 
 Not verified in production: whether alerts were actually being dropped before.

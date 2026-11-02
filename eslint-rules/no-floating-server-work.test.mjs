@@ -18,6 +18,7 @@ tester.run("no-floating-server-work", noFloatingServerWork, {
     "async function f() { await Promise.all([a(), b()]); }",
     "const pending = send().catch(log);",
     "void 0;",
+    "logger.info(message);",
     // A handler on a promise awaited elsewhere only keeps it from going unhandled.
     "const facts = load(); facts.catch(() => {}); await facts;",
   ],
@@ -36,6 +37,18 @@ tester.run("no-floating-server-work", noFloatingServerWork, {
     },
     {
       code: "client.from('x').insert(row).then(log);",
+      errors: [{ messageId: "floating" }],
+    },
+    {
+      code: "dispatchNotificationEvent(id, event);",
+      errors: [{ messageId: "floating" }],
+    },
+    {
+      code: "send()?.catch(log);",
+      errors: [{ messageId: "floating" }],
+    },
+    {
+      code: "void client?.from('x').insert(row);",
       errors: [{ messageId: "floating" }],
     },
   ],

@@ -13,7 +13,10 @@
  * Flags, as a statement on its own:
  *  - `void <call>`, the explicit way to drop a promise;
  *  - a call chain that starts work and ends in `.then(...)`, `.catch(...)` or
- *    `.finally(...)`, which handles the result without anyone waiting for it.
+ *    `.finally(...)`, which handles the result without anyone waiting for it;
+ *  - a bare call to a known alert sender (`dispatchNotificationEvent` and the
+ *    like), which is always async. Other bare calls need type information
+ *    this rule does not have.
  *
  * Not flagged: an awaited or returned call, one passed to `after()`,
  * `Promise.all` or another call that takes ownership of it, and a handler
@@ -22,6 +25,23 @@
  */
 
 const SETTLE_METHODS = new Set(["then", "catch", "finally"]);
+const ASYNC_SENDERS = new Set([
+  "dispatchNotificationEvent",
+  "sendNotification",
+  "notifyPublishedShiftChanges",
+]);
+
+function unwrapChain(node) {
+  return node.type === "ChainExpression" ? node.expression : node;
+}
+
+function isAsyncSenderCall(node) {
+  return (
+    node.type === "CallExpression" &&
+    node.callee.type === "Identifier" &&
+    ASYNC_SENDERS.has(node.callee.name)
+  );
+}
 
 function isSettleChain(node) {
   return (
@@ -30,7 +50,7 @@ function isSettleChain(node) {
     !node.callee.computed &&
     node.callee.property.type === "Identifier" &&
     SETTLE_METHODS.has(node.callee.property.name) &&
-    node.callee.object.type === "CallExpression"
+    unwrapChain(node.callee.object).type === "CallExpression"
   );
 }
 
@@ -49,12 +69,12 @@ export const noFloatingServerWork = {
   create(context) {
     return {
       ExpressionStatement(node) {
-        const { expression } = node;
+        const expression = unwrapChain(node.expression);
         const voidedCall =
           expression.type === "UnaryExpression" &&
           expression.operator === "void" &&
-          expression.argument.type === "CallExpression";
-        if (voidedCall || isSettleChain(expression)) {
+          unwrapChain(expression.argument).type === "CallExpression";
+        if (voidedCall || isSettleChain(expression) || isAsyncSenderCall(expression)) {
           context.report({ node, messageId: "floating" });
         }
       },
