@@ -620,6 +620,7 @@ export default function PersonDetailScreen() {
     mutationFn: async (input: {
       action: "create" | "resend" | "revoke";
       orgRole?: OrgRole;
+      adminPermissions?: AdminPermissions | null;
       linkExistingAccount?: boolean;
       reconcileName?: boolean;
     }) => {
@@ -628,6 +629,7 @@ export default function PersonDetailScreen() {
         return createMobilePersonInvitation(accessToken!, person.id, {
           email: person.email,
           orgRole: input.orgRole,
+          ...(input.adminPermissions ? { adminPermissions: { ...input.adminPermissions } } : {}),
           linkExistingAccount: input.linkExistingAccount,
           reconcileName: input.reconcileName,
         });
@@ -1817,7 +1819,6 @@ export default function PersonDetailScreen() {
                     />
                   )
                 ) : null}
-                {/* Choosing them stays on the web; the count says how far they reach. */}
                 {hasAccessRecord && adminPermissionCount ? (
                   canChangePermissions ? (
                     <ProfileNavRow
@@ -2381,16 +2382,17 @@ export default function PersonDetailScreen() {
       <PersonInviteSheet
         canGrantSuperAdmin={bootstrapQuery.data?.effectiveRole === "super_admin"}
         email={person.email}
+        permissionLabels={{ focusAreaLabel, certificationLabel, roleLabel }}
         error={invitationError}
         isPending={invitationMutation.isPending}
         onDismiss={() => {
           setInvitationError(null);
           setShowInviteSheet(false);
         }}
-        onSend={(orgRole) =>
+        onSend={(orgRole, adminPermissions) =>
           new Promise<void>((resolve) => {
             invitationMutation.mutate(
-              { action: "create", orgRole },
+              { action: "create", orgRole, adminPermissions },
               { onSettled: () => resolve() },
             );
           })

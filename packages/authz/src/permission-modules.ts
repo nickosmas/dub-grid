@@ -1,5 +1,5 @@
 import type { AdminPermissions } from "@dubgrid/domain";
-import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./index";
+import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./permission-sets";
 
 /**
  * The areas an Admin's permissions are set by, with a View and an Edit level
@@ -193,6 +193,22 @@ export function buildInitialPermissions(
     initial[key] = false;
   }
   return initial;
+}
+
+/**
+ * `base` with only the switches an editor shows taken from `requested`; the
+ * always-on and Super Admin-only keys keep their fixed values whatever is sent.
+ */
+export function applyConfigurablePermissions(
+  base: Partial<AdminPermissions> | null | undefined,
+  requested: Partial<Record<string, boolean>>,
+): AdminPermissions {
+  const next = buildInitialPermissions(base);
+  for (const key of CONFIGURABLE_PERMISSION_KEYS) {
+    const value = requested[key];
+    if (typeof value === "boolean") next[key] = value;
+  }
+  return next;
 }
 
 export function describePermissionModule(

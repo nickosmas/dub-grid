@@ -728,3 +728,80 @@ describe("POST /api/organizations/invitations/create", () => {
     });
   });
 });
+
+describe("an Admin's permissions chosen before the invite (113)", () => {
+  function clientWithInvitationUpdate() {
+    const eq = vi.fn(async () => ({ error: null }));
+    const update = vi.fn((_row: { admin_permissions: Record<string, boolean> }) => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    return { client: { rpc: invitationRpc(), from }, update, eq };
+  }
+
+  it("stores a Super Admin's choice on the invitation before it is emailed", async () => {
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+    const { client, update, eq } = clientWithInvitationUpdate();
+    getServiceClient.mockReturnValue(client);
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "new@test.com",
+        role: "admin",
+        adminPermissions: {
+          canViewReports: false,
+          canEditShifts: true,
+          canManageOrgSettings: true,
+        },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const stored = update.mock.calls[0]?.[0].admin_permissions;
+    expect(stored).toMatchObject({ canViewReports: false, canEditShifts: true });
+    // Never delegatable, whatever is sent.
+    expect(stored?.canManageOrgSettings).toBe(false);
+    expect(eq).toHaveBeenCalledWith("id", "inv-1");
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(
+      sendPendingInvitationEmail.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it("refuses an Admin who isn't a Super Admin and sends nothing", async () => {
+    const { client, update } = clientWithInvitationUpdate();
+    getServiceClient.mockReturnValue(client);
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "new@test.com",
+        role: "admin",
+        adminPermissions: { canViewReports: false },
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("refuses permissions on an invite that isn't for an Admin", async () => {
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+    const { client } = clientWithInvitationUpdate();
+    getServiceClient.mockReturnValue(client);
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        email: "new@test.com",
+        role: "user",
+        adminPermissions: { canViewReports: false },
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+});

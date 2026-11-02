@@ -7,7 +7,11 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
-import { FIRST_DAY_FIELD_HINT, PLANNED_START_MAX_DAYS } from "@dubgrid/domain";
+import {
+  FIRST_DAY_FIELD_HINT,
+  PLANNED_START_MAX_DAYS,
+  type AdminPermissions,
+} from "@dubgrid/domain";
 import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
   BottomSheetModal,
@@ -43,6 +47,7 @@ import {
   ProfileSwitchRow,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { InvitePermissionsRow } from "./InvitePermissionsRow";
 import { OrgRoleChoice } from "./OrgRoleChoice";
 import type { OrgRole } from "./OrgRoleSheet";
 
@@ -82,6 +87,7 @@ export function AddPersonSheet({
   const [firstDay, setFirstDay] = useState<string | null>(null);
   const [invite, setInvite] = useState(true);
   const [orgRole, setOrgRole] = useState<OrgRole>("user");
+  const [adminPermissions, setAdminPermissions] = useState<AdminPermissions | null>(null);
   const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
   /**
    * Field errors only the server can find, chiefly a duplicate email. Kept apart
@@ -111,7 +117,8 @@ export function AddPersonSheet({
     focusAreaIds.length > 0 ||
     firstDay !== null ||
     !invite ||
-    orgRole !== "user";
+    orgRole !== "user" ||
+    adminPermissions !== null;
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   // A new hire's first day (51g4) is today or later here; an earlier one is set on the web.
@@ -154,6 +161,8 @@ export function AddPersonSheet({
   // An invite needs an address, so the choice appears once one is typed.
   const canInvite = emailToCheck !== "";
   const canGrantSuperAdmin = bootstrapQuery.data?.effectiveRole === "super_admin";
+  // Only a Super Admin sets an Admin's permissions; anyone else's invite gets the standard set.
+  const setsPermissions = canGrantSuperAdmin && orgRole === "admin";
   useEffect(() => {
     if (!accessToken || !emailToCheck) {
       setServerFieldErrors((current) =>
@@ -206,6 +215,9 @@ export function AddPersonSheet({
           await createMobilePersonInvitation(accessToken!, result.person.id, {
             email: normalizedEmail,
             orgRole,
+            ...(setsPermissions && adminPermissions
+              ? { adminPermissions: { ...adminPermissions } }
+              : {}),
           });
         } catch {
           // The person was created, so this isn't fatal and must not roll the
@@ -275,6 +287,7 @@ export function AddPersonSheet({
     setFirstDay(null);
     setInvite(true);
     setOrgRole("user");
+    setAdminPermissions(null);
     setServerFieldErrors({});
   }
 
@@ -428,6 +441,20 @@ export function AddPersonSheet({
                   canGrantSuperAdmin={canGrantSuperAdmin}
                   value={orgRole}
                   onChange={setOrgRole}
+                />
+              ) : null}
+              {invite && setsPermissions ? (
+                <InvitePermissionsRow
+                  labels={{
+                    focusAreaLabel,
+                    certificationLabel,
+                    roleLabel: bootstrapQuery.data?.currentOrg.labels.role ?? "Roles",
+                  }}
+                  onChange={setAdminPermissions}
+                  personName={
+                    [firstName.trim(), lastName.trim()].filter(Boolean).join(" ") || "New person"
+                  }
+                  value={adminPermissions}
                 />
               ) : null}
             </>
