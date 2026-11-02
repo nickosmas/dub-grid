@@ -189,7 +189,7 @@ describe("OrganizationSetupWizard", () => {
     await user.click(screen.getByRole("button", { name: /^skip$/i }));
 
     await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
-    expect(screen.getByText(/staff need a focus area to be on the schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/staff need an area to be on the schedule/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^create 1 employee$/i })).toBeDisabled();
   }, 15000);
 

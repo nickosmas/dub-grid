@@ -144,6 +144,7 @@
             "apps/web/src/lib/db/mappers.ts",
             "apps/web/src/components/settings/nav-config.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "packages/domain/src/permissions.ts",
             "apps/web/src/components/PrintOptionsModal.tsx",
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
@@ -161,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bf26008a852c82efdd42593d3430ac425419786b709f36e7e27ad4e0f48b4248"
+      "evidenceFingerprint": "sha256:e8b6210634de187db17b857305c813ddabc4679470ad3047e45e8efcfa4504ee"
     },
     {
       "id": "quickstart",
@@ -364,6 +365,7 @@
             "apps/web/src/app/(app)/schedule/_hooks/useScheduleImport.ts",
             "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/mobile/app/(tabs)/_layout.tsx",
             "apps/mobile/src/features/schedule/screens/ShiftDetailScreen.tsx"
           ],
@@ -384,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:489de77653da03a405a1f876cf78ecc21fae7d101ee3f9481f6a07450ebf3c95"
+      "evidenceFingerprint": "sha256:478b0f5d1bbe665b50ebb5f25ad71ed714b52a71f99b3610f9cbc45673fa0369"
     },
     {
       "id": "draft-publish",
@@ -427,6 +429,7 @@
             "apps/web/src/lib/schedule-cells.ts",
             "apps/web/src/components/ScheduleGrid.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "supabase/migrations/030_auto_approve_shift_requests.sql"
           ],
           "testFiles": [
@@ -441,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:583f2da46a69b118ff7136f77bb542158698da3a02a5528028827b8bc5527d9c"
+      "evidenceFingerprint": "sha256:274d05ace9ae97441a4ed901c1838857c5d972fea5edfbeda7c73683ed44cd71"
     },
     {
       "id": "recurring-shifts",
@@ -481,7 +484,8 @@
             "apps/web/src/app/api/schedule/manage/route.ts",
             "apps/web/src/lib/constants.ts",
             "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
-            "packages/authz/src/index.ts"
+            "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts"
           ],
           "testFiles": [
             "apps/web/src/__tests__/RecurringScheduleSection.test.tsx",
@@ -495,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:72626b5e2030d3a5bf0692668dca2ec62fb0c27087fd19cd5f15216e0ce6ee79"
+      "evidenceFingerprint": "sha256:daabe51fc8e14a0d546c4c5b293c7804c32ead4bc03d20b6122f3d52004d0328"
     },
     {
       "id": "realtime",
@@ -686,7 +690,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3e8063e76831df88642d4baedd89fdbcea1f7fb444b4b040ce238c104e2be322"
+      "evidenceFingerprint": "sha256:c056d837de459be7ccc10afdfeda590830ae2158608b74389dc44ead44192c79"
     },
     {
       "id": "roster",
@@ -741,6 +745,7 @@
             "apps/web/src/components/staff-detail/EmployeeStatusActions.tsx",
             "apps/web/src/components/InactiveAccountBanner.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "supabase/migrations/067_inactive_staff_unschedulable.sql",
             "supabase/migrations/037_mfa_enrolled_claim.sql",
             "apps/mobile/src/features/people/screens/PeopleScreen.tsx"
@@ -758,7 +763,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:55fd7d5eb594bb9ef2e7d3f736cdd4fc854e04a357715fbff6e20bf1187def58"
+      "evidenceFingerprint": "sha256:fc4a3fd7205137be430b415c72dd9073e9dd2cf5ff8c48546da410d04b086fc7"
     },
     {
       "id": "person-detail",
@@ -839,7 +844,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:80f9f6ae6274d9729a19508a6caca7db46f1ce58fb9e4b06bac71726b5e12185"
+      "evidenceFingerprint": "sha256:d4f29d69c79354c8a4e2d1f3442063ee4786003e0446e4a3c840afea6a08e750"
     },
     {
       "id": "invitations",
@@ -902,7 +907,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1eb214a04c47aa1bcd93bd802e840b282d4a0747b005b8c55e3234504d771cc3"
+      "evidenceFingerprint": "sha256:c74b00851cb3d3d95abe92da66c640a2711a6fb7edb08a586093576fd94b60b4"
     },
     {
       "id": "organization",
@@ -939,6 +944,7 @@
             "apps/web/src/components/settings/SettingsPage.tsx",
             "apps/web/src/app/(app)/settings/page.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/OrganizationGeneral.tsx",
             "apps/web/src/components/organization/OrganizationLocationFields.tsx",
@@ -957,7 +963,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f82fc1f7e93d7e7d198713961cf44d6e80f049b496d663445c7b45f1c8557a28"
+      "evidenceFingerprint": "sha256:bd138a9ea6528ca1277535481d99363ec215261f4247878ea99ac462336fcd56"
     },
     {
       "id": "coverage",
@@ -991,6 +997,7 @@
             "apps/web/src/components/settings/nav-config.tsx",
             "apps/web/src/components/settings/SettingsPage.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/Coverage.tsx",
             "apps/web/src/lib/db/config.ts",
@@ -1009,7 +1016,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b56fdaf17e34b0cd7cac46366bc90301e4379725cc31cbca1d6c613d44f1780f"
+      "evidenceFingerprint": "sha256:edbba1f41bcf6e250af36248ad3ad55b9b9b039d8bf1708af339d08d0feabb27"
     },
     {
       "id": "terminology",
@@ -1041,6 +1048,7 @@
             "apps/web/src/components/settings/SettingsPage.tsx",
             "apps/web/src/app/(app)/settings/page.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/OrganizationLabels.tsx",
             "apps/web/src/lib/db/mappers.ts",
@@ -1058,7 +1066,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:78b28b5daa92750fd120aded46af8b753178452c3943d696ba705b7de7b3308e"
+      "evidenceFingerprint": "sha256:21906676ba1e5c9645eafc8a5c7f8f6570db24fb4472d869c4a6b5376103b356"
     },
     {
       "id": "roles",
@@ -1090,6 +1098,7 @@
           ],
           "sourceFiles": [
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "packages/domain/src/permissions.ts",
             "packages/domain/src/org-roles.ts",
             "packages/domain/src/self-guard.ts",
@@ -1111,7 +1120,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:83e679b2a4294e5733ba3e4b886c7e2326251aa9fa0ec3ca09cb6f7c37b96320"
+      "evidenceFingerprint": "sha256:e66f16ddb23d9fdad475517a3a5849edfed46eaee48cb1b7f61093e4e76632b1"
     },
     {
       "id": "admin-permissions",
@@ -1140,6 +1149,7 @@
           ],
           "sourceFiles": [
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/PermissionsEditor.tsx",
             "apps/web/src/components/staff/MemberAccessControls.tsx",
@@ -1154,7 +1164,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a1555d4df0bf4d7b74f62e0a38eb1b9a4438cf09cfa533a0b65353a28876eddd"
+      "evidenceFingerprint": "sha256:b7ba588907eca5096969882b7ce660c43a22297c8d152c209db99566e5a4c601"
     },
     {
       "id": "billing",
@@ -1310,7 +1320,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b62b814a71150398a3ad1fe36176e4492cd9d6961ad0e7f50be3ac10d247e1b2"
+      "evidenceFingerprint": "sha256:b4f3214a3752722b1c84707e5a600ec42676ad7ac5f1ab6e6c7ceb3fb889eba5"
     },
     {
       "id": "alerts",
@@ -1412,6 +1422,7 @@
             "apps/web/src/features/reports/shared/table.ts",
             "apps/web/src/components/Header.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/app/api/reports/operations/export/route.ts"
           ],
@@ -1427,7 +1438,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8bbdd2e0d894d892c2c51d2a081848474da29fd0566637649776c83e0b1de15f"
+      "evidenceFingerprint": "sha256:de53fe66ea1566fa1711888891b8cb67fe9e6a295550dec20861e6612f3d7045"
     },
     {
       "id": "profile",
@@ -1502,7 +1513,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d2de316f0bdc94a393b17a4f863a5e71f406d0a88bfa9e237eb0d9f90634510b"
+      "evidenceFingerprint": "sha256:8217e56bd4a122157fb233db5dd5c5c5422707d4b94c33a0ae64849ec674fbb9"
     },
     {
       "id": "security-sessions",
@@ -1678,6 +1689,7 @@
             "apps/web/src/components/settings/nav-config.tsx",
             "apps/web/src/components/settings/SettingsPage.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/ScheduleRules.tsx",
             "apps/web/src/components/settings/DisplayMode.tsx",
@@ -1697,7 +1709,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fea3b782ff2eeebce2cc4df087c3614717a0a7f47bdb40a16d87e0ae929aeb36"
+      "evidenceFingerprint": "sha256:6eed25345e9ce1d7b3b12a5894cb36130fd2690bf793323d9bff7c11e1e36488"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1733,6 +1745,7 @@
             "apps/web/src/components/settings/nav-config.tsx",
             "apps/web/src/components/settings/SettingsPage.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/StringListSettings.tsx",
             "apps/web/src/components/settings/Indicators.tsx",
@@ -1750,7 +1763,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:29d89e41d4cff4e34af4e66727d34421ad5e92aaee0c27178bf3d29ee25f5deb"
+      "evidenceFingerprint": "sha256:9ab81e86ce8751eaafb00db61215375054556906ec95e14f21e00b2ddfae641c"
     },
     {
       "id": "organization-activity-controls",
@@ -1786,6 +1799,7 @@
             "apps/web/src/components/settings/SettingsPage.tsx",
             "apps/web/src/app/(app)/settings/page.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/ActivityLog.tsx",
             "apps/web/src/lib/audit/registry.ts",
@@ -1806,7 +1820,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:68d2047be845b3b5f8053e16288a2fd6ba0c90521763d992f04ec33ed8143f45"
+      "evidenceFingerprint": "sha256:5e001e64b8b19e0d65de21dbcd7a244006a6ca2d55c86bfabf71ad24414bdcf3"
     },
     {
       "id": "departments-focus-areas",
@@ -1841,6 +1855,7 @@
             "apps/web/src/components/settings/nav-config.tsx",
             "apps/web/src/components/settings/SettingsPage.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/DepartmentsSettings.tsx",
             "apps/web/src/components/Toolbar.tsx",
@@ -1858,7 +1873,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:829703adf747fdd7b08b72f03aa8c258da01752591cf35df44945bd401d550ef"
+      "evidenceFingerprint": "sha256:8008a94ae0241524ede9e6427bc3223c5c20f9605e44f28cbee2db780c6d2bf8"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1896,6 +1911,7 @@
             "apps/web/src/components/settings/nav-config.tsx",
             "apps/web/src/components/settings/SettingsPage.tsx",
             "packages/authz/src/index.ts",
+            "packages/authz/src/permission-sets.ts",
             "apps/web/src/lib/permission-labels.ts",
             "apps/web/src/components/settings/ShiftCategories.tsx",
             "apps/web/src/components/settings/Jobs.tsx",
@@ -1915,7 +1931,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c0362d3cbaae3fcf3626645010a1f05ea183d10cda1a7c99f14a3312a0d80cef"
+      "evidenceFingerprint": "sha256:7c7e2d525682df059964201bf79e531711c18f336209e9c2e8353d7a7a9f8073"
     },
     {
       "id": "schedule-tools",

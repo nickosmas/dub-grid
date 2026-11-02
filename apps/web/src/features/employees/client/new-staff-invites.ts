@@ -2,7 +2,12 @@ import { getStepUpMethod } from "@/features/account/client/step-up";
 import type { AssignableOrganizationRole, Employee } from "@/types";
 
 /** An invite asked for in Add staff members, keyed by the address typed for that person. */
-export type NewStaffInvite = { email: string; role: AssignableOrganizationRole };
+export type NewStaffInvite = {
+  email: string;
+  role: AssignableOrganizationRole;
+  /** An Admin's permissions, chosen before the invite; omitted for the standard set. */
+  adminPermissions?: Record<string, boolean>;
+};
 
 /**
  * Sends each invite still in `pending` to the person just added with that

@@ -87,7 +87,7 @@ export function WorkCard({
   focusAreas,
   certifications,
   roles,
-  focusAreaLabel = "Focus areas",
+  focusAreaLabel = "Areas",
   certificationLabel = "Certification",
   roleLabel = "Roles",
   showScheduleDetails,

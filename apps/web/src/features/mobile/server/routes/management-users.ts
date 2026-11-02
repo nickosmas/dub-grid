@@ -23,6 +23,7 @@ import {
 } from "@/features/mobile/server/invitation-email";
 import { fetchMobileHiddenPeople } from "@/features/mobile/server";
 import logger from "@/lib/logger";
+import { invitationAdminPermissions } from "@/features/organization/server/invitation-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  const chosen = invitationAdminPermissions({
+    role: parsed.data.orgRole,
+    requested: parsed.data.adminPermissions,
+    canConfigure: auth.permissions.canConfigureAdminPermissions,
+  });
+  if ("response" in chosen) return chosen.response;
 
   const departmentIds = [...new Set(parsed.data.managementDepartmentIds)];
   const invalidIds = await findInvalidManagementDepartmentIds(
@@ -95,6 +103,7 @@ export async function POST(req: NextRequest) {
     phone: parsed.data.phone || null,
     departmentIds,
     deptAdminIds: [],
+    adminPermissions: chosen.permissions,
   });
 
   try {
@@ -144,6 +153,7 @@ export async function POST(req: NextRequest) {
       roleToAssign: parsed.data.orgRole,
       departmentIds,
       managementOnly: true,
+      ...(chosen.permissions ? { adminPermissions: chosen.permissions } : {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,

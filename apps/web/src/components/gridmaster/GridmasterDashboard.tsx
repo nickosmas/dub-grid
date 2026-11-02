@@ -652,7 +652,7 @@ export default function GridmasterDashboard({
                   "Status",
                   "Org users",
                   "Employees",
-                  "Focus areas",
+                  "Areas",
                   "Certifications",
                   "Roles",
                   "Timezone",

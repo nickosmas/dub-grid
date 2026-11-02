@@ -71,6 +71,7 @@ import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/Edit
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   changeMobilePersonOrgRole,
+  updateMobilePersonPermissions,
   checkMobilePersonContact,
   createMobilePersonInvitation,
   getMobilePerson,
@@ -142,6 +143,9 @@ import {
 } from "../components/StatusMark";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import { PersonInviteSheet } from "../components/PersonInviteSheet";
+import { PermissionsSheet } from "../components/PermissionsSheet";
+import { buildInitialPermissions, countPermissionLevels } from "@dubgrid/authz";
+import type { AdminPermissions } from "@dubgrid/domain";
 import { statusForViewer } from "../lib/statusForViewer";
 import {
   getPersonOrgRole,
@@ -356,6 +360,8 @@ export default function PersonDetailScreen() {
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
   const [showOrgRole, setShowOrgRole] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
   const [showManagementAccess, setShowManagementAccess] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [orgRoleError, setOrgRoleError] = useState<string | null>(null);
@@ -617,6 +623,7 @@ export default function PersonDetailScreen() {
     mutationFn: async (input: {
       action: "create" | "resend" | "revoke";
       orgRole?: OrgRole;
+      adminPermissions?: AdminPermissions | null;
       linkExistingAccount?: boolean;
       reconcileName?: boolean;
     }) => {
@@ -625,6 +632,7 @@ export default function PersonDetailScreen() {
         return createMobilePersonInvitation(accessToken!, person.id, {
           email: person.email,
           orgRole: input.orgRole,
+          ...(input.adminPermissions ? { adminPermissions: { ...input.adminPermissions } } : {}),
           linkExistingAccount: input.linkExistingAccount,
           reconcileName: input.reconcileName,
         });
@@ -677,6 +685,33 @@ export default function PersonDetailScreen() {
         tone: "success",
         title,
         message,
+      });
+    },
+  });
+
+  const permissionsMutation = useMutation({
+    mutationFn: async (adminPermissions: AdminPermissions) => {
+      if (!person) throw new Error("Person unavailable");
+      return updateMobilePersonPermissions(accessToken!, person.id, {
+        adminPermissions: adminPermissions as unknown as Record<string, boolean>,
+        expectedMembershipUpdatedAt: person.membershipUpdatedAt ?? null,
+      });
+    },
+    onMutate: () => setPermissionsError(null),
+    onError: (error) => {
+      setPermissionsError(
+        getClientFriendlyErrorMessage(error, "We couldn't save those permissions right now."),
+      );
+      void personQuery.refetch();
+    },
+    onSuccess: async (result) => {
+      updateCachedPerson(result.person);
+      setShowPermissions(false);
+      await personQuery.refetch();
+      pushToast({
+        tone: "success",
+        title: "Permissions saved",
+        message: "Their access updates right away.",
       });
     },
   });
@@ -1049,7 +1084,20 @@ export default function PersonDetailScreen() {
     person.status !== "removed" &&
     (person.userId ? person.membershipUpdatedAt != null : invitation != null && !invitationExpired);
   const canChangeOrgRole = hasAccessRecord && canManageManagementAccess && !isSelf;
-  const adminPermissionCount = orgRole === "admin" ? person.adminPermissionCount : null;
+  // Counted the way the Permissions sheet counts, one level per switch, so the
+  // row and the sheet it opens never disagree.
+  const adminPermissionCount =
+    orgRole === "admin" && person.adminPermissions
+      ? (({ enabled, total }) => `${enabled} of ${total}`)(
+          countPermissionLevels(buildInitialPermissions(person.adminPermissions)),
+        )
+      : null;
+  // Choosing them is a Super Admin's, for an Admin who has joined, never themselves.
+  const canChangePermissions =
+    bootstrapQuery.data?.effectiveRole === "super_admin" &&
+    !isSelf &&
+    Boolean(person.userId) &&
+    person.status !== "removed";
   const managesDepartments =
     canViewEmployeeDetails &&
     person.status !== "removed" &&
@@ -1774,15 +1822,27 @@ export default function PersonDetailScreen() {
                     />
                   )
                 ) : null}
-                {/* Choosing them stays on the web; the count says how far they reach. */}
                 {hasAccessRecord && adminPermissionCount ? (
-                  <ProfileInfoRow
-                    emphasis="label"
-                    iconName="shield-checkmark-outline"
-                    isLast={!managesDepartments}
-                    label="Permissions"
-                    value={`${adminPermissionCount.granted} of ${adminPermissionCount.total}`}
-                  />
+                  canChangePermissions ? (
+                    <ProfileNavRow
+                      iconName="shield-checkmark-outline"
+                      isLast={!managesDepartments}
+                      label="Permissions"
+                      value={adminPermissionCount}
+                      onPress={() => {
+                        setPermissionsError(null);
+                        setShowPermissions(true);
+                      }}
+                    />
+                  ) : (
+                    <ProfileInfoRow
+                      emphasis="label"
+                      iconName="shield-checkmark-outline"
+                      isLast={!managesDepartments}
+                      label="Permissions"
+                      value={adminPermissionCount}
+                    />
+                  )
                 ) : null}
                 {managesDepartments ? (
                   canChangeManagement ? (
@@ -2325,22 +2385,40 @@ export default function PersonDetailScreen() {
       <PersonInviteSheet
         canGrantSuperAdmin={bootstrapQuery.data?.effectiveRole === "super_admin"}
         email={person.email}
+        permissionLabels={{ focusAreaLabel, certificationLabel, roleLabel }}
         error={invitationError}
         isPending={invitationMutation.isPending}
         onDismiss={() => {
           setInvitationError(null);
           setShowInviteSheet(false);
         }}
-        onSend={(orgRole) =>
+        onSend={(orgRole, adminPermissions) =>
           new Promise<void>((resolve) => {
             invitationMutation.mutate(
-              { action: "create", orgRole },
+              { action: "create", orgRole, adminPermissions },
               { onSettled: () => resolve() },
             );
           })
         }
         personName={fullName}
         visible={showInviteSheet}
+      />
+      <PermissionsSheet
+        error={permissionsError}
+        isPending={permissionsMutation.isPending}
+        labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+        onDismiss={() => {
+          setPermissionsError(null);
+          setShowPermissions(false);
+        }}
+        onSave={(next) =>
+          new Promise<void>((resolve) => {
+            permissionsMutation.mutate(next, { onSettled: () => resolve() });
+          })
+        }
+        personName={fullName}
+        stored={person.adminPermissions}
+        visible={showPermissions}
       />
       <OrgRoleSheet
         error={orgRoleError}

@@ -1,9 +1,9 @@
 // @vitest-environment node
 
 /**
- * Migration 113: organizations that stored an earlier default label ("Focus
+ * Migration 114: organizations that stored an earlier default label ("Focus
  * Areas", "Scheduled Departments") follow the product default again, and a
- * custom label is kept. Runs 113 from its file inside BEGIN/ROLLBACK against
+ * custom label is kept. Runs 114 from its file inside BEGIN/ROLLBACK against
  * the seeded local database.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
@@ -37,9 +37,9 @@ async function probeDb(): Promise<boolean> {
 }
 
 const reachable = await probeDb();
-const MIGRATION = readFileSync(migrationPath("113_label_defaults.sql"), "utf8");
+const MIGRATION = readFileSync(migrationPath("114_label_defaults.sql"), "utf8");
 
-describe.skipIf(!reachable)("113 label defaults", () => {
+describe.skipIf(!reachable)("114 label defaults", () => {
   let db: Client;
   let orgIds: string[] = [];
 

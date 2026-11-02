@@ -101,6 +101,7 @@ function PeopleContent() {
                   role: invite.role,
                   orgId: inviteOrgId,
                   employeeId: invite.employeeId,
+                  ...(invite.adminPermissions ? { adminPermissions: invite.adminPermissions } : {}),
                 },
                 accessToken,
               ),

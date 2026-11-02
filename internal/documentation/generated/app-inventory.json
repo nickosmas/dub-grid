@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ad8c99f5a330cf5fa9a4b3be94e53853919ee12e383c1510978fab880b49c95f",
+  "sourceDigest": "sha256:9c70fcfaaa7c7d65bb158471411a5cefef0df83be93d92acd8d1035ad80e340e",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2125,6 +2125,18 @@
       },
       "implementationSource": {
         "path": "apps/web/src/features/mobile/server/routes/person-invitation.ts"
+      }
+    },
+    {
+      "id": "http:PATCH:/api/mobile/v1/people/[id]/permissions",
+      "method": "PATCH",
+      "path": "/api/mobile/v1/people/[id]/permissions",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/mobile/v1/people/[id]/permissions/route.ts"
+      },
+      "implementationSource": {
+        "path": "apps/web/src/features/mobile/server/routes/person-permissions.ts"
       }
     },
     {
@@ -4915,13 +4927,23 @@
       }
     },
     {
-      "id": "migration:113_label_defaults.sql",
+      "id": "migration:113_invite_admin_permissions.sql",
       "version": "113",
-      "name": "label_defaults",
-      "file": "113_label_defaults.sql",
-      "sha256": "eeb50fc993130014824fad8a58386b88d8eaf8b3ee9ff93642b565f2d4a0a2a4",
+      "name": "invite_admin_permissions",
+      "file": "113_invite_admin_permissions.sql",
+      "sha256": "3a42f07194af9e501145ec29a8282a21af607701b3417855b3c05cb34220b5b0",
       "source": {
-        "path": "supabase/migrations/113_label_defaults.sql"
+        "path": "supabase/migrations/113_invite_admin_permissions.sql"
+      }
+    },
+    {
+      "id": "migration:114_label_defaults.sql",
+      "version": "114",
+      "name": "label_defaults",
+      "file": "114_label_defaults.sql",
+      "sha256": "db1b8e1e12f21ca35a394055e02890fb61a5e2c3616341e3e6f87fadbb9d43e8",
+      "source": {
+        "path": "supabase/migrations/114_label_defaults.sql"
       }
     }
   ],

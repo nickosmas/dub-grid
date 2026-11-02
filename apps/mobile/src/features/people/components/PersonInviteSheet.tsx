@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { PermissionEditorLabels } from "@dubgrid/authz";
+import type { AdminPermissions } from "@dubgrid/domain";
 import {
   BottomSheetModal,
   SheetActions,
@@ -11,19 +13,22 @@ import {
   ProfileList,
   ProfileSection,
 } from "../../profile/components/ProfilePrimitives";
+import { InvitePermissionsRow } from "./InvitePermissionsRow";
 import { OrgRoleChoice } from "./OrgRoleChoice";
 import type { OrgRole } from "./OrgRoleSheet";
 
 /**
  * Sends someone on the roster an invite to the app, with the access role it
- * grants. The address is the one on their profile; with none, the page offers
- * no Send, so this sheet never asks for one.
+ * grants and, for an Admin invited by a Super Admin, their permissions. The
+ * address is the one on their profile; with none, the page offers no Send, so
+ * this sheet never asks for one.
  */
 export function PersonInviteSheet({
   visible,
   personName,
   email,
   canGrantSuperAdmin,
+  permissionLabels,
   isPending,
   error,
   onDismiss,
@@ -32,20 +37,27 @@ export function PersonInviteSheet({
   visible: boolean;
   personName: string;
   email: string;
+  /** A Super Admin, who alone grants Super Admin and sets an Admin's permissions. */
   canGrantSuperAdmin: boolean;
+  permissionLabels: PermissionEditorLabels;
   isPending: boolean;
   error?: string | null;
   onDismiss: () => void;
-  onSend: (orgRole: OrgRole) => Promise<unknown> | void;
+  onSend: (orgRole: OrgRole, adminPermissions: AdminPermissions | null) => Promise<unknown> | void;
 }) {
   const [orgRole, setOrgRole] = useState<OrgRole>("user");
+  const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
 
   // Each opening starts from User, the way Add person does.
   if (visible !== wasVisible) {
     setWasVisible(visible);
-    if (visible) setOrgRole("user");
+    if (visible) {
+      setOrgRole("user");
+      setPermissions(null);
+    }
   }
+  const setsPermissions = canGrantSuperAdmin && orgRole === "admin";
 
   return (
     <BottomSheetModal
@@ -58,7 +70,7 @@ export function PersonInviteSheet({
                 disabled={isPending}
                 label="Send"
                 loading={isPending}
-                onPress={() => onSend(orgRole)}
+                onPress={() => onSend(orgRole, setsPermissions ? permissions : null)}
               />
             }
           >
@@ -82,6 +94,14 @@ export function PersonInviteSheet({
         value={orgRole}
         onChange={setOrgRole}
       />
+      {setsPermissions ? (
+        <InvitePermissionsRow
+          labels={permissionLabels}
+          onChange={setPermissions}
+          personName={personName}
+          value={permissions}
+        />
+      ) : null}
     </BottomSheetModal>
   );
 }

@@ -1104,6 +1104,7 @@ export default function PeopleScreen() {
       <AddPersonSheet onDismiss={() => setShowAddPerson(false)} visible={showAddPerson} />
       <ManagementUserInviteSheet
         canGrantSuperAdmin={canGrantSuperAdmin}
+        permissionLabels={{ focusAreaLabel, certificationLabel, roleLabel }}
         error={inviteError}
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}

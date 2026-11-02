@@ -16,6 +16,8 @@ A Super Admin can invite anyone and give them any access role. An Admin who can 
 - **Someone on an administrative team who isn't on the schedule**: on **People**, select **Add**, then **Administrative team**. Enter their name, email, optional phone, their administrative teams, and their access role, and select **Send Invitation**.
 - **During setup**: the first Super Admin can invite people from the setup guide's **Invite Team** step.
 
+When a Super Admin invites someone as an **Admin**, they can also choose that Admin's [permissions](/reference/admin-permissions) before sending: **Set permissions** opens the same **View** and **Edit** switches, and the choice applies when the invitation is accepted. Without it, the Admin starts with the standard set.
+
 You can't invite an address that's already part of your organization. If the address already has a DubGrid account, the person joins yours when they accept, using their existing password.
 
 ## What the invitee gets
@@ -28,7 +30,7 @@ The link works for **72 hours** from when it was sent and doesn't extend. The in
 
 On the person's page and in the People panel, a card with their status shows a pending invitation (**Invited** on a date, **hasn't joined**, with the day it expires) or an expired one (**Invite expired** on a date):
 
-- **Resend** sends a new link and asks you to confirm first. The old link stops working immediately; the invitation keeps its email and access role. A reissued email's subject reads "Your new invitation to join _your organization_ on DubGrid".
+- **Resend** sends a new link and asks you to confirm first. The old link stops working immediately; the invitation keeps its email, access role, and permissions. A reissued email's subject reads "Your new invitation to join _your organization_ on DubGrid".
 - **Revoke**, on a pending invitation, confirms **Revoke Invitation?**, then the link stops working immediately.
 
 Inviting the same address again while an invitation is pending reissues it, as long as the access role matches. Changing a pending invitation's access role in the **Access** column also sends a new link.
@@ -41,4 +43,4 @@ An expired link stops working. The person's page then shows **Invite expired** w
 
 ## In the DubGrid app
 
-People who manage staff can send, reissue, and revoke invitations from a person's screen, in the **App invite** row under **Access**. **Send** asks for the access role the invite gives; only a Super Admin can give Super Admin.
+People who manage staff can send, reissue, and revoke invitations from a person's screen, in the **App invite** row under **Access**. **Send** asks for the access role the invite gives; only a Super Admin can give Super Admin. A Super Admin who chooses **Admin** also sees **Permissions**, here and in **Add person**, to set what the Admin can do before the invite goes out.

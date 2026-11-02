@@ -1682,7 +1682,7 @@ export default function OrganizationSetupWizard({
                 <SectionNotice
                   tone="warning"
                   messages={[
-                    "Staff need a focus area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
+                    "Staff need an area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
                   ]}
                 />
               </div>

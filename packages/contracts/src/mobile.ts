@@ -1019,6 +1019,8 @@ export const mobilePersonSchema = z.object({
    * management access lives on the membership, so the two need separate guards.
    */
   membershipUpdatedAt: z.string().nullable().default(null),
+  /** An Admin's stored permissions, for the Permissions screen; null for any other tier. */
+  adminPermissions: z.record(z.string(), z.boolean()).nullable().default(null),
   /** An Admin's permissions, as granted of total; null for any other tier. */
   adminPermissionCount: z
     .object({ granted: z.number().int().nonnegative(), total: z.number().int().nonnegative() })
@@ -1155,6 +1157,8 @@ export const mobilePersonInvitationCreateBodySchema = z.object({
   email: z.string().trim().email(),
   /** The access role the invite grants; Super Admin only from a Super Admin. */
   orgRole: mobileRoleSchema.default("user"),
+  /** An Admin invite's permissions, set by a Super Admin before it goes out. */
+  adminPermissions: z.record(z.string(), z.boolean()).optional(),
   linkExistingAccount: z.boolean().optional(),
   reconcileName: z.boolean().optional(),
 });
@@ -1216,6 +1220,17 @@ export const mobilePersonOrgRoleResponseSchema = z.object({
   person: mobilePersonSchema,
 });
 
+/** An Admin's permissions, set from the app's Permissions screen. */
+export const mobilePersonPermissionsBodySchema = z.object({
+  adminPermissions: z.record(z.string(), z.boolean()),
+  expectedMembershipUpdatedAt: z.string().nullable(),
+});
+
+export const mobilePersonPermissionsResponseSchema = z.object({
+  success: z.literal(true),
+  person: mobilePersonSchema,
+});
+
 /**
  * Someone on the management roster. Deliberately not a `MobilePerson`: a
  * management user may have no staff profile at all (and a pending one has no
@@ -1264,6 +1279,7 @@ export const mobileManagementUserInviteBodySchema = z.object({
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema.default(""),
   orgRole: mobileRoleSchema,
+  adminPermissions: z.record(z.string(), z.boolean()).optional(),
   managementDepartmentIds: z.array(z.number().int()).min(1),
 });
 
@@ -1488,6 +1504,7 @@ export type MobileManagementAccessRemoveBody = z.infer<
 export type MobileManagementAccessResponse = z.infer<typeof mobileManagementAccessResponseSchema>;
 export type MobilePersonOrgRoleBody = z.infer<typeof mobilePersonOrgRoleBodySchema>;
 export type MobilePersonOrgRoleResponse = z.infer<typeof mobilePersonOrgRoleResponseSchema>;
+export type MobilePersonPermissionsBody = z.infer<typeof mobilePersonPermissionsBodySchema>;
 export type MobileManagementUser = z.infer<typeof mobileManagementUserSchema>;
 export type MobileManagementUsersResponse = z.infer<typeof mobileManagementUsersResponseSchema>;
 export type MobileManagementUserUpdateBody = z.infer<typeof mobileManagementUserUpdateBodySchema>;

@@ -249,7 +249,7 @@ describe("documentation source inventory", () => {
     );
     write(
       root,
-      "packages/authz/src/index.ts",
+      "packages/authz/src/permission-sets.ts",
       `
         const ALL_PERMS = { canViewSchedule: true, canEditShifts: true };
         export const READ_ONLY_PERMS = { canViewSchedule: true, canEditShifts: false };
@@ -259,7 +259,7 @@ describe("documentation source inventory", () => {
     );
     write(
       root,
-      "apps/web/src/components/PermissionsEditor.tsx",
+      "packages/authz/src/permission-modules.ts",
       `export const PERMISSION_MODULES = [{ id: "schedule", viewKeys: ["canViewSchedule"], editKeys: ["canEditShifts"] }];`,
     );
     write(

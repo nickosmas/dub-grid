@@ -8,7 +8,9 @@ import {
   type MobileDepartment,
   type MobileManagementUserInviteBody,
 } from "@dubgrid/contracts";
+import type { PermissionEditorLabels } from "@dubgrid/authz";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
+import type { AdminPermissions } from "@dubgrid/domain";
 import { AppText } from "../../../shared/components/AppText";
 import {
   BottomSheetModal,
@@ -26,6 +28,7 @@ import {
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
+import { InvitePermissionsRow } from "./InvitePermissionsRow";
 import { OrgRoleChoice } from "./OrgRoleChoice";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
@@ -35,6 +38,7 @@ type InviteDraft = {
   email: string;
   phone: string;
   orgRole: ManagementAccessRole;
+  adminPermissions: AdminPermissions | null;
   managementDepartmentIds: number[];
 };
 
@@ -44,6 +48,7 @@ const EMPTY_DRAFT: InviteDraft = {
   email: "",
   phone: "",
   orgRole: "user",
+  adminPermissions: null,
   managementDepartmentIds: [],
 };
 
@@ -64,6 +69,7 @@ export function ManagementUserInviteSheet({
   visible,
   managementDepartments,
   canGrantSuperAdmin,
+  permissionLabels,
   isPending,
   error,
   onDismiss,
@@ -71,8 +77,9 @@ export function ManagementUserInviteSheet({
 }: {
   visible: boolean;
   managementDepartments: MobileDepartment[];
-  /** Only a Super Admin may invite another one, as on web. */
+  /** Only a Super Admin may invite another one, or set an Admin's permissions, as on web. */
   canGrantSuperAdmin: boolean;
+  permissionLabels: PermissionEditorLabels;
   isPending: boolean;
   /**
    * Why the last submit failed. The sheet stays open on error, and a toast
@@ -111,7 +118,9 @@ export function ManagementUserInviteSheet({
     draft.lastName !== "" ||
     draft.email !== "" ||
     draft.phone !== "" ||
+    draft.adminPermissions !== null ||
     draft.managementDepartmentIds.length > 0;
+  const setsPermissions = canGrantSuperAdmin && draft.orgRole === "admin";
 
   // Deliberately no `onDiscard`: the draft is cleared on open, above, so that
   // the fields are never seen emptying themselves as the sheet slides away.
@@ -134,6 +143,9 @@ export function ManagementUserInviteSheet({
       email: draft.email.trim(),
       phone: normalizeOptionalUsPhone(draft.phone),
       orgRole: draft.orgRole,
+      ...(setsPermissions && draft.adminPermissions
+        ? { adminPermissions: { ...draft.adminPermissions } }
+        : {}),
       managementDepartmentIds: draft.managementDepartmentIds,
     });
   }
@@ -230,6 +242,19 @@ export function ManagementUserInviteSheet({
             value={draft.orgRole}
             onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}
           />
+          {setsPermissions ? (
+            <InvitePermissionsRow
+              labels={permissionLabels}
+              onChange={(adminPermissions) =>
+                setDraft((current) => ({ ...current, adminPermissions }))
+              }
+              personName={
+                [draft.firstName.trim(), draft.lastName.trim()].filter(Boolean).join(" ") ||
+                "New person"
+              }
+              value={draft.adminPermissions}
+            />
+          ) : null}
 
           {/* The same ring-and-check list the management-access sheet uses,
               one row per department with its full name. */}

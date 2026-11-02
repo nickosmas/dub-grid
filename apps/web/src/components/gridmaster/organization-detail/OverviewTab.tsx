@@ -445,7 +445,7 @@ export function OverviewTab({
           {editing ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               <div>
-                <label style={labelStyle}>Focus areas</label>
+                <label style={labelStyle}>Areas</label>
                 <input
                   className="dg-input"
                   value={editFocusAreaLabel}
@@ -471,7 +471,7 @@ export function OverviewTab({
             </div>
           ) : (
             <>
-              <InfoRow label="Focus areas" value={organization.focusAreaLabel} />
+              <InfoRow label="Areas" value={organization.focusAreaLabel} />
               <InfoRow label="Certifications" value={organization.certificationLabel} />
               <InfoRow label="Roles" value={organization.roleLabel} />
             </>

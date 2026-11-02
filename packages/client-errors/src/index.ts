@@ -159,7 +159,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern: /not assigned to the focus area|required focus area/i,
-    message: "You are not assigned to the focus area required for this shift.",
+    message: "You are not assigned to the area required for this shift.",
   },
   {
     pattern: /another active shift request/i,

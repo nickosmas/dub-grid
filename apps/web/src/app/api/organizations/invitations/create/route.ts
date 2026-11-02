@@ -24,6 +24,7 @@ import {
   canAssignOrgRole,
   canManageEmployees,
   isGridmasterActor,
+  isOrgSuperAdminOrGridmaster,
 } from "@/app/api/employees/shared";
 import { writeInvitationAuditEntry } from "@/lib/audit/invitation";
 import { getRequestIp } from "@/features/mobile/server/management-roster";
@@ -41,6 +42,7 @@ import {
   isEmailNotConfigured,
   sendPendingInvitationEmail,
 } from "@/features/organization/server/invitation-delivery";
+import { invitationAdminPermissions } from "@/features/organization/server/invitation-permissions";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -52,6 +54,7 @@ const postSchema = z.object({
   phone: z.string().trim().optional(),
   departmentIds: z.array(z.number().int()).optional(),
   deptAdminIds: z.array(z.number().int()).optional(),
+  adminPermissions: z.record(z.string(), z.boolean()).optional(),
 });
 
 type RefreshedInvitation = {
@@ -161,6 +164,18 @@ function sameIds(stored: number[] | null, requested: number[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
+async function storeInvitationPermissions(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  invitationId: string,
+  permissions: Record<string, boolean>,
+) {
+  const { error } = await serviceClient
+    .from("invitations")
+    .update({ admin_permissions: permissions })
+    .eq("id", invitationId);
+  if (error) throw error;
+}
+
 async function restoreRefreshedInvitation(
   serviceClient: ReturnType<typeof getServiceClient>,
   refreshed: RefreshedInvitation,
@@ -220,8 +235,10 @@ export async function POST(req: NextRequest) {
     phone,
     departmentIds,
     deptAdminIds,
+    adminPermissions,
   } = parsed.data;
   const inviteeEmail = normalizeRequiredStaffEmail(email);
+  let chosenPermissions: Record<string, boolean> | null = null;
 
   try {
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
@@ -251,6 +268,16 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
     }
+
+    const chosen = invitationAdminPermissions({
+      role,
+      requested: adminPermissions,
+      canConfigure:
+        adminPermissions !== undefined &&
+        (await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId)),
+    });
+    if ("response" in chosen) return chosen.response;
+    chosenPermissions = chosen.permissions;
 
     const fieldErrors = getStaffFieldErrors({
       email,
@@ -318,6 +345,9 @@ export async function POST(req: NextRequest) {
     const invitationId = data.invitation_id as string;
     const token = data.token as string;
     try {
+      if (chosenPermissions) {
+        await storeInvitationPermissions(serviceClient, invitationId, chosenPermissions);
+      }
       await sendPendingInvitationEmail({
         orgId,
         token,
@@ -351,6 +381,7 @@ export async function POST(req: NextRequest) {
       details: {
         email: inviteeEmail,
         role,
+        ...(chosenPermissions ? { adminPermissions: chosenPermissions } : {}),
       },
       ipAddress: getRequestIp(req),
       userAgent: req.headers.get("user-agent"),
@@ -408,6 +439,13 @@ export async function POST(req: NextRequest) {
         }
         if (refreshed) {
           try {
+            if (chosenPermissions) {
+              await storeInvitationPermissions(
+                serviceClient,
+                refreshed.invitationId,
+                chosenPermissions,
+              );
+            }
             await sendPendingInvitationEmail({
               orgId,
               token: refreshed.token,

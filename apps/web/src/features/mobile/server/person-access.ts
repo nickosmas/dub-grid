@@ -60,6 +60,8 @@ export async function loadMobilePersonWithAccess(
     managementDeptAdminIds: membership?.dept_admin_ids ?? pendingInvitation?.dept_admin_ids ?? [],
     orgRole: toMobileOrgRole(membership?.org_role),
     membershipUpdatedAt: membership?.updated_at ?? null,
+    adminPermissions:
+      membership?.org_role === "admin" ? (membership.admin_permissions ?? null) : null,
     adminPermissionCount: countMobileAdminPermissions(membership),
     pendingInvitation: pendingInvitation
       ? {

@@ -758,7 +758,7 @@ export function ProfilePanel({
               <div>
                 <div className="dg-card-title">Work details</div>
                 <div className="dg-card-description">
-                  Employment type, {(focusAreaLabel ?? "focus areas").toLowerCase()},{" "}
+                  Employment type, {(focusAreaLabel ?? "areas").toLowerCase()},{" "}
                   {(certificationLabel ?? "certification").toLowerCase()}, and{" "}
                   {(roleLabel ?? "roles").toLowerCase()} for this account.
                 </div>
