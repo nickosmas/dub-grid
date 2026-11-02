@@ -259,7 +259,7 @@ describe("documentation source inventory", () => {
     );
     write(
       root,
-      "apps/web/src/components/PermissionsEditor.tsx",
+      "packages/authz/src/permission-modules.ts",
       `export const PERMISSION_MODULES = [{ id: "schedule", viewKeys: ["canViewSchedule"], editKeys: ["canEditShifts"] }];`,
     );
     write(
