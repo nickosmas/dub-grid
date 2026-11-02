@@ -305,6 +305,7 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 | PATCH               | `/api/mobile/v1/people/[id]/access`            | Change the person's org role (member or pending invitation) |
 | POST, PATCH, DELETE | `/api/mobile/v1/people/[id]/invitation`        | Send, resend, or revoke an invitation for a person          |
 | PUT, DELETE         | `/api/mobile/v1/people/[id]/management-access` | Grant or revoke management access (departments only)        |
+| PATCH               | `/api/mobile/v1/people/[id]/permissions`       | An Admin's permissions (Super Admin only)                   |
 
 ### Management Users
 

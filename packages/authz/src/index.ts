@@ -329,3 +329,4 @@ export function getPermissionsFromSession(session: Session | null): Permissions 
   const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
   return buildPerms(effectiveRole, orgId, false);
 }
+export * from "./permission-modules";

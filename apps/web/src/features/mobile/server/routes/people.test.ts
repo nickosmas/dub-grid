@@ -252,6 +252,7 @@ describe("mobile people route", () => {
     );
     expect(payload.people).toEqual([
       {
+        adminPermissions: null,
         adminPermissionCount: null,
         id: "00000000-0000-0000-0000-000000000001",
         employeeNumber: 1042,
