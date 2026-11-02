@@ -565,7 +565,7 @@ export default function InviteEmployeeModal({
 
           {/* Role */}
           <div style={{ maxWidth: 200 }}>
-            <label style={labelStyle}>Role</label>
+            <label style={labelStyle}>Access role</label>
             <CustomSelect
               value={role}
               options={roleOptions}

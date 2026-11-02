@@ -1,5 +1,5 @@
 import type { AdminPermissions } from "@dubgrid/domain";
-import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./index";
+import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./permission-sets";
 
 /**
  * The areas an Admin's permissions are set by, with a View and an Edit level
