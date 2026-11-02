@@ -3,7 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "./Text";
 import { formatBadgeCount, numericBadgeSize, type NumericBadgeSize } from "@dubgrid/design-tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileTabularText, mobileText, type MobileColors } from "../theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 export type NumericBadgeTone = "danger" | "brand" | "secondary" | "neutral" | "onAccent";
 
@@ -97,13 +97,11 @@ const styles = StyleSheet.create({
   },
   textMd: {
     ...mobileText.badge,
-    ...mobileTabularText,
     textAlign: "center",
     includeFontPadding: false,
   },
   textSm: {
     ...mobileText.micro,
-    ...mobileTabularText,
     textAlign: "center",
     includeFontPadding: false,
   },

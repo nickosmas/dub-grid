@@ -636,9 +636,10 @@ sweeps in phase. It is off entirely under reduce motion.
   The deliberate editable-field exception is `mobileInputText()`: it uses the
   named Inter face after loading succeeds, then falls back to a bare
   `fontWeight` and the system font before or after a load failure. DM Sans is
-  reserved for `DubGridWordmark` and its startup font load. Apply
-  `mobileTabularText` only to operational dates, times, hours, counts, and
-  schedule figures; ordinary prose keeps proportional numerals.
+  reserved for `DubGridWordmark` and its startup font load. Numbers use
+  Inter's own proportional figures everywhere, schedule figures included;
+  never set `tabular-nums` (owner, 2026-11-02), which
+  `typography-contract.test.ts` guards.
 
 - **Route every duration through `useMotionPreference().d()`.** It returns 0
   when the OS reduce-motion setting is on, which is what makes that setting

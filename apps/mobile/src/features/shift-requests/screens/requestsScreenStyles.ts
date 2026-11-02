@@ -6,7 +6,6 @@ import {
   mobileRadii,
   mobileRadius,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -142,7 +141,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     shiftWhen: {
       ...mobileTextWeighted("meta", "medium"),
-      ...mobileTabularText,
       color: mobileColors.textMuted,
     },
     // A tinted fill without an outline.

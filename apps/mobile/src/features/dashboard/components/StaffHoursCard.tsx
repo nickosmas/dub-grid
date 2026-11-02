@@ -11,7 +11,6 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -102,7 +101,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     overtime: {
       ...mobileText.bodyStrong,
-      ...mobileTabularText,
       color: mobileColors.dangerText,
     },
     overtimeLabel: {

@@ -62,9 +62,11 @@
   mobile, select weight through the registered Inter family aliases; editable
   fields use the load-safe `mobileInputText()` fallback so Android controls
   remain interactive if a font is unavailable.
-- Operational dates, times, hours, counts, and schedule figures use the shared
-  tabular-numeral utility (`dg-tabular-nums` on web,
-  `mobileTabularText` on mobile). Do not apply tabular figures to prose.
+- On web, operational dates, times, hours, counts, and schedule figures use
+  the shared tabular-numeral utility (`dg-tabular-nums`). Do not apply
+  tabular figures to prose. The mobile app uses Inter's own proportional
+  figures everywhere and never sets `tabular-nums` (owner, 2026-11-02);
+  `typography-contract.test.ts` guards it.
 
 ## Naming
 

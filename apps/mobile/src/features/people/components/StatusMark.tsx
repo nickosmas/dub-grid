@@ -26,7 +26,6 @@ import { ProfileList } from "../../profile/components/ProfilePrimitives";
 import {
   mobileListRow,
   mobileSpace,
-  mobileTabularText,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
@@ -323,11 +322,9 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     title: {
       ...mobileTextWeighted("rowTitle", "semibold"),
-      ...mobileTabularText,
     },
     detail: {
       ...mobileText.meta,
-      ...mobileTabularText,
       color: mobileColors.textSecondary,
     },
     line: {
@@ -349,7 +346,6 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     lineText: {
       ...mobileText.meta,
-      ...mobileTabularText,
       color: mobileColors.textSecondary,
       flex: 1,
       minWidth: 0,

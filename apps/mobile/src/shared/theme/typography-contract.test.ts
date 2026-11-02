@@ -110,15 +110,12 @@ describe("mobile typography contract", () => {
     expect(violations).toEqual([]);
   });
 
-  it("applies the shared tabular style to schedule and dashboard figures", () => {
-    for (const filePath of [
-      "src/features/dashboard/components/DashboardHeroCard.tsx",
-      "src/features/schedule/screens/scheduleScreenStyles.ts",
-      "src/features/schedule/screens/shiftDetailScreenStyles.ts",
-    ]) {
-      expect(readFileSync(path.resolve(mobileRoot, filePath), "utf8"), filePath).toContain(
-        "mobileTabularText",
-      );
-    }
+  // Numbers read in Inter's own proportional figures; tabular ones were
+  // dropped from the app (owner, 2026-11-02).
+  it("never switches numbers to tabular figures", () => {
+    const violations = productionFiles
+      .filter((filePath) => readFileSync(filePath, "utf8").includes("tabular-nums"))
+      .map(relative);
+    expect(violations).toEqual([]);
   });
 });
