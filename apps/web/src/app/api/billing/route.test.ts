@@ -274,7 +274,7 @@ describe("GET /api/billing", () => {
           id: "43",
           action: "billing.trial_extended",
           label: "Trial extended",
-          actorLabel: "DubGrid Support",
+          actorLabel: "DubGrid",
           resourceType: "billing",
           resourceId: null,
           details: { days: 14 },
