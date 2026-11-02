@@ -125,7 +125,7 @@ export async function clearFocusAreaShiftsAfterSave(
   if (error) {
     logger.error(
       { error, orgId: input.orgId, empId: input.employeeId },
-      "Clearing area shifts failed",
+      "Clearing schedule area shifts failed",
     );
     return { notCleared: focusAreaShiftsClearFailed(input.areas) };
   }
@@ -151,7 +151,7 @@ export async function clearFocusAreaShiftsAfterSave(
     if (auditError) {
       logger.error(
         { error: auditError, orgId: input.orgId, empId: input.employeeId },
-        "Area shifts audit log write failed",
+        "Schedule area shifts audit log write failed",
       );
     }
   }

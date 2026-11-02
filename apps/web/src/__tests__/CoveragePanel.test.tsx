@@ -726,7 +726,9 @@ describe("CoveragePanel", () => {
     it("says what a build does and previews the rows shown", () => {
       const build = withBuild({ status: "idle" });
 
-      expect(section().getByText("All areas, Mon, Oct 26 to Wed, Oct 28")).toBeInTheDocument();
+      expect(
+        section().getByText("All schedule areas, Mon, Oct 26 to Wed, Oct 28"),
+      ).toBeInTheDocument();
       expect(
         within(section().getByRole("list", { name: "How Auto-build works" }))
           .getAllByRole("listitem")
@@ -1193,7 +1195,7 @@ describe("CoveragePanel", () => {
 
     it("clears the preview when the focus area filter changes", () => {
       const build = withBuild({ status: "idle" });
-      fireEvent.click(screen.getByText("All areas"));
+      fireEvent.click(screen.getByText("All schedule areas"));
       fireEvent.click(screen.getByRole("option", { name: "North Wing" }));
       expect(build.onCancel).toHaveBeenCalled();
     });

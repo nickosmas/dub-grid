@@ -594,7 +594,7 @@ export default function OrganizationSetupWizard({
             >
               <div>
                 <label style={labelStyle} htmlFor={ids.focusAreaLabel}>
-                  Areas label
+                  Schedule areas label
                 </label>
                 <input
                   id={ids.focusAreaLabel}
@@ -1707,7 +1707,7 @@ export default function OrganizationSetupWizard({
                 <SectionNotice
                   tone="warning"
                   messages={[
-                    "Staff need an area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
+                    "Staff need a schedule area to be on the schedule. Go back to Setup and add one, or skip this step and add staff later from People.",
                   ]}
                 />
               </div>

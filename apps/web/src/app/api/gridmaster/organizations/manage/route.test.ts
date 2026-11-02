@@ -535,7 +535,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
           addressCountry: "",
           phone: "",
           timezone: "America/Los_Angeles",
-          focusAreaLabel: "Areas",
+          focusAreaLabel: "Schedule Areas",
           certificationLabel: "",
           roleLabel: "Positions",
           shiftDisplayMode: "code",

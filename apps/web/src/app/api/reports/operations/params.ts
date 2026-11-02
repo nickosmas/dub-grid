@@ -67,7 +67,7 @@ export function parseOperationsFilters(
 
   const focusAreaIds = parseCsv(input.focusAreaIds).map((value) => {
     if (!/^\d+$/.test(value)) {
-      throw new RangeError("Choose valid areas before generating the report.");
+      throw new RangeError("Choose valid schedule areas before generating the report.");
     }
     return Number(value);
   });

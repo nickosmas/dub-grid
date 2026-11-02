@@ -87,7 +87,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
         ? `${formatTimezoneLabel(value)} · ${value}`
         : DEFAULT_EMPTY,
   },
-  focusAreaLabel: { label: "Areas Label", sensitive: false },
+  focusAreaLabel: { label: "Schedule Areas Label", sensitive: false },
   certificationLabel: { label: "Certifications Label", sensitive: false },
   roleLabel: { label: "Roles Label", sensitive: false },
   departmentLabel: { label: "Departments Label", sensitive: false },

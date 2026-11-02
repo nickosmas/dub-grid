@@ -44,7 +44,7 @@ export default function OrganizationLabels({
     focusAreaLabel:
       form.focusAreaLabel.trim().length > 0
         ? getLineTextError(form.focusAreaLabel, {
-            label: "Area label",
+            label: "Schedule area label",
             maxLength: 50,
             required: true,
             disallowUrl: true,
@@ -99,7 +99,7 @@ export default function OrganizationLabels({
         ...organization,
         focusAreaLabel: form.focusAreaLabel.trim()
           ? normalizeLineText(form.focusAreaLabel, {
-              label: "Area label",
+              label: "Schedule area label",
               maxLength: 50,
               required: true,
               disallowUrl: true,
@@ -198,7 +198,7 @@ export default function OrganizationLabels({
           style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
         >
           <div>
-            <label style={labelStyle}>Areas label</label>
+            <label style={labelStyle}>Schedule areas label</label>
             <input
               value={form.focusAreaLabel}
               onChange={(e) => setForm((p) => ({ ...p, focusAreaLabel: e.target.value }))}
