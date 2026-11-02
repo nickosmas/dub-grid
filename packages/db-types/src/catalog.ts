@@ -37,6 +37,8 @@ export interface DbInvitation {
   phone: string | null;
   department_ids: number[];
   dept_admin_ids: number[];
+  /** An invited Admin's permissions, chosen before the invite (113). */
+  admin_permissions: Record<string, boolean> | null;
 }
 
 export interface DbShiftCategory {

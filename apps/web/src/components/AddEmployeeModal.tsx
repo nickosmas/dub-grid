@@ -10,7 +10,8 @@ import {
 } from "@dubgrid/contracts";
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
-import type { AssignableOrganizationRole } from "@/types";
+import type { AdminPermissions, AssignableOrganizationRole } from "@/types";
+import { InvitePermissionsField } from "@/components/InvitePermissionsField";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import type { NewStaffInvite } from "@/features/employees/client/new-staff-invites";
 import CustomSelect from "@/components/CustomSelect";
@@ -33,6 +34,7 @@ type RowEntry = {
   /** Send them an invite to the app; only possible with an email. */
   invite: boolean;
   role: AssignableOrganizationRole;
+  adminPermissions: AdminPermissions | null;
 };
 
 type RowDraft = Omit<RowEntry, "_id">;
@@ -49,6 +51,7 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
     firstDay: "",
     invite: true,
     role: "user",
+    adminPermissions: null,
   };
 }
 
@@ -122,6 +125,7 @@ export default function AddEmployeeModal({
           firstDay: "",
           invite: true,
           role: "user" as const,
+          adminPermissions: null,
         })),
       ),
     [defaultCertId, defaultFocusAreaIds],
@@ -138,6 +142,7 @@ export default function AddEmployeeModal({
         firstDay: row.firstDay,
         invite: row.invite,
         role: row.role,
+        adminPermissions: row.adminPermissions,
       })),
     ) !== initialRowsSnapshot;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -236,9 +241,16 @@ export default function AddEmployeeModal({
         deptAdminIds: [],
         version: 0,
       })),
-      invitedRows.map((r) => ({ email: normalizeOptionalStaffEmail(r.email), role: r.role })),
+      invitedRows.map((r) => ({
+        email: normalizeOptionalStaffEmail(r.email),
+        role: r.role,
+        // Only a Super Admin sets an Admin's permissions; the others get the standard set.
+        ...(canGrantSuperAdmin && r.role === "admin" && r.adminPermissions
+          ? { adminPermissions: { ...r.adminPermissions } }
+          : {}),
+      })),
     );
-  }, [validRows, invitedRows, onAdd]);
+  }, [validRows, invitedRows, onAdd, canGrantSuperAdmin]);
 
   const scrollMaxHeight = isMobile ? "calc(100dvh - 300px)" : "min(620px, calc(100vh - 250px))";
 
@@ -681,6 +693,19 @@ export default function AddEmployeeModal({
                             onChange={(role) => updateRow(row._id, { role })}
                             style={{ flex: 1, minWidth: 0 }}
                             fontSize={12}
+                          />
+                        </div>
+                      ) : null}
+                      {canGrantSuperAdmin &&
+                      canInviteRow(row, idx) &&
+                      row.invite &&
+                      row.role === "admin" ? (
+                        <div className="col-span-full">
+                          <InvitePermissionsField
+                            value={row.adminPermissions}
+                            onChange={(adminPermissions) =>
+                              updateRow(row._id, { adminPermissions })
+                            }
                           />
                         </div>
                       ) : null}

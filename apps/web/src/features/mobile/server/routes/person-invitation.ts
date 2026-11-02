@@ -23,6 +23,7 @@ import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-acce
 import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
 import logger from "@/lib/logger";
 import { changedElsewhereMessage } from "@dubgrid/domain";
+import { invitationAdminPermissions } from "@/features/organization/server/invitation-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -304,6 +305,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       { status: 403 },
     );
   }
+  const chosen = invitationAdminPermissions({
+    role: orgRole,
+    requested: parsed.data.adminPermissions,
+    canConfigure: loaded.auth.permissions.canConfigureAdminPermissions,
+  });
+  if ("response" in chosen) return chosen.response;
 
   const existingMember = await findExistingOrganizationMemberByEmail({
     serviceClient: loaded.auth.serviceClient,
@@ -346,6 +353,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     invitedBy: loaded.auth.user.id,
     email: parsed.data.email,
     roleToAssign: orgRole,
+    adminPermissions: chosen.permissions,
   });
   try {
     await sendInvitationEmail({
@@ -389,6 +397,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       email: invitation.email,
       employeeId: id,
       roleToAssign: orgRole,
+      ...(chosen.permissions ? { adminPermissions: chosen.permissions } : {}),
     },
     ip_address: getRequestIp(req),
     user_agent: req.headers?.get("user-agent") ?? null,
