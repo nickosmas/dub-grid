@@ -30,6 +30,7 @@ import {
   mobilePeopleResponseSchema,
   mobilePersonInvitationResponseSchema,
   mobilePersonOrgRoleResponseSchema,
+  mobilePersonPermissionsResponseSchema,
   mobilePersonStatusUpdateResponseSchema,
   mobilePersonUpdateResponseSchema,
   mobilePushTokenResponseSchema,
@@ -63,6 +64,7 @@ import {
   type MobileProfilePhoneUpdateBody,
   type MobileProfileResponse,
   type MobilePersonOrgRoleBody,
+  type MobilePersonPermissionsBody,
   type MobilePersonStatusUpdateBody,
   type MobilePersonUpdateBody,
   type MobileScheduleRange,
@@ -1264,6 +1266,22 @@ export function changeMobilePersonOrgRole(
       body: JSON.stringify(body),
     },
     (value) => mobilePersonOrgRoleResponseSchema.parse(value),
+  );
+}
+
+export function updateMobilePersonPermissions(
+  accessToken: string,
+  personId: string,
+  body: MobilePersonPermissionsBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/permissions`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+    (value) => mobilePersonPermissionsResponseSchema.parse(value),
   );
 }
 

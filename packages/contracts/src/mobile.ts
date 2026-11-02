@@ -1019,6 +1019,8 @@ export const mobilePersonSchema = z.object({
    * management access lives on the membership, so the two need separate guards.
    */
   membershipUpdatedAt: z.string().nullable().default(null),
+  /** An Admin's stored permissions, for the Permissions screen; null for any other tier. */
+  adminPermissions: z.record(z.string(), z.boolean()).nullable().default(null),
   /** An Admin's permissions, as granted of total; null for any other tier. */
   adminPermissionCount: z
     .object({ granted: z.number().int().nonnegative(), total: z.number().int().nonnegative() })
@@ -1213,6 +1215,17 @@ export const mobilePersonOrgRoleBodySchema = z.object({
 export const mobilePersonOrgRoleResponseSchema = z.object({
   success: z.literal(true),
   result: z.enum(["membership_updated", "invitation_replaced", "unchanged"]),
+  person: mobilePersonSchema,
+});
+
+/** An Admin's permissions, set from the app's Permissions screen. */
+export const mobilePersonPermissionsBodySchema = z.object({
+  adminPermissions: z.record(z.string(), z.boolean()),
+  expectedMembershipUpdatedAt: z.string().nullable(),
+});
+
+export const mobilePersonPermissionsResponseSchema = z.object({
+  success: z.literal(true),
   person: mobilePersonSchema,
 });
 
@@ -1488,6 +1501,7 @@ export type MobileManagementAccessRemoveBody = z.infer<
 export type MobileManagementAccessResponse = z.infer<typeof mobileManagementAccessResponseSchema>;
 export type MobilePersonOrgRoleBody = z.infer<typeof mobilePersonOrgRoleBodySchema>;
 export type MobilePersonOrgRoleResponse = z.infer<typeof mobilePersonOrgRoleResponseSchema>;
+export type MobilePersonPermissionsBody = z.infer<typeof mobilePersonPermissionsBodySchema>;
 export type MobileManagementUser = z.infer<typeof mobileManagementUserSchema>;
 export type MobileManagementUsersResponse = z.infer<typeof mobileManagementUsersResponseSchema>;
 export type MobileManagementUserUpdateBody = z.infer<typeof mobileManagementUserUpdateBodySchema>;

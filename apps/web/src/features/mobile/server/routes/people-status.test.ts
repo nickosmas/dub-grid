@@ -188,6 +188,7 @@ describe("mobile people status route", () => {
     expect(payload).toEqual({
       success: true,
       person: {
+        adminPermissions: null,
         adminPermissionCount: null,
         id: "00000000-0000-0000-0000-000000000001",
         employeeNumber: 1042,

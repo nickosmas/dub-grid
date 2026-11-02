@@ -569,6 +569,7 @@ export async function loadMobilePeoplePayload(
       // while removing hidden fields and auth-account links.
       return {
         ...mobilePerson,
+        adminPermissions: null,
         adminPermissionCount: null,
         contactNotes: "",
         deptAdminIds: [],

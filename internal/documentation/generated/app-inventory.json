@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:265d13f161e8a1ee45531f89e97c4bade4634ab66d184938a72a933378841885",
+  "sourceDigest": "sha256:798f5944a0bac79a5111c3e9aaa80b2d80133ef233009bbf4132dea41f6f8855",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2125,6 +2125,18 @@
       },
       "implementationSource": {
         "path": "apps/web/src/features/mobile/server/routes/person-invitation.ts"
+      }
+    },
+    {
+      "id": "http:PATCH:/api/mobile/v1/people/[id]/permissions",
+      "method": "PATCH",
+      "path": "/api/mobile/v1/people/[id]/permissions",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/mobile/v1/people/[id]/permissions/route.ts"
+      },
+      "implementationSource": {
+        "path": "apps/web/src/features/mobile/server/routes/person-permissions.ts"
       }
     },
     {
