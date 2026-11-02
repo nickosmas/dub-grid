@@ -2101,6 +2101,10 @@ export async function fetchMobilePeople(
     ),
     membershipUpdatedAt:
       (row.user_id ? managementMembershipByUserId.get(row.user_id)?.updated_at : null) ?? null,
+    adminPermissions: (() => {
+      const membership = row.user_id ? managementMembershipByUserId.get(row.user_id) : null;
+      return membership?.org_role === "admin" ? (membership.admin_permissions ?? null) : null;
+    })(),
     adminPermissionCount: countMobileAdminPermissions(
       row.user_id ? managementMembershipByUserId.get(row.user_id) : null,
     ),

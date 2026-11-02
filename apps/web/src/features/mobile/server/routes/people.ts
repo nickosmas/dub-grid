@@ -66,6 +66,7 @@ type MobilePersonSource = Pick<
   managementDeptAdminIds?: number[];
   orgRole?: MobilePerson["orgRole"];
   membershipUpdatedAt?: string | null;
+  adminPermissions?: MobilePerson["adminPermissions"];
   adminPermissionCount?: MobilePerson["adminPermissionCount"];
   pendingInvitation?: {
     id: string;
@@ -110,6 +111,7 @@ export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
     userId: person.userId,
     version: person.version,
     membershipUpdatedAt: person.membershipUpdatedAt ?? null,
+    adminPermissions: person.adminPermissions ?? null,
     adminPermissionCount: person.adminPermissionCount ?? null,
     pendingInvitation: person.pendingInvitation
       ? {

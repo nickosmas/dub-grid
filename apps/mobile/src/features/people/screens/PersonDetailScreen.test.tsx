@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { buildInitialPermissions, countPermissionLevels } from "@dubgrid/authz";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
 import { formatReturnDate } from "@dubgrid/domain";
@@ -2435,6 +2436,7 @@ describe("PersonDetailScreen", () => {
   describe("access role on the page", () => {
     function renderForAccess(options: {
       canManageManagementAccess?: boolean;
+      effectiveRole?: string;
       person?: Record<string, unknown>;
     }) {
       const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
@@ -2461,6 +2463,7 @@ describe("PersonDetailScreen", () => {
             canManageEmployees: true,
             canManageManagementAccess: options.canManageManagementAccess ?? true,
           },
+          effectiveRole: options.effectiveRole,
         },
         error: null,
         isFetching: false,
@@ -2518,17 +2521,47 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Admin")).toBeInTheDocument();
     });
 
+    // Counted the way the Permissions sheet counts, one level per switch.
     it("counts an Admin's permissions under the level", () => {
+      const stored = { canEditShifts: true, canViewReports: true };
       renderForAccess({
         person: {
           orgRole: "admin",
+          userId: "user-2",
           membershipUpdatedAt: "2026-01-01T00:00:00.000Z",
-          adminPermissionCount: { granted: 18, total: 25 },
+          adminPermissions: stored,
+          adminPermissionCount: { granted: 2, total: 2 },
         },
       });
 
+      const { enabled, total } = countPermissionLevels(buildInitialPermissions(stored));
       expect(screen.getByText("Permissions")).toBeInTheDocument();
-      expect(screen.getByText("18 of 25")).toBeInTheDocument();
+      expect(screen.getByText(`${enabled} of ${total}`)).toBeInTheDocument();
+      // Only a Super Admin opens them.
+      expect(screen.queryByRole("button", { name: /^Permissions/ })).not.toBeInTheDocument();
+    });
+
+    it("lets a Super Admin turn a permission on and save it", () => {
+      const mutationCalls = renderForAccess({
+        person: {
+          orgRole: "admin",
+          userId: "user-2",
+          membershipUpdatedAt: "2026-01-01T00:00:00.000Z",
+          adminPermissions: { canEditShifts: true },
+          adminPermissionCount: { granted: 1, total: 1 },
+        },
+        effectiveRole: "super_admin",
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /^Permissions/ }));
+      expect(screen.getByText("Scheduling and staff")).toBeInTheDocument();
+      expect(screen.getAllByText("Always on").length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByLabelText("Coverage view"));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(allMutatePayloads(mutationCalls)).toContainEqual(
+        expect.objectContaining({ canViewCoverageRequirements: true, canEditShifts: true }),
+      );
     });
 
     // The invitation's `roleToAssign` is the role until it is accepted; reading
