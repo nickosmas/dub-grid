@@ -190,6 +190,8 @@ const LAST_DAY_HINT = "Leave it empty to offboard them now.";
 const SERVER_CHECKED_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
 const LINKED_EMAIL_REQUIRED_MESSAGE = "An account needs an email to sign in with.";
 
+type ContactField = "email" | "phone";
+
 type EditDraft = {
   firstName: string;
   lastName: string;
@@ -327,6 +329,7 @@ export default function PersonDetailScreen() {
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [editFocusField, setEditFocusField] = useState<ContactField | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   /** The person the draft was last built from, so the sync below runs once. */
   const [draftSource, setDraftSource] = useState<MobilePerson | null>(null);
@@ -876,27 +879,12 @@ export default function PersonDetailScreen() {
     return updateMutation.mutateAsync(buildUpdateBody());
   }
 
-  /** Saves one empty contact field typed on the page, leaving the rest as stored. */
-  function saveContactField(patch: Pick<Partial<MobilePersonUpdateBody>, "email" | "phone">) {
+  /** Opens the editor, with the keyboard up on a contact field when one was asked for. */
+  function startEditing(field: ContactField | null = null) {
     if (!person) return;
-    return updateMutation
-      .mutateAsync({
-        expectedVersion: person.version,
-        firstName: person.firstName,
-        lastName: person.lastName,
-        employmentType: person.employmentType,
-        phone: person.phone,
-        email: person.email,
-        contactNotes: person.contactNotes,
-        certificationId: person.certificationId,
-        focusAreaIds: person.focusAreaIds,
-        roleIds: person.roleIds,
-        departmentIds: person.departmentIds,
-        ...patch,
-      })
-      .catch(() => {
-        // The mutation owns its user-facing error.
-      });
+    setEditFocusField(field);
+    setEditing(true);
+    setDraft(makeDraft(person));
   }
 
   function buildUpdateBody(): MobilePersonUpdateBody {
@@ -1627,10 +1615,7 @@ export default function PersonDetailScreen() {
               ? {
                   label: "Edit",
                   accessibilityHint: "Opens the staff details editor",
-                  onPress: () => {
-                    setEditing(true);
-                    setDraft(makeDraft(person));
-                  },
+                  onPress: () => startEditing(),
                 }
               : null,
           ),
@@ -1752,6 +1737,7 @@ export default function PersonDetailScreen() {
             focusAreas={bootstrapQuery.data?.focusAreas ?? []}
             hasManagementAccess={person.managementDepartmentIds.length > 0}
             hasAccount={Boolean(person.userId)}
+            initialFocusField={editFocusField}
             serverFieldErrors={serverFieldErrors}
             onChange={(next) => {
               // A server verdict only holds for the value it was given. Editing
@@ -1874,19 +1860,16 @@ export default function PersonDetailScreen() {
           {canViewEmployeeDetails ? (
             <ProfileSection title="Contact">
               <ProfileList>
-                {/* An empty field is ready to type into for a manager, saved
-                    when they finish; a filled one changes through Edit, so a
-                    stray tap can't rewrite it. */}
-                {!person.email && canManageEmployees ? (
-                  <ContactEntryField
-                    autoComplete="email"
-                    keyboardType="email-address"
+                {/* The page only shows what's on file; everything changes in
+                    Edit. An empty field is a row that opens Edit with the
+                    keyboard on it, as adding a detail in Contacts is done in
+                    its editor (owner, 2026-11-02). */}
+                {!person.email && canEdit ? (
+                  <ProfileInfoRow
+                    iconName="mail-outline"
                     label="Email"
-                    saving={updateMutation.isPending}
-                    validate={getOptionalStaffEmailError}
-                    onSave={(email) =>
-                      saveContactField({ email: normalizeOptionalStaffEmail(email) })
-                    }
+                    value="Add email"
+                    onPress={() => startEditing("email")}
                   />
                 ) : (
                   <ProfileInfoRow
@@ -1895,14 +1878,13 @@ export default function PersonDetailScreen() {
                     value={person.email || "No email on file"}
                   />
                 )}
-                {!person.phone && canManageEmployees ? (
-                  <ContactEntryField
-                    autoComplete="tel"
-                    keyboardType="phone-pad"
+                {!person.phone && canEdit ? (
+                  <ProfileInfoRow
+                    iconName="call-outline"
+                    isLast
                     label="Phone"
-                    saving={updateMutation.isPending}
-                    validate={getOptionalUsPhoneError}
-                    onSave={(phone) => saveContactField({ phone: normalizeOptionalUsPhone(phone) })}
+                    value="Add phone"
+                    onPress={() => startEditing("phone")}
                   />
                 ) : (
                   <ProfileInfoRow
@@ -2671,6 +2653,7 @@ function EditPanel({
   useCompactRoleCertificationLabels,
   hasManagementAccess,
   hasAccount,
+  initialFocusField,
   serverFieldErrors,
   onChange,
 }: {
@@ -2683,6 +2666,8 @@ function EditPanel({
   roleLabel: string;
   hasManagementAccess: boolean;
   hasAccount: boolean;
+  /** The contact field the editor opens with the keyboard on. */
+  initialFocusField: ContactField | null;
   roles: MobileBootstrapRole[];
   useCompactRoleCertificationLabels: boolean;
   serverFieldErrors: Partial<Record<MobileStaffField, string>>;
@@ -2750,6 +2735,7 @@ function EditPanel({
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="Phone"
+            autoFocus={initialFocusField === "phone"}
             editable={!saving}
             error={fieldErrors.phone}
             focused={focusedField === "phone"}
@@ -2770,6 +2756,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="Email"
             autoCapitalize="none"
+            autoFocus={initialFocusField === "email"}
             editable={!saving}
             error={fieldErrors.email}
             focused={focusedField === "email"}
@@ -2925,54 +2912,3 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
   });
-
-/** An empty contact field on the page, ready to type into and saved on Done. */
-function ContactEntryField({
-  label,
-  keyboardType,
-  autoComplete,
-  saving,
-  validate,
-  onSave,
-}: {
-  label: string;
-  keyboardType: "email-address" | "phone-pad";
-  autoComplete: "email" | "tel";
-  saving: boolean;
-  validate: (value: string) => string | null;
-  onSave: (value: string) => unknown;
-}) {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  function commit() {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      setError(null);
-      return;
-    }
-    const problem = validate(trimmed);
-    setError(problem);
-    if (!problem) void onSave(trimmed);
-  }
-
-  return (
-    <ProfileTextInput
-      autoCapitalize="none"
-      autoComplete={autoComplete}
-      autoCorrect={false}
-      editable={!saving}
-      error={error}
-      keyboardType={keyboardType}
-      label={label}
-      returnKeyType="done"
-      value={value}
-      onBlur={commit}
-      onChangeText={(next) => {
-        setValue(next);
-        if (error) setError(null);
-      }}
-      onSubmitEditing={commit}
-    />
-  );
-}

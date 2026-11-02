@@ -305,6 +305,7 @@ export function ProfileInfoRow({
   trailing,
   emphasis = "value",
   isLast = false,
+  onPress,
 }: {
   iconName?: IconName;
   label: string;
@@ -318,23 +319,29 @@ export function ProfileInfoRow({
    */
   emphasis?: "value" | "label";
   isLast?: boolean;
+  /** Makes the row an action, such as adding a detail that isn't on file: its value in the tint and a chevron at its end. */
+  onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <View
-      style={[
-        styles.row,
-        IS_NATIVE_LIST && styles.rowNative,
-        !isLast && !IS_NATIVE_LIST && styles.rowDivider,
-      ]}
-    >
+  const rowStyle = [
+    styles.row,
+    IS_NATIVE_LIST && styles.rowNative,
+    !isLast && !IS_NATIVE_LIST && styles.rowDivider,
+  ];
+  const content = (
+    <>
       {iconName ? <ProfileIcon name={iconName} /> : null}
       <View style={styles.rowCopy}>
         <Text style={emphasis === "label" ? styles.navLabel : styles.rowLabel}>{label}</Text>
-        <Text numberOfLines={2} style={emphasis === "label" ? styles.rowDetail : styles.rowValue}>
+        <Text
+          numberOfLines={2}
+          style={[
+            emphasis === "label" ? styles.rowDetail : styles.rowValue,
+            onPress && { color: mobileColors.brand },
+          ]}
+        >
           {value}
         </Text>
         {detail ? (
@@ -344,10 +351,21 @@ export function ProfileInfoRow({
         ) : null}
       </View>
       {trailing}
+      {onPress ? (
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      ) : null}
       {!isLast && IS_NATIVE_LIST ? (
         <View style={[styles.insetDivider, iconName ? styles.insetDividerIcon : null]} />
       ) : null}
-    </View>
+    </>
+  );
+
+  return onPress ? (
+    <PressableRow onPress={onPress} style={rowStyle}>
+      {content}
+    </PressableRow>
+  ) : (
+    <View style={rowStyle}>{content}</View>
   );
 }
 
@@ -753,10 +771,6 @@ const personLayoutStyles = StyleSheet.create({
   actionRowItem: {
     flex: 1,
   },
-  // The same break above the foot's actions as the drawn stack takes.
-  actionGroup: {
-    paddingTop: mobileSpace.lg,
-  },
 });
 
 /** The stack of fact lines under a centered hero's name. */
@@ -886,30 +900,11 @@ export interface ProfileActionItem {
 }
 
 /**
- * Actions that end a page: on a phone a list card of tinted rows, Revoke and
- * the like in red; elsewhere one full-width button each.
+ * Actions that end a page, one full-width button each, drawn the way
+ * Profile's Switch organization and Sign out are (owner, 2026-11-02).
  */
 export function ProfileActionGroup({ actions }: { actions: ProfileActionItem[] }) {
   if (actions.length === 0) return null;
-  if (IS_NATIVE_LIST) {
-    return (
-      <View style={personLayoutStyles.actionGroup}>
-        <ProfileList>
-          {actions.map((action, index) => (
-            <ProfileListAction
-              disabled={action.disabled}
-              isLast={index === actions.length - 1}
-              key={action.key}
-              label={action.label}
-              loading={action.loading}
-              onPress={action.onPress}
-              tone={action.tone}
-            />
-          ))}
-        </ProfileList>
-      </View>
-    );
-  }
   return (
     <ProfileActionStack>
       {actions.map((action) => (
