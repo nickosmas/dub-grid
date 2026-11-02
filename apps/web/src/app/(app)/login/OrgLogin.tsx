@@ -70,7 +70,7 @@ const ORG_DELETED_CODE = "ORG_DELETED";
 const LOCKOUT_COPY: Record<OrgLockout, { title: string; body: string }> = {
   suspended: {
     title: "This organization is suspended",
-    body: "Access has been paused by the DubGrid platform team. Contact support to restore it.",
+    body: "We've paused access to this organization. Contact us to restore it.",
   },
   deleted: {
     title: "This organization has been deleted",

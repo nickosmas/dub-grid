@@ -207,7 +207,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
           )}
           {!billing.stripeConfigured && (
             <BillingBanner tone="warning" icon="info">
-              Online billing isn&apos;t set up here. Contact DubGrid Support to subscribe.
+              Online billing isn&apos;t set up here. Contact us to subscribe.
             </BillingBanner>
           )}
 

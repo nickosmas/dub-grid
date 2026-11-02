@@ -103,7 +103,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         <div>
           <h2 className="dg-card-title">Delete this organization</h2>
           <p className="dg-card-description">
-            Everyone loses access and billing stops. Only DubGrid Support can bring it back.
+            Everyone loses access and billing stops. Contact us if you need it back.
           </p>
         </div>
       </div>

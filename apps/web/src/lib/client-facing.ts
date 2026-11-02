@@ -21,7 +21,7 @@ export function formatClientLabel(value: string | null | undefined): string {
 }
 
 /** Who customers see behind a change a Gridmaster made; the role name stays internal. */
-export const DUBGRID_SUPPORT_ACTOR_LABEL = "DubGrid Support";
+export const DUBGRID_SUPPORT_ACTOR_LABEL = "DubGrid";
 
 const ORGANIZATION_ROLE_LABELS: Record<string, string> = {
   admin: "Admin",

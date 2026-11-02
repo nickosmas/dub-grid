@@ -52,8 +52,7 @@ export function TwoFactorReenrollGate({ children }: { children: ReactNode }) {
         <div className="flex flex-col gap-2">
           <h1 className="dg-type-page-title">Set up two-factor again</h1>
           <p className="text-[14px] leading-relaxed text-[var(--dg-color-text-secondary)]">
-            DubGrid support reset two-factor sign-in on your account. Set up an authenticator app to
-            continue.
+            We reset two-factor sign-in on your account. Set up an authenticator app to continue.
           </p>
         </div>
         <div className="dg-card">

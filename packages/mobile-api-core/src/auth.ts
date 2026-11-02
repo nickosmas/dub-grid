@@ -122,7 +122,7 @@ function getMobileUserName(user: User): {
 function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
   if (orgRole === "super_admin") {
     if (billingAccess.reason === "suspended") {
-      return "Organization unavailable. Contact DubGrid Support for help.";
+      return "Organization unavailable. Contact us for help.";
     }
     return "Organization unavailable. Sign in on the web to manage billing.";
   }
