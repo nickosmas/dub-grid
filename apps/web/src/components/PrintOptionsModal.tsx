@@ -8,6 +8,7 @@ import Modal from "@/components/Modal";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { PRINT_FONT_SIZES, type PrintFontSizeKey } from "@/components/print-font-sizes";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 export interface PrintConfig {
   fontSize: number;
@@ -29,7 +30,7 @@ export default function PrintOptionsModal({
   currentSpanWeeks,
   onPrint,
   onClose,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   shiftDisplayMode = "code",
 }: PrintOptionsModalProps) {
   // Spelled-out shift names only fit a week's columns on one page.

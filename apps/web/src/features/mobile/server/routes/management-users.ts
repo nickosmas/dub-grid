@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   );
   if (invalidIds.length > 0) {
     return NextResponse.json(
-      { error: "Select management departments from this organization." },
+      { error: "Select administrative teams from this organization." },
       { status: 400 },
     );
   }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   const existing = await loadManagementUsers(auth.serviceClient, auth.currentOrg.id);
   if (existing.some((candidate) => candidate.email.trim().toLowerCase() === email)) {
     return NextResponse.json(
-      { error: "Someone with that email is already on the management roster." },
+      { error: "Someone with that email is already on an administrative team." },
       { status: 409 },
     );
   }

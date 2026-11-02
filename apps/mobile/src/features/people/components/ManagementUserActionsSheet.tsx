@@ -16,7 +16,7 @@ import {
   updateMobileManagementUser,
   updateMobileManagementUserInvitation,
 } from "../../../shared/lib/api";
-import { getDepartmentNames, MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
+import { getDepartmentNames } from "../../../shared/lib/departments";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
@@ -24,6 +24,7 @@ import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { ManagementUserAccessSheet } from "./ManagementUserAccessSheet";
 import { OrgRoleSheet } from "./OrgRoleSheet";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 type InvitationConfirmAction = "resend" | "revoke" | null;
 
@@ -133,7 +134,7 @@ export function ManagementUserActionsSheet({
       setError(
         getClientFriendlyErrorMessage(
           mutationError,
-          "We couldn't update their management access right now.",
+          "We couldn't update their administrative teams right now.",
         ),
       );
     },
@@ -151,13 +152,13 @@ export function ManagementUserActionsSheet({
         tone: "success",
         title:
           result.result === "access_removed"
-            ? "Management access removed"
+            ? "Removed from administrative teams"
             : roleChanged
               ? "Access role updated"
-              : "Management access updated",
+              : "Administrative teams updated",
         message: roleChanged
           ? "Their access role was updated."
-          : "Their management access was updated.",
+          : "Their administrative teams were updated.",
       });
     },
   });
@@ -188,7 +189,7 @@ export function ManagementUserActionsSheet({
       pushToast({
         tone: "success",
         title: result.result === "invitation_revoked" ? "Invitation revoked" : "Invitation resent",
-        message: "Their management invitation was updated.",
+        message: "Their invitation was updated.",
       });
     },
   });
@@ -275,7 +276,7 @@ export function ManagementUserActionsSheet({
               ) : null}
               <Button
                 disabled={isPending}
-                label="Edit management access"
+                label="Edit administrative teams"
                 // Sequenced, not swapped: presenting the access sheet in the same
                 // commit that dismisses this one is the case iOS refuses, and the
                 // access sheet could come up unreachable behind a dead backdrop.
@@ -296,7 +297,7 @@ export function ManagementUserActionsSheet({
               />
               <Button
                 disabled={isPending}
-                label={isPendingInvite ? "Revoke invite" : "Remove from management"}
+                label={isPendingInvite ? "Revoke invite" : "Remove from administrative teams"}
                 onPress={() =>
                   isPendingInvite
                     ? setInvitationConfirmAction("revoke")
@@ -312,7 +313,7 @@ export function ManagementUserActionsSheet({
             subtitle={
               isPendingInvite
                 ? `Invitation pending · ${displayed.email}`
-                : displayed.email || "Management access only"
+                : displayed.email || "Not on the schedule"
             }
             title={fullName}
           />
@@ -324,7 +325,7 @@ export function ManagementUserActionsSheet({
             children, which would break a label off from its own value. */}
         <View style={styles.field}>
           <AppText tone="secondary" variant="meta">
-            {MANAGEMENT_DEPARTMENT_LABELS.plural}
+            {ADMINISTRATIVE_TEAM_LABELS.plural}
           </AppText>
           <AppText tone="muted">{departmentNames.join(", ") || "None"}</AppText>
         </View>

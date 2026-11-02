@@ -80,7 +80,8 @@ vi.mock("@/components/auth/PasswordInput", () => ({
   ),
 }));
 vi.mock("@/components/auth/PasswordStrength", () => ({ PasswordStrength: () => null }));
-vi.mock("@dubgrid/domain", () => ({
+vi.mock("@dubgrid/domain", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/domain")>()),
   getPasswordMismatchError: (password: string, confirmation: string) =>
     confirmation && password !== confirmation ? "Passwords do not match." : null,
   isPasswordAcceptable: (password: string) => password.length >= 10,

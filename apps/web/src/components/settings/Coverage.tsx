@@ -27,7 +27,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { NumberField } from "@/components/ui/number-field";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -847,7 +847,7 @@ export default function CoverageRequirementsSettings({
   onCoverageRequirementsChange,
   canEdit,
   defaultShiftEnabled = true,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
 }: {
   orgId: string;
   focusAreas: FocusArea[];

@@ -1,6 +1,6 @@
 "use client";
 
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -224,7 +224,7 @@ export function BulkImportModal({
   focusAreas,
   certifications,
   roles,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   onClose,
   onImported,
 }: {

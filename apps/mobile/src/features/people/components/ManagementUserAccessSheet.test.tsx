@@ -72,7 +72,7 @@ describe("ManagementUserAccessSheet", () => {
     fireEvent.click(screen.getByText("Operations"));
 
     expect(
-      screen.getByText("Saving now takes them off the management roster."),
+      screen.getByText("Saving now takes them off every administrative team."),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Save access" }));
@@ -86,9 +86,7 @@ describe("ManagementUserAccessSheet", () => {
 
     fireEvent.click(screen.getByText("Operations"));
 
-    expect(
-      screen.getByText("Saving now revokes their pending management invitation."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Saving now revokes their pending invitation.")).toBeInTheDocument();
   });
 
   it("still saves an ordinary department change through onSubmit", () => {

@@ -7,14 +7,14 @@ The **People** tab lists everyone in your organization. What you see and can cha
 
 ## The directory
 
-**Directory** lists your colleagues with their focus areas, certification, and roles. Search by name, or by qualification. Your own row is marked **You**.
+**Directory** lists your colleagues with their areas, certification, and roles. Search by name, or by qualification. Your own row is marked **You**.
 
 If you manage staff, the directory also shows each person's employment type, account, access role, and the date they joined, plus their email or phone, and you can search by name, email, or phone. If you can manage staff, selecting a name opens their [person page](/staff/detail-page).
 
 Managers also get:
 
 - **Status tabs**: **All**, **Active**, **Away**, and **Offboarded**, each with a count. Everyone else sees active staff only.
-- **On Schedule** and **Management**, to switch between people on the schedule and people who manage a department but aren't scheduled, when your organization has management departments.
+- **On Schedule** and **Administrative Teams**, to switch between people on the schedule and people on an administrative team who aren't scheduled, when your organization has administrative teams.
 - **Filters**: qualifications, employment type, department, whether the person has an account, contact details, and access role.
 - **Sort**: by seniority, name, or access role.
 - **Reorder**: on the **Active** tab, sorted by seniority with no filters, drag people to change the seniority order and select **Save order**. The whole order saves at once; if it can't be saved, nothing changes and the list stays open to try again. **Discard** puts the rows back without leaving reorder mode.
@@ -23,7 +23,7 @@ The **Account** column says whether each person can sign in: **Linked** (they ha
 
 ## Adding people
 
-Select **Add**. If you can add both kinds of people, choose **Scheduled staff** or **Management staff**.
+Select **Add**. If you can add both kinds of people, choose **Scheduled staff** or **Administrative team**.
 
 **Add staff members** adds several people at once; use **Add Another Person** for each extra row. For each person enter:
 
@@ -32,20 +32,20 @@ Select **Add**. If you can add both kinds of people, choose **Scheduled staff** 
 - Their certification (optional)
 - **Email** (optional; needed to invite them)
 - **First day** (optional; see [A first day](#a-first-day))
-- At least one focus area
+- At least one area
 - **Invite to the app**, for someone with an email, and their access role
 
 **Invite everyone with an email** ticks or clears every row that has one. The button says how many people it adds and invites, such as **Add 4 Staff Members, Invite 2**. Anyone you don't invite now can be invited later from their person page. See [Invitations](/staff/invitations).
 
 ### Importing a list
 
-On a desktop-sized screen, **Import** adds people from a `.csv` file of up to 500 rows. The file's columns are `first_name`, `last_name`, `email`, `phone`, `focus_areas`, `certification`, `roles`, and `notes`; only the names are required, and several focus areas are separated with semicolons.
+On a desktop-sized screen, **Import** adds people from a `.csv` file of up to 500 rows. The file's columns are `first_name`, `last_name`, `email`, `phone`, `focus_areas`, `certification`, `roles`, and `notes`; only the names are required, and several areas are separated with semicolons.
 
 Before importing, DubGrid checks for duplicates. A row that matches someone already on your roster by name, email, or phone, or another row in the file, is skipped. A row with a similar name but different contact details is flagged so you can double-check it. Importing may not be available in every organization.
 
-## Taking someone off a focus area
+## Taking someone off an area
 
-When you save someone's record without a focus area they have shifts in from today on, you're asked what to do with those shifts first, with how many there are and their dates. This works the same on the web and in the app.
+When you save someone's record without an area they have shifts in from today on, you're asked what to do with those shifts first, with how many there are and their dates. This works the same on the web and in the app.
 
 - **Clear shifts** saves the change and takes those shifts off in the draft, so they come off the schedule when you publish it. Open requests for those shifts are closed.
 - **Keep shifts** saves the change and leaves the shifts as they are. They still show on the schedule.
@@ -79,14 +79,14 @@ To change someone's status, select **Change staff status** in that card. It list
 When someone is marked away or offboarded:
 
 - An offboarded person is signed out everywhere and loses their access to your organization, whoever offboards them: on the web, in the app, several at once, or after a last day. **Restore** gives that access back with the role they had, so they can sign in again. An Away person stays signed in.
-- From today on, their draft shifts are cleared and their published shifts are marked for removal at the next publish. Their recurring schedules and repeating shifts stop, and their open requests expire, except that a pickup an offboarded person claimed goes back up for others.
+- From today on, their draft shifts are cleared, and their published shifts come off the published schedule right away, with their schedule notes. The removal shows as one entry in **Publish History**, and no schedule-change alert is sent. Their recurring schedules and repeating shifts stop, and their open requests expire, except that a pickup an offboarded person claimed goes back up for others.
 - Their past schedule is kept. Bringing them back doesn't restore what was cleared.
 
 ### Away with dates
 
 When you mark someone away, you can give a **Return date**: the first day they're back. Until then they show as **Away until** that date. You can change or clear it, and its absence, later with **Edit time away** in the card's **⋯** menu (in the app, in **Change staff status**).
 
-- Only the days before the return date are cleared, and they can be scheduled again from that date, even while still Away.
+- Only the days before the return date are cleared, and they can be scheduled again from that date, even while still Away. Their published shifts in those days are removed in the draft instead, and go live when you publish the period.
 - Their recurring schedules pause instead of stopping, and fill again from the return date.
 - On the return date they're set back to **Active** automatically, in your organization's time zone.
 
@@ -96,7 +96,7 @@ Time away can also start later. Pick a **Starts** date up to a year ahead and co
 
 - They stay **Active** until then, and their record shows **Away from** that date. They can be scheduled as usual before it.
 - From the start date, their days can't be scheduled. Those days are cleared in the draft straight away, under the absence if you picked one, and open requests for them are closed.
-- On the start date they're marked **Away** automatically, with the return date and absence you chose.
+- On the start date they're marked **Away** automatically, with the return date and absence you chose. With no return date, shifts still cleared only in the draft come off the published schedule then.
 - To change the dates or the absence, select **Edit plan** and then **Save changes**. To start the time away today instead, clear **Starts** and confirm with **Mark away**. **Cancel planned time away** puts back the days that held the absence, and keeps the rest cleared.
 - Suspending or offboarding them, or scheduling a suspension, cancels the planned time away.
 
@@ -106,7 +106,7 @@ When someone is leaving, pick **Offboard** and give their **Last day**, today or
 
 - They stay **Active** through their last day, and show **Leaving** with that date. They can be scheduled as usual up to and on it.
 - The days after it can't be scheduled. Their shifts after it are cleared in the draft straight away, and open requests for those days are closed.
-- The day after their last day, in your organization's time zone, they're offboarded automatically, just as if you'd selected **Offboard** then.
+- The day after their last day, in your organization's time zone, they're offboarded automatically, just as if you'd selected **Offboard** then. Shifts still cleared only in the draft come off the published schedule then.
 - To move the last day, select **Edit plan** and then **Save changes**. To offboard them today instead, clear **Last day** and confirm with **Offboard**. **Cancel last day** keeps them Active; shifts already cleared stay cleared.
 - Someone has one planned change at a time: a last day replaces a planned time away or suspension, and marking them away, scheduling time away or suspending them cancels the last day. Each confirmation says so.
 - Only someone Active can have a last day. Someone away or suspended is offboarded straight away.
@@ -154,15 +154,15 @@ A person can have a **First day**, the first day they can be scheduled. Set it w
 
 ## Who can do what
 
-| To                                               | You need                         |
-| ------------------------------------------------ | -------------------------------- |
-| See the directory                                | Everyone                         |
-| See contact details, account, and access         | Permission to view staff details |
-| Add, import, edit, or change the status of staff | Permission to manage staff       |
-| Change someone's access, or add management staff | Super Admin                      |
+| To                                                             | You need                         |
+| -------------------------------------------------------------- | -------------------------------- |
+| See the directory                                              | Everyone                         |
+| See contact details, account, and access                       | Permission to view staff details |
+| Add, import, edit, or change the status of staff               | Permission to manage staff       |
+| Change someone's access, or add people to administrative teams | Super Admin                      |
 
 Exporting staff data is available to people who can view staff details, and may not be available in every organization.
 
 ## In the DubGrid app
 
-The app's **People** tab has a **Schedule** and **Management** switch, filters, and sorting; search sits above the list, with **Add person** and **Filter** in the top bar. Managers can add people, with a first day from today up to a year ahead and, for someone with an email, an invite to the app with their access role, approve or reject profile requests, and change a person's status or invitation from their page. A first day is changed on the web.
+The app's **People** tab has an **On Schedule** and **Administrative Teams** switch, filters, and sorting; search sits above the list, with **Add person** and **Filter** in the top bar. Managers can add people, with a first day from today up to a year ahead and, for someone with an email, an invite to the app with their access role, approve or reject profile requests, and change a person's status or invitation from their page. A first day is changed on the web.

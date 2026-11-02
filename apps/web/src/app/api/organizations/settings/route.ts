@@ -24,7 +24,7 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, storedOrganizationLabel } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -202,7 +202,7 @@ export async function PUT(req: NextRequest) {
     ...(fields.focusAreaLabel !== undefined
       ? {
           focusAreaLabel: getLineTextError(fields.focusAreaLabel, {
-            label: "Focus area label",
+            label: "Area label",
             maxLength: 50,
             required: true,
           }),
@@ -338,7 +338,7 @@ export async function PUT(req: NextRequest) {
       focusAreaLabel:
         fields.focusAreaLabel !== undefined
           ? normalizeLineText(fields.focusAreaLabel, {
-              label: "Focus area label",
+              label: "Area label",
               maxLength: 50,
               required: true,
             })
@@ -416,13 +416,16 @@ export async function PUT(req: NextRequest) {
       update.address = nextOrg.address;
     }
     if (changeKeys.has("focusAreaLabel")) {
-      update.focus_area_label = nextOrg.focusAreaLabel;
+      update.focus_area_label = storedOrganizationLabel("focusArea", nextOrg.focusAreaLabel);
     }
     if (changeKeys.has("certificationLabel")) {
-      update.certification_label = nextOrg.certificationLabel;
+      update.certification_label = storedOrganizationLabel(
+        "certification",
+        nextOrg.certificationLabel,
+      );
     }
     if (changeKeys.has("roleLabel")) {
-      update.role_label = nextOrg.roleLabel;
+      update.role_label = storedOrganizationLabel("role", nextOrg.roleLabel);
     }
     if (changeKeys.has("shiftDisplayMode")) {
       update.shift_display_mode = nextOrg.shiftDisplayMode;

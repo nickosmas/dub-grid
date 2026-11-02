@@ -1,4 +1,9 @@
-import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 import { useMemo, useState } from "react";
 import { Screen } from "../../../src/shared/components/Screen";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
@@ -26,7 +31,8 @@ const UNASSIGNED_LABEL = "Unassigned";
 
 export default function OpenShiftsExpandedScreen() {
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg?.labels?.focusArea ?? "Focus Areas";
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg?.labels?.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   // Drilling in from Home used to lose pull-to-refresh entirely: these routes
   // share Home's cached query, so the only way to refresh was to back out.
   const manualRefresh = useManualRefresh(() => dashboardQuery.refetch());

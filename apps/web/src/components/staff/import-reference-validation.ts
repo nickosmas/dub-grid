@@ -24,7 +24,7 @@ export function getImportReferenceErrors(
   options: ImportReferenceOptions,
 ): string[] {
   const errors = unknownNames(row.focusAreaNames, options.focusAreaNames).map(
-    (name) => `Unknown focus area: "${name}"`,
+    (name) => `Unknown area: "${name}"`,
   );
 
   if (

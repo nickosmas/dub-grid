@@ -1,4 +1,4 @@
-import { billingPolicyOverridesFromRow } from "@dubgrid/domain";
+import { billingPolicyOverridesFromRow, resolveOrganizationLabel } from "@dubgrid/domain";
 import type {
   Department,
   DepartmentType,
@@ -107,10 +107,10 @@ export function rowToOrganizationTerminology(
   >,
 ): OrganizationTerminology {
   return {
-    focusAreaLabel: row.focus_area_label ?? "Focus Areas",
-    certificationLabel: row.certification_label ?? "Certifications",
-    roleLabel: row.role_label ?? "Roles",
-    departmentLabel: row.department_label ?? "Scheduled Departments",
+    focusAreaLabel: resolveOrganizationLabel("focusArea", row.focus_area_label),
+    certificationLabel: resolveOrganizationLabel("certification", row.certification_label),
+    roleLabel: resolveOrganizationLabel("role", row.role_label),
+    departmentLabel: resolveOrganizationLabel("department", row.department_label),
   };
 }
 

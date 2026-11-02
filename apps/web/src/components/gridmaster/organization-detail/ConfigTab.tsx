@@ -13,6 +13,7 @@ import {
 } from "@/types";
 import { useTheme } from "next-themes";
 import { gmHeaderStyle, gmTableStyle } from "@/components/gridmaster/table-styles";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 // Configuration tab for the gridmaster OrganizationDetail view.
 
@@ -54,7 +55,8 @@ export function ConfigTab({
       {/* Focus Areas */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          {organization.focusAreaLabel || "Focus Areas"} ({activeFocusAreas.length})
+          {organization.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea} (
+          {activeFocusAreas.length})
           {archivedFocusAreas.length > 0 && (
             <span
               style={{
@@ -127,7 +129,7 @@ export function ConfigTab({
             <table style={gmTableStyle}>
               <thead>
                 <tr>
-                  {["Shift", "Short code", "Times", "Focus area"].map((h) => (
+                  {["Shift", "Short code", "Times", "Area"].map((h) => (
                     <th
                       key={h}
                       style={{

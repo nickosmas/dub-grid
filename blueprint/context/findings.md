@@ -553,13 +553,13 @@
 **Suggested fix:** Return early unless an open pickup with a parent exists for the org and date (`idx_shift_requests_org_open_pickups`). Check the archived-reference case separately.
 **Resolution:**
 
-### F-174 [P2] open - Leaving the grid locks the person's whole schedule history
+### F-174 [P2] fixed - Leaving the grid locks the person's whole schedule history
 
 **File:** `supabase/migrations/100_away_absence.sql:170-212` (`clear_schedule_for_departed_employee`)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** The loop selects every cell for the person with no lower date bound and `FOR UPDATE`, one row per day of tenure per status change, multiplied by bulk changes of up to 100 people. Past days need work only when they hold a draft. The in-progress fix (migration 113) copies this body and adds publish work to the same loop.
 **Suggested fix:** Add `AND (c.date >= v_today OR EXISTS (a draft snapshot))` before `FOR UPDATE`; fold it into 113 while that migration is unreleased.
-**Resolution:**
+**Resolution:** Fixed on fix/leaving-grid-publishes-removals (2026-11-02): migration 114 adds the lower bound before `FOR UPDATE`, so a past day is locked only when it holds a draft or has nothing published; the integration test checks a past draft is still cleared and a past published day kept.
 
 ### F-175 [P3] open - Bulk status changes run one person at a time with no time limit
 

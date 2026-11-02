@@ -11,6 +11,8 @@ import {
   describeBulkStatusAction,
   describeEmploymentStatus,
   type BulkStatusPlan,
+  DEFAULT_ORGANIZATION_LABELS,
+  ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
@@ -237,8 +239,8 @@ export function MembersSection({
   isGridmaster,
   isManagementUser,
   departments: departmentItems = [],
-  departmentLabel = "Scheduled Departments",
-  managementDepartmentLabel = "Management Departments",
+  departmentLabel = DEFAULT_ORGANIZATION_LABELS.department,
+  managementDepartmentLabel = ADMINISTRATIVE_TEAM_LABELS.plural,
 }: MembersSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const featureFlags = useClientFeatureFlags();
@@ -1148,7 +1150,7 @@ export function MembersSection({
                     },
                     {
                       value: "management",
-                      label: `Management (${departmentUsers.length})`,
+                      label: `${managementDepartmentLabel} (${departmentUsers.length})`,
                     },
                   ]}
                   onChange={(value) => {
@@ -1520,7 +1522,7 @@ export function MembersSection({
                             setShowManagementInvite(true);
                           }}
                         >
-                          Management staff
+                          Administrative team
                         </MenuItem>
                       </MenuContent>
                     </Menu>
@@ -2126,12 +2128,12 @@ export function MembersSection({
                 title={
                   searchQuery || managementHasActiveFilters
                     ? "No results found"
-                    : "Nobody in management yet"
+                    : "Nobody on an administrative team yet"
                 }
                 description={
                   searchQuery || managementHasActiveFilters
                     ? "Try adjusting your search or filters."
-                    : "People assigned to management will show here."
+                    : "People on an administrative team will show here."
                 }
               />
             ))}
@@ -2293,8 +2295,8 @@ export function MembersSection({
               title={
                 selectedEmployeeDirectoryPerson?.isManagementUser ||
                 selectedEmployeeHasPendingManagementInvite
-                  ? "Edit management access"
-                  : "Add to management"
+                  ? "Edit administrative teams"
+                  : "Add to an administrative team"
               }
               onClose={closeManagementAccessPopup}
               onRequestClose={requestManagementAccessClose}

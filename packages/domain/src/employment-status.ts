@@ -110,7 +110,7 @@ export const RESTORE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can restore a Su
 
 /** Gridmaster's Remove from organization confirmation: it offboards their staff record too (51k). */
 export const REMOVE_FROM_ORGANIZATION_MESSAGE =
-  "They're offboarded there: they lose access now, and their upcoming shifts come off the schedule in the draft. Their staff record stays, and the organization can restore them.";
+  "They're offboarded there: they lose access now, and their upcoming shifts come off the published schedule. Their staff record stays, and the organization can restore them.";
 
 /**
  * Whether this manager may offboard or restore someone with `targetOrgRole`
@@ -446,7 +446,7 @@ function describeSetReturnDate(
       message: "They stay away until someone marks them active.",
       points: changing
         ? [
-            "Any upcoming shifts come off the schedule in the draft.",
+            "Any upcoming shifts come off the published schedule now.",
             "Recurring schedules set up for them are removed.",
           ]
         : [],
@@ -485,7 +485,7 @@ function plannedAwayPoints(
   const from = formatReturnDate(startDate);
   if (!returnDate) {
     return [
-      `Shifts from ${from} on come off the schedule in the draft.`,
+      `Shifts from ${from} on come off the schedule in the draft, and off the published schedule on ${from}.`,
       `Recurring schedules set up for them are removed on ${from}.`,
       `Open requests for days from ${from} are closed.`,
     ];
@@ -518,7 +518,7 @@ function lastDayPoints(lastDay: string, account: boolean): string[] {
   const day = formatReturnDate(lastDay);
   const offboarded = formatReturnDate(plannedFromForLastDay(lastDay));
   return [
-    `Shifts after ${day} come off the schedule in the draft.`,
+    `Shifts after ${day} come off the schedule in the draft, and off the published schedule on ${offboarded}.`,
     `Open requests for days after ${day} are closed.`,
     account
       ? `On ${offboarded} they're offboarded: they can no longer sign in, and recurring schedules set up for them are removed.`
@@ -620,8 +620,9 @@ export function describeStatusAction(
       : plannedStatus === "suspended"
         ? [`The suspension planned from ${formatReturnDate(plannedFrom)} is canceled.`]
         : [`The time away planned from ${formatReturnDate(plannedFrom)} is canceled.`];
+  // Leaving the grid publishes the removals at once (114).
   const leavingSchedule = [
-    "Any upcoming shifts come off the schedule in the draft.",
+    "Any upcoming shifts come off the published schedule now.",
     "Recurring schedules set up for them are removed.",
     "Open requests they're part of are closed.",
   ];

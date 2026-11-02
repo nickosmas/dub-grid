@@ -693,7 +693,7 @@ describe("last day (51g2)", () => {
     expect(copy.title).toBe("Offboard Ana Diaz?");
     expect(copy.message).toBe("They stay Active through Sun, Nov 8, their last day.");
     expect(copy.points).toEqual([
-      "Shifts after Nov 8 come off the schedule in the draft.",
+      "Shifts after Nov 8 come off the schedule in the draft, and off the published schedule on Nov 9.",
       "Open requests for days after Nov 8 are closed.",
       "On Nov 9 they're offboarded: they can no longer sign in, and recurring schedules set up for them are removed.",
     ]);

@@ -34,7 +34,7 @@ import { satisfiesCertificationRequirement } from "@/lib/credential-requirements
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { FirstDayField } from "@/components/staff/FirstDayField";
-import { upcomingFirstDay } from "@dubgrid/domain";
+import { upcomingFirstDay, DEFAULT_ORGANIZATION_LABELS, singularLabelNoun } from "@dubgrid/domain";
 import { CalendarPlus } from "lucide-react";
 import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
@@ -156,7 +156,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       certificationLabel = "Certification",
       roles,
       roleLabel = "Roles",
-      focusAreaLabel = "Focus Areas",
+      focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
       isManagementUser = false,
       hideIdentityFields = false,
       onSave,
@@ -258,7 +258,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         lastName: touched.lastName ? validateRequired(form.lastName, "Last name") : null,
         focusAreaIds:
           touched.focusAreaIds && form.focusAreaIds.length === 0 && !isManagementUser
-            ? `At least one ${focusAreaLabel.toLowerCase()} is required`
+            ? `At least one ${singularLabelNoun(focusAreaLabel)} is required`
             : null,
         email: touched.email ? validateStaffEmail(form.email) : null,
         phone: touched.phone ? validatePhone(form.phone) : null,
@@ -485,7 +485,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const assignmentNotices = useMemo(() => {
       const notices: string[] = [];
       if (isManagementUser && form.focusAreaIds.length === 0) {
-        notices.push("Saving now removes them from the schedule. They'll keep management access.");
+        notices.push(
+          "Saving now removes them from the schedule. They'll stay on their administrative teams.",
+        );
       }
       return notices;
     }, [isManagementUser, form.focusAreaIds.length]);

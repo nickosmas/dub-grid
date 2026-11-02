@@ -21,7 +21,7 @@ import type {
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 import { updateOrganizationInvitationGuarded, updateOrganizationMembershipGuarded } from "./access";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, storedOrganizationLabel } from "@dubgrid/domain";
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
@@ -76,10 +76,10 @@ export async function updateOrganization(org: Organization): Promise<void> {
       address_postal_code: org.addressPostalCode,
       address_country: org.addressCountry,
       phone: org.phone,
-      focus_area_label: org.focusAreaLabel || null,
-      certification_label: org.certificationLabel || null,
-      role_label: org.roleLabel || null,
-      department_label: org.departmentLabel || null,
+      focus_area_label: storedOrganizationLabel("focusArea", org.focusAreaLabel),
+      certification_label: storedOrganizationLabel("certification", org.certificationLabel),
+      role_label: storedOrganizationLabel("role", org.roleLabel),
+      department_label: storedOrganizationLabel("department", org.departmentLabel),
       shift_display_mode: org.shiftDisplayMode || "code",
       timezone: org.timezone || null,
       pay_period_start_date: org.payPeriodStartDate || null,

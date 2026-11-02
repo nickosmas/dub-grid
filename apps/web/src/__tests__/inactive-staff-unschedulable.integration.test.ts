@@ -549,6 +549,9 @@ describe.skipIf(!reachable)("067 leaving clears the future and keeps the past", 
 
   it("clears staff who had already left when the migration runs", async () => {
     await seedLeaver();
+    // With no one credited, today's trigger leaves their removals pending, as
+    // they were before 067 ran; with someone credited it publishes them (114).
+    await db.query(`UPDATE public.employees SET updated_by = NULL WHERE id = $1`, [fx.leaverEmpId]);
     await setStatus(fx.leaverEmpId, "inactive");
 
     await applyMigration();

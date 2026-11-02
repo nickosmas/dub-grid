@@ -267,7 +267,7 @@ function summarizeProfileChange(
     changes.push({ field: "Certification" });
   }
   if (requestedChanges.focusAreaIds !== undefined) {
-    changes.push({ field: "Focus areas" });
+    changes.push({ field: "Areas" });
   }
   if (requestedChanges.roleIds !== undefined) {
     changes.push({ field: "Roles" });

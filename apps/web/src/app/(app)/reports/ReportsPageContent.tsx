@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { capitalizeFirst, pluralLabelNoun } from "@dubgrid/domain";
+import { capitalizeFirst, pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import type { CSSProperties, ReactNode } from "react";
 import { ChevronDown, FileText, FileUp, RefreshCw, Upload, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -377,7 +377,9 @@ function ReportsContent() {
     ],
   );
   const filtersKey = useMemo(() => serializeFilters(reportFilters), [reportFilters]);
-  const focusAreaTerm = pluralLabelNoun(org?.focusAreaLabel || "Focus Areas");
+  const focusAreaTerm = pluralLabelNoun(
+    org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea,
+  );
   const reportOptions = useMemo(
     () =>
       REPORT_OPTIONS.map((option) =>

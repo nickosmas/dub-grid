@@ -44,11 +44,7 @@ import {
   updateProfileAccount,
   updateProfilePhone,
 } from "../../../shared/lib/api";
-import {
-  getDepartmentNames,
-  getScheduledDepartmentNames,
-  MANAGEMENT_DEPARTMENT_LABELS,
-} from "../../../shared/lib/departments";
+import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -75,6 +71,7 @@ import { isRoleCertificationBlocked } from "../lib/role-certification";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 import { getMobileStepUpMethod } from "../lib/step-up";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
@@ -654,11 +651,11 @@ export default function ProfileWorkScreen() {
                       <ProfileNavRow
                         iconName="briefcase-outline"
                         isLast
-                        label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                        label={ADMINISTRATIVE_TEAM_LABELS.plural}
                         value={
                           managementDepartmentNames.length > 0
                             ? managementDepartmentNames.join(", ")
-                            : "Not in management"
+                            : "Not on an administrative team"
                         }
                         onPress={() => setShowManagementAccess(true)}
                       />
@@ -666,7 +663,7 @@ export default function ProfileWorkScreen() {
                       <ProfileInfoRow
                         iconName="briefcase-outline"
                         isLast
-                        label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                        label={ADMINISTRATIVE_TEAM_LABELS.plural}
                         value={managementDepartmentNames.join(", ")}
                       />
                     ) : null}
@@ -786,7 +783,7 @@ function EditPanel({
   // set is a consequence of saving rather than a missing answer.
   const assignmentNotices =
     isManagementUser && draft.focusAreaIds.length === 0
-      ? ["Saving now removes you from the schedule. You'll keep management access."]
+      ? ["Saving now removes you from the schedule. You'll stay on your administrative teams."]
       : [];
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {

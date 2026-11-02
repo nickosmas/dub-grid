@@ -1,6 +1,6 @@
 "use client";
 
-import { pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useState, useCallback } from "react";
 import StepLayout from "../StepLayout";
 import CompositeSection from "./CompositeSection";
@@ -179,7 +179,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
 
       <CompositeSection
         title="Shifts"
-        description={`The shifts worked in each ${singularLabelNoun(org.focusAreaLabel || "Focus Areas")}, such as Day, Evening and Night.`}
+        description={`The shifts worked in each ${singularLabelNoun(org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea)}, such as Day, Evening and Night.`}
       >
         <ShiftCategoriesSettings
           shiftCategories={shiftCategories}
@@ -192,7 +192,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
 
       <CompositeSection
         title="Jobs"
-        description={`Responsibilities such as Supervisor, Mentor or Nurse, placed on the departments, ${pluralLabelNoun(org.focusAreaLabel || "Focus Areas")} and shifts where they apply.`}
+        description={`Responsibilities such as Supervisor, Mentor or Nurse, placed on the departments, ${pluralLabelNoun(org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea)} and shifts where they apply.`}
       >
         <JobsSettings
           jobs={jobs}

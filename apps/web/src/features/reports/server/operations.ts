@@ -1,4 +1,4 @@
-import { singularLabelNoun } from "@dubgrid/domain";
+import { singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { absenceSideOf } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
@@ -371,7 +371,7 @@ export function reportLabelsFor(
   org: Pick<OrganizationRow, "focus_area_label" | "certification_label" | "role_label">,
 ): OperationsReportLabels {
   return {
-    focusArea: org.focus_area_label?.trim() || "Focus Areas",
+    focusArea: org.focus_area_label?.trim() || DEFAULT_ORGANIZATION_LABELS.focusArea,
     certification: org.certification_label?.trim() || "Certifications",
     role: org.role_label?.trim() || "Roles",
   };

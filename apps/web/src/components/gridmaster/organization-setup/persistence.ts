@@ -125,9 +125,7 @@ export async function saveOrganizationSetupConfig({
         focusArea.departmentId == null || !scheduledDepartmentRowIds.has(focusArea.departmentId),
     )
   ) {
-    throw new Error(
-      "Assign each focus area to a scheduled department before saving configuration.",
-    );
+    throw new Error("Assign each area to a department before saving configuration.");
   }
 
   if (
@@ -135,7 +133,7 @@ export async function saveOrganizationSetupConfig({
       (category) => category.focusAreaId == null || !focusAreaRowIds.has(category.focusAreaId),
     )
   ) {
-    throw new Error("Assign each shift to a focus area before saving configuration.");
+    throw new Error("Assign each shift to an area before saving configuration.");
   }
 
   if (
@@ -146,9 +144,7 @@ export async function saveOrganizationSetupConfig({
       return !hasDepartment || !hasFocusArea || !hasShift;
     })
   ) {
-    throw new Error(
-      "Assign each job to a scheduled department, focus area, and shift before saving configuration.",
-    );
+    throw new Error("Assign each job to a department, area and shift before saving configuration.");
   }
 
   if (shiftDisplayMode !== "code") {
@@ -202,7 +198,7 @@ export async function saveOrganizationSetupConfig({
           (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ??
           null,
         name: normalizeLineText(focusArea.name, {
-          label: "Focus area name",
+          label: "Area name",
           maxLength: 80,
           required: true,
           disallowUrl: true,
@@ -212,7 +208,7 @@ export async function saveOrganizationSetupConfig({
       })),
       [],
     );
-    requireAllSaved(upserts, "focus areas").forEach((saved, index) => {
+    requireAllSaved(upserts, "areas").forEach((saved, index) => {
       focusAreaIdMap.set(validFocusAreas[index].id, saved.id);
     });
   }
@@ -367,7 +363,7 @@ export async function createOrganizationEmployees(
   if (validRows.length === 0) return [];
   const firstFocusAreaId = focusAreaIds.values().next().value;
   if (firstFocusAreaId === undefined) {
-    throw new Error("Add a focus area in the setup step before adding staff.");
+    throw new Error("Add an area in the setup step before adding staff.");
   }
 
   const { employees, failed } = await insertEmployees(

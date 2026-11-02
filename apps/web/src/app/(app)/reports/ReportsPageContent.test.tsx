@@ -443,7 +443,7 @@ describe("ReportsPageContent", () => {
 
     await chooseCustomSelect("Report", "Mentoring detail");
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
-    expect(await screen.findByText("Focus area")).toBeInTheDocument();
+    expect(await screen.findByText("Area")).toBeInTheDocument();
     expect(screen.getByText("Caregiver")).toBeInTheDocument();
 
     await selectExportFormat("CSV");
@@ -535,7 +535,7 @@ describe("ReportsPageContent", () => {
     expect(screen.queryByLabelText("Range")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Date range")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /People/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Focus areas/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Areas/ })).toBeInTheDocument();
     expect(screen.queryByText(/ to /)).not.toBeInTheDocument();
   });
 
@@ -579,14 +579,14 @@ describe("ReportsPageContent", () => {
     await chooseCustomSelect("Report", "Coverage");
 
     expect(screen.getByLabelText("Range")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Focus areas/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Areas/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /People/ })).not.toBeInTheDocument();
   });
 
   it("uses matching collapsed and open chrome for people and focus-area targets", async () => {
     renderReports();
 
-    const focusTarget = await screen.findByRole("button", { name: "Focus areas" });
+    const focusTarget = await screen.findByRole("button", { name: "Areas" });
     const peopleTarget = screen.getByRole("button", { name: "People" });
 
     expect(focusTarget).toHaveClass("dg-input");
@@ -596,7 +596,7 @@ describe("ReportsPageContent", () => {
 
     fireEvent.click(focusTarget);
     await waitFor(() => {
-      expect(screen.getAllByText("Focus areas").length).toBeGreaterThan(1);
+      expect(screen.getAllByText("Areas").length).toBeGreaterThan(1);
     });
     expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
   });
@@ -604,7 +604,7 @@ describe("ReportsPageContent", () => {
   it("applies top-level focus area and people targets to refetches and exports", async () => {
     renderReports();
 
-    fireEvent.click(screen.getByRole("button", { name: /Focus areas/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Areas/ }));
     fireEvent.click(await screen.findByLabelText("North"));
 
     fireEvent.click(screen.getByRole("button", { name: /People/ }));
@@ -650,7 +650,7 @@ describe("ReportsPageContent", () => {
     fireEvent.click(await screen.findByLabelText("Avery Ng"));
     expect(screen.getByRole("button", { name: "People" })).toHaveTextContent("1 selected");
 
-    fireEvent.click(screen.getByRole("button", { name: "Focus areas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Areas" }));
     fireEvent.click(await screen.findByLabelText("South"));
 
     expect(screen.getByRole("button", { name: "People" })).toHaveTextContent("All people");

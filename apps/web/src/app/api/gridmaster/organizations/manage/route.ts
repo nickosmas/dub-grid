@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import type { DbOrganization } from "@dubgrid/db-types";
+import { storedOrganizationLabel } from "@dubgrid/domain";
 import {
   createRequestSupabaseClient,
   requireGridmasterSession,
@@ -374,10 +375,13 @@ export async function POST(req: NextRequest) {
               address_country: input.addressCountry,
               phone: input.phone,
               employee_count: null,
-              focus_area_label: input.focusAreaLabel || "Focus Areas",
-              certification_label: input.certificationLabel || "Certifications",
-              role_label: input.roleLabel || "Roles",
-              department_label: "Scheduled Departments",
+              focus_area_label: storedOrganizationLabel("focusArea", input.focusAreaLabel),
+              certification_label: storedOrganizationLabel(
+                "certification",
+                input.certificationLabel,
+              ),
+              role_label: storedOrganizationLabel("role", input.roleLabel),
+              department_label: null,
               shift_display_mode: input.shiftDisplayMode,
               // The column is NOT NULL and defaults to 'UTC'. A gridmaster may
               // leave the time zone to the super admin's own onboarding, so an

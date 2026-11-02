@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { capitalizeFirst, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+  ADMINISTRATIVE_TEAM_LABELS,
+} from "@dubgrid/domain";
 import { Department, FocusArea } from "@/types";
 import { Button } from "@/components/Button";
 import {
@@ -301,12 +307,12 @@ function DepartmentSection({
   onDepartmentsChange: (departments: Department[]) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
 }) {
-  const addLabel =
-    type === "scheduled" ? departmentLabel.replace(/s$/i, "") : "Management Department";
+  const addLabel = type === "scheduled" ? departmentLabel.replace(/s$/i, "") : "Team";
   const emptyTitle =
     type === "scheduled"
       ? `No ${departmentLabel.toLowerCase()} defined yet`
-      : "No management departments defined yet";
+      : `No ${ADMINISTRATIVE_TEAM_LABELS.pluralLower} defined yet`;
+  const itemNoun = type === "scheduled" ? "Department" : "Team";
 
   const isWizardMode = useWizardMode();
 
@@ -357,7 +363,7 @@ function DepartmentSection({
         name:
           department.name.trim().length > 0
             ? getLineTextError(department.name, {
-                label: "Department name",
+                label: `${itemNoun} name`,
                 maxLength: 80,
                 required: true,
                 disallowUrl: true,
@@ -366,12 +372,12 @@ function DepartmentSection({
         abbr:
           department.abbr.trim().length > 0
             ? getCodeError(department.abbr, {
-                label: "Department abbreviation",
+                label: `${itemNoun} abbreviation`,
                 maxLength: 20,
               })
             : null,
       })),
-    [localDepts],
+    [itemNoun, localDepts],
   );
   const focusAreaErrors = useMemo(
     () =>
@@ -539,18 +545,18 @@ function DepartmentSection({
     const cleaned = nonEmpty(localDepts).map((department, index) => ({
       ...department,
       name: normalizeLineText(department.name, {
-        label: "Department name",
+        label: `${itemNoun} name`,
         maxLength: 80,
         required: true,
         disallowUrl: true,
       }),
       abbr:
         normalizeCode(department.abbr, {
-          label: "Department abbreviation",
+          label: `${itemNoun} abbreviation`,
           maxLength: 20,
         }) ||
         normalizeLineText(department.name, {
-          label: "Department name",
+          label: `${itemNoun} name`,
           maxLength: 80,
           required: true,
           disallowUrl: true,
@@ -711,7 +717,7 @@ function DepartmentSection({
 
       onDepartmentsChange(savedDepts);
       if (failedFocusAreaWrites > 0) {
-        lastSaveErrorRef.current = new Error("Some focus areas did not save.");
+        lastSaveErrorRef.current = new Error("Some areas did not save.");
         toast.error(focusAreaFailureMessage(failedFocusAreaWrites, focusAreaWrites));
         return;
       }
@@ -1026,7 +1032,7 @@ function DepartmentSection({
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                         draggable={false}
-                        placeholder="Department name"
+                        placeholder={`${itemNoun} name`}
                         style={{
                           ...fieldStyle,
                           flex: 1,
@@ -1259,7 +1265,7 @@ function DepartmentSection({
             <ConfirmDialog
               icon={Trash2}
               title={`Delete "${deleteConfirm.dept.name}"?`}
-              message={`Nothing uses ${deleteConfirm.dept.name || "this department"}, so it's deleted permanently and no history is lost.`}
+              message={`Nothing uses ${deleteConfirm.dept.name || `this ${itemNoun.toLowerCase()}`}, so it's deleted permanently and no history is lost.`}
               confirmLabel="Delete"
               variant="danger"
               onConfirm={() => {
@@ -1345,8 +1351,8 @@ export default function DepartmentsSettings({
   onFocusAreasChange,
 }: DepartmentsSettingsProps) {
   const canEdit = canManageFocusAreas;
-  const scheduledDepartmentLabel = departmentLabel || "Scheduled Departments";
-  const managementDepartmentLabel = "Management Departments";
+  const scheduledDepartmentLabel = departmentLabel || DEFAULT_ORGANIZATION_LABELS.department;
+  const managementDepartmentLabel = ADMINISTRATIVE_TEAM_LABELS.plural;
 
   const scheduledDepts = departments
     .filter((d) => d.type === "scheduled" && !d.archivedAt)

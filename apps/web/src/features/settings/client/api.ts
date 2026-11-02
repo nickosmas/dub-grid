@@ -216,7 +216,7 @@ export async function fetchFocusAreas(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "We couldn't fetch focus areas. Try again." },
+    { errorMessage: "We couldn't fetch areas. Try again." },
   );
   return body.items;
 }
@@ -265,7 +265,7 @@ export async function saveFocusAreas(
   for (const request of requests) {
     const body = await postSettingsAction<SaveFocusAreasResult>(
       { action: "saveFocusAreas", orgId, ...request },
-      "We couldn't save focus areas. Try again.",
+      "We couldn't save areas. Try again.",
     );
     result.upserts.push(...body.upserts);
     result.deletes.push(...body.deletes);
@@ -282,14 +282,14 @@ export function checkFocusAreaDependencies(
       orgId,
       itemId: String(focusAreaId),
     }),
-    { errorMessage: "We couldn't check focus area dependencies. Try again." },
+    { errorMessage: "We couldn't check area dependencies. Try again." },
   );
 }
 
 export function restoreFocusArea(focusAreaId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreFocusArea", orgId, itemId: focusAreaId },
-    "We couldn't restore focus area. Try again.",
+    "We couldn't restore area. Try again.",
   ).then(() => undefined);
 }
 

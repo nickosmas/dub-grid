@@ -12,10 +12,10 @@ import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SectionNotice } from "./SectionNotice";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
-import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 type Draft = {
   /** Rides along unchanged: the write that takes this draft needs the pair. */
@@ -113,7 +113,7 @@ export function ManagementUserAccessSheet({
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: isPending,
-    body: "Your changes to their management access will be lost.",
+    body: "Your changes to their administrative teams will be lost.",
     onDiscard: () => setDraft(baseline),
     onClose: onDismiss,
   });
@@ -122,8 +122,8 @@ export function ManagementUserAccessSheet({
     draft.managementDepartmentIds.length === 0
       ? [
           managementUser.source === "pending_invite"
-            ? "Saving now revokes their pending management invitation."
-            : "Saving now takes them off the management roster.",
+            ? "Saving now revokes their pending invitation."
+            : "Saving now takes them off every administrative team.",
         ]
       : [];
 
@@ -176,7 +176,7 @@ export function ManagementUserAccessSheet({
           subtitle={
             `${managementUser.firstName} ${managementUser.lastName}`.trim() || managementUser.email
           }
-          title="Edit management access"
+          title="Edit administrative teams"
         />
       }
       scrollable
@@ -195,7 +195,7 @@ export function ManagementUserAccessSheet({
             name: department.name,
             disabled: isPending,
           }))}
-          label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+          label={ADMINISTRATIVE_TEAM_LABELS.plural}
           selectedIds={draft.managementDepartmentIds}
           onToggle={(id) =>
             setDraft((current) => ({

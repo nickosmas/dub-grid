@@ -147,8 +147,8 @@ describe("OrganizationSetupWizard", () => {
   async function saveSetupWithFocusArea(user: ReturnType<typeof userEvent.setup>) {
     await user.type(screen.getByPlaceholderText("e.g. Emergency"), "Nursing");
     await user.type(screen.getByPlaceholderText("e.g. ER"), "NUR");
-    await user.type(screen.getByPlaceholderText("Focus Area name"), "East Wing");
-    await user.click(screen.getAllByRole("button", { name: /select scheduled department/i })[0]!);
+    await user.type(screen.getByPlaceholderText("Area name"), "East Wing");
+    await user.click(screen.getAllByRole("button", { name: /select department/i })[0]!);
     await user.click(screen.getByRole("option", { name: "Nursing" }));
     await user.click(screen.getByRole("button", { name: /^next$/i }));
     await user.click(
@@ -189,7 +189,7 @@ describe("OrganizationSetupWizard", () => {
     await user.click(screen.getByRole("button", { name: /^skip$/i }));
 
     await user.type((await screen.findAllByPlaceholderText("John"))[0]!, "Jane");
-    expect(screen.getByText(/staff need a focus area to be on the schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/staff need an area to be on the schedule/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^create 1 employee$/i })).toBeDisabled();
   }, 15000);
 
@@ -205,7 +205,7 @@ describe("OrganizationSetupWizard", () => {
       "placeholder",
       "Acme Healthcare",
     );
-    expect(screen.getByLabelText(/focus areas label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/areas label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/certifications label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/roles label/i)).toBeInTheDocument();
 
@@ -251,8 +251,8 @@ describe("OrganizationSetupWizard", () => {
       );
 
       await user.click(screen.getByRole("button", { name: /set up now/i }));
-      expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/select department/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/select area/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);
       expect(screen.queryByPlaceholderText("e.g. RN")).not.toBeInTheDocument();
       expect(screen.queryByPlaceholderText("e.g. CN")).not.toBeInTheDocument();

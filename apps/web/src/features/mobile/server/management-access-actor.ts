@@ -35,7 +35,7 @@ export async function requireManagementAccessActor(
   if (!auth.permissions.canManageUsers) {
     return {
       response: NextResponse.json(
-        { error: "You don't have permission to change who's in management." },
+        { error: "You don't have permission to change who's on an administrative team." },
         { status: 403 },
       ),
     };
@@ -52,7 +52,7 @@ export async function requireManagementAccessActor(
   if (loaded.person.status === "removed") {
     return {
       response: NextResponse.json(
-        { error: "Offboarded people can't be given management access." },
+        { error: "Offboarded people can't be added to an administrative team." },
         { status: 400 },
       ),
     };

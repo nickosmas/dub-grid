@@ -256,12 +256,14 @@ test.describe("role variance: interaction contract", () => {
     // panel; a management-only person or pending invite opens the lighter
     // ManagementStaffPanel. Either way, nothing editable for this role.
     await page.getByRole("button", { name: /^On Schedule \(\d+\)$/ }).click();
-    await page.getByRole("option", { name: /^Management \(\d+\)$/ }).click();
-    await expect(page.getByRole("button", { name: /^Management \(\d+\)$/ })).toBeVisible();
+    await page.getByRole("option", { name: /^Administrative Teams \(\d+\)$/ }).click();
+    await expect(
+      page.getByRole("button", { name: /^Administrative Teams \(\d+\)$/ }),
+    ).toBeVisible();
     await expectNoManageControls(page, page);
     await page.locator("tbody tr").first().click();
     const managementPanel = page.getByRole("dialog", {
-      name: /^(Staff detail|Management staff detail)$/,
+      name: /^(Staff detail|Administrative team member detail)$/,
     });
     await expect(managementPanel).toBeVisible({ timeout: 15_000 });
     await expectNoManageControls(page, managementPanel);
