@@ -24,15 +24,15 @@ export function TwoFactorResetEmail({ logoUrl, partial = false }: TwoFactorReset
       <EmailGreeting />
       {partial ? (
         <Text style={styles.paragraph}>
-          DubGrid support removed the authenticator app from your account. Some devices may still be
-          signed in, so sign out of any you don&apos;t recognize. The next time you sign in with
-          your password, you&apos;ll set up an authenticator app again before you continue.
+          We removed the authenticator app from your account. Some devices may still be signed in,
+          so sign out of any you don&apos;t recognize. The next time you sign in with your password,
+          you&apos;ll set up an authenticator app again before you continue.
         </Text>
       ) : (
         <Text style={styles.paragraph}>
-          DubGrid support removed the authenticator app from your account and signed you out
-          everywhere. The next time you sign in with your password, you&apos;ll set up an
-          authenticator app again before you continue.
+          We removed the authenticator app from your account and signed you out everywhere. The next
+          time you sign in with your password, you&apos;ll set up an authenticator app again before
+          you continue.
         </Text>
       )}
       <Text style={styles.paragraph}>

@@ -1404,8 +1404,8 @@ async function dispatchNotificationEventInternal(
         event.targetUserId,
         event.orgId,
         "security_session_revoked" as NotificationType,
-        "DubGrid support signed you out",
-        `DubGrid support ended your sessions${where}. Sign in again to continue. If you weren't expecting this, contact support@dubgrid.com.`,
+        "We signed you out",
+        `We ended your sessions${where}. Sign in again to continue. If you weren't expecting this, contact support@dubgrid.com.`,
         {
           initiatedBy: event.initiatedBy,
           deviceLabel: event.deviceLabel ?? null,

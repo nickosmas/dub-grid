@@ -480,7 +480,7 @@ describe("dispatchNotificationEvent", () => {
       "user-1",
       "org-1",
       "security_session_revoked",
-      "DubGrid support signed you out",
+      "We signed you out",
       expect.stringContaining("If you weren't expecting this, contact support@dubgrid.com."),
       { initiatedBy: "gridmaster", deviceLabel: null },
     );

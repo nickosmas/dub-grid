@@ -81,7 +81,7 @@ const billingSummary: OrganizationBillingSummary = {
       id: "43",
       action: "billing.trial_extended",
       label: "Trial extended",
-      actorLabel: "DubGrid Support",
+      actorLabel: "DubGrid",
       resourceType: "billing",
       resourceId: null,
       details: {},
@@ -157,7 +157,7 @@ describe("BillingSettings", () => {
     expect(within(table).getByText("Subscription canceled.")).toBeInTheDocument();
     expect(within(table).getByText("Payment provider")).toBeInTheDocument();
     expect(within(table).getByText("Free trial extended.")).toBeInTheDocument();
-    expect(within(table).getByText("DubGrid Support")).toBeInTheDocument();
+    expect(within(table).getByText("DubGrid")).toBeInTheDocument();
     expect(within(table).getByText("You")).toBeInTheDocument();
     expect(screen.queryByText(/Olivia/)).not.toBeInTheDocument();
     expect(screen.queryByText("sub_123")).not.toBeInTheDocument();
@@ -268,7 +268,7 @@ describe("BillingSettings", () => {
     expect(await screen.findByText("Suspended")).toBeInTheDocument();
     expect(screen.getByText("Your organization is suspended.")).toBeInTheDocument();
     expect(
-      screen.getByText("Contact DubGrid Support to find out why and what happens next."),
+      screen.getByText("Contact us to find out why and what happens next."),
     ).toBeInTheDocument();
   });
 
@@ -281,7 +281,7 @@ describe("BillingSettings", () => {
           id: "50",
           action: "billing.paused",
           label: "Billing paused",
-          actorLabel: "DubGrid Support",
+          actorLabel: "DubGrid",
           resourceType: "organization",
           resourceId: null,
           details: {},
@@ -308,7 +308,7 @@ describe("BillingSettings", () => {
     expect(screen.getByText("They don't count down while billing is paused.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start subscription" })).not.toBeInTheDocument();
     const row = screen.getAllByText("Billing paused.").find((node) => node.closest("tr"));
-    expect(row?.closest("tr")).toHaveTextContent("DubGrid Support");
+    expect(row?.closest("tr")).toHaveTextContent("DubGrid");
   });
 
   it("tells an admin who tries to subscribe twice to use Manage billing", async () => {
@@ -354,7 +354,7 @@ describe("BillingSettings", () => {
 
     expect(
       await screen.findByText(
-        "2 seats in use aren't paid for yet. DubGrid Support updates your paid seats to match the seats in use, and the change is prorated on your next invoice.",
+        "2 seats in use aren't paid for yet. We update your paid seats to match the seats in use, and the change is prorated on your next invoice.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage billing" })).toBeInTheDocument();
@@ -371,9 +371,7 @@ describe("BillingSettings", () => {
     renderBillingSettings();
 
     expect(
-      await screen.findByText(
-        "Online billing isn't set up here. Contact DubGrid Support to subscribe.",
-      ),
+      await screen.findByText("Online billing isn't set up here. Contact us to subscribe."),
     ).toBeInTheDocument();
   });
 });
