@@ -88,7 +88,9 @@ describe("settings help cleanup", () => {
 
     expect(screen.queryByText("How custom labels work")).not.toBeInTheDocument();
     expect(
-      screen.getByText("e.g. Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations"),
+      screen.getByText(
+        "e.g. Schedule Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(

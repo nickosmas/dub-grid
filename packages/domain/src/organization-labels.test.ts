@@ -10,7 +10,7 @@ import {
 
 describe("organization label defaults", () => {
   it("reads the product default when nothing is stored", () => {
-    expect(resolveOrganizationLabel("focusArea", null)).toBe("Areas");
+    expect(resolveOrganizationLabel("focusArea", null)).toBe("Schedule Areas");
     expect(resolveOrganizationLabel("department", undefined)).toBe("Departments");
     expect(resolveOrganizationLabel("certification", "  ")).toBe("Certifications");
     expect(resolveOrganizationLabel("role", "")).toBe(DEFAULT_ORGANIZATION_LABELS.role);
@@ -30,8 +30,8 @@ describe("storing a submitted label", () => {
   });
 
   it("stores nothing for the current default, in any case", () => {
-    expect(storedOrganizationLabel("focusArea", "Areas")).toBeNull();
-    expect(storedOrganizationLabel("focusArea", " areas ")).toBeNull();
+    expect(storedOrganizationLabel("focusArea", "Schedule Areas")).toBeNull();
+    expect(storedOrganizationLabel("focusArea", " schedule areas ")).toBeNull();
     expect(storedOrganizationLabel("department", "Departments")).toBeNull();
     expect(storedOrganizationLabel("certification", "Certifications")).toBeNull();
     expect(storedOrganizationLabel("role", "ROLES")).toBeNull();
@@ -44,6 +44,7 @@ describe("storing a submitted label", () => {
 
   it("keeps an earlier default someone types on purpose", () => {
     expect(storedOrganizationLabel("focusArea", "Focus Areas")).toBe("Focus Areas");
+    expect(storedOrganizationLabel("focusArea", "Areas")).toBe("Areas");
     expect(storedOrganizationLabel("department", "Scheduled Departments")).toBe(
       "Scheduled Departments",
     );
@@ -63,7 +64,7 @@ describe("administrative team labels", () => {
 describe("label example hints", () => {
   it("lists each label's examples after e.g.", () => {
     expect(organizationLabelHint("focusArea")).toBe(
-      "e.g. Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations",
+      "e.g. Schedule Areas, Units, Wings, Halls, Floors, Neighborhoods, Locations",
     );
     expect(organizationLabelHint("certification")).toBe(
       "e.g. Certifications, Credentials, Licenses, Qualifications, Designations, Skill Levels, Training",

@@ -149,7 +149,17 @@ function csvField(value: string): string {
 
 /** The same rows as a CSV file's text, with a header row. */
 export function shiftRecordsToCsv(records: readonly ShiftRecord[]): string {
-  const header = ["Date", "Shift", "Job", "Time", "Area", "Hours", "State", "Was", "Absence"];
+  const header = [
+    "Date",
+    "Shift",
+    "Job",
+    "Time",
+    "Schedule area",
+    "Hours",
+    "State",
+    "Was",
+    "Absence",
+  ];
   const rows = records.map((record) => [
     record.date,
     record.shifts.map((shift) => shift.name).join(" / "),

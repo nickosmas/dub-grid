@@ -57,7 +57,7 @@ const CHANGE_LABELS: Record<string, string> = {
   lastName: "Last name",
   employmentType: "Employment",
   certificationId: "Certification",
-  focusAreaIds: "Areas",
+  focusAreaIds: "Schedule areas",
   roleIds: "Roles",
   departmentIds: "Departments",
 };

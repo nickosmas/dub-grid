@@ -202,7 +202,7 @@ export async function PUT(req: NextRequest) {
     ...(fields.focusAreaLabel !== undefined
       ? {
           focusAreaLabel: getLineTextError(fields.focusAreaLabel, {
-            label: "Area label",
+            label: "Schedule area label",
             maxLength: 50,
             required: true,
           }),
@@ -338,7 +338,7 @@ export async function PUT(req: NextRequest) {
       focusAreaLabel:
         fields.focusAreaLabel !== undefined
           ? normalizeLineText(fields.focusAreaLabel, {
-              label: "Area label",
+              label: "Schedule area label",
               maxLength: 50,
               required: true,
             })

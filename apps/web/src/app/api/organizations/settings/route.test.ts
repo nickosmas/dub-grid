@@ -487,7 +487,11 @@ describe("PUT /api/organizations/settings", () => {
     it("stores nothing when a label is changed to the default", async () => {
       const response = await saveLabels(
         { focus_area_label: "Wings", certification_label: "Training", role_label: "Jobs" },
-        { focusAreaLabel: "Areas", certificationLabel: "Certifications", roleLabel: "Roles" },
+        {
+          focusAreaLabel: "Schedule Areas",
+          certificationLabel: "Certifications",
+          roleLabel: "Roles",
+        },
       );
 
       expect(response.status).toBe(200);

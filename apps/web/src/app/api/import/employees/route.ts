@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
           else
             errors.push({
               row: originalIndex + 1,
-              error: `"${name}" doesn't match any area in your organization.`,
+              error: `"${name}" doesn't match any schedule area in your organization.`,
             });
         }
       }

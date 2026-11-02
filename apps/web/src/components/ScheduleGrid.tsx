@@ -1694,7 +1694,7 @@ const SectionBlock = memo(function SectionBlock({
         >
           {sectionName}
         </div>
-        <EmptyState size="inline" title="No staff assigned to this area." />
+        <EmptyState size="inline" title="No staff assigned to this schedule area." />
       </div>
     );
   }

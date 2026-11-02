@@ -433,7 +433,7 @@ describe("POST /api/employees/manage", () => {
 
       expect(response.status).toBe(400);
       const payload = await response.json();
-      expect(payload.fieldErrors.focusAreaIds).toBe("Select at least one area");
+      expect(payload.fieldErrors.focusAreaIds).toBe("Select at least one schedule area");
     });
 
     it("allows clearing focus areas for an employee who also holds management access", async () => {
