@@ -3,7 +3,7 @@
 ## Departments, Areas and Administrative Teams
 
 **Type:** Fix
-**Status:** in progress
+**Status:** verified
 **Branch:** `claude/departments-areas-administrative-teams` (cloud session; merges into `dev` by pull request)
 
 ## The problem
