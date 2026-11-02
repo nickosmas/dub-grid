@@ -102,7 +102,7 @@ test.describe("gridmaster portal states", () => {
       ["Configuration", (c) => c.getByText("Short code")],
       ["Activity", (c) => c.getByRole("heading", { name: "Organization Activity" })],
       ["Invitations", (c) => c.getByText("Expires")],
-      ["Schedule", (c) => c.getByText(/No shifts found|^Area$/)],
+      ["Schedule", (c) => c.getByText(/No shifts found|^Schedule area$/)],
     ];
     for (const [name, marker] of tabs) {
       await content.getByRole("tab", { name, exact: true }).click();

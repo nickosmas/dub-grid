@@ -242,7 +242,7 @@ describe("saveOrganizationSetupConfig", () => {
           },
         ],
       }),
-    ).rejects.toThrow("Assign each area to a department");
+    ).rejects.toThrow("Assign each schedule area to a department");
 
     expect(saveDepartments).not.toHaveBeenCalled();
     expect(saveFocusAreas).not.toHaveBeenCalled();

@@ -145,7 +145,7 @@ describe("shiftRecordsToCsv", () => {
   it("writes a header and one escaped row per record", () => {
     const records = buildShiftRecords("emp", { "emp_2026-10-02": cell({}) }, RANGE, lookups);
     expect(shiftRecordsToCsv(records).split("\r\n")).toEqual([
-      "Date,Shift,Job,Time,Area,Hours,State,Was,Absence",
+      "Date,Shift,Job,Time,Schedule area,Hours,State,Was,Absence",
       "2026-10-02,Day Shift,Day Shift Supervisor,7:00 AM - 3:00 PM,Skilled Nursing,8,Published,,",
     ]);
   });

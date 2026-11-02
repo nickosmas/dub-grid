@@ -1088,7 +1088,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
   },
 
   // ── Setup: single records ──────────────────────────────────────────────────
-  ...configRecordSpecs("focus_area", "area"),
+  ...configRecordSpecs("focus_area", "schedule area"),
   ...configRecordSpecs("assignment", "schedule option"),
   ...configRecordSpecs("absence_type", "absence type"),
   ...configRecordSpecs("shift_category", "shift"),
@@ -1831,7 +1831,7 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   data_export: "Data export",
   department: "Department",
   employee: "Team member",
-  focus_area: "Area",
+  focus_area: "Schedule area",
   impersonation_session: "Viewing session",
   indicator_type: "Schedule note",
   invitation: "Invitation",

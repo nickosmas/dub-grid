@@ -862,7 +862,7 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
     expect(screen.queryByText("App access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status")).not.toBeInTheDocument();
-    expect(screen.getByText("Area")).toBeInTheDocument();
+    expect(screen.getByText("Schedule area")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
     expect(screen.getByText("Sort by")).toBeInTheDocument();
   });
@@ -1332,7 +1332,7 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
-    expect(screen.getByText("Area")).toBeInTheDocument();
+    expect(screen.getByText("Schedule area")).toBeInTheDocument();
     // Access role is the one control both halves share, so the roster-only
     // sections are what prove the staff sheet is showing.
     expect(screen.queryByText("Administrative team")).not.toBeInTheDocument();
@@ -1340,7 +1340,7 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByText("Administrative Teams"));
 
-    expect(screen.queryByText("Area")).not.toBeInTheDocument();
+    expect(screen.queryByText("Schedule area")).not.toBeInTheDocument();
     expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
     expect(screen.getByText("Administrative team")).toBeInTheDocument();
     expect(screen.getByText("Invitation")).toBeInTheDocument();

@@ -1,6 +1,6 @@
 /** What each configurable organization label reads when the organization hasn't chosen one. */
 export const DEFAULT_ORGANIZATION_LABELS = {
-  focusArea: "Areas",
+  focusArea: "Schedule Areas",
   department: "Departments",
   certification: "Certifications",
   role: "Roles",
@@ -42,7 +42,7 @@ export const ADMINISTRATIVE_TEAM_LABELS = {
 
 /** Examples shown under each editable label's field. The first is the default. */
 export const ORGANIZATION_LABEL_EXAMPLES = {
-  focusArea: ["Areas", "Units", "Wings", "Halls", "Floors", "Neighborhoods", "Locations"],
+  focusArea: ["Schedule Areas", "Units", "Wings", "Halls", "Floors", "Neighborhoods", "Locations"],
   certification: [
     "Certifications",
     "Credentials",

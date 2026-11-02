@@ -648,7 +648,7 @@ describe("assignable shift resolution", () => {
           certificationNames: new Map([[2, "CSN II"]]),
         },
       ),
-    ).toEqual(["the North area", "the Supervisor role", "CSN II certification"]);
+    ).toEqual(["the North schedule area", "the Supervisor role", "CSN II certification"]);
   });
 
   it("ignores cosmetic roles when evaluating job eligibility", () => {
@@ -690,10 +690,10 @@ describe("assignable shift resolution", () => {
       formatShiftAssignmentDisqualificationMessage({
         employeeName: "Nancy Thornton",
         assignmentLabel: "E · SUPV",
-        reasons: ["the Emergency area", "the Supervisor role"],
+        reasons: ["the Emergency schedule area", "the Supervisor role"],
       }),
     ).toBe(
-      "Nancy Thornton can't take E · SUPV because this assignment requires the Emergency area and the Supervisor role.",
+      "Nancy Thornton can't take E · SUPV because this assignment requires the Emergency schedule area and the Supervisor role.",
     );
 
     expect(

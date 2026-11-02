@@ -129,7 +129,7 @@ export function ConfigTab({
             <table style={gmTableStyle}>
               <thead>
                 <tr>
-                  {["Shift", "Short code", "Times", "Area"].map((h) => (
+                  {["Shift", "Short code", "Times", "Schedule area"].map((h) => (
                     <th
                       key={h}
                       style={{

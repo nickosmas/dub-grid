@@ -2410,7 +2410,7 @@ export async function POST(req: NextRequest) {
         if (failures.length > 0) {
           logger.error(
             { action: data.action, orgId: data.orgId, failed: failures.length, error: failures[0] },
-            "Some areas did not save",
+            "Some schedule areas did not save",
           );
         }
 

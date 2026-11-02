@@ -138,7 +138,7 @@ export function buildNavGroups(
         label: "Labels",
         Icon: LabelsIcon,
         description:
-          "Customize the terminology used in your organization. For example, rename 'Areas' to 'Wings' or 'Units'.",
+          "Customize the terminology used in your organization. For example, rename 'Schedule Areas' to 'Wings' or 'Units'.",
       });
     if (generalItems.length > 0)
       groups.push({ id: "general", label: "General", items: generalItems });
