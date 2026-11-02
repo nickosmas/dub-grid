@@ -128,7 +128,7 @@ import {
 } from "../lib/scheduleScreenChips";
 
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
-import { Button } from "../../../shared/components/Button";
+import { ChromeTextButton } from "../../../shared/components/ChromeTextButton";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -1309,13 +1309,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
-          <Button
-            fullWidth={false}
-            label="Today"
-            onPress={handleGoToToday}
-            size="sm"
-            tone="secondary"
-          />
+          <ChromeTextButton label="Today" onPress={handleGoToToday} />
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
         </View>
       </View>
