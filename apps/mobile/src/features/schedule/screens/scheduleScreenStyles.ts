@@ -945,17 +945,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     dateHighlightOutsideMonth: {
       opacity: 0.4,
     },
+    // Dates read in Inter's regular weight, as Calendar's do; only the
+    // selected day and today step up (owner, 2026-11-02).
     dateHighlightText: {
-      ...mobileTextWeighted("rowTitle", "bold"),
+      ...mobileTextWeighted("rowTitle", "regular"),
       color: mobileColors.textPrimary,
     },
     dateHighlightTextSelected: {
+      ...mobileTextWeighted("rowTitle", "semibold"),
       color: mobileColors.textInverse,
     },
     dateHighlightTextToday: {
+      ...mobileTextWeighted("rowTitle", "semibold"),
       color: mobileColors.brand,
     },
     dateHighlightTextTodaySelected: {
+      ...mobileTextWeighted("rowTitle", "semibold"),
       color: mobileColors.textInverse,
     },
     alertBadge: {

@@ -15,6 +15,8 @@ The owner prefers Inter's own proportional figures (2026-11-02).
 - Every `mobileTabularText` spread and the two tab strips' own
   `fontVariant: ["tabular-nums"]` are removed (19 files), and so is the
   `mobileTabularText` token.
+- The calendar's dates are Inter regular, not bold; the selected day and
+  today are semibold (owner, 2026-11-02).
 - `typography-contract.test.ts` now fails if any app file sets
   `tabular-nums`, in place of the test that required it.
 - The coding standards, `apps/mobile/AGENTS.md` and the project overview
