@@ -549,7 +549,7 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByText("Management"));
     fireEvent.click(screen.getByText("Done"));
     fireEvent.click(screen.getByText("Jo Park"));
-    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access role" }));
     // The role sheet is presented only once the actions sheet has finished
     // leaving: iOS refuses a present that overlaps a dismiss.
     fireEvent.click(await screen.findByText("Super Admin"));
@@ -617,7 +617,7 @@ describe("PeopleScreen", () => {
     // The chooser leaves first, then the form is presented: iOS refuses a
     // present that overlaps a dismiss.
     expect(await screen.findByText("Invite management user")).toBeInTheDocument();
-    // Access levels are the described list, and an admin cannot hand out Super Admin.
+    // Access roles are the described list, and an admin cannot hand out Super Admin.
     expect(
       screen.getByText("Manages the schedule and staff, within their permissions."),
     ).toBeInTheDocument();
@@ -1253,7 +1253,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText(`Starts ${formatReturnDate(firstDay)}`)).toBeInTheDocument();
   });
 
-  it("filters admins out of the staff directory by access level", () => {
+  it("filters admins out of the staff directory by access role", () => {
     useQuery.mockReturnValue({
       data: {
         people: [
@@ -1282,7 +1282,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
-  it("can sort the staff directory by access level", () => {
+  it("can sort the staff directory by access role", () => {
     useQuery.mockReturnValue({
       data: {
         people: [
@@ -1315,7 +1315,7 @@ describe("PeopleScreen", () => {
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     // Twice on this tab too: the section of access-level filters, then the
     // sort by it.
-    fireEvent.click(screen.getAllByText("Access level")[1]);
+    fireEvent.click(screen.getAllByText("Access role")[1]);
 
     const minaRow = screen.getByText("Mina Diaz");
     const juneRow = screen.getByText("June Patel");
@@ -1333,7 +1333,7 @@ describe("PeopleScreen", () => {
 
     fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
     expect(screen.getByText("Focus area")).toBeInTheDocument();
-    // Access level is the one control both halves share, so the roster-only
+    // Access role is the one control both halves share, so the roster-only
     // sections are what prove the staff sheet is showing.
     expect(screen.queryByText("Management department")).not.toBeInTheDocument();
     expect(screen.queryByText("Invitation")).not.toBeInTheDocument();
@@ -1345,10 +1345,10 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Management department")).toBeInTheDocument();
     expect(screen.getByText("Invitation")).toBeInTheDocument();
     // Twice: the section of access-level filters, and the sort by it.
-    expect(screen.getAllByText("Access level")).toHaveLength(2);
+    expect(screen.getAllByText("Access role")).toHaveLength(2);
   });
 
-  it("filters the management roster by access level", () => {
+  it("filters the management roster by access role", () => {
     mockManagementRoster();
 
     render(<PeopleScreen />);

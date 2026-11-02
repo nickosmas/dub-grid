@@ -70,7 +70,7 @@ describe("PermissionsEditor", () => {
     );
   });
 
-  it("counts the access levels on screen rather than the stored keys", async () => {
+  it("counts the access roles on screen rather than the stored keys", async () => {
     const user = userEvent.setup();
     renderEditor({ showPermissionCounter: true });
 

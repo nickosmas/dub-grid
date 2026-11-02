@@ -1153,7 +1153,7 @@ export const mobilePersonStatusUpdateResponseSchema = z.object({
 
 export const mobilePersonInvitationCreateBodySchema = z.object({
   email: z.string().trim().email(),
-  /** The access level the invite grants; Super Admin only from a Super Admin. */
+  /** The access role the invite grants; Super Admin only from a Super Admin. */
   orgRole: mobileRoleSchema.default("user"),
   linkExistingAccount: z.boolean().optional(),
   reconcileName: z.boolean().optional(),

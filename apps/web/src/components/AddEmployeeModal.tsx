@@ -672,10 +672,10 @@ export default function AddEmployeeModal({
                       {canInviteRow(row, idx) && row.invite ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
-                            Access level
+                            Access role
                           </span>
                           <CustomSelect
-                            ariaLabel="Access level"
+                            ariaLabel="Access role"
                             value={row.role}
                             options={roleOptions}
                             onChange={(role) => updateRow(row._id, { role })}

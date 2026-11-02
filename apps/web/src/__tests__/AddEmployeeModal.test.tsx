@@ -229,7 +229,7 @@ describe("AddEmployeeModal", () => {
       );
     }
 
-    it("invites only the people ticked, each with their access level", async () => {
+    it("invites only the people ticked, each with their access role", async () => {
       const { onAdd } = renderModal();
       const firstNames = getFirstNameInputs();
       const lastNames = getLastNameInputs();
@@ -247,7 +247,7 @@ describe("AddEmployeeModal", () => {
       expect(screen.getByRole("checkbox", { name: "Add an email to invite" })).toBeDisabled();
       await userEvent.click(inviteBoxes[1]!);
 
-      await userEvent.click(screen.getByRole("button", { name: "Access level" }));
+      await userEvent.click(screen.getByRole("button", { name: "Access role" }));
       await userEvent.click(screen.getByRole("option", { name: "Admin" }));
       // Super Admin is offered only by someone who holds it.
       expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();

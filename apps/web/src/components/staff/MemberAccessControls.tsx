@@ -119,7 +119,7 @@ export function MemberAccessControls({
               title={
                 pendingInvitationEmail
                   ? `Change the invitation for ${pendingInvitationEmail} to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
-                  : `Change their access level to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
+                  : `Change their access role to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
               }
               message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
               summary={
@@ -132,7 +132,7 @@ export function MemberAccessControls({
                     }
                   : undefined
               }
-              confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access level"}
+              confirmLabel={pendingInvitationEmail ? "Change and resend" : "Change access role"}
               variant="warning"
               onCancel={() => setPendingRole(null)}
               // Awaited rather than fired into a `void` IIFE: the dialog stays
@@ -153,14 +153,14 @@ export function MemberAccessControls({
                   toast.success(
                     pendingInvitationEmail
                       ? `Invitation replaced with ${ROLE_LABELS[next] ?? next} access.`
-                      : `Access level changed to ${ROLE_LABELS[next] ?? next}.`,
+                      : `Access role changed to ${ROLE_LABELS[next] ?? next}.`,
                   );
                   setPendingRole(null);
                 } catch (error) {
                   toast.error(
                     formatClientErrorMessage(
                       error,
-                      "We couldn't change their access level. Try again.",
+                      "We couldn't change their access role. Try again.",
                     ),
                   );
                 } finally {

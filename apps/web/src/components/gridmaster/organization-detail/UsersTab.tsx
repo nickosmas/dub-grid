@@ -124,7 +124,7 @@ export function UsersTab({
         );
       });
       if (!completed) return;
-      toast.success("Access level updated");
+      toast.success("Access role updated");
       setRoleChangeConfirm(null);
       onUsersChanged();
     } catch (err: unknown) {
@@ -133,7 +133,7 @@ export function UsersTab({
         onUsersChanged();
       } else {
         toast.error(
-          formatClientErrorMessage(err, "We couldn't change their access level. Try again."),
+          formatClientErrorMessage(err, "We couldn't change their access role. Try again."),
         );
       }
     } finally {
@@ -546,7 +546,7 @@ export function UsersTab({
       {roleChangeConfirm && !stepUp.dialog && (
         <ConfirmDialog
           title={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
-          confirmLabel="Change access level"
+          confirmLabel="Change access role"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
           onConfirm={handleConfirmRoleChange}

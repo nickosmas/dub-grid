@@ -62,10 +62,10 @@ describe("InlineRoleSelect self-guard", () => {
 
     fireEvent.click(screen.getByRole("button", { expanded: false }));
     fireEvent.click(screen.getByRole("option", { name: "Admin" }));
-    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access role" }));
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Change access level" })).toBeNull(),
+      expect(screen.queryByRole("button", { name: "Change access role" })).toBeNull(),
     );
     expect(stepUpRun).toHaveBeenCalledOnce();
     expect(onChange).not.toHaveBeenCalled();

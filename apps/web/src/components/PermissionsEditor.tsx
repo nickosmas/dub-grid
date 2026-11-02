@@ -104,7 +104,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     id: "staff",
     title: "Staff",
     description: (labels) =>
-      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add and invite people, change their status, and set their access level.`,
+      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add and invite people, change their status, and set their access role.`,
     icon: "users",
     category: "CORE",
     viewKeys: ["canViewEmployeeDetails"],
@@ -535,7 +535,7 @@ export default function PermissionsEditor({
     setReviewConfig(nextReview);
   }
 
-  // Counts what the screen shows (one access level per switch) rather than
+  // Counts what the screen shows (one access role per switch) rather than
   // the stored keys behind it, which is what the old counter did.
   const levelCount = PERMISSION_MODULES.reduce(
     (acc, mod) => {

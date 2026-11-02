@@ -3,7 +3,7 @@ import { ORG_ROLE_LABELS } from "../lib/orgRoleBadges";
 import { ORG_ROLE_OPTIONS, type OrgRole } from "./OrgRoleSheet";
 
 /**
- * The access level as the same described radio list `OrgRoleSheet` shows,
+ * The access role as the same described radio list `OrgRoleSheet` shows,
  * for the sheets that grant a role as part of an invitation. Super Admin is
  * offered only by someone who holds it, as on web.
  */
@@ -11,7 +11,7 @@ export function OrgRoleChoice({
   value,
   canGrantSuperAdmin,
   disabled = false,
-  label = "Access level",
+  label = "Access role",
   onChange,
 }: {
   value: OrgRole;

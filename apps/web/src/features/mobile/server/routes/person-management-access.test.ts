@@ -429,7 +429,7 @@ describe("mobile person management-access route", () => {
     );
   });
 
-  it("replaces a pre-existing invitation when its access level changes", async () => {
+  it("replaces a pre-existing invitation when its access role changes", async () => {
     loadMobilePersonWithAccess.mockResolvedValue({
       person: makePerson({
         pendingInvitation: {

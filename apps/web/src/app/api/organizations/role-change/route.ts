@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       }
       return apiErrorResponse(
         result.error,
-        "We couldn't change their access level. Try again.",
+        "We couldn't change their access role. Try again.",
         400,
       );
     }

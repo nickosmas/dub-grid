@@ -99,12 +99,12 @@ describe("PersonMembershipActions", () => {
   it("changes the role in the card's organization through step-up", async () => {
     const { onChanged } = renderActions();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access role" }));
     fireEvent.click(
       within(
-        screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
+        screen.getByRole("alertdialog", { name: /^Change this person's access role in / }),
       ).getByRole("button", {
-        name: "Change access level",
+        name: "Change access role",
       }),
     );
 
@@ -130,12 +130,12 @@ describe("PersonMembershipActions", () => {
     stepUpRun.mockResolvedValueOnce(false);
     const { onChanged } = renderActions();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change access level" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change access role" }));
     fireEvent.click(
       within(
-        screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
+        screen.getByRole("alertdialog", { name: /^Change this person's access role in / }),
       ).getByRole("button", {
-        name: "Change access level",
+        name: "Change access role",
       }),
     );
 
@@ -143,7 +143,7 @@ describe("PersonMembershipActions", () => {
     expect(updateOrganizationMembershipGuarded).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("alertdialog", { name: /^Change this person's access level in / }),
+      screen.getByRole("alertdialog", { name: /^Change this person's access role in / }),
     ).toBeInTheDocument();
   });
 
@@ -261,7 +261,7 @@ describe("PersonMembershipActions", () => {
     unmount();
 
     renderActions(organization({ orgRole: "user", adminPermissions: null }));
-    expect(screen.getByRole("button", { name: "Change access level" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change access role" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit permissions" })).not.toBeInTheDocument();
   });
 });
