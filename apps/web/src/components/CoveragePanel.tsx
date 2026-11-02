@@ -2,7 +2,7 @@
 import { ChevronLeft, History } from "lucide-react";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { createPortal } from "react-dom";
 import {
   parseLocalDateKey,
@@ -174,7 +174,7 @@ export default function CoveragePanel({
   canEditShifts,
   hasRequirements,
   todayKey,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   getCellFill,
   describeCellChanges,
   onFillSpot,

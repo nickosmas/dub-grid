@@ -13,7 +13,7 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import type { NamedItem } from "@/types";
-import { indefiniteArticle } from "@dubgrid/domain";
+import { indefiniteArticle, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useWizardEditorCollector } from "../WizardModeContext";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -91,7 +91,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
   const deptLabel = org.departmentLabel || "Departments";
   const roleNoun = roleLabel.toLowerCase().replace(/s$/, "");
   const certNoun = certLabel.toLowerCase().replace(/s$/, "");
-  const focusLabel = org.focusAreaLabel || "Focus Areas";
+  const focusLabel = org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea;
 
   return (
     <StepLayout
@@ -106,7 +106,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
       <Provider>
         <CompositeSection
           title={`${deptLabel} & ${focusLabel}`}
-          description={`${deptLabel} appear on the schedule grid. ${focusLabel} live inside them. Management departments are for non-schedule staff like HR or admin.`}
+          description={`${deptLabel} appear on the schedule grid. ${focusLabel} live inside them. Administrative Teams are for people who aren't scheduled, such as HR or Reception.`}
         >
           <DepartmentsSettings
             departments={departments}

@@ -165,7 +165,11 @@ import {
 import { planRecurringFills } from "./_lib/recurring-fills";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
-import { CORRECTION_ADMIN_WINDOW_DAYS, singularLabelNoun } from "@dubgrid/domain";
+import {
+  CORRECTION_ADMIN_WINDOW_DAYS,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
 import {
@@ -2994,7 +2998,7 @@ function SchedulerContent({
     () => [
       {
         id: "all",
-        label: "All " + (org?.focusAreaLabel || "Focus Areas"),
+        label: "All " + (org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea),
         active: activeFocusArea === null,
         onClick: () => setActiveFocusArea(null),
       },
@@ -6867,7 +6871,7 @@ function SchedulerContent({
             if (openShift.source === "coverage_gap" && currentEmployee) {
               if (!currentEmployee.focusAreaIds.includes(openShift.focusAreaId)) {
                 toast.error(
-                  `You aren't assigned to the ${singularLabelNoun(org?.focusAreaLabel || "Focus Areas")} this shift is in.`,
+                  `You aren't assigned to the ${singularLabelNoun(org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea)} this shift is in.`,
                 );
                 return;
               }
@@ -7998,7 +8002,7 @@ function SchedulerContent({
           if (framesLeft-- > 0) window.requestAnimationFrame(reveal);
           else
             toast.info(
-              `No one in that ${singularLabelNoun(org?.focusAreaLabel || "Focus Areas")} is on the grid to show.`,
+              `No one in that ${singularLabelNoun(org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea)} is on the grid to show.`,
             );
           return;
         }

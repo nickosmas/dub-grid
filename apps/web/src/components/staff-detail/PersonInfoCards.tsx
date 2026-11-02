@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { describePlannedChangeInFull, formatFirstDay, plannedReturn } from "@dubgrid/domain";
+import {
+  ADMINISTRATIVE_TEAM_LABELS,
+  describePlannedChangeInFull,
+  formatFirstDay,
+  plannedReturn,
+} from "@dubgrid/domain";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateTimeLabel } from "@/lib/client-facing";
@@ -82,7 +87,7 @@ export function WorkCard({
   focusAreas,
   certifications,
   roles,
-  focusAreaLabel = "Focus areas",
+  focusAreaLabel = "Areas",
   certificationLabel = "Certification",
   roleLabel = "Roles",
   showScheduleDetails,
@@ -173,7 +178,7 @@ export function AccessCard({
           </InfoField>
         ) : null}
         {managedDepartments ? (
-          <InfoField label="Manages">
+          <InfoField label={ADMINISTRATIVE_TEAM_LABELS.plural}>
             <span className="inline-flex flex-wrap items-baseline gap-x-2">
               {managedDepartments.length > 0 ? (
                 managedDepartments.join(", ")
@@ -185,7 +190,7 @@ export function AccessCard({
                   type="button"
                   onClick={onEditManagement}
                   className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[var(--dg-color-link)] hover:underline"
-                  aria-label="Edit management access"
+                  aria-label="Edit administrative teams"
                 >
                   Edit
                 </button>

@@ -582,9 +582,7 @@ export function getAssignableShiftDisqualificationReasons(
 
   if (input.shift?.focusAreaId && !emp.focusAreaIds.includes(input.shift.focusAreaId)) {
     const focusAreaName = input.focusAreaNames?.get(input.shift.focusAreaId)?.trim() ?? "";
-    reasons.push(
-      focusAreaName.length > 0 ? `the ${focusAreaName} focus area` : "the required focus area",
-    );
+    reasons.push(focusAreaName.length > 0 ? `the ${focusAreaName} area` : "the required area");
   }
 
   const eligibleRoleIds = getScheduleEligibleRoleIds(input.job, input.orgRoles);

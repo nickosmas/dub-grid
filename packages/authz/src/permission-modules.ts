@@ -1,4 +1,4 @@
-import type { AdminPermissions } from "@dubgrid/domain";
+import { DEFAULT_ORGANIZATION_LABELS, type AdminPermissions } from "@dubgrid/domain";
 import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./permission-sets";
 
 /**
@@ -57,9 +57,9 @@ export const PERMISSION_CATEGORY_LABELS: Record<PermissionCategory, string> = {
 };
 
 export const DEFAULT_PERMISSION_LABELS: PermissionEditorLabels = {
-  focusAreaLabel: "Focus Areas",
-  certificationLabel: "Certifications",
-  roleLabel: "Roles",
+  focusAreaLabel: DEFAULT_ORGANIZATION_LABELS.focusArea,
+  certificationLabel: DEFAULT_ORGANIZATION_LABELS.certification,
+  roleLabel: DEFAULT_ORGANIZATION_LABELS.role,
 };
 
 function inSentence(label: string): string {

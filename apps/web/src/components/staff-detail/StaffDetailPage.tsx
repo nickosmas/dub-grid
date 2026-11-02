@@ -1311,7 +1311,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             className="dg-btn dg-btn-secondary"
             onClick={() => setIsEditingManagementAccess(true)}
           >
-            Add to management
+            Add to an administrative team
           </Button>
         )}
         {canAddToSchedule && (
@@ -1697,8 +1697,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             <Modal
               title={
                 directoryPerson?.isManagementUser || hasPendingManagementInvite
-                  ? "Edit management access"
-                  : "Add to management"
+                  ? "Edit administrative teams"
+                  : "Add to an administrative team"
               }
               onClose={closeManagementAccessEditor}
               onRequestClose={requestManagementAccessClose}

@@ -68,7 +68,12 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { changedElsewhereMessage, pluralLabelNoun, singularLabelNoun } from "@dubgrid/domain";
+import {
+  changedElsewhereMessage,
+  pluralLabelNoun,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
@@ -835,7 +840,7 @@ function JobSectionCard({
           description={
             section === "shiftless"
               ? "Create shiftless jobs for work that should appear without a Day, Evening, or Night shift."
-              : `Create jobs that start with scheduled departments, then narrow to the ${focusAreasTerm} and shifts where they apply.`
+              : `Create jobs that start with departments, then narrow to the ${focusAreasTerm} and shifts where they apply.`
           }
           action={
             canManageScheduleDefinitions ? (
@@ -1796,7 +1801,7 @@ function JobRow({
           {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Placement"
-              description={`Choose the scheduled departments first. Then select the ${pluralLabelNoun(focusAreaLabel)} inside them and the shifts where this job applies.`}
+              description={`Choose the departments first. Then select the ${pluralLabelNoun(focusAreaLabel)} inside them and the shifts where this job applies.`}
               summary={placementSummary}
               collapsible
               defaultOpen={form.departmentIds.length === 0}
@@ -1809,7 +1814,7 @@ function JobRow({
                 }}
               >
                 <ChecklistPanel
-                  title="Scheduled departments"
+                  title="Departments"
                   summary={
                     form.departmentIds.length === 0
                       ? "Choose where this job can exist."
@@ -1860,7 +1865,7 @@ function JobRow({
                     })
                   }
                   disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                  emptyMessage="No scheduled departments exist yet."
+                  emptyMessage="No departments exist yet."
                 />
 
                 <ChecklistPanel
@@ -1947,7 +1952,7 @@ function JobRow({
                   }
                   emptyMessage={
                     form.departmentIds.length === 0
-                      ? "Select scheduled departments first."
+                      ? "Select departments first."
                       : `No ${pluralLabelNoun(focusAreaLabel)} exist in the selected departments yet.`
                   }
                 />
@@ -2434,7 +2439,7 @@ function JobRow({
                 margin: 0,
               }}
             >
-              Select at least one scheduled department.
+              Select at least one department.
             </p>
           ) : null}
 
@@ -2612,7 +2617,7 @@ export default function JobsSettings({
   const [local, setLocal] = useState<Array<JobDefinition & { isNew?: boolean }>>(jobs);
   const nextTmpId = useRef(-1);
   const defaultShiftEnabled = organization?.defaultShiftEnabled ?? true;
-  const focusAreaLabel = organization?.focusAreaLabel || "Focus Areas";
+  const focusAreaLabel = organization?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea;
 
   useEffect(() => {
     setLocal((previous) => {
@@ -2893,7 +2898,7 @@ export default function JobsSettings({
             lineHeight: 1.45,
           }}
         >
-          {`Create at least one scheduled department with a ${singularLabelNoun(focusAreaLabel)} and shift before adding scheduled jobs.`}
+          {`Create at least one department with a ${singularLabelNoun(focusAreaLabel)} and shift before adding scheduled jobs.`}
         </div>
       ) : null}
 

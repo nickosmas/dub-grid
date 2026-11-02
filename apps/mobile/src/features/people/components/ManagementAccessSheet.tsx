@@ -18,7 +18,6 @@ import {
   removeMobilePersonManagementAccess,
   updateMobilePersonManagementAccess,
 } from "../../../shared/lib/api";
-import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
@@ -31,6 +30,7 @@ import {
   type ManagementAccessRole,
   type ManagementAccessSubject,
 } from "../lib/managementAccess";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 function sameIds(left: number[], right: number[]): boolean {
   if (left.length !== right.length) return false;
@@ -125,8 +125,8 @@ export function ManagementAccessSheet({
         getClientFriendlyErrorMessage(
           mutationError,
           isSelf
-            ? "We couldn't update your management access right now."
-            : "We couldn't update their management access right now.",
+            ? "We couldn't update your administrative teams right now."
+            : "We couldn't update their administrative teams right now.",
         ),
       );
     },
@@ -146,16 +146,16 @@ export function ManagementAccessSheet({
         tone: "success",
         title:
           result.result === "access_removed"
-            ? "Management access removed"
+            ? "Removed from administrative teams"
             : result.result === "invitation_sent"
-              ? "Management invitation sent"
-              : "Management access updated",
+              ? "Invitation sent"
+              : "Administrative teams updated",
         message:
           result.result === "invitation_sent"
-            ? "They'll join management once they accept."
+            ? "They'll join once they accept."
             : isSelf
-              ? "Your management access was updated."
-              : "Their management access was updated.",
+              ? "Your administrative teams were updated."
+              : "Their administrative teams were updated.",
       });
     },
   });
@@ -164,8 +164,8 @@ export function ManagementAccessSheet({
     isDirty: hasUnsavedChanges,
     disabled: mutation.isPending,
     body: isSelf
-      ? "Your changes to your management access will be lost."
-      : "Your changes to their management access will be lost.",
+      ? "Your changes to your administrative teams will be lost."
+      : "Your changes to their administrative teams will be lost.",
     onDiscard: () => setDraft(baseline),
     onClose: onDismiss,
   });
@@ -191,10 +191,10 @@ export function ManagementAccessSheet({
   const removalNotices = isRemoval
     ? [
         !person.userId && person.pendingInvitation
-          ? "Saving now revokes their pending management invitation."
+          ? "Saving now revokes their pending invitation."
           : isSelf
-            ? "Saving now removes your management access. Your staff profile stays as it is."
-            : "Saving now removes their management access. Their staff profile stays as it is.",
+            ? "Saving now takes you off every administrative team. Your staff profile stays as it is."
+            : "Saving now takes them off every administrative team. Their staff profile stays as it is.",
       ]
     : [];
 
@@ -237,7 +237,7 @@ export function ManagementAccessSheet({
           mutation.mutate({ remove: true });
         }}
         presentation="inline"
-        title="Remove management access?"
+        title="Remove from administrative teams?"
         visible={showRemoveConfirmation}
       />
     </>
@@ -279,7 +279,7 @@ export function ManagementAccessSheet({
       header={
         <SheetHeader
           subtitle={`${person.firstName} ${person.lastName}`.trim() || person.email}
-          title={isEditing ? "Edit management access" : "Add to management"}
+          title={isEditing ? "Edit administrative teams" : "Add to an administrative team"}
         />
       }
       scrollable
@@ -288,7 +288,7 @@ export function ManagementAccessSheet({
     >
       {managementDepartments.length === 0 ? (
         <AppText tone="secondary" variant="body">
-          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one in Settings on the web before granting management access.`}
+          {`There are no ${ADMINISTRATIVE_TEAM_LABELS.pluralLower} yet. Add one in Settings on the web before adding anyone to one.`}
         </AppText>
       ) : (
         <View style={{ gap: mobileSpace.lg }}>
@@ -318,7 +318,7 @@ export function ManagementAccessSheet({
           <ProfileChoiceGroup
             error={
               !isRemoval && draft.managementDepartmentIds.length === 0
-                ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
+                ? `Select at least one ${ADMINISTRATIVE_TEAM_LABELS.singularLower}`
                 : null
             }
             items={managementDepartments.map((department) => ({
@@ -326,7 +326,7 @@ export function ManagementAccessSheet({
               name: department.name,
               disabled: mutation.isPending,
             }))}
-            label={needsRoleForInvite ? MANAGEMENT_DEPARTMENT_LABELS.plural : undefined}
+            label={needsRoleForInvite ? ADMINISTRATIVE_TEAM_LABELS.plural : undefined}
             selectedIds={draft.managementDepartmentIds}
             onToggle={toggleDepartment}
           />

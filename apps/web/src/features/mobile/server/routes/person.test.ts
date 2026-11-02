@@ -325,7 +325,7 @@ describe("mobile person route", () => {
       requireMobileAuth.mockResolvedValue(makeAuth());
       mockManagementMemberships([]);
       validateStaffOrgReferences.mockResolvedValueOnce({
-        focusAreaIds: "Select at least one focus area",
+        focusAreaIds: "Select at least one area",
       });
 
       const { PATCH } = await import("./person");

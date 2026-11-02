@@ -196,7 +196,7 @@ export async function validateStaffOrgReferences(
   const deptAdminIds = input.deptAdminIds ? [...new Set(input.deptAdminIds)] : undefined;
 
   if (input.requireFocusArea && focusAreaIds && focusAreaIds.length === 0) {
-    fieldErrors.focusAreaIds = "Select at least one focus area";
+    fieldErrors.focusAreaIds = "Select at least one area";
   }
 
   const checks: Array<Promise<void>> = [];

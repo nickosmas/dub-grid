@@ -26,11 +26,11 @@ import {
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
-import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
 import { InvitePermissionsRow } from "./InvitePermissionsRow";
 import { OrgRoleChoice } from "./OrgRoleChoice";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 type InviteDraft = {
   firstName: string;
@@ -109,7 +109,7 @@ export function ManagementUserInviteSheet({
   const phoneError = getOptionalUsPhoneError(draft.phone);
   const departmentError =
     draft.managementDepartmentIds.length === 0
-      ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
+      ? `Select at least one ${ADMINISTRATIVE_TEAM_LABELS.singularLower}`
       : null;
   const isValid =
     !firstNameError && !lastNameError && !emailError && !phoneError && !departmentError;
@@ -183,8 +183,8 @@ export function ManagementUserInviteSheet({
       }
       header={
         <SheetHeader
-          subtitle="They'll get an invitation to join management, with no schedule profile."
-          title="Invite management user"
+          subtitle="They'll get an invitation to join an administrative team, with no schedule profile."
+          title="Invite to an administrative team"
         />
       }
       scrollable
@@ -193,7 +193,7 @@ export function ManagementUserInviteSheet({
     >
       {managementDepartments.length === 0 ? (
         <AppText tone="secondary" variant="body">
-          {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one in Settings on the web before inviting anyone into management.`}
+          {`There are no ${ADMINISTRATIVE_TEAM_LABELS.pluralLower} yet. Add one in Settings on the web before inviting anyone to one.`}
         </AppText>
       ) : (
         <View style={styles.body}>
@@ -265,7 +265,7 @@ export function ManagementUserInviteSheet({
               name: department.name,
               disabled: isPending,
             }))}
-            label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+            label={ADMINISTRATIVE_TEAM_LABELS.plural}
             selectedIds={draft.managementDepartmentIds}
             onToggle={(id) =>
               setDraft((current) => ({

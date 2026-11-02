@@ -130,6 +130,7 @@ import {
 
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_EXPAND_TIMING = {
   duration: 240,
@@ -1438,7 +1439,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           ) : null
         ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
           <ScrollableTabStrip
-            accessibilityLabel={bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas"}
+            accessibilityLabel={
+              bootstrapQuery.data?.currentOrg.labels.focusArea ??
+              DEFAULT_ORGANIZATION_LABELS.focusArea
+            }
             activeKey={activeTeamFocusAreaKey}
             onSelect={handleSelectFocusArea}
             tabs={teamFocusAreaTabs}

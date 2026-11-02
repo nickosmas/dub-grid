@@ -1,5 +1,5 @@
 "use client";
-import { pluralLabelNoun } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { PencilLine, Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -535,7 +535,7 @@ export function RecurringScheduleSection({
   absenceTypes = [],
   shiftDisplayMode = "code",
   defaultShiftEnabled = true,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";

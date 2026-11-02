@@ -68,7 +68,7 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
 
         <CompositeSection
           title="Terminology"
-          description="Rename labels like 'Focus Areas' to 'Wings' or 'Units'. These names appear everywhere in the app."
+          description="Rename labels like 'Areas' to 'Wings' or 'Units'. These names appear everywhere in the app."
         >
           <OrganizationLabels organization={org} onSave={setOrg} />
         </CompositeSection>

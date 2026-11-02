@@ -236,7 +236,7 @@ describe("StaffDetailPanel access controls", () => {
       onManageManagementAccess: vi.fn(),
     });
 
-    const manageButton = screen.getByRole("button", { name: /Add to Management/ });
+    const manageButton = screen.getByRole("button", { name: /Add to an administrative team/ });
     const row = manageButton.parentElement;
     expect(row).not.toBeNull();
     expect(row).not.toContainElement(screen.getByText("User"));
@@ -350,7 +350,7 @@ describe("StaffDetailPanel access controls", () => {
     });
 
     const actionFooter = document.querySelector<HTMLElement>('[data-slot="staff-panel-actions"]');
-    const managementButton = screen.getByRole("button", { name: /add to management/i });
+    const managementButton = screen.getByRole("button", { name: /add to an administrative team/i });
 
     const personActions = document.querySelector<HTMLElement>('[data-slot="staff-person-actions"]');
 

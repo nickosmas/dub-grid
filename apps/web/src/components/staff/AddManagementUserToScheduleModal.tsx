@@ -13,7 +13,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 /** Only the read-only prefill fields this modal actually needs — satisfied by
  *  both `DirectoryPerson` (People directory) and `Employee` (self/detail
@@ -48,7 +48,7 @@ export function AddManagementUserToScheduleModal({
   focusAreas,
   certifications,
   roles,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   certificationLabel = "Certification",
   roleLabel = "Roles",
   onClose,

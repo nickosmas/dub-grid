@@ -31,7 +31,7 @@ import { type Employee, type Organization } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 // Overview tab for the gridmaster OrganizationDetail view.
 
@@ -91,9 +91,9 @@ export function OverviewTab({
         addressCountry: editAddressCountry.trim(),
       }),
       timezone: editTimezone || null,
-      focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
-      certificationLabel: editCertLabel.trim() || "Certifications",
-      roleLabel: editRoleLabel.trim() || "Roles",
+      focusAreaLabel: editFocusAreaLabel.trim() || DEFAULT_ORGANIZATION_LABELS.focusArea,
+      certificationLabel: editCertLabel.trim() || DEFAULT_ORGANIZATION_LABELS.certification,
+      roleLabel: editRoleLabel.trim() || DEFAULT_ORGANIZATION_LABELS.role,
       shiftDisplayMode: editShiftDisplayMode,
       enforceConflictPrevention: editEnforceConflictPrevention,
       dataRetentionDays: editDataRetentionDays,
@@ -445,7 +445,7 @@ export function OverviewTab({
           {editing ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               <div>
-                <label style={labelStyle}>Focus areas</label>
+                <label style={labelStyle}>Areas</label>
                 <input
                   className="dg-input"
                   value={editFocusAreaLabel}
@@ -471,7 +471,7 @@ export function OverviewTab({
             </div>
           ) : (
             <>
-              <InfoRow label="Focus areas" value={organization.focusAreaLabel} />
+              <InfoRow label="Areas" value={organization.focusAreaLabel} />
               <InfoRow label="Certifications" value={organization.certificationLabel} />
               <InfoRow label="Roles" value={organization.roleLabel} />
             </>

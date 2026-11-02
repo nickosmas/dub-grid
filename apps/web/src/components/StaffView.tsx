@@ -39,6 +39,7 @@ import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
+import { DEFAULT_ORGANIZATION_LABELS, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 const EMPTY_CODE_MAP = new Map<number, string>();
 
@@ -197,7 +198,7 @@ export default function StaffView({
   assignmentLabelMap,
   absenceTypes,
   departments: departmentsProp = [],
-  departmentLabel: departmentLabelProp = "Scheduled Departments",
+  departmentLabel: departmentLabelProp = DEFAULT_ORGANIZATION_LABELS.department,
   canViewRecurringShifts,
   canManageRecurringShifts,
   canViewEmployeeDetails,
@@ -205,7 +206,7 @@ export default function StaffView({
   isSuperAdmin = false,
   isGridmaster = false,
   isManagementUser = false,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   certificationLabel = "Certifications",
   roleLabel = "Roles",
   shiftDisplayMode = "code",
@@ -215,8 +216,8 @@ export default function StaffView({
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
   const { user } = useAuth();
-  const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
-  const managementDepartmentLabel = "Management Departments";
+  const scheduledDepartmentLabel = departmentLabelProp || DEFAULT_ORGANIZATION_LABELS.department;
+  const managementDepartmentLabel = ADMINISTRATIVE_TEAM_LABELS.plural;
   const canAccessPeopleAdminSurfaces = Boolean(canManageEmployees || isSuperAdmin || isGridmaster);
   // canViewRecurringShifts is what the recurring API itself requires
   // (api/schedule/recurring canReadRecurring), and authz derives it from

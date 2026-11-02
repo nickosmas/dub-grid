@@ -2,7 +2,7 @@ import { router, Stack } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
-import { getOrgRoleLabel } from "@dubgrid/domain";
+import { getOrgRoleLabel, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -54,11 +54,7 @@ import { queryClient } from "../../../shared/lib/query-client";
 import { clearQueryCache } from "../../../shared/lib/query-persistence";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
-import {
-  getDepartmentNames,
-  getScheduledDepartmentNames,
-  MANAGEMENT_DEPARTMENT_LABELS,
-} from "../../../shared/lib/departments";
+import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
 import {
   getProfileInitials,
   ProfileHero,
@@ -553,7 +549,7 @@ export default function ProfileScreen() {
                   <ProfileInfoRow
                     iconName="briefcase-outline"
                     isLast
-                    label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                    label={ADMINISTRATIVE_TEAM_LABELS.plural}
                     value={managementDepartmentNames.join(", ")}
                   />
                 ) : null}

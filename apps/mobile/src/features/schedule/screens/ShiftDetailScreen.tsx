@@ -12,7 +12,12 @@ import {
   type MobileScheduleEntrySegment,
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
-import { capitalizeFirst, describeShiftRequestSubmitted, singularLabelNoun } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  describeShiftRequestSubmitted,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import {
   BottomSheetModal,
@@ -254,7 +259,9 @@ export default function ShiftDetailScreen() {
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const focusAreaFieldLabel = capitalizeFirst(
-    singularLabelNoun(bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas"),
+    singularLabelNoun(
+      bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea,
+    ),
   );
   const queryClient = useQueryClient();
   const { pushToast } = useToast();

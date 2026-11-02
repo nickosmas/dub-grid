@@ -358,25 +358,25 @@ describe("StaffDetailPage", () => {
     it("shows a staff-managing Admin the departments, read-only", async () => {
       renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: true });
 
-      expect(await screen.findByText("Manages")).toBeInTheDocument();
+      expect(await screen.findByText("Administrative Teams")).toBeInTheDocument();
       expect(screen.getByText("Nursing Office")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Edit management access" }),
+        screen.queryByRole("button", { name: "Edit administrative teams" }),
       ).not.toBeInTheDocument();
     });
 
     it("lets a Super Admin edit them", async () => {
       renderWith({});
 
-      expect(await screen.findByText("Manages")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Edit management access" })).toBeInTheDocument();
+      expect(await screen.findByText("Administrative Teams")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit administrative teams" })).toBeInTheDocument();
     });
 
     it("hides them from a caller who does not manage employees", async () => {
       renderWith({ role: "admin", isSuperAdmin: false, canManageEmployees: false });
 
       await screen.findByText("Access role");
-      expect(screen.queryByText("Manages")).not.toBeInTheDocument();
+      expect(screen.queryByText("Administrative Teams")).not.toBeInTheDocument();
     });
   });
 });

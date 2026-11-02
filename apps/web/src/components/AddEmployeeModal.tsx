@@ -20,6 +20,7 @@ import { FirstDayField } from "@/components/staff/FirstDayField";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MOBILE, useMediaQuery } from "@/hooks";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 type RowEntry = {
   _id: string;
@@ -90,7 +91,7 @@ interface AddEmployeeModalProps {
 export default function AddEmployeeModal({
   focusAreas,
   certifications,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   certificationLabel = "Certification",
   canGrantSuperAdmin = false,
   onAdd,

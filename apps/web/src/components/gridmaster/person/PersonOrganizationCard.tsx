@@ -5,6 +5,7 @@ import {
   describePlannedChangeInFull,
   plannedReturn,
   formatFirstDay,
+  ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
 import type { ReactNode } from "react";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
@@ -85,7 +86,7 @@ function MembershipFacts({
         empty="None"
       />
       <PersonField
-        label="Management departments"
+        label={ADMINISTRATIVE_TEAM_LABELS.plural}
         value={namesOf(membership.deptAdminIds, names.departments)}
         empty="None"
       />
@@ -187,7 +188,7 @@ function StaffFacts({
       />
       <PersonField label="Seniority" value={String(employee.seniority)} tabular />
       <PersonField
-        label="Management departments"
+        label={ADMINISTRATIVE_TEAM_LABELS.plural}
         value={namesOf(employee.deptAdminIds, names.departments)}
         empty="None"
       />

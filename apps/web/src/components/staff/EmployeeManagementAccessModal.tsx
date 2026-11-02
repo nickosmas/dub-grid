@@ -32,7 +32,7 @@ import type {
   Invitation,
   OrganizationUser,
 } from "@/types";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 interface EmployeeManagementAccessEditorProps {
   employee: Employee;
@@ -215,7 +215,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
       ? [
           isRevokeOnSave
             ? "Saving now revokes the pending invitation."
-            : "Saving now removes their management access. They'll stay on the schedule.",
+            : "Saving now takes them off every administrative team. They'll stay on the schedule.",
         ]
       : [];
   const discardChanges = useCallback(() => {
@@ -299,7 +299,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
     try {
       if (matchedUser) {
         if (!(await applyMatchedUserAccess())) return;
-        toast.success("Management access updated");
+        toast.success("Administrative teams updated");
         await onCompleted(null);
       } else if (inviteSaveAction === "revoke" && pendingInvitation) {
         if (!pendingInvitation.updatedAt) {
@@ -367,7 +367,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
         toast.error(changedElsewhereMessage("their access"));
         return;
       }
-      toast.error(formatClientErrorMessage(err, "We couldn't update management access."));
+      toast.error(formatClientErrorMessage(err, "We couldn't update their administrative teams."));
     } finally {
       setSaving(false);
     }
@@ -404,7 +404,9 @@ export const EmployeeManagementAccessEditor = forwardRef<
 
   const fields = (
     <section
-      aria-label={isEditingExistingAccess ? "Edit management access" : "Add to management"}
+      aria-label={
+        isEditingExistingAccess ? "Edit administrative teams" : "Add to an administrative team"
+      }
       style={{ display: "flex", flexDirection: "column", gap: 16 }}
     >
       {/* First thing in the editor, so in a popup it lands directly under the
@@ -430,7 +432,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
 
       <div>
         <label style={fieldLabelStyle}>
-          Management departments
+          {ADMINISTRATIVE_TEAM_LABELS.plural}
           {!hasExistingManagementAccess && (
             <span style={{ color: "var(--dg-color-danger)" }}> *</span>
           )}
@@ -443,7 +445,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
               color: "var(--dg-color-text-muted)",
             }}
           >
-            You don't have any management departments yet. Add one in Settings, under Departments,
+            You don't have any administrative teams yet. Add one in Settings, under Departments,
             then come back to assign it here.
           </div>
         ) : (
@@ -464,7 +466,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
                   consequence of the save, so it is raised once at the top of
                   the section instead. */}
             {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
-              <FieldError message="Select at least one management department" />
+              <FieldError message="Select at least one administrative team" />
             )}
           </>
         )}
@@ -472,8 +474,8 @@ export const EmployeeManagementAccessEditor = forwardRef<
 
       {isInSandbox && (
         <Banner tone="info" icon={FlaskConical}>
-          Granting management access isn't available in sandbox mode. Exit the sandbox to update
-          access on your real organization.
+          Changing administrative teams isn't available in sandbox mode. Exit the sandbox to update
+          your real organization.
         </Banner>
       )}
     </section>

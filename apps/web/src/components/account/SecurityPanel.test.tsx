@@ -25,7 +25,8 @@ vi.mock("@/features/account/client/step-up", async (load) => ({
 }));
 vi.mock("@/features/account/client/auth", () => ({}));
 
-vi.mock("@dubgrid/domain", () => ({
+vi.mock("@dubgrid/domain", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/domain")>()),
   getPasswordMismatchError: (password: string, confirmation: string) =>
     confirmation.length > 0 && password !== confirmation ? "Passwords do not match." : null,
   isPasswordAcceptable: (password: string) => password.length >= 10,

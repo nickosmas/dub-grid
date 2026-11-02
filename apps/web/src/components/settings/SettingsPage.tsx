@@ -33,6 +33,7 @@ import dynamic from "next/dynamic";
 import { SettingsShell } from "./SettingsShell";
 import { Banner } from "@/components/ui/Banner";
 import { Lock } from "lucide-react";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 function SettingsSectionSkeleton() {
   return (
@@ -256,10 +257,11 @@ export default function SettingsPage({
     ],
   );
 
-  const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
+  const focusAreaLabel = organization.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea;
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
-  const scheduledDepartmentLabel = "Scheduled Departments";
+  const scheduledDepartmentLabel =
+    organization.departmentLabel || DEFAULT_ORGANIZATION_LABELS.department;
   const navGroups = useMemo(
     () =>
       buildNavGroups(perms, {

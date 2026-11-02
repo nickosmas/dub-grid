@@ -3,6 +3,7 @@ import {
   capitalizeFirst,
   pluralLabelNoun,
   singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 import type {
   OperationsReportPayload,
@@ -128,9 +129,9 @@ function formatMissingRole(value: boolean, role: string): string {
 /** The organization's own terms, in the forms report headings and cells need. */
 function reportTerms(payload: OperationsReportPayload) {
   const labels = payload.labels ?? {
-    focusArea: "Focus Areas",
-    certification: "Certifications",
-    role: "Roles",
+    focusArea: DEFAULT_ORGANIZATION_LABELS.focusArea,
+    certification: DEFAULT_ORGANIZATION_LABELS.certification,
+    role: DEFAULT_ORGANIZATION_LABELS.role,
   };
   return {
     focusArea: singularLabelNoun(labels.focusArea),

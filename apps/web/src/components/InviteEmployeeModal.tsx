@@ -28,6 +28,7 @@ import { checkEmployeePhoneConflict } from "@/features/employees/client";
 import { useIsInSandbox } from "@/hooks";
 import { usePermissions } from "@/features/permissions/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
+import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -219,7 +220,7 @@ export default function InviteEmployeeModal({
         managementDepts.length > 0 &&
         touched.departmentIds &&
         departmentIds.length === 0
-          ? "Select at least one management department"
+          ? "Select at least one administrative team"
           : null,
     }),
     [
@@ -291,7 +292,9 @@ export default function InviteEmployeeModal({
     <>
       <Modal
         title={
-          isManagementInvite ? "Invite to management" : `Invite ${getEmployeeDisplayName(employee)}`
+          isManagementInvite
+            ? "Invite to an administrative team"
+            : `Invite ${getEmployeeDisplayName(employee)}`
         }
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
@@ -527,7 +530,8 @@ export default function InviteEmployeeModal({
           {isManagementInvite && managementDepts.length > 0 && (
             <div>
               <label style={labelStyle}>
-                Management departments <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                {ADMINISTRATIVE_TEAM_LABELS.plural}{" "}
+                <span style={{ color: "var(--dg-color-danger)" }}>*</span>
               </label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {managementDepts.map((department) => (

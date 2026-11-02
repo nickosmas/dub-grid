@@ -15,6 +15,7 @@ import { HeaderFilterAction } from "../../../src/shared/navigation/HeaderFilterA
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { useManualRefresh } from "../../../src/shared/hooks/useManualRefresh";
 import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 export default function CoverageExpandedScreen() {
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
@@ -62,7 +63,8 @@ export default function CoverageExpandedScreen() {
   }
 
   const sections = dashboardQuery.data.coverageBySection;
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Focus Areas";
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels?.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   const filtered =
     focusAreaFilter === "all"
       ? sections

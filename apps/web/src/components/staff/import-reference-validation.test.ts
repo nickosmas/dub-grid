@@ -19,7 +19,7 @@ describe("getImportReferenceErrors", () => {
         options,
       ),
     ).toEqual([
-      'Unknown focus area: "Rehab Wing"',
+      'Unknown area: "Rehab Wing"',
       'Unknown certification: "RN"',
       'Unknown role: "Supervisor"',
     ]);

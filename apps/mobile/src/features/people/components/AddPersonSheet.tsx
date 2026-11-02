@@ -11,6 +11,7 @@ import {
   FIRST_DAY_FIELD_HINT,
   PLANNED_START_MAX_DAYS,
   type AdminPermissions,
+  DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import {
@@ -120,7 +121,8 @@ export function AddPersonSheet({
     orgRole !== "user" ||
     adminPermissions !== null;
 
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel =
+    bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
   // A new hire's first day (51g4) is today or later here; an earlier one is set on the web.
   const today = getIsoDateInTimeZone(new Date(), bootstrapQuery.data?.currentOrg.timezone ?? null);
   const certificationLabel =

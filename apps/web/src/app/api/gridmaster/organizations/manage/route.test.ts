@@ -521,6 +521,39 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(invitationDeleteEq).toHaveBeenCalledWith("token", "raw-invite-token");
   });
 
+  it("stores no labels the gridmaster left blank or at their defaults, and keeps a custom one", async () => {
+    const response = await POST(
+      makeRequest({
+        action: "createOrganizationSetup",
+        input: {
+          name: "Acme Health",
+          addressLine1: "",
+          addressLine2: "",
+          addressCity: "",
+          addressState: "",
+          addressPostalCode: "",
+          addressCountry: "",
+          phone: "",
+          timezone: "America/Los_Angeles",
+          focusAreaLabel: "Areas",
+          certificationLabel: "",
+          roleLabel: "Positions",
+          shiftDisplayMode: "code",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(organizationInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        focus_area_label: null,
+        certification_label: null,
+        role_label: "Positions",
+        department_label: null,
+      }),
+    );
+  });
+
   it("leaves the time zone to the database default when the gridmaster skips it", async () => {
     const response = await POST(
       makeRequest({

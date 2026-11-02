@@ -45,6 +45,7 @@ import {
   collectFontFaceCss,
   whenPrintReady,
 } from "@/components/print-document";
+import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 const BRAND_MUTED = "#4A607F";
 const BRAND_SEPARATOR = "#94A3B8";
@@ -821,7 +822,7 @@ export default function PrintScheduleView({
   getShiftStyle,
   getCustomShiftTimes,
   onClose,
-  focusAreaLabel = "Focus Areas",
+  focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   shiftDisplayMode = "code",
   noteMarksForKey,
   indicatorTypes = NO_INDICATORS,

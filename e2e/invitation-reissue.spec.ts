@@ -230,7 +230,7 @@ async function openPeople(page: Page, search: string): Promise<void> {
 async function openManagementView(page: Page, search: string): Promise<void> {
   await openPeople(page, search);
   await page.getByRole("button", { name: /^On Schedule/ }).click();
-  await page.getByRole("option", { name: /^Management/ }).click();
+  await page.getByRole("option", { name: /^Administrative Teams/ }).click();
 }
 
 function rowFor(page: Page, name: string): Locator {
@@ -300,7 +300,7 @@ test.describe("invitation reissue and revoke", () => {
         .getByRole("cell")
         .nth(2)
         .click();
-      const panel = page.getByRole("dialog", { name: "Management staff detail" });
+      const panel = page.getByRole("dialog", { name: "Administrative team member detail" });
       await expect(panel).toBeVisible();
       await askAndCancel(
         page,
@@ -366,7 +366,7 @@ test.describe("invitation reissue and revoke", () => {
         .getByRole("cell")
         .nth(2)
         .click();
-      const panel = page.getByRole("dialog", { name: "Management staff detail" });
+      const panel = page.getByRole("dialog", { name: "Administrative team member detail" });
       await panel.getByRole("button", { name: "Revoke invitation" }).click();
       const confirm = page.getByRole("alertdialog", { name: /^Revoke the invitation for / });
       await confirm.getByRole("button", { name: "Revoke" }).click();

@@ -1563,7 +1563,7 @@ function buildMobileOpenShiftsFromGaps(
       if (!input.employee.focusAreaIds.includes(gap.focusAreaId)) {
         return {
           canVolunteer: false,
-          volunteerBlockReason: "You are not assigned to the focus area required for this shift.",
+          volunteerBlockReason: "You are not assigned to the area required for this shift.",
         };
       }
 

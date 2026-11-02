@@ -87,7 +87,7 @@ describe("settings help cleanup", () => {
     render(<OrganizationLabels organization={organization as never} onSave={vi.fn()} />);
 
     expect(screen.queryByText("How custom labels work")).not.toBeInTheDocument();
-    expect(screen.getByText("e.g. Focus Areas, Departments, Units")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Suggested area labels" })).toBeInTheDocument();
     expect(screen.getByText("e.g. Certifications, Designations")).toBeInTheDocument();
     expect(screen.getByText("e.g. Responsibilities, Positions")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();

@@ -211,7 +211,7 @@ export default function ReadOnlyScheduleView({
                   <tr>
                     <th style={gmHeaderStyle("Employee")}>Employee</th>
                     <th style={gmHeaderStyle("Shift")}>Shift</th>
-                    <th style={gmHeaderStyle("Focus area")}>Focus area</th>
+                    <th style={gmHeaderStyle("Area")}>Area</th>
                     <th style={gmHeaderStyle("Status")}>Status</th>
                   </tr>
                 </thead>

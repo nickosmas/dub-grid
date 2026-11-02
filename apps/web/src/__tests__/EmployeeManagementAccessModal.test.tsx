@@ -389,7 +389,7 @@ describe("EmployeeManagementAccessEditor", () => {
     );
 
     expect(
-      await screen.findByRole("region", { name: /edit management access/i }),
+      await screen.findByRole("region", { name: /edit administrative teams/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
@@ -443,7 +443,7 @@ describe("EmployeeManagementAccessEditor", () => {
     );
 
     expect(
-      await screen.findByRole("region", { name: /edit management access/i }),
+      await screen.findByRole("region", { name: /edit administrative teams/i }),
     ).toBeInTheDocument();
 
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -498,7 +498,7 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    await screen.findByRole("region", { name: /edit management access/i });
+    await screen.findByRole("region", { name: /edit administrative teams/i });
 
     // Deselecting the last department is the removal path; there is no separate
     // Remove button, and the note below is what says so before saving.
@@ -833,7 +833,7 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    await screen.findByRole("region", { name: /edit management access/i });
+    await screen.findByRole("region", { name: /edit administrative teams/i });
 
     expect(screen.queryByText(employee.email)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save invitation" })).toBeInTheDocument();
@@ -890,7 +890,7 @@ describe("EmployeeManagementAccessEditor", () => {
       />,
     );
 
-    await screen.findByRole("region", { name: /edit management access/i });
+    await screen.findByRole("region", { name: /edit administrative teams/i });
 
     await user.click(screen.getByRole("button", { name: "Operations" }));
     act(() => {
@@ -898,6 +898,6 @@ describe("EmployeeManagementAccessEditor", () => {
     });
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole("region", { name: /edit management access/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /edit administrative teams/i })).toBeInTheDocument();
   });
 });

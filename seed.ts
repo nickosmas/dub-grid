@@ -192,10 +192,10 @@ const TENANTS = [
       { name: "Med Tech", abbr: "MT", deptIndexes: [0] },
     ],
     departments: [
-      // Scheduled departments — focus areas linked to these
+      // Departments, with their areas linked to these
       { name: "Nursing", type: "scheduled" as const },
       { name: "Residential", type: "scheduled" as const },
-      // Management departments (with permission templates)
+      // Administrative teams (management departments in the data, with permission templates)
       {
         name: "Administration",
         type: "management" as const,
@@ -2428,7 +2428,7 @@ async function main() {
         tenant.focus_area_label,
         tenant.certification_label,
         tenant.role_label,
-        "Scheduled Departments",
+        null,
         tenant.employeeCount,
       ],
     );
@@ -2750,7 +2750,7 @@ async function main() {
       }
     }
 
-    // 9b. Assign ~20% of employees to management departments
+    // 9b. Assign ~20% of employees to administrative teams
     // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
     const mgmtDeptIds = deptIds.filter(
       (_, idx) => tenant.departments?.[idx]?.type === "management",
@@ -3203,7 +3203,7 @@ async function main() {
 
   const { rows: allOrgs } = await db.query(`SELECT id FROM public.organizations ORDER BY name`);
 
-  // Ensure a "Tech" management department exists in every org, then assign the
+  // Ensure a "Tech" administrative team exists in every org, then assign the
   // seeded logins to it below. Members surface as management users in the People
   // directory. The department carries a permissions template only because the
   // column exists; no resolution path reads it, so nobody's access depends on it.
@@ -3219,7 +3219,7 @@ async function main() {
       WHERE d.org_id = o.id AND d.name = 'Tech' AND d.type = 'management'
     )
   `);
-  console.log(`    ✓ Tech management department ensured in ${allOrgs.length} organizations`);
+  console.log(`    ✓ Tech administrative team ensured in ${allOrgs.length} organizations`);
 
   const memberUsers = TEST_USERS.filter((u) => u.platform_role !== "gridmaster");
 

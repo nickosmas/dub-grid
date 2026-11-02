@@ -1,21 +1,5 @@
 import type { MobileDepartment, MobileFocusArea } from "@dubgrid/contracts";
 
-/**
- * What management departments are called — in every org, whatever that org
- * calls the other kind.
- *
- * `labels.department` renames the *scheduled* kind, so composing
- * `Management ${label}` gave an org that calls them "Scheduled Departments"
- * the row label "Management Scheduled Departments". Web draws the same line:
- * its department-label prop feeds the scheduled list while management sits
- * beside it as a fixed string.
- */
-export const MANAGEMENT_DEPARTMENT_LABELS = {
-  plural: "Management Departments",
-  pluralLower: "management departments",
-  singularLower: "management department",
-} as const;
-
 /** Names for a set of department ids, in the order the ids were given. */
 export function getDepartmentNames(
   departmentIds: number[],
