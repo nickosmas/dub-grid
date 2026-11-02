@@ -1216,6 +1216,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
       runOnJS(handleCalendarDragEnd)(shouldOpen);
     });
+  // A tap on the handle opens or closes the month too, as a drag would.
+  const calendarHandleTapGesture = Gesture.Tap().onEnd(() => {
+    "worklet";
+    const shouldOpen = calendarExpandProgress.value < 0.5;
+    if (shouldOpen) runOnJS(handleCalendarDragStart)();
+    calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
+    runOnJS(handleCalendarDragEnd)(shouldOpen);
+  });
+  const calendarHandleGesture = Gesture.Exclusive(calendarDragGesture, calendarHandleTapGesture);
 
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
@@ -1380,11 +1389,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Reanimated.View>
         </Reanimated.View>
 
-        <GestureDetector gesture={calendarDragGesture}>
+        <GestureDetector gesture={calendarHandleGesture}>
           <View
             accessibilityLabel={isCalendarOpen ? "Collapse month calendar" : "Open month calendar"}
+            accessibilityActions={[{ name: "activate" }]}
             accessibilityRole="adjustable"
             hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
+            onAccessibilityAction={() => {
+              const shouldOpen = !isCalendarOpen;
+              if (shouldOpen) handleCalendarDragStart();
+              calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
+              handleCalendarDragEnd(shouldOpen);
+            }}
             style={styles.calendarDragHandleRow}
           >
             <View style={styles.calendarDragHandleBar} />
