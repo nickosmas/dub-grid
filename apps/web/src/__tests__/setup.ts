@@ -9,6 +9,16 @@ process.env.NEXT_PUBLIC_SUPABASE_URL ||= "http://127.0.0.1:54321";
 process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||= "test-publishable-key";
 process.env.SUPABASE_SECRET_KEY ||= "test-secret-key";
 
+// `after()` throws outside a Next request scope, which a route test never has.
+// Run the task in place, as the route would once its response is sent. A test
+// that needs to hold the task back mocks next/server itself.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: Promise<unknown> | (() => unknown)) => {
+    if (typeof task === "function") void task();
+  },
+}));
+
 // jsdom does not implement window.matchMedia — stub it for useMediaQuery.
 // Guarded so a server-side test file can opt into the node environment
 // (`// @vitest-environment node`) and still share this setup.

@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import {
   mobilePeopleResponseSchema,
   mobilePersonCreateBodySchema,
@@ -255,11 +255,13 @@ export async function POST(req: NextRequest) {
 
   const employee = rowToEmployee(insertedRow);
 
-  void dispatchNotificationEvent(auth.user.id, {
-    action: "employee_created",
-    orgId: auth.currentOrg.id,
-    empId: employee.id,
-  });
+  after(() =>
+    dispatchNotificationEvent(auth.user.id, {
+      action: "employee_created",
+      orgId: auth.currentOrg.id,
+      empId: employee.id,
+    }),
+  );
 
   await insertMobileAuditLogEntry(auth.serviceClient, {
     org_id: auth.currentOrg.id,

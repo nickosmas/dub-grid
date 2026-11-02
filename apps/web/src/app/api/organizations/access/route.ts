@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -375,13 +375,15 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (roleChanged) {
-      void dispatchNotificationEvent(user.id, {
-        action: "role_changed",
-        orgId,
-        targetUserId: userId,
-        fromRole: currentUser.orgRole ?? "user",
-        toRole: nextRole,
-      });
+      after(() =>
+        dispatchNotificationEvent(user.id, {
+          action: "role_changed",
+          orgId,
+          targetUserId: userId,
+          fromRole: currentUser.orgRole ?? "user",
+          toRole: nextRole,
+        }),
+      );
     }
 
     // A role change already carries the whole story ("your role changed from
@@ -391,13 +393,15 @@ export async function PATCH(req: NextRequest) {
     // promoted. Only a permission-only edit (still an admin, keys retuned) is
     // worth spelling out.
     if (permissionsChanged && !roleChanged) {
-      void dispatchNotificationEvent(user.id, {
-        action: "admin_permissions_changed",
-        orgId,
-        targetUserId: userId,
-        before: (currentUser.adminPermissions ?? null) as Record<string, boolean> | null,
-        after: (nextPermissions ?? null) as Record<string, boolean> | null,
-      });
+      after(() =>
+        dispatchNotificationEvent(user.id, {
+          action: "admin_permissions_changed",
+          orgId,
+          targetUserId: userId,
+          before: (currentUser.adminPermissions ?? null) as Record<string, boolean> | null,
+          after: (nextPermissions ?? null) as Record<string, boolean> | null,
+        }),
+      );
     }
 
     return NextResponse.json({ success: true, user: latestUser });
@@ -540,11 +544,13 @@ export async function DELETE(req: NextRequest) {
       req,
     });
 
-    void dispatchNotificationEvent(user.id, {
-      action: "membership_removed",
-      orgId,
-      removedUserId: userId,
-    });
+    after(() =>
+      dispatchNotificationEvent(user.id, {
+        action: "membership_removed",
+        orgId,
+        removedUserId: userId,
+      }),
+    );
 
     return NextResponse.json({ success: true });
   } catch (err) {

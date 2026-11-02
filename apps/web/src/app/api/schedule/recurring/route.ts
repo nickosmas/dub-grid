@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { DbRecurringShift } from "@dubgrid/db-types";
@@ -17,7 +17,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
 
-/** Fire-and-forget audit log write — never blocks or throws on the hot schedule-edit path. */
+/** Writes the audit row after the response, so the schedule-edit path never waits on it. */
 function logScheduleAudit(
   serviceClient: SupabaseClient,
   entry: {
@@ -30,10 +30,9 @@ function logScheduleAudit(
     details: Record<string, unknown>;
   },
 ): void {
-  try {
-    void serviceClient
-      .from("audit_log")
-      .insert({
+  after(async () => {
+    try {
+      const { error } = await serviceClient.from("audit_log").insert({
         org_id: entry.orgId,
         actor_id: entry.actorId,
         actor_email: entry.actorEmail,
@@ -41,15 +40,14 @@ function logScheduleAudit(
         resource_type: entry.resourceType,
         resource_id: entry.resourceId,
         details: entry.details,
-      })
-      .then(({ error }) => {
-        if (error) {
-          logger.error({ error, action: entry.action }, "Schedule audit log write failed");
-        }
       });
-  } catch (error) {
-    logger.error({ error, action: entry.action }, "Schedule audit log write failed");
-  }
+      if (error) {
+        logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+      }
+    } catch (error) {
+      logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+    }
+  });
 }
 
 // Recurring shifts don't take a worked shift plus an absence yet (item 45a).

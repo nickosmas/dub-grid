@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import {
   fetchUserSessionOverviewForUser,
@@ -83,13 +83,15 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (priorRow) {
-      void dispatchNotificationEvent(auth.user.id, {
-        action: "security_session_revoked",
-        orgId: (priorRow.org_id as string | null) ?? null,
-        targetUserId: auth.user.id,
-        initiatedBy: "self",
-        deviceLabel: (priorRow.device_label as string | null) ?? null,
-      });
+      after(() =>
+        dispatchNotificationEvent(auth.user.id, {
+          action: "security_session_revoked",
+          orgId: (priorRow.org_id as string | null) ?? null,
+          targetUserId: auth.user.id,
+          initiatedBy: "self",
+          deviceLabel: (priorRow.device_label as string | null) ?? null,
+        }),
+      );
     }
 
     return NextResponse.json({ success: true });

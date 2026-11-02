@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -122,7 +122,8 @@ export async function POST(req: NextRequest) {
   // invalidate immediately so an archived org's subdomain stops resolving
   // right away instead of appearing valid until the cache expires.
   if (org.slug) {
-    void cacheDel(CacheKey.orgBySlug(org.slug));
+    const slug = org.slug;
+    after(() => cacheDel(CacheKey.orgBySlug(slug)));
   }
 
   // Cancel the Stripe subscription. A Stripe failure must not block the

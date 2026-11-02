@@ -273,13 +273,13 @@
 **Suggested fix:** `after(() => dispatchNotificationEvent(...))`, as `shifts/publish/route.ts:149` already does.
 **Resolution:**
 
-### F-145 [P1] unverified - About 15 fire-and-forget alert dispatches may be cut off after the response
+### F-145 [P1] fixed - About 15 fire-and-forget alert dispatches may be cut off after the response
 
 **File:** for example `apps/web/src/app/api/employees/manage/route.ts:691, 964`, `schedule/manage/route.ts:2535, 2607`, `stripe/webhook/route.ts:142`, `features/mobile/server/routes/people.ts:254`, `organizations/access/route.ts:379` (`void dispatchNotificationEvent(...)`)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** On Vercel, work left running after a response is not guaranteed to finish without `after()` or `waitUntil`, so these alerts and emails could be dropped silently. Unconfirmed: whether production's function settings let them finish.
 **Suggested fix:** Wrap each in `after()`. To confirm, compare sent-alert rows against the triggering audit rows in production.
-**Resolution:**
+**Resolution:** Fixed on fix/alerts-finish-after-response (2026-11-02): all 18 `void dispatchNotificationEvent(...)` calls in server code run in `after()`, and the lint rule `design/no-floating-server-work` fails a `void <call>` or a floating `call().then/catch(...)` in `app/api` and `features/**/server`. Not checked: whether production actually dropped alerts before.
 
 ### F-146 [P2] open - Publish alerts fan out with no concurrency limit and a query chain per recipient
 
@@ -577,13 +577,13 @@
 **Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
 **Resolution:**
 
-### F-177 [P2] unverified - Schedule audit rows are fire-and-forget, like F-145's alerts
+### F-177 [P2] fixed - Schedule audit rows are fire-and-forget, like F-145's alerts
 
 **File:** `apps/web/src/app/api/schedule/manage/route.ts:57` (`logScheduleAudit`, 13 calls); `apps/web/src/app/api/schedule/recurring/route.ts:21` (4 calls)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** `void serviceClient.from("audit_log").insert(...)` after the response may be cut off on Vercel, dropping the activity log's Before and After. It also means F-145's suggested check (alerts against audit rows) can't confirm schedule actions.
 **Suggested fix:** Wrap in `after()`.
-**Resolution:**
+**Resolution:** Fixed on fix/alerts-finish-after-response (2026-11-02): `logScheduleAudit` in `schedule/manage` and `schedule/recurring` writes inside `after()` and still only logs a failed write; the same lint rule covers it.
 
 ### F-178 [P3] open - Gridmaster oversight reads whole platform tables with unordered offset paging
 

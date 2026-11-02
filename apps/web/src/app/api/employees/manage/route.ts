@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import {
   changedElsewhereMessage,
   canMarkInactive,
@@ -688,11 +688,13 @@ export async function POST(req: NextRequest) {
         }
 
         const insertedRow = row as DbEmployee;
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "employee_created",
-          orgId: data.orgId,
-          empId: insertedRow.id,
-        });
+        after(() =>
+          dispatchNotificationEvent(auth.actor.id, {
+            action: "employee_created",
+            orgId: data.orgId,
+            empId: insertedRow.id,
+          }),
+        );
 
         const { error: createAuditError } = await auth.serviceClient.from("audit_log").insert({
           org_id: data.orgId,
@@ -961,23 +963,27 @@ export async function POST(req: NextRequest) {
 
         if (previousRow) {
           if (previousRow.status !== nextEmployee.status) {
-            void dispatchNotificationEvent(auth.actor.id, {
-              action: "employee_status_changed",
-              orgId: data.orgId,
-              empId: nextEmployee.id,
-              fromStatus: previousRow.status,
-              toStatus: nextEmployee.status,
-            });
+            after(() =>
+              dispatchNotificationEvent(auth.actor.id, {
+                action: "employee_status_changed",
+                orgId: data.orgId,
+                empId: nextEmployee.id,
+                fromStatus: previousRow.status,
+                toStatus: nextEmployee.status,
+              }),
+            );
           }
           // Seniority is the order managers keep, so it never alerts the person.
           const alertFields = changedProfileFields.filter((field) => field !== "seniority");
           if (alertFields.length > 0) {
-            void dispatchNotificationEvent(auth.actor.id, {
-              action: "employee_profile_changed",
-              orgId: data.orgId,
-              empId: nextEmployee.id,
-              fields: alertFields,
-            });
+            after(() =>
+              dispatchNotificationEvent(auth.actor.id, {
+                action: "employee_profile_changed",
+                orgId: data.orgId,
+                empId: nextEmployee.id,
+                fields: alertFields,
+              }),
+            );
           }
 
           const statusChanged = previousRow.status !== nextEmployee.status;
