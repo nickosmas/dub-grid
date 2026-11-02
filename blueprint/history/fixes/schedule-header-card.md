@@ -21,8 +21,9 @@
 - The header is one white card, edge to edge, with rounded bottom corners
   (`teamHeaderCard`). The handle sits inside it at its foot.
 - The title names the month shown ("November"), with the year only outside
-  the current one ("January 2027"). A **Today** button replaces the arrow
-  icon, and the weekdays are single letters.
+  the current one ("January 2027"). Today stays Home's round arrow, shown
+  only away from today and pointing back to it (owner, 2026-11-02, after a
+  worded Today button was tried), and the weekdays are single letters.
 - A dot marks each day the person works a shift (an absence alone isn't one),
   blue under the selected day. The days come from their own schedule in
   fixed four-week blocks (`getCalendarDotRanges`), since a month can show 42

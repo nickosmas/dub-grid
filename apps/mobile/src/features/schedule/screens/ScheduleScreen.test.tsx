@@ -2521,7 +2521,8 @@ describe("ScheduleScreen", () => {
 
     // The header names the month, its year only outside the current one.
     expect(screen.getByText("April")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+    // Today is Home's arrow, shown only away from today.
+    expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("today-date-dot-2026-04-16")).not.toBeInTheDocument();
     // Focus areas are a shared ScrollableTabStrip now, so they carry role="tab"
     // and their bare label, matching the Requests strip.

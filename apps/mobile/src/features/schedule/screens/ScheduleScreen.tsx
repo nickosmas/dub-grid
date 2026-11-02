@@ -46,7 +46,11 @@ import {
   getInitials,
   getSegmentScheduleNotes,
 } from "../components/MyScheduleSections";
-import { AlertsChromeButton, WeekNavigatorHeader } from "../components/WeekNavigatorHeader";
+import {
+  AlertsChromeButton,
+  IconControlButton,
+  WeekNavigatorHeader,
+} from "../components/WeekNavigatorHeader";
 import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge } from "../components/SplitShift";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
@@ -128,7 +132,6 @@ import {
 } from "../lib/scheduleScreenChips";
 
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
-import { ChromeTextButton } from "../../../shared/components/ChromeTextButton";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -554,6 +557,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const visibleCalendarMonth =
     (isCalendarOpen && calendarMonthAnchor) || getScheduleMonthStartDate(selectedDate);
   const teamHeaderTitle = formatCalendarMonthTitle(visibleCalendarMonth, todayDate);
+  const isSelectedToday = selectedDate === todayDate;
+  // The Today control's arrow points the way today lies: back from a future
+  // week, forward from a past one. Ionicons only draws the clockwise arrow,
+  // which reads as forward, so the backward one is that glyph mirrored.
+  const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
   const nextWeekDate = addDaysToIsoDate(selectedDate, 7);
   const previousWeekDays = useMemo(
@@ -1309,7 +1317,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
-          <ChromeTextButton label="Today" onPress={handleGoToToday} />
+          {/* The same control as Home's, so the two headers read as one set. */}
+          {!isSelectedToday ? (
+            <IconControlButton
+              accessibilityLabel="Today"
+              iconName="refresh-outline"
+              iconStyle={todayIconStyle}
+              onPress={handleGoToToday}
+            />
+          ) : null}
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
         </View>
       </View>
