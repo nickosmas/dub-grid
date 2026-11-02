@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:715f057bd50000f407ce087406df2e62c816d9c15eb64e78cfad8ce5339000b3",
+  "sourceDigest": "sha256:3d74eefbb481fa3112be749cb7b55da4dda721b2a1408e66f60b61f80f7e6300",
   "webRoutes": [
     {
       "id": "web:/",
@@ -4934,6 +4934,16 @@
       "sha256": "3a42f07194af9e501145ec29a8282a21af607701b3417855b3c05cb34220b5b0",
       "source": {
         "path": "supabase/migrations/113_invite_admin_permissions.sql"
+      }
+    },
+    {
+      "id": "migration:114_leaving_grid_publishes_removals.sql",
+      "version": "114",
+      "name": "leaving_grid_publishes_removals",
+      "file": "114_leaving_grid_publishes_removals.sql",
+      "sha256": "8132f334e8aaad4f6ae655886a2dc7d3f091fcde6b546c7d12cfca724c1b4f06",
+      "source": {
+        "path": "supabase/migrations/114_leaving_grid_publishes_removals.sql"
       }
     }
   ],
