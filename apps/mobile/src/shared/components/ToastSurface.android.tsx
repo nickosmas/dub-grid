@@ -1,3 +1,4 @@
+import { TOAST_ICON_FILL } from "@dubgrid/design-tokens";
 import { useSegments } from "expo-router";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -5,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE, mobileSpace, mobileText, type MobileColors } from "../theme/tokens";
 import { Text } from "./Text";
+import { ToneSymbol } from "./ToneSymbol";
 import { useToastSwipe } from "./toast-swipe";
 import type { ToastSurfaceProps } from "./ToastSurface.types";
 
@@ -14,17 +16,20 @@ export type { ToastSurfaceProps } from "./ToastSurface.types";
 const NAVIGATION_BAR_HEIGHT = 80;
 const SNACKBAR_MARGIN = 12;
 
-function joinTitleAndMessage(title: string | undefined, message: string): string {
-  if (!title) return message;
-  return /[.!?]$/.test(title) ? `${title} ${message}` : `${title}. ${message}`;
-}
-
 /**
- * A toast as a Material 3 snackbar: an inverse-surface bar at the bottom,
- * above the navigation bar on a tab screen, with one block of text and no
- * icon, as Android's own apps show one.
+ * A toast as a snackbar at the bottom, above the navigation bar on a tab
+ * screen. It takes iOS's colours rather than Material's inverse surface (light
+ * in light mode, dark in dark), a large filled tone icon, and the title above
+ * the message.
  */
-export function ToastSurface({ testID, title, message, onDismiss }: ToastSurfaceProps) {
+export function ToastSurface({
+  testID,
+  tone,
+  title,
+  message,
+  isOfflineNotice = false,
+  onDismiss,
+}: ToastSurfaceProps) {
   const mobileColors = useMobileColors();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
@@ -32,6 +37,7 @@ export function ToastSurface({ testID, title, message, onDismiss }: ToastSurface
   const swipe = useToastSwipe(onDismiss, "bottom");
   const isOnTabScreen = segments[0] === "(tabs)";
   const bottom = insets.bottom + (isOnTabScreen ? NAVIGATION_BAR_HEIGHT : 0) + SNACKBAR_MARGIN;
+  const symbolTone = tone === "error" ? "danger" : tone;
 
   return (
     <View
@@ -46,9 +52,27 @@ export function ToastSurface({ testID, title, message, onDismiss }: ToastSurface
       ]}
     >
       <View accessibilityLiveRegion="polite" testID={testID} {...swipe} style={styles.snackbar}>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={2} style={styles.text}>
-          {joinTitleAndMessage(title, message)}
-        </Text>
+        <ToneSymbol
+          color={TOAST_ICON_FILL[symbolTone]}
+          markColor="#FFFFFF"
+          offline={isOfflineNotice}
+          size={28}
+          tone={symbolTone}
+        />
+        <View style={styles.copy}>
+          {title ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} style={styles.title}>
+              {title}
+            </Text>
+          ) : null}
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            numberOfLines={2}
+            style={title ? styles.message : styles.title}
+          >
+            {message}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -63,22 +87,33 @@ const createStyles = (mobileColors: MobileColors) =>
       zIndex: 100,
       elevation: 100,
     },
-    // Material's inverse surface: the primary text colour as the fill and the
-    // surface colour as the text, so it is dark in light mode and light in dark.
     snackbar: {
-      backgroundColor: mobileColors.textPrimary,
+      alignItems: "center",
+      alignSelf: "center",
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.border,
       borderRadius: 4,
+      borderWidth: StyleSheet.hairlineWidth,
       elevation: 6,
-      justifyContent: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
       maxWidth: 560,
-      minHeight: 48,
-      paddingHorizontal: 16,
+      minHeight: 56,
+      paddingLeft: mobileSpace.md,
+      paddingRight: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
       width: "100%",
-      alignSelf: "center",
     },
-    text: {
-      ...mobileText.body,
-      color: mobileColors.surface,
+    copy: {
+      flex: 1,
+      gap: mobileSpace.xs,
+    },
+    title: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+    },
+    message: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
     },
   });

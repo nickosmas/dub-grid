@@ -1,11 +1,12 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { bannerIconColor, type StatusIconTone } from "@dubgrid/design-tokens";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
+import { ToneSymbol } from "./ToneSymbol";
 import { Button } from "./Button";
 import { CONTENT_UNAVAILABLE_ICON_SIZE } from "./ContentUnavailable";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
   mobileRadii,
@@ -24,39 +25,31 @@ type StatusBannerVariant = "inline" | "centered";
 const createStatusBannerTone = (mobileColors: MobileColors) =>
   ({
     error: {
+      symbolTone: "danger" as StatusIconTone,
       backgroundColor: mobileColors.dangerBorder,
-      iconColor: mobileColors.dangerText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
-      iconName: "alert-circle" as const,
-      centeredIconName: "alert-circle" as const,
       inlineActionTone: "danger" as const,
     },
     warning: {
+      symbolTone: "warning" as StatusIconTone,
       backgroundColor: mobileColors.warningBorder,
-      iconColor: mobileColors.warningText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
-      iconName: "warning" as const,
-      centeredIconName: "warning" as const,
       inlineActionTone: "secondary" as const,
     },
     info: {
+      symbolTone: "info" as StatusIconTone,
       backgroundColor: mobileColors.brandBorder,
-      iconColor: mobileColors.brand,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
-      iconName: "information-circle" as const,
-      centeredIconName: "information-circle" as const,
       inlineActionTone: "secondary" as const,
     },
     success: {
+      symbolTone: "success" as StatusIconTone,
       backgroundColor: mobileColors.successBorder,
-      iconColor: mobileColors.successText,
       titleColor: mobileColors.textPrimary,
       bodyColor: mobileColors.textMuted,
-      iconName: "checkmark-circle" as const,
-      centeredIconName: "checkmark-circle" as const,
       inlineActionTone: "secondary" as const,
     },
   }) as const;
@@ -84,6 +77,7 @@ export function StatusBanner({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const statusBannerTone = useMemo(() => createStatusBannerTone(mobileColors), [mobileColors]);
   const palette = statusBannerTone[tone];
+  const iconColor = bannerIconColor(palette.symbolTone, useIsDarkMode() ? "dark" : "light");
 
   if (variant === "centered") {
     return (
@@ -91,8 +85,8 @@ export function StatusBanner({
         actionLabel={actionLabel}
         body={body}
         fillScreen={fillScreen}
-        iconColor={palette.iconColor}
-        iconName={palette.centeredIconName}
+        iconColor={iconColor}
+        symbolTone={palette.symbolTone}
         onAction={onAction}
         title={title}
       />
@@ -102,7 +96,14 @@ export function StatusBanner({
   return (
     <View style={[styles.banner, { backgroundColor: palette.backgroundColor }]}>
       <View style={styles.copyRow}>
-        <Ionicons color={palette.iconColor} name={palette.iconName} size={24} style={styles.icon} />
+        <View style={styles.icon}>
+          <ToneSymbol
+            color={iconColor}
+            markColor={palette.backgroundColor}
+            size={24}
+            tone={palette.symbolTone}
+          />
+        </View>
         <View style={styles.copy}>
           <Text
             maxFontSizeMultiplier={MAX_FONT_SCALE}
@@ -132,7 +133,7 @@ export function StatusBanner({
 function CenteredStatus({
   title,
   body,
-  iconName,
+  symbolTone,
   iconColor,
   actionLabel,
   onAction,
@@ -140,7 +141,7 @@ function CenteredStatus({
 }: {
   title: string;
   body?: string;
-  iconName: keyof typeof Ionicons.glyphMap;
+  symbolTone: StatusIconTone;
   iconColor: string;
   actionLabel?: string;
   onAction?: () => void;
@@ -155,7 +156,12 @@ function CenteredStatus({
   return (
     <View style={[centeredStyles.card, fillScreen ? fillScreenAnchorStyles.fill : null]}>
       {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
-      <Ionicons color={iconColor} name={iconName} size={CONTENT_UNAVAILABLE_ICON_SIZE} />
+      <ToneSymbol
+        color={iconColor}
+        markColor="#FFFFFF"
+        size={CONTENT_UNAVAILABLE_ICON_SIZE}
+        tone={symbolTone}
+      />
       <View style={centeredStyles.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.title}>
           {title}

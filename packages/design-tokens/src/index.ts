@@ -72,6 +72,8 @@ export {
   type ToastTimingTone,
 } from "./toast-timing";
 
+export { bannerIconColor, TOAST_ICON_FILL, type StatusIconTone } from "./status-icon";
+
 export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
 
 export {

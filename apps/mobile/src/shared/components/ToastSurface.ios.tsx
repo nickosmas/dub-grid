@@ -1,4 +1,4 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { TOAST_ICON_FILL } from "@dubgrid/design-tokens";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useEffect, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -7,8 +7,9 @@ import { hapticNotify } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE, mobileSpace, mobileText, type MobileColors } from "../theme/tokens";
 import { Text } from "./Text";
+import { ToneSymbol } from "./ToneSymbol";
 import { useToastSwipe } from "./toast-swipe";
-import type { ToastSurfaceProps, ToastSurfaceTone } from "./ToastSurface.types";
+import type { ToastSurfaceProps } from "./ToastSurface.types";
 
 export type { ToastSurfaceProps } from "./ToastSurface.types";
 
@@ -16,17 +17,10 @@ const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
 const TOAST_HOST_GUTTER = 20;
 const TOAST_BOX_RADIUS = 24;
 
-const TONE_ICON: Record<ToastSurfaceTone, keyof typeof Ionicons.glyphMap> = {
-  error: "alert-circle",
-  success: "checkmark-circle",
-  info: "information-circle",
-  warning: "warning",
-};
-
 /**
  * A toast as an iOS 26 Liquid Glass capsule under the Dynamic Island, like the
- * system's own banners: clear glass with no tone fill, the tone carried by the
- * symbol alone. One line hugs its content as a capsule; with a second line it
+ * system's own banners: clear glass with no tone fill, the tone carried by a
+ * large filled symbol. One line hugs its content as a capsule; with a second line it
  * becomes a rounded box. Before iOS 26 it is a translucent surface with a
  * hairline.
  */
@@ -46,12 +40,7 @@ export function ToastSurface({
   );
   const swipe = useToastSwipe(onDismiss, "top");
   const isTwoLine = Boolean(title);
-  const iconColor = {
-    error: mobileColors.dangerText,
-    success: mobileColors.successText,
-    info: mobileColors.brand,
-    warning: mobileColors.warningText,
-  }[tone];
+  const symbolTone = tone === "error" ? "danger" : tone;
 
   useEffect(() => {
     if (tone !== "info") hapticNotify(tone);
@@ -59,11 +48,12 @@ export function ToastSurface({
 
   const content = (
     <>
-      <Ionicons
-        color={iconColor}
-        name={isOfflineNotice ? "cloud-offline" : TONE_ICON[tone]}
-        size={20}
-        style={isTwoLine ? styles.iconOnFirstLine : null}
+      <ToneSymbol
+        color={TOAST_ICON_FILL[symbolTone]}
+        markColor="#FFFFFF"
+        offline={isOfflineNotice}
+        size={28}
+        tone={symbolTone}
       />
       <View style={styles.copy}>
         {title ? (
@@ -118,10 +108,11 @@ const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight:
       alignItems: "center",
       borderRadius: 999,
       minHeight: 48,
+      paddingLeft: mobileSpace.md,
       paddingVertical: mobileSpace.md,
     },
     box: {
-      alignItems: "flex-start",
+      alignItems: "center",
       borderRadius: TOAST_BOX_RADIUS,
       paddingVertical: mobileSpace.md,
     },
@@ -129,10 +120,6 @@ const createStyles = (mobileColors: MobileColors, insetLeft: number, insetRight:
       backgroundColor: mobileColors.surface,
       borderColor: mobileColors.border,
       borderWidth: StyleSheet.hairlineWidth,
-    },
-    // Centres the 20pt symbol on the title's 22pt first line.
-    iconOnFirstLine: {
-      marginTop: 1,
     },
     copy: {
       flexShrink: 1,

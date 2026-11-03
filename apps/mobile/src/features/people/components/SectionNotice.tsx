@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { bannerIconColor } from "@dubgrid/design-tokens";
 import { AppText } from "../../../shared/components/AppText";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { ToneSymbol } from "../../../shared/components/ToneSymbol";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 
 /**
@@ -25,15 +26,17 @@ export function SectionNotice({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors, tone), [mobileColors, tone]);
+  const iconColor = bannerIconColor(tone, useIsDarkMode() ? "dark" : "light");
 
   if (messages.length === 0) return null;
 
   return (
     <View accessibilityRole="summary" style={styles.notice}>
-      <Ionicons
-        color={tone === "warning" ? mobileColors.warningText : mobileColors.dangerText}
-        name="warning"
-        size={16}
+      <ToneSymbol
+        color={iconColor}
+        markColor={tone === "warning" ? mobileColors.warningSoft : mobileColors.dangerSoft}
+        size={18}
+        tone={tone}
       />
       <View style={styles.messages}>
         {messages.map((message) => (
