@@ -76,10 +76,10 @@ if (typeof window !== "undefined" && !globalThis.__dubgridToastPatched) {
 }
 
 const ICONS = {
-  success: <StatusIcon tone="success" size={28} markColor="#ffffff" />,
-  error: <StatusIcon tone="danger" size={28} markColor="#ffffff" />,
-  warning: <StatusIcon tone="warning" size={28} markColor="#ffffff" />,
-  info: <StatusIcon tone="info" size={28} markColor="#ffffff" />,
+  success: <StatusIcon tone="success" size={28} markColor="white" />,
+  error: <StatusIcon tone="danger" size={28} markColor="white" />,
+  warning: <StatusIcon tone="warning" size={28} markColor="white" />,
+  info: <StatusIcon tone="info" size={28} markColor="white" />,
   loading: <LoaderCircle strokeWidth={2} className="animate-spin" aria-hidden />,
   close: <X strokeWidth={2} aria-hidden />,
 };
