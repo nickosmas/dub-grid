@@ -90,7 +90,12 @@ export function ActivityFeedCard({
           renderItem={(item) => <ActivityRow item={item} />}
         />
       ) : (
-        <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
+        <EmptyStateCard
+          body="Publishes, shift changes and requests show here."
+          compact
+          scene="activity-empty"
+          title="No recent activity"
+        />
       )}
     </DashboardCard>
   );

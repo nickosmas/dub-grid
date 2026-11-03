@@ -191,7 +191,7 @@ describe("AddToScheduleScreen", () => {
   it("says so when the org has no focus areas to assign", () => {
     renderScreen({ focusAreas: [] });
 
-    expect(emptyStateTitles).toContain("No focus areas");
+    expect(emptyStateTitles).toContain("No Focus Areas yet");
   });
 
   it("holds the save until at least one focus area is picked", () => {

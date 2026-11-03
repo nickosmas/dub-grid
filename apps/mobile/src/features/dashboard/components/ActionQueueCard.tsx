@@ -80,11 +80,7 @@ export function ActionQueueCard({
           renderItem={(request) => <ActionQueueRow request={request} />}
         />
       ) : (
-        <EmptyStateCard
-          compact
-          iconName="checkmark-circle"
-          title="No requests are waiting on you"
-        />
+        <EmptyStateCard compact scene="approvals-clear" title="No requests are waiting on you" />
       )}
     </DashboardCard>
   );

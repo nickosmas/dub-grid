@@ -149,11 +149,23 @@ export default function OpenShiftsExpandedScreen() {
 
       {filtered.length === 0 ? (
         activeFilterCount > 0 ? (
-          <EmptyStateCard iconName="checkmark-circle" title="No open shifts match this filter" />
+          <EmptyStateCard
+            actionLabel="Clear filter"
+            onAction={() => {
+              setUrgencyFilter("all");
+              setFocusAreaFilter("all");
+            }}
+            scene="open-shifts-filtered"
+            title="No open shifts match this filter"
+          />
         ) : (
           <EmptyStateCard
             {...getOpenShiftsEmptyCopy(dashboardQuery.data?.metrics.coverageWindow)}
-            iconName="checkmark-circle"
+            scene={
+              dashboardQuery.data?.metrics.coverageWindow === "unpublished"
+                ? "not-published"
+                : "open-shifts-none"
+            }
           />
         )
       ) : (

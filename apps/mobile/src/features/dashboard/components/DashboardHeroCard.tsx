@@ -115,16 +115,16 @@ export function DashboardHeroCard({
     >
       {unpublished ? (
         <EmptyStateCard
-          body="Coverage and open gaps will appear after this period is published."
+          body="Coverage and open shifts show here once this period is published."
           compact
-          iconName="calendar-outline"
+          scene="not-published"
           title="Not published yet"
         />
       ) : !configured ? (
         <EmptyStateCard
-          body="Set how many people each shift needs in Settings on the web, and coverage shows here."
+          body="Set how many people each shift needs in Settings on the web."
           compact
-          iconName="options-outline"
+          scene="staffing-needs"
           title="Set staffing needs"
         />
       ) : (

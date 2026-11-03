@@ -16,14 +16,15 @@ import {
   type MobileColors,
   mobileSpace,
 } from "../../../shared/theme/tokens";
-import { ProfileQuickActions, type ProfileHeroAlign } from "./ProfilePrimitives";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { groupedCardEdge, ProfileQuickActions, type ProfileHeroAlign } from "./ProfilePrimitives";
 
 /** `avatar` in ProfilePrimitives. */
 const AVATAR_SIZE = 64;
 /** `avatar` + `avatarLarge`, the size a centered hero's avatar takes. */
 const CENTERED_AVATAR_SIZE = 96;
-/** `iconBadge` in ProfilePrimitives. */
-const ICON_BADGE_SIZE = 32;
+/** `iconBadge` in ProfilePrimitives, or the bare 22pt glyph a native list draws. */
+const ICON_BADGE_SIZE = IS_NATIVE_LIST ? 22 : 32;
 
 /** The row shapes the profile screens build their framed lists from. */
 export type ProfileRowVariant =
@@ -71,8 +72,10 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
 
   if (variant === "nav") {
     return (
-      <View style={[styles.row, styles.navRow]}>
-        <SkeletonIcon size={ICON_BADGE_SIZE} />
+      <View style={[styles.row, styles.navRow, IS_NATIVE_LIST && styles.rowNative]}>
+        <View style={styles.iconColumn}>
+          <SkeletonIcon size={ICON_BADGE_SIZE} />
+        </View>
         <View style={styles.rowCopy}>
           <SkeletonLine variant="cardTitle" width="52%" />
         </View>
@@ -82,8 +85,10 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   }
 
   return (
-    <View style={styles.row}>
-      <SkeletonIcon size={ICON_BADGE_SIZE} />
+    <View style={[styles.row, IS_NATIVE_LIST && styles.rowNative]}>
+      <View style={styles.iconColumn}>
+        <SkeletonIcon size={ICON_BADGE_SIZE} />
+      </View>
       <View style={styles.rowCopy}>
         <SkeletonLine variant="caption" width="34%" />
         <SkeletonLine variant="rowTitle" width="64%" />
@@ -160,8 +165,10 @@ const QUICK_ACTION_WIDTHS = [88, 100];
  * a teammate's detail page, and the three profile settings screens.
  *
  * Built from the same vocabulary as `ProfilePrimitives` — a 64pt avatar hero
- * (96pt where the real one is centered), a wrapped meta grid, then framed
- * 16-radius lists of 66pt rows — because that is what actually replaces it. The
+ * (96pt where the real one is centered), a wrapped meta grid, then grouped
+ * lists whose rows and dividers follow the real ones (52pt native rows with
+ * dividers inset past the icon on iOS and Android) — because that is what
+ * actually replaces it. The
  * generic detail skeleton it supersedes drew none of the frames and sized the
  * avatar as a 56×64 rectangle.
  *
@@ -226,9 +233,12 @@ export function ProfileSkeleton({
               {skeletonRows(section.rows, (rowIndex) => (
                 <View
                   key={`profile-row-${sectionIndex}-${rowIndex}`}
-                  style={rowIndex < section.rows - 1 ? styles.rowDivider : null}
+                  style={rowIndex < section.rows - 1 && !IS_NATIVE_LIST ? styles.rowDivider : null}
                 >
                   <ProfileRow variant={section.rowVariant ?? rowVariant} />
+                  {rowIndex < section.rows - 1 && IS_NATIVE_LIST ? (
+                    <View style={styles.insetDivider} />
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -299,14 +309,13 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // and the rows are clipped to the corners one level down.
     list: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
       ...mobileElevation("card", isDark),
+      ...groupedCardEdge(mobileColors, isDark),
     },
     listClip: {
       overflow: "hidden",
-      borderRadius: mobileRadii.card - 1,
+      borderRadius: IS_NATIVE_LIST ? mobileRadii.card : mobileRadii.card - 1,
     },
     row: {
       alignItems: "center",
@@ -318,6 +327,26 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     navRow: {
       minHeight: 70,
+    },
+    // ProfilePrimitives' `rowNative`: the platform's row height.
+    rowNative: {
+      minHeight: 52,
+      paddingVertical: mobileSpace.md,
+    },
+    // The real icon column, so the copy starts where the row's text will.
+    iconColumn: {
+      alignItems: "center",
+      justifyContent: "center",
+      width: IS_NATIVE_LIST ? 28 : ICON_BADGE_SIZE,
+    },
+    // Starts at the text, past the icon column (16 + 28 + 12), as the real one.
+    insetDivider: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      left: 56,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: mobileColors.borderSubtle,
     },
     toggleRow: {
       alignItems: "center",

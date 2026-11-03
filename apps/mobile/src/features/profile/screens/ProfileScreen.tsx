@@ -430,10 +430,14 @@ export default function ProfileScreen() {
         </>
       ) : contentState.kind === "empty" || !profile ? (
         <EmptyStateCard
+          actionLabel="Try again"
+          body="Check your connection."
           fillScreen
-          body="We couldn't load your account details. Try signing out and back in."
-          iconName="person-circle-outline"
-          title="Profile unavailable"
+          onAction={() => {
+            void profileQuery.refetch();
+          }}
+          scene="profile-unavailable"
+          title="Couldn't load your profile"
         />
       ) : (
         <>

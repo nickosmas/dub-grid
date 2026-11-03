@@ -983,7 +983,7 @@ export default function PersonDetailScreen() {
         <EmptyStateCard
           fillScreen
           body="This teammate isn't in your directory anymore."
-          iconName="person-outline"
+          scene="person-not-found"
           title="Person not found"
         />
       </Screen>

@@ -905,7 +905,7 @@ describe("PeopleScreen", () => {
       target: { value: "private@dubgrid.com" },
     });
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
-    expect(screen.getByText("No matches")).toBeInTheDocument();
+    expect(screen.getByText("No one matches \u201cprivate@dubgrid.com\u201d")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Search people"), {
       target: { value: "Charge Nurse" },

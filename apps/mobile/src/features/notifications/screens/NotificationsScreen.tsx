@@ -417,16 +417,29 @@ export default function NotificationsScreen() {
           onAction={() => notificationsQuery.refetch()}
         />
       ) : contentState.kind === "empty" ? (
-        <EmptyStateCard
-          fillScreen
-          body={
-            debouncedSearch || filter !== "all"
-              ? "Try clearing your filters or search."
-              : "Schedule updates and request decisions will appear here."
-          }
-          iconName="notifications-outline"
-          title={debouncedSearch || filter !== "all" ? "No matching alerts" : "No alerts yet"}
-        />
+        filter !== "all" ? (
+          <EmptyStateCard
+            actionLabel="Clear filter"
+            fillScreen
+            onAction={() => setFilter("all")}
+            scene="alerts-filtered"
+            title="No alerts match this filter"
+          />
+        ) : debouncedSearch ? (
+          <EmptyStateCard
+            body="Check the spelling, or try another word."
+            fillScreen
+            scene="alerts-filtered"
+            title={`No alerts match \u201c${debouncedSearch}\u201d`}
+          />
+        ) : (
+          <EmptyStateCard
+            body="Schedule updates and request decisions show here."
+            fillScreen
+            scene="alerts-none"
+            title="No alerts yet"
+          />
+        )
       ) : null}
       <ConfirmationModal
         cancelLabel="Cancel"
