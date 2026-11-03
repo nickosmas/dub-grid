@@ -82,6 +82,7 @@ import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import {
   getAvatarInitials,
@@ -671,6 +672,12 @@ export function MembersSection({
   const canAddManagement = canManageManagementAccess && managementDepts.length > 0;
 
   const clearManagementFilters = managementFilters.clearFilters;
+  // The hook's count includes a non-default sort, which never empties the list.
+  const managementNarrowingFilterCount = [
+    deptFilterId !== null,
+    managementFilters.filterRole !== "all",
+    managementFilters.filterInvitation !== "all",
+  ].filter(Boolean).length;
   useEffect(() => {
     if (!showManagement) {
       clearManagementFilters();
@@ -1875,6 +1882,7 @@ export function MembersSection({
               <StaffEmptyState
                 activeTab={activeTab}
                 hasFilters={Boolean(searchQuery || hasActiveFilters)}
+                activeFilterCount={activeFilterCount}
                 onClearFilters={clearFilters}
               />
             ))}
@@ -2134,6 +2142,14 @@ export function MembersSection({
                   searchQuery || managementHasActiveFilters
                     ? "Try adjusting your search or filters."
                     : "People on an administrative team will show here."
+                }
+                action={
+                  managementNarrowingFilterCount > 0 ? (
+                    <ClearFiltersButton
+                      activeFilterCount={managementNarrowingFilterCount}
+                      onClear={clearManagementFilters}
+                    />
+                  ) : undefined
                 }
               />
             ))}

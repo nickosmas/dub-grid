@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 
 const BADGE_STYLES: Record<
   OpenShift["urgency"],
@@ -64,6 +65,9 @@ export default function ExpandedOpenShifts({
     [openShifts],
   );
   const filteredSlotCount = filtered.reduce((total, shift) => total + shift.needed, 0);
+  const openShiftFilterCount = [urgencyFilter !== "all", focusAreaFilter !== "all"].filter(
+    Boolean,
+  ).length;
 
   return (
     <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
@@ -150,9 +154,25 @@ export default function ExpandedOpenShifts({
                 <EmptyState
                   size="compact"
                   heading={
-                    isPartial
-                      ? "No open shifts on published dates"
-                      : "No open shifts matching filters"
+                    openShiftFilterCount > 1
+                      ? "No open shifts match these filters"
+                      : openShiftFilterCount === 1
+                        ? "No open shifts match this filter"
+                        : isPartial
+                          ? "No open shifts on published dates"
+                          : "No open shifts"
+                  }
+                  action={
+                    openShiftFilterCount > 0 ? (
+                      <ClearFiltersButton
+                        activeFilterCount={openShiftFilterCount}
+                        onClear={() => {
+                          setUrgencyFilter("all");
+                          setFocusAreaFilter("all");
+                        }}
+                        small
+                      />
+                    ) : undefined
                   }
                 />
               ) : (

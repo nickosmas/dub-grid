@@ -38,6 +38,8 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { Button } from "@/components/Button";
 import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
+import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import {
@@ -280,6 +282,12 @@ export function InboxView({
   const userId = user?.id ?? null;
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  // Inbox or Archived is the section, and the search box clears itself.
+  const activeFilterCount = [
+    filters.read !== DEFAULT_FILTERS.read,
+    filters.category !== DEFAULT_FILTERS.category,
+    filters.priority !== DEFAULT_FILTERS.priority,
+  ].filter(Boolean).length;
 
   const visibleCategories = useMemo<CategoryFilter[]>(
     () =>
@@ -664,15 +672,32 @@ export function InboxView({
         ) : notifications.length === 0 ? (
           <EmptyState
             icon={<Inbox size={28} />}
-            heading="No alerts"
+            heading={activeFilterCount > 0 ? "No alerts match" : "No alerts"}
             description={
-              debouncedSearch ||
-              filters.read !== "all" ||
-              filters.category !== "all" ||
-              filters.priority !== "all" ||
-              filters.includeArchived
-                ? "Try clearing or loosening your filters."
-                : "You're all caught up."
+              activeFilterCount > 0
+                ? activeFilterCount === 1
+                  ? "Nothing here matches this filter."
+                  : "Nothing here matches these filters."
+                : debouncedSearch
+                  ? "Nothing here matches your search."
+                  : filters.includeArchived
+                    ? "Alerts you archive show up here."
+                    : "You're all caught up."
+            }
+            action={
+              activeFilterCount > 0 ? (
+                <ClearFiltersButton
+                  activeFilterCount={activeFilterCount}
+                  onClear={() =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      read: DEFAULT_FILTERS.read,
+                      category: DEFAULT_FILTERS.category,
+                      priority: DEFAULT_FILTERS.priority,
+                    }))
+                  }
+                />
+              ) : undefined
             }
           />
         ) : (
@@ -1394,51 +1419,19 @@ function NotificationRow({
 function ListPlaceholder() {
   return (
     <div
-      style={{
-        background: "var(--dg-color-surface)",
-        border: "1px solid var(--dg-color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        padding: 0,
-        overflow: "hidden",
-      }}
+      className="overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
       aria-busy="true"
-      aria-live="polite"
+      aria-label="Loading alerts"
     >
-      {[0, 1, 2, 3].map((i) => (
+      {["w-[40%]", "w-[32%]", "w-[46%]", "w-[36%]"].map((width, index) => (
         <div
-          key={i}
-          style={{
-            display: "flex",
-            gap: 12,
-            padding: "16px",
-            borderBottom: i < 3 ? "1px solid var(--dg-color-border-light)" : "none",
-          }}
+          key={index}
+          className="flex gap-3 border-b border-[var(--dg-color-border-light)] p-4 last:border-b-0"
         >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: "var(--dg-color-bg-secondary)",
-            }}
-          />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-            <div
-              style={{
-                width: "40%",
-                height: 12,
-                background: "var(--dg-color-bg-secondary)",
-                borderRadius: "var(--dg-radius-xs)",
-              }}
-            />
-            <div
-              style={{
-                width: "70%",
-                height: 10,
-                background: "var(--dg-color-bg-secondary)",
-                borderRadius: "var(--dg-radius-xs)",
-              }}
-            />
+          <Skeleton className="h-8 w-8 shrink-0 dg-skeleton--round" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className={`h-3 ${width}`} />
+            <Skeleton className="h-2.5 w-[70%]" />
           </div>
         </div>
       ))}

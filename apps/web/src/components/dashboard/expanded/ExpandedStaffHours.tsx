@@ -12,6 +12,7 @@ import Modal from "@/components/Modal";
 
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 
 type SortMode = "hours" | "name";
 
@@ -157,7 +158,23 @@ export default function ExpandedStaffHours({
           style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}
         >
           {sorted.length === 0 ? (
-            <EmptyState size="compact" heading="No staff matching filters" />
+            <EmptyState
+              size="compact"
+              heading={
+                faFilter !== "all" && faMap.has(faFilter)
+                  ? `No one in ${faMap.get(faFilter)?.name} is over the limit`
+                  : "No one is over the limit"
+              }
+              action={
+                faFilter === "all" ? undefined : (
+                  <ClearFiltersButton
+                    activeFilterCount={1}
+                    onClear={() => setFaFilter("all")}
+                    small
+                  />
+                )
+              }
+            />
           ) : (
             sorted.map((h) => {
               const emp = empMap.get(h.empId);

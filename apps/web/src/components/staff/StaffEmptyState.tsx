@@ -1,16 +1,24 @@
 "use client";
 
 import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@/components/Button";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import type { EmployeeTab } from "./useStaffFilters";
 
 interface StaffEmptyStateProps {
   activeTab: EmployeeTab;
+  /** A search or a filter narrowed the list. */
   hasFilters: boolean;
+  /** Filters alone: a search clears from its own box. */
+  activeFilterCount: number;
   onClearFilters: () => void;
 }
 
-export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: StaffEmptyStateProps) {
+export function StaffEmptyState({
+  activeTab,
+  hasFilters,
+  activeFilterCount,
+  onClearFilters,
+}: StaffEmptyStateProps) {
   const title = hasFilters
     ? "No results found"
     : activeTab === "active"
@@ -49,14 +57,8 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       title={title}
       description={description}
       action={
-        hasFilters ? (
-          <Button
-            onClick={onClearFilters}
-            className="dg-btn dg-btn-secondary"
-            style={{ marginTop: 8 }}
-          >
-            Clear filters
-          </Button>
+        activeFilterCount > 0 ? (
+          <ClearFiltersButton activeFilterCount={activeFilterCount} onClear={onClearFilters} />
         ) : undefined
       }
     />

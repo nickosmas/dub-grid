@@ -1,7 +1,7 @@
 # Fix: Empty states and skeletons refinement
 
 **Type:** Fix
-**Status:** in progress
+**Status:** verified
 
 Design reference: the "Empty states and skeletons" canvas (owner, 2026-11-02 and 2026-11-03), and its "Recommended approach" board.
 
@@ -68,12 +68,12 @@ Buttons stay text-only. Staff copy says "the app", never DubGrid.
   - Password and Add to schedule skeletons drawn as their controls.
   - The ungated skeletons go through the gate.
   - **Done when:** each skeleton overlays its loaded screen without a jump.
-- [ ] 7. **Web empty states:**
+- [x] 7. **Web empty states:**
   - No dashed border.
   - Clear filters on Alerts, admin teams and the schedule grid's search.
   - The 5 loading messages become skeletons.
   - **Done when:** screenshots show each, light and dark.
-- [ ] 8. **Web skeletons:**
+- [x] 8. **Web skeletons:**
   - A dark `.dg-skeleton` sweep.
   - Skeletons for People, Profile and the staff page.
   - **Done when:** a throttled load shows them in light and dark.

@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ProgressBar from "@/components/ProgressBar";
+import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
+import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
@@ -1336,6 +1338,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     ) : null;
 
   const isLoading = loading || orgLoading || perms.isLoading;
+  const showSkeleton = useSkeletonGate(!(employee && org) && !error);
 
   if (!perms.isLoading && !perms.canViewEmployeeDetails) {
     return <ProgressBar loading />;
@@ -1364,8 +1367,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       {focusAreaDialog}
 
       {/* A re-run of the load (permissions settling, a bootstrap refetch) keeps
-          the rendered profile in place; only a first load shows nothing. */}
-      {employee && org && (
+          the rendered profile in place; only a first load shows the skeleton. */}
+      {showSkeleton ? <PersonPageSkeleton variant="staff" tabCount={4} /> : null}
+      {employee && org && !showSkeleton && (
         <div
           ref={contentScrollerRef}
           className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"

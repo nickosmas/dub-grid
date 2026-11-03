@@ -7,7 +7,9 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/Button";
 import { StatusPill } from "@/components/ui/status-pill";
 import CustomSelect from "@/components/CustomSelect";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { EmptyState } from "@/components/EmptyState";
+import { ListRowsSkeleton, MonthCalendarSkeleton } from "@/components/LoadingSkeletons";
 import { describePreference, shiftLabel } from "@/components/staff/PreferencesModal";
 import { fetchJobPreferences, fetchShiftPreferences } from "@/features/schedule/client";
 import { DAY_LABELS } from "@/lib/constants";
@@ -187,7 +189,16 @@ export function ScheduleTab({
       </div>
 
       {loading ? (
-        <EmptyState size="compact" title="Loading their schedule" />
+        asCalendar ? (
+          <MonthCalendarSkeleton label="Loading their schedule" />
+        ) : (
+          <ListRowsSkeleton
+            rows={6}
+            dateColumn="wide"
+            weekHeadings
+            label="Loading their schedule"
+          />
+        )
       ) : asCalendar ? (
         <PersonMonthCalendar
           employeeId={employee.id}
@@ -198,7 +209,15 @@ export function ScheduleTab({
           loadMonth={loadMonth}
         />
       ) : weeks.length === 0 ? (
-        <EmptyState size="compact" title={`Nothing ${periodPhrase}`} />
+        <EmptyState
+          size="compact"
+          title={`Nothing ${periodPhrase}`}
+          action={
+            filter === "all" ? undefined : (
+              <ClearFiltersButton activeFilterCount={1} onClear={() => setFilter("all")} small />
+            )
+          }
+        />
       ) : (
         <section className="dg-card overflow-hidden" aria-label="Shifts and time off">
           {weeks.map((week, weekIndex) => (
