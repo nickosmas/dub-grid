@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Check, Lock, Moon, UserMinus, type LucideIcon } from "lucide-react";
+import { CalendarDays, CircleCheck, Lock, Plane, UserMinus, type LucideIcon } from "lucide-react";
 import { formatDateKey } from "@/lib/utils";
 import {
   statusMark,
@@ -10,18 +10,19 @@ import {
   type StatusTone,
 } from "@dubgrid/domain";
 import { MaybeHint } from "@/components/ui/hint";
+import { StatusIcon as SolidStatusIcon } from "@/components/ui/StatusIcon";
 
 export const STATUS_MARK_ICONS: Record<StatusMarkKind, LucideIcon> = {
   suspended: Lock,
-  away: Moon,
+  away: Plane,
   planned: CalendarDays,
   archived: UserMinus,
 };
 
 /** The icon for each status a person can be in or be moved to. */
 export const STATUS_KIND_ICONS: Record<StatusChoiceKind, LucideIcon> = {
-  active: Check,
-  away: Moon,
+  active: CircleCheck,
+  away: Plane,
   suspended: Lock,
   archived: UserMinus,
 };
@@ -52,7 +53,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
- * moon for Away, a calendar for a planned away, a person with a minus for Offboarded.
+ * plane for Away, a calendar for a planned away, a person with a minus for Offboarded.
  * `only` limits it to some kinds, as the grid does.
  */
 export function StatusMarkIcon({
@@ -91,34 +92,21 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
   return <Icon aria-hidden="true" size={size} strokeWidth={2.4} />;
 }
 
-/** An icon in a tinted circle, for the status card and the Change staff status dialog. */
-export function StatusIconCircle({
-  icon: Icon,
-  tone,
-  size = 32,
-}: {
-  icon: LucideIcon;
-  tone: StatusTone;
-  size?: number;
-}) {
-  const colors = STATUS_TONE_COLORS[tone];
+const SYMBOL_COLORS: Record<StatusTone, string> = {
+  success: "var(--dg-color-banner-success-icon)",
+  warning: "var(--dg-color-banner-warning-icon)",
+  danger: "var(--dg-color-banner-danger-icon)",
+  neutral: "var(--dg-color-text-muted)",
+};
+
+/**
+ * A status's icon drawn solid in its tone, as banners draw theirs, for the
+ * status card and the Change staff status dialog.
+ */
+export function StatusSymbol({ icon, tone }: { icon: LucideIcon; tone: StatusTone }) {
   return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        background: colors.bg,
-        border: `1px solid ${colors.border}`,
-        color: colors.text,
-      }}
-    >
-      <Icon size={Math.round(size / 2)} strokeWidth={2.4} />
+    <span aria-hidden="true" style={{ display: "flex", flexShrink: 0, color: SYMBOL_COLORS[tone] }}>
+      <SolidStatusIcon tone={tone === "neutral" ? "info" : tone} icon={icon} size={25} />
     </span>
   );
 }

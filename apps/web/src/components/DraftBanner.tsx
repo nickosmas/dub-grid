@@ -7,6 +7,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import ChangeCountChips from "@/components/ChangeCountChips";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { BannerIcon } from "@/components/ui/Banner";
 
 interface DraftBannerProps {
   onPublish: () => void;
@@ -39,7 +40,7 @@ export default function DraftBanner({
 
   return (
     <div className="dg-draft-banner no-print" data-tour="draft-banner">
-      <FilePen size={16} className="shrink-0" aria-hidden="true" />
+      <BannerIcon tone="warning" icon={FilePen} />
       <span style={{ fontWeight: 700 }}>Draft changes</span>
       {/* Every draft change is highlighted on the grid, with no toggle to
           switch that off, so these counts are also the key for what is

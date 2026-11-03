@@ -1,10 +1,11 @@
 "use client";
 
-import { MonitorSmartphone, CalendarClock } from "lucide-react";
+import { Monitor, CalendarClock } from "lucide-react";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import Modal from "@/components/Modal";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { BannerIcon } from "@/components/ui/Banner";
 
 export function ScheduleSessionWarning({
   sessionCount,
@@ -21,7 +22,7 @@ export function ScheduleSessionWarning({
 
   return (
     <div className="dg-draft-banner dg-draft-banner--danger no-print" role="alert">
-      <MonitorSmartphone size={16} className="shrink-0" aria-hidden="true" />
+      <BannerIcon tone="danger" icon={Monitor} />
       <strong>Schedule open elsewhere</strong>
       <span>
         Your account has this schedule open in {sessionLabel}. End those schedule sessions before
