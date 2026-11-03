@@ -1339,7 +1339,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
       </View>
 
-      <View style={styles.calendarBlock}>
+      <View>
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
