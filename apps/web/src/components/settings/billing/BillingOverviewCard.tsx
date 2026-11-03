@@ -1,14 +1,7 @@
 import type { ReactNode } from "react";
 import { Tag } from "lucide-react";
 import type { BillingOverview, BillingTimelineStep } from "@/features/billing/overview";
-import {
-  BillingCard,
-  FooterNote,
-  IconTile,
-  ProgressRing,
-  StatusBadge,
-  toneColors,
-} from "./billing-ui";
+import { BillingCard, IconTile, ProgressRing, StatusBadge, toneColors } from "./billing-ui";
 
 const DOT = 14;
 
@@ -115,11 +108,9 @@ function Timeline({ steps }: { steps: BillingTimelineStep[] }) {
 
 export function BillingOverviewCard({
   overview,
-  footerNote,
   actions,
 }: {
   overview: BillingOverview;
-  footerNote: string;
   actions: ReactNode;
 }) {
   const { visual } = overview;
@@ -131,7 +122,7 @@ export function BillingOverviewCard({
       aside={<StatusBadge label={overview.status.label} tone={overview.status.tone} />}
       footer={
         <>
-          <FooterNote>{footerNote}</FooterNote>
+          <span aria-hidden="true" className="hidden sm:block sm:flex-1" />
           {actions}
         </>
       }
@@ -194,20 +185,22 @@ export function BillingOverviewCard({
             >
               {overview.lead}
             </p>
-            <p
-              className="justify-center sm:justify-start"
-              style={{
-                margin: "10px 0 0",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-              }}
-            >
-              <Tag size={13} aria-hidden="true" />
-              DubGrid is billed monthly for each seat.
-            </p>
+            {overview.pricingNote && (
+              <p
+                className="justify-center sm:justify-start"
+                style={{
+                  margin: "10px 0 0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--dg-color-text-muted)",
+                }}
+              >
+                <Tag size={13} aria-hidden="true" />
+                DubGrid is billed monthly for each seat.
+              </p>
+            )}
           </div>
         </div>
         <Timeline steps={overview.timeline} />

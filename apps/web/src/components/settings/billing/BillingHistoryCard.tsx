@@ -56,7 +56,7 @@ export function BillingHistoryCard({ operations }: { operations: BillingOperatio
         />
       }
       footer={
-        <FooterNote>Invoices and receipts can be downloaded from the billing portal.</FooterNote>
+        <FooterNote>Payment methods, invoices, and receipts are in the billing portal.</FooterNote>
       }
     >
       {rows.length === 0 ? (
