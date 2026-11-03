@@ -32,6 +32,10 @@ import {
   type RehearsalRecord,
 } from "./lib/migration-rehearsal";
 
+// The scratch stack lives outside the repo, where `npx supabase` would fetch the
+// newest CLI rather than the version package.json pins.
+const SUPABASE_CLI = resolve(import.meta.dirname, "../node_modules/.bin/supabase");
+
 // The rehearsal reads only the database, so every other service stays down.
 const EXCLUDED_SERVICES = [
   "gotrue",
@@ -159,6 +163,13 @@ function run(
   return output;
 }
 
+function supabase(args: string[], options: { cwd: string; allowFailure?: boolean }): string {
+  if (!existsSync(SUPABASE_CLI)) {
+    throw new Error("The pinned Supabase CLI is missing; run `npm ci --ignore-scripts` first.");
+  }
+  return run(SUPABASE_CLI, args, options);
+}
+
 function portInUse(port: number): Promise<boolean> {
   return new Promise((resolvePort) => {
     const socket = createConnection({ host: "127.0.0.1", port });
@@ -236,18 +247,14 @@ function inspect(repoRoot: string, scratch: Scratch, expectComplete: boolean): s
 }
 
 function dryRun(scratch: Scratch): ReturnType<typeof parseDryRunVersions> {
-  const output = run(
-    "npx",
-    ["supabase", "db", "push", "--local", "--workdir", scratch.workdir, "--dry-run"],
-    {
-      cwd: scratch.workdir,
-    },
-  );
+  const output = supabase(["db", "push", "--local", "--workdir", scratch.workdir, "--dry-run"], {
+    cwd: scratch.workdir,
+  });
   return parseDryRunVersions(output);
 }
 
 function stop(scratch: Scratch): void {
-  run("npx", ["supabase", "stop", "--workdir", scratch.workdir, "--no-backup"], {
+  supabase(["stop", "--workdir", scratch.workdir, "--no-backup"], {
     cwd: scratch.workdir,
     allowFailure: true,
   });
@@ -381,7 +388,7 @@ async function main(): Promise<void> {
   try {
     await assertPortsFree(ports);
     const excluded = options.seeded ? SEEDED_EXCLUDED_SERVICES : EXCLUDED_SERVICES;
-    run("npx", ["supabase", "start", "--workdir", scratch.workdir, "-x", excluded.join(",")], {
+    supabase(["start", "--workdir", scratch.workdir, "-x", excluded.join(",")], {
       cwd: scratch.workdir,
     });
     if (options.seeded) {
@@ -412,7 +419,7 @@ async function main(): Promise<void> {
       );
     }
 
-    run("npx", ["supabase", "db", "push", "--local", "--workdir", scratch.workdir, "--yes"], {
+    supabase(["db", "push", "--local", "--workdir", scratch.workdir, "--yes"], {
       cwd: scratch.workdir,
     });
     const inspectorAfter = inspect(repoRoot, scratch, true);

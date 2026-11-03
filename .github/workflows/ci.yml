@@ -134,13 +134,10 @@ jobs:
       # of through turbo, so nothing else builds them first.
       - run: npm run build:packages
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
-        with:
-          version: "2.111.0" # pinned: `latest` silently adopts any new CLI build
-
+      # The CLI is the `supabase` dev dependency, so CI runs the version local
+      # and production commands do.
       - name: Start Supabase
-        run: supabase start
+        run: npx supabase start
 
       - name: Seed database
         run: npx tsx seed.ts

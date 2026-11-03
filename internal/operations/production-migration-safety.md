@@ -17,6 +17,28 @@ Supabase compares these files with `supabase_migrations.schema_migrations` and
 [Supabase migration guide](https://supabase.com/docs/guides/deployment/database-migrations)
 and [CLI reference](https://supabase.com/docs/reference/cli/v0/supabase-gen-types-typescript).
 
+## Which Supabase CLI
+
+Every `npx supabase` below runs the CLI pinned as the `supabase` dev
+dependency in the root `package.json`, the same version CI installs. Check it
+from the checkout or worktree you will apply from before the first command:
+
+```bash
+npx supabase --version
+```
+
+It must print the pinned version. Anything else means npx found no local
+install (outside the repository, or `node_modules` predates the pin) and
+fetched one: run `npm ci --ignore-scripts` in the repository first. Never run
+a global or Homebrew `supabase`, or `npx supabase@latest`, for a release: CLI
+3.0 refuses `supabase/config.toml` (`[inbucket] ... is no longer supported`),
+and an unpinned CLI can change behavior between rehearsal and apply. Moving to
+3.x is its own change, made to the config, the pin and CI together.
+
+The `--linked` commands sign in with `SUPABASE_ACCESS_TOKEN` and
+`SUPABASE_DB_PASSWORD` from `.env.remote` when they are exported; without them
+a shell that cannot prompt waits silently for a login.
+
 ## Non-negotiable stops
 
 Stop without applying anything when any of these is true:
@@ -113,8 +135,10 @@ runs, for review or a manual rehearsal:
    against it: Arden Wood is a real client and the rehearsal needs no data.
 2. Move the pending migrations out of the scratch `migrations/` folder so it
    holds exactly the versions production already has.
-3. Start it: `npx supabase start --workdir <scratch>` (exclude the services the
-   rehearsal does not read with `-x`).
+3. Start it: `npx supabase start --workdir <scratch>` from the repository, not
+   from the scratch directory, where npx would download the newest CLI instead
+   of the pinned one (exclude the services the rehearsal does not read with
+   `-x`).
 4. Run the inspector against it in local mode. Its ledger, missing list and
    invariant rows must match the production report line for line:
 
@@ -129,7 +153,8 @@ every pending SQL file before going further.
 ## 3. Rehearse on the scratch stack
 
 Restore the pending migrations into the scratch `migrations/` folder, then
-preview and apply with `--local` from the scratch directory. The CLI insists on
+preview and apply with `--local --workdir <scratch>`, run from the repository
+so npx uses the pinned CLI. The CLI insists on
 TLS for any `--db-url`, which the local container does not speak, so `--local`
 is the only path that exercises `db push` here:
 
@@ -176,7 +201,7 @@ Immediately before the approved maintenance window:
 4. Obtain the separate explicit production-apply authorization.
 5. Apply once with `npx supabase db push --linked` from the candidate
    checkout or worktree (copy the gitignored `supabase/.temp/` link metadata
-   into a worktree). Do not use `--db-url` with the `.env.remote` connection
+   into a worktree, and check the CLI version there as above). Do not use `--db-url` with the `.env.remote` connection
    string: it targets the transaction-mode pooler on port 6543, and the CLI
    fails there with `prepared statement already exists` (SQLSTATE 42P05).
    Never include seed data.
