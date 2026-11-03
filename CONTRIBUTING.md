@@ -7,7 +7,9 @@ DubGrid is proprietary software. All contributions must be authorized.
 ## Development Setup
 
 1. Follow the [Getting Started](README.md#getting-started) guide.
-2. Ensure the Supabase CLI is installed and `supabase start` runs cleanly.
+2. Ensure Docker is running and `npx supabase start` runs cleanly. The CLI is
+   the pinned `supabase` dev dependency, the same version CI uses; run it
+   through `npx` or an npm script rather than a global install.
 3. Run `npm run db:reset` to apply migrations and seed the local database.
 4. Run `npm run hooks:install` to enable the repo's git hooks (see below).
 5. Run `npm test` to confirm everything passes before making changes.

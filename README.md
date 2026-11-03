@@ -58,8 +58,8 @@ DubGrid is an active, full-stack monorepo rather than a starter application. The
 ## Prerequisites
 
 - Node.js 22.x with npm 10.x (`engines` in `package.json`; `.nvmrc` pins 22.13.0 and `packageManager` pins npm 10.9.2)
-- [Supabase CLI](https://supabase.com/docs/guides/cli) (for local development)
-- A Supabase project (or use local dev with `supabase start`)
+- Docker, for the local Supabase stack. The [Supabase CLI](https://supabase.com/docs/guides/cli) is a pinned dev dependency (`supabase` in `package.json`), so `npm install` brings it and `npx supabase` runs that version; a global or Homebrew `supabase` may be a different major
+- A Supabase project (or use local dev with `npx supabase start`)
 
 ## Getting Started
 
