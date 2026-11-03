@@ -1,7 +1,12 @@
 import {
+  AlarmClock,
+  CircleCheck,
+  CircleCheckBig,
+  CircleX,
   Clock,
   Eye,
   Hourglass,
+  Info,
   Lock,
   Mail,
   MailX,
@@ -38,8 +43,21 @@ const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
   },
 };
 
-// Own icons with a natural solid form. Any other own icon sits in a tone circle.
+// Own icons with a natural solid form. Any other own icon sits in a tone circle,
+// so an icon drawn in a ring needs an entry here, or it shows a ring in a disc.
 const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
+  [CircleCheck, TONE_GLYPHS.success],
+  [CircleCheckBig, TONE_GLYPHS.success],
+  [Info, TONE_GLYPHS.info],
+  [CircleX, { fill: [CIRCLE], cut: ["m15 9-6 6", "m9 9 6 6"] }],
+  [
+    AlarmClock,
+    {
+      fill: ["M12 5a8 8 0 1 0 0 16a8 8 0 1 0 0-16z"],
+      stroke: ["M5 3 2 6", "m22 6-3-3", "M6.38 18.7 4 21", "M17.64 18.67 20 21"],
+      cut: ["M12 9v4l2 2"],
+    },
+  ],
   [
     Lock,
     {
