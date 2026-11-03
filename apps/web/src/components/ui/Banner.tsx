@@ -7,39 +7,37 @@ export type BannerTone = "info" | "success" | "warning" | "danger";
 const BANNER_ICON_SIZE = 25;
 
 const TONE_CLASSES: Record<BannerTone, string> = {
-  info: "border-[var(--dg-color-banner-info-border)] bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
-  success:
-    "border-[var(--dg-color-banner-success-border)] bg-[var(--dg-color-banner-success-bg)] text-[var(--dg-color-banner-success-text)]",
-  warning:
-    "border-[var(--dg-color-banner-warning-border)] bg-[var(--dg-color-banner-warning-bg)] text-[var(--dg-color-banner-warning-text)]",
-  danger:
-    "border-[var(--dg-color-banner-danger-border)] bg-[var(--dg-color-banner-danger-bg)] text-[var(--dg-color-banner-danger-text)]",
+  info: "bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
+  success: "bg-[var(--dg-color-banner-success-bg)] text-[var(--dg-color-banner-success-text)]",
+  warning: "bg-[var(--dg-color-banner-warning-bg)] text-[var(--dg-color-banner-warning-text)]",
+  danger: "bg-[var(--dg-color-banner-danger-bg)] text-[var(--dg-color-banner-danger-text)]",
 };
 
 const BAR_TONE_CLASSES: Record<BannerTone, string> = {
-  info: "border-[var(--dg-color-banner-info-vivid-border)] bg-[var(--dg-color-banner-info-vivid-bg)] text-[var(--dg-color-banner-info-vivid-text)]",
+  info: "bg-[var(--dg-color-banner-info-vivid-bg)] text-[var(--dg-color-banner-info-vivid-text)]",
   success:
-    "border-[var(--dg-color-banner-success-vivid-border)] bg-[var(--dg-color-banner-success-vivid-bg)] text-[var(--dg-color-banner-success-vivid-text)]",
+    "bg-[var(--dg-color-banner-success-vivid-bg)] text-[var(--dg-color-banner-success-vivid-text)]",
   warning:
-    "border-[var(--dg-color-banner-warning-vivid-border)] bg-[var(--dg-color-banner-warning-vivid-bg)] text-[var(--dg-color-banner-warning-vivid-text)]",
+    "bg-[var(--dg-color-banner-warning-vivid-bg)] text-[var(--dg-color-banner-warning-vivid-text)]",
   danger:
-    "border-[var(--dg-color-banner-danger-vivid-border)] bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
+    "bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
-// The icon colour. Whole class names, so Tailwind sees them.
+// The icon takes the text's colour, so the two never sit in near-matching
+// shades. Whole class names, so Tailwind sees them.
 const ICON_CLASSES: Record<BannerTone, string> = {
-  info: "text-[var(--dg-color-banner-info-icon)]",
-  success: "text-[var(--dg-color-banner-success-icon)]",
-  warning: "text-[var(--dg-color-banner-warning-icon)]",
-  danger: "text-[var(--dg-color-banner-danger-icon)]",
+  info: "text-[var(--dg-color-banner-info-text)]",
+  success: "text-[var(--dg-color-banner-success-text)]",
+  warning: "text-[var(--dg-color-banner-warning-text)]",
+  danger: "text-[var(--dg-color-banner-danger-text)]",
 };
 
-// A bar's fill is the tone itself, so its icon is white.
+// A bar's icon takes the bar's text colour too.
 const BAR_ICON_CLASSES: Record<BannerTone, string> = {
-  info: "text-white",
-  success: "text-white",
+  info: "text-[var(--dg-color-banner-info-vivid-text)]",
+  success: "text-[var(--dg-color-banner-success-vivid-text)]",
   warning: "text-[var(--dg-color-banner-warning-vivid-text)]",
-  danger: "text-white",
+  danger: "text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
 export interface BannerProps {
@@ -62,7 +60,7 @@ export interface BannerProps {
   className?: string;
 }
 
-/** Every banner and notice in the app: a tinted fill, a deeper border and dark text of one hue. */
+/** Every banner and notice in the app: a tinted fill with text and icon in one colour, no border. */
 export function Banner({
   tone,
   icon,
@@ -76,8 +74,8 @@ export function Banner({
 }: BannerProps) {
   const shape =
     layout === "bar"
-      ? "items-center justify-center border-b px-4 py-2"
-      : "items-center rounded-[10px] border px-3.5 py-3";
+      ? "items-center justify-center px-4 py-2"
+      : "items-center rounded-[10px] px-3.5 py-3";
 
   return (
     <div

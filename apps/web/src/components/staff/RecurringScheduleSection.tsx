@@ -1039,7 +1039,6 @@ export function RecurringScheduleSection({
             top: 0,
             zIndex: 20,
             background: "var(--dg-color-banner-info-bg)",
-            border: "1px solid var(--dg-color-banner-info-border)",
             borderRadius: 10,
             padding: isMobile ? "10px 12px" : "10px 20px",
             display: "flex",

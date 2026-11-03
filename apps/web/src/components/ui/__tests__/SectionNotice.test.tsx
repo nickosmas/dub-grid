@@ -16,7 +16,6 @@ describe("SectionNotice", () => {
     // is actually inside the toned container.
     expect(callout.querySelector("svg")).toBeInTheDocument();
     expect(callout).toHaveClass(
-      "border-[var(--dg-color-banner-danger-border)]",
       "bg-[var(--dg-color-banner-danger-bg)]",
       "text-[var(--dg-color-banner-danger-text)]",
     );
@@ -28,7 +27,6 @@ describe("SectionNotice", () => {
     );
 
     expect(screen.getByRole("note")).toHaveClass(
-      "border-[var(--dg-color-banner-warning-border)]",
       "bg-[var(--dg-color-banner-warning-bg)]",
       "text-[var(--dg-color-banner-warning-text)]",
     );
