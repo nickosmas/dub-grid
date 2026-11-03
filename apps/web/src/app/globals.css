@@ -379,13 +379,8 @@
   --dg-color-banner-success-bg: #cbead3;
   --dg-color-banner-success-border: #93cca0;
   --dg-color-banner-success-text: #16452b;
-  /* A banner's solid icon: the brightest of its hue that still stands off the
-     tint (@dubgrid/design-tokens bannerIconColor). Toasts sit on a neutral
-     card, so theirs take the bright fills in both themes. */
-  --dg-color-banner-danger-icon: #dc2626;
-  --dg-color-banner-warning-icon: #d97706;
-  --dg-color-banner-info-icon: #2563eb;
-  --dg-color-banner-success-icon: #15803d;
+  /* Toasts sit on a neutral card, so their icons take bright fills in both
+     themes; a banner's icon takes its text colour. */
   --dg-color-toast-icon-success: #16a34a;
   --dg-color-toast-icon-warning: #f59e0b;
   --dg-color-toast-icon-info: #2563eb;
@@ -549,10 +544,6 @@
   --dg-color-banner-success-bg: #163b25;
   --dg-color-banner-success-border: #245e3a;
   --dg-color-banner-success-text: #bfe9cc;
-  --dg-color-banner-danger-icon: #f87171;
-  --dg-color-banner-warning-icon: #fbbf24;
-  --dg-color-banner-info-icon: #60a5fa;
-  --dg-color-banner-success-icon: #4ade80;
   --dg-color-today-bg: #152238;
   --dg-color-today-text: #93c5fd;
   --dg-color-today-border: #2c5282;

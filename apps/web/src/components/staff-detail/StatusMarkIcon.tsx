@@ -92,20 +92,16 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
   return <Icon aria-hidden="true" size={size} strokeWidth={2.4} />;
 }
 
-const SYMBOL_COLORS: Record<StatusTone, string> = {
-  success: "var(--dg-color-banner-success-icon)",
-  warning: "var(--dg-color-banner-warning-icon)",
-  danger: "var(--dg-color-banner-danger-icon)",
-  neutral: "var(--dg-color-text-muted)",
-};
-
 /**
- * A status's icon drawn solid in its tone, as banners draw theirs, for the
- * status card and the Change staff status dialog.
+ * A status's icon drawn solid in its tone's text colour, the colour its card
+ * writes the status in, for the status card and the Change staff status dialog.
  */
 export function StatusSymbol({ icon, tone }: { icon: LucideIcon; tone: StatusTone }) {
   return (
-    <span aria-hidden="true" style={{ display: "flex", flexShrink: 0, color: SYMBOL_COLORS[tone] }}>
+    <span
+      aria-hidden="true"
+      style={{ display: "flex", flexShrink: 0, color: STATUS_TONE_COLORS[tone].text }}
+    >
       <SolidStatusIcon tone={tone === "neutral" ? "info" : tone} icon={icon} size={25} />
     </span>
   );

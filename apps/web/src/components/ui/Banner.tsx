@@ -26,20 +26,21 @@ const BAR_TONE_CLASSES: Record<BannerTone, string> = {
     "border-[var(--dg-color-banner-danger-vivid-border)] bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
-// The icon colour. Whole class names, so Tailwind sees them.
+// The icon takes the text's colour, so the two never sit in near-matching
+// shades. Whole class names, so Tailwind sees them.
 const ICON_CLASSES: Record<BannerTone, string> = {
-  info: "text-[var(--dg-color-banner-info-icon)]",
-  success: "text-[var(--dg-color-banner-success-icon)]",
-  warning: "text-[var(--dg-color-banner-warning-icon)]",
-  danger: "text-[var(--dg-color-banner-danger-icon)]",
+  info: "text-[var(--dg-color-banner-info-text)]",
+  success: "text-[var(--dg-color-banner-success-text)]",
+  warning: "text-[var(--dg-color-banner-warning-text)]",
+  danger: "text-[var(--dg-color-banner-danger-text)]",
 };
 
-// A bar's fill is the tone itself, so its icon is white.
+// A bar's icon takes the bar's text colour too.
 const BAR_ICON_CLASSES: Record<BannerTone, string> = {
-  info: "text-white",
-  success: "text-white",
+  info: "text-[var(--dg-color-banner-info-vivid-text)]",
+  success: "text-[var(--dg-color-banner-success-vivid-text)]",
   warning: "text-[var(--dg-color-banner-warning-vivid-text)]",
-  danger: "text-white",
+  danger: "text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
 export interface BannerProps {
