@@ -61,6 +61,7 @@ import {
   mobileQueryKeys,
 } from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileMotion,
@@ -547,6 +548,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // page instead until the fetch settles.
   const isRangeSwitching =
     scheduleQuery.isPlaceholderData || (canLoadRequests && requestsQuery.isPlaceholderData);
+  // Gated like a first load, so a quick page holds a blank beat, not a flash.
+  const showRangeSkeleton = useSkeletonGate(isRangeSwitching);
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
@@ -1458,7 +1461,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           />
         ) : null}
         {contentState.kind === "loading" || isRangeSwitching ? (
-          isRangeSwitching || (contentState.kind === "loading" && contentState.showSkeleton) ? (
+          showRangeSkeleton || (contentState.kind === "loading" && contentState.showSkeleton) ? (
             isTeamScope ? (
               <ScheduleTeamSkeleton />
             ) : (

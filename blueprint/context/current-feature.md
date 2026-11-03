@@ -22,7 +22,7 @@ Three parts, each its own pull request into `dev`:
    - Each drawing is one flat gray (`#C7C7CC` light, `#48484A` dark), with details cut out in the surface color. Anything empty is drawn as a dashed outline.
    - People use one set of proportions. Short text appears only where it helps (40h, a date, day letters).
    - The refined copy from the canvas replaces the current copy.
-   - A text-only button appears only where the next step is on that screen: Clear filter (activity, open shifts), Clear search (People), Clear filters (alerts), and Try again (Profile).
+   - A text-only button appears only where the next step is on that screen: Clear filter (activity, open shifts, alerts), Clear filters (People, when filters alone hide everyone), and Try again (Profile). A search keeps its field's own clear control: neither platform's native search field can be cleared from code.
    - Drawings are hidden from VoiceOver and TalkBack.
    - `ContentUnavailable` stays for system pages that aren't empty states: offline, organization locked, app lock and route error.
 2. **Mobile skeletons** follow their content's rows, heights, gaps and dividers. Every skeleton goes through the existing 150/300ms gate.
@@ -58,10 +58,10 @@ Buttons stay text-only. Staff copy says "the app", never DubGrid.
   - **Done when:** the simulator shows each in light and dark.
 - [x] 5. **Wire Requests, People, Add to schedule, Alerts, Profile and Person:**
   - Covers the remaining 17 states.
-  - Includes Clear search, Clear filters and Try again.
+  - Includes Clear filter, Clear filters and Try again.
   - Fixes the Approval tab saying "Nothing to approve".
   - **Done when:** the simulator shows each in light and dark.
-- [ ] 6. **Mobile skeleton shapes:**
+- [x] 6. **Mobile skeleton shapes:**
   - Profile and person detail rows at 52pt with inset dividers.
   - Dashboard list and card skeletons.
   - Admin My schedule shows 7 days.

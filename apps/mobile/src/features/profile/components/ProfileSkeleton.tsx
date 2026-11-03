@@ -35,7 +35,9 @@ export type ProfileRowVariant =
   /** A settings toggle: title and caption with a switch on the right. */
   | "toggle"
   /** A signed-in device: round platform badge, a title over three lines, a chevron. */
-  | "session";
+  | "session"
+  /** A form field row: its label at the row's height, the entry beside it. */
+  | "field";
 
 function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
   const mobileColors = useMobileColors();
@@ -66,6 +68,14 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
           <SkeletonLine variant="caption" width="44%" />
         </View>
         <SkeletonLine variant="body" width={12} />
+      </View>
+    );
+  }
+
+  if (variant === "field") {
+    return (
+      <View style={[styles.row, IS_NATIVE_LIST && styles.rowNative]}>
+        <SkeletonLine variant="body" width="42%" />
       </View>
     );
   }
@@ -155,6 +165,8 @@ function ProfileHeroSkeleton({
 export type ProfileSectionSkeleton = {
   rows: number;
   rowVariant?: ProfileRowVariant;
+  /** A section with a description over its card in place of a title. */
+  description?: boolean;
 };
 
 /** The real pair's widths: a compact pill with its glyph, "Call" then "Email". */
@@ -227,7 +239,14 @@ export function ProfileSkeleton({
       ) : null}
       {sectionSpecs.map((section, sectionIndex) => (
         <View key={`profile-section-${sectionIndex}`} style={styles.section}>
-          <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
+          {section.description ? (
+            <View style={styles.sectionDescription}>
+              <SkeletonLine variant="body" width="92%" />
+              <SkeletonLine variant="body" width="64%" />
+            </View>
+          ) : (
+            <SkeletonLine style={styles.sectionTitle} variant="sectionTitle" width="30%" />
+          )}
           <View style={styles.list}>
             <View style={styles.listClip}>
               {skeletonRows(section.rows, (rowIndex) => (
@@ -303,6 +322,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     sectionTitle: {
       paddingHorizontal: mobileSpace.lg,
       marginTop: mobileSpace.sm,
+    },
+    // ProfileSection's description: body text inset like the title.
+    sectionDescription: {
+      gap: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.lg,
     },
     // The clip sits on an inner view: iOS drops a view's own shadow when the
     // same view clips its children, so the shadow-casting list stays unclipped

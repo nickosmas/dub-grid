@@ -37,6 +37,7 @@ import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/sk
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { ShiftChangeButton } from "../components/ShiftChangeView";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -473,6 +474,8 @@ export default function ShiftDetailScreen() {
     );
   }, [linkedEmployeeId, requestsQuery.data?.requests, shiftEntry, shouldCheckExistingRequests]);
   const isCheckingExistingRequests = shouldCheckExistingRequests && requestsQuery.isLoading;
+  const showExistingRequestsSkeleton = useSkeletonGate(isCheckingExistingRequests);
+  const showSwapOptionsSkeleton = useSkeletonGate(swapOptionsQuery.isLoading);
   const shiftRequestCheckError =
     shouldCheckExistingRequests && requestsQuery.error
       ? getQueryErrorMessage(
@@ -1265,7 +1268,9 @@ export default function ShiftDetailScreen() {
                     icon-less, retry-less error lived here. Both now read
                     like every other surface. */}
                 {swapOptionsQuery.isLoading ? (
-                  <CardRowListSkeleton rows={2} />
+                  showSwapOptionsSkeleton ? (
+                    <CardRowListSkeleton rows={2} />
+                  ) : null
                 ) : swapOptionsQuery.error ? (
                   <StatusBanner
                     actionLabel="Try again"
@@ -1591,7 +1596,7 @@ export default function ShiftDetailScreen() {
             </View>
           ) : null}
 
-          {isCheckingExistingRequests ? (
+          {showExistingRequestsSkeleton ? (
             <SkeletonCardSurface>
               <SkeletonLine
                 style={{ marginBottom: mobileSpace.sm }}

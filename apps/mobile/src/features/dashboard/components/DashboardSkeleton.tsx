@@ -4,7 +4,6 @@ import {
   SkeletonCardSurface,
   SkeletonGroup,
   SkeletonLine,
-  SkeletonPill,
   skeletonRows,
   useSkeletonFillCount,
 } from "../../../shared/components/skeleton";
@@ -175,7 +174,7 @@ export function DashboardSkeleton({ view }: { view: "mine" | "team" }) {
   return (
     <SkeletonGroup style={styles.page}>
       {view === "mine" ? (
-        <ScheduleMeSkeleton inGroup rows={3} />
+        <ScheduleMeSkeleton inGroup />
       ) : (
         <>
           <DashboardHeroSkeleton />
@@ -189,44 +188,38 @@ export function DashboardSkeleton({ view }: { view: "mine" | "team" }) {
 }
 
 /**
- * The expanded single-metric routes under `home/`: a filter header, then a
- * borderless list at the real 16pt gap.
+ * The expanded single-metric routes under `home/`, as `DashboardListSection`
+ * draws them: a count caption over one grouped card of hairline-split rows.
+ * Their filter lives in the navigation bar, so nothing stands in for it here.
  */
 export function DashboardListSkeleton({
   rows,
-  showFilterHeader = true,
   variant = "figure",
 }: {
   /** Defaults to enough rows to reach the bottom of the screen. */
   rows?: number;
-  showFilterHeader?: boolean;
   variant?: DashboardRowVariant;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  // Two lines at the list row's padding, plus the 16pt list gap; the
-  // reserved height is the native header and the filter row above the list.
+  // Two lines at the list row's padding; the reserved height is the native
+  // header and the caption above the card.
   const fillRows = useSkeletonFillCount(
-    mobileListRow.paddingVertical * 2 +
-      mobileText.body.lineHeight +
-      mobileText.caption.lineHeight +
-      16,
+    mobileListRow.paddingVertical * 2 + mobileText.body.lineHeight + mobileText.caption.lineHeight,
     160,
   );
   const rowCount = rows ?? fillRows;
 
   return (
     <SkeletonGroup style={styles.expandedPage}>
-      {showFilterHeader ? (
-        <View style={styles.filterHeader}>
-          <SkeletonLine variant="label" width={96} />
-          <SkeletonPill height={36} width={112} />
-        </View>
-      ) : null}
-      <View style={styles.expandedList}>
+      <SkeletonLine style={styles.expandedCaption} variant="meta" width={72} />
+      <View style={styles.expandedSurface}>
         {skeletonRows(rowCount, (index) => (
-          <DashboardRow key={`expanded-row-${index}`} variant={variant} />
+          <View key={`expanded-row-${index}`}>
+            {index > 0 ? <View style={styles.rowDivider} /> : null}
+            <DashboardRow variant={variant} />
+          </View>
         ))}
       </View>
     </SkeletonGroup>
@@ -330,18 +323,20 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileListRow.titleGap,
       paddingVertical: mobileListRow.paddingVertical,
     },
+    // `DashboardListSection`'s group, caption and surface.
     expandedPage: {
-      gap: mobileSpace.md,
+      gap: mobileSpace.sm,
+      paddingTop: mobileSpace.md,
     },
-    filterHeader: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: mobileSpace.md,
-      justifyContent: "space-between",
-      paddingBottom: 4,
-      paddingTop: 12,
+    expandedCaption: {
+      marginHorizontal: mobileSpace.lg,
     },
-    expandedList: {
-      gap: 16,
+    expandedSurface: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+      borderColor: mobileColors.cardBorder,
+      paddingHorizontal: mobileSpace.lg,
+      overflow: "hidden",
     },
   });

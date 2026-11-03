@@ -27,9 +27,7 @@ export default function PendingApprovalsExpandedScreen() {
       // A skeleton stands in for content; it must not scroll, and there is
       // nothing to pull-to-refresh while the thing is still loading.
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? (
-          <DashboardListSkeleton showFilterHeader={false} variant="text" />
-        ) : null}
+        {contentState.showSkeleton ? <DashboardListSkeleton variant="text" /> : null}
       </Screen>
     );
   }

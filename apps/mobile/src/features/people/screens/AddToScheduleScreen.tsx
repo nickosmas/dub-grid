@@ -132,7 +132,7 @@ export default function AddToScheduleScreen() {
   if (contentState.kind === "loading") {
     return (
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? <PersonFormSkeleton /> : null}
+        {contentState.showSkeleton ? <PersonFormSkeleton chipGroups={3} sections={[]} /> : null}
       </Screen>
     );
   }
