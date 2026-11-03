@@ -867,11 +867,11 @@ export default function RequestsScreen() {
             void refreshRequests();
           }}
         />
-      ) : contentState.kind === "empty" && activeTab !== "history" ? (
+      ) : contentState.kind === "empty" && activeTab !== "history" && activeTab !== "approval" ? (
         <EmptyStateCard
           fillScreen
-          body="Pickup, swap, and call-off requests show up here."
-          iconName="swap-horizontal-outline"
+          body="Pickup, swap and call-off requests show here."
+          scene="requests-none"
           title="No requests yet"
         />
       ) : activeTab === "available" ? (
@@ -879,8 +879,8 @@ export default function RequestsScreen() {
           {availableOpenShiftFeed.totalCount === 0 ? (
             <EmptyStateCard
               fillScreen
-              body="Open shifts you can claim will appear here."
-              iconName="briefcase-outline"
+              body="Open shifts you can claim show here."
+              scene="pickup-none"
               title="Nothing to pick up"
             />
           ) : (
@@ -925,8 +925,8 @@ export default function RequestsScreen() {
           {allRequests.length === 0 ? (
             <EmptyStateCard
               fillScreen
-              body="Open and pending requests will appear here."
-              iconName="list-outline"
+              body="Open and pending requests show here."
+              scene="active-none"
               title="No active requests"
             />
           ) : (
@@ -950,8 +950,8 @@ export default function RequestsScreen() {
           {myRequests.length === 0 ? (
             <EmptyStateCard
               fillScreen
-              body="Your requests stay here until they're resolved or canceled."
-              iconName="document-text-outline"
+              body="Requests you make stay here until they're resolved or canceled."
+              scene="mine-none"
               title="You haven't made any requests"
             />
           ) : (
@@ -975,8 +975,8 @@ export default function RequestsScreen() {
           {approvalRequests.length === 0 ? (
             <EmptyStateCard
               fillScreen
-              body="Requests appear here when they need your approval."
-              iconName="checkmark"
+              body="Requests that need your approval show here."
+              scene="approve-none"
               title="Nothing to approve"
             />
           ) : (
@@ -1021,8 +1021,8 @@ export default function RequestsScreen() {
           ) : historyContentState.kind === "empty" ? (
             <EmptyStateCard
               fillScreen
-              body="Resolved, canceled, and expired requests appear here."
-              iconName="time-outline"
+              body="Resolved, canceled and expired requests show here."
+              scene="history-none"
               title="No history yet"
             />
           ) : (

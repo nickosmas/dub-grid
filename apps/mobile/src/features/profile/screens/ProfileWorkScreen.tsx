@@ -603,10 +603,14 @@ export default function ProfileWorkScreen() {
         />
       ) : !profile ? (
         <EmptyStateCard
+          actionLabel="Try again"
+          body="Check your connection."
           fillScreen
-          body="We couldn't load your profile."
-          iconName="person-circle-outline"
-          title="Profile unavailable"
+          onAction={() => {
+            void profileQuery.refetch();
+          }}
+          scene="profile-unavailable"
+          title="Couldn't load your profile"
         />
       ) : (
         <>

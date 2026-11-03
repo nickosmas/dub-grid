@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
 
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 
 const TYPE_FILTERS = [
   { value: "all", label: "All" },
@@ -82,7 +83,19 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
           style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}
         >
           {filtered.length === 0 ? (
-            <EmptyState size="compact" heading="No activity matching filter" />
+            <EmptyState
+              size="compact"
+              heading={typeFilter === "all" ? "No recent activity" : "No activity of this type"}
+              action={
+                typeFilter === "all" ? undefined : (
+                  <ClearFiltersButton
+                    activeFilterCount={1}
+                    onClear={() => setTypeFilter("all")}
+                    small
+                  />
+                )
+              }
+            />
           ) : (
             filtered.map((item, i) => (
               <Link

@@ -61,6 +61,7 @@ import {
   mobileQueryKeys,
 } from "../../../shared/lib/mobile-query-keys";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileMotion,
@@ -547,6 +548,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // page instead until the fetch settles.
   const isRangeSwitching =
     scheduleQuery.isPlaceholderData || (canLoadRequests && requestsQuery.isPlaceholderData);
+  // Gated like a first load, so a quick page holds a blank beat, not a flash.
+  const showRangeSkeleton = useSkeletonGate(isRangeSwitching);
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
@@ -806,16 +809,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading || requestsQuery.isLoading,
     error: scheduleQuery.error ?? bootstrapQuery.error,
   });
-  const emptyStateTitle = "Nothing to show yet";
   const rawEmptyStateDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
   const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(rawEmptyStateDateLabel)
     ? rawEmptyStateDateLabel.charAt(0).toLowerCase() + rawEmptyStateDateLabel.slice(1)
     : rawEmptyStateDateLabel;
-  const emptyStateBody = isTeamScope
-    ? activeTeamFocusAreaTab
-      ? `${activeTeamFocusAreaTab.label} has no published shifts for ${emptyStateDateLabel}.`
-      : `No shifts have been published for ${emptyStateDateLabel}.`
-    : `You have no published shifts for ${emptyStateDateLabel}.`;
+  const emptyStateTitle = isTeamScope
+    ? `No shifts published for ${emptyStateDateLabel}`
+    : `No shifts for ${emptyStateDateLabel}`;
+  const emptyStateBody =
+    isTeamScope && activeTeamFocusAreaTab
+      ? `${activeTeamFocusAreaTab.label} shifts show here once they're published.`
+      : "Shifts show here once they're published.";
 
   useEffect(() => {
     if (!accessToken) {
@@ -1457,7 +1461,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           />
         ) : null}
         {contentState.kind === "loading" || isRangeSwitching ? (
-          isRangeSwitching || (contentState.kind === "loading" && contentState.showSkeleton) ? (
+          showRangeSkeleton || (contentState.kind === "loading" && contentState.showSkeleton) ? (
             isTeamScope ? (
               <ScheduleTeamSkeleton />
             ) : (
@@ -1476,8 +1480,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         ) : isBlockedTeamView ? (
           <EmptyStateCard
             fillScreen
-            body="You don't have permission to view the team schedule. Ask an admin if you need access."
-            iconName="lock-closed-outline"
+            body="Your access role doesn't include the team schedule. Ask an admin if you need it."
+            scene="team-locked"
             title="Team schedule unavailable"
           />
         ) : !isTeamScope && !linkedEmployee ? (
@@ -1485,10 +1489,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             fillScreen
             body={
               canManageEmployees
-                ? "Open the People tab to link your account to a staff profile. This page will update automatically once you're done."
-                : "Ask an admin to finish setting up your account. This page will update automatically once they're done."
+                ? "Open the People tab to link your account to a staff profile. This page updates once you're done."
+                : "Ask an admin to finish setting up your account. This page updates once they're done."
             }
-            iconName="person-add-outline"
+            scene="account-not-linked"
             title="Your account isn't linked yet"
           />
         ) : !isTeamScope ? (
@@ -1504,6 +1508,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               featuredItem={meHeroState.item}
               hasWeekItems={hasScheduledWeekDay}
               timing={meHeroTiming}
+              weekDays={weekDays}
               shiftmates={meHeroShiftmates}
               status={meHeroState.status}
               onPress={
@@ -1580,7 +1585,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           <EmptyStateCard
             fillScreen
             body={emptyStateBody}
-            iconName="calendar-clear-outline"
+            scene="team-day-empty"
             title={emptyStateTitle}
           />
         ) : (

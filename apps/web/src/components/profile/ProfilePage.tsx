@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
 import ProgressBar from "@/components/ProgressBar";
+import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
 import { Button } from "@/components/Button";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
+import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import {
   getProfileOverviewCurrentWeekDateKeys,
@@ -146,18 +148,25 @@ export function ProfilePage() {
     [absenceTypes, assignments, focusAreas, jobs, shiftCategories],
   );
 
+  const showSkeleton = useSkeletonGate(permsLoading || profileLoading);
+
   useEffect(() => {
     if (activeTab !== "account" || !linkedSection) return;
     document
       .getElementById(`profile-${linkedSection}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [activeTab, linkedSection, profileLoading]);
+  }, [activeTab, linkedSection, profileLoading, showSkeleton]);
 
   // Wait for real permissions before rendering: canEditProfileDirectly
   // defaults to false while perms are loading, which would otherwise flash
   // the non-admin "request a name change" UI at admins for a moment.
-  if (permsLoading || profileLoading) {
-    return <ProgressBar loading />;
+  if (permsLoading || profileLoading || showSkeleton) {
+    return (
+      <>
+        <ProgressBar loading={permsLoading || profileLoading} />
+        {showSkeleton ? <PersonPageSkeleton variant="profile" tabCount={3} /> : null}
+      </>
+    );
   }
 
   if (profileError) {

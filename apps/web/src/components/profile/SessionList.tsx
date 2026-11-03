@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -234,6 +235,36 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count:
   );
 }
 
+function SessionListSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading sessions"
+      className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border-light)] bg-[var(--dg-color-surface)]"
+    >
+      <div className="flex items-center justify-between border-b border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] px-4 py-2.5">
+        <Skeleton className="h-3 w-28 dg-skeleton--on-muted" />
+        <Skeleton className="h-3 w-4 dg-skeleton--on-muted" />
+      </div>
+      {[0, 1].map((row) => (
+        <div
+          key={row}
+          className="flex items-center gap-3 border-b border-[var(--dg-color-border-light)] px-4 py-3 last:border-b-0"
+        >
+          <Skeleton className="h-4 w-4 shrink-0" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <Skeleton className={row === 0 ? "h-3.5 w-40" : "h-3.5 w-32"} />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-36" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+          <Skeleton className="h-7 w-16 shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SessionList({
   onOtherSessionCountChange,
 }: {
@@ -332,7 +363,7 @@ export function SessionList({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {stepUp.dialog}
-      {loading && <EmptyState size="inline" title="Loading sessions..." />}
+      {loading && <SessionListSkeleton />}
       {!loading && active.length === 0 && stale.length === 0 && (
         <EmptyState size="inline" title="No active sessions" />
       )}

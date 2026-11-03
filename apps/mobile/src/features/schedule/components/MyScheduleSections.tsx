@@ -661,6 +661,7 @@ export function MeHeroCard({
   timing,
   shiftmates,
   hasWeekItems = false,
+  weekDays,
   onPress,
 }: {
   currentDate: string;
@@ -671,6 +672,8 @@ export function MeHeroCard({
   shiftmates: MobileScheduleEntry[];
   /** Whether Your Week below has any scheduled day; the empty copy differs. */
   hasWeekItems?: boolean;
+  /** The week on screen, so the empty scene's day letters and marks match it. */
+  weekDays?: readonly MobileScheduleWeekDay[];
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -683,12 +686,20 @@ export function MeHeroCard({
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
         <EmptyStateCard
-          iconName="calendar-outline"
+          scene={hasWeekItems ? "me-week-done" : "me-week-empty"}
+          sceneWeek={
+            weekDays && weekDays.length === 7
+              ? {
+                  letters: weekDays.map((day) => day.weekdayLabel.charAt(0)),
+                  todayIndex: weekDays.findIndex((day) => day.date === currentDate),
+                }
+              : undefined
+          }
           title={hasWeekItems ? "Nothing more this week" : "Nothing scheduled this week"}
           body={
             hasWeekItems
               ? "You've finished your shifts for this week."
-              : "Your upcoming shifts will appear here once published."
+              : "Your shifts show here once they're published."
           }
         />
       </View>

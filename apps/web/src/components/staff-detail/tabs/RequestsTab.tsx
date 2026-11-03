@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import CustomSelect from "@/components/CustomSelect";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { EmptyState } from "@/components/EmptyState";
+import { ListRowsSkeleton } from "@/components/LoadingSkeletons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { requestRowsInRange, type PersonRequestRow } from "@/lib/person-requests";
 
@@ -63,7 +65,7 @@ export function RequestsTab({ rows, loading, error, range, periodPhrase }: Reque
           {error}
         </p>
       ) : loading ? (
-        <EmptyState size="compact" title="Loading requests" />
+        <ListRowsSkeleton rows={4} label="Loading requests" />
       ) : shown.length === 0 ? (
         <EmptyState
           size="compact"
@@ -71,6 +73,11 @@ export function RequestsTab({ rows, loading, error, range, periodPhrase }: Reque
             inPeriod.length === 0
               ? `No requests sent ${periodPhrase}`
               : "No requests match this filter"
+          }
+          action={
+            inPeriod.length > 0 && filter !== "all" ? (
+              <ClearFiltersButton activeFilterCount={1} onClear={() => setFilter("all")} small />
+            ) : undefined
           }
         />
       ) : (

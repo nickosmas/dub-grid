@@ -1140,7 +1140,7 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("No history yet")).toBeInTheDocument();
     expect(
-      screen.getByText("Resolved, canceled, and expired requests appear here."),
+      screen.getByText("Resolved, canceled and expired requests show here."),
     ).toBeInTheDocument();
   });
 

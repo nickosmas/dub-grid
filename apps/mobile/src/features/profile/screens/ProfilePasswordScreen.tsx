@@ -404,7 +404,10 @@ export default function ProfilePasswordScreen() {
       ) : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowsPerSection={3} sections={1} showHero={false} />
+          <ProfileSkeleton
+            sections={[{ rows: 3, rowVariant: "field", description: true }]}
+            showHero={false}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner

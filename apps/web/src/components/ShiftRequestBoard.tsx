@@ -13,6 +13,8 @@ import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { EmptyState } from "@/components/EmptyState";
+import { CardGridSkeleton } from "@/components/LoadingSkeletons";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   ApprovalDraftWarning,
@@ -218,6 +220,18 @@ export default function ShiftRequestBoard({
           new Date(left.resolvedAt ?? left.createdAt).getTime(),
       );
   }, [historyQuery.data, historyStaff, historyStatus]);
+  // The shift-date window is the lookup itself, with its own clear, so only
+  // the narrowing filters count here.
+  const historyFilterCount = [
+    historyType !== "all",
+    historyStatus !== "all",
+    historyStaff.length > 0,
+  ].filter(Boolean).length;
+  const clearHistoryFilters = () => {
+    setHistoryType("all");
+    setHistoryStatus("all");
+    setHistoryStaff([]);
+  };
   // One optional note per pending card, sent with whichever decision is made.
   const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
@@ -282,7 +296,7 @@ export default function ShiftRequestBoard({
       case "approval":
         return canApprove ? "No active requests" : "No organization requests";
       case "history":
-        return historyQuery.isPending ? "Loading history" : "No decided requests match";
+        return "No decided requests match";
     }
   }
 
@@ -1063,7 +1077,13 @@ export default function ShiftRequestBoard({
             </div>
           ) : null}
           {tabData.length === 0 ? (
-            loading || (activeTab === "history" && historyQuery.isPending) ? null : (
+            loading || (activeTab === "history" && historyQuery.isPending) ? (
+              <CardGridSkeleton
+                cards={isMobile ? 3 : 6}
+                singleColumn={isMobile}
+                label="Loading requests"
+              />
+            ) : (
               <EmptyState
                 icon={
                   <svg
@@ -1083,6 +1103,14 @@ export default function ShiftRequestBoard({
                   </svg>
                 }
                 title={getEmptyMessage()}
+                action={
+                  activeTab === "history" && historyFilterCount > 0 ? (
+                    <ClearFiltersButton
+                      activeFilterCount={historyFilterCount}
+                      onClear={clearHistoryFilters}
+                    />
+                  ) : undefined
+                }
                 style={{ padding: "40px 24px" }}
               />
             )

@@ -37,6 +37,7 @@ import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/sk
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
 import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { ShiftChangeButton } from "../components/ShiftChangeView";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -473,6 +474,8 @@ export default function ShiftDetailScreen() {
     );
   }, [linkedEmployeeId, requestsQuery.data?.requests, shiftEntry, shouldCheckExistingRequests]);
   const isCheckingExistingRequests = shouldCheckExistingRequests && requestsQuery.isLoading;
+  const showExistingRequestsSkeleton = useSkeletonGate(isCheckingExistingRequests);
+  const showSwapOptionsSkeleton = useSkeletonGate(swapOptionsQuery.isLoading);
   const shiftRequestCheckError =
     shouldCheckExistingRequests && requestsQuery.error
       ? getQueryErrorMessage(
@@ -1175,7 +1178,7 @@ export default function ShiftDetailScreen() {
                 {targetedPickupOptions.length === 0 ? (
                   <EmptyStateCard
                     compact
-                    iconName="person-remove-outline"
+                    scene="no-absent"
                     title="No absent teammates on this date"
                   />
                 ) : (
@@ -1265,7 +1268,9 @@ export default function ShiftDetailScreen() {
                     icon-less, retry-less error lived here. Both now read
                     like every other surface. */}
                 {swapOptionsQuery.isLoading ? (
-                  <CardRowListSkeleton rows={2} />
+                  showSwapOptionsSkeleton ? (
+                    <CardRowListSkeleton rows={2} />
+                  ) : null
                 ) : swapOptionsQuery.error ? (
                   <StatusBanner
                     actionLabel="Try again"
@@ -1281,9 +1286,9 @@ export default function ShiftDetailScreen() {
                 ) : swapTargetOptions.length === 0 ? (
                   <EmptyStateCard
                     compact
-                    iconName="swap-horizontal-outline"
-                    title="No eligible shifts"
-                    body="Eligible teammate shifts will appear here once published."
+                    scene="no-eligible-swap"
+                    title="No shifts to swap with"
+                    body="Teammates' shifts you could swap with show here once published."
                   />
                 ) : selectedTargetEntry ? (
                   <View style={styles.swapSelectedPanel}>
@@ -1429,8 +1434,8 @@ export default function ShiftDetailScreen() {
       ) : !employeeId || !shiftDate || !shiftEntry ? (
         <EmptyStateCard
           fillScreen
-          body="This shift isn't in the schedule range you're viewing."
-          iconName="calendar-clear-outline"
+          body="This shift isn't in the week you're viewing."
+          scene="shift-not-found"
           title="Shift not found"
         />
       ) : (
@@ -1591,7 +1596,7 @@ export default function ShiftDetailScreen() {
             </View>
           ) : null}
 
-          {isCheckingExistingRequests ? (
+          {showExistingRequestsSkeleton ? (
             <SkeletonCardSurface>
               <SkeletonLine
                 style={{ marginBottom: mobileSpace.sm }}
@@ -2213,11 +2218,7 @@ function ShiftmateSegmentGroups({
               ))}
             </View>
           ) : (
-            <EmptyStateCard
-              compact
-              iconName="people-outline"
-              title={`No one in ${group.label} yet`}
-            />
+            <EmptyStateCard compact scene="group-empty" title={`No one in ${group.label} yet`} />
           )}
         </View>
       ))}
