@@ -299,7 +299,11 @@ export function PeopleDirectorySkeleton({
               <h1 className="text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
                 Directory
               </h1>
-              <Skeleton className="mt-2.5 h-3.5 w-72 max-w-full" />
+              {/* The description's own color, so the heading reads over it as
+                  it will once the real line lands. */}
+              <div className="mt-2.5 text-[var(--dg-color-text-muted)]">
+                <Skeleton className="h-3.5 w-72 max-w-full" />
+              </div>
             </div>
 
             {showSummaries ? (
