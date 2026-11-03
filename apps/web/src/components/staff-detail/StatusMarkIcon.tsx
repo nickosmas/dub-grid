@@ -37,7 +37,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
     warning: {
       bg: "var(--dg-color-warning-bg)",
       border: "var(--dg-color-warning-border)",
-      text: "var(--dg-color-warning-text)",
+      text: "var(--dg-color-status-warning-text)",
     },
     danger: {
       bg: "var(--dg-color-danger-bg)",

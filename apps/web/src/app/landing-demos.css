@@ -351,7 +351,6 @@
   gap: 10px;
   min-height: 34px;
   padding: 8px 14px;
-  border: 1px solid var(--dg-color-banner-warning-border);
   border-radius: 10px;
   background: var(--dg-color-banner-warning-bg);
   color: var(--dg-color-banner-warning-text);

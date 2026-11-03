@@ -66,8 +66,9 @@ function CardText({
 
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
- * tinted like their pill, white while Active, with a dashed card for a first
- * day still ahead (51g4) and one for a change planned for later.
+ * tinted like their pill, with a card of its own for a first day still ahead
+ * (51g4) and one for a change planned for later. Cards carry a tint, never a
+ * border.
  */
 export function EmployeeStatusCard({
   employee,
@@ -83,7 +84,6 @@ export function EmployeeStatusCard({
     absenceName,
     today: formatDateKey(new Date()),
   });
-  const active = current.kind === "active";
   const colors = STATUS_TONE_COLORS[current.tone];
   const cardStyle = {
     display: "flex",
@@ -100,16 +100,11 @@ export function EmployeeStatusCard({
       data-status={current.kind}
       style={{
         ...cardStyle,
-        border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
-        background: active ? "var(--dg-color-surface)" : colors.bg,
+        background: colors.bg,
       }}
     >
       <StatusSymbol icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
-      <CardText
-        title={current.title}
-        detail={current.detail}
-        color={active ? "var(--dg-color-text-primary)" : colors.text}
-      />
+      <CardText title={current.title} detail={current.detail} color={colors.text} />
       {action ? <div className="shrink-0">{action}</div> : null}
     </section>
   );
@@ -122,8 +117,7 @@ export function EmployeeStatusCard({
           data-status="starts"
           style={{
             ...cardStyle,
-            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
-            background: "var(--dg-color-surface)",
+            background: STATUS_TONE_COLORS.warning.bg,
           }}
         >
           <StatusSymbol icon={CalendarDays} tone="warning" />
@@ -141,8 +135,7 @@ export function EmployeeStatusCard({
           data-status="planned"
           style={{
             ...cardStyle,
-            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
-            background: "var(--dg-color-surface)",
+            background: STATUS_TONE_COLORS.warning.bg,
           }}
         >
           <StatusSymbol icon={CalendarDays} tone="warning" />

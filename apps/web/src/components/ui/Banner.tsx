@@ -7,23 +7,20 @@ export type BannerTone = "info" | "success" | "warning" | "danger";
 const BANNER_ICON_SIZE = 25;
 
 const TONE_CLASSES: Record<BannerTone, string> = {
-  info: "border-[var(--dg-color-banner-info-border)] bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
-  success:
-    "border-[var(--dg-color-banner-success-border)] bg-[var(--dg-color-banner-success-bg)] text-[var(--dg-color-banner-success-text)]",
-  warning:
-    "border-[var(--dg-color-banner-warning-border)] bg-[var(--dg-color-banner-warning-bg)] text-[var(--dg-color-banner-warning-text)]",
-  danger:
-    "border-[var(--dg-color-banner-danger-border)] bg-[var(--dg-color-banner-danger-bg)] text-[var(--dg-color-banner-danger-text)]",
+  info: "bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
+  success: "bg-[var(--dg-color-banner-success-bg)] text-[var(--dg-color-banner-success-text)]",
+  warning: "bg-[var(--dg-color-banner-warning-bg)] text-[var(--dg-color-banner-warning-text)]",
+  danger: "bg-[var(--dg-color-banner-danger-bg)] text-[var(--dg-color-banner-danger-text)]",
 };
 
 const BAR_TONE_CLASSES: Record<BannerTone, string> = {
-  info: "border-[var(--dg-color-banner-info-vivid-border)] bg-[var(--dg-color-banner-info-vivid-bg)] text-[var(--dg-color-banner-info-vivid-text)]",
+  info: "bg-[var(--dg-color-banner-info-vivid-bg)] text-[var(--dg-color-banner-info-vivid-text)]",
   success:
-    "border-[var(--dg-color-banner-success-vivid-border)] bg-[var(--dg-color-banner-success-vivid-bg)] text-[var(--dg-color-banner-success-vivid-text)]",
+    "bg-[var(--dg-color-banner-success-vivid-bg)] text-[var(--dg-color-banner-success-vivid-text)]",
   warning:
-    "border-[var(--dg-color-banner-warning-vivid-border)] bg-[var(--dg-color-banner-warning-vivid-bg)] text-[var(--dg-color-banner-warning-vivid-text)]",
+    "bg-[var(--dg-color-banner-warning-vivid-bg)] text-[var(--dg-color-banner-warning-vivid-text)]",
   danger:
-    "border-[var(--dg-color-banner-danger-vivid-border)] bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
+    "bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
 // The icon takes the text's colour, so the two never sit in near-matching
@@ -63,7 +60,7 @@ export interface BannerProps {
   className?: string;
 }
 
-/** Every banner and notice in the app: a tinted fill, a deeper border and dark text of one hue. */
+/** Every banner and notice in the app: a tinted fill with text and icon in one colour, no border. */
 export function Banner({
   tone,
   icon,
@@ -77,8 +74,8 @@ export function Banner({
 }: BannerProps) {
   const shape =
     layout === "bar"
-      ? "items-center justify-center border-b px-4 py-2"
-      : "items-center rounded-[10px] border px-3.5 py-3";
+      ? "items-center justify-center px-4 py-2"
+      : "items-center rounded-[10px] px-3.5 py-3";
 
   return (
     <div

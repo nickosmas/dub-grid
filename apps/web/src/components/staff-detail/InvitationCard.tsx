@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { INVITATION_ACTION_COPY } from "@/components/staff/useInvitationActionConfirm";
 import { describeInvitationCard, type PersonAccountState } from "@/lib/person-account-state";
-import { StatusSymbol } from "./StatusMarkIcon";
+import { STATUS_TONE_COLORS, StatusSymbol } from "./StatusMarkIcon";
 
 type Result = Promise<boolean | void> | boolean | void;
 
@@ -56,6 +56,8 @@ export function InvitationCard({
       : null,
   ].filter((action): action is NonNullable<typeof action> => action !== null);
 
+  const tone = invitation ? "warning" : "neutral";
+
   async function confirm() {
     if (!invitation || !confirming) return;
     await (confirming === "revoke" ? onRevoke : onResend)?.(invitation.invitationId);
@@ -75,21 +77,17 @@ export function InvitationCard({
           padding: "12px 14px",
           borderRadius: "var(--dg-radius-lg)",
           minWidth: 0,
-          border: "1px solid var(--dg-color-border)",
-          background: "var(--dg-color-surface)",
+          background: STATUS_TONE_COLORS[tone].bg,
         }}
       >
-        <StatusSymbol
-          icon={state.kind === "expired" ? MailX : Mail}
-          tone={invitation ? "warning" : "neutral"}
-        />
+        <StatusSymbol icon={state.kind === "expired" ? MailX : Mail} tone={tone} />
         <span style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
           <span
             className="dg-tabular-nums"
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
-              color: "var(--dg-color-text-primary)",
+              color: STATUS_TONE_COLORS[tone].text,
             }}
           >
             {title}
