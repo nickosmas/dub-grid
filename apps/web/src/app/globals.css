@@ -381,9 +381,6 @@
   --dg-color-banner-success-text: #166534;
   /* Toasts sit on a neutral card, so their icons take bright fills in both
      themes; a banner's icon takes its text colour. */
-  /* A status card writes its status and draws its icon in one colour; amber
-     is a shade lighter than warning text, still 4.8:1 on its tint. */
-  --dg-color-status-warning-text: #b45309;
   --dg-color-toast-icon-success: #16a34a;
   --dg-color-toast-icon-warning: #f59e0b;
   --dg-color-toast-icon-info: #2563eb;
@@ -547,7 +544,6 @@
   --dg-color-banner-success-bg: #163b25;
   --dg-color-banner-success-border: #245e3a;
   --dg-color-banner-success-text: #bfe9cc;
-  --dg-color-status-warning-text: #fbbf24;
   --dg-color-today-bg: #152238;
   --dg-color-today-text: #93c5fd;
   --dg-color-today-border: #2c5282;

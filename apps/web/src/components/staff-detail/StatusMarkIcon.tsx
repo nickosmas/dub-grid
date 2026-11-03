@@ -37,7 +37,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
     warning: {
       bg: "var(--dg-color-warning-bg)",
       border: "var(--dg-color-warning-border)",
-      text: "var(--dg-color-status-warning-text)",
+      text: "var(--dg-color-warning-text)",
     },
     danger: {
       bg: "var(--dg-color-danger-bg)",
@@ -47,6 +47,34 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
     neutral: {
       bg: "var(--dg-color-bg-secondary)",
       border: "var(--dg-color-border-light)",
+      text: "var(--dg-color-text-secondary)",
+    },
+  };
+
+/**
+ * A status card's fill, border and the one colour its icon and status share:
+ * the same tint and colour a banner of that tone uses.
+ */
+export const STATUS_CARD_COLORS: Record<StatusTone, { bg: string; border: string; text: string }> =
+  {
+    success: {
+      bg: "var(--dg-color-banner-success-bg)",
+      border: "var(--dg-color-banner-success-border)",
+      text: "var(--dg-color-banner-success-text)",
+    },
+    warning: {
+      bg: "var(--dg-color-banner-warning-bg)",
+      border: "var(--dg-color-banner-warning-border)",
+      text: "var(--dg-color-banner-warning-text)",
+    },
+    danger: {
+      bg: "var(--dg-color-banner-danger-bg)",
+      border: "var(--dg-color-banner-danger-border)",
+      text: "var(--dg-color-banner-danger-text)",
+    },
+    neutral: {
+      bg: "var(--dg-color-bg-secondary)",
+      border: "var(--dg-color-border)",
       text: "var(--dg-color-text-secondary)",
     },
   };
@@ -96,12 +124,18 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
  * A status's icon drawn solid in its tone's text colour, the colour its card
  * writes the status in, for the status card and the Change staff status dialog.
  */
-export function StatusSymbol({ icon, tone }: { icon: LucideIcon; tone: StatusTone }) {
+export function StatusSymbol({
+  icon,
+  tone,
+  color = STATUS_TONE_COLORS[tone].text,
+}: {
+  icon: LucideIcon;
+  tone: StatusTone;
+  /** The colour of the text beside it, when that isn't the tone's own. */
+  color?: string;
+}) {
   return (
-    <span
-      aria-hidden="true"
-      style={{ display: "flex", flexShrink: 0, color: STATUS_TONE_COLORS[tone].text }}
-    >
+    <span aria-hidden="true" style={{ display: "flex", flexShrink: 0, color }}>
       <SolidStatusIcon tone={tone === "neutral" ? "info" : tone} icon={icon} size={25} />
     </span>
   );

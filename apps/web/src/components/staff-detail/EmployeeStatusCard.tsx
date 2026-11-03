@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react";
 import { describeStatusCard } from "@dubgrid/domain";
 import type { AbsenceType, Employee } from "@/types";
 import { formatDateKey } from "@/lib/utils";
-import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusSymbol } from "./StatusMarkIcon";
+import { STATUS_CARD_COLORS, STATUS_KIND_ICONS, StatusSymbol } from "./StatusMarkIcon";
 
 interface EmployeeStatusCardProps {
   employee: Employee;
@@ -66,9 +66,8 @@ function CardText({
 
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
- * tinted like their pill, with a card of its own for a first day still ahead
- * (51g4) and one for a change planned for later. Cards carry a tint, never a
- * border.
+ * tinted like a banner of their tone, with a dashed card for a first day
+ * still ahead (51g4) and one for a change planned for later.
  */
 export function EmployeeStatusCard({
   employee,
@@ -84,7 +83,8 @@ export function EmployeeStatusCard({
     absenceName,
     today: formatDateKey(new Date()),
   });
-  const colors = STATUS_TONE_COLORS[current.tone];
+  const colors = STATUS_CARD_COLORS[current.tone];
+  const planColors = STATUS_CARD_COLORS.warning;
   const cardStyle = {
     display: "flex",
     alignItems: "center",
@@ -100,10 +100,15 @@ export function EmployeeStatusCard({
       data-status={current.kind}
       style={{
         ...cardStyle,
+        border: `1px solid ${colors.border}`,
         background: colors.bg,
       }}
     >
-      <StatusSymbol icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
+      <StatusSymbol
+        icon={STATUS_KIND_ICONS[current.kind]}
+        tone={current.tone}
+        color={colors.text}
+      />
       <CardText title={current.title} detail={current.detail} color={colors.text} />
       {action ? <div className="shrink-0">{action}</div> : null}
     </section>
@@ -117,15 +122,16 @@ export function EmployeeStatusCard({
           data-status="starts"
           style={{
             ...cardStyle,
-            background: STATUS_TONE_COLORS.warning.bg,
+            border: `1px dashed ${planColors.border}`,
+            background: planColors.bg,
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" />
+          <StatusSymbol icon={CalendarDays} tone="warning" color={planColors.text} />
           <CardText
             eyebrow="First day"
             title={starts.title}
             detail={starts.detail}
-            color={STATUS_TONE_COLORS.warning.text}
+            color={planColors.text}
           />
         </section>
       ) : null}
@@ -135,15 +141,16 @@ export function EmployeeStatusCard({
           data-status="planned"
           style={{
             ...cardStyle,
-            background: STATUS_TONE_COLORS.warning.bg,
+            border: `1px dashed ${planColors.border}`,
+            background: planColors.bg,
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" />
+          <StatusSymbol icon={CalendarDays} tone="warning" color={planColors.text} />
           <CardText
             eyebrow="Planned"
             title={planned.title}
             detail={planned.detail}
-            color={STATUS_TONE_COLORS.warning.text}
+            color={planColors.text}
           />
           {planAction ? <div className="shrink-0">{planAction}</div> : null}
         </section>

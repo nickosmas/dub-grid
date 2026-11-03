@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { INVITATION_ACTION_COPY } from "@/components/staff/useInvitationActionConfirm";
 import { describeInvitationCard, type PersonAccountState } from "@/lib/person-account-state";
-import { STATUS_TONE_COLORS, StatusSymbol } from "./StatusMarkIcon";
+import { STATUS_CARD_COLORS, StatusSymbol } from "./StatusMarkIcon";
 
 type Result = Promise<boolean | void> | boolean | void;
 
@@ -77,17 +77,22 @@ export function InvitationCard({
           padding: "12px 14px",
           borderRadius: "var(--dg-radius-lg)",
           minWidth: 0,
-          background: STATUS_TONE_COLORS[tone].bg,
+          border: `1px solid ${STATUS_CARD_COLORS[tone].border}`,
+          background: STATUS_CARD_COLORS[tone].bg,
         }}
       >
-        <StatusSymbol icon={state.kind === "expired" ? MailX : Mail} tone={tone} />
+        <StatusSymbol
+          icon={state.kind === "expired" ? MailX : Mail}
+          tone={tone}
+          color={STATUS_CARD_COLORS[tone].text}
+        />
         <span style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
           <span
             className="dg-tabular-nums"
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 600,
-              color: STATUS_TONE_COLORS[tone].text,
+              color: STATUS_CARD_COLORS[tone].text,
             }}
           >
             {title}
