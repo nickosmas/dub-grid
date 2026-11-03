@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  CalendarDays,
-  CircleCheck,
-  Lock,
-  PlaneTakeoff,
-  UserMinus,
-  type LucideIcon,
-} from "lucide-react";
+import { CalendarDays, CircleCheck, Lock, Plane, UserMinus, type LucideIcon } from "lucide-react";
 import { formatDateKey } from "@/lib/utils";
 import {
   statusMark,
@@ -21,7 +14,7 @@ import { StatusIcon as SolidStatusIcon } from "@/components/ui/StatusIcon";
 
 export const STATUS_MARK_ICONS: Record<StatusMarkKind, LucideIcon> = {
   suspended: Lock,
-  away: PlaneTakeoff,
+  away: Plane,
   planned: CalendarDays,
   archived: UserMinus,
 };
@@ -29,7 +22,7 @@ export const STATUS_MARK_ICONS: Record<StatusMarkKind, LucideIcon> = {
 /** The icon for each status a person can be in or be moved to. */
 export const STATUS_KIND_ICONS: Record<StatusChoiceKind, LucideIcon> = {
   active: CircleCheck,
-  away: PlaneTakeoff,
+  away: Plane,
   suspended: Lock,
   archived: UserMinus,
 };
@@ -60,7 +53,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
- * plane taking off for Away, a calendar for a planned away, a person with a minus for Offboarded.
+ * plane for Away, a calendar for a planned away, a person with a minus for Offboarded.
  * `only` limits it to some kinds, as the grid does.
  */
 export function StatusMarkIcon({

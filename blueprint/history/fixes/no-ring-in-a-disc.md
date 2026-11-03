@@ -38,7 +38,7 @@ Owner decisions, 2026-11-03:
   with no circle (`StatusSymbol`). Active is the solid check circle; each
   card sets `--dg-icon-cut` to its own background, the selected option
   included.
-- **Away is a plane taking off** on web, in place of the moon: the status
+- **Away is a plane** on web, in place of the moon: the status
   card, Change status, the mark beside a name, the "You're away" bar and the
   Mark away dialog. Mobile keeps the moon (its icon sets have no match).
 
@@ -51,7 +51,7 @@ Toasts are unchanged.
 - [x] **2.** Banner icons at 25px and centered; `BannerIcon` in the
       Schedule's bars.
 - [x] **3.** `StatusSymbol` for the status cards and Change status; Away as
-      a plane taking off.
+      a plane.
 
 ## Verify
 

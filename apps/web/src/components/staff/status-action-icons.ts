@@ -4,7 +4,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarX2,
-  PlaneTakeoff,
+  Plane,
   UserCheck,
   UserCog,
   UserMinus,
@@ -13,7 +13,7 @@ import {
 
 /** The confirmation icon for each staff status change, single or bulk. */
 export const STATUS_ACTION_ICONS: Record<StatusAction, LucideIcon> = {
-  markAway: PlaneTakeoff,
+  markAway: Plane,
   archive: UserMinus,
   markActive: UserCheck,
   restore: UserCheck,
