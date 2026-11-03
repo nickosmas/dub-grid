@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { INVITATION_ACTION_COPY } from "@/components/staff/useInvitationActionConfirm";
 import { describeInvitationCard, type PersonAccountState } from "@/lib/person-account-state";
-import { StatusIconCircle } from "./StatusMarkIcon";
+import { StatusSymbol } from "./StatusMarkIcon";
 
 type Result = Promise<boolean | void> | boolean | void;
 
@@ -79,7 +79,7 @@ export function InvitationCard({
           background: "var(--dg-color-surface)",
         }}
       >
-        <StatusIconCircle
+        <StatusSymbol
           icon={state.kind === "expired" ? MailX : Mail}
           tone={invitation ? "warning" : "neutral"}
         />

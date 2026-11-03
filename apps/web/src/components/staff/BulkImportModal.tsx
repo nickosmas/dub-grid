@@ -3,13 +3,7 @@
 import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import {
-  AlertTriangle,
-  FileWarning,
-  Import as ImportIcon,
-  UserSearch,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, FileWarning, Import as ImportIcon, Users, XCircle } from "lucide-react";
 import { Banner } from "@/components/ui/Banner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
@@ -642,7 +636,7 @@ export function BulkImportModal({
                     </Banner>
                   )}
                   {warningCount > 0 && (
-                    <Banner tone="warning" icon={UserSearch}>
+                    <Banner tone="warning" icon={Users}>
                       <div>
                         {warningCount} row{warningCount !== 1 ? "s" : ""}{" "}
                         {warningCount !== 1 ? "look" : "looks"} like people already on staff. Check

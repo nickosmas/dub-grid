@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCog, Repeat } from "lucide-react";
+import { Calendar1, Repeat } from "lucide-react";
 import { Banner } from "@/components/ui/Banner";
 import type { ShiftSeriesPattern } from "@/types";
 import {
@@ -165,7 +165,7 @@ export function SeriesSummaryCard({
       />
 
       {changedHere ? (
-        <Banner tone="warning" icon={CalendarCog}>
+        <Banner tone="warning" icon={Calendar1}>
           <span>
             Changed on this day only.
             {seriesItemText ? ` The series is ${seriesItemText}.` : null}
