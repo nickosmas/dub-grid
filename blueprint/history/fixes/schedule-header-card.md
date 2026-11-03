@@ -33,6 +33,10 @@
 - The handle is wider (48pt) and a lighter gray, and a tap on it (or
   VoiceOver's activate) opens or closes the month as a drag does (owner,
   2026-11-02, fix/schedule-grab-handle).
+- The dot has its own space 4pt under the date circle instead of touching
+  its edge, the weekday letters sit 4pt above the dates instead of 14pt, and
+  the handle follows the dates with 8pt above it instead of a section gap
+  (owner, 2026-11-03, fix/schedule-header-spacing).
 
 ## Checks
 
