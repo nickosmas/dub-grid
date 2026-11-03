@@ -64,6 +64,9 @@ function CardText({
   );
 }
 
+// A plan's dashes: the pale amber border, a quarter of the way to its icon's amber.
+const PLAN_BORDER = `color-mix(in srgb, ${STATUS_TONE_COLORS.warning.border} 75%, ${STATUS_TONE_COLORS.warning.text})`;
+
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
  * tinted like their pill, white while Active, with a dashed card for a first
@@ -104,7 +107,11 @@ export function EmployeeStatusCard({
         background: active ? "var(--dg-color-surface)" : colors.bg,
       }}
     >
-      <StatusSymbol icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
+      <StatusSymbol
+        icon={STATUS_KIND_ICONS[current.kind]}
+        tone={current.tone}
+        color={active ? undefined : colors.text}
+      />
       <CardText
         title={current.title}
         detail={current.detail}
@@ -122,11 +129,15 @@ export function EmployeeStatusCard({
           data-status="starts"
           style={{
             ...cardStyle,
-            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+            border: `1px dashed ${PLAN_BORDER}`,
             background: "var(--dg-color-surface)",
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" />
+          <StatusSymbol
+            icon={CalendarDays}
+            tone="warning"
+            color={STATUS_TONE_COLORS.warning.text}
+          />
           <CardText
             eyebrow="First day"
             title={starts.title}
@@ -141,11 +152,15 @@ export function EmployeeStatusCard({
           data-status="planned"
           style={{
             ...cardStyle,
-            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+            border: `1px dashed ${PLAN_BORDER}`,
             background: "var(--dg-color-surface)",
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" />
+          <StatusSymbol
+            icon={CalendarDays}
+            tone="warning"
+            color={STATUS_TONE_COLORS.warning.text}
+          />
           <CardText
             eyebrow="Planned"
             title={planned.title}

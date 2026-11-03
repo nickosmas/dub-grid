@@ -37,7 +37,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
     warning: {
       bg: "var(--dg-color-warning-bg)",
       border: "var(--dg-color-warning-border)",
-      text: "var(--dg-color-warning-text)",
+      text: "var(--dg-color-status-warning-text)",
     },
     danger: {
       bg: "var(--dg-color-danger-bg)",
@@ -50,6 +50,17 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
       text: "var(--dg-color-text-secondary)",
     },
   };
+
+/**
+ * A status icon's bright tone colour, as toasts use: status cards and Change
+ * status options sit on white with neutral text, so the icon carries the tone.
+ */
+const STATUS_ICON_COLORS: Record<StatusTone, string> = {
+  success: "var(--dg-color-toast-icon-success)",
+  warning: "var(--dg-color-toast-icon-warning)",
+  danger: "var(--dg-color-toast-icon-danger)",
+  neutral: "var(--dg-color-text-muted)",
+};
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
@@ -92,20 +103,22 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
   return <Icon aria-hidden="true" size={size} strokeWidth={2.4} />;
 }
 
-const SYMBOL_COLORS: Record<StatusTone, string> = {
-  success: "var(--dg-color-banner-success-icon)",
-  warning: "var(--dg-color-banner-warning-icon)",
-  danger: "var(--dg-color-banner-danger-icon)",
-  neutral: "var(--dg-color-text-muted)",
-};
-
 /**
- * A status's icon drawn solid in its tone, as banners draw theirs, for the
- * status card and the Change staff status dialog.
+ * A status's icon drawn solid, for the status cards and Change status. Beside
+ * a status written in its tone's colour, it takes that colour (`color`);
+ * beside neutral text, the tone's bright colour.
  */
-export function StatusSymbol({ icon, tone }: { icon: LucideIcon; tone: StatusTone }) {
+export function StatusSymbol({
+  icon,
+  tone,
+  color = STATUS_ICON_COLORS[tone],
+}: {
+  icon: LucideIcon;
+  tone: StatusTone;
+  color?: string;
+}) {
   return (
-    <span aria-hidden="true" style={{ display: "flex", flexShrink: 0, color: SYMBOL_COLORS[tone] }}>
+    <span aria-hidden="true" style={{ display: "flex", flexShrink: 0, color }}>
       <SolidStatusIcon tone={tone === "neutral" ? "info" : tone} icon={icon} size={25} />
     </span>
   );
