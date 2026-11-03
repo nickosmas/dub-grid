@@ -44,11 +44,13 @@ Owner decisions, 2026-11-03:
 
 - **Crisper solids.** Marks are cut out as real holes through an SVG mask,
   in place of lines painted in the background colour, so they stay sharp and
-  show whatever is behind; the `--dg-icon-cut` wiring is gone. Fills follow
-  the line icon's path without tracing it with a 2px line, which kept corners
-  rounded and filled narrow gaps, and the view is cropped by that line's
-  width so icons stay as large as before. The owner chose to keep these over
-  another icon set after comparing 11 (2026-11-03).
+  show whatever is behind; the `--dg-icon-cut` wiring is gone. Fills are
+  still traced with the line icon's 2px line, so every part and gap matches
+  the line icon, but with mitred joins, so corners stay sharp. Filling
+  without that line was tried and dropped: filled parts shrank while line
+  parts did not, which loosened the person, monitor and phone, hourglass,
+  alarm clock and envelope icons. The owner chose to keep these over another
+  icon set after comparing 11 (2026-11-03).
 
 Toasts keep their size and timing; their marks stay white through a
 `markColor`, as decided on 2026-11-02.

@@ -251,9 +251,9 @@ export interface StatusIconProps {
 
 /**
  * A tone or own icon drawn solid, its marks cut out as real holes, so they
- * show whatever is behind the icon. The fill follows the line icon's path
- * without its line, which keeps corners sharp, and the view is cropped by
- * that line's width so the icon stays as large as the line icon.
+ * show whatever is behind the icon. The fill is traced with the line icon's
+ * own 2px line, so every part and gap matches the line icon, with mitred
+ * joins so its corners stay sharp.
  */
 export function StatusIcon({ tone, icon, size, className, markColor }: StatusIconProps) {
   const solid = icon ? SOLID_GLYPHS.get(icon) : TONE_GLYPHS[tone];
@@ -286,7 +286,7 @@ export function StatusIcon({ tone, icon, size, className, markColor }: StatusIco
     <svg
       width={size}
       height={size}
-      viewBox="1 1 22 22"
+      viewBox="0 0 24 24"
       aria-hidden="true"
       className={`overflow-visible ${className ?? ""}`}
     >
@@ -301,13 +301,21 @@ export function StatusIcon({ tone, icon, size, className, markColor }: StatusIco
         strokeLinejoin="round"
       >
         {glyph.fill.map((d) => (
-          <path key={d} d={d} fill="white" />
+          <path
+            key={d}
+            d={d}
+            fill="white"
+            stroke="white"
+            strokeWidth={2}
+            strokeLinejoin="miter"
+            strokeMiterlimit={2.5}
+          />
         ))}
         {glyph.stroke?.map((d) => (
           <path key={d} d={d} fill="none" stroke="white" strokeWidth={2} />
         ))}
         {glyph.cut?.map((d) => (
-          <path key={d} d={d} fill="none" stroke="black" strokeWidth={2.25} />
+          <path key={d} d={d} fill="none" stroke="black" strokeWidth={2} />
         ))}
         {glyph.cutFill?.map((d) => (
           <path key={d} d={d} fill="black" stroke="black" strokeWidth={0.5} />
