@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
@@ -23,7 +22,6 @@ import { BillingBanner, FooterActions } from "./billing/billing-ui";
 import { BillingHistoryCard } from "./billing/BillingHistoryCard";
 import { BillingOverviewCard } from "./billing/BillingOverviewCard";
 import { BillingSeatsCard } from "./billing/BillingSeatsCard";
-import { BillingStatCards } from "./billing/BillingStatCards";
 import { SeatHistoryChart } from "./billing/SeatHistoryChart";
 
 function LoadingCards() {
@@ -177,11 +175,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
     : !featureFlags.stripe
       ? "Billing is unavailable right now. Try again in a moment."
       : null;
-  const footerNote = !billing?.canManageBilling
-    ? "Only a Super Admin can change billing. Ask a Super Admin in your organization if something needs to change."
-    : overview?.action
-      ? "Payment methods, invoices, and billing details are managed securely in the Stripe billing portal."
-      : "Nothing about billing can be changed from here right now.";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
@@ -200,11 +193,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
         <LoadingCards />
       ) : (
         <>
-          {overview.banner && (
-            <BillingBanner tone={overview.banner.tone} icon={overview.banner.icon}>
-              {overview.banner.message}
-            </BillingBanner>
-          )}
           {!billing.stripeConfigured && (
             <BillingBanner tone="warning" icon="info">
               Online billing isn&apos;t set up here. Contact us to subscribe.
@@ -213,7 +201,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
 
           <BillingOverviewCard
             overview={overview}
-            footerNote={footerNote}
             actions={
               <FooterActions>
                 <Button
@@ -221,7 +208,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
                   className="dg-btn dg-btn-secondary"
                   onClick={() => billingQuery.refetch()}
                 >
-                  <RefreshCw size={15} aria-hidden="true" />
                   Refresh
                 </Button>
                 {billing.billingAccess.isLocked && (
@@ -230,7 +216,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
                     className="dg-btn dg-btn-secondary"
                     onClick={() => signOut()}
                   >
-                    <LogOut size={15} aria-hidden="true" />
                     Sign out
                   </Button>
                 )}
@@ -242,12 +227,8 @@ export default function BillingSettings({ organization }: { organization: { id: 
                       onClick={overview.action.kind === "portal" ? handlePortal : handleCheckout}
                       disabled={!billing.stripeConfigured || opening || actionBlocked !== null}
                     >
-                      <ButtonLoading
-                        loading={opening}
-                        spinnerSize={15}
-                        icon={<ExternalLink size={15} aria-hidden="true" />}
-                      >
-                        {overview.action.label}
+                      <ButtonLoading loading={opening} spinnerSize={15}>
+                        <span className="truncate">{overview.action.label}</span>
                       </ButtonLoading>
                     </Button>
                   </MaybeHint>
@@ -255,8 +236,6 @@ export default function BillingSettings({ organization }: { organization: { id: 
               </FooterActions>
             }
           />
-
-          <BillingStatCards stats={overview.stats} />
 
           {billing.seatBreakdown && (
             <BillingSeatsCard
