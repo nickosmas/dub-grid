@@ -58,9 +58,14 @@ export const HEADER_CONTROL_HEIGHT = 44;
 export const WEEK_STRIP_ROW_HEIGHT = 50;
 // Fixed size for the circular date highlight, shared by every week/month row.
 export const DATE_HIGHLIGHT_SIZE = 36;
+// The worked-day dot sits in its own space under the date circle, never on its
+// edge, so the circle and the dot read as two marks.
+const DATE_DOT_SIZE = 5;
+const DATE_DOT_GAP = 4;
+const DATE_SLOT_INSET =
+  (WEEK_STRIP_ROW_HEIGHT - DATE_HIGHLIGHT_SIZE - DATE_DOT_GAP - DATE_DOT_SIZE) / 2;
 // Matches monthCalendarWeek/monthCalendarWeeks gap in styles below.
 export const MONTH_GRID_ROW_GAP = 6;
-export const MONTH_EXPAND_SECTION_GAP = 14;
 
 /**
  * The stylesheet for the schedule screen's screen. Split out of the screen file
@@ -841,9 +846,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     iconControlMirrored: {
       transform: [{ scaleX: -1 }],
     },
-    calendarBlock: {
-      gap: MONTH_EXPAND_SECTION_GAP,
-    },
     weekStripFrame: {
       overflow: "hidden",
     },
@@ -857,19 +859,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dateScheduledDot: {
       position: "absolute",
-      bottom: 2,
-      width: 5,
-      height: 5,
-      borderRadius: 3,
+      top: DATE_SLOT_INSET + DATE_HIGHLIGHT_SIZE + DATE_DOT_GAP,
+      width: DATE_DOT_SIZE,
+      height: DATE_DOT_SIZE,
+      borderRadius: DATE_DOT_SIZE / 2,
       backgroundColor: mobileColors.textSubtle,
     },
     dateScheduledDotSelected: {
       backgroundColor: mobileColors.brand,
     },
+    // The dates' own slot already ends in the dot's space, so the handle
+    // follows the last row with only its own breathing room.
     calendarDragHandleRow: {
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: mobileSpace.xs,
+      paddingTop: mobileSpace.sm,
+      paddingBottom: mobileSpace.xs,
     },
     // Wider and lighter than a sheet's grabber, so it reads as the card's own
     // handle rather than a divider (owner, 2026-11-02).
@@ -889,6 +894,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     monthCalendarWeekdays: {
       flexDirection: "row",
       gap: mobileSpace.sm,
+      marginBottom: mobileSpace.xs,
     },
     monthCalendarWeekdayLabel: {
       ...mobileTextWeighted("meta", "semibold"),
@@ -916,7 +922,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minHeight: WEEK_STRIP_ROW_HEIGHT,
       alignItems: "center",
-      justifyContent: "center",
+      justifyContent: "flex-start",
+      paddingTop: DATE_SLOT_INSET,
     },
     dateHighlightCircle: {
       width: DATE_HIGHLIGHT_SIZE,
